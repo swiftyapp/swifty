@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "description": "Swifty application build with Electron",
   "repository": "",
-  "dependencies": {},
+  "dependencies": {
+    "nucleon": "file:../nucleon"
+  },
   "author": {
     "name": "Alex Chaplinsky",
     "email": ""
