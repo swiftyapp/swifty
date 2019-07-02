@@ -1,11 +1,3 @@
-import { Application } from 'nucleon'
-import Tray from './tray'
-import Window from './window'
-
-class Swifty extends Application {
-  components() {
-    return { Tray, Window }
-  }
-}
+import Swifty from './application'
 
 const app = new Swifty(SETTINGS)

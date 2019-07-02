@@ -7,9 +7,20 @@
 </head>
 <body>
   <div class="message">
-    <h1 id="title"></h1>
-    <div id="details"></div>
-    <small id="versions"></small>
+    <div id="setup">
+      <div id="title">Setup Master Password</div>
+      <input type="password" id="setup_password" />
+      <input type="button" onClick="setupPassword()" value="Send" />
+    </div>
+    <div id="prompt">
+      <div id="title">Enter Master Password</div>
+      <input type="password" id="enter_password" />
+      <input type="button" onClick="enterPassword()" value="Send" />
+      <div id="invalid"></div>
+    </div>
+    <div id="app">
+      <div id="title">Swifty App</div>
+    </div>
   </div>
 </body>
 </html>
