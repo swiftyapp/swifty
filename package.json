@@ -7,6 +7,8 @@
     "cryptr": "^4.0.2",
     "electron": "6.0.0-beta.11",
     "nucleon": "file:../nucleon",
+    "react": "^16.8.6",
+    "react-dom": "^16.8.6",
     "shortid": "^2.2.14"
   },
   "author": {
@@ -14,9 +16,17 @@
     "email": ""
   },
   "devDependencies": {
+    "@babel/core": "^7.4.5",
+    "@babel/preset-env": "^7.4.5",
+    "@babel/preset-react": "^7.0.0",
+    "babel-loader": "^8.0.6",
     "bozon": "0.9.4",
+    "css-loader": "^3.0.0",
     "mocha": "^6.1.4",
-    "spectron": "^5.0.0"
+    "node-sass": "^4.12.0",
+    "sass-loader": "^7.1.0",
+    "spectron": "^5.0.0",
+    "style-loader": "^0.23.1"
   },
   "build": {
     "appId": "com.electron.swifty",

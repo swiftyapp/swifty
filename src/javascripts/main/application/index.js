@@ -8,6 +8,14 @@ export default class Swifty extends Application {
     return { Window }
   }
 
+  windowOptions() {
+    return {
+      name: this.settings.name,
+      width: this.settings.width,
+      height: this .settings.height
+    }
+  }
+
   onReady() {
     this.storage = new Storage({
       name: this.app.getName(),
