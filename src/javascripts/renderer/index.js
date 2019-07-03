@@ -10,18 +10,18 @@ const renderApp = flow => {
   render(<Swifty flow={flow} />, root)
 }
 
-ipcRenderer.on('prompt-setup', (event, data) => {
+ipcRenderer.on('setup', (event, data) => {
   renderApp('setup')
 })
 
-ipcRenderer.on('prompt-password', (event, data) => {
+ipcRenderer.on('auth', (event, data) => {
   renderApp('auth')
 })
 
-ipcRenderer.on('invalid-password', (event, data) => {
+ipcRenderer.on('auth:fail', (event, data) => {
   renderApp('auth')
 })
 
-ipcRenderer.on('launch-app', (event, data) => {
+ipcRenderer.on('launch', (event, data) => {
   renderApp('main')
 })

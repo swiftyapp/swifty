@@ -4,7 +4,7 @@ import React from 'react'
 export default () => {
   const enterPassword = value => {
     let password = document.getElementById('enter_password').value
-    ipcRenderer.send('password-enter', password)
+    ipcRenderer.send('auth:done', password)
   }
 
   return (

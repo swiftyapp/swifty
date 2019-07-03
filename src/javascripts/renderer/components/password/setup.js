@@ -5,7 +5,7 @@ export default () => {
 
   const setupPassword = () => {
     let password = document.getElementById('setup_password').value
-    ipcRenderer.send('password-setup', password)
+    ipcRenderer.send('setup:done', password)
   }
 
   return (
