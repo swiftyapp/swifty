@@ -1,6 +1,6 @@
 import { Application } from 'nucleon'
 import Window from '../window'
-import Storage from '../storage'
+import Manager from '../manager'
 import { ipcMain } from 'electron'
 
 export default class Swifty extends Application {
@@ -17,32 +17,25 @@ export default class Swifty extends Application {
   }
 
   onReady() {
-    this.storage = new Storage({
-      name: this.app.getName(),
-      dataPath: this.app.getPath('appData')
-    })
+    this.manager = new Manager()
   }
 
   onWindowReady() {
-    if (this.storage.data.key === null) {
-      this.setupMasterPassword()
-    } else {
-      if (!this.masterPassword) {
-        this.requireMasterPassword()
-      }
+    if (!this.manager.isTokenPresent()) {
+      return this.setupMasterPassword()
     }
+    return this.requireMasterPassword()
   }
 
   setupMasterPassword() {
     this.promptSetup().then(password => {
-      this.storage.storeKey(password)
+      this.manager.setup(password)
       this.launchApp()
     })
   }
 
   requireMasterPassword() {
-    this.promptForMasterPassword().then(password => {
-      this.masterPassword = password
+    this.promptForMasterPassword().then(() => {
       this.launchApp()
     }).catch(error => {
       this.promptInvalidMasterPassword()
@@ -62,11 +55,11 @@ export default class Swifty extends Application {
   promptForMasterPassword() {
     return new Promise((resolve, reject) => {
       this.window.webContents.send('prompt-password')
-      ipcMain.on('password-enter', (event, data) => {
-        if (this.storage.isValidPassword(data))  {
-          return resolve(data)
+      ipcMain.on('password-enter', (event, password) => {
+        if (this.manager.authenticate(password))  {
+          return resolve(password)
         } else {
-          return reject(data)
+          return reject(password)
         }
       })
     })
