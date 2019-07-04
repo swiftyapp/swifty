@@ -1,6 +1,6 @@
 import React from 'react'
 import Setup from './password/setup'
-import Enter from './password/enter'
+import Auth from './password/auth'
 import Main from './main'
 
 export default ({ flow }) => {
@@ -9,7 +9,7 @@ export default ({ flow }) => {
       return <Setup />
       break
     case 'auth':
-      return <Enter />
+      return <Auth />
       break
     default:
       return <Main />

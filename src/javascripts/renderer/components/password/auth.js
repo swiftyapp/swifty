@@ -4,7 +4,7 @@ import React from 'react'
 export default () => {
   const handleKeyDown = event => {
     if (event.key === 'Enter') {
-      ipcRenderer.send('setup:done', event.currentTarget.value)
+      ipcRenderer.send('auth:done', event.currentTarget.value)
     }
   }
 
@@ -17,10 +17,10 @@ export default () => {
         <div className="masterpass-input">
           <input
             type="password"
-            placeholder="Setup Master Password"
-            onKeyDown={handleKeyDown}
-          />
+            placeholder="Master Password"
+            onKeyDown={handleKeyDown} />
         </div>
+        <div id="invalid"></div>
       </div>
     </div>
   )

@@ -11,9 +11,11 @@ export default class Swifty extends Application {
 
   windowOptions() {
     return {
+      titleBarStyle: 'hiddenInset',
       name: this.settings.name,
       width: this.settings.width,
-      height: this .settings.height
+      height: this.settings.height,
+      devTools: this.settings.devTools
     }
   }
 
