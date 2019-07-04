@@ -1,4 +1,5 @@
 .masterpass-input
+  position: relative
   input
     padding: 12px 20px
     border: 1px solid #a2b0bc
@@ -10,3 +11,13 @@
     transition: border .2s ease
     &:focus
       border: 1px solid #3081c6
+  .error-message
+    padding: 5px 0 0
+    position: absolute
+    width: 100%
+    text-align: center
+    font-size: 12px
+    color: #e74c3c
+  &.error
+    input
+      border: 1px solid #e74c3c

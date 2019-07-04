@@ -15,7 +15,7 @@ const promptAuth = (window, manager) => {
 
 export const showAuth = (window, manager) => {
   promptAuth(window, manager).then(() => {
-    window.webContents.send('launch')
+    window.webContents.send('auth:success')
   }).catch(error => {
     window.webContents.send('auth:fail')
     showAuth(window, manager)

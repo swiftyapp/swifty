@@ -12,6 +12,6 @@ const promptSetup = window => {
 export const showSetup = (window, manager) => {
   promptSetup(window).then(password => {
     manager.setup(password)
-    window.webContents.send('launch')
+    window.webContents.send('auth:success')
   })
 }
