@@ -29,12 +29,21 @@ export default class Manager {
 
   get(id) {
     const data = this.data.items.find(item => (item.id === id))
-    return this.cryptr.decrypt(JSON.parse(data))
+    return JSON.parse(this.cryptr.decrypt(data))
+  }
+
+  getItems() {
+    return this.data.items.map(item => {
+      let data = {}
+      data[item.key] = JSON.parse(this.cryptr.decrypt(item.value))
+      return data
+    })
   }
 
   set(data) {
-    const encryptedData = this.cryptr.encrypt(JSON.stringify(data))
-    this.data.items[shortid.generate()] = encryptedData
+    let item = {}
+    item[shortid.generate()] = this.cryptr.encrypt(JSON.stringify(data))
+    this.data.items.push(item)
     this.provider.write(this.data)
   }
 

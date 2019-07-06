@@ -1,3 +1,4 @@
+import { ipcMain } from 'electron'
 import { Application } from 'nucleon'
 import Window from '../window'
 import Manager from '../manager'
@@ -24,6 +25,10 @@ export default class Swifty extends Application {
   }
 
   onWindowReady() {
+    ipcMain.on('item:save', (event, data) => {
+      this.manager.set(data)
+      this.window.webContents.send('item:saved', this.manager.getItems())
+    })
     if (!this.manager.isTokenPresent()) {
       return showSetup(this.window, this.manager)
     }
