@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
+import { connect } from 'react-redux'
+
 import saveItem from 'actions/credentials'
 
-export default () => {
+const Form = ({ onSaveItem }) => {
   const [credentials, setCredentials] = useState({})
 
   const updateCredentials = event => {
@@ -12,7 +14,7 @@ export default () => {
 
   const saveCredentials = () => {
     if (credentials.title && credentials.username && credentials.password) {
-      saveItem(credentials)
+      onSaveItem(credentials)
     } else {
       console.log("Please fill in title, username and password")
     }
@@ -50,3 +52,9 @@ export default () => {
     </div>
   )
 }
+const mapDispatchToProps = dispatch => {
+  return {
+    onSaveItem: credentials => dispatch(saveItem(credentials))
+  }
+}
+export default connect(null, mapDispatchToProps)(Form)

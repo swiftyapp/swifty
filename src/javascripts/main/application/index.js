@@ -25,13 +25,22 @@ export default class Swifty extends Application {
   }
 
   onWindowReady() {
-    ipcMain.on('item:save', (event, data) => {
-      this.manager.set(data)
-      this.window.webContents.send('item:saved', this.manager.getItems())
-    })
+    this.subscribeForEvents()
     if (!this.manager.isTokenPresent()) {
       return showSetup(this.window, this.manager)
     }
     return showAuth(this.window, this.manager)
+  }
+
+  subscribeForEvents() {
+    ipcMain.removeAllListeners()
+    ipcMain.on('item:save', (event, data) => {
+      this.manager.set(data)
+      this.window.webContents.send('item:saved', this.manager.getItems())
+    })
+    ipcMain.on('item:remove', (event, id) => {
+      this.manager.remove(id)
+      this.window.webContents.send('item:removed', this.manager.getItems())
+    })
   }
 }

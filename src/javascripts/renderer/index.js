@@ -12,12 +12,11 @@ import Swifty from './components/swifty'
 const store = createStore(rootReducer, applyMiddleware(thunkMiddleware))
 
 window.onload = () => {
-  const root = document.getElementById('root')
   render(
     <Provider store={store}>
       <Swifty />
     </Provider>,
-    root
+    document.getElementById('root')
   )
 }
 
@@ -34,6 +33,7 @@ ipcRenderer.on('auth:fail', (event, data) => {
 })
 
 ipcRenderer.on('auth:success', (event, data) => {
+  store.dispatch({ type: 'SET_ENTRIES', entries: data })
   store.dispatch({ type: 'AUTH_SUCCESS' })
   store.dispatch({ type: 'FLOW_MAIN' })
 })

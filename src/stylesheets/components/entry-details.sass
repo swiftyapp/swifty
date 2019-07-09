@@ -1,0 +1,40 @@
+.entry-title
+  display: flex
+  flex-direction: row
+  .action
+    width: 18px
+    height: 18px
+    margin: 5px 0 0 10px
+    cursor: pointer
+    svg path
+      transition: fill .3s ease
+      fill: #aaa
+    &:hover svg path
+      fill: #777
+  h1
+    flex: 1
+.entry-details
+  background: #fff
+  border: 1px solid #ebedf2
+  border-radius: 5px
+
+.entry-details, .entry-extra
+  .item
+    display: flex
+    flex-direction: row
+    padding: 12px 10px
+    border-bottom: 1px solid #ebedf2
+    &:last-child
+      border: none
+    .label
+      width: 80px
+      font-size: 14px
+      text-align: right
+      color: #777
+      padding-right: 20px
+    .value
+      flex: 1
+
+.entry-extra .item
+  border-bottom: none
+  padding-bottom: 0

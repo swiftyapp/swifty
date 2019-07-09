@@ -35,7 +35,7 @@ export default class Manager {
   getItems() {
     return this.data.items.map(item => {
       let data = {}
-      data[item.key] = JSON.parse(this.cryptr.decrypt(item.value))
+      data[Object.keys(item)[0]] = JSON.parse(this.cryptr.decrypt(Object.values(item)[0]))
       return data
     })
   }
@@ -44,6 +44,13 @@ export default class Manager {
     let item = {}
     item[shortid.generate()] = this.cryptr.encrypt(JSON.stringify(data))
     this.data.items.push(item)
+    this.provider.write(this.data)
+  }
+
+  remove(id) {
+    this.data.items = this.data.items.filter(item => {
+      return Object.keys(item)[0] !== id
+    })
     this.provider.write(this.data)
   }
 
