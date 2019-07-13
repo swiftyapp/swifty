@@ -5,7 +5,9 @@ import { connect } from 'react-redux'
 
 const List = ({ entries }) => {
   const emptyList = () => (
-    <div className="empty">No Items</div>
+    <div className="list">
+      <div className="empty">No Items</div>
+    </div>
   )
 
   const entriesList = () => {

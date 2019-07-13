@@ -24,7 +24,7 @@ export default class FileStorage {
   }
 
   create() {
-    this.write({ token: null, items: [] })
+    this.write({ token: null, entries: [] })
   }
 
   buildPath() {

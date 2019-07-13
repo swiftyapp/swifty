@@ -12,6 +12,7 @@ const promptSetup = window => {
 export const showSetup = (window, manager) => {
   promptSetup(window).then(password => {
     manager.setup(password)
-    window.webContents.send('auth:success', manager.getItems())
+    window.resize({ width: 900, height: 700 }, true)
+    window.webContents.send('auth:success', manager.getEntries())
   })
 }

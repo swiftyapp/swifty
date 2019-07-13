@@ -3,8 +3,15 @@ import { connect } from 'react-redux'
 
 import saveItem from 'actions/credentials'
 
-const Form = ({ onSaveItem }) => {
-  const [credentials, setCredentials] = useState({})
+const Form = ({ entry, onSaveItem }) => {
+  const [credentials, setCredentials] = useState(entry || {
+    title: '',
+    website: '',
+    username: '',
+    password: '',
+    email: '',
+    note: ''
+  })
 
   const updateCredentials = event => {
     let obj = {}
@@ -24,27 +31,27 @@ const Form = ({ onSaveItem }) => {
     <div className="aside">
       <div className="field">
         <label htmlFor="">Title</label>
-        <input name="title" type="text" onChange={updateCredentials} />
+        <input name="title" type="text" onChange={updateCredentials} value={credentials.title} />
       </div>
       <div className="field">
         <label htmlFor="">Website</label>
-        <input name="website" type="text" onChange={updateCredentials} />
+        <input name="website" type="text" onChange={updateCredentials} value={credentials.website} />
       </div>
       <div className="field">
         <label htmlFor="">Username</label>
-        <input name="username" type="text" onChange={updateCredentials} />
+        <input name="username" type="text" onChange={updateCredentials} value={credentials.username} />
       </div>
       <div className="field">
         <label htmlFor="">Password</label>
-        <input name="password" type="text" onChange={updateCredentials} />
+        <input name="password" type="text" onChange={updateCredentials} value={credentials.password} />
       </div>
       <div className="field">
         <label htmlFor="">Email</label>
-        <input name="email" type="text" onChange={updateCredentials} />
+        <input name="email" type="text" onChange={updateCredentials} value={credentials.email} />
       </div>
       <div className="field">
         <label htmlFor="">Note</label>
-        <textarea name="note" cols="10" rows="5" onChange={updateCredentials} />
+        <textarea name="note" cols="10" rows="5" onChange={updateCredentials} value={credentials.note} />
       </div>
       <div className="action">
         <span className="button" onClick={saveCredentials}>Save</span>

@@ -3,11 +3,9 @@ import { useDispatch } from 'react-redux'
 
 export default ({ entry }) => {
   const dispatch = useDispatch()
-  const attributes = Object.values(entry)[0]
 
   const onClick = () => {
-    const id = Object.keys(entry)[0]
-    dispatch({ type: 'SET_CURRENT_ENTRY', id: id })
+    dispatch({ type: 'SET_CURRENT_ENTRY', id: entry.id })
   }
 
   return (
@@ -16,8 +14,8 @@ export default ({ entry }) => {
         <img src="images/gear.svg" />
       </div>
       <div className="description">
-        <div className="primary">{attributes.title}</div>
-        <div className="secondary">{attributes.username}</div>
+        <div className="primary">{entry.title}</div>
+        <div className="secondary">{entry.username}</div>
       </div>
     </div>
   )
