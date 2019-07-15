@@ -35,12 +35,12 @@ export default class Swifty extends Application {
   subscribeForEvents() {
     ipcMain.removeAllListeners()
     ipcMain.on('item:save', (event, data) => {
-      this.manager.save(data)
-      this.window.webContents.send('item:saved', this.manager.getEntries())
+      const entry = this.manager.save(data)
+      this.window.webContents.send('item:saved', { entry: entry, entries: this.manager.entries })
     })
     ipcMain.on('item:remove', (event, id) => {
       this.manager.delete(id)
-      this.window.webContents.send('item:removed', this.manager.getEntries())
+      this.window.webContents.send('item:removed', this.manager.entries)
     })
   }
 }

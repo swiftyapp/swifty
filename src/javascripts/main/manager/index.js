@@ -6,14 +6,15 @@ export default class Manager {
   constructor() {
     this.token = "3d56638738f6a4de1d724af6f88424dfc67976e6"
     this.provider = new FileStorage()
-    this.data = this.provider.read()
+    this.encryptedToken = this.provider.read().token
+    this.entries = []
     this.cryptr = null
   }
 
   authenticate(password) {
     this.cryptr = new Cryptr(password)
     if (this.isValidPassword()) {
-      this.decryptEntries()
+      this.readEntries()
       return true
     } else {
       this.cryptr = null
@@ -23,58 +24,53 @@ export default class Manager {
 
   setup(password) {
     this.cryptr = new Cryptr(password)
-    this.data = { token: this.cryptr.encrypt(this.token), entries: [] }
-    this.provider.write(this.data)
-  }
-
-  getEntries() {
-    return this.entries || []
+    this.encryptedToken = this.cryptr.encrypt(this.token)
+    this.entries = []
+    this.writeData()
   }
 
   save(data) {
-    if (data.id) {
-      this.update(data)
-    } else {
-      this.create(data)
-    }
+    return (data.id) ? this.update(data) : this.create(data)
   }
 
   create(data) {
-    const item = JSON.stringify(this.buildItem(data))
-    this.data.entries.push(this.cryptr.encrypt(item))
-    this.provider.write(this.data)
+    const item = this.buildItem(data)
+    this.entries.push(item)
+    this.writeData()
+    return item
   }
 
   update(data) {
-
+    const index = this.entries.findIndex(item => (item.id === data.id))
+    this.entries[index] = data
+    this.writeData()
+    return this.entries[index]
   }
 
   delete(id) {
-    const entries = this.entries.filter(item => (item.id !== id))
-    this.data.entries = this.data.entries.filter(item => (item.id !== id))
-    this.writeData(this.data)
+    this.entries = this.entries.filter(item => (item.id !== id))
+    this.writeData()
   }
 
   isTokenPresent() {
-    return this.data.token !== null
+    return this.encryptedToken !== null
   }
 
   isValidPassword() {
-    return this.cryptr.decrypt(this.data.token) === this.token
+    return this.cryptr.decrypt(this.encryptedToken) === this.token
   }
 
-  decryptEntries() {
-    this.entries = this.data.entries.map(item => {
+  readEntries() {
+    this.entries = this.provider.read().entries.map(item => {
       return JSON.parse(this.cryptr.decrypt(item))
     })
   }
 
   writeData() {
-    const entries = this.data.entries.map(item => {
-      return this.cryptr.encrypt(JSON.stringify(item))
-    })
-    const data = { ...this.data, entries: entries }
-    console.log(data)
+    const entries = this.entries.map(item => (
+      this.cryptr.encrypt(JSON.stringify(item))
+    ))
+    this.provider.write({ token: this.encryptedToken, entries: entries })
   }
 
   date() {

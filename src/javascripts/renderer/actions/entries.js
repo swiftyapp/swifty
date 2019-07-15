@@ -8,3 +8,13 @@ export const deleteEntry = id => {
     })
   }
 }
+
+export const saveEntry = credentials => {
+  return dispatch => {
+    ipcRenderer.send('item:save', credentials)
+    ipcRenderer.once('item:saved', (event, data) => {
+      dispatch({ type: 'SET_ENTRIES', ...data })
+      dispatch({ type: 'ENTRY_SAVED', ...data })
+    })
+  }
+}

@@ -13,6 +13,6 @@ export const showSetup = (window, manager) => {
   promptSetup(window).then(password => {
     manager.setup(password)
     window.resize({ width: 900, height: 700 }, true)
-    window.webContents.send('auth:success', manager.getEntries())
+    window.webContents.send('auth:success', manager.entries)
   })
 }

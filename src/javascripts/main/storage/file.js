@@ -6,7 +6,7 @@ export default class FileStorage {
   constructor() {
     this.filePath = this.buildPath()
   }
-
+  
   write(data) {
     try {
       fs.writeFileSync(this.filePath, JSON.stringify(data), { flag: 'w' })

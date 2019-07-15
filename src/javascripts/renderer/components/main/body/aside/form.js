@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { connect } from 'react-redux'
 
-import saveItem from 'actions/credentials'
+import { saveEntry } from 'actions/entries'
 
 const Form = ({ entry, onSaveItem }) => {
   const [credentials, setCredentials] = useState(entry || {
@@ -61,7 +61,7 @@ const Form = ({ entry, onSaveItem }) => {
 }
 const mapDispatchToProps = dispatch => {
   return {
-    onSaveItem: credentials => dispatch(saveItem(credentials))
+    onSaveItem: credentials => dispatch(saveEntry(credentials))
   }
 }
 export default connect(null, mapDispatchToProps)(Form)
