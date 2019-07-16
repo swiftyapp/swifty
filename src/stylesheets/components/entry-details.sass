@@ -2,14 +2,14 @@
   display: flex
   flex-direction: row
   .action
-    width: 18px
-    height: 18px
+    width: 16px
+    height: 16px
     margin: 5px 0 0 10px
     cursor: pointer
-    svg path
+    path
       transition: fill .3s ease
       fill: #aaa
-    &:hover svg path
+    &:hover path
       fill: #777
   h1
     flex: 1
@@ -24,8 +24,6 @@
     flex-direction: row
     padding: 12px 10px
     border-bottom: 1px solid #ebedf2
-    &:last-child
-      border: none
     .label
       width: 80px
       font-size: 14px
@@ -34,6 +32,17 @@
       padding-right: 20px
     .value
       flex: 1
+    svg
+      cursor: pointer
+      path
+        fill: #aaa
+      &:hover
+        path
+          fill: #777
+    &:last-child
+      border: none
+    &.secure .value
+      -webkit-text-security: disc
 
 .entry-extra .item
   border-bottom: none

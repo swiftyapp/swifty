@@ -1,6 +1,7 @@
 import React from 'react'
 import Pencil from 'pencil.svg'
 import Delete from 'delete.svg'
+import Item from './item'
 
 import { connect } from 'react-redux'
 import { deleteEntry } from 'actions/entries'
@@ -18,34 +19,17 @@ const Show = ({ entry, onClickDelete, onClickEdit }) => {
 
   return (
     <div className="aside shaded">
+      <div className="copied-notification hidden">Copied to Clipboard</div>
       <div className="entry-title">
         <h1>{entry.title}</h1>
-        <span onClick={onEdit} className="action">
-          <Pencil width="16" height="16" />
-        </span>
-        <span onClick={onDelete} className="action">
-          <Delete width="16" height="16" />
-        </span>
+        <Pencil width="16" height="16" onClick={onEdit} className="action" />
+        <Delete width="16" height="16" onClick={onDelete} className="action" />
       </div>
       <div className="entry-details">
-        <div className="item">
-          <div className="label">Website</div>
-          <div className="value">
-            <a href="{entry.website}">{entry.website}</a>
-          </div>
-        </div>
-        <div className="item">
-          <div className="label">Username</div>
-          <div className="value">{entry.username}</div>
-        </div>
-        <div className="item">
-          <div className="label">Password</div>
-          <div className="value">{entry.password}</div>
-        </div>
-        <div className="item">
-          <div className="label">Email</div>
-          <div className="value">{entry.email}</div>
-        </div>
+        <Item name="Website" entry={entry} link />
+        <Item name="Username" entry={entry} />
+        <Item name="Password" entry={entry} secure />
+        <Item name="Email" entry={entry} />
       </div>
       <div className="entry-extra">
         <div className="item">

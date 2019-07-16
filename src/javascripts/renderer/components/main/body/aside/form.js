@@ -6,6 +6,7 @@ import { saveEntry } from 'actions/entries'
 const Form = ({ entry, onSaveItem }) => {
   const [credentials, setCredentials] = useState(entry || {
     title: '',
+    type: 'login',
     website: '',
     username: '',
     password: '',
@@ -43,7 +44,7 @@ const Form = ({ entry, onSaveItem }) => {
       </div>
       <div className="field">
         <label htmlFor="">Password</label>
-        <input name="password" type="text" onChange={updateCredentials} value={credentials.password} />
+        <input name="password" className="secure" type="text" onChange={updateCredentials} value={credentials.password} />
       </div>
       <div className="field">
         <label htmlFor="">Email</label>
