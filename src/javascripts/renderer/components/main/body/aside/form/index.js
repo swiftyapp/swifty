@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
+import generator from 'generate-password'
 import { connect } from 'react-redux'
+
 import Field from './field'
 import SecureField from './secure'
 
@@ -30,12 +32,19 @@ const Form = ({ entry, onSaveItem }) => {
     }
   }
 
+  const generatePassword = () => {
+    const password = generator.generate({ length: 12, numbers: true })
+    setCredentials({ ...credentials, password })
+  }
+
   return (
     <div className="aside">
       <Field name="Title" entry={credentials} onChange={updateCredentials} />
       <Field name="Website" entry={credentials} onChange={updateCredentials} />
       <Field name="Username" entry={credentials} onChange={updateCredentials} />
-      <SecureField name="Password" entry={credentials} onChange={updateCredentials} />
+      <SecureField name="Password" entry={credentials} onChange={updateCredentials}>
+        <span className="action" onClick={generatePassword}>generate</span>
+      </SecureField>
       <Field name="Email" entry={credentials} onChange={updateCredentials} />
       <Field name="Note" entry={credentials} onChange={updateCredentials} multiline />
       <div className="action">

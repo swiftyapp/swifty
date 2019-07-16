@@ -8,7 +8,7 @@
     font-size: 14px
     text-align: right
     color: #777
-    padding-right: 20px
+    padding: 5px 20px 0 0
   input, textarea
     flex: 1
     display: block
@@ -22,6 +22,17 @@
     transition: border .3s ease
     &:focus
       border: 1px solid #4792ff
+  .value
+    flex: 1
+  .wrapper
+    margin-bottom: 3px
+  .action
+    font-size: 12px
+    color: #106cc8
+    float: right
+    cursor: pointer
+    &:hover
+      color: darken(#106cc8, 4%)
   &.secure-on, &.secure-off
     position: relative
     svg

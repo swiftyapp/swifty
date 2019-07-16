@@ -2,7 +2,7 @@ import React from 'react'
 import Pencil from 'pencil.svg'
 import Delete from 'delete.svg'
 import Item from './item'
-
+import { DateTime } from 'luxon'
 import { connect } from 'react-redux'
 import { deleteEntry } from 'actions/entries'
 
@@ -15,6 +15,10 @@ const Show = ({ entry, onClickDelete, onClickEdit }) => {
     if (confirm('Are you sure you want to delete this item?')) {
       onClickDelete(entry.id)
     }
+  }
+
+  const formatDate = str => {
+    return DateTime.fromISO(str).toLocaleString(DateTime.DATETIME_MED)
   }
 
   return (
@@ -34,11 +38,11 @@ const Show = ({ entry, onClickDelete, onClickEdit }) => {
       <div className="entry-extra">
         <div className="item">
           <div className="label">Last Modified</div>
-          <div className="value">{entry.updated_at}</div>
+          <div className="value">{formatDate(entry.updated_at)}</div>
         </div>
         <div className="item">
           <div className="label">Created</div>
-          <div className="value">{entry.created_at}</div>
+          <div className="value">{formatDate(entry.created_at)}</div>
         </div>
       </div>
     </div>
