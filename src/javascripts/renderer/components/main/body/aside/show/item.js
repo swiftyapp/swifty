@@ -17,7 +17,7 @@ export default ({ entry, name, link, secure }) => {
 
   const value = () => {
     if (link) {
-      return <a href={entry[name.toLowerCase()]}>{[name.toLowerCase()]}</a>
+      return <a href={entry[name.toLowerCase()]}>{entry[name.toLowerCase()]}</a>
     } else {
       return entry[name.toLowerCase()]
     }

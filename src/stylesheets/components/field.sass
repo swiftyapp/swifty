@@ -20,10 +20,26 @@
     box-sizing: border-box
     outline: none
     transition: border .3s ease
-    &.secure
-      -webkit-text-security: disc
     &:focus
       border: 1px solid #4792ff
+  &.secure-on, &.secure-off
+    position: relative
+    svg
+      position: absolute
+      right: 10px
+      top: 10px
+      path
+        fill: #777
+      &:hover path
+        fill: #333
+  &.secure-on
+    svg.hide
+      display: none
+    input
+      -webkit-text-security: disc
+  &.secure-off
+    svg.view
+      display: none
 
 .action .button
   float: right
