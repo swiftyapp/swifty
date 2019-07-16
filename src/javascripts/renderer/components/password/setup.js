@@ -11,7 +11,7 @@ export default () => {
   return (
     <div className="lock-screen">
       <div className="top-lock">
-        <img src="images/lock_icon.png" alt="" width="100" />
+        <img src="images/swifty.png" alt="" width="120" />
       </div>
       <div className="bottom-lock">
         <div className="masterpass-input">
