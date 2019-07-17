@@ -3,7 +3,7 @@ import React from 'react'
 import Item from './item'
 import { connect } from 'react-redux'
 
-const List = ({ entries }) => {
+const List = ({ entries, query }) => {
   const emptyList = () => (
     <div className="list">
       <div className="empty">No Items</div>
@@ -11,7 +11,15 @@ const List = ({ entries }) => {
   )
 
   const entriesList = () => {
-    return entries.map(entry => (
+    let items
+    if (query !== '') {
+      items = entries.filter(entry => {
+        return entry.title.toLowerCase().match(query.toLowerCase())
+      })
+    } else {
+      items = entries
+    }
+    return items.map(entry => (
       <Item entry={entry} key={shortid.generate()} />
     ))
   }
@@ -27,6 +35,7 @@ const List = ({ entries }) => {
 
 const mapStateToProps = state => {
   return {
+    query: state.filters.query,
     entries: state.entries.items
   }
 }

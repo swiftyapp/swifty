@@ -27,6 +27,8 @@ export default ({ entry, name, link, secure }) => {
     return secure ? 'item secure' : 'item'
   }
 
+  if (entry[name.toLowerCase()] === '') return null
+
   return (
     <div className={className()}>
       <div className="label">{name}</div>

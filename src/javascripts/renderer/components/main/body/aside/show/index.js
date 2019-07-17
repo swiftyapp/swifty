@@ -34,6 +34,7 @@ const Show = ({ entry, onClickDelete, onClickEdit }) => {
         <Item name="Username" entry={entry} />
         <Item name="Password" entry={entry} secure />
         <Item name="Email" entry={entry} />
+        <Item name="Note" entry={entry} />
       </div>
       <div className="entry-extra">
         <div className="item">
