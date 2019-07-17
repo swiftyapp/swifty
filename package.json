@@ -18,9 +18,12 @@
     "redux-thunk": "^2.3.0",
     "shortid": "^2.2.14"
   },
+  "scripts": {
+    "lint": "npx eslint --color src/javascripts"
+  },
   "author": {
     "name": "Alex Chaplinsky",
-    "email": ""
+    "email": "alchaplinsky@gmail.com"
   },
   "devDependencies": {
     "@babel/core": "^7.5.5",
@@ -29,6 +32,9 @@
     "babel-loader": "^8.0.6",
     "bozon": "0.9.4",
     "css-loader": "^3.0.0",
+    "eslint": "^6.0.1",
+    "eslint-plugin-jsx-a11y": "^6.2.3",
+    "eslint-plugin-react": "^7.14.2",
     "mocha": "^6.1.4",
     "node-sass": "^4.12.0",
     "react-svg-loader": "^3.0.3",

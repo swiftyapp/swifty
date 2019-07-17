@@ -1,4 +1,4 @@
-import css from 'application.sass'
+import 'application.sass'
 import { ipcRenderer } from 'electron'
 import React from 'react'
 import { render } from 'react-dom'
@@ -20,15 +20,15 @@ window.onload = () => {
   )
 }
 
-ipcRenderer.on('setup', (event, data) => {
+ipcRenderer.on('setup', () => {
   store.dispatch({ type: 'FLOW_SETUP' })
 })
 
-ipcRenderer.on('auth', (event, data) => {
+ipcRenderer.on('auth', () => {
   store.dispatch({ type: 'FLOW_AUTH' })
 })
 
-ipcRenderer.on('auth:fail', (event, data) => {
+ipcRenderer.on('auth:fail', () => {
   store.dispatch({ type: 'AUTH_FAIL' })
 })
 

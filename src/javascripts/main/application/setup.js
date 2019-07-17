@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 
 const promptSetup = window => {
-  return new Promise((resolve, reject) => {
+  return new Promise(resolve => {
     window.webContents.send('setup')
     ipcMain.on('setup:done', (event, data) => {
       return resolve(data)

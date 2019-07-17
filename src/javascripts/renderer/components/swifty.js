@@ -8,13 +8,10 @@ const Swifty = ({ flow }) => {
   switch (flow) {
     case 'setup':
       return <Setup />
-      break
     case 'auth':
       return <Auth />
-      break
     case 'main':
       return <Main />
-      break
     default:
       return <Auth />
   }
