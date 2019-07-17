@@ -8,27 +8,30 @@ import SecureField from './secure'
 import { saveEntry } from 'actions/entries'
 
 const Form = ({ entry, onSaveItem, onClickCancel }) => {
-  const [credentials, setCredentials] = useState(entry || {
-    title: '',
-    type: 'login',
-    website: '',
-    username: '',
-    password: '',
-    email: '',
-    note: ''
-  })
+  const [credentials, setCredentials] = useState(
+    entry || {
+      title: '',
+      type: 'login',
+      website: '',
+      username: '',
+      password: '',
+      email: '',
+      note: ''
+    }
+  )
 
   const updateCredentials = event => {
     let obj = {}
     obj[event.target.name] = event.target.value
-    setCredentials({ ...credentials, ...obj})
+    setCredentials({ ...credentials, ...obj })
   }
 
   const saveCredentials = () => {
     if (credentials.title && credentials.username && credentials.password) {
       onSaveItem(credentials)
     } else {
-      console.log("Please fill in title, username and password")
+      /* eslint-disable-next-line no-console */
+      console.log('Please fill in title, username and password')
     }
   }
 
@@ -46,15 +49,30 @@ const Form = ({ entry, onSaveItem, onClickCancel }) => {
       <Field name="Title" entry={credentials} onChange={updateCredentials} />
       <Field name="Website" entry={credentials} onChange={updateCredentials} />
       <Field name="Username" entry={credentials} onChange={updateCredentials} />
-      <SecureField name="Password" entry={credentials} onChange={updateCredentials}>
-        <span className="action" onClick={generatePassword}>generate</span>
+      <SecureField
+        name="Password"
+        entry={credentials}
+        onChange={updateCredentials}
+      >
+        <span className="action" onClick={generatePassword}>
+          generate
+        </span>
       </SecureField>
       <Field name="Email" entry={credentials} onChange={updateCredentials} />
-      <Field name="Note" entry={credentials} onChange={updateCredentials} multiline />
+      <Field
+        name="Note"
+        entry={credentials}
+        onChange={updateCredentials}
+        multiline
+      />
 
       <div className="actions">
-        <span className="cancel" onClick={reset}>Cancel</span>
-        <span className="button" onClick={saveCredentials}>Save</span>
+        <span className="cancel" onClick={reset}>
+          Cancel
+        </span>
+        <span className="button" onClick={saveCredentials}>
+          Save
+        </span>
       </div>
     </div>
   )
@@ -66,4 +84,7 @@ const mapDispatchToProps = dispatch => {
     onClickCancel: id => dispatch({ type: 'SET_CURRENT_ENTRY', id: id })
   }
 }
-export default connect(null, mapDispatchToProps)(Form)
+export default connect(
+  null,
+  mapDispatchToProps
+)(Form)

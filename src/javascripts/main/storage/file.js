@@ -6,11 +6,12 @@ export default class FileStorage {
   constructor() {
     this.filePath = this.buildPath()
   }
-  
+
   write(data) {
     try {
       fs.writeFileSync(this.filePath, JSON.stringify(data), { flag: 'w' })
-    } catch(error) {
+    } catch (error) {
+      /* eslint-disable-next-line no-console */
       console.log(error)
     }
   }
@@ -29,7 +30,9 @@ export default class FileStorage {
 
   buildPath() {
     return path.join(
-      app.getPath('appData'), app.getName(), 'storage_default.swftx'
+      app.getPath('appData'),
+      app.getName(),
+      'storage_default.swftx'
     )
   }
 }

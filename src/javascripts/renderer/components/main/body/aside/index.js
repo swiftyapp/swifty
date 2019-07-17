@@ -8,7 +8,7 @@ import { connect } from 'react-redux'
 const View = ({ isNew, isEditing, entry }) => {
   if (isNew) return <Form />
   if (!entry) return <Empty />
-  if (isEditing) return <Form entry={entry}/>
+  if (isEditing) return <Form entry={entry} />
   return <Show entry={entry} />
 }
 
@@ -20,4 +20,7 @@ const mapStateToProps = state => {
   }
 }
 
-export default connect(mapStateToProps, null)(View)
+export default connect(
+  mapStateToProps,
+  null
+)(View)

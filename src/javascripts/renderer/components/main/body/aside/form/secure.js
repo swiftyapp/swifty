@@ -23,12 +23,20 @@ export default ({ name, entry, onChange, children }) => {
             onChange={onChange}
             value={entry[name.toLowerCase()]}
           />
-          <View width="16" height="16" onClick={toggleSecure} className="view" />
-          <Hide width="16" height="16" onClick={toggleSecure} className="hide" />
+          <View
+            width="16"
+            height="16"
+            onClick={toggleSecure}
+            className="view"
+          />
+          <Hide
+            width="16"
+            height="16"
+            onClick={toggleSecure}
+            className="hide"
+          />
         </div>
-        <div>
-          {children}
-        </div>
+        <div>{children}</div>
       </div>
     </div>
   )

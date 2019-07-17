@@ -4,7 +4,7 @@ import FileStorage from '../storage/file'
 
 export default class Manager {
   constructor() {
-    this.token = "3d56638738f6a4de1d724af6f88424dfc67976e6"
+    this.token = '3d56638738f6a4de1d724af6f88424dfc67976e6'
     this.provider = new FileStorage()
     this.encryptedToken = this.provider.read().token
     this.entries = []
@@ -30,7 +30,7 @@ export default class Manager {
   }
 
   save(data) {
-    return (data.id) ? this.update(data) : this.create(data)
+    return data.id ? this.update(data) : this.create(data)
   }
 
   create(data) {
@@ -41,14 +41,14 @@ export default class Manager {
   }
 
   update(data) {
-    const index = this.entries.findIndex(item => (item.id === data.id))
+    const index = this.entries.findIndex(item => item.id === data.id)
     this.entries[index] = data
     this.writeData()
     return this.entries[index]
   }
 
   delete(id) {
-    this.entries = this.entries.filter(item => (item.id !== id))
+    this.entries = this.entries.filter(item => item.id !== id)
     this.writeData()
   }
 
@@ -67,9 +67,9 @@ export default class Manager {
   }
 
   writeData() {
-    const entries = this.entries.map(item => (
+    const entries = this.entries.map(item =>
       this.cryptr.encrypt(JSON.stringify(item))
-    ))
+    )
     this.provider.write({ token: this.encryptedToken, entries: entries })
   }
 

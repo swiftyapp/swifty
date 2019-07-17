@@ -1,10 +1,12 @@
-import React from "react"
+import React from 'react'
 import { connect } from 'react-redux'
 
 const Sidebar = ({ onAddEntry }) => {
   return (
     <div className="sidebar">
-      <div className="add-button" onClick={onAddEntry}>+</div>
+      <div className="add-button" onClick={onAddEntry}>
+        +
+      </div>
     </div>
   )
 }
@@ -17,4 +19,7 @@ const mapDispatchToProps = dispatch => {
   }
 }
 
-export default connect(null, mapDispatchToProps)(Sidebar)
+export default connect(
+  null,
+  mapDispatchToProps
+)(Sidebar)

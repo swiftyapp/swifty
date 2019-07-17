@@ -19,18 +19,12 @@ const List = ({ entries, query }) => {
     } else {
       items = entries
     }
-    return items.map(entry => (
-      <Item entry={entry} key={shortid.generate()} />
-    ))
+    return items.map(entry => <Item entry={entry} key={shortid.generate()} />)
   }
 
   if (entries.length == 0) return emptyList()
 
-  return (
-    <div className="list">
-      {entriesList()}
-    </div>
-  )
+  return <div className="list">{entriesList()}</div>
 }
 
 const mapStateToProps = state => {
@@ -39,4 +33,7 @@ const mapStateToProps = state => {
     entries: state.entries.items
   }
 }
-export default connect(mapStateToProps, null)(List)
+export default connect(
+  mapStateToProps,
+  null
+)(List)

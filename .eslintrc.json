@@ -18,9 +18,11 @@
     "sourceType": "module"
   },
   "plugins": [
-    "react"
+    "react",
+    "prettier"
   ],
   "rules": {
+    "prettier/prettier": ["error", {"singlQuote": true, "parser": "flow"}],
     "react/jsx-uses-react": 1,
     "react/jsx-uses-vars": 1,
     "no-console": "warn"

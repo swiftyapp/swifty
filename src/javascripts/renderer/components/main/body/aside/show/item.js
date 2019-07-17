@@ -4,7 +4,9 @@ import { clipboard } from 'electron'
 
 export default ({ entry, name, link, secure }) => {
   const copy = value => {
-    const notification = document.getElementsByClassName('copied-notification')[0]
+    const notification = document.getElementsByClassName(
+      'copied-notification'
+    )[0]
     clipboard.writeText(value)
     notification.classList.remove('hidden')
     setTimeout(() => {
@@ -33,7 +35,11 @@ export default ({ entry, name, link, secure }) => {
     <div className={className()}>
       <div className="label">{name}</div>
       <div className="value">{value()}</div>
-      <Copy width="16" height="16" onClick={() => copy(entry[name.toLowerCase()])} />
+      <Copy
+        width="16"
+        height="16"
+        onClick={() => copy(entry[name.toLowerCase()])}
+      />
     </div>
   )
 }

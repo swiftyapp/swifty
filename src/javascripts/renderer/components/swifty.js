@@ -21,4 +21,7 @@ const mapStateToProps = state => {
   return { flow: state.flow }
 }
 
-export default connect(mapStateToProps, null)(Swifty)
+export default connect(
+  mapStateToProps,
+  null
+)(Swifty)

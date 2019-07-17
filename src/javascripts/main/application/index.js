@@ -23,7 +23,16 @@ export default class Swifty extends Application {
 
   onReady() {
     this.manager = new Manager()
-    this.tray = new Tray(path.resolve(__dirname, '..', '..', 'images', 'tray', 'iconTemplate@2x.png'))
+    this.tray = new Tray(
+      path.resolve(
+        __dirname,
+        '..',
+        '..',
+        'images',
+        'tray',
+        'iconTemplate@2x.png'
+      )
+    )
     this.tray.setToolTip(SETTINGS.name)
     this.tray.on('click', () => {
       this.window.show()
@@ -42,7 +51,10 @@ export default class Swifty extends Application {
     ipcMain.removeAllListeners()
     ipcMain.on('item:save', (event, data) => {
       const entry = this.manager.save(data)
-      this.window.webContents.send('item:saved', { entry: entry, entries: this.manager.entries })
+      this.window.webContents.send('item:saved', {
+        entry: entry,
+        entries: this.manager.entries
+      })
     })
     ipcMain.on('item:remove', (event, id) => {
       this.manager.delete(id)

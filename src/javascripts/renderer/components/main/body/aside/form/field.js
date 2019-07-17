@@ -1,7 +1,6 @@
 import React from 'react'
 
 export default ({ name, entry, onChange, multiline }) => {
-
   const renderInput = () => {
     if (multiline) {
       return (

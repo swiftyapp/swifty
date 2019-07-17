@@ -51,9 +51,12 @@ const mapStateToProps = state => {
 const mapDispatchToProps = dispatch => {
   return {
     clearError: () => {
-      dispatch({type: 'AUTH_CLEAR'})
+      dispatch({ type: 'AUTH_CLEAR' })
     }
   }
 }
 
-export default connect(mapStateToProps, mapDispatchToProps)(Auth)
+export default connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(Auth)

@@ -7,9 +7,19 @@ export default (state = initialState(), action) => {
     case 'SET_ENTRIES':
       return { ...state, items: action.entries }
     case 'SET_CURRENT_ENTRY':
-      return { ...state, current: findEntry(state, action.id), new: false, edit: false }
+      return {
+        ...state,
+        current: findEntry(state, action.id),
+        new: false,
+        edit: false
+      }
     case 'ENTRY_SAVED':
-      return { ...state, edit: false, new: false, current: findEntry(state, action.entry.id) }
+      return {
+        ...state,
+        edit: false,
+        new: false,
+        current: findEntry(state, action.entry.id)
+      }
     case 'ENTRY_REMOVED':
       return { new: false, edit: false, current: null, items: action.entries }
     default:
