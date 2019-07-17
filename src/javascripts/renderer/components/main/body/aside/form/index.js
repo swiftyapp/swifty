@@ -7,7 +7,7 @@ import SecureField from './secure'
 
 import { saveEntry } from 'actions/entries'
 
-const Form = ({ entry, onSaveItem }) => {
+const Form = ({ entry, onSaveItem, onClickCancel }) => {
   const [credentials, setCredentials] = useState(entry || {
     title: '',
     type: 'login',
@@ -32,6 +32,10 @@ const Form = ({ entry, onSaveItem }) => {
     }
   }
 
+  const reset = () => {
+    onClickCancel(entry.id)
+  }
+
   const generatePassword = () => {
     const password = generator.generate({ length: 12, numbers: true })
     setCredentials({ ...credentials, password })
@@ -47,15 +51,19 @@ const Form = ({ entry, onSaveItem }) => {
       </SecureField>
       <Field name="Email" entry={credentials} onChange={updateCredentials} />
       <Field name="Note" entry={credentials} onChange={updateCredentials} multiline />
-      <div className="action">
+
+      <div className="actions">
+        <span className="cancel" onClick={reset}>Cancel</span>
         <span className="button" onClick={saveCredentials}>Save</span>
       </div>
     </div>
   )
 }
+
 const mapDispatchToProps = dispatch => {
   return {
-    onSaveItem: credentials => dispatch(saveEntry(credentials))
+    onSaveItem: credentials => dispatch(saveEntry(credentials)),
+    onClickCancel: id => dispatch({ type: 'SET_CURRENT_ENTRY', id: id })
   }
 }
 export default connect(null, mapDispatchToProps)(Form)

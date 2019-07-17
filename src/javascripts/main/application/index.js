@@ -1,4 +1,5 @@
-import { ipcMain } from 'electron'
+import path from 'path'
+import { ipcMain, Tray } from 'electron'
 import { Application } from 'nucleon'
 import Window from '../window'
 import Manager from '../manager'
@@ -22,6 +23,11 @@ export default class Swifty extends Application {
 
   onReady() {
     this.manager = new Manager()
+    this.tray = new Tray(path.resolve(__dirname, '..', '..', 'images', 'tray', 'iconTemplate@2x.png'))
+    this.tray.setToolTip(SETTINGS.name)
+    this.tray.on('click', () => {
+      this.window.show()
+    })
   }
 
   onWindowReady() {
