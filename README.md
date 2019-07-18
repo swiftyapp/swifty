@@ -1,5 +1,5 @@
 # Swifty
-![](https://alchaplinsky.com/images/misc/swifty_banner_alpha.png)
+![](https://alchaplinsky.com/images/misc/swifty_banner_alpha.png?v=1)
 
 
 [![CircleCI](https://circleci.com/gh/alchaplinsky/swifty/tree/master.svg?style=svg&circle-token=3179a51a22aa66c4c17395eef2952eab42a14057)](https://circleci.com/gh/alchaplinsky/swifty/tree/master)
