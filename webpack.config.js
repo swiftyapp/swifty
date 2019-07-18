@@ -40,17 +40,49 @@ module.exports = {
               loader: "react-svg-loader"
             }
           ]
-        }
+        },
+        {
+          test: /\.(png|jpe?g|gif)$/,
+          use: [
+            {
+              loader: 'file-loader',
+              options: {},
+            },
+          ],
+        },
       ],
     },
     resolve: {
       modules: [
         path.resolve(__dirname, 'node_modules'),
-        path.resolve(__dirname, './src/javascripts/renderer'),
-        path.resolve(__dirname, './src/stylesheets'),
-        path.resolve(__dirname, './src/images')
+        path.resolve(__dirname, './src/renderer/javascripts'),
+        path.resolve(__dirname, './src/renderer/stylesheets'),
+        path.resolve(__dirname, './src/renderer/images')
       ]
     }
   },
-  main: {}
+  main: {
+    target: "electron-main",
+    module: {
+      rules: [
+        {
+          test: /\.(png|jpe?g|gif)$/,
+          use: [
+            {
+              loader: 'file-loader',
+              options: {
+                name: '[name].[ext]'
+              },
+            },
+          ],
+        }
+      ]
+    },
+    resolve: {
+      modules: [
+        path.resolve(__dirname, 'resources'),
+        path.resolve(__dirname, 'node_modules'),
+      ]
+    }
+  }
 }

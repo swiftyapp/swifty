@@ -5,6 +5,7 @@ import Window from '../window'
 import Manager from '../manager'
 import { showSetup } from './setup'
 import { showAuth } from './auth'
+import trayIcon from 'iconTemplate@2x.png'
 
 export default class Swifty extends Application {
   components() {
@@ -23,16 +24,7 @@ export default class Swifty extends Application {
 
   onReady() {
     this.manager = new Manager()
-    this.tray = new Tray(
-      path.resolve(
-        __dirname,
-        '..',
-        '..',
-        'images',
-        'tray',
-        'iconTemplate@2x.png'
-      )
-    )
+    this.tray = new Tray(path.resolve(__dirname, trayIcon))
     this.tray.setToolTip(SETTINGS.name)
     this.tray.on('click', () => {
       this.window.show()

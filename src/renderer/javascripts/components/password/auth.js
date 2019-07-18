@@ -2,6 +2,7 @@ import { ipcRenderer } from 'electron'
 import classnames from 'classnames'
 import React from 'react'
 import { connect } from 'react-redux'
+import img from 'swifty.png'
 
 const Auth = ({ auth, clearError }) => {
   const handleKeyDown = event => {
@@ -26,7 +27,7 @@ const Auth = ({ auth, clearError }) => {
   return (
     <div className="lock-screen">
       <div className="top-lock">
-        <img src="images/swifty.png" alt="" width="120" />
+        <img src={img} alt="" width="120" />
       </div>
       <div className="bottom-lock">
         <div className={cssClasses()}>

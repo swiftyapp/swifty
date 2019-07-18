@@ -1,5 +1,6 @@
 import React from 'react'
 import { useDispatch } from 'react-redux'
+import Gear from 'gear.svg'
 
 export default ({ entry }) => {
   const dispatch = useDispatch()
@@ -11,7 +12,7 @@ export default ({ entry }) => {
   return (
     <div className="entry" onClick={onClick}>
       <div className="icon">
-        <img src="images/gear.svg" />
+        <Gear width="32" height="32" />
       </div>
       <div className="description">
         <div className="primary">{entry.title}</div>
