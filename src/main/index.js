@@ -1,3 +1,3 @@
 import Swifty from './application'
 
-new Swifty(SETTINGS)
+new Swifty(CONFIG)

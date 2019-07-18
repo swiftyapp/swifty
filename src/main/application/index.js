@@ -25,7 +25,7 @@ export default class Swifty extends Application {
   onReady() {
     this.manager = new Manager()
     this.tray = new Tray(path.resolve(__dirname, trayIcon))
-    this.tray.setToolTip(SETTINGS.name)
+    this.tray.setToolTip(CONFIG.name)
     this.tray.on('click', () => {
       this.window.show()
     })
