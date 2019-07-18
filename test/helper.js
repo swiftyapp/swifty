@@ -6,7 +6,7 @@ module.exports = {
       case 'darwin':
         return path.join(__dirname, '..', '.tmp', 'mac', 'Swifty.app', 'Contents', 'MacOS', 'Swifty');
       case 'linux':
-        return path.join(__dirname, '..', '.tmp', 'linux', 'Swifty');
+        return path.join(__dirname, '..', '.tmp', 'linux-unpacked', 'swifty');
       default:
         throw 'Unsupported platform';
     }
