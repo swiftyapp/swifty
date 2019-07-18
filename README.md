@@ -1,7 +1,8 @@
 # Swifty
 
-> My Swifty app built with Electron
+[![CircleCI](https://circleci.com/gh/alchaplinsky/swifty/tree/master.svg?style=svg&circle-token=3179a51a22aa66c4c17395eef2952eab42a14057)](https://circleci.com/gh/alchaplinsky/swifty/tree/master)
 
+Swifty is a lightweight, fast and free Password Manager for MacOS.
 
 ## Dev
 
