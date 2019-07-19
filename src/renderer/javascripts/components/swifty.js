@@ -1,13 +1,13 @@
 import React from 'react'
-import Setup from './password/setup'
-import Auth from './password/auth'
+import Start from './start'
+import Auth from './auth'
 import Main from './main'
 import { connect } from 'react-redux'
 
 const Swifty = ({ flow }) => {
   switch (flow) {
     case 'setup':
-      return <Setup />
+      return <Start />
     case 'auth':
       return <Auth />
     case 'main':

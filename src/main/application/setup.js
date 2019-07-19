@@ -1,8 +1,13 @@
-import { ipcMain } from 'electron'
+import { ipcMain, dialog } from 'electron'
 
 const promptSetup = window => {
   return new Promise(resolve => {
     window.webContents.send('setup')
+    ipcMain.on('choose:file', () => {
+      dialog.showOpenDialog({ properties: ['openFile'] }, paths => {
+        console.log(paths[0])
+      })
+    })
     ipcMain.on('setup:done', (event, data) => {
       return resolve(data)
     })
