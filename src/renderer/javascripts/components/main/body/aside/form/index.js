@@ -36,7 +36,7 @@ const Form = ({ entry, onSaveItem, onClickCancel }) => {
   }
 
   const reset = () => {
-    onClickCancel(entry.id)
+    onClickCancel(entry)
   }
 
   const generatePassword = () => {
@@ -81,7 +81,13 @@ const Form = ({ entry, onSaveItem, onClickCancel }) => {
 const mapDispatchToProps = dispatch => {
   return {
     onSaveItem: credentials => dispatch(saveEntry(credentials)),
-    onClickCancel: id => dispatch({ type: 'SET_CURRENT_ENTRY', id: id })
+    onClickCancel: entry => {
+      if (entry) {
+        dispatch({ type: 'SET_CURRENT_ENTRY', id: entry.id })
+      } else {
+        dispatch({ type: 'SET_NO_ENTRY' })
+      }
+    }
   }
 }
 export default connect(

@@ -2,6 +2,8 @@ export default (state = initialState(), action) => {
   switch (action.type) {
     case 'NEW_ENTRY':
       return { ...state, new: true, edit: false }
+    case 'SET_NO_ENTRY':
+      return { ...state, new: false, edit: false, current: null }
     case 'EDIT_ENTRY':
       return { ...state, edit: true, new: false }
     case 'SET_ENTRIES':
