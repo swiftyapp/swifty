@@ -3,7 +3,6 @@ import classnames from 'classnames'
 import Error from './error'
 
 export default ({ placeholder, error, onEnter, onChange }) => {
-
   const cssClasses = () => {
     return classnames('masterpass-input', { error: error })
   }

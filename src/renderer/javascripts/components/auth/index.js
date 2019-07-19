@@ -1,5 +1,4 @@
 import { ipcRenderer } from 'electron'
-import classnames from 'classnames'
 import React, { useState } from 'react'
 import Masterpass from '../elements/masterpass'
 import img from 'swifty.png'
@@ -14,7 +13,7 @@ export default () => {
     })
   }
 
-  const handleChange = event => {
+  const handleChange = () => {
     setError(null)
   }
 
