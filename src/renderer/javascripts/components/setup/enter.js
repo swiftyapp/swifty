@@ -1,13 +1,13 @@
 import React, { useState } from 'react'
-import Error from './error'
+import Masterpass from 'components/elements/masterpass'
 
 export default ({ display, onEnter }) => {
   const [password, setPassword] = useState(null)
   const [error, setError] = useState(null)
 
-  const onChange = value => {
+  const onChange = event => {
     setError(null)
-    setPassword(value)
+    setPassword(event.currentTarget.value)
   }
 
   const onClick = () => {
@@ -22,14 +22,11 @@ export default ({ display, onEnter }) => {
 
   return (
     <div className="bottom-lock">
-      <div className="masterpass-input">
-        <Error error={error} />
-        <input
-          type="password"
-          placeholder="Set Master Password"
-          onChange={event => onChange(event.currentTarget.value)}
-        />
-      </div>
+      <Masterpass
+        placeholder="Set Master Password"
+        error={error}
+        onChange={onChange}
+      />
       <br />
       <div className="button" onClick={onClick}>
         Continue

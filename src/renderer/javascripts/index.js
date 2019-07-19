@@ -28,12 +28,7 @@ ipcRenderer.on('auth', () => {
   store.dispatch({ type: 'FLOW_AUTH' })
 })
 
-ipcRenderer.on('auth:fail', () => {
-  store.dispatch({ type: 'AUTH_FAIL' })
-})
-
 ipcRenderer.on('auth:success', (event, data) => {
   store.dispatch({ type: 'SET_ENTRIES', entries: data })
-  store.dispatch({ type: 'AUTH_SUCCESS' })
   store.dispatch({ type: 'FLOW_MAIN' })
 })

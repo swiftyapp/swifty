@@ -1,22 +1,21 @@
 import React, { useState } from 'react'
-import { ipcRenderer } from 'electron'
 import Masterpass from 'components/elements/masterpass'
+import { ipcRenderer } from 'electron'
 
-export default ({ display, password }) => {
-  const [confirmation, setConfirmation] = useState(null)
-  const [error, setError] = useState(null)
+export default ({ display }) => {
+  const [password, setPassword] = useState()
+  const [error, setError] = useState()
 
   const onChange = event => {
     setError(null)
-    setConfirmation(event.currentTarget.value)
+    setPassword(event.currentTarget.value)
   }
 
   const onClick = () => {
-    if (confirmation === password) {
-      ipcRenderer.send('setup:done', password)
-    } else {
-      setError('Passwords do not match')
-    }
+    ipcRenderer.send('backup:password', password)
+    ipcRenderer.on('backup:password:fail', () => {
+      setError('Invalid password for backup')
+    })
   }
 
   if (!display) return null
@@ -24,7 +23,7 @@ export default ({ display, password }) => {
   return (
     <div className="bottom-lock">
       <Masterpass
-        placeholder="Confirm Master Password"
+        placeholder="Enter Master Password"
         error={error}
         onChange={onChange}
       />

@@ -13,7 +13,7 @@ const Swifty = ({ flow }) => {
     case 'main':
       return <Main />
     default:
-      return <Auth />
+      return null
   }
 }
 

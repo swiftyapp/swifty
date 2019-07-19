@@ -1,17 +1,26 @@
-import React from 'react'
-import { ipcRenderer } from 'electron'
+import React, { useState } from 'react'
+import Backup from 'backup.svg'
+import Import from './import'
+import Confirm from './confirm'
 
 export default () => {
-  const chooseFle = () => {
-    ipcRenderer.send('choose:file')
+  const [step, setStep] = useState(null)
+  const onImport = () => {
+    setStep('confirmation')
   }
 
   return (
     <div className="lock-screen">
-      <h2>Restore from Backup</h2>
-      <div className="button" onClick={chooseFle}>
-        Choose backup File
+      <div className="top-lock">
+        <Backup width="48" />
+        <h2>Restore Backup</h2>
+        <div className="instructions">
+          If you've been using Swifty before you can restore your data from
+          backup file. Your Master Password will be required for this.
+        </div>
       </div>
+      <Import display={step !== 'confirmation'} onImport={onImport} />
+      <Confirm display={step === 'confirmation'} />
     </div>
   )
 }

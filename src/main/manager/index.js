@@ -1,3 +1,4 @@
+import fs from 'fs'
 import shortid from 'shortid'
 import Cryptr from 'cryptr'
 import FileStorage from '../storage/file'
@@ -71,6 +72,21 @@ export default class Manager {
       this.cryptr.encrypt(JSON.stringify(item))
     )
     this.provider.write({ token: this.encryptedToken, entries: entries })
+  }
+
+  loadBackup(path) {
+    this.backup = JSON.parse(fs.readFileSync(path))
+  }
+
+  validateBackup(password) {
+    this.cryptr = new Cryptr(password)
+    return this.cryptr.decrypt(this.backup.token) === this.token
+  }
+
+  storeBackup() {
+    this.provider.write(this.backup)
+    this.encryptedToken = this.backup.token
+    this.readEntries()
   }
 
   date() {

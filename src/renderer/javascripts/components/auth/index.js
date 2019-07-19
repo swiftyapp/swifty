@@ -1,27 +1,21 @@
 import { ipcRenderer } from 'electron'
 import classnames from 'classnames'
-import React from 'react'
-import { connect } from 'react-redux'
+import React, { useState } from 'react'
+import Masterpass from '../elements/masterpass'
 import img from 'swifty.png'
 
-const Auth = ({ auth, clearError }) => {
-  const handleKeyDown = event => {
-    if (event.key === 'Enter') {
-      ipcRenderer.send('auth:done', event.currentTarget.value)
-    }
+export default () => {
+  const [error, setError] = useState(null)
+
+  const handleEnter = value => {
+    ipcRenderer.send('auth:done', value)
+    ipcRenderer.once('auth:fail', () => {
+      setError('Incorrect Master Password')
+    })
   }
 
   const handleChange = event => {
-    if (event.currentTarget.value === '') clearError()
-  }
-
-  const errorMessage = () => {
-    if (!auth.failure) return null
-    return <div>Incorrect Master Password</div>
-  }
-
-  const cssClasses = () => {
-    return classnames('masterpass-input', { error: auth.failure })
+    setError(null)
   }
 
   return (
@@ -30,34 +24,12 @@ const Auth = ({ auth, clearError }) => {
         <img src={img} alt="" width="120" />
       </div>
       <div className="bottom-lock">
-        <div className={cssClasses()}>
-          <input
-            type="password"
-            placeholder="Master Password"
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-          />
-          <div className="error-message">{errorMessage()}</div>
-        </div>
+        <Masterpass
+          error={error}
+          onChange={handleChange}
+          onEnter={handleEnter}
+        />
       </div>
     </div>
   )
 }
-
-const mapStateToProps = state => {
-  return {
-    auth: state.auth
-  }
-}
-const mapDispatchToProps = dispatch => {
-  return {
-    clearError: () => {
-      dispatch({ type: 'AUTH_CLEAR' })
-    }
-  }
-}
-
-export default connect(
-  mapStateToProps,
-  mapDispatchToProps
-)(Auth)
