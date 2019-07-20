@@ -18,13 +18,13 @@ Swifty is a lightweight, fast and free Password Manager for MacOS.
   - Generate password so that you don't need to come up with a strong character sequence
 * There's a lot more to come...
 
-### Screenshots
+## Screenshots
 
 ![img](https://alchaplinsky.com/images/misc/swifty_screen_01.png)
 
 ![img](https://alchaplinsky.com/images/misc/swifty_screen_02.png)
 
-### Install
+## Install
 
 Check [Latest Releases](https://github.com/alchaplinsky/swifty/releases) page for recent version of packaged app.
 
