@@ -6,26 +6,35 @@
 
 Swifty is a lightweight, fast and free Password Manager for MacOS.
 
-## Dev
+## Features
+
+* Create and manage encrypted credentials records
+  - No data is leaving your computer. Everything is stored on your local file system
+  - Decryption happens once on entering Master Password
+  - Ability to migrate from one computer to another using backup file
+* Single Master Password to encrypt all data added to Swifty
+  - All data is stored encrypted with your single Master Password
+* Random Password Generator
+  - Generate password so that you don't need to come up with a strong character sequence
+* There's a lot more to come...
+
+### Screenshots
+
+![img](https://alchaplinsky.com/images/misc/swifty_screen_01.png)
+
+![img](https://alchaplinsky.com/images/misc/swifty_screen_02.png)
+
+### Install
+
+Check [Latest Releases](https://github.com/alchaplinsky/swifty/releases) page for recent version of packaged app.
+
+Alternatively you can build app yourself:
 
 ```
-$ npm install
+git clone git@github.com:alchaplinsky/swifty.git
+yarn install
+bozon package mac
 ```
-
-### Run
-
-```
-$ bozon start
-```
-
-### Package
-
-```
-$ bozon package
-```
-
-Builds the app for OS X, Linux, and Windows, using [electron-builder](https://github.com/electron-userland/electron-builder).
-
 
 ## License
 
