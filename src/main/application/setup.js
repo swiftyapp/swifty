@@ -4,8 +4,9 @@ const promptSetup = (window, manager) => {
   return new Promise(resolve => {
     window.webContents.send('setup')
     ipcMain.on('backup:file', () => {
-      dialog.showOpenDialog({ properties: ['openFile'] }, paths => {
-        manager.loadBackup(paths[0])
+      const result = dialog.showOpenDialog({ properties: ['openFile'] })
+      result.then(({ filePaths }) => {
+        manager.loadBackup(filePaths[0])
         window.webContents.send('backup:loaded')
       })
     })

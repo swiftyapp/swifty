@@ -11,7 +11,7 @@ export default ({ display, onImport }) => {
 
   return (
     <div className="bottom-lock">
-      <div className="button" onClick={chooseFle}>
+      <div className="button choose-file" onClick={chooseFle}>
         Choose backup File
       </div>
     </div>

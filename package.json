@@ -4,7 +4,6 @@
   "description": "Swifty application build with Electron",
   "repository": "",
   "dependencies": {
-    "add": "^2.0.6",
     "classnames": "^2.2.6",
     "cryptr": "^4.0.2",
     "electron": "6.0.0-beta.11",
@@ -32,6 +31,8 @@
     "@babel/preset-react": "^7.0.0",
     "babel-loader": "^8.0.6",
     "bozon": "^0.10.0",
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
     "css-loader": "^3.0.0",
     "eslint": "^6.0.1",
     "eslint-plugin-jsx-a11y": "^6.2.3",

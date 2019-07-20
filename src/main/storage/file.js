@@ -29,6 +29,9 @@ export default class FileStorage {
   }
 
   buildPath() {
+    if (process.env.SPECTRON_STORAGE_PATH) {
+      return process.env.SPECTRON_STORAGE_PATH
+    }
     return path.join(
       app.getPath('appData'),
       app.getName(),
