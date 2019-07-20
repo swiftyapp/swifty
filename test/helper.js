@@ -1,10 +1,6 @@
 require('./support/globals')
 const fs = require('fs')
 
-const assetPath = (file) => {
-  return path.join(process.cwd(), 'test', 'assets', file)
-}
-
 const appPath = () => {
   switch (process.platform) {
     case 'darwin':
@@ -22,14 +18,6 @@ const fixturePath = (file) => {
 
 const storageFile = () => {
   return path.join(process.cwd(), 'test', 'storage', 'default.swftx')
-}
-
-const restoreStorage = () => {
-  fs.writeFileSync(helper.assetPath('empty.swftx'), '{"token":null,"entries":[]}', { flag: 'w' })
-  fs.writeFileSync(
-    helper.assetPath('storage.swftx'), '{"token":"2b9c597f97318e3598d7241f58a3fa54fcf610a17c11b1dfc7aecb8966c3eaeafb7e132e4dba56fdfaa7dd074857414ab918c4e52834c0c6","entries":[]}',
-    { flag: 'w' }
-  )
 }
 
 const prepareStorage = storage => {
@@ -56,4 +44,4 @@ const afterHelper = () => {
   }
 }
 
-module.exports = { assetPath, appPath, restoreStorage, beforeHelper, afterHelper }
+module.exports = { beforeHelper, afterHelper }
