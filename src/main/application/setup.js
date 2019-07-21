@@ -12,7 +12,6 @@ const promptSetup = (window, manager) => {
     })
     ipcMain.on('backup:password', (event, password) => {
       if (manager.validateBackup(password)) {
-        manager.storeBackup()
         window.resize({ width: 900, height: 700 }, true)
         window.webContents.send('auth:success', manager.entries)
       } else {

@@ -22,8 +22,11 @@ const storageFile = () => {
 
 const prepareStorage = storage => {
   try {
-    const data = JSON.parse(fs.readFileSync(fixturePath(`${storage}.txt`)))
-    fs.writeFileSync(storageFile(), JSON.stringify(data), { flag: 'w' })
+    let data = ''
+    if (storage !== 'pristine') {
+      data = fs.readFileSync(fixturePath(`${storage}.txt`)).toString('utf-8')
+    }
+    fs.writeFileSync(storageFile(), data, { flag: 'w' })
   } catch (error) {
     console.log(error)
   }

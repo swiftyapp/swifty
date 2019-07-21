@@ -9,7 +9,7 @@ export default class FileStorage {
 
   write(data) {
     try {
-      fs.writeFileSync(this.filePath, JSON.stringify(data), { flag: 'w' })
+      fs.writeFileSync(this.filePath, data, { flag: 'w' })
     } catch (error) {
       /* eslint-disable-next-line no-console */
       console.log(error)
@@ -20,12 +20,15 @@ export default class FileStorage {
     if (!fs.existsSync(this.filePath)) {
       this.create()
     }
-    const data = JSON.parse(fs.readFileSync(this.filePath))
-    return data
+    return this.readFile(this.filePath)
   }
 
   create() {
-    this.write({ token: null, entries: [] })
+    this.write('')
+  }
+
+  readFile(filePath) {
+    return fs.readFileSync(filePath).toString('utf8')
   }
 
   buildPath() {

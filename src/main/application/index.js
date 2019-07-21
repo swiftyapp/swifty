@@ -33,7 +33,7 @@ export default class Swifty extends Application {
 
   onWindowReady() {
     this.subscribeForEvents()
-    if (!this.manager.isTokenPresent()) {
+    if (this.manager.isPristineStorage()) {
       return showSetup(this.window, this.manager)
     }
     return showAuth(this.window, this.manager)

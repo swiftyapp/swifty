@@ -1,4 +1,3 @@
-import fs from 'fs'
 import shortid from 'shortid'
 import Cryptr from 'cryptr'
 import FileStorage from '../storage/file'
@@ -6,20 +5,12 @@ import FileStorage from '../storage/file'
 export default class Manager {
   constructor() {
     this.provider = new FileStorage()
-    this.encryptedToken = this.provider.read().token
-    this.entries = []
     this.cryptr = null
+    this.readData()
   }
 
   authenticate(password) {
-    this.cryptr = new Cryptr(password)
-    if (this.isValidPassword(password)) {
-      this.readEntries()
-      return true
-    } else {
-      this.cryptr = null
-      return false
-    }
+    return this.tryDecryptData(this.data, password)
   }
 
   setup(password) {
@@ -52,40 +43,49 @@ export default class Manager {
     this.writeData()
   }
 
-  isTokenPresent() {
-    return this.encryptedToken !== null
+  isPristineStorage() {
+    return this.data === ''
   }
 
-  isValidPassword(password) {
-    return this.cryptr.decrypt(this.encryptedToken) === password
+  tryDecryptData(data, password) {
+    this.cryptr = new Cryptr(password)
+    try {
+      const json = JSON.parse(this.cryptr.decrypt(data))
+      if (this.cryptr.decrypt(json.token) !== password) return false
+      this.encryptedToken = json.token
+      this.entries = json.entries.map(item => {
+        return JSON.parse(this.cryptr.decrypt(item))
+      })
+      return true
+    } catch (e) {
+      this.cryptr = null
+      return false
+    }
   }
 
-  readEntries() {
-    this.entries = this.provider.read().entries.map(item => {
-      return JSON.parse(this.cryptr.decrypt(item))
-    })
+  readData() {
+    this.data = this.provider.read()
   }
 
   writeData() {
     const entries = this.entries.map(item =>
       this.cryptr.encrypt(JSON.stringify(item))
     )
-    this.provider.write({ token: this.encryptedToken, entries: entries })
+    const data = { token: this.encryptedToken, entries: entries }
+    this.provider.write(this.cryptr.encrypt(JSON.stringify(data)))
   }
 
   loadBackup(path) {
-    this.backup = JSON.parse(fs.readFileSync(path))
+    this.backup = this.provider.readFile(path)
   }
 
   validateBackup(password) {
-    this.cryptr = new Cryptr(password)
-    return this.cryptr.decrypt(this.backup.token) === password
-  }
-
-  storeBackup() {
-    this.provider.write(this.backup)
-    this.encryptedToken = this.backup.token
-    this.readEntries()
+    if (this.tryDecryptData(this.backup, password)) {
+      this.provider.write(this.backup)
+      return true
+    } else {
+      return false
+    }
   }
 
   date() {
