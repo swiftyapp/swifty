@@ -5,7 +5,6 @@ import FileStorage from '../storage/file'
 
 export default class Manager {
   constructor() {
-    this.token = '3d56638738f6a4de1d724af6f88424dfc67976e6'
     this.provider = new FileStorage()
     this.encryptedToken = this.provider.read().token
     this.entries = []
@@ -14,7 +13,7 @@ export default class Manager {
 
   authenticate(password) {
     this.cryptr = new Cryptr(password)
-    if (this.isValidPassword()) {
+    if (this.isValidPassword(password)) {
       this.readEntries()
       return true
     } else {
@@ -25,7 +24,7 @@ export default class Manager {
 
   setup(password) {
     this.cryptr = new Cryptr(password)
-    this.encryptedToken = this.cryptr.encrypt(this.token)
+    this.encryptedToken = this.cryptr.encrypt(password)
     this.entries = []
     this.writeData()
   }
@@ -57,8 +56,8 @@ export default class Manager {
     return this.encryptedToken !== null
   }
 
-  isValidPassword() {
-    return this.cryptr.decrypt(this.encryptedToken) === this.token
+  isValidPassword(password) {
+    return this.cryptr.decrypt(this.encryptedToken) === password
   }
 
   readEntries() {
@@ -80,7 +79,7 @@ export default class Manager {
 
   validateBackup(password) {
     this.cryptr = new Cryptr(password)
-    return this.cryptr.decrypt(this.backup.token) === this.token
+    return this.cryptr.decrypt(this.backup.token) === password
   }
 
   storeBackup() {
