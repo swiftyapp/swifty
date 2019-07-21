@@ -4,4 +4,4 @@ node_modules
 builds
 packages
 bower_components
-test/.storage/*
+test/.storage/*.swftx
