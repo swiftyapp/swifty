@@ -19,6 +19,30 @@ describe('Create credentials entry', function() {
       ).to.eventually.equal('CancelSave')
     })
 
+    it('cancels entry creation', () => {
+      return expect(
+        app.client
+          .setValue('input[name=title]', 'Example')
+          .click('.aside .actions .cancel')
+          .isExisting('.list .entry')
+      ).to.eventually.equal(false)
+    })
+
+    it('hides creation form', () => {
+      return expect(
+        app.client.isExisting('.aside .empty')
+      ).to.eventually.equal(true)
+    })
+
+    it('opens creation form again', () => {
+      return expect(
+        app.client
+          .click('.add-button')
+          .waitForExist('input[name=title]')
+          .getValue('input[name=title]')
+      ).to.eventually.equal('')
+    })
+
     it('creates credentials entry', () => {
       return expect(
         app.client

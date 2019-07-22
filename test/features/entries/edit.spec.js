@@ -27,6 +27,30 @@ describe('Edit credential entry', function() {
       ).to.eventually.equal('CancelSave')
     })
 
+    it('cancels update', () => {
+      return expect(
+        app.client
+          .setValue('input[name=title]', 'Example Updated')
+          .click('.actions .cancel')
+          .getText('.list .entry')
+      ).to.eventually.equal('Example\nmyuser')
+    })
+
+    it('hides edit form', () => {
+      return expect(
+        app.client.getText('.entry-title h1')
+      ).to.eventually.equal('Example')
+    })
+
+    it('shows editor form again', () => {
+      return expect(
+        app.client
+          .click('.entry-title .action:nth-of-type(1)')
+          .waitForExist('input[name=title]')
+          .getValue('input[name=title]')
+      ).to.eventually.equal('Example')
+    })
+
     it('updates credential entry', () => {
       return expect(
         app.client
@@ -38,8 +62,7 @@ describe('Edit credential entry', function() {
 
     it('displays show view in a sidebar', () => {
       return expect(
-        app.client
-          .getText('.entry-title h1')
+        app.client.getText('.entry-title h1')
       ).to.eventually.equal('Example Updated')
     })
   })
