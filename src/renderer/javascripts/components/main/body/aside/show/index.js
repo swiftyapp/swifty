@@ -12,6 +12,7 @@ const Show = ({ entry, onClickDelete, onClickEdit }) => {
   }
 
   const onDelete = () => {
+    if (process.env.RUNNING_IN_SPECTRON) return onClickDelete(entry.id)
     if (confirm('Are you sure you want to delete this item?')) {
       onClickDelete(entry.id)
     }

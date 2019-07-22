@@ -36,7 +36,7 @@ const beforeHelper = options => {
   if (options && options.storage) prepareStorage(options.storage)
   global.app = new Application({
     path: appPath(),
-    env: { SPECTRON_STORAGE_PATH: storageFile() }
+    env: { SPECTRON_STORAGE_PATH: storageFile(), RUNNING_IN_SPECTRON: 1 }
   })
   return app.start()
 }

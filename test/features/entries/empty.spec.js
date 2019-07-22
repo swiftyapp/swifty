@@ -3,8 +3,8 @@ const { beforeHelper, afterHelper } = require('./../../helper')
 describe('Empty entries list', function() {
   this.timeout(10000)
 
-  describe('user enters password', () => {
-    before(() => beforeHelper())
+  describe('user loads main application window', () => {
+    before(() => beforeHelper({ storage: 'empty' }))
 
     after(() => afterHelper())
 
