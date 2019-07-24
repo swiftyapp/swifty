@@ -34,12 +34,13 @@ describe('Search credential entries', function() {
       ).to.eventually.equal('Instagram\nanotheruser')
     })
     
-    // it('adds entries back on clear filter', () => {
-    //   return expect(
-    //     app.client
-    //       .clearElement('.search input')
-    //       .isExisting('.list .entry:nth-child(3)')
-    //   ).to.eventually.equal(true)
-    // })
+    it('adds entries back on clear filter', () => {
+      return expect(
+        app.client
+          .keys("\uE003")
+          .keys("\uE003")
+          .isExisting('.list .entry:nth-child(3)')
+      ).to.eventually.equal(true)
+    })
   })
 })
