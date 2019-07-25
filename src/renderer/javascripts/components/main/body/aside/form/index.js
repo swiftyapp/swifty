@@ -1,13 +1,14 @@
 import React, { useState } from 'react'
 import generator from 'generate-password'
-import { connect } from 'react-redux'
+import { useDispatch } from 'react-redux'
 
 import Field from './field'
 import SecureField from './secure'
 
 import { saveEntry } from 'actions/entries'
 
-const Form = ({ entry, onSaveItem, onClickCancel }) => {
+const Form = ({ entry }) => {
+  const dispatch = useDispatch()
   const [credentials, setCredentials] = useState(
     entry || {
       title: '',
@@ -29,14 +30,18 @@ const Form = ({ entry, onSaveItem, onClickCancel }) => {
 
   const saveCredentials = () => {
     if (credentials.title && credentials.username && credentials.password) {
-      onSaveItem(credentials)
+      dispatch(saveEntry(credentials))
     } else {
       setValidate(true)
     }
   }
 
   const reset = () => {
-    onClickCancel(entry)
+    if (entry) {
+      dispatch({ type: 'SET_CURRENT_ENTRY', id: entry.id })
+    } else {
+      dispatch({ type: 'SET_NO_ENTRY' })
+    }
   }
 
   const generatePassword = () => {
@@ -89,19 +94,4 @@ const Form = ({ entry, onSaveItem, onClickCancel }) => {
   )
 }
 
-const mapDispatchToProps = dispatch => {
-  return {
-    onSaveItem: credentials => dispatch(saveEntry(credentials)),
-    onClickCancel: entry => {
-      if (entry) {
-        dispatch({ type: 'SET_CURRENT_ENTRY', id: entry.id })
-      } else {
-        dispatch({ type: 'SET_NO_ENTRY' })
-      }
-    }
-  }
-}
-export default connect(
-  null,
-  mapDispatchToProps
-)(Form)
+export default Form

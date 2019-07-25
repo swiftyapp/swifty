@@ -1,9 +1,14 @@
 import shortid from 'shortid'
 import React from 'react'
 import Item from './item'
-import { connect } from 'react-redux'
+import { useSelector } from 'react-redux'
 
-const List = ({ entries, query }) => {
+const List = () => {
+  const { entries, query } = useSelector(state => ({
+    query: state.filters.query,
+    entries: state.entries.items
+  }))
+
   const emptyList = () => (
     <div className="list">
       <div className="empty">No Items</div>
@@ -27,13 +32,4 @@ const List = ({ entries, query }) => {
   return <div className="list">{entriesList()}</div>
 }
 
-const mapStateToProps = state => {
-  return {
-    query: state.filters.query,
-    entries: state.entries.items
-  }
-}
-export default connect(
-  mapStateToProps,
-  null
-)(List)
+export default List

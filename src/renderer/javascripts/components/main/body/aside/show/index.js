@@ -3,18 +3,20 @@ import Pencil from 'pencil.svg'
 import Delete from 'delete.svg'
 import Item from './item'
 import { DateTime } from 'luxon'
-import { connect } from 'react-redux'
+import { useDispatch } from 'react-redux'
 import { deleteEntry } from 'actions/entries'
 
-const Show = ({ entry, onClickDelete, onClickEdit }) => {
+const Show = ({ entry }) => {
+  const dispatch = useDispatch()
+
   const onEdit = () => {
-    onClickEdit()
+    dispatch({ type: 'EDIT_ENTRY' })
   }
 
   const onDelete = () => {
-    if (process.env.RUNNING_IN_SPECTRON) return onClickDelete(entry.id)
+    if (process.env.RUNNING_IN_SPECTRON) return dispatch(deleteEntry(entry.id))
     if (confirm('Are you sure you want to delete this item?')) {
-      onClickDelete(entry.id)
+      dispatch(deleteEntry(entry.id))
     }
   }
 
@@ -50,15 +52,4 @@ const Show = ({ entry, onClickDelete, onClickEdit }) => {
     </div>
   )
 }
-
-const mapDispatchToProps = dispatch => {
-  return {
-    onClickDelete: id => dispatch(deleteEntry(id)),
-    onClickEdit: () => dispatch({ type: 'EDIT_ENTRY' })
-  }
-}
-
-export default connect(
-  null,
-  mapDispatchToProps
-)(Show)
+export default Show

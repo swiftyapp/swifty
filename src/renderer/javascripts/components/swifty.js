@@ -2,9 +2,11 @@ import React from 'react'
 import Start from './start'
 import Auth from './auth'
 import Main from './main'
-import { connect } from 'react-redux'
+import { useSelector } from 'react-redux'
 
-const Swifty = ({ flow }) => {
+const Swifty = () => {
+  const flow = useSelector(state => state.flow)
+
   switch (flow) {
     case 'setup':
       return <Start />
@@ -17,11 +19,4 @@ const Swifty = ({ flow }) => {
   }
 }
 
-const mapStateToProps = state => {
-  return { flow: state.flow }
-}
-
-export default connect(
-  mapStateToProps,
-  null
-)(Swifty)
+export default Swifty
