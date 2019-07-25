@@ -53,7 +53,13 @@
       "publish": null
     },
     "mac": {
-      "publish": null,
+      "publish": [
+        {
+          "provider": "github",
+          "owner": "alchaplinsky",
+          "repo": "swifty"
+        }
+      ],
       "category": "your.app.category.type"
     }
   }
