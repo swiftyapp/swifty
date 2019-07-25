@@ -18,6 +18,14 @@ describe('Create credentials entry', function() {
           .getText('.aside .actions')
       ).to.eventually.equal('CancelSave')
     })
+    
+    it('shows validation errors', () => {
+      return expect(
+        app.client
+          .click('.aside .actions .button')
+          .isExisting('.field.error:nth-of-type(3)')
+      ).to.eventually.equal(true)
+    })
 
     it('cancels entry creation', () => {
       return expect(

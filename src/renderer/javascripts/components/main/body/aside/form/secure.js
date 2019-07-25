@@ -3,13 +3,21 @@ import classnames from 'classnames'
 import View from 'view.svg'
 import Hide from 'hide.svg'
 
-export default ({ name, entry, onChange, children }) => {
+export default ({ name, entry, validate, onChange, children }) => {
   const [show, setShow] = useState(false)
 
   const toggleSecure = () => setShow(!show)
 
+  const isEmpty = () => {
+    return entry[name.toLowerCase()].trim() === ''
+  }
+
   const className = () => {
-    return classnames('field', { 'secure-on': !show, 'secure-off': show })
+    return classnames('field', {
+      'secure-on': !show,
+      'secure-off': show,
+      error: validate && isEmpty()
+    })
   }
 
   return (

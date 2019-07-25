@@ -1,6 +1,15 @@
 import React from 'react'
+import classnames from 'classnames'
 
-export default ({ name, entry, onChange, multiline }) => {
+export default ({ name, entry, validate, onChange, multiline }) => {
+  const isEmpty = () => {
+    return entry[name.toLowerCase()].trim() === ''
+  }
+
+  const classNames = () => {
+    return classnames('field', { error: validate && isEmpty() })
+  }
+
   const renderInput = () => {
     if (multiline) {
       return (
@@ -24,7 +33,7 @@ export default ({ name, entry, onChange, multiline }) => {
   }
 
   return (
-    <div className="field">
+    <div className={classNames()}>
       <label htmlFor="">{name}</label>
       {renderInput()}
     </div>

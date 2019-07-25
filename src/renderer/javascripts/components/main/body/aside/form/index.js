@@ -19,6 +19,7 @@ const Form = ({ entry, onSaveItem, onClickCancel }) => {
       note: ''
     }
   )
+  const [validate, setValidate] = useState(false)
 
   const updateCredentials = event => {
     let obj = {}
@@ -30,8 +31,7 @@ const Form = ({ entry, onSaveItem, onClickCancel }) => {
     if (credentials.title && credentials.username && credentials.password) {
       onSaveItem(credentials)
     } else {
-      /* eslint-disable-next-line no-console */
-      console.log('Please fill in title, username and password')
+      setValidate(true)
     }
   }
 
@@ -46,11 +46,22 @@ const Form = ({ entry, onSaveItem, onClickCancel }) => {
 
   return (
     <div className="aside">
-      <Field name="Title" entry={credentials} onChange={updateCredentials} />
+      <Field
+        name="Title"
+        validate={validate}
+        entry={credentials}
+        onChange={updateCredentials}
+      />
       <Field name="Website" entry={credentials} onChange={updateCredentials} />
-      <Field name="Username" entry={credentials} onChange={updateCredentials} />
+      <Field
+        name="Username"
+        validate={validate}
+        entry={credentials}
+        onChange={updateCredentials}
+      />
       <SecureField
         name="Password"
+        validate={validate}
         entry={credentials}
         onChange={updateCredentials}
       >
