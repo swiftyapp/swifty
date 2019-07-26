@@ -7,6 +7,8 @@ import { showSetup } from './setup'
 import { showAuth } from './auth'
 import trayIcon from 'iconTemplate@2x.png'
 
+const INACTIVE_TIMEOUT = 60000
+
 export default class Swifty extends Application {
   components() {
     return { Window }
@@ -23,6 +25,7 @@ export default class Swifty extends Application {
   }
 
   onReady() {
+    this.shouldShowAuth = false
     this.manager = new Manager()
     this.tray = new Tray(path.resolve(__dirname, trayIcon))
     this.tray.setToolTip(CONFIG.name)
@@ -32,11 +35,30 @@ export default class Swifty extends Application {
   }
 
   onWindowReady() {
+    this.setupWindowEvents()
     this.subscribeForEvents()
     if (this.manager.isPristineStorage()) {
       return showSetup(this.window, this.manager)
     }
     return showAuth(this.window, this.manager)
+  }
+
+  setupWindowEvents() {
+    this.window.on('close', () => {
+      this.shouldShowAuth = true
+    })
+    this.window.on('hide', () => {
+      this.inactiveTimeout = setTimeout(() => {
+        this.shouldShowAuth = true
+      }, INACTIVE_TIMEOUT)
+    })
+    this.window.on('show', () => {
+      clearTimeout(this.inactiveTimeout)
+      if (this.shouldShowAuth) {
+        showAuth(this.window, this.manager)
+        this.shouldShowAuth = false
+      }
+    })
   }
 
   subscribeForEvents() {

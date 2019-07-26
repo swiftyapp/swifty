@@ -10,7 +10,11 @@ export default class Manager {
   }
 
   authenticate(password) {
-    return this.tryDecryptData(this.data, password)
+    if (this.cryptr) {
+      return this.validate(this.data, password)
+    } else {
+      return this.tryDecryptData(this.data, password)
+    }
   }
 
   setup(password) {
@@ -59,6 +63,16 @@ export default class Manager {
       return true
     } catch (e) {
       this.cryptr = null
+      return false
+    }
+  }
+
+  validate(data, password) {
+    try {
+      const json = JSON.parse(this.cryptr.decrypt(data))
+      if (this.cryptr.decrypt(json.token) !== password) return false
+      return true
+    } catch (e) {
       return false
     }
   }
