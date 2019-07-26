@@ -16,7 +16,7 @@ const promptAuth = (window, manager) => {
 export const showAuth = (window, manager) => {
   promptAuth(window, manager)
     .then(() => {
-      window.resize({ width: 900, height: 700 }, true)
+      window.enlarge()
       window.webContents.send('auth:success', manager.entries)
     })
     .catch(() => {

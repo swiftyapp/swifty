@@ -5,4 +5,9 @@ export default class MainWindow extends Window {
   sourceFile() {
     return path.resolve(__dirname, '..', 'renderer', 'index.html')
   }
+
+  enlarge() {
+    this.setMinimumSize(740, 400)
+    this.resize({ width: 900, height: 700 }, true)
+  }
 }
