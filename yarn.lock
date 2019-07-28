@@ -2768,10 +2768,10 @@ electron-updater@^4.1.2:
     pako "^1.0.10"
     semver "^6.2.0"
 
-electron@6.0.0-beta.15:
-  version "6.0.0-beta.15"
-  resolved "https://registry.yarnpkg.com/electron/-/electron-6.0.0-beta.15.tgz#c4825ceee46086ecdf3b12c19d660abb13f06ebe"
-  integrity sha512-msdO180UWIvvbYOnKP2pvVFMEtmMcHn3N2KjU+N+Pjqi1GzYUMHGC8JyIIIKQoT00cfKw2xwlQWjEOksTtlh8g==
+electron@6.0.0-beta.11:
+  version "6.0.0-beta.11"
+  resolved "https://registry.yarnpkg.com/electron/-/electron-6.0.0-beta.11.tgz#aa4821ed685aca0545be61bc46eacab191ac6887"
+  integrity sha512-B6zh9c5pJ0BKKNkOEbF6vKXnBCWgtvY8LaUYDNeR9ttnPP0CCm0oovIoqP9/nN5gL8rlCoCgKWsjmiHu0jg7mA==
   dependencies:
     "@types/node" "^10.12.18"
     electron-download "^4.1.0"

@@ -1,9 +1,22 @@
-import { ipcMain } from 'electron'
+import { ipcMain, systemPreferences } from 'electron'
 
 const promptAuth = (window, manager) => {
   return new Promise((resolve, reject) => {
-    window.webContents.send('auth')
-    ipcMain.on('auth:done', (event, password) => {
+    const touchID =
+      manager.cryptr !== null && systemPreferences.canPromptTouchID()
+
+    window.webContents.send('auth', touchID)
+    ipcMain.once('auth:touchid', () => {
+      systemPreferences
+        .promptTouchID('Confirm your identity')
+        .then(() => {
+          return resolve()
+        })
+        .catch(err => {
+          return reject(err)
+        })
+    })
+    ipcMain.once('auth:done', (event, password) => {
       if (manager.authenticate(password)) {
         return resolve(password)
       } else {

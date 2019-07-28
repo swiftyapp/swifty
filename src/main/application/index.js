@@ -46,6 +46,7 @@ export default class Swifty extends Application {
   setupWindowEvents() {
     this.window.on('close', () => {
       this.shouldShowAuth = true
+      clearTimeout(this.inactiveTimeout)
     })
     this.window.on('hide', () => {
       this.inactiveTimeout = setTimeout(() => {

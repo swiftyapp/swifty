@@ -1,8 +1,16 @@
 import React from 'react'
 import classnames from 'classnames'
 import Error from './error'
+import Touchid from 'touchid.svg'
 
-export default ({ placeholder, error, onEnter, onChange }) => {
+export default ({
+  error,
+  touchID,
+  placeholder,
+  onEnter,
+  onChange,
+  onTouchID
+}) => {
   const cssClasses = () => {
     return classnames('masterpass-input', { error: error })
   }
@@ -26,6 +34,14 @@ export default ({ placeholder, error, onEnter, onChange }) => {
         onChange={onChange}
         onKeyDown={handleKeyDown}
       />
+      {touchID && (
+        <Touchid
+          width="32"
+          height="32"
+          className="touchid"
+          onClick={onTouchID}
+        />
+      )}
     </div>
   )
 }

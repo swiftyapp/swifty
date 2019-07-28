@@ -24,8 +24,8 @@ ipcRenderer.on('setup', () => {
   store.dispatch({ type: 'FLOW_SETUP' })
 })
 
-ipcRenderer.on('auth', () => {
-  store.dispatch({ type: 'FLOW_AUTH' })
+ipcRenderer.on('auth', (event, touchID) => {
+  store.dispatch({ type: 'FLOW_AUTH', touchID: touchID })
 })
 
 ipcRenderer.on('auth:success', (event, data) => {

@@ -1,11 +1,11 @@
-export default (state = 'auth', action) => {
+export default (state = { name: 'auth', touchID: false }, action) => {
   switch (action.type) {
     case 'FLOW_SETUP':
-      return 'setup'
+      return { ...state, name: 'setup' }
     case 'FLOW_AUTH':
-      return 'auth'
+      return { name: 'auth', touchID: action.touchID }
     case 'FLOW_MAIN':
-      return 'main'
+      return { ...state, name: 'main' }
     default:
       return state
   }
