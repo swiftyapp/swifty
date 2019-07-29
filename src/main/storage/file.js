@@ -27,6 +27,10 @@ export default class FileStorage {
     this.write('')
   }
 
+  copy(filepath) {
+    return fs.copyFileSync(this.buildPath(), `${filepath}.swftx`)
+  }
+
   readFile(filePath) {
     return fs.readFileSync(filePath).toString('utf8')
   }

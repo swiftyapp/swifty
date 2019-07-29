@@ -102,6 +102,10 @@ export default class Manager {
     }
   }
 
+  saveBackup(filepath) {
+    return this.provider.copy(filepath)
+  }
+
   date() {
     return new Date().toISOString()
   }

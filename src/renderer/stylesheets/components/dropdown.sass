@@ -1,0 +1,30 @@
+.dropdown-overlay
+  position: fixed
+  z-index: 10
+  width: 100%
+  height: 100%
+  top: 0
+  left: 0
+.dropdown
+  position: absolute
+  z-index: 11
+  background: #fff
+  border: 1px solid #E3E4E5
+  box-shadow: 0 1px 8px 0 rgba(0,0,0,0.1)
+  border-radius: 4px
+  line-height: 18px
+  .dropdown-item
+    text-align: left
+    padding: 10px 15px
+    cursor: pointer
+    color: #333
+    min-width: 160px
+    &.separated
+      border-top: 1px solid #E3E4E5
+    &:hover
+      background: #fafafa
+    svg
+      margin-right: 10px
+      margin-bottom: -2px
+      path
+        fill: #333

@@ -75,5 +75,8 @@ export default class Swifty extends Application {
       this.manager.delete(id)
       this.window.webContents.send('item:removed', this.manager.entries)
     })
+    ipcMain.on('backup:save', (event, filepath) => {
+      this.manager.saveBackup(filepath)
+    })
   }
 }

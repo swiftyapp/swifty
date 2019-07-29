@@ -1,16 +1,28 @@
 .sidebar
   padding-top: 48px
-  .add-button
-    color: #fff
-    font-size: 32px
-    font-weight: 500
-    margin: 0 auto
-    line-height: 42px
+  .add-button, .settings
     width: 50px
     height: 50px
+    margin: 0 auto
     cursor: pointer
     text-align: center
     border-radius: 50%
     transition: background .2s ease
     &:hover
       background: darken(#4792ff, 3%)
+  .add-button
+    color: #fff
+    font-size: 32px
+    font-weight: 500
+    line-height: 42px
+  .settings
+    position: absolute
+    bottom: 10px
+    left: 12px
+    > svg
+      margin-top: 11px
+      path
+        fill: #fff
+    .dropdown
+      bottom: 36px
+      left: 20px
