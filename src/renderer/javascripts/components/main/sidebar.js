@@ -13,8 +13,8 @@ const Sidebar = () => {
 
   const handleSaveBackup = () => {
     setDropdown(false)
-    remote.dialog.showSaveDialog({}, filepath => {
-      ipcRenderer.send('backup:save', filepath)
+    remote.dialog.showSaveDialog().then(({ canceled, filePath }) => {
+      if (!canceled) ipcRenderer.send('backup:save', filePath)
     })
   }
 
