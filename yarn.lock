@@ -1797,7 +1797,7 @@ check-error@^1.0.2:
   resolved "https://registry.yarnpkg.com/check-error/-/check-error-1.0.2.tgz#574d312edd88bb5dd8912e9286dd6c0aed4aac82"
   integrity sha1-V00xLt2Iu13YkS6Sht1sCu1KrII=
 
-chokidar@^2.0.2, chokidar@^2.0.3:
+chokidar@^2.0.2:
   version "2.1.6"
   resolved "https://registry.yarnpkg.com/chokidar/-/chokidar-2.1.6.tgz#b6cad653a929e244ce8a834244164d241fa954c5"
   integrity sha512-V2jUo67OKkc6ySiRpJrjlpJKl9kDuG+Xb8VgsGzb+aEouhgS1D0weyPU4lEzdAcsCAvrih2J2BqyXqHWvVLw5g==
@@ -2669,10 +2669,10 @@ electron-download@^4.1.0:
     semver "^5.4.1"
     sumchecker "^2.0.2"
 
-electron-log@^2.2.14:
-  version "2.2.17"
-  resolved "https://registry.yarnpkg.com/electron-log/-/electron-log-2.2.17.tgz#e71e2ebb949fc96ded7cdb99eeee7202e48981d2"
-  integrity sha512-v+Af5W5z99ehhaLOfE9eTSXUwjzh2wFlQjz51dvkZ6ZIrET6OB/zAZPvsuwT6tm3t5x+M1r+Ed3U3xtPZYAyuQ==
+electron-log@^3.0.7:
+  version "3.0.7"
+  resolved "https://registry.yarnpkg.com/electron-log/-/electron-log-3.0.7.tgz#bfdba9489c84b1301d6067028fce2f4cb2f89d7f"
+  integrity sha512-W5pjj9DtXjSHaJWH1VWSgBweJxeZ6OEBAIOzSbu6coKFYxXPGRyg9FAILYbnDt0iJT8r6YQqjEnYgmGJn/LoAg==
 
 electron-publish@21.2.0:
   version "21.2.0"
@@ -2705,15 +2705,6 @@ electron-updater@^4.1.2:
     lodash.isequal "^4.5.0"
     pako "^1.0.10"
     semver "^6.2.0"
-
-electron@^5.0.0:
-  version "5.0.7"
-  resolved "https://registry.yarnpkg.com/electron/-/electron-5.0.7.tgz#a48fcbd13d30f16f7d7887908b68e52156e90259"
-  integrity sha512-OMMz8DhatxLuBFbnW7KYcAUjflGYFn0IQEtKR0iZhMAm89FgNOd9SVbxXWAGNxvRR6C0gORXwhTh6BCqqqcR6Q==
-  dependencies:
-    "@types/node" "^10.12.18"
-    electron-download "^4.1.0"
-    extract-zip "^1.0.3"
 
 electron@^6.0.0:
   version "6.0.0"
@@ -3191,7 +3182,7 @@ file-entry-cache@^5.0.1:
   dependencies:
     flat-cache "^2.0.1"
 
-file-loader@^4.0.0, file-loader@^4.1.0:
+file-loader@^4.1.0:
   version "4.1.0"
   resolved "https://registry.yarnpkg.com/file-loader/-/file-loader-4.1.0.tgz#3a763391bc9502da7c59612fe348e38fc1980336"
   integrity sha512-ajDk1nlByoalZAGR4b0H6oD+EGlWnyW1qbSxzaUc7RFiqmn+RbXQQRbTc72jsiUIlVusJ4Et58ltds8ZwTfnAw==
@@ -5216,17 +5207,16 @@ nth-check@^1.0.2:
   dependencies:
     boolbase "~1.0.0"
 
-nucleon@^1.0.4:
-  version "1.0.4"
-  resolved "https://registry.yarnpkg.com/nucleon/-/nucleon-1.0.4.tgz#e5ddad1877dcf5efcf4d49e72f8a3b051fdd303e"
-  integrity sha512-7etZbRSzc5HZn+qqJIXVYRgJLWNKy12PjaOn9Otyyry+wMyxJ5AISS/IUacO+qDP0ECFprv2AlGjQ82zeUkBAw==
+nucleon@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/nucleon/-/nucleon-1.0.5.tgz#f432c95db0bba12d341efea2fe5b56e7f9a24284"
+  integrity sha512-I7G+eJkvyAmgexYcVYN66jENGd4WXLKeKMUGROxA/6VlgXr/VKmRvAXwXPeslJELy9mMsB6oaSmdqzjizMCXvw==
   dependencies:
-    chalk "^2.4.1"
-    chokidar "^2.0.3"
-    electron "^5.0.0"
-    electron-log "^2.2.14"
+    chalk "^2.4.2"
+    electron "^6.0.0"
+    electron-log "^3.0.7"
     electron-updater "^4.1.2"
-    file-loader "^4.0.0"
+    file-loader "^4.1.0"
 
 nugget@^2.0.1:
   version "2.0.1"
