@@ -6,7 +6,6 @@
   "dependencies": {
     "classnames": "^2.2.6",
     "cryptr": "^4.0.2",
-    "electron": "6.0.0-beta.11",
     "generate-password": "^1.4.2",
     "luxon": "^1.17.2",
     "nucleon": "^1.0.4",
@@ -30,7 +29,7 @@
     "@babel/preset-env": "^7.5.5",
     "@babel/preset-react": "^7.0.0",
     "babel-loader": "^8.0.6",
-    "bozon": "^0.10.0",
+    "bozon": "^0.10.1",
     "chai": "^4.2.0",
     "chai-as-promised": "^7.1.1",
     "css-loader": "^3.1.0",
