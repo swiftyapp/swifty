@@ -1,5 +1,5 @@
 import path from 'path'
-import electron, { Menu } from 'electron'
+import electron from 'electron'
 import trayIcon from 'iconTemplate@2x.png'
 
 export default class Tray extends electron.Tray {

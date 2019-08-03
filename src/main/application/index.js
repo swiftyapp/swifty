@@ -1,4 +1,3 @@
-import path from 'path'
 import { ipcMain } from 'electron'
 import { Application } from 'nucleon'
 import Window from '../window'

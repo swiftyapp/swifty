@@ -1,5 +1,5 @@
 import shortid from 'shortid'
-import React, { useEffect } from 'react'
+import React from 'react'
 import Item from './item'
 import { useSelector } from 'react-redux'
 
@@ -21,7 +21,10 @@ const List = () => {
 
     if (query !== '') {
       items = entries.filter(entry => {
-        return entry.type === scope && entry.title.toLowerCase().match(query.toLowerCase())
+        return (
+          entry.type === scope &&
+          entry.title.toLowerCase().match(query.toLowerCase())
+        )
       })
     } else {
       items = entries.filter(entry => {

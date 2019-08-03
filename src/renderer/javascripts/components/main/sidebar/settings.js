@@ -13,7 +13,7 @@ const Settings = () => {
       if (!canceled) ipcRenderer.send('backup:save', filePath)
     })
   }
-  
+
   return (
     <div className="settings">
       <SettingsIcon

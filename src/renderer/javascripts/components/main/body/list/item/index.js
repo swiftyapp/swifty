@@ -16,7 +16,7 @@ export default ({ entry }) => {
   const classname = () => {
     return classnames('entry', { current: current && current.id === entry.id })
   }
-  
+
   const itemContent = () => {
     switch (entry.type) {
       case 'login':

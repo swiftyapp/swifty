@@ -19,13 +19,13 @@ const Card = ({ entry }) => {
       name: ''
     }
   )
-  
+
   const updateCard = event => {
     let obj = {}
     obj[event.target.name] = event.target.value
     setCard({ ...card, ...obj })
   }
-  
+
   const reset = () => {
     if (entry) {
       dispatch({ type: 'SET_CURRENT_ENTRY', id: entry.id })
@@ -33,9 +33,16 @@ const Card = ({ entry }) => {
       dispatch({ type: 'SET_NO_ENTRY' })
     }
   }
-  
+
   const saveCard = () => {
-    if (card.title && card.number && card.pin && card.cvc && card.month && card.year) {
+    if (
+      card.title &&
+      card.number &&
+      card.pin &&
+      card.cvc &&
+      card.month &&
+      card.year
+    ) {
       dispatch(saveEntry(card))
     } else {
       setValidate(true)
@@ -80,11 +87,7 @@ const Card = ({ entry }) => {
         entry={card}
         onChange={updateCard}
       />
-      <Field
-        name="Name"
-        entry={card}
-        onChange={updateCard}
-      />
+      <Field name="Name" entry={card} onChange={updateCard} />
       <div className="actions">
         <span className="cancel" onClick={reset}>
           Cancel

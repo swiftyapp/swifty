@@ -14,7 +14,7 @@ const Note = ({ entry }) => {
       note: ''
     }
   )
-  
+
   const reset = () => {
     if (entry) {
       dispatch({ type: 'SET_CURRENT_ENTRY', id: entry.id })
@@ -22,7 +22,7 @@ const Note = ({ entry }) => {
       dispatch({ type: 'SET_NO_ENTRY' })
     }
   }
-  
+
   const saveNote = () => {
     if (note.title && note.note) {
       dispatch(saveEntry(note))
@@ -30,17 +30,28 @@ const Note = ({ entry }) => {
       setValidate(true)
     }
   }
-  
+
   const updateNote = event => {
     let obj = {}
     obj[event.target.name] = event.target.value
     setNote({ ...note, ...obj })
   }
-  
+
   return (
     <div className="aside">
-      <Field name="Title" entry={note} onChange={updateNote} />
-      <Field name="Note" entry={note} onChange={updateNote} rows="15" />
+      <Field
+        name="Title"
+        entry={note}
+        onChange={updateNote}
+        validate={validate}
+      />
+      <Field
+        name="Note"
+        entry={note}
+        onChange={updateNote}
+        validate={validate}
+        rows="15"
+      />
       <div className="actions">
         <span className="cancel" onClick={reset}>
           Cancel

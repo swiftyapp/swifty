@@ -9,15 +9,15 @@ import NoteIcon from 'note.svg'
 const Switcher = () => {
   const dispatch = useDispatch()
   const { scope } = useSelector(state => state.filters)
-  
+
   const switchScope = scope => {
     dispatch({ type: 'SET_FILTER_SCOPE', scope })
   }
-  
+
   const itemClassname = currentScope => {
     return classnames('item', { current: scope === currentScope })
   }
-  
+
   return (
     <div className="switcher">
       <div
