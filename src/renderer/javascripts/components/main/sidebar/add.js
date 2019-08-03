@@ -1,5 +1,6 @@
 import React from 'react'
 import { useDispatch } from 'react-redux'
+import Plus from 'plus.svg'
 
 const Add = () => {
   const dispatch = useDispatch()
@@ -8,7 +9,7 @@ const Add = () => {
 
   return (
     <div className="add-button" onClick={onAddEntry}>
-      +
+      <Plus />
     </div>
   )
 }

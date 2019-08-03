@@ -2,8 +2,8 @@ import classnames from 'classnames'
 import React from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 
-import UserIcon from 'user.svg'
-import CardIcon from 'credit-card.svg'
+import LoginIcon from 'login.svg'
+import CardIcon from 'card.svg'
 import NoteIcon from 'note.svg'
 
 const Switcher = () => {
@@ -25,7 +25,7 @@ const Switcher = () => {
         title="Login"
         onClick={() => switchScope('login')}
       >
-        <UserIcon with="28" height="28" />
+        <LoginIcon with="28" height="28" />
       </div>
       <div
         className={itemClassname('note')}
