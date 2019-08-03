@@ -28,18 +28,18 @@ const Switcher = () => {
         <UserIcon with="28" height="28" />
       </div>
       <div
-        className={itemClassname('card')}
-        title="Credit Card"
-        onClick={() => switchScope('card')}
-      >
-        <CardIcon with="28" height="28" />
-      </div>
-      <div
         className={itemClassname('note')}
         title="Secure Note"
         onClick={() => switchScope('note')}
       >
         <NoteIcon with="28" height="28" />
+      </div>
+      <div
+        className={itemClassname('card')}
+        title="Credit Card"
+        onClick={() => switchScope('card')}
+      >
+        <CardIcon with="28" height="28" />
       </div>
     </div>
   )
