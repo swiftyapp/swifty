@@ -1,10 +1,11 @@
 import shortid from 'shortid'
-import React from 'react'
+import React, { useEffect } from 'react'
 import Item from './item'
 import { useSelector } from 'react-redux'
 
 const List = () => {
-  const { entries, query } = useSelector(state => ({
+  const { entries, query, scope } = useSelector(state => ({
+    scope: state.filters.scope,
     query: state.filters.query,
     entries: state.entries.items
   }))
@@ -17,17 +18,20 @@ const List = () => {
 
   const entriesList = () => {
     let items
+
     if (query !== '') {
       items = entries.filter(entry => {
-        return entry.title.toLowerCase().match(query.toLowerCase())
+        return entry.type === scope && entry.title.toLowerCase().match(query.toLowerCase())
       })
     } else {
-      items = entries
+      items = entries.filter(entry => {
+        return entry.type === scope
+      })
     }
     return items.map(entry => <Item entry={entry} key={shortid.generate()} />)
   }
 
-  if (entries.length == 0) return emptyList()
+  if (entriesList().length == 0) return emptyList()
 
   return <div className="list">{entriesList()}</div>
 }

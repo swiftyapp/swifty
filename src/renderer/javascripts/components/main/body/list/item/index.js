@@ -1,7 +1,9 @@
 import classnames from 'classnames'
 import React from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import Gear from 'gear.svg'
+import Login from './login'
+import Card from './card'
+import Note from './note'
 
 export default ({ entry }) => {
   const dispatch = useDispatch()
@@ -14,16 +16,23 @@ export default ({ entry }) => {
   const classname = () => {
     return classnames('entry', { current: current && current.id === entry.id })
   }
+  
+  const itemContent = () => {
+    switch (entry.type) {
+      case 'login':
+        return <Login entry={entry} />
+      case 'card':
+        return <Card entry={entry} />
+      case 'note':
+        return <Note entry={entry} />
+      default:
+        return null
+    }
+  }
 
   return (
     <div className={classname()} onClick={onClick}>
-      <div className="icon">
-        <Gear width="32" height="32" />
-      </div>
-      <div className="description">
-        <div className="primary">{entry.title}</div>
-        <div className="secondary">{entry.username}</div>
-      </div>
+      {itemContent()}
     </div>
   )
 }

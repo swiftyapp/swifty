@@ -5,12 +5,16 @@
   background: #fff
   border-bottom: 1px solid #eee
   cursor: pointer
+  min-height: 52px
+  box-sizing: border-box
   transition: background .2s ease
   .icon
     width: 32px
     margin-right: 10px
-    img
-      max-width: 100%
+  .description, .icon
+    display: flex
+    flex-direction: column
+    justify-content: center
   .description
     flex: 1
   .primary

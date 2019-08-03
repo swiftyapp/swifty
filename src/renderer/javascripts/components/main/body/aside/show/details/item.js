@@ -2,7 +2,7 @@ import React from 'react'
 import Copy from 'copy.svg'
 import { clipboard } from 'electron'
 
-export default ({ entry, name, link, secure }) => {
+export default ({ entry, name, link, cc, secure }) => {
   const copy = value => {
     const notification = document.getElementsByClassName(
       'copied-notification'
@@ -20,6 +20,8 @@ export default ({ entry, name, link, secure }) => {
   const value = () => {
     if (link) {
       return <a href={entry[name.toLowerCase()]}>{entry[name.toLowerCase()]}</a>
+    } else if (cc) {
+      return entry[name.toLowerCase()].match(/.{1,4}/g).join(' ')
     } else {
       return entry[name.toLowerCase()]
     }

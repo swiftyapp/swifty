@@ -1,14 +1,10 @@
 import React from 'react'
-import { useSelector } from 'react-redux'
-
 import Login from './login'
 import Card from './card'
 import Note from './note'
 
-const Form = ({ entry }) => {
-  const { scope } = useSelector(state => state.filters)
-
-  switch (scope) {
+const Details = ({ entry }) => {
+  switch (entry.type) {
     case 'login':
       return <Login entry={entry} />
     case 'card':
@@ -20,4 +16,4 @@ const Form = ({ entry }) => {
   }
 }
 
-export default Form
+export default Details

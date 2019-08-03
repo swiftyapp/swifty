@@ -3,7 +3,7 @@
   .add-button, .settings
     width: 50px
     height: 50px
-    margin: 0 auto
+    margin: 0 auto 10px auto
     cursor: pointer
     text-align: center
     border-radius: 50%
@@ -13,11 +13,11 @@
   .add-button
     color: #fff
     font-size: 32px
-    font-weight: 500
+    font-weight: 400
     line-height: 42px
   .settings
     position: absolute
-    bottom: 10px
+    bottom: 5px
     left: 12px
     > svg
       margin-top: 11px
@@ -26,3 +26,16 @@
     .dropdown
       bottom: 36px
       left: 20px
+  .switcher
+    .item
+      height: 60px
+      text-align: center
+      transition: background .2s ease
+      &:hover
+        background: darken(#4792ff, 2%)
+      &.current
+        background: darken(#4792ff, 5%)
+      svg
+        margin-top: 16px
+        path
+          fill: #fff

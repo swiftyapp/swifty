@@ -1,11 +1,11 @@
 import path from 'path'
-import { ipcMain, Tray } from 'electron'
+import { ipcMain } from 'electron'
 import { Application } from 'nucleon'
 import Window from '../window'
 import Manager from '../manager'
+import Tray from '../tray'
 import { showSetup } from './setup'
 import { showAuth } from './auth'
-import trayIcon from 'iconTemplate@2x.png'
 
 const INACTIVE_TIMEOUT = 60000
 
@@ -27,11 +27,7 @@ export default class Swifty extends Application {
   onReady() {
     this.shouldShowAuth = false
     this.manager = new Manager()
-    this.tray = new Tray(path.resolve(__dirname, trayIcon))
-    this.tray.setToolTip(CONFIG.name)
-    this.tray.on('click', () => {
-      this.window.show()
-    })
+    this.tray = new Tray(this)
   }
 
   onWindowReady() {

@@ -1,10 +1,10 @@
 import React from 'react'
 import Pencil from 'pencil.svg'
 import Delete from 'delete.svg'
-import Item from './item'
 import { DateTime } from 'luxon'
 import { useDispatch } from 'react-redux'
 import { deleteEntry } from 'actions/entries'
+import Details from './details'
 
 const Show = ({ entry }) => {
   const dispatch = useDispatch()
@@ -32,13 +32,7 @@ const Show = ({ entry }) => {
         <Pencil width="16" height="16" onClick={onEdit} className="action" />
         <Delete width="16" height="16" onClick={onDelete} className="action" />
       </div>
-      <div className="entry-details">
-        <Item name="Website" entry={entry} link />
-        <Item name="Username" entry={entry} />
-        <Item name="Password" entry={entry} secure />
-        <Item name="Email" entry={entry} />
-        <Item name="Note" entry={entry} />
-      </div>
+      <Details entry={entry} />
       <div className="entry-extra">
         <div className="item">
           <div className="label">Last Modified</div>

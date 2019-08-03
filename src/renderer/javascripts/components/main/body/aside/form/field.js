@@ -1,7 +1,7 @@
 import React from 'react'
 import classnames from 'classnames'
 
-export default ({ name, entry, validate, onChange, multiline }) => {
+export default ({ name, entry, validate, onChange, rows }) => {
   const isEmpty = () => {
     return entry[name.toLowerCase()].trim() === ''
   }
@@ -11,12 +11,12 @@ export default ({ name, entry, validate, onChange, multiline }) => {
   }
 
   const renderInput = () => {
-    if (multiline) {
+    if (rows && rows !== '1') {
       return (
         <textarea
           name={name.toLowerCase()}
           cols="10"
-          rows="5"
+          rows={rows}
           onChange={onChange}
           value={entry[name.toLowerCase()]}
         />
