@@ -18,3 +18,23 @@ export const saveEntry = credentials => {
     })
   }
 }
+
+export const isValid = entry => {
+  switch (entry.type) {
+    case 'login':
+      return entry.title && entry.username && entry.password
+    case 'card':
+      return (
+        entry.title &&
+        entry.number &&
+        entry.pin &&
+        entry.cvc &&
+        entry.month &&
+        entry.year
+      )
+    case 'note':
+      return entry.title && entry.note
+    default:
+      return false
+  }
+}
