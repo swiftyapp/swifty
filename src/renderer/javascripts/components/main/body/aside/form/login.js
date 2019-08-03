@@ -7,7 +7,7 @@ import SecureField from './secure'
 const Login = ({ entry, validate, onChange }) => {
   const generatePassword = () => {
     const password = generator.generate({ length: 12, numbers: true })
-    onChange({ target: { name: 'password', value: password }})
+    onChange({ target: { name: 'password', value: password } })
   }
 
   return (
