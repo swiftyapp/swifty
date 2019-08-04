@@ -7,14 +7,14 @@ import Note from './note'
 
 import { saveEntry, isValid } from 'actions/entries'
 
-import records from 'records'
+import entries from 'defaults/entries'
 
 const Form = ({ entry }) => {
   const dispatch = useDispatch()
   const { scope } = useSelector(state => state.filters)
 
   const [validate, setValidate] = useState(false)
-  const [model, setModel] = useState(entry || records[scope])
+  const [model, setModel] = useState(entry || entries[scope])
 
   const onCancel = () => {
     if (model.id) {
