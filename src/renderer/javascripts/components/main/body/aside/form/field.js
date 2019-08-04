@@ -1,7 +1,7 @@
 import React from 'react'
 import classnames from 'classnames'
 
-export default ({ name, entry, validate, onChange, rows }) => {
+export default ({ name, entry, validate, onChange, rows, maxLength }) => {
   const isEmpty = () => {
     return entry[name.toLowerCase()].trim() === ''
   }
@@ -18,6 +18,7 @@ export default ({ name, entry, validate, onChange, rows }) => {
           cols="10"
           rows={rows}
           onChange={onChange}
+          maxLength={maxLength ? maxLength : ''}
           value={entry[name.toLowerCase()]}
         />
       )
@@ -26,6 +27,7 @@ export default ({ name, entry, validate, onChange, rows }) => {
       <input
         name={name.toLowerCase()}
         type="text"
+        maxLength={maxLength ? maxLength : ''}
         onChange={onChange}
         value={entry[name.toLowerCase()]}
       />

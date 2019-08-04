@@ -16,25 +16,35 @@ const Card = ({ entry, validate, onChange }) => {
         validate={validate}
         entry={entry}
         onChange={onChange}
+        maxLength="19"
       />
       <Field
         name="Month"
         validate={validate}
         entry={entry}
         onChange={onChange}
+        maxLength="2"
       />
       <Field
         name="Year"
         validate={validate}
         entry={entry}
         onChange={onChange}
+        maxLength="4"
       />
-      <Field name="CVC" validate={validate} entry={entry} onChange={onChange} />
+      <Field
+        name="CVC"
+        validate={validate}
+        entry={entry}
+        onChange={onChange}
+        maxLength="4"
+      />
       <SecureField
         name="Pin"
         validate={validate}
         entry={entry}
         onChange={onChange}
+        maxLength="6"
       />
       <Field name="Name" entry={entry} onChange={onChange} />
     </>

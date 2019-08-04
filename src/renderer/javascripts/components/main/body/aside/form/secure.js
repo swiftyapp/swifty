@@ -3,7 +3,7 @@ import classnames from 'classnames'
 import View from 'view.svg'
 import Hide from 'hide.svg'
 
-export default ({ name, entry, validate, onChange, children }) => {
+export default ({ name, entry, validate, onChange, children, maxLength }) => {
   const [show, setShow] = useState(false)
 
   const toggleSecure = () => setShow(!show)
@@ -30,6 +30,7 @@ export default ({ name, entry, validate, onChange, children }) => {
             type="text"
             onChange={onChange}
             value={entry[name.toLowerCase()]}
+            maxLength={maxLength ? maxLength : ''}
           />
           <View
             width="16"

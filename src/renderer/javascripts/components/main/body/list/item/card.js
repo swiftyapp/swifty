@@ -11,7 +11,7 @@ const Card = ({ entry }) => {
       case '4':
         return <Visa width="32" />
       default:
-        return <CardIcon width="32" />
+        return <CardIcon width="30" />
     }
   }
   return (
