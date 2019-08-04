@@ -1,10 +1,8 @@
 import parseDomain from 'parse-domain'
 import icons from 'defaults/icons'
 import React from 'react'
-import Key from 'logins/key.svg'
 
 const Login = ({ entry }) => {
-
   const getIconKey = () => {
     try {
       return parseDomain(entry.website).domain
@@ -14,7 +12,7 @@ const Login = ({ entry }) => {
   }
 
   const icon = icons[getIconKey()] ? icons[getIconKey()] : icons['default']
-  
+
   return (
     <>
       <div className="icon web" style={{ backgroundColor: icon.color }}>
