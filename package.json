@@ -52,7 +52,12 @@
     "win": {
       "publish": null
     },
+    "linux": {
+      "category": "Utilities",
+      "target": ["deb", "rpm"]
+    },
     "mac": {
+      "icon": "build/icon.icns",
       "publish": [
         {
           "provider": "github",
