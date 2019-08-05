@@ -30,7 +30,10 @@ export const showAuth = (window, manager) => {
   promptAuth(window, manager)
     .then(() => {
       window.enlarge()
-      window.webContents.send('auth:success', manager.entries)
+      window.webContents.send('auth:success', {
+        entries: manager.entries,
+        platform: process.platform
+      })
     })
     .catch(() => {
       window.webContents.send('auth:fail')

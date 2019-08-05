@@ -28,6 +28,9 @@ export const showSetup = (window, manager) => {
   promptSetup(window, manager).then(password => {
     manager.setup(password)
     window.enlarge()
-    window.webContents.send('auth:success', manager.entries)
+    window.webContents.send('auth:success', {
+      entries: manager.entries,
+      platform: process.platform
+    })
   })
 }

@@ -25,6 +25,7 @@
       color: #858b8f
       font-weight: 300
       .logobar
+        display: none
         flex: 1
         line-height: 28px
         text-align: right
@@ -50,3 +51,6 @@
         border-left: 1px solid #eee
         &.shaded
           background: #fafafa
+
+[platform="darwin"] .layout .mainbar .header .logobar
+  display: block
