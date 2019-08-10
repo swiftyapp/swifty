@@ -1,12 +1,13 @@
 import React from 'react'
 import generator from 'generate-password'
+import { getProps } from 'defaults/generator'
 
 import Field from './field'
 import SecureField from './secure'
 
 const Login = ({ entry, validate, onChange }) => {
   const generatePassword = () => {
-    const password = generator.generate({ length: 12, numbers: true })
+    const password = generator.generate(getProps())
     onChange({ target: { name: 'password', value: password } })
   }
 
