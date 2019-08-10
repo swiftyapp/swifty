@@ -25,6 +25,15 @@ export default class Storage {
     }
   }
 
+  remove(name) {
+    try {
+      return fs.unlinkSync(this.filePath(name))
+    } catch (error) {
+      /* eslint-disable-next-line no-console */
+      console.log(error)
+    }
+  }
+
   dirPath() {
     return path.join(app.getPath('appData'), app.getName(), 'credentials')
   }

@@ -31,5 +31,14 @@ ipcRenderer.on('auth', (event, touchID) => {
 ipcRenderer.on('auth:success', (event, data) => {
   document.getElementById('root').setAttribute('platform', data.platform)
   store.dispatch({ type: 'SET_ENTRIES', entries: data.entries })
-  store.dispatch({ type: 'FLOW_MAIN', sync: data.sync })
+  store.dispatch({ type: 'FLOW_MAIN' })
+  store.dispatch({ type: 'SYNC_INIT', enabled: data.sync })
+})
+
+ipcRenderer.on('vault:sync:disconnected', () => {
+  store.dispatch({ type: 'SYNC_DISCONNECTED' })
+})
+
+ipcRenderer.on('vault:sync:connected', () => {
+  store.dispatch({ type: 'SYNC_CONNECTED' })
 })

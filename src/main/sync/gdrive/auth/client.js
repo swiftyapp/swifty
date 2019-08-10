@@ -13,10 +13,15 @@ export default class Client {
     this.storage = new Storage()
     this.refreshToken = this.storage.read('refresh_token')
     this.accessToken = this.storage.read('access_token')
-    if (this.refreshToken) {
+    if (this.refreshToken && this.accessToken) {
       this.setupAuth()
       this.setupCredentials()
     }
+  }
+
+  disconnect() {
+    this.storage.remove('access_token')
+    delete this.auth
   }
 
   setupAuth() {

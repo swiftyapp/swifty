@@ -79,15 +79,26 @@ export default class Swifty extends Application {
       this.manager.saveBackup(filepath)
     })
 
-    ipcMain.on('backup:sync:start', () => {
+    ipcMain.on('vault:sync:start', () => {
       if (this.gdrive.isConfigured()) {
-        this.gdrive.sync()
+        this.gdrive.sync().then(() => {
+          this.window.webContents.send('vault:sync:stop')
+        })
       }
     })
 
-    ipcMain.on('backup:sync:setup', () => {
+    ipcMain.on('vault:sync:connect', () => {
       if (!this.gdrive.isConfigured()) {
-        this.gdrive.setup()
+        this.gdrive.setup().then(() => {
+          this.window.webContents.send('vault:sync:connected')
+        })
+      }
+    })
+
+    ipcMain.on('vault:sync:disconnect', () => {
+      if (this.gdrive.isConfigured()) {
+        this.gdrive.disconnect()
+        this.window.webContents.send('vault:sync:disconnected')
       }
     })
   }

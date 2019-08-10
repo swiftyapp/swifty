@@ -9,6 +9,10 @@ export default (
       return { name: 'auth', touchID: action.touchID }
     case 'FLOW_MAIN':
       return { ...state, name: 'main', sync: action.sync }
+    case 'SYNC_DISCONNECTED':
+      return { ...state, sync: false }
+    case 'SYNC_CONNECTED':
+      return { ...state, sync: true }
     default:
       return state
   }

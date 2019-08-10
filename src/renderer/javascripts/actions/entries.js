@@ -6,7 +6,11 @@ export const deleteEntry = id => {
     ipcRenderer.once('item:removed', (event, items) => {
       dispatch({ type: 'ENTRY_REMOVED', entries: items })
     })
-    //ipcRenderer.send('backup:sync:start')
+    dispatch({ type: 'SYNC_START' })
+    ipcRenderer.send('vault:sync:start')
+    ipcRenderer.once('vault:sync:stop', () => {
+      dispatch({ type: 'SYNC_STOP' })
+    })
   }
 }
 
@@ -17,7 +21,11 @@ export const saveEntry = credentials => {
       dispatch({ type: 'SET_ENTRIES', ...data })
       dispatch({ type: 'ENTRY_SAVED', ...data })
     })
-    // ipcRenderer.send('backup:sync:start')
+    dispatch({ type: 'SYNC_START' })
+    ipcRenderer.send('vault:sync:start')
+    ipcRenderer.once('vault:sync:stop', () => {
+      dispatch({ type: 'SYNC_STOP' })
+    })
   }
 }
 

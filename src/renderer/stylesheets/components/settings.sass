@@ -1,0 +1,52 @@
+.preferences
+  display: flex
+  flex-direction: row
+  flex-wrap: wrap
+  width: 100%
+  max-height: 100%
+  min-height: 500px
+  line-height: 30px
+  color: #333
+  .navigation
+    display: flex
+    flex-direction: column
+    flex: 1
+    border-radius: 10px 0 0 10px
+    border-right: 1px solid #eee
+    background: #fafafa
+    padding: 20px 10px
+    margin: 0
+    li
+      padding: 0 10px
+      border-radius: 3px
+      margin-bottom: 4px
+      line-height: 30px
+      &:hover
+        background: rgba(100, 100, 100, .07)
+      &.current
+        color: #fff
+        background: #4792ff
+  .body
+    flex: 3
+    padding: 10px 20px 20px 20px
+    overflow-y: auto
+    max-height: 100%
+    h1
+      padding-top: 10px
+      margin-bottom: 20px
+    .section
+      margin-bottom: 20px
+    .button
+      position: relative
+      line-height: 12px
+      background: #b2bec3
+      &.iconed
+        padding-left: 35px
+      &.danger
+        background: #d63031
+      svg
+        position: absolute
+        top: 6px
+        left: 10px
+      path
+        fill: #fff
