@@ -35,6 +35,14 @@ ipcRenderer.on('auth:success', (event, data) => {
   store.dispatch({ type: 'SYNC_INIT', enabled: data.sync })
 })
 
+ipcRenderer.on('vault:sync:started', () => {
+  store.dispatch({ type: 'SYNC_START' })
+})
+
+ipcRenderer.on('vault:sync:stopped', (event, data) => {
+  store.dispatch({ type: 'SYNC_STOP', ...data })
+})
+
 ipcRenderer.on('vault:sync:disconnected', () => {
   store.dispatch({ type: 'SYNC_DISCONNECTED' })
 })
