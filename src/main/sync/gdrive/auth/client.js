@@ -1,10 +1,7 @@
-import dotenv from 'dotenv'
 import { google } from 'googleapis'
 import { DateTime } from 'luxon'
 import AuthWindow from '../../../window/auth'
 import Storage from './storage'
-
-dotenv.config()
 
 export default class Client {
   constructor() {
