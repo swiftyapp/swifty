@@ -1,11 +1,23 @@
 import React from 'react'
+import classnames from 'classnames'
 
-export default class Navigation extends React.Component {
-  render() {
-    return (
-      <ul className="navigation">
-        <li className="current">Vault Settings</li>
-      </ul>
-    )
-  }
+const Navigation = ({ section, onClick }) => {
+  return (
+    <ul className="navigation">
+      <li
+        className={classnames({ current: section === 'vault' })}
+        onClick={() => onClick('vault')}
+      >
+        Vault Settings
+      </li>
+      <li
+        className={classnames({ current: section === 'password' })}
+        onClick={() => onClick('password')}
+      >
+        Password Generation
+      </li>
+    </ul>
+  )
 }
+
+export default Navigation

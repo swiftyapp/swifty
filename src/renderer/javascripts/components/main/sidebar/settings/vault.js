@@ -3,7 +3,7 @@ import { ipcRenderer, remote } from 'electron'
 import { useSelector } from 'react-redux'
 import DownloadIcon from 'download.svg'
 
-const Vault = () => {
+const Vault = ({ section }) => {
   const syncEnabled = useSelector(state => state.sync.enabled)
 
   const onClickSaveBackup = () => {
@@ -34,6 +34,8 @@ const Vault = () => {
       </div>
     )
   }
+
+  if (section !== 'vault') return null
 
   return (
     <>
