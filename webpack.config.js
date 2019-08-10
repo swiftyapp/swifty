@@ -2,16 +2,16 @@ var path = require('path')
 
 module.exports = {
   renderer: {
-    target: "electron-renderer",
+    target: 'electron-renderer',
     module: {
       rules: [
         {
           test: /\.js$/,
           exclude: /node_modules/,
           use: {
-            loader: "babel-loader",
+            loader: 'babel-loader',
             query: {
-               presets: ["@babel/react", "@babel/preset-env"]
+              presets: ['@babel/react', '@babel/preset-env']
             }
           }
         },
@@ -20,13 +20,13 @@ module.exports = {
           exclude: /node_modules/,
           use: [
             {
-              loader: "style-loader"
+              loader: 'style-loader'
             },
             {
-              loader: "css-loader"
+              loader: 'css-loader'
             },
             {
-              loader: "sass-loader"
+              loader: 'sass-loader'
             }
           ]
         },
@@ -34,10 +34,10 @@ module.exports = {
           test: /\.svg$/,
           use: [
             {
-              loader: "babel-loader"
+              loader: 'babel-loader'
             },
             {
-              loader: "react-svg-loader"
+              loader: 'react-svg-loader'
             }
           ]
         },
@@ -46,11 +46,11 @@ module.exports = {
           use: [
             {
               loader: 'file-loader',
-              options: {},
-            },
-          ],
-        },
-      ],
+              options: {}
+            }
+          ]
+        }
+      ]
     },
     resolve: {
       modules: [
@@ -62,7 +62,7 @@ module.exports = {
     }
   },
   main: {
-    target: "electron-main",
+    target: 'electron-main',
     module: {
       rules: [
         {
@@ -72,16 +72,16 @@ module.exports = {
               loader: 'file-loader',
               options: {
                 name: '[name].[ext]'
-              },
-            },
-          ],
+              }
+            }
+          ]
         }
       ]
     },
     resolve: {
       modules: [
         path.resolve(__dirname, 'resources'),
-        path.resolve(__dirname, 'node_modules'),
+        path.resolve(__dirname, 'node_modules')
       ]
     }
   }

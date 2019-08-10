@@ -21,7 +21,8 @@
   },
   "scripts": {
     "lint": "npx eslint --color src",
-    "test": "yarn lint && bozon test"
+    "start": "NODE_ENV=development bozon start",
+    "test": "NODE_ENV=test yarn lint && bozon test"
   },
   "author": {
     "name": "Alex Chaplinsky",

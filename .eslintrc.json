@@ -17,12 +17,9 @@
     "ecmaVersion": 2018,
     "sourceType": "module"
   },
-  "plugins": [
-    "react",
-    "prettier"
-  ],
+  "plugins": ["react", "prettier"],
   "rules": {
-    "prettier/prettier": ["error", {"singlQuote": true, "parser": "flow"}],
+    "prettier/prettier": ["error", { "singlQuote": true, "parser": "flow" }],
     "react/jsx-uses-react": 1,
     "react/jsx-uses-vars": 1,
     "no-console": "warn"
