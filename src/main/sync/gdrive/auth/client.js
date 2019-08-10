@@ -3,10 +3,8 @@ import { google } from 'googleapis'
 import { DateTime } from 'luxon'
 import AuthWindow from '../../../window/auth'
 import Storage from './storage'
-const {
-  GOOGLE_OAUTH_CLIENT_ID,
-  GOOGLE_OAUTH_CLIENT_SECRET
-} = dotenv.config().parsed
+
+dotenv.config()
 
 export default class Client {
   constructor() {
@@ -26,8 +24,8 @@ export default class Client {
 
   setupAuth() {
     this.auth = new google.auth.OAuth2(
-      GOOGLE_OAUTH_CLIENT_ID,
-      GOOGLE_OAUTH_CLIENT_SECRET,
+      process.env.GOOGLE_OAUTH_CLIENT_ID,
+      process.env.GOOGLE_OAUTH_CLIENT_SECRET,
       `${CONFIG.apiHost}/google_oauth2/callback`
     )
     this.auth.on('tokens', tokens => this.storeTokens(tokens))
