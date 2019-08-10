@@ -1,5 +1,6 @@
 .DS_Store
 .tmp
+.env
 node_modules
 builds
 packages

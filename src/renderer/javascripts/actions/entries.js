@@ -17,7 +17,7 @@ export const saveEntry = credentials => {
       dispatch({ type: 'SET_ENTRIES', ...data })
       dispatch({ type: 'ENTRY_SAVED', ...data })
     })
-    //ipcRenderer.send('backup:sync:start')
+    // ipcRenderer.send('backup:sync:start')
   }
 }
 

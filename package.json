@@ -6,8 +6,9 @@
   "dependencies": {
     "classnames": "^2.2.6",
     "cryptr": "^4.0.2",
+    "dotenv": "^8.0.0",
     "generate-password": "^1.4.2",
-    "googleapis": "39",
+    "googleapis": "^42.0.0",
     "luxon": "^1.17.2",
     "nucleon": "^1.0.5",
     "parse-domain": "^2.3.1",
