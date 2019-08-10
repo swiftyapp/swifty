@@ -1,5 +1,4 @@
 import React from 'react'
-import classnames from 'classnames'
 
 export default class Navigation extends React.Component {
   render() {
