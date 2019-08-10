@@ -1,4 +1,10 @@
 {
   "reload": true,
-  "devTools": true
+  "devTools": true,
+  "apiHost": "http://localhost:3000",
+  "googleOauth": {
+    "clientId": "968373227094-hje6id9sho581kckt0ri2suc3vdggknv.apps.googleusercontent.com",
+    "clientSecret": "QrfdKz-SzdowfJ3p2yoa_xxs",
+    "scope": "https://www.googleapis.com/auth/drive.file"
+  }
 }

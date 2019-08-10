@@ -12,7 +12,7 @@ describe('Authentication with master password', function() {
       return expect(
         app.client
           .setValue('input[type=password]', 'word')
-          .keys("\uE007")
+          .keys('\uE007')
           .getText('.error-message')
       ).to.eventually.equal('Incorrect Master Password')
     })
@@ -21,10 +21,9 @@ describe('Authentication with master password', function() {
       return expect(
         app.client
           .setValue('input[type=password]', 'password')
-          .keys("\uE007")
-          .waitForExist('.logobar')
-          .getText('.logobar')
-      ).to.eventually.equal('Swifty')
+          .keys('\uE007')
+          .isExisting('.sync-indicator')
+      ).to.eventually.equal(true)
     })
   })
 })

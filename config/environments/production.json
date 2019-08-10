@@ -1,4 +1,10 @@
 {
   "reload": false,
-  "devTools": false
+  "devTools": false,
+  "apiHost": "http://api.getswifty.pro",
+  "googleOauth": {
+    "clientId": "968373227094-gto9gk2sec62egj3o9gujihn578u0589.apps.googleusercontent.com",
+    "clientSecret": "vGB5aKwC4-n0mhVmO4P9APUC",
+    "scope": "https://www.googleapis.com/auth/drive.file"
+  }
 }

@@ -6,6 +6,7 @@ export const deleteEntry = id => {
     ipcRenderer.once('item:removed', (event, items) => {
       dispatch({ type: 'ENTRY_REMOVED', entries: items })
     })
+    //ipcRenderer.send('backup:sync:start')
   }
 }
 
@@ -16,6 +17,7 @@ export const saveEntry = credentials => {
       dispatch({ type: 'SET_ENTRIES', ...data })
       dispatch({ type: 'ENTRY_SAVED', ...data })
     })
+    //ipcRenderer.send('backup:sync:start')
   }
 }
 

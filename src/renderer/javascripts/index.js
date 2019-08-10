@@ -29,7 +29,7 @@ ipcRenderer.on('auth', (event, touchID) => {
 })
 
 ipcRenderer.on('auth:success', (event, data) => {
-  document.getElementById('root').setAttribute('platform',data.platform)
+  document.getElementById('root').setAttribute('platform', data.platform)
   store.dispatch({ type: 'SET_ENTRIES', entries: data.entries })
-  store.dispatch({ type: 'FLOW_MAIN' })
+  store.dispatch({ type: 'FLOW_MAIN', sync: data.sync })
 })

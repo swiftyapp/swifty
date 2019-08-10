@@ -1,6 +1,6 @@
 import { ipcMain, systemPreferences } from 'electron'
 
-const promptAuth = (window, manager) => {
+export const promptAuth = (window, manager) => {
   return new Promise((resolve, reject) => {
     const touchID =
       manager.cryptr !== null && systemPreferences.canPromptTouchID()
@@ -24,19 +24,4 @@ const promptAuth = (window, manager) => {
       }
     })
   })
-}
-
-export const showAuth = (window, manager) => {
-  promptAuth(window, manager)
-    .then(() => {
-      window.enlarge()
-      window.webContents.send('auth:success', {
-        entries: manager.entries,
-        platform: process.platform
-      })
-    })
-    .catch(() => {
-      window.webContents.send('auth:fail')
-      showAuth(window, manager)
-    })
 }

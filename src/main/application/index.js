@@ -3,8 +3,9 @@ import { Application } from 'nucleon'
 import Window from '../window'
 import Manager from '../manager'
 import Tray from '../tray'
-import { showSetup } from './setup'
-import { showAuth } from './auth'
+import GDrive from '../sync/gdrive'
+import { promptSetup } from './prompt/setup'
+import { promptAuth } from './prompt/auth'
 
 const INACTIVE_TIMEOUT = 60000
 
@@ -27,17 +28,21 @@ export default class Swifty extends Application {
     this.shouldShowAuth = false
     this.manager = new Manager()
     this.tray = new Tray(this)
+    this.gdrive = new GDrive()
   }
 
   onWindowReady() {
     this.setupWindowEvents()
     this.subscribeForEvents()
     if (this.manager.isPristineStorage()) {
-      return showSetup(this.window, this.manager)
+      return this.showSetup(this.window, this.manager)
     }
-    return showAuth(this.window, this.manager)
+    return this.showAuth(this.window, this.manager)
   }
 
+  /**
+   * Application Events
+   */
   setupWindowEvents() {
     this.window.on('close', () => {
       this.shouldShowAuth = true
@@ -51,7 +56,7 @@ export default class Swifty extends Application {
     this.window.on('show', () => {
       clearTimeout(this.inactiveTimeout)
       if (this.shouldShowAuth) {
-        showAuth(this.window, this.manager)
+        this.showAuth(this.window, this.manager)
         this.shouldShowAuth = false
       }
     })
@@ -73,5 +78,47 @@ export default class Swifty extends Application {
     ipcMain.on('backup:save', (event, filepath) => {
       this.manager.saveBackup(filepath)
     })
+
+    ipcMain.on('backup:sync:start', () => {
+      if (this.gdrive.isConfigured()) {
+        this.gdrive.sync()
+      }
+    })
+
+    ipcMain.on('backup:sync:setup', () => {
+      if (!this.gdrive.isConfigured()) {
+        this.gdrive.setup()
+      }
+    })
+  }
+
+  /**
+   * Authentication and Setup
+   */
+  showAuth() {
+    promptAuth(this.window, this.manager)
+      .then(() => this.authSuccess())
+      .catch(() => this.authFail())
+  }
+
+  showSetup() {
+    promptSetup(this.window, this.manager).then(password => {
+      this.manager.setup(password)
+      this.authSuccess()
+    })
+  }
+
+  authSuccess() {
+    this.window.enlarge()
+    this.window.webContents.send('auth:success', {
+      entries: this.manager.entries,
+      platform: process.platform,
+      sync: this.gdrive.isConfigured()
+    })
+  }
+
+  authFail() {
+    this.window.webContents.send('auth:fail')
+    this.showAuth()
   }
 }
