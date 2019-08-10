@@ -81,9 +81,16 @@ export default class Swifty extends Application {
 
     ipcMain.on('vault:sync:start', () => {
       if (this.gdrive.isConfigured()) {
-        this.gdrive.sync().then(() => {
-          this.window.webContents.send('vault:sync:stop')
-        })
+        this.gdrive
+          .sync()
+          .then(() => {
+            this.window.webContents.send('vault:sync:stop', { success: true })
+          })
+          .catch(error => {
+            this.window.webContents.send('vault:sync:stop', { success: false })
+            /* eslint-disable-next-line no-console */
+            console.log(error)
+          })
       }
     })
 

@@ -34,23 +34,18 @@ export default class GDrive {
     const { folderName, fileName } = this
     const drive = google.drive({ version: 'v3', auth: this.client.auth })
 
-    return (
-      folderExists(folderName, drive)
-        .then(folderId => {
-          if (!folderId) {
-            return createFolder(folderName, drive).then(folderId => {
-              return createFile(fileName, folderId, this.storage.read(), drive)
-            })
-          }
-          return fileExists(fileName, folderId, drive).then(fileId => {
-            if (!fileId) {
-              return createFile(fileName, folderId, this.storage.read(), drive)
-            }
-            return updateFile(fileId, this.storage.read(), drive)
-          })
+    return folderExists(folderName, drive).then(folderId => {
+      if (!folderId) {
+        return createFolder(folderName, drive).then(folderId => {
+          return createFile(fileName, folderId, this.storage.read(), drive)
         })
-        /* eslint-disable-next-line no-console */
-        .catch(error => console.log(error))
-    )
+      }
+      return fileExists(fileName, folderId, drive).then(fileId => {
+        if (!fileId) {
+          return createFile(fileName, folderId, this.storage.read(), drive)
+        }
+        return updateFile(fileId, this.storage.read(), drive)
+      })
+    })
   }
 }

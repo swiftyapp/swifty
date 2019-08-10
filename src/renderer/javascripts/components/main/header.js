@@ -27,7 +27,11 @@ export default () => {
         <input type="text" placeholder="Search" onChange={filterItems} />
       </div>
       <div
-        className={classnames('sync-indicator', { loading: sync.inProgress })}
+        className={classnames('sync-indicator', {
+          loading: sync.inProgress,
+          success: sync.success,
+          failure: !sync.success
+        })}
       >
         <div className="spinner" />
         {getIcon()}

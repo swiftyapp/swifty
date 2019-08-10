@@ -8,8 +8,8 @@ export const deleteEntry = id => {
     })
     dispatch({ type: 'SYNC_START' })
     ipcRenderer.send('vault:sync:start')
-    ipcRenderer.once('vault:sync:stop', () => {
-      dispatch({ type: 'SYNC_STOP' })
+    ipcRenderer.once('vault:sync:stop', (event, data) => {
+      dispatch({ type: 'SYNC_STOP', ...data })
     })
   }
 }
@@ -23,8 +23,8 @@ export const saveEntry = credentials => {
     })
     dispatch({ type: 'SYNC_START' })
     ipcRenderer.send('vault:sync:start')
-    ipcRenderer.once('vault:sync:stop', () => {
-      dispatch({ type: 'SYNC_STOP' })
+    ipcRenderer.once('vault:sync:stop', (event, data) => {
+      dispatch({ type: 'SYNC_STOP', ...data })
     })
   }
 }

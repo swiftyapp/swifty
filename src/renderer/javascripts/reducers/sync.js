@@ -1,4 +1,7 @@
-export default (state = { enabled: false, inProgress: false }, action) => {
+export default (
+  state = { enabled: false, inProgress: false, success: true },
+  action
+) => {
   switch (action.type) {
     case 'SYNC_INIT':
       return { ...state, enabled: action.enabled }
@@ -7,9 +10,9 @@ export default (state = { enabled: false, inProgress: false }, action) => {
     case 'SYNC_CONNECTED':
       return { ...state, enabled: true }
     case 'SYNC_START':
-      return { ...state, inProgress: true }
+      return { ...state, inProgress: true, success: true }
     case 'SYNC_STOP':
-      return { ...state, inProgress: false }
+      return { ...state, inProgress: false, success: action.success }
     default:
       return state
   }
