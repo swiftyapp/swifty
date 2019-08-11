@@ -42,3 +42,12 @@ export const updateFile = (fileId, content, drive) => {
     media: { body: content }
   })
 }
+
+export const readFile = (fileId, drive) => {
+  return new Promise((resolve, reject) => {
+    return drive.files
+      .get({ fileId: fileId, alt: 'media' })
+      .then(response => resolve(response.data))
+      .catch(error => reject(error))
+  })
+}

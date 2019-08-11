@@ -6,7 +6,8 @@ import {
   fileExists,
   createFolder,
   createFile,
-  updateFile
+  updateFile,
+  readFile
 } from './files'
 
 export default class GDrive {
@@ -28,6 +29,22 @@ export default class GDrive {
 
   disconnect() {
     return this.client.disconnect()
+  }
+
+  import() {
+    const { folderName, fileName } = this
+    return this.setup().then(() => {
+      const drive = google.drive({ version: 'v3', auth: this.client.auth })
+      return folderExists(folderName, drive).then(folderId => {
+        if (!folderId) return null
+        return fileExists(fileName, folderId, drive).then(fileId => {
+          if (!fileId) return null
+          return readFile(fileId, drive).then(data => {
+            this.storage.write(data)
+          })
+        })
+      })
+    })
   }
 
   sync() {

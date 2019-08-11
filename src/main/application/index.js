@@ -79,6 +79,13 @@ export default class Swifty extends Application {
       this.manager.saveBackup(filepath)
     })
 
+    ipcMain.on('vault:import', () => {
+      this.gdrive.import().then(() => {
+        this.manager.readData()
+        return this.showAuth(this.window, this.manager)
+      })
+    })
+
     ipcMain.on('vault:sync:start', () => {
       if (this.gdrive.isConfigured()) {
         this.window.webContents.send('vault:sync:started')
@@ -119,13 +126,13 @@ export default class Swifty extends Application {
    * Authentication and Setup
    */
   showAuth() {
-    promptAuth(this.window, this.manager)
+    return promptAuth(this.window, this.manager)
       .then(() => this.authSuccess())
       .catch(() => this.authFail())
   }
 
   showSetup() {
-    promptSetup(this.window, this.manager).then(password => {
+    return promptSetup(this.window, this.manager).then(password => {
       this.manager.setup(password)
       this.authSuccess()
     })

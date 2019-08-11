@@ -7,13 +7,21 @@ export default ({ display, onImport }) => {
     ipcRenderer.once('backup:loaded', () => onImport())
   }
 
+  const onGdriveSync = () => {
+    ipcRenderer.send('vault:import')
+  }
+
   if (!display) return null
 
   return (
-    <div className="bottom-lock">
+    <>
       <div className="button choose-file" onClick={chooseFle}>
         Choose backup File
       </div>
-    </div>
+      <p>or</p>
+      <div className="button" onClick={() => onGdriveSync()}>
+        Import from Google Drive
+      </div>
+    </>
   )
 }

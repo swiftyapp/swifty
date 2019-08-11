@@ -21,7 +21,7 @@ export default ({ display }) => {
   if (!display) return null
 
   return (
-    <div className="bottom-lock">
+    <>
       <Masterpass
         placeholder="Enter Master Password"
         error={error}
@@ -31,6 +31,6 @@ export default ({ display }) => {
       <div className="button" onClick={onClick}>
         Finish
       </div>
-    </div>
+    </>
   )
 }

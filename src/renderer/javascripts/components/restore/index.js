@@ -19,8 +19,10 @@ export default () => {
           backup file. Your Master Password will be required for this.
         </div>
       </div>
-      <Import display={step !== 'confirmation'} onImport={onImport} />
-      <Confirm display={step === 'confirmation'} />
+      <div className="bottom-lock">
+        <Import display={step !== 'confirmation'} onImport={onImport} />
+        <Confirm display={step === 'confirmation'} />
+      </div>
     </div>
   )
 }
