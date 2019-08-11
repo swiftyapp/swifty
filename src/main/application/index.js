@@ -50,7 +50,7 @@ export default class Swifty extends Application {
     })
     this.window.on('hide', () => {
       this.inactiveTimeout = setTimeout(() => {
-        this.shouldShowAuth = true
+        if (this.manager.cryptr) this.shouldShowAuth = true
       }, INACTIVE_TIMEOUT)
     })
     this.window.on('show', () => {
@@ -80,7 +80,8 @@ export default class Swifty extends Application {
     })
 
     ipcMain.on('vault:import', () => {
-      this.gdrive.import().then(() => {
+      this.gdrive.import().then(data => {
+        this.manager.provider.write(data)
         this.manager.readData()
         return this.showAuth(this.window, this.manager)
       })
