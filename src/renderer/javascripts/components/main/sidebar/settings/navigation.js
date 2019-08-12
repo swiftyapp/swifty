@@ -14,7 +14,7 @@ const Navigation = ({ section, onClick }) => {
         className={classnames({ current: section === 'password' })}
         onClick={() => onClick('password')}
       >
-        Password Generation
+        Password
       </li>
     </ul>
   )

@@ -34,7 +34,7 @@
     "@babel/preset-env": "^7.5.5",
     "@babel/preset-react": "^7.0.0",
     "babel-loader": "^8.0.6",
-    "bozon": "^0.10.1",
+    "bozon": "^0.10.2",
     "chai": "^4.2.0",
     "chai-as-promised": "^7.1.1",
     "css-loader": "^3.2.0",
@@ -54,7 +54,8 @@
   "build": {
     "appId": "com.electron.swifty",
     "win": {
-      "publish": null
+      "publish": null,
+      "icon": "build/icon.ico"
     },
     "linux": {
       "category": "Utilities",
