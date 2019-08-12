@@ -39,10 +39,13 @@ export default class FileStorage {
     if (process.env.SPECTRON_STORAGE_PATH) {
       return process.env.SPECTRON_STORAGE_PATH
     }
-    return path.join(
-      app.getPath('appData'),
-      app.getName(),
-      'storage_default.swftx'
-    )
+    return path.join(app.getPath('appData'), app.getName(), this.fileName())
+  }
+
+  fileName() {
+    if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
+      return 'storage_default.swftx'
+    }
+    return `storage_${process.env.APP_ENV}.swftx`
   }
 }

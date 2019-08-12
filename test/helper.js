@@ -4,7 +4,16 @@ const fs = require('fs')
 const appPath = () => {
   switch (process.platform) {
     case 'darwin':
-      return path.join(__dirname, '..', '.tmp', 'mac', 'Swifty.app', 'Contents', 'MacOS', 'Swifty')
+      return path.join(
+        __dirname,
+        '..',
+        '.tmp',
+        'mac',
+        'Swifty.app',
+        'Contents',
+        'MacOS',
+        'Swifty'
+      )
     case 'linux':
       return path.join(__dirname, '..', '.tmp', 'linux-unpacked', 'swifty')
     default:
@@ -12,7 +21,7 @@ const appPath = () => {
   }
 }
 
-const fixturePath = (file) => {
+const fixturePath = file => {
   return path.join(process.cwd(), 'test', 'fixtures', file)
 }
 
@@ -36,7 +45,11 @@ const beforeHelper = options => {
   if (options && options.storage) prepareStorage(options.storage)
   global.app = new Application({
     path: appPath(),
-    env: { SPECTRON_STORAGE_PATH: storageFile(), RUNNING_IN_SPECTRON: 1 }
+    env: {
+      SPECTRON_STORAGE_PATH: storageFile(),
+      RUNNING_IN_SPECTRON: 1,
+      APP_ENV: 'test'
+    }
   })
   return app.start()
 }

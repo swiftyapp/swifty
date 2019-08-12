@@ -15,7 +15,7 @@ export default class GDrive {
     this.storage = new Storage()
     this.client = new Client()
     this.folderName = 'Swifty'
-    this.fileName = 'storage_default.sftx'
+    this.fileName = this.storage.fileName()
   }
 
   isConfigured() {
