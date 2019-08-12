@@ -1,4 +1,5 @@
 var path = require('path')
+var Dotenv = require('dotenv-webpack')
 
 module.exports = {
   renderer: {
@@ -78,6 +79,11 @@ module.exports = {
         }
       ]
     },
+    plugins: [
+      new Dotenv({
+        path: path.resolve(__dirname, '.env')
+      })
+    ],
     resolve: {
       modules: [
         path.resolve(__dirname, 'resources'),
