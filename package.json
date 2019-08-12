@@ -53,26 +53,26 @@
   },
   "build": {
     "appId": "com.electron.swifty",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "alchaplinsky",
+        "repo": "swifty"
+      }
+    ],
     "win": {
-      "publish": null,
       "icon": "build/icon.ico"
     },
     "linux": {
       "category": "Utilities",
       "target": [
         "deb",
-        "rpm"
+        "rpm",
+        "AppImage"
       ]
     },
     "mac": {
       "icon": "build/icon.icns",
-      "publish": [
-        {
-          "provider": "github",
-          "owner": "alchaplinsky",
-          "repo": "swifty"
-        }
-      ],
       "category": "your.app.category.type"
     }
   }
