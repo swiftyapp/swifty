@@ -1,7 +1,7 @@
 {
   "reload": false,
   "devTools": false,
-  "apiHost": "http://api.getswifty.pro",
+  "apiHost": "http://getswifty.pro",
   "googleOauth": {
     "scope": "https://www.googleapis.com/auth/drive.file"
   }
