@@ -92,7 +92,7 @@ export default {
     icon: RedditIcon
   },
   skype: {
-    color: '#BD081C',
+    color: '#00aff0',
     icon: SkypeIcon
   },
   snapchat: {
