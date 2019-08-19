@@ -19,11 +19,10 @@ export default class GDrive {
   }
 
   isConfigured() {
-    return this.client.auth !== undefined
+    return this.client.isConfigured()
   }
 
   setup() {
-    this.client.setupAuth()
     return this.client.authenticate()
   }
 
@@ -36,7 +35,7 @@ export default class GDrive {
   }
 
   getFileContents() {
-    const drive = google.drive({ version: 'v3', auth: this.client.auth })
+    const drive = google.drive({ version: 'v3', auth: this.client.getAuth() })
 
     return new Promise((resolve, reject) => {
       folderExists(this.folderName, drive).then(folderId => {
@@ -50,7 +49,7 @@ export default class GDrive {
   }
 
   sync() {
-    const drive = google.drive({ version: 'v3', auth: this.client.auth })
+    const drive = google.drive({ version: 'v3', auth: this.client.getAuth() })
 
     return folderExists(this.folderName, drive).then(folderId => {
       if (!folderId) {

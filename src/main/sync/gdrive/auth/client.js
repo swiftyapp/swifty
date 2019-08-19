@@ -6,20 +6,6 @@ import Storage from './storage'
 export default class Client {
   constructor() {
     this.storage = new Storage()
-    this.refreshToken = this.storage.read('refresh_token')
-    this.accessToken = this.storage.read('access_token')
-    if (this.refreshToken && this.accessToken) {
-      this.setupAuth()
-      this.setupCredentials()
-    }
-  }
-
-  disconnect() {
-    this.storage.remove('access_token')
-    delete this.auth
-  }
-
-  setupAuth() {
     this.auth = new google.auth.OAuth2(
       process.env.GOOGLE_OAUTH_CLIENT_ID,
       process.env.GOOGLE_OAUTH_CLIENT_SECRET,
@@ -28,27 +14,15 @@ export default class Client {
     this.auth.on('tokens', tokens => this.storeTokens(tokens))
   }
 
-  setupCredentials() {
-    if (this.isExpiredAccessToken()) {
-      this.auth.setCredentials({ refresh_token: this.refreshToken })
-    } else {
-      this.auth.setCredentials(this.accessToken)
-    }
+  getAuth() {
+    this.actualizeCredentials()
+    return this.auth
   }
 
-  isExpiredAccessToken() {
-    const expiry = DateTime.fromMillis(this.accessToken.expiry_date)
-    return expiry.diffNow('seconds').toObject().seconds < 60
-  }
-
-  storeTokens(tokens) {
-    if (tokens.refresh_token) {
-      this.refreshToken = tokens.refresh_token
-      delete tokens.refresh_token
-      this.storage.write('refresh_token', this.refreshToken)
-    }
-    this.auth.setCredentials(tokens)
-    this.storage.write('access_token', tokens)
+  isConfigured() {
+    return (
+      this.storage.read('access_token') && this.storage.read('refresh_token')
+    )
   }
 
   authenticate() {
@@ -58,6 +32,36 @@ export default class Client {
       this.authWindow.close()
       return this.auth.getToken(code)
     })
+  }
+
+  disconnect() {
+    this.storage.remove('access_token')
+    delete this.auth
+  }
+
+  actualizeCredentials() {
+    const accessToken = this.storage.read('access_token')
+    const refreshToken = this.storage.read('refresh_token')
+
+    if (this.isExpiredAccessToken(accessToken)) {
+      this.auth.setCredentials({ refresh_token: refreshToken })
+    } else {
+      this.auth.setCredentials(accessToken)
+    }
+  }
+
+  isExpiredAccessToken(accessToken) {
+    const expiry = DateTime.fromMillis(accessToken.expiry_date)
+    return expiry.diffNow('seconds').toObject().seconds < 60
+  }
+
+  storeTokens(tokens) {
+    if (tokens.refresh_token) {
+      this.storage.write('refresh_token', tokens.refresh_token)
+      delete tokens.refresh_token
+    }
+    this.auth.setCredentials(tokens)
+    this.storage.write('access_token', tokens)
   }
 
   authUrl() {
