@@ -7,9 +7,19 @@
   display: flex
   justify-content: center
   align-items: center
+  background: #f5f5f5
   
   svg
     position: absolute
+
+  .success-icon
+    position: absolute
+    top: 2px
+    right: -2px
+  .error-icon
+    position: absolute
+    top: 2px
+    right: 3px
   
   .monochrome path
     fill: #4792ff
@@ -23,10 +33,9 @@
   .spinner
     font-size: 10px
     position: relative
-    border-top: 2px solid rgba(71, 146, 255, 0.3)
-    border-right: 2px solid rgba(71, 146, 255, 0.3)
-    border-bottom: 2px solid rgba(71, 146, 255, 0.3)
-    border-left: 2px solid rgba(71, 146, 255, 0.3)
+    border-width: 2px
+    border-style: solid
+    border-color: transparent
     transform: translateZ(0)
 
   @keyframes load
@@ -35,12 +44,21 @@
     100%
       transform: rotate(360deg)
 
-  &.loading .spinner
-    animation: load 1.1s infinite linear
-    border-left: 2px solid rgba(71, 146, 255, 0.7)
-  &.static .spinner
-    border-color: rgba(71, 146, 255, 0.3)
-  &:not(.loading).success .spinner
-    border-color: rgba(6, 146, 2, 0.3)
-  &:not(.loading).failure .spinner
-    border-color: rgba(214, 48, 49, 0.3)
+  &.loading
+    svg
+      path:nth-child(1)
+        fill: #d7d7d7
+      path:nth-child(2)
+        fill: #c6c6c6
+      path:nth-child(3)
+        fill: #e9e8e6
+    .spinner
+      animation: load 1.1s infinite linear
+      border-top: 2px solid rgba(71, 146, 255, 0.3)
+      border-right: 2px solid rgba(71, 146, 255, 0.3)
+      border-bottom: 2px solid rgba(71, 146, 255, 0.3)
+      border-left: 2px solid rgba(71, 146, 255, 0.7)
+  &.static
+    .error-icon,
+    .success-icon
+      display: none

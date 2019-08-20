@@ -27,7 +27,6 @@ export default class Client {
 
   authenticate() {
     this.authWindow = new AuthWindow(this.authUrl())
-    this.authWindow.webContents.openDevTools({ mode: 'detach' })
     return this.authWindow.authenticate().then(code => {
       this.authWindow.close()
       return this.auth.getToken(code)
@@ -36,7 +35,6 @@ export default class Client {
 
   disconnect() {
     this.storage.remove('access_token')
-    delete this.auth
   }
 
   actualizeCredentials() {
