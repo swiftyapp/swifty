@@ -22,6 +22,7 @@ export default class Manager {
     this.encryptedToken = this.cryptr.encrypt(password)
     this.entries = []
     this.writeData()
+    this.readData()
   }
 
   save(data) {
