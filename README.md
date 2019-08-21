@@ -1,22 +1,27 @@
 # Swifty
+
 ![](https://alchaplinsky.com/images/misc/swifty_banner_alpha.png?v=1)
 
+[![CircleCI](https://circleci.com/gh/swiftyapp/swifty/tree/master.svg?style=svg&circle-token=3179a51a22aa66c4c17395eef2952eab42a14057)](https://circleci.com/gh/swiftyapp/swifty/tree/master)
 
-[![CircleCI](https://circleci.com/gh/alchaplinsky/swifty/tree/master.svg?style=svg&circle-token=3179a51a22aa66c4c17395eef2952eab42a14057)](https://circleci.com/gh/alchaplinsky/swifty/tree/master)
-
-Swifty is a lightweight, fast and free Password Manager for MacOS.
+Swifty is a lightweight, fast and free Password Manager for MacOS, Windows and Linux.
 
 ## Features
 
-* Create and manage encrypted credentials records
-  - No data is leaving your computer. Everything is stored on your local file system
+- Store Login/Password credentials
+- Store Credit card Information
+- Create secure notes to store sensitive information
+- No data is leaving your computer:
+  - Everything is encrypted, stored and decrypted on your local file system
   - Decryption happens once on entering Master Password
-  - Ability to migrate from one computer to another using backup file
-* Single Master Password to encrypt all data added to Swifty
-  - All data is stored encrypted with your single Master Password
-* Random Password Generator
-  - Generate password so that you don't need to come up with a strong character sequence
-* There's a lot more to come...
+  - Ability to migrate from one computer to another using backup file or GDrive sync
+- Single Master Password to encrypt all data added to Swifty
+  - All data is encrypted with single Master Password
+- Integrated Password Generator
+  - One-click Strong Password Generation
+- Google Drive Sync
+  - Enable synchronization with Google Drive
+- There's a lot more to come...
 
 ## Screenshots
 
@@ -26,7 +31,7 @@ Swifty is a lightweight, fast and free Password Manager for MacOS.
 
 ## Install
 
-Check [Latest Releases](https://github.com/alchaplinsky/swifty/releases) page for recent version of packaged app.
+Check [Latest Releases](https://github.com/alchaplinsky/swifty/releases) page for recent version of packaged app for MacOS, Windows or Linux.
 
 Alternatively you can build app yourself:
 
