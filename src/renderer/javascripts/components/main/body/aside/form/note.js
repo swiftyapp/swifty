@@ -9,6 +9,7 @@ const Note = ({ entry, validate, onChange }) => {
         entry={entry}
         onChange={onChange}
         validate={validate}
+        maxLength="40"
       />
       <Field
         name="Note"

@@ -18,6 +18,7 @@ const Login = ({ entry, validate, onChange }) => {
         validate={validate}
         entry={entry}
         onChange={onChange}
+        maxLength="40"
       />
       <Field name="Website" entry={entry} onChange={onChange} />
       <Field
@@ -25,12 +26,14 @@ const Login = ({ entry, validate, onChange }) => {
         validate={validate}
         entry={entry}
         onChange={onChange}
+        maxLength="40"
       />
       <SecureField
         name="Password"
         validate={validate}
         entry={entry}
         onChange={onChange}
+        maxLength="24"
       >
         <span className="action" onClick={generatePassword}>
           generate

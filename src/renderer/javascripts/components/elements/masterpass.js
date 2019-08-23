@@ -30,6 +30,7 @@ export default ({
       <Error error={error} />
       <input
         type="password"
+        maxLength="24"
         placeholder={placeholderText()}
         onChange={onChange}
         onKeyDown={handleKeyDown}

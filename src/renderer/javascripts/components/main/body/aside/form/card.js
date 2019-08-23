@@ -10,6 +10,7 @@ const Card = ({ entry, validate, onChange }) => {
         validate={validate}
         entry={entry}
         onChange={onChange}
+        maxLength="40"
       />
       <Field
         name="Number"
