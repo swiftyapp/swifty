@@ -38,6 +38,7 @@ export default class Manager {
 
   update(data) {
     const index = this.entries.findIndex(item => item.id === data.id)
+    data.updated_at = this.date()
     this.entries[index] = data
     this.writeData()
     return this.entries[index]
