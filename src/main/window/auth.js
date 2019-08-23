@@ -18,6 +18,10 @@ export default class AuthWindow extends BrowserWindow {
       this.loadURL(this.url, {
         extraHeaders: 'cookie: m_pixel_ratio=2'
       })
+      this.webContents.on('will-navigate', (event, url) => {
+        if (url !== this.url) event.preventDefault()
+      })
+
       this.webContents.on('did-navigate', (event, url) => {
         if (this.isAuthSuccess(url)) {
           return this.on('page-title-updated', (event, code) => {

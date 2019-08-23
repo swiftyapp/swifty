@@ -33,6 +33,7 @@ export default class Swifty extends Application {
 
   onWindowReady() {
     this.window.setMenu(null)
+    this.window.disableNavigation()
     this.setupWindowEvents()
     this.subscribeForEvents()
     if (this.manager.isPristineStorage()) {
