@@ -16,7 +16,7 @@ export const promptAuth = (window, manager) => {
           return reject(err)
         })
     })
-    ipcMain.once('auth:done', (event, password) => {
+    ipcMain.once('auth:start', (event, password) => {
       if (manager.authenticate(password)) {
         return resolve(password)
       } else {

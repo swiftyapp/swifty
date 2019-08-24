@@ -1,4 +1,3 @@
-import { ipcRenderer } from 'electron'
 import React, { useState } from 'react'
 import Masterpass from '../elements/masterpass'
 import img from 'swifty.png'
@@ -7,14 +6,14 @@ export default ({ touchID }) => {
   const [error, setError] = useState(null)
 
   const handleEnter = value => {
-    ipcRenderer.send('auth:done', value)
-    ipcRenderer.once('auth:fail', () => {
+    window.sendAuthStart(value)
+    window.onAuthFail(() => {
       setError('Incorrect Master Password')
     })
   }
 
   const handleTouchId = () => {
-    ipcRenderer.send('auth:touchid')
+    window.sendAuthTouchId()
   }
 
   const handleChange = () => {

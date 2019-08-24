@@ -4,7 +4,7 @@ export const promptSetup = (window, manager) => {
   return new Promise(resolve => {
     window.webContents.send('setup')
 
-    ipcMain.on('backup:file', () => {
+    ipcMain.on('backup:select', () => {
       dialog
         .showOpenDialog({ properties: ['openFile'] })
         .then(({ filePaths }) => {

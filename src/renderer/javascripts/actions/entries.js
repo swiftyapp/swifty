@@ -1,23 +1,29 @@
-import { ipcRenderer } from 'electron'
+const {
+  sendItemRemove,
+  sendItemSave,
+  onItemRemoved,
+  onItemSaved,
+  sendVaultSyncStart
+} = window
 
 export const deleteEntry = id => {
   return dispatch => {
-    ipcRenderer.send('item:remove', id)
-    ipcRenderer.once('item:removed', (event, items) => {
+    sendItemRemove(id)
+    onItemRemoved((event, items) => {
       dispatch({ type: 'ENTRY_REMOVED', entries: items })
     })
-    ipcRenderer.send('vault:sync:start')
+    sendVaultSyncStart()
   }
 }
 
 export const saveEntry = credentials => {
   return dispatch => {
-    ipcRenderer.send('item:save', credentials)
-    ipcRenderer.once('item:saved', (event, data) => {
+    sendItemSave(credentials)
+    onItemSaved((event, data) => {
       dispatch({ type: 'SET_ENTRIES', ...data })
       dispatch({ type: 'ENTRY_SAVED', ...data })
     })
-    ipcRenderer.send('vault:sync:start')
+    sendVaultSyncStart()
   }
 }
 

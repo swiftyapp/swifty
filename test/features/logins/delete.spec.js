@@ -12,14 +12,16 @@ describe('Delete credentials entry', function() {
       return expect(
         app.client
           .setValue('input[type=password]', 'password')
-          .keys("\uE007")
+          .keys('\uE007')
           .waitForExist('.body .list .entry')
           .click('.list .entry')
           .getText('.entry-details')
-      ).to.eventually.equal(`Website\nhttps://example.com\nUsername\nmyuser\nPassword\nmypassword`)
+      ).to.eventually.equal(
+        `Website\nhttps://example.com\nUsername\nmyuser\nPassword\nmypassword`
+      )
     })
 
-    it('creates credentials entry', () => {
+    it('deletes credentials entry', () => {
       return expect(
         app.client
           .click('.entry-title .action:nth-of-type(2)')

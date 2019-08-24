@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { ipcRenderer } from 'electron'
 import Masterpass from 'components/elements/masterpass'
 
 export default ({ display, password }) => {
@@ -13,7 +12,7 @@ export default ({ display, password }) => {
 
   const onClick = () => {
     if (confirmation === password) {
-      ipcRenderer.send('setup:done', password)
+      window.sendSetupDone(password)
     } else {
       setError('Passwords do not match')
     }

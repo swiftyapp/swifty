@@ -1,23 +1,29 @@
 import React from 'react'
-import { ipcRenderer, remote } from 'electron'
 import { useSelector } from 'react-redux'
 import DownloadIcon from 'download.svg'
+
+const {
+  showSaveDialog,
+  sendBackupSave,
+  sendVaultConnect,
+  sendVaultDisconnect
+} = window
 
 const Vault = ({ section }) => {
   const syncEnabled = useSelector(state => state.sync.enabled)
 
   const onClickSaveBackup = () => {
-    remote.dialog.showSaveDialog().then(({ canceled, filePath }) => {
-      if (!canceled) ipcRenderer.send('backup:save', filePath)
+    showSaveDialog(({ canceled, filePath }) => {
+      if (!canceled) sendBackupSave(filePath)
     })
   }
 
   const onClickConnect = () => {
-    ipcRenderer.send('vault:sync:connect')
+    sendVaultConnect()
   }
 
   const onClickDisconnect = () => {
-    ipcRenderer.send('vault:sync:disconnect')
+    sendVaultDisconnect()
   }
 
   const syncAction = () => {

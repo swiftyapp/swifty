@@ -1,5 +1,4 @@
 import 'application.sass'
-import { ipcRenderer } from 'electron'
 import React from 'react'
 import { render } from 'react-dom'
 import { Provider } from 'react-redux'
@@ -20,33 +19,33 @@ window.onload = () => {
   )
 }
 
-ipcRenderer.on('setup', () => {
+window.onMessage('setup', () => {
   store.dispatch({ type: 'FLOW_SETUP' })
 })
 
-ipcRenderer.on('auth', (event, touchID) => {
+window.onMessage('auth', (event, touchID) => {
   store.dispatch({ type: 'FLOW_AUTH', touchID: touchID })
 })
 
-ipcRenderer.on('auth:success', (event, data) => {
+window.onMessage('auth:success', (event, data) => {
   document.getElementById('root').setAttribute('platform', data.platform)
   store.dispatch({ type: 'SET_ENTRIES', entries: data.entries })
   store.dispatch({ type: 'FLOW_MAIN' })
   store.dispatch({ type: 'SYNC_INIT', enabled: data.sync })
 })
 
-ipcRenderer.on('vault:sync:started', () => {
+window.onMessage('vault:sync:started', () => {
   store.dispatch({ type: 'SYNC_START' })
 })
 
-ipcRenderer.on('vault:sync:stopped', (event, data) => {
+window.onMessage('vault:sync:stopped', (event, data) => {
   store.dispatch({ type: 'SYNC_STOP', ...data })
 })
 
-ipcRenderer.on('vault:sync:disconnected', () => {
+window.onMessage('vault:sync:disconnected', () => {
   store.dispatch({ type: 'SYNC_DISCONNECTED' })
 })
 
-ipcRenderer.on('vault:sync:connected', () => {
+window.onMessage('vault:sync:connected', () => {
   store.dispatch({ type: 'SYNC_CONNECTED' })
 })

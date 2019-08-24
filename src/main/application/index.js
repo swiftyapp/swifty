@@ -1,4 +1,5 @@
-import { ipcMain } from 'electron'
+import path from 'path'
+import { ipcMain, app } from 'electron'
 import { Application } from 'nucleon'
 import Window from '../window'
 import Manager from '../manager'
@@ -20,7 +21,10 @@ export default class Swifty extends Application {
       name: this.settings.name,
       width: this.settings.width,
       height: this.settings.height,
-      devTools: this.settings.devTools
+      devTools: this.settings.devTools,
+      webPreferences: {
+        preload: path.join(app.getAppPath(), 'preload', 'index.js')
+      }
     }
   }
 

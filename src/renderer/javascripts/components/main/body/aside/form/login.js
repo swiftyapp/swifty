@@ -1,5 +1,4 @@
 import React from 'react'
-import generator from 'generate-password'
 import { getProps } from 'defaults/generator'
 
 import Field from './field'
@@ -7,7 +6,7 @@ import SecureField from './secure'
 
 const Login = ({ entry, validate, onChange }) => {
   const generatePassword = () => {
-    const password = generator.generate(getProps())
+    const password = window.generatePassword(getProps())
     onChange({ target: { name: 'password', value: password } })
   }
 

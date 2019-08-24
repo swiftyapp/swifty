@@ -1,18 +1,17 @@
 import React, { useState } from 'react'
 import classnames from 'classnames'
-import { ipcRenderer } from 'electron'
 
 export default ({ display, onImport }) => {
   const [isLoading, setIsLoading] = useState(false)
 
   const chooseFle = () => {
-    ipcRenderer.send('backup:file')
-    ipcRenderer.once('backup:loaded', () => onImport())
+    window.sendBackupSelect()
+    window.onBackupLoaded(() => onImport())
   }
 
   const onGdriveSync = () => {
     setIsLoading(true)
-    ipcRenderer.send('vault:import')
+    window.sendVaultImport()
   }
 
   if (!display) return null

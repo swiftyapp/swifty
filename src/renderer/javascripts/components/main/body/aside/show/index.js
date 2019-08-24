@@ -14,7 +14,7 @@ const Show = ({ entry }) => {
   }
 
   const onDelete = () => {
-    if (process.env.RUNNING_IN_SPECTRON) return dispatch(deleteEntry(entry.id))
+    if (window.isSpectron()) return dispatch(deleteEntry(entry.id))
     if (confirm('Are you sure you want to delete this item?')) {
       dispatch(deleteEntry(entry.id))
     }

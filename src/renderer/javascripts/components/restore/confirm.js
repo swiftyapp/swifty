@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import Masterpass from 'components/elements/masterpass'
-import { ipcRenderer } from 'electron'
 
 export default ({ display }) => {
   const [password, setPassword] = useState()
@@ -12,8 +11,8 @@ export default ({ display }) => {
   }
 
   const onClick = () => {
-    ipcRenderer.send('backup:password', password)
-    ipcRenderer.on('backup:password:fail', () => {
+    window.sendBackupPassword(password)
+    window.onBackupPasswordFail(() => {
       setError('Invalid password for backup')
     })
   }
