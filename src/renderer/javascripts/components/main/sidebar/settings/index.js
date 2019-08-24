@@ -10,8 +10,8 @@ const Settings = () => {
   const [section, setSection] = useState('vault')
 
   return (
-    <div className="settings">
-      <SettingsIcon width="28" height="28" onClick={() => setModal(!modal)} />
+    <div className="settings" onClick={() => setModal(!modal)}>
+      <SettingsIcon width="28" height="28" />
       {modal && (
         <Modal onClose={() => setModal(!modal)}>
           <div className="preferences">
