@@ -1,4 +1,5 @@
 import path from 'path'
+import { shell } from 'electron'
 import { Window } from 'nucleon'
 
 export default class MainWindow extends Window {
@@ -12,6 +13,11 @@ export default class MainWindow extends Window {
   }
 
   disableNavigation() {
+    this.webContents.on('new-window', async (event, navigationUrl) => {
+      event.preventDefault()
+      await shell.openExternal(navigationUrl)
+    })
+
     this.webContents.on('will-navigate', event => event.preventDefault())
   }
 }

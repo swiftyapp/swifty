@@ -13,9 +13,17 @@ export default ({ entry, name, link, cc, secure }) => {
     }, 2000)
   }
 
+  const onClick = event => {
+    window.openLink(event.target.href)
+  }
+
   const value = () => {
     if (link) {
-      return <a href={entry[name.toLowerCase()]}>{entry[name.toLowerCase()]}</a>
+      return (
+        <a href={entry[name.toLowerCase()]} onClick={onClick}>
+          {entry[name.toLowerCase()]}
+        </a>
+      )
     } else if (cc) {
       return entry[name.toLowerCase()].match(/.{1,4}/g).join(' ')
     } else {

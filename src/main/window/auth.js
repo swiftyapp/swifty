@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, shell } from 'electron'
 
 export default class AuthWindow extends BrowserWindow {
   constructor(url) {
@@ -21,6 +21,11 @@ export default class AuthWindow extends BrowserWindow {
       })
       this.webContents.on('will-navigate', (event, url) => {
         if (url !== this.url) event.preventDefault()
+      })
+
+      this.webContents.on('new-window', async (event, navigationUrl) => {
+        event.preventDefault()
+        await shell.openExternal(navigationUrl)
       })
 
       this.webContents.on('did-navigate', (event, url) => {
