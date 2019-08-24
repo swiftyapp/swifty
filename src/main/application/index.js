@@ -23,7 +23,8 @@ export default class Swifty extends Application {
       height: this.settings.height,
       devTools: this.settings.devTools,
       webPreferences: {
-        preload: path.join(app.getAppPath(), 'preload', 'index.js')
+        preload: path.join(app.getAppPath(), 'preload', 'index.js'),
+        enableRemoteModule: false
       }
     }
   }

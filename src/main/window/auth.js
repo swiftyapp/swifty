@@ -7,6 +7,7 @@ export default class AuthWindow extends BrowserWindow {
       width: 400,
       height: 520,
       webPreferences: {
+        enableRemoteModule: false,
         nodeIntegration: false
       }
     })
