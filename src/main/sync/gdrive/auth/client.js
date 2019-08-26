@@ -27,6 +27,7 @@ export default class Client {
 
   authenticate() {
     this.authWindow = new AuthWindow(this.authUrl())
+    this.authWindow.webContents.openDevTools({ mode: 'detach' })
     this.authWindow.removeMenu()
     return this.authWindow.authenticate().then(code => {
       this.authWindow.close()

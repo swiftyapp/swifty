@@ -12,6 +12,11 @@ export default class AuthWindow extends BrowserWindow {
       }
     })
     this.url = url
+    this.URLWhitelist = [
+      'https://accounts.google.com/o/oauth2/v2/auth',
+      'https://accounts.google.com/signin/oauth',
+      'https://getswifty.pro/google_oauth2/callback'
+    ]
   }
 
   authenticate() {
@@ -20,7 +25,7 @@ export default class AuthWindow extends BrowserWindow {
         extraHeaders: 'cookie: m_pixel_ratio=2'
       })
       this.webContents.on('will-navigate', (event, url) => {
-        if (url !== this.url) event.preventDefault()
+        if (!this.isWhitelisted(url)) event.preventDefault()
       })
 
       this.webContents.on('new-window', async (event, navigationUrl) => {
@@ -36,6 +41,10 @@ export default class AuthWindow extends BrowserWindow {
         }
       })
     })
+  }
+
+  isWhitelisted(url) {
+    return this.URLWhitelist.find(item => url.match(item))
   }
 
   isAuthSuccess(url) {
