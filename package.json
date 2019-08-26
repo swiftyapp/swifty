@@ -18,7 +18,7 @@
     "parse-domain": "^2.3.2",
     "react": "^16.9.0",
     "react-dom": "^16.9.0",
-    "react-redux": "^7.1.0",
+    "react-redux": "^7.1.1",
     "redux": "^4.0.4",
     "redux-thunk": "^2.3.0",
     "shortid": "^2.2.14"
@@ -41,7 +41,7 @@
     "chai": "^4.2.0",
     "chai-as-promised": "^7.1.1",
     "css-loader": "^3.2.0",
-    "eslint": "^6.2.1",
+    "eslint": "^6.2.2",
     "eslint-plugin-jsx-a11y": "^6.2.3",
     "eslint-plugin-prettier": "^3.1.0",
     "eslint-plugin-react": "^7.14.3",
