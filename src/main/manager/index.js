@@ -1,5 +1,5 @@
 import shortid from 'shortid'
-import Cryptr from 'cryptr'
+import { Cryptor } from '@swiftyapp/cryptor'
 import FileStorage from '../storage/file'
 
 export default class Manager {
@@ -18,9 +18,9 @@ export default class Manager {
   }
 
   setup(password) {
-    this.cryptr = new Cryptr(password)
+    this.cryptr = new Cryptor(password)
     this.encryptedToken = this.cryptr.encrypt(password)
-    this.entries = []
+    if (!this.entries) this.entries = []
     this.writeData()
     this.readData()
   }
@@ -54,7 +54,7 @@ export default class Manager {
   }
 
   tryDecryptData(data, password) {
-    this.cryptr = new Cryptr(password)
+    this.cryptr = new Cryptor(password)
     try {
       const json = JSON.parse(this.cryptr.decrypt(data))
       if (this.cryptr.decrypt(json.token) !== password) return false

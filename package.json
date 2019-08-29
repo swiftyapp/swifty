@@ -4,8 +4,8 @@
   "description": "Modern, Lightweight, Fast and Free Password Manager",
   "repository": "https://github.com/alchaplinsky/swifty.git",
   "dependencies": {
+    "@swiftyapp/cryptor": "^1.0.3",
     "classnames": "^2.2.6",
-    "cryptr": "^4.0.2",
     "dotenv": "^8.1.0",
     "dotenv-webpack": "^1.7.0",
     "electron-log": "^3.0.7",
