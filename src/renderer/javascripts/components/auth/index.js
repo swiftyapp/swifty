@@ -6,7 +6,7 @@ export default ({ touchID }) => {
   const [error, setError] = useState(null)
 
   const handleEnter = value => {
-    window.sendAuthStart(value)
+    window.sendAuthStart(window.hashSecret(value))
     window.onAuthFail(() => {
       setError('Incorrect Master Password')
     })

@@ -3,6 +3,7 @@ import './messages'
 import './remote'
 import './clipboard'
 import './generator'
+import './cryptor'
 
 window.isSpectron = () => {
   return process.env.RUNNING_IN_SPECTRON

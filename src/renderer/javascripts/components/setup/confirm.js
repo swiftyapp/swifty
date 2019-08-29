@@ -7,7 +7,7 @@ export default ({ display, password }) => {
 
   const onChange = event => {
     setError(null)
-    setConfirmation(event.currentTarget.value)
+    setConfirmation(window.hashSecret(event.currentTarget.value))
   }
 
   const onClick = () => {
