@@ -2,7 +2,9 @@ import { ipcMain, systemPreferences } from 'electron'
 
 export const promptAuth = (window, manager) => {
   return new Promise((resolve, reject) => {
-    if (process.platform === 'darwin') promptTouchIDAuth(window)
+    if (process.platform === 'darwin') {
+      promptTouchIDAuth(window, manager, resolve, reject)
+    }
 
     ipcMain.once('auth:start', (event, password) => {
       if (manager.authenticate(password)) {
@@ -14,7 +16,7 @@ export const promptAuth = (window, manager) => {
   })
 }
 
-const promptTouchIDAuth = (window, manager) => {
+const promptTouchIDAuth = (window, manager, resolve, reject) => {
   const touchID =
     manager.cryptr !== null && systemPreferences.canPromptTouchID()
 
