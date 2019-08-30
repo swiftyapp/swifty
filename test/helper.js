@@ -56,7 +56,7 @@ const beforeHelper = options => {
 }
 
 const afterHelper = () => {
-  ps.lookup({ command: /Swifty$/ }, (err, items) => {
+  ps.lookup({ command: /MacOS\/Swifty$/ }, (err, items) => {
     items.forEach(item => {
       ps.kill(item.pid, err => {
         if (err) throw new Error(err)
