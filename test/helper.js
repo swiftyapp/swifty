@@ -1,5 +1,6 @@
 require('./support/globals')
 const fs = require('fs')
+const ps = require('ps-node')
 
 const appPath = () => {
   switch (process.platform) {
@@ -55,6 +56,13 @@ const beforeHelper = options => {
 }
 
 const afterHelper = () => {
+  ps.lookup({ command: /Swifty$/ }, (err, items) => {
+    items.forEach(item => {
+      ps.kill(item.pid, err => {
+        if (err) throw new Error(err)
+      })
+    })
+  })
   if (app && app.isRunning()) {
     return app.stop()
   }
