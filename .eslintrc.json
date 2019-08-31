@@ -2,7 +2,8 @@
   "env": {
     "browser": true,
     "node": true,
-    "es6": true
+    "es6": true,
+    "jest/globals": true
   },
   "extends": "eslint:recommended",
   "globals": {
@@ -17,7 +18,7 @@
     "ecmaVersion": 2018,
     "sourceType": "module"
   },
-  "plugins": ["react", "prettier"],
+  "plugins": ["react", "prettier", "jest"],
   "rules": {
     "prettier/prettier": ["error", { "singlQuote": true, "parser": "flow" }],
     "react/jsx-uses-react": 1,

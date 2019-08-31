@@ -26,7 +26,7 @@
   "scripts": {
     "lint": "npx eslint --color src",
     "start": "NODE_ENV=development bozon start",
-    "test": "NODE_ENV=test yarn lint && bozon test"
+    "test": "NODE_ENV=test yarn lint && npx jest test/units && bozon test test/features"
   },
   "author": {
     "name": "Alex Chaplinsky",
@@ -36,16 +36,19 @@
     "@babel/core": "^7.5.5",
     "@babel/preset-env": "^7.5.5",
     "@babel/preset-react": "^7.0.0",
+    "babel-jest": "^24.9.0",
     "babel-loader": "^8.0.6",
     "bozon": "^0.10.3",
     "chai": "^4.2.0",
     "chai-as-promised": "^7.1.1",
     "css-loader": "^3.2.0",
     "eslint": "^6.3.0",
+    "eslint-plugin-jest": "^22.16.0",
     "eslint-plugin-jsx-a11y": "^6.2.3",
     "eslint-plugin-prettier": "^3.1.0",
     "eslint-plugin-react": "^7.14.3",
     "file-loader": "^4.2.0",
+    "jest": "^24.9.0",
     "mocha": "^6.2.0",
     "node-sass": "^4.12.0",
     "prettier": "^1.18.2",
