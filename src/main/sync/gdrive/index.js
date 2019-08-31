@@ -1,6 +1,6 @@
 import { google } from 'googleapis'
 import Client from './auth/client'
-import Storage from '../../storage/file'
+import Storage, { vaultFile } from '../../storage'
 import {
   folderExists,
   fileExists,
@@ -15,7 +15,7 @@ export default class GDrive {
     this.storage = new Storage()
     this.client = new Client()
     this.folderName = 'Swifty'
-    this.fileName = this.storage.fileName()
+    this.fileName = vaultFile()
   }
 
   isConfigured() {
@@ -32,6 +32,10 @@ export default class GDrive {
 
   import() {
     return this.setup().then(() => this.getFileContents())
+  }
+
+  read() {
+    return this.storage.read(this.fileName)
   }
 
   getFileContents() {
@@ -54,14 +58,14 @@ export default class GDrive {
     return folderExists(this.folderName, drive).then(folderId => {
       if (!folderId) {
         return createFolder(this.folderName, drive).then(folderId => {
-          return createFile(this.fileName, folderId, this.storage.read(), drive)
+          return createFile(this.fileName, folderId, this.read(), drive)
         })
       }
       return fileExists(this.fileName, folderId, drive).then(fileId => {
         if (!fileId) {
-          return createFile(this.fileName, folderId, this.storage.read(), drive)
+          return createFile(this.fileName, folderId, this.read(), drive)
         }
-        return updateFile(fileId, this.storage.read(), drive)
+        return updateFile(fileId, this.read(), drive)
       })
     })
   }

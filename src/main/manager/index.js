@@ -1,10 +1,10 @@
 import shortid from 'shortid'
 import { Cryptor } from '@swiftyapp/cryptor'
-import FileStorage from '../storage/file'
+import Storage, { vaultFile } from '../storage'
 
 export default class Manager {
   constructor() {
-    this.provider = new FileStorage()
+    this.storage = new Storage()
     this.cryptr = null
     this.readData()
   }
@@ -80,7 +80,7 @@ export default class Manager {
   }
 
   readData() {
-    this.data = this.provider.read()
+    this.data = this.storage.read(vaultFile())
   }
 
   writeData() {
@@ -88,16 +88,16 @@ export default class Manager {
       this.cryptr.encrypt(JSON.stringify(item))
     )
     const data = { token: this.encryptedToken, entries: entries }
-    this.provider.write(this.cryptr.encrypt(JSON.stringify(data)))
+    this.storage.write(vaultFile(), this.cryptr.encrypt(JSON.stringify(data)))
   }
 
   loadBackup(path) {
-    this.backup = this.provider.readFile(path)
+    this.backup = this.storage.read(path)
   }
 
   validateBackup(password) {
     if (this.tryDecryptData(this.backup, password)) {
-      this.provider.write(this.backup)
+      this.storage.write(vaultFile(), this.backup)
       return true
     } else {
       return false
@@ -105,7 +105,7 @@ export default class Manager {
   }
 
   saveBackup(filepath) {
-    return this.provider.copy(filepath)
+    return this.storage.export(vaultFile(), filepath)
   }
 
   date() {
@@ -121,4 +121,11 @@ export default class Manager {
       updated_at: now
     }
   }
+  //
+  // vaultFile() {
+  //   if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
+  //     return 'storage_default.swftx'
+  //   }
+  //   return `storage_${process.env.APP_ENV}.swftx`
+  // }
 }
