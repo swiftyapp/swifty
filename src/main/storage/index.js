@@ -39,4 +39,12 @@ export default class Storage {
     const dest = !path.match(/\.swftx$/) ? `${path}.swftx` : path
     return fs.copyFileSync(filepath(filename), dest)
   }
+
+  remove(filename) {
+    try {
+      return fs.unlinkSync(filepath(filename))
+    } catch (error) {
+      return false
+    }
+  }
 }

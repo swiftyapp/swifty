@@ -196,4 +196,21 @@ describe('Storage', () => {
       })
     })
   })
+
+  describe('#remove', () => {
+    let result
+    beforeEach(() => {
+      fs.unlinkSync = jest.fn(() => true)
+      result = storage.remove('/Desktop/storage_default.swftx')
+    })
+    test('calls fs module to remove file', () => {
+      expect(fs.unlinkSync).toHaveBeenCalledWith(
+        '/Desktop/storage_default.swftx'
+      )
+    })
+
+    test('returns true on success', () => {
+      expect(result).toBe(true)
+    })
+  })
 })
