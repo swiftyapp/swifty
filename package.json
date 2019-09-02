@@ -14,7 +14,7 @@
     "generate-password": "^1.4.2",
     "googleapis": "^42.0.0",
     "luxon": "^1.17.2",
-    "nucleon": "^1.0.8",
+    "nucleon": "^1.0.9",
     "parse-domain": "^2.3.2",
     "react": "^16.9.0",
     "react-dom": "^16.9.0",
