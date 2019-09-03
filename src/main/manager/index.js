@@ -121,11 +121,4 @@ export default class Manager {
       updated_at: now
     }
   }
-  //
-  // vaultFile() {
-  //   if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
-  //     return 'storage_default.swftx'
-  //   }
-  //   return `storage_${process.env.APP_ENV}.swftx`
-  // }
 }

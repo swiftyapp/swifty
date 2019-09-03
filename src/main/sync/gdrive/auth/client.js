@@ -7,7 +7,8 @@ import Storage, { appDir } from '../../../storage'
 
 export default class Client {
   constructor() {
-    this.storage = new Strg()
+    this.strg = new Strg()
+    this.storage = new Storage()
     this.auth = new google.auth.OAuth2(
       process.env.GOOGLE_OAUTH_CLIENT_ID,
       process.env.GOOGLE_OAUTH_CLIENT_SECRET,
@@ -23,7 +24,8 @@ export default class Client {
 
   isConfigured() {
     return (
-      this.storage.read('access_token') && this.storage.read('refresh_token')
+      this.storage.read(path.join(appDir(), 'access_token.json')) &&
+      this.storage.read(path.join(appDir(), 'refresh_token.json'))
     )
   }
 
@@ -37,13 +39,16 @@ export default class Client {
   }
 
   disconnect() {
-    const storage = new Storage()
-    storage.remove(path.join(appDir(), 'access_token.json'))
+    this.storage.remove(path.join(appDir(), 'access_token.json'))
   }
 
   actualizeCredentials() {
-    const accessToken = this.storage.read('access_token')
-    const refreshToken = this.storage.read('refresh_token')
+    const accessToken = JSON.parse(
+      this.storage.read(path.join(appDir(), 'access_token.json'))
+    )
+    const refreshToken = this.storage.read(
+      path.join(appDir(), 'refresh_token.json')
+    )
 
     if (this.isExpiredAccessToken(accessToken)) {
       this.auth.setCredentials({ refresh_token: refreshToken })
@@ -59,11 +64,11 @@ export default class Client {
 
   storeTokens(tokens) {
     if (tokens.refresh_token) {
-      this.storage.write('refresh_token', tokens.refresh_token)
+      this.strg.write('refresh_token', tokens.refresh_token)
       delete tokens.refresh_token
     }
     this.auth.setCredentials(tokens)
-    this.storage.write('access_token', tokens)
+    this.strg.write('access_token', tokens)
   }
 
   authUrl() {

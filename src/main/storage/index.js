@@ -7,13 +7,13 @@ export const appDir = () => {
 }
 
 const filepath = file => {
-  if (process.env.SPECTRON_STORAGE_PATH) {
-    return process.env.SPECTRON_STORAGE_PATH
-  }
   return !path.isAbsolute(file) ? path.join(appDir(), file) : file
 }
 
 export const vaultFile = () => {
+  if (process.env.SPECTRON_STORAGE_PATH) {
+    return process.env.SPECTRON_STORAGE_PATH
+  }
   if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
     return 'storage_default.swftx'
   }
