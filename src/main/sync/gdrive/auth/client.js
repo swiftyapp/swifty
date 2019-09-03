@@ -1,11 +1,13 @@
+import path from 'path'
 import { google } from 'googleapis'
 import { DateTime } from 'luxon'
 import AuthWindow from '../../../window/auth'
-import Storage from './storage'
+import Strg from './storage'
+import Storage, { appDir } from '../../../storage'
 
 export default class Client {
   constructor() {
-    this.storage = new Storage()
+    this.storage = new Strg()
     this.auth = new google.auth.OAuth2(
       process.env.GOOGLE_OAUTH_CLIENT_ID,
       process.env.GOOGLE_OAUTH_CLIENT_SECRET,
@@ -35,7 +37,8 @@ export default class Client {
   }
 
   disconnect() {
-    this.storage.remove('access_token')
+    const storage = new Storage()
+    storage.remove(path.join(appDir(), 'access_token.json'))
   }
 
   actualizeCredentials() {

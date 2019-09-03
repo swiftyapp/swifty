@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { app } from 'electron'
 
-const appDir = () => {
+export const appDir = () => {
   return path.join(app.getPath('appData'), app.getName())
 }
 
