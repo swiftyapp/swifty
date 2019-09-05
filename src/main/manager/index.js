@@ -11,7 +11,7 @@ export default class Manager {
 
   authenticate(password) {
     if (this.cryptor) {
-      return this.validate(this.data, password)
+      return this.validate(password)
     } else {
       return this.tryDecryptData(this.data, password)
     }
@@ -19,7 +19,6 @@ export default class Manager {
 
   setup(password) {
     this.cryptor = new Cryptor(password)
-    this.encryptedToken = this.cryptor.encrypt(password)
     if (!this.entries) this.entries = []
     this.writeData()
     this.readData()
@@ -57,8 +56,6 @@ export default class Manager {
     this.cryptor = new Cryptor(password)
     try {
       const json = JSON.parse(this.cryptor.decrypt(data))
-      if (this.cryptor.decrypt(json.token) !== password) return false
-      this.encryptedToken = json.token
       this.entries = json.entries.map(item => {
         return JSON.parse(this.cryptor.decrypt(item))
       })
@@ -69,11 +66,11 @@ export default class Manager {
     }
   }
 
-  validate(data, password) {
+  validate(password) {
     try {
-      const json = JSON.parse(this.cryptor.decrypt(data))
-      if (this.cryptor.decrypt(json.token) !== password) return false
-      return true
+      const cryptor = new Cryptor(password)
+      const encrypted = this.cryptor.encrypt(password)
+      return cryptor.decrypt(encrypted) === password
     } catch (e) {
       return false
     }
@@ -87,7 +84,7 @@ export default class Manager {
     const entries = this.entries.map(item =>
       this.cryptor.encrypt(JSON.stringify(item))
     )
-    const data = { token: this.encryptedToken, entries: entries }
+    const data = { entries: entries }
     this.storage.write(this.cryptor.encrypt(JSON.stringify(data)))
   }
 
