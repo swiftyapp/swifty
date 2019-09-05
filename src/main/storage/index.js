@@ -1,50 +1,36 @@
-import fs from 'fs'
+import fs from 'fs-extra'
 import path from 'path'
 import { app } from 'electron'
 
-export const appDir = () => {
+const appDir = () => {
   return path.join(app.getPath('appData'), app.getName())
 }
 
-const filepath = file => {
-  return !path.isAbsolute(file) ? path.join(appDir(), file) : file
-}
-
-export const vaultFile = () => {
-  if (process.env.SPECTRON_STORAGE_PATH) {
-    return process.env.SPECTRON_STORAGE_PATH
-  }
-  if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
-    return 'storage_default.swftx'
-  }
-  return `storage_${process.env.APP_ENV}.swftx`
-}
-
 export default class Storage {
-  read(filename) {
-    if (!fs.existsSync(filepath(filename))) this.write(filename, '')
-    return fs.readFileSync(filepath(filename)).toString('utf8')
+  constructor(file) {
+    this.path = !path.isAbsolute(file) ? path.join(appDir(), file) : file
+    fs.ensureFileSync(this.path)
   }
 
-  write(filename, data) {
+  read() {
+    return this.import(this.path)
+  }
+
+  write(data) {
     try {
-      fs.writeFileSync(filepath(filename), data, { flag: 'w' })
+      fs.writeFileSync(this.path, data, { flag: 'w' })
       return true
     } catch (error) {
       return false
     }
   }
 
-  export(filename, path) {
-    const dest = !path.match(/\.swftx$/) ? `${path}.swftx` : path
-    return fs.copyFileSync(filepath(filename), dest)
+  import(path) {
+    return fs.readFileSync(path).toString('utf8')
   }
 
-  remove(filename) {
-    try {
-      return fs.unlinkSync(filepath(filename))
-    } catch (error) {
-      return false
-    }
+  export(path) {
+    const destination = !path.match(/\.swftx$/) ? `${path}.swftx` : path
+    return fs.copyFileSync(this.path, destination)
   }
 }

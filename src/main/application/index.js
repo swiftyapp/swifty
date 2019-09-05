@@ -32,7 +32,7 @@ export default class Swifty extends Application {
     this.shouldShowAuth = false
     this.manager = new Manager()
     this.tray = new Tray(this)
-    this.gdrive = new GDrive()
+    this.gdrive = new GDrive(this.manager)
   }
 
   onWindowReady() {
@@ -56,7 +56,7 @@ export default class Swifty extends Application {
     })
     this.window.on('hide', () => {
       this.inactiveTimeout = setTimeout(() => {
-        if (this.manager.cryptr) this.shouldShowAuth = true
+        if (this.manager.cryptor) this.shouldShowAuth = true
       }, INACTIVE_TIMEOUT)
     })
     this.window.on('show', () => {

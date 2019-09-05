@@ -1,6 +1,5 @@
 import { google } from 'googleapis'
 import Client from './auth/client'
-import Storage, { vaultFile } from '../../storage'
 import {
   folderExists,
   fileExists,
@@ -11,11 +10,11 @@ import {
 } from './files'
 
 export default class GDrive {
-  constructor() {
-    this.storage = new Storage()
-    this.client = new Client()
+  constructor(manager) {
+    this.storage = manager.storage
+    this.client = new Client(manager)
     this.folderName = 'Swifty'
-    this.fileName = vaultFile()
+    this.fileName = 'storage_default.swftx'
   }
 
   isConfigured() {
@@ -35,7 +34,7 @@ export default class GDrive {
   }
 
   read() {
-    return this.storage.read(this.fileName)
+    return this.storage.read()
   }
 
   getFileContents() {

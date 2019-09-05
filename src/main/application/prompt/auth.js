@@ -18,7 +18,7 @@ export const promptAuth = (window, manager) => {
 
 const promptTouchIDAuth = (window, manager, resolve, reject) => {
   const touchID =
-    manager.cryptr !== null && systemPreferences.canPromptTouchID()
+    manager.cryptor !== null && systemPreferences.canPromptTouchID()
 
   window.webContents.send('auth', touchID)
   ipcMain.once('auth:touchid', () => {

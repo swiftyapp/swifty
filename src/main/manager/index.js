@@ -1,16 +1,16 @@
 import shortid from 'shortid'
 import { Cryptor } from '@swiftyapp/cryptor'
-import Storage, { vaultFile } from '../storage'
+import Storage from '../storage'
 
 export default class Manager {
   constructor() {
-    this.storage = new Storage()
-    this.cryptr = null
+    this.storage = new Storage(this.vaultFile())
+    this.cryptor = null
     this.readData()
   }
 
   authenticate(password) {
-    if (this.cryptr) {
+    if (this.cryptor) {
       return this.validate(this.data, password)
     } else {
       return this.tryDecryptData(this.data, password)
@@ -18,8 +18,8 @@ export default class Manager {
   }
 
   setup(password) {
-    this.cryptr = new Cryptor(password)
-    this.encryptedToken = this.cryptr.encrypt(password)
+    this.cryptor = new Cryptor(password)
+    this.encryptedToken = this.cryptor.encrypt(password)
     if (!this.entries) this.entries = []
     this.writeData()
     this.readData()
@@ -54,25 +54,25 @@ export default class Manager {
   }
 
   tryDecryptData(data, password) {
-    this.cryptr = new Cryptor(password)
+    this.cryptor = new Cryptor(password)
     try {
-      const json = JSON.parse(this.cryptr.decrypt(data))
-      if (this.cryptr.decrypt(json.token) !== password) return false
+      const json = JSON.parse(this.cryptor.decrypt(data))
+      if (this.cryptor.decrypt(json.token) !== password) return false
       this.encryptedToken = json.token
       this.entries = json.entries.map(item => {
-        return JSON.parse(this.cryptr.decrypt(item))
+        return JSON.parse(this.cryptor.decrypt(item))
       })
       return true
     } catch (e) {
-      this.cryptr = null
+      this.cryptor = null
       return false
     }
   }
 
   validate(data, password) {
     try {
-      const json = JSON.parse(this.cryptr.decrypt(data))
-      if (this.cryptr.decrypt(json.token) !== password) return false
+      const json = JSON.parse(this.cryptor.decrypt(data))
+      if (this.cryptor.decrypt(json.token) !== password) return false
       return true
     } catch (e) {
       return false
@@ -80,24 +80,24 @@ export default class Manager {
   }
 
   readData() {
-    this.data = this.storage.read(vaultFile())
+    this.data = this.storage.read()
   }
 
   writeData() {
     const entries = this.entries.map(item =>
-      this.cryptr.encrypt(JSON.stringify(item))
+      this.cryptor.encrypt(JSON.stringify(item))
     )
     const data = { token: this.encryptedToken, entries: entries }
-    this.storage.write(vaultFile(), this.cryptr.encrypt(JSON.stringify(data)))
+    this.storage.write(this.cryptor.encrypt(JSON.stringify(data)))
   }
 
   loadBackup(path) {
-    this.backup = this.storage.read(path)
+    this.backup = this.storage.import(path)
   }
 
   validateBackup(password) {
     if (this.tryDecryptData(this.backup, password)) {
-      this.storage.write(vaultFile(), this.backup)
+      this.storage.write(this.backup)
       return true
     } else {
       return false
@@ -105,7 +105,7 @@ export default class Manager {
   }
 
   saveBackup(filepath) {
-    return this.storage.export(vaultFile(), filepath)
+    return this.storage.export(filepath)
   }
 
   date() {
@@ -120,5 +120,15 @@ export default class Manager {
       created_at: now,
       updated_at: now
     }
+  }
+
+  vaultFile() {
+    if (process.env.SPECTRON_STORAGE_PATH) {
+      return process.env.SPECTRON_STORAGE_PATH
+    }
+    if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
+      return 'storage_default.swftx'
+    }
+    return `storage_${process.env.APP_ENV}.swftx`
   }
 }

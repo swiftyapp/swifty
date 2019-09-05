@@ -1,9 +1,9 @@
 import Storage from 'main/storage/index.js'
-import fs from 'fs'
+import fs from 'fs-extra'
 
 jest.mock('fs')
 
-const storage = new Storage()
+let storage
 
 describe('Storage', () => {
   afterEach(() => {
@@ -21,7 +21,8 @@ describe('Storage', () => {
 
       describe('relative path', () => {
         beforeEach(() => {
-          result = storage.read('storage_default.swftx')
+          storage = new Storage('storage_default.swftx')
+          result = storage.read()
         })
 
         test('reads file content', () => {
@@ -37,7 +38,8 @@ describe('Storage', () => {
 
       describe('absolute path', () => {
         beforeEach(() => {
-          result = storage.read('/Desktop/storage_default.swftx')
+          storage = new Storage('/Desktop/storage_default.swftx')
+          result = storage.read()
         })
 
         test('reads file content', () => {
@@ -54,16 +56,15 @@ describe('Storage', () => {
 
     describe('file do not exist', () => {
       beforeEach(() => {
-        fs.existsSync = jest.fn(() => false)
+        fs.ensureFileSync = jest.fn(() => true)
         fs.readFileSync = jest.fn(() => '')
-        result = storage.read('storage_default.swftx')
+        storage = new Storage('storage_default.swftx')
+        result = storage.read()
       })
 
       test('creates file content', () => {
-        expect(fs.writeFileSync).toHaveBeenCalledWith(
-          '/Applications/Swifty/storage_default.swftx',
-          '',
-          { flag: 'w' }
+        expect(fs.ensureFileSync).toHaveBeenCalledWith(
+          '/Applications/Swifty/storage_default.swftx'
         )
       })
 
@@ -80,7 +81,8 @@ describe('Storage', () => {
     describe('successfull', () => {
       describe('relative path', () => {
         beforeEach(() => {
-          result = storage.write('storage_default.swftx', 'data')
+          storage = new Storage('storage_default.swftx')
+          result = storage.write('data')
         })
         test('calls fs module to perform write', () => {
           expect(fs.writeFileSync).toHaveBeenCalledWith(
@@ -97,7 +99,8 @@ describe('Storage', () => {
 
       describe('absolute path', () => {
         beforeEach(() => {
-          result = storage.write('/Desktop/storage_default.swftx', 'data')
+          storage = new Storage('/Desktop/storage_default.swftx')
+          result = storage.write('data')
         })
         test('calls fs module to perform write', () => {
           expect(fs.writeFileSync).toHaveBeenCalledWith(
@@ -118,7 +121,8 @@ describe('Storage', () => {
         fs.writeFileSync.mockImplementation(() => {
           throw new Error()
         })
-        result = storage.write('storage_default.swftx', 'data')
+        storage = new Storage('storage_default.swftx')
+        result = storage.write('data')
       })
 
       test('calls fs module to perform write', () => {
@@ -144,10 +148,8 @@ describe('Storage', () => {
     describe('relative path', () => {
       describe('contains extension', () => {
         beforeEach(() => {
-          result = storage.export(
-            'storage_default.swftx',
-            '/Desktop/storage_default.swftx'
-          )
+          storage = new Storage('storage_default.swftx')
+          result = storage.export('/Desktop/storage_default.swftx')
         })
         test('copies file', () => {
           expect(fs.copyFileSync).toHaveBeenCalledWith(
@@ -163,10 +165,8 @@ describe('Storage', () => {
 
       describe('does not contain extension', () => {
         beforeEach(() => {
-          result = storage.export(
-            'storage_default.swftx',
-            '/Desktop/storage_default'
-          )
+          storage = new Storage('storage_default.swftx')
+          result = storage.export('/Desktop/storage_default')
         })
         test('copies file', () => {
           expect(fs.copyFileSync).toHaveBeenCalledWith(
@@ -179,10 +179,8 @@ describe('Storage', () => {
 
     describe('absolute path', () => {
       beforeEach(() => {
-        result = storage.export(
-          '/Users/dev/storage_default.swftx',
-          '/Desktop/storage_default.swftx'
-        )
+        storage = new Storage('/Users/dev/storage_default.swftx')
+        result = storage.export('/Desktop/storage_default.swftx')
       })
       test('copies file', () => {
         expect(fs.copyFileSync).toHaveBeenCalledWith(
@@ -194,23 +192,6 @@ describe('Storage', () => {
       test('returns true', () => {
         expect(result).toBe(true)
       })
-    })
-  })
-
-  describe('#remove', () => {
-    let result
-    beforeEach(() => {
-      fs.unlinkSync = jest.fn(() => true)
-      result = storage.remove('/Desktop/storage_default.swftx')
-    })
-    test('calls fs module to remove file', () => {
-      expect(fs.unlinkSync).toHaveBeenCalledWith(
-        '/Desktop/storage_default.swftx'
-      )
-    })
-
-    test('returns true on success', () => {
-      expect(result).toBe(true)
     })
   })
 })

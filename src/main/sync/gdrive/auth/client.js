@@ -1,30 +1,31 @@
 import path from 'path'
 import { google } from 'googleapis'
-import { DateTime } from 'luxon'
 import AuthWindow from '../../../window/auth'
-import Storage, { appDir } from '../../../storage'
+import Storage from '../../../storage'
 
 export default class Client {
-  constructor() {
-    this.storage = new Storage()
-    this.auth = new google.auth.OAuth2(
+  constructor(manager) {
+    this.manager = manager
+    this.storage = new Storage(path.join('auth', 'gdrive.swftx'))
+    this.auth = this.buildAuth()
+    this.auth.on('tokens', tokens => this.updataTokens(tokens))
+  }
+
+  buildAuth() {
+    return new google.auth.OAuth2(
       process.env.GOOGLE_OAUTH_CLIENT_ID,
       process.env.GOOGLE_OAUTH_CLIENT_SECRET,
       `${CONFIG.apiHost}/google_oauth2/callback`
     )
-    this.auth.on('tokens', tokens => this.storeTokens(tokens))
   }
 
   getAuth() {
-    this.actualizeCredentials()
+    this.auth.setCredentials(this.readTokens())
     return this.auth
   }
 
   isConfigured() {
-    return (
-      this.storage.read(path.join(appDir(), 'access_token.json')) &&
-      this.storage.read(path.join(appDir(), 'refresh_token.json'))
-    )
+    return !!this.readTokens()
   }
 
   authenticate() {
@@ -37,41 +38,29 @@ export default class Client {
   }
 
   disconnect() {
-    this.storage.remove(path.join(appDir(), 'access_token.json'))
+    const tokens = this.readTokens()
+    this.writeTokens(Object.assign({}, { refresh_token: tokens.refresh_token }))
   }
 
-  actualizeCredentials() {
-    const accessToken = JSON.parse(
-      this.storage.read(path.join(appDir(), 'access_token.json'))
-    )
-    const refreshToken = this.storage.read(
-      path.join(appDir(), 'refresh_token.json')
-    )
-
-    if (this.isExpiredAccessToken(accessToken)) {
-      this.auth.setCredentials({ refresh_token: refreshToken })
-    } else {
-      this.auth.setCredentials(accessToken)
-    }
-  }
-
-  isExpiredAccessToken(accessToken) {
-    const expiry = DateTime.fromMillis(accessToken.expiry_date)
-    return expiry.diffNow('seconds').toObject().seconds < 60
-  }
-
-  storeTokens(tokens) {
-    if (tokens.refresh_token) {
-      this.storage.write(
-        path.join(appDir(), 'access_token.json').tokens.refresh_token
-      )
-      delete tokens.refresh_token
-    }
+  updataTokens(tokens) {
+    const credentials = this.readTokens() || {}
     this.auth.setCredentials(tokens)
-    this.storage.write(
-      path.join(appDir(), 'access_token.json'),
-      JSON.stringify(tokens)
+    this.writeTokens(Object.assign(credentials, tokens))
+  }
+
+  writeTokens(tokens) {
+    return this.storage.write(
+      this.manager.cryptor.encrypt(JSON.stringify(tokens))
     )
+  }
+
+  readTokens() {
+    try {
+      const content = this.storage.read()
+      return JSON.parse(this.manager.cryptor.decrypt(content))
+    } catch (e) {
+      return null
+    }
   }
 
   authUrl() {
