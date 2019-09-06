@@ -18,7 +18,7 @@ export default class Storage {
 
   write(data) {
     try {
-      fs.writeFileSync(this.path, data, { flag: 'w' })
+      fs.writeFileSync(this.path, data, { flag: 'w', encoding: 'base64' })
       return true
     } catch (error) {
       return false
@@ -26,7 +26,7 @@ export default class Storage {
   }
 
   import(path) {
-    return fs.readFileSync(path).toString('utf8')
+    return fs.readFileSync(path, 'base64').toString('utf8')
   }
 
   export(path) {
