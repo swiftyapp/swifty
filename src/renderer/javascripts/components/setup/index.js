@@ -4,7 +4,7 @@ import Enter from './enter'
 import Confirm from './confirm'
 
 export default () => {
-  const [password, setPassword] = useState(null)
+  const [hashedSecret, setHashedSecret] = useState(null)
 
   return (
     <div className="lock-screen">
@@ -17,8 +17,8 @@ export default () => {
           forget it.
         </div>
       </div>
-      <Enter display={password === null} onEnter={setPassword} />
-      <Confirm display={password !== null} password={password} />
+      <Enter display={hashedSecret === null} onEnter={setHashedSecret} />
+      <Confirm display={hashedSecret !== null} hashedSecret={hashedSecret} />
     </div>
   )
 }

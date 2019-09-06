@@ -2,17 +2,17 @@ import React, { useState } from 'react'
 import Masterpass from 'components/elements/masterpass'
 
 export default ({ display, onEnter }) => {
-  const [password, setPassword] = useState(null)
+  const [hashedSecret, setHashedSecret] = useState(null)
   const [error, setError] = useState(null)
 
   const onChange = event => {
     setError(null)
-    setPassword(window.hashSecret(event.currentTarget.value))
+    setHashedSecret(window.hashSecret(event.currentTarget.value))
   }
 
   const onClick = () => {
-    if (password) {
-      onEnter(password)
+    if (hashedSecret) {
+      onEnter(hashedSecret)
     } else {
       setError('Fill in the password')
     }

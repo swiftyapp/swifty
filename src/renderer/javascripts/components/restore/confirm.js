@@ -2,16 +2,16 @@ import React, { useState } from 'react'
 import Masterpass from 'components/elements/masterpass'
 
 export default ({ display }) => {
-  const [password, setPassword] = useState()
+  const [hashedSecret, setHashedSecret] = useState()
   const [error, setError] = useState()
 
   const onChange = event => {
     setError(null)
-    setPassword(window.hashSecret(event.currentTarget.value))
+    setHashedSecret(window.hashSecret(event.currentTarget.value))
   }
 
   const onClick = () => {
-    window.sendBackupPassword(password)
+    window.sendBackupPassword(hashedSecret)
     window.onBackupPasswordFail(() => {
       setError('Invalid password for backup')
     })

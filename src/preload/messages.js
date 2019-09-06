@@ -1,9 +1,11 @@
 import { ipcRenderer } from 'electron'
 
 window.onMessage = (message, callback) => {
-  ipcRenderer.on(message, (event, data) => {
-    callback(event, data)
-  })
+  ipcRenderer.on(message, callback)
+}
+
+window.onOnce = (message, callback) => {
+  ipcRenderer.once(message, callback)
 }
 
 // Authentication and Setup
@@ -60,20 +62,12 @@ window.sendVaultSyncStart = () => {
 }
 
 // Entries management
-window.sendItemSave = item => {
-  ipcRenderer.send('item:save', item)
+window.sendSaveData = data => {
+  ipcRenderer.send('data:save', data)
 }
 
-window.onItemSaved = callback => {
-  ipcRenderer.once('item:saved', callback)
-}
-
-window.sendItemRemove = id => {
-  ipcRenderer.send('item:remove', id)
-}
-
-window.onItemRemoved = callback => {
-  ipcRenderer.once('item:removed', callback)
+window.onDataSaved = callback => {
+  ipcRenderer.once('data:saved', callback)
 }
 
 export default {}

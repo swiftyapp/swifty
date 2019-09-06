@@ -27,11 +27,11 @@ window.onMessage('auth', (event, touchID) => {
   store.dispatch({ type: 'FLOW_AUTH', touchID: touchID })
 })
 
-window.onMessage('auth:success', (event, data) => {
-  document.getElementById('root').setAttribute('platform', data.platform)
-  store.dispatch({ type: 'SET_ENTRIES', entries: data.entries })
+window.onMessage('auth:success', (event, options) => {
+  document.getElementById('root').setAttribute('platform', options.platform)
+  store.dispatch({ type: 'SET_ENTRIES', data: options.data })
   store.dispatch({ type: 'FLOW_MAIN' })
-  store.dispatch({ type: 'SYNC_INIT', enabled: data.sync })
+  store.dispatch({ type: 'SYNC_INIT', enabled: options.sync })
 })
 
 window.onMessage('vault:sync:started', () => {

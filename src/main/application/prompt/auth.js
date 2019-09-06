@@ -1,24 +1,26 @@
 import { ipcMain, systemPreferences } from 'electron'
+import { Cryptor } from '@swiftyapp/cryptor'
 
-export const promptAuth = (window, manager) => {
+export const promptAuth = (window, vault, sync) => {
   return new Promise((resolve, reject) => {
     if (process.platform === 'darwin') {
-      promptTouchIDAuth(window, manager, resolve, reject)
+      promptTouchIDAuth(window, sync, resolve, reject)
     }
 
-    ipcMain.once('auth:start', (event, password) => {
-      if (manager.authenticate(password)) {
-        return resolve(password)
-      } else {
-        return reject(password)
+    ipcMain.once('auth:start', (event, hashedSecret) => {
+      const cryptor = new Cryptor(hashedSecret)
+      if (vault.authenticate(cryptor)) {
+        sync.initialize(vault, cryptor)
+        return resolve()
       }
+      reject()
     })
   })
 }
 
-const promptTouchIDAuth = (window, manager, resolve, reject) => {
+const promptTouchIDAuth = (window, sync, resolve, reject) => {
   const touchID =
-    manager.cryptor !== null && systemPreferences.canPromptTouchID()
+    sync.client && sync.client.cryptor && systemPreferences.canPromptTouchID()
 
   window.webContents.send('auth', touchID)
   ipcMain.once('auth:touchid', () => {

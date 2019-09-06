@@ -1,11 +1,11 @@
 import path from 'path'
 import { google } from 'googleapis'
-import AuthWindow from '../../../window/auth'
+import AuthWindow from '../../../../window/auth'
 import Storage from '../../../storage'
 
 export default class Client {
-  constructor(manager) {
-    this.manager = manager
+  constructor(cryptor) {
+    this.cryptor = cryptor
     this.storage = new Storage(path.join('auth', 'gdrive.swftx'))
     this.auth = this.buildAuth()
     this.auth.on('tokens', tokens => this.updataTokens(tokens))
@@ -49,15 +49,12 @@ export default class Client {
   }
 
   writeTokens(tokens) {
-    return this.storage.write(
-      this.manager.cryptor.encrypt(JSON.stringify(tokens))
-    )
+    return this.storage.write(this.cryptor.encrypt(JSON.stringify(tokens)))
   }
 
   readTokens() {
     try {
-      const content = this.storage.read()
-      return JSON.parse(this.manager.cryptor.decrypt(content))
+      return JSON.parse(this.cryptor.decrypt(this.storage.read()))
     } catch (e) {
       return null
     }

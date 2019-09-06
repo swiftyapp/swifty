@@ -12,11 +12,13 @@ describe('Edit credential entry', function() {
       return expect(
         app.client
           .setValue('input[type=password]', 'password')
-          .keys("\uE007")
+          .keys('\uE007')
           .waitForExist('.body .list .entry')
           .click('.list .entry')
           .getText('.entry-details')
-      ).to.eventually.equal(`Website\nhttps://example.com\nUsername\nmyuser\nPassword\nmypassword`)
+      ).to.eventually.equal(
+        `Website\nhttps://example.com\nUsername\nmyuser\nPassword\nmypassword`
+      )
     })
 
     it('shows edit form', () => {
@@ -37,9 +39,9 @@ describe('Edit credential entry', function() {
     })
 
     it('hides edit form', () => {
-      return expect(
-        app.client.getText('.entry-title h1')
-      ).to.eventually.equal('Example')
+      return expect(app.client.getText('.entry-title h1')).to.eventually.equal(
+        'Example'
+      )
     })
 
     it('shows editor form again', () => {
@@ -61,9 +63,9 @@ describe('Edit credential entry', function() {
     })
 
     it('displays show view in a sidebar', () => {
-      return expect(
-        app.client.getText('.entry-title h1')
-      ).to.eventually.equal('Example Updated')
+      return expect(app.client.getText('.entry-title h1')).to.eventually.equal(
+        'Example Updated'
+      )
     })
   })
 })

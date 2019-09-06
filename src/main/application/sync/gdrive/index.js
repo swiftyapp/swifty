@@ -10,11 +10,14 @@ import {
 } from './files'
 
 export default class GDrive {
-  constructor(manager) {
-    this.storage = manager.storage
-    this.client = new Client(manager)
+  constructor() {
     this.folderName = 'Swifty'
     this.fileName = 'storage_default.swftx'
+  }
+
+  initialize(vault, cryptor) {
+    this.vault = vault
+    this.client = new Client(cryptor)
   }
 
   isConfigured() {
@@ -34,7 +37,7 @@ export default class GDrive {
   }
 
   read() {
-    return this.storage.read()
+    return this.vault.read()
   }
 
   getFileContents() {

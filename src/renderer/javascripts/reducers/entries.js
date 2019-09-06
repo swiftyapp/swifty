@@ -7,7 +7,7 @@ export default (state = initialState(), action) => {
     case 'EDIT_ENTRY':
       return { ...state, edit: true, new: false }
     case 'SET_ENTRIES':
-      return { ...state, items: action.entries }
+      return { ...state, items: decodeEntries(action.data) }
     case 'SET_CURRENT_ENTRY':
       return {
         ...state,
@@ -20,13 +20,22 @@ export default (state = initialState(), action) => {
         ...state,
         edit: false,
         new: false,
-        current: findEntry(state, action.entry.id)
+        current: findEntry(state, action.currentId)
       }
     case 'ENTRY_REMOVED':
-      return { new: false, edit: false, current: null, items: action.entries }
+      return {
+        new: false,
+        edit: false,
+        current: null,
+        items: decodeEntries(action.data)
+      }
     default:
       return state
   }
+}
+
+const decodeEntries = data => {
+  return window.decryptData(data).entries
 }
 
 const findEntry = (state, id) => {
