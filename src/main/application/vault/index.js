@@ -21,6 +21,7 @@ export default class Vault {
     try {
       return !!JSON.parse(cryptor.decrypt(data))
     } catch (e) {
+      console.log(e)
       return false
     }
   }
@@ -37,9 +38,8 @@ export default class Vault {
     const data = this.storage.import(path)
     if (this.isDecryptable(data, cryptor)) {
       return this.storage.write(data)
-    } else {
-      return false
     }
+    return false
   }
 
   export(filepath) {

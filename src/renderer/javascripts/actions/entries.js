@@ -14,9 +14,7 @@ export const deleteEntry = id => {
 
 export const saveEntry = credentials => {
   return (dispatch, getState) => {
-    const entries = getState().entries.items.slice(0)
-    const item = buildItem(credentials)
-    entries.push(item)
+    const [entries, item] = save(credentials, getState())
     sendSaveData(encryptData({ entries }))
     onOnce('data:saved', (event, data) => {
       dispatch({ type: 'SET_ENTRIES', ...data })
@@ -46,8 +44,33 @@ export const isValid = entry => {
   }
 }
 
+const save = (data, state) => {
+  const entries = state.entries.items.slice(0)
+  if (data.id && entries.find(e => e.id === data.id)) {
+    return update(entries, data)
+  }
+  return create(entries, data)
+}
+
+const update = (entries, data) => {
+  const index = entries.findIndex(item => item.id === data.id)
+  data.updated_at = date()
+  entries[index] = data
+  return [entries, data]
+}
+
+const create = (entries, data) => {
+  const item = buildItem(data)
+  entries.push(item)
+  return [entries, item]
+}
+
+const date = () => {
+  return new Date().toISOString()
+}
+
 const buildItem = data => {
-  const now = new Date().toISOString()
+  const now = date()
   return {
     id: shortid.generate(),
     ...data,
