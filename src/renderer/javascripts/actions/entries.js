@@ -1,5 +1,6 @@
 import shortid from 'shortid'
-const { sendSaveData, onOnce, encryptData, sendVaultSyncStart } = window
+import { encryptData } from 'services/cryptor'
+const { sendSaveData, onOnce, sendVaultSyncStart } = window
 
 export const deleteEntry = id => {
   return (dispatch, getState) => {

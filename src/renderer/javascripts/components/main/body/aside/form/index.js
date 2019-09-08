@@ -6,7 +6,7 @@ import Card from './card'
 import Note from './note'
 
 import { saveEntry, isValid } from 'actions/entries'
-
+import { obscure, expose } from 'services/cryptor'
 import entries from 'defaults/entries'
 
 const Form = ({ entry }) => {
@@ -14,7 +14,7 @@ const Form = ({ entry }) => {
   const { scope } = useSelector(state => state.filters)
 
   const [validate, setValidate] = useState(false)
-  const [model, setModel] = useState(entry || entries[scope])
+  const [model, setModel] = useState(expose(entry) || entries[scope])
 
   const onCancel = () => {
     if (model.id) {
@@ -26,7 +26,7 @@ const Form = ({ entry }) => {
 
   const onSave = () => {
     if (isValid(model)) {
-      dispatch(saveEntry(model))
+      dispatch(saveEntry(obscure(model)))
     } else {
       setValidate(true)
     }

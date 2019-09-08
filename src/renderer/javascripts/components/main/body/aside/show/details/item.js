@@ -1,6 +1,8 @@
 import React from 'react'
 import Copy from 'copy.svg'
 
+const { decrypt } = window
+
 export default ({ entry, name, link, cc, secure }) => {
   const copy = value => {
     const notification = document.getElementsByClassName(
@@ -26,9 +28,16 @@ export default ({ entry, name, link, cc, secure }) => {
       )
     } else if (cc) {
       return entry[name.toLowerCase()].match(/.{1,4}/g).join(' ')
+    } else if (secure) {
+      return decrypt(entry[name.toLowerCase()])
     } else {
       return entry[name.toLowerCase()]
     }
+  }
+
+  const copyValue = () => {
+    if (secure) return decrypt(entry[name.toLowerCase()])
+    return entry[name.toLowerCase()]
   }
 
   const className = () => {
@@ -41,11 +50,7 @@ export default ({ entry, name, link, cc, secure }) => {
     <div className={className()}>
       <div className="label">{name}</div>
       <div className="value">{value()}</div>
-      <Copy
-        width="16"
-        height="16"
-        onClick={() => copy(entry[name.toLowerCase()])}
-      />
+      <Copy width="16" height="16" onClick={() => copy(copyValue())} />
     </div>
   )
 }

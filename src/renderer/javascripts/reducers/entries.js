@@ -1,3 +1,5 @@
+import { decryptData } from 'services/cryptor'
+
 export default (state = initialState(), action) => {
   switch (action.type) {
     case 'NEW_ENTRY':
@@ -35,7 +37,7 @@ export default (state = initialState(), action) => {
 }
 
 const decodeEntries = data => {
-  return window.decryptData(data).entries
+  return decryptData(data).entries
 }
 
 const findEntry = (state, id) => {

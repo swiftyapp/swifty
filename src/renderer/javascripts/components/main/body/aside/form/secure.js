@@ -3,13 +3,25 @@ import classnames from 'classnames'
 import View from 'view.svg'
 import Hide from 'hide.svg'
 
-export default ({ name, entry, validate, onChange, children, maxLength }) => {
+export default ({
+  name,
+  entry,
+  validate,
+  onChange,
+  children,
+  rows,
+  maxLength
+}) => {
   const [show, setShow] = useState(false)
 
   const toggleSecure = () => setShow(!show)
 
   const isEmpty = () => {
     return entry[name.toLowerCase()].trim() === ''
+  }
+
+  const value = () => {
+    return entry[name.toLowerCase()]
   }
 
   const className = () => {
@@ -20,18 +32,36 @@ export default ({ name, entry, validate, onChange, children, maxLength }) => {
     })
   }
 
+  const renderInput = () => {
+    if (rows && rows !== '1') {
+      return (
+        <textarea
+          name={name.toLowerCase()}
+          cols="10"
+          rows={rows}
+          value={value()}
+          onChange={onChange}
+          maxLength={maxLength ? maxLength : ''}
+        />
+      )
+    }
+    return (
+      <input
+        name={name.toLowerCase()}
+        type="text"
+        value={value()}
+        onChange={onChange}
+        maxLength={maxLength ? maxLength : ''}
+      />
+    )
+  }
+
   return (
     <div className={className()}>
       <label htmlFor="">{name}</label>
       <div className="value">
         <div className="wrapper">
-          <input
-            name={name.toLowerCase()}
-            type="text"
-            onChange={onChange}
-            value={entry[name.toLowerCase()]}
-            maxLength={maxLength ? maxLength : ''}
-          />
+          {renderInput()}
           <View
             width="16"
             height="16"

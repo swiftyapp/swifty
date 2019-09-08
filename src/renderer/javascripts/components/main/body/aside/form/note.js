@@ -1,5 +1,6 @@
 import React from 'react'
 import Field from './field'
+import SecureField from './secure'
 
 const Note = ({ entry, validate, onChange }) => {
   return (
@@ -11,7 +12,7 @@ const Note = ({ entry, validate, onChange }) => {
         validate={validate}
         maxLength="40"
       />
-      <Field
+      <SecureField
         name="Note"
         entry={entry}
         onChange={onChange}
