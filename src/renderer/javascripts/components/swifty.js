@@ -6,7 +6,6 @@ import { useSelector } from 'react-redux'
 
 const Swifty = () => {
   const flow = useSelector(state => state.flow)
-
   switch (flow.name) {
     case 'setup':
       return <Start />

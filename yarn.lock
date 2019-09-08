@@ -6400,6 +6400,11 @@ mocha@^6.1.4, mocha@^6.2.0:
     yargs-parser "13.0.0"
     yargs-unparser "1.5.0"
 
+mousetrap@^1.6.3:
+  version "1.6.3"
+  resolved "https://registry.yarnpkg.com/mousetrap/-/mousetrap-1.6.3.tgz#80fee49665fd478bccf072c9d46bdf1bfed3558a"
+  integrity sha512-bd+nzwhhs9ifsUrC2tWaSgm24/oo2c83zaRyZQF06hYA6sANfsXHtnZ19AbbbDXCDzeH5nZBSQ4NvCjgD62tJA==
+
 move-concurrently@^1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/move-concurrently/-/move-concurrently-1.0.1.tgz#be2c005fda32e0b29af1f05d7c4b33214c701f92"
@@ -6733,10 +6738,10 @@ nth-check@^1.0.2:
   dependencies:
     boolbase "~1.0.0"
 
-nucleon@^1.0.9:
-  version "1.0.9"
-  resolved "https://registry.yarnpkg.com/nucleon/-/nucleon-1.0.9.tgz#eb6b9f80ccfc7f541206cf5c0d60c70bab825a8c"
-  integrity sha512-x9yxcmdaCkFyJHjlE7WWedU+gVuHaPQ4jqTLfgpW1DNbKym/35pRh22c/uog/P16usXUe4uJXGWicu5Z0gzNJQ==
+nucleon@^1.0.10:
+  version "1.0.10"
+  resolved "https://registry.yarnpkg.com/nucleon/-/nucleon-1.0.10.tgz#32181a2f7d269e8ee516153230dfe27a5dfb7fe8"
+  integrity sha512-eqUpTDCDLXT37wtH9KLCZGtD1MxQ3SppCyUwJ30VxY+p4BBkgPFyIETo5qPKJt0CHVPSIn9Ti/Lyfwi3NGbgeg==
   dependencies:
     chalk "^2.4.2"
     electron "^6.0.7"

@@ -2,6 +2,7 @@ import 'application.sass'
 import React from 'react'
 import { render } from 'react-dom'
 import { Provider } from 'react-redux'
+import Mousetrap from 'mousetrap'
 import { createStore, applyMiddleware } from 'redux'
 import thunkMiddleware from 'redux-thunk'
 import rootReducer from 'reducers'
@@ -9,6 +10,9 @@ import rootReducer from 'reducers'
 import Swifty from './components/swifty'
 
 const store = createStore(rootReducer, applyMiddleware(thunkMiddleware))
+
+// Disable Reload Shortcuts
+Mousetrap.bind(['command+r', 'ctrl+r', 'f5'], () => false)
 
 window.onload = () => {
   render(

@@ -6,3 +6,4 @@ builds
 packages
 bower_components
 test/.storage/*.swftx
+yarn-error.log
