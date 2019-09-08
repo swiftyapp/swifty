@@ -21,6 +21,7 @@ export default class Vault {
     try {
       return !!JSON.parse(cryptor.decrypt(data))
     } catch (e) {
+      /* eslint-disable-next-line no-console */
       console.log(e)
       return false
     }
