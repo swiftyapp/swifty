@@ -24,6 +24,7 @@ export const expose = data => {
 }
 
 const prepareFields = (data, callback) => {
+  if (!data) return
   const object = Object.assign({}, data)
   SENSITIVE_FIELDS[object.type].forEach(field => {
     object[field] = callback(object[field])
