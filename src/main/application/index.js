@@ -69,7 +69,6 @@ export default class Swifty extends Application {
   }
 
   subscribeForEvents() {
-    ipcMain.removeAllListeners()
     ipcMain.on('data:save', (event, data) => {
       this.vault.write(data)
       this.window.webContents.send('data:saved', {
