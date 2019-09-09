@@ -62,6 +62,14 @@
   },
   "build": {
     "appId": "com.electron.swifty",
+    "fileAssociations": [
+      {
+        "ext": "swftx",
+        "role": "None",
+        "icon": "build/fileicon.icns",
+        "mimeType": "application/vnd.swftx"
+      }
+    ],
     "publish": [
       {
         "provider": "github",
