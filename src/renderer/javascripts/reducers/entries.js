@@ -2,8 +2,10 @@ import { decryptData } from 'services/cryptor'
 
 export default (state = initialState(), action) => {
   switch (action.type) {
+    case 'SET_FILTER_SCOPE':
+      return { ...state, new: false }
     case 'NEW_ENTRY':
-      return { ...state, new: true, edit: false }
+      return { ...state, new: true, edit: false, current: null }
     case 'SET_NO_ENTRY':
       return { ...state, new: false, edit: false, current: null }
     case 'EDIT_ENTRY':
