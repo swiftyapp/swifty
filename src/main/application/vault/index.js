@@ -1,5 +1,15 @@
 import Storage from '../storage'
 
+const btoa = data => {
+  const buffer = Buffer.from(data, 'utf8')
+  return buffer.toString('base64')
+}
+
+const atob = data => {
+  const buffer = Buffer.from(data, 'base64')
+  return buffer.toString('utf8')
+}
+
 export default class Vault {
   constructor() {
     this.storage = new Storage(this.vaultFile())
@@ -10,7 +20,7 @@ export default class Vault {
   }
 
   setup(cryptor) {
-    this.storage.write(cryptor.encrypt(JSON.stringify({ entries: [] })))
+    this.storage.write(btoa(cryptor.encrypt(JSON.stringify({ entries: [] }))))
   }
 
   isPristine() {
@@ -19,7 +29,7 @@ export default class Vault {
 
   isDecryptable(data, cryptor) {
     try {
-      return !!JSON.parse(cryptor.decrypt(data))
+      return !!JSON.parse(cryptor.decrypt(atob(data)))
     } catch (e) {
       /* eslint-disable-next-line no-console */
       console.log(e)

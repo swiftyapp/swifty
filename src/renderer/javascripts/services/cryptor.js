@@ -8,11 +8,11 @@ const SENSITIVE_FIELDS = {
 }
 
 export const decryptData = data => {
-  return parse(decrypt(data))
+  return parse(decrypt(atob(data)))
 }
 
 export const encryptData = data => {
-  return encrypt(stringify(data))
+  return btoa(encrypt(stringify(data)))
 }
 
 export const obscure = data => {
