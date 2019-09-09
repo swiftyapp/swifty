@@ -4,7 +4,7 @@ export const createFile = (name, parentId, content, drive) => {
       .create({
         requestBody: {
           name: name,
-          mimeType: 'text/plain',
+          mimeType: 'application/vnd.swftx',
           parents: [parentId]
         },
         media: { body: content }
@@ -39,7 +39,8 @@ export const fileExists = (name, parentId, drive) => {
 export const updateFile = (fileId, content, drive) => {
   return drive.files.update({
     fileId: fileId,
-    media: { body: content }
+    media: { body: content },
+    mimeType: 'application/vnd.swftx'
   })
 }
 
