@@ -10,9 +10,19 @@ const atob = data => {
   return buffer.toString('utf8')
 }
 
+const vaultFile = () => {
+  if (process.env.SPECTRON_STORAGE_PATH) {
+    return process.env.SPECTRON_STORAGE_PATH
+  }
+  if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
+    return 'storage_default.swftx'
+  }
+  return `storage_${process.env.APP_ENV}.swftx`
+}
+
 export default class Vault {
   constructor() {
-    this.storage = new Storage(this.vaultFile())
+    this.storage = new Storage(vaultFile())
   }
 
   authenticate(cryptor) {
@@ -20,7 +30,9 @@ export default class Vault {
   }
 
   setup(cryptor) {
-    this.storage.write(btoa(cryptor.encrypt(JSON.stringify({ entries: [] }))))
+    return this.storage.write(
+      btoa(cryptor.encrypt(JSON.stringify({ entries: [] })))
+    )
   }
 
   isPristine() {
@@ -31,8 +43,6 @@ export default class Vault {
     try {
       return !!JSON.parse(cryptor.decrypt(atob(data)))
     } catch (e) {
-      /* eslint-disable-next-line no-console */
-      console.log(e)
       return false
     }
   }
@@ -55,15 +65,5 @@ export default class Vault {
 
   export(filepath) {
     return this.storage.export(filepath)
-  }
-
-  vaultFile() {
-    if (process.env.SPECTRON_STORAGE_PATH) {
-      return process.env.SPECTRON_STORAGE_PATH
-    }
-    if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
-      return 'storage_default.swftx'
-    }
-    return `storage_${process.env.APP_ENV}.swftx`
   }
 }
