@@ -10,7 +10,7 @@ export default ({ display }) => {
     setHashedSecret(window.hashSecret(event.currentTarget.value))
   }
 
-  const onClick = () => {
+  const onSend = () => {
     window.setupCryptor(hashedSecret)
     window.sendBackupPassword(hashedSecret)
     window.onBackupPasswordFail(() => {
@@ -25,10 +25,11 @@ export default ({ display }) => {
       <Masterpass
         placeholder="Enter Master Password"
         error={error}
+        onEnter={onSend}
         onChange={onChange}
       />
       <br />
-      <div className="button" onClick={onClick}>
+      <div className="button" onClick={onSend}>
         Finish
       </div>
     </>

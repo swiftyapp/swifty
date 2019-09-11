@@ -11,7 +11,7 @@ export default ({ display, onEnter, goBack }) => {
     setHashedSecret(window.hashSecret(event.currentTarget.value))
   }
 
-  const onClick = () => {
+  const onSend = () => {
     if (hashedSecret) {
       onEnter(hashedSecret)
     } else {
@@ -26,13 +26,13 @@ export default ({ display, onEnter, goBack }) => {
       <Masterpass
         placeholder="Set Master Password"
         error={error}
+        onEnter={onSend}
         onChange={onChange}
       />
       <br />
-      <div className="button" onClick={onClick}>
+      <div className="button" onClick={onSend}>
         Continue
       </div>
-      <br />
       <span className="navigate-back" onClick={() => goBack()}>
         <Back width="15" /> Go Back
       </span>

@@ -10,7 +10,7 @@ export default ({ display, hashedSecret }) => {
     setConfirmation(window.hashSecret(event.currentTarget.value))
   }
 
-  const onClick = () => {
+  const onSend = () => {
     if (hashedSecret === confirmation) {
       window.setupCryptor(hashedSecret)
       window.sendSetupDone(hashedSecret)
@@ -26,10 +26,11 @@ export default ({ display, hashedSecret }) => {
       <Masterpass
         placeholder="Confirm Master Password"
         error={error}
+        onEnter={onSend}
         onChange={onChange}
       />
       <br />
-      <div className="button" onClick={onClick}>
+      <div className="button" onClick={onSend}>
         Finish
       </div>
     </div>
