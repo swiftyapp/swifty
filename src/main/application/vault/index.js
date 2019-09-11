@@ -10,14 +10,14 @@ const atob = data => {
   return buffer.toString('utf8')
 }
 
-const vaultFile = () => {
+export const vaultFile = () => {
   if (process.env.SPECTRON_STORAGE_PATH) {
     return process.env.SPECTRON_STORAGE_PATH
   }
   if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
-    return 'storage_default.swftx'
+    return 'vault.swftx'
   }
-  return `storage_${process.env.APP_ENV}.swftx`
+  return `vault_${process.env.APP_ENV}.swftx`
 }
 
 export default class Vault {

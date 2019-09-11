@@ -1,5 +1,6 @@
 import { google } from 'googleapis'
 import Client from './auth/client'
+import { vaultFile } from '../../vault'
 import {
   folderExists,
   fileExists,
@@ -12,7 +13,7 @@ import {
 export default class GDrive {
   constructor() {
     this.folderName = 'Swifty'
-    this.fileName = 'storage_default.swftx'
+    this.fileName = vaultFile()
   }
 
   initialize(vault, cryptor) {
