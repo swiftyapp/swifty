@@ -3,7 +3,7 @@ import Backup from 'backup.svg'
 import Import from './import'
 import Confirm from './confirm'
 
-export default () => {
+export default ({ goBack }) => {
   const [step, setStep] = useState(null)
   const onImport = () => {
     setStep('confirmation')
@@ -20,7 +20,11 @@ export default () => {
         </div>
       </div>
       <div className="bottom-lock">
-        <Import display={step !== 'confirmation'} onImport={onImport} />
+        <Import
+          display={step !== 'confirmation'}
+          goBack={goBack}
+          onImport={onImport}
+        />
         <Confirm display={step === 'confirmation'} />
       </div>
     </div>

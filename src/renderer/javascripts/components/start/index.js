@@ -8,8 +8,8 @@ export default () => {
 
   if (!flow) return <Choice onSelect={setFlow} />
   if (flow === 'setup') {
-    return <Setup />
+    return <Setup goBack={() => setFlow(null)} />
   } else {
-    return <Restore />
+    return <Restore goBack={() => setFlow(null)} />
   }
 }

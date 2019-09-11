@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import Masterpass from 'components/elements/masterpass'
+import Back from 'back.svg'
 
-export default ({ display, onEnter }) => {
+export default ({ display, onEnter, goBack }) => {
   const [hashedSecret, setHashedSecret] = useState(null)
   const [error, setError] = useState(null)
 
@@ -31,6 +32,10 @@ export default ({ display, onEnter }) => {
       <div className="button" onClick={onClick}>
         Continue
       </div>
+      <br />
+      <span className="navigate-back" onClick={() => goBack()}>
+        <Back width="15" /> Go Back
+      </span>
     </div>
   )
 }

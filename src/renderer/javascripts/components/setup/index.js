@@ -3,7 +3,7 @@ import NewUser from 'new_user.svg'
 import Enter from './enter'
 import Confirm from './confirm'
 
-export default () => {
+export default ({ goBack }) => {
   const [hashedSecret, setHashedSecret] = useState(null)
 
   return (
@@ -17,7 +17,11 @@ export default () => {
           forget it.
         </div>
       </div>
-      <Enter display={hashedSecret === null} onEnter={setHashedSecret} />
+      <Enter
+        display={hashedSecret === null}
+        goBack={goBack}
+        onEnter={setHashedSecret}
+      />
       <Confirm display={hashedSecret !== null} hashedSecret={hashedSecret} />
     </div>
   )
