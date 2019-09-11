@@ -47,7 +47,7 @@ window.onBackupPasswordFail = callback => {
 }
 
 window.sendVaultImport = () => {
-  ipcRenderer.send('vault:import')
+  ipcRenderer.send('vault:sync:import')
 }
 
 window.sendVaultConnect = () => {

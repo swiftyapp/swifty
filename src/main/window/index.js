@@ -20,4 +20,8 @@ export default class MainWindow extends Window {
 
     this.webContents.on('will-navigate', event => event.preventDefault())
   }
+
+  send(event, data) {
+    this.webContents.send(event, data)
+  }
 }

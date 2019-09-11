@@ -1,12 +1,22 @@
 import path from 'path'
-import { ipcMain, app } from 'electron'
+import { app, systemPreferences } from 'electron'
 import { Application } from 'nucleon'
 import Window from '../window'
 import Tray from '../tray'
 import GDrive from './sync/gdrive'
 import Vault from './vault'
-import { promptSetup } from './prompt/setup'
-import { promptAuth } from './prompt/auth'
+import {
+  onAuthStart,
+  onAuthTouchId,
+  onDataSave,
+  onSetupDone,
+  onBackupSave,
+  onBackupSelect,
+  onVaultSyncImport,
+  onVaultSyncStart,
+  onVaultSyncConnect,
+  onVaultSyncDisconnect
+} from './events'
 
 const INACTIVE_TIMEOUT = 60000
 
@@ -69,78 +79,42 @@ export default class Swifty extends Application {
   }
 
   subscribeForEvents() {
-    ipcMain.on('data:save', (event, data) => {
-      this.vault.write(data)
-      this.window.webContents.send('data:saved', {
-        data: this.vault.read()
-      })
-    })
-    ipcMain.on('backup:save', (event, filepath) => {
-      this.vault.export(filepath)
-    })
-
-    ipcMain.on('vault:import', () => {
-      this.sync.import().then(data => {
-        this.vault.provider.write(data)
-        this.vault.read()
-        return this.showAuth(this.window, this.vault)
-      })
-    })
-
-    ipcMain.on('vault:sync:start', () => {
-      if (this.sync.isConfigured()) {
-        this.window.webContents.send('vault:sync:started')
-        this.sync
-          .sync()
-          .then(() => {
-            this.window.webContents.send('vault:sync:stopped', {
-              success: true
-            })
-          })
-          .catch(error => {
-            this.window.webContents.send('vault:sync:stopped', {
-              success: false
-            })
-            /* eslint-disable-next-line no-console */
-            console.log(error)
-          })
-      }
-    })
-
-    ipcMain.on('vault:sync:connect', () => {
-      if (!this.sync.isConfigured()) {
-        this.sync.setup().then(() => {
-          this.window.webContents.send('vault:sync:connected')
-        })
-      }
-    })
-
-    ipcMain.on('vault:sync:disconnect', () => {
-      if (this.sync.isConfigured()) {
-        this.sync.disconnect()
-        this.window.webContents.send('vault:sync:disconnected')
-      }
-    })
+    onDataSave(this.vault, this.window)
+    onBackupSave(this.vault)
+    onVaultSyncImport(this.vault, this.sync, () =>
+      this.showAuth(this.window, this.vault)
+    )
+    onVaultSyncConnect(this.sync, this.window)
+    onVaultSyncDisconnect(this.sync, this.window)
+    onVaultSyncStart(this.sync, this.window)
   }
 
   /**
    * Authentication and Setup
    */
+
   showAuth() {
-    return promptAuth(this.window, this.vault, this.sync)
-      .then(() => this.authSuccess())
-      .catch(() => this.authFail())
+    this.window.webContents.send('auth', this.isTouchIdAvailable())
+    if (this.isTouchIdAvailable()) {
+      onAuthTouchId(() => this.authSuccess(), () => this.authFail())
+    }
+    onAuthStart(
+      this.vault,
+      this.sync,
+      () => this.authSuccess(),
+      () => this.authFail()
+    )
   }
 
   showSetup() {
-    return promptSetup(this.window, this.vault, this.sync).then(() =>
-      this.authSuccess()
-    )
+    this.window.webContents.send('setup')
+    onBackupSelect(this.vault, this.sync, this.window, () => this.authSuccess())
+    onSetupDone(this.vault, this.sync, () => this.authSuccess())
   }
 
   authSuccess() {
     this.window.enlarge()
-    this.window.webContents.send('auth:success', {
+    this.window.send('auth:success', {
       sync: this.sync.isConfigured(),
       data: this.vault.read(),
       platform: process.platform
@@ -148,7 +122,16 @@ export default class Swifty extends Application {
   }
 
   authFail() {
-    this.window.webContents.send('auth:fail')
+    this.window.send('auth:fail')
     this.showAuth()
+  }
+
+  isTouchIdAvailable() {
+    return (
+      process.platform === 'darwin' &&
+      this.sync.client &&
+      this.sync.client.cryptor &&
+      systemPreferences.canPromptTouchID()
+    )
   }
 }
