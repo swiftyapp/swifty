@@ -11,6 +11,7 @@ export default ({ display }) => {
   }
 
   const onClick = () => {
+    window.setupCryptor(hashedSecret)
     window.sendBackupPassword(hashedSecret)
     window.onBackupPasswordFail(() => {
       setError('Invalid password for backup')
