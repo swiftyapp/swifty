@@ -5,6 +5,7 @@ export const onVaultSyncImport = (vault, sync, callback) => {
     sync.import().then(data => {
       vault.write(data)
       vault.read()
+      sync.initialize(vault, null)
       callback()
     })
   })

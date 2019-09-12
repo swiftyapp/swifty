@@ -50,10 +50,8 @@ export default class Swifty extends Application {
     this.window.disableNavigation()
     this.setupWindowEvents()
     this.subscribeForEvents()
-    if (this.vault.isPristine()) {
-      return this.showSetup(this.window, this.vault)
-    }
-    return this.showAuth(this.window, this.vault)
+    if (this.vault.isPristine()) return this.showSetup()
+    return this.showAuth()
   }
 
   /**
@@ -72,7 +70,7 @@ export default class Swifty extends Application {
     this.window.on('show', () => {
       clearTimeout(this.inactiveTimeout)
       if (this.shouldShowAuth) {
-        this.showAuth(this.window, this.vault)
+        this.showAuth()
         this.shouldShowAuth = false
       }
     })
@@ -81,9 +79,7 @@ export default class Swifty extends Application {
   subscribeForEvents() {
     onDataSave(this.vault, this.window)
     onBackupSave(this.vault)
-    onVaultSyncImport(this.vault, this.sync, () =>
-      this.showAuth(this.window, this.vault)
-    )
+    onVaultSyncImport(this.vault, this.sync, () => this.showAuth())
     onVaultSyncConnect(this.sync, this.window)
     onVaultSyncDisconnect(this.sync, this.window)
     onVaultSyncStart(this.sync, this.window)
