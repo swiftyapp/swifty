@@ -3347,10 +3347,10 @@ electron@^6.0.3:
     electron-download "^4.1.0"
     extract-zip "^1.0.3"
 
-electron@^6.0.7:
-  version "6.0.7"
-  resolved "https://registry.yarnpkg.com/electron/-/electron-6.0.7.tgz#cf3f02502aa58d1517f3befd9c2da2a95cd2eb46"
-  integrity sha512-W0TFnJrBdYBUhzRnEqZt/CfYFmG9RwSnhhXBbOumn/qLQYr9e7kXb6z4y0XQQLhXKkDhuXp+dNqfzhtId5ZiQw==
+electron@^6.0.9:
+  version "6.0.9"
+  resolved "https://registry.yarnpkg.com/electron/-/electron-6.0.9.tgz#fea15e9fec329248db500b33ba6544a26fe025a3"
+  integrity sha512-lFpSmDNyjpvJFwEnK897Soone3DV7D3ASFUb315H2VTVZSbKib9Kbrsovxf4c+e1q5hTdaONsGIm3Lb4CXIW1g==
   dependencies:
     "@types/node" "^10.12.18"
     electron-download "^4.1.0"
@@ -6738,13 +6738,13 @@ nth-check@^1.0.2:
   dependencies:
     boolbase "~1.0.0"
 
-nucleon@^1.0.10:
-  version "1.0.10"
-  resolved "https://registry.yarnpkg.com/nucleon/-/nucleon-1.0.10.tgz#32181a2f7d269e8ee516153230dfe27a5dfb7fe8"
-  integrity sha512-eqUpTDCDLXT37wtH9KLCZGtD1MxQ3SppCyUwJ30VxY+p4BBkgPFyIETo5qPKJt0CHVPSIn9Ti/Lyfwi3NGbgeg==
+nucleon@^1.0.11:
+  version "1.0.11"
+  resolved "https://registry.yarnpkg.com/nucleon/-/nucleon-1.0.11.tgz#3fc46c667137695bb443374413e926efa7cdbf0f"
+  integrity sha512-i5Y9Mg3Nka0sWMpuV75qbreEVkcWzxdlYui9WDJHmqxjOgOlC+VYJZmhonQhnd1ftwq8W5AnXDOXEwnhS5kZMw==
   dependencies:
     chalk "^2.4.2"
-    electron "^6.0.7"
+    electron "^6.0.9"
     electron-log "^3.0.7"
     electron-updater "^4.1.2"
     file-loader "^4.2.0"
