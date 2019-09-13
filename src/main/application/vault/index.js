@@ -1,4 +1,5 @@
 import Storage from '../storage'
+import Migrator from './migrator'
 
 const btoa = data => {
   const buffer = Buffer.from(data, 'utf8')
@@ -22,10 +23,19 @@ export const vaultFile = () => {
 
 export default class Vault {
   constructor() {
+    this.migrator = new Migrator()
+    this.shouldMigrate = this.migrator.shouldMigrate()
     this.storage = new Storage(vaultFile())
   }
 
   authenticate(cryptor) {
+    if (this.shouldMigrate) {
+      if (this.migrator.migrate(cryptor)) {
+        this.shouldMigrate = false
+        return true
+      }
+      return false
+    }
     return this.isDecryptable(this.read(), cryptor)
   }
 
@@ -36,7 +46,7 @@ export default class Vault {
   }
 
   isPristine() {
-    return this.read() === ''
+    return this.read() === '' && !this.shouldMigrate
   }
 
   isDecryptable(data, cryptor) {
