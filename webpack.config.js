@@ -1,6 +1,15 @@
 var path = require('path')
 var Dotenv = require('dotenv-webpack')
 
+const envFile = () => {
+  const NODE_ENV = process.env.NODE_ENV
+  if (!NODE_ENV) {
+    return path.resolve(__dirname, '.env')
+  } else {
+    return path.resolve(__dirname, `.env.${NODE_ENV}`)
+  }
+}
+
 module.exports = {
   renderer: {
     target: 'electron-renderer',
@@ -82,7 +91,7 @@ module.exports = {
     },
     plugins: [
       new Dotenv({
-        path: path.resolve(__dirname, '.env')
+        path: envFile()
       })
     ],
     resolve: {
