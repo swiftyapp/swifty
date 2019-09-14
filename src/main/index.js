@@ -1,4 +1,3 @@
-import dotenv from 'dotenv'
 import Swifty from './application'
 import unhandled from 'electron-unhandled'
 import { openNewGitHubIssue, debugInfo } from 'electron-util'
@@ -12,7 +11,5 @@ unhandled({
     })
   }
 })
-
-dotenv.config()
 
 new Swifty(CONFIG)
