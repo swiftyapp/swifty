@@ -11,11 +11,12 @@ export const onVaultSyncImport = (vault, sync, callback) => {
   })
 }
 
-export const onVaultSyncConnect = (sync, window) => {
+export const onVaultSyncConnect = (sync, window, callback) => {
   ipcMain.on('vault:sync:connect', () => {
     if (!sync.isConfigured()) {
       sync.setup().then(() => {
         window.send('vault:sync:connected')
+        callback()
       })
     }
   })

@@ -41,6 +41,18 @@ export default class GDrive {
     return this.vault.read()
   }
 
+  pull() {
+    return new Promise(resolve => {
+      if (!this.isConfigured()) return resolve(false)
+      this.getFileContents().then(data => {
+        if (!this.vault.isDecryptable(data, this.client.cryptor))
+          return resolve(false)
+        this.vault.write(data)
+        return resolve(true)
+      })
+    })
+  }
+
   getFileContents() {
     const drive = google.drive({ version: 'v3', auth: this.client.getAuth() })
 

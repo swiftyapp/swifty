@@ -80,7 +80,7 @@ export default class Swifty extends Application {
     onDataSave(this.vault, this.window)
     onBackupSave(this.vault)
     onVaultSyncImport(this.vault, this.sync, () => this.showAuth())
-    onVaultSyncConnect(this.sync, this.window)
+    onVaultSyncConnect(this.sync, this.window, () => this.pullVaultData())
     onVaultSyncDisconnect(this.sync, this.window)
     onVaultSyncStart(this.sync, this.window)
   }
@@ -109,17 +109,29 @@ export default class Swifty extends Application {
   }
 
   authSuccess() {
+    const configured = this.sync.isConfigured()
     this.window.enlarge()
     this.window.send('auth:success', {
-      sync: this.sync.isConfigured(),
+      sync: configured,
       data: this.vault.read(),
       platform: process.platform
     })
+    if (configured) this.pullVaultData()
   }
 
   authFail() {
     this.window.send('auth:fail')
     this.showAuth()
+  }
+
+  pullVaultData() {
+    this.window.send('vault:pull:started')
+    this.sync.pull().then(() => {
+      this.window.send('vault:pull:stopped', {
+        success: true,
+        data: this.vault.read()
+      })
+    })
   }
 
   isTouchIdAvailable() {

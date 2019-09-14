@@ -25,7 +25,8 @@ export default class Client {
   }
 
   isConfigured() {
-    return !!this.readTokens()
+    const result = this.readTokens()
+    return result && result.access_token
   }
 
   authenticate() {

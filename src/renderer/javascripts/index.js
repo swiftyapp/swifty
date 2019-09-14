@@ -39,8 +39,17 @@ window.onMessage('vault:sync:started', () => {
   store.dispatch({ type: 'SYNC_START' })
 })
 
-window.onMessage('vault:sync:stopped', (event, data) => {
-  store.dispatch({ type: 'SYNC_STOP', ...data })
+window.onMessage('vault:sync:stopped', (event, options) => {
+  store.dispatch({ type: 'SYNC_STOP', ...options })
+})
+
+window.onMessage('vault:pull:started', () => {
+  store.dispatch({ type: 'SYNC_START' })
+})
+
+window.onMessage('vault:pull:stopped', (event, options) => {
+  store.dispatch({ type: 'SYNC_STOP', success: options.success })
+  store.dispatch({ type: 'SET_ENTRIES', data: options.data })
 })
 
 window.onMessage('vault:sync:disconnected', () => {
