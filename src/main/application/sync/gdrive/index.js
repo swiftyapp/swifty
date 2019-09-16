@@ -55,12 +55,11 @@ export default class GDrive {
 
   getFileContents() {
     const drive = google.drive({ version: 'v3', auth: this.client.getAuth() })
-
-    return new Promise((resolve, reject) => {
+    return new Promise(resolve => {
       folderExists(this.folderName, drive).then(folderId => {
-        if (!folderId) reject()
+        if (!folderId) return resolve(false)
         return fileExists(this.fileName, folderId, drive).then(fileId => {
-          if (!fileId) reject()
+          if (!fileId) return resolve(false)
           return readFile(fileId, drive).then(data => resolve(data))
         })
       })
