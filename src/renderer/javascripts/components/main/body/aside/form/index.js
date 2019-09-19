@@ -34,7 +34,13 @@ const Form = ({ entry }) => {
 
   const onChange = event => {
     let obj = {}
-    obj[event.target.name] = event.target.value
+    const {
+      target: { name, value }
+    } = event
+    if (name === 'password') {
+      obj['password_updated_at'] = new Date().toISOString()
+    }
+    obj[name] = value
     setModel({ ...model, ...obj })
   }
 
