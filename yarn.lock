@@ -6747,10 +6747,10 @@ nth-check@^1.0.2:
   dependencies:
     boolbase "~1.0.0"
 
-nucleon@^1.0.12:
-  version "1.0.12"
-  resolved "https://registry.yarnpkg.com/nucleon/-/nucleon-1.0.12.tgz#5b512038d7c1049e6f836d40d0955d0d53b576f9"
-  integrity sha512-wKJyhvA80z3/Wkn4ipFEZU5HveSjbSkX08n/qj9QBnDJO/D4zT3sxXPQP9TKkCMiHVCgDT+W3ZHNTGY0CwA6Ug==
+nucleon@^1.0.13:
+  version "1.0.13"
+  resolved "https://registry.yarnpkg.com/nucleon/-/nucleon-1.0.13.tgz#4f8217cd671460c440d4a366e082590e5143712c"
+  integrity sha512-71Z09Jz/8qbbpPnmv35+ROYE1kpshbaH2Cwca3nWqPkAClv2R2G/UaHyvEv1vyagdWaUbmMctqnkLXpJfn+vQQ==
   dependencies:
     chalk "^2.4.2"
     electron "^6.0.9"
