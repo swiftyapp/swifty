@@ -4,7 +4,8 @@ import Item from './item'
 import { useSelector } from 'react-redux'
 
 const List = () => {
-  const { entries, query, scope } = useSelector(state => ({
+  const { entries, query, scope, ids } = useSelector(state => ({
+    ids: state.filters.ids,
     scope: state.filters.scope,
     query: state.filters.query,
     entries: state.entries.items
@@ -29,6 +30,12 @@ const List = () => {
     } else {
       items = entries.filter(entry => {
         return entry.type === scope
+      })
+    }
+
+    if (ids && ids.length !== 0) {
+      items = entries.filter(entry => {
+        return ids.indexOf(entry.id) !== -1
       })
     }
     return items.map(entry => <Item entry={entry} key={shortid.generate()} />)

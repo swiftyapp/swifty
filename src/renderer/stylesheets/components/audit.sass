@@ -1,0 +1,37 @@
+.audit
+  min-height: 100px
+  width: 240px
+  .stats
+    margin: 0
+    padding: 0
+    list-style: none
+    font-size: 13px
+    font-weight: 500
+    line-height: 20px
+    li
+      overflow: hidden
+      padding: 5px
+      border-top: 1px dashed rgba(221, 222, 233, 0.85)
+      color: rgb(55, 56, 87)
+      &:first-child
+        border-top: none
+      &:hover
+        background: rgba(238, 238, 238, .4)
+      .count
+        float: right
+      .marker
+        display: inline-block
+        box-sizing: border-box
+        width: 10px
+        height: 10px
+        border-width: 2.5px
+        border-style: solid
+        margin-right: 10px
+        &.level-one
+          border-color: #d63031
+        &.level-two
+          border-color: #e17055
+        &.level-three
+          border-color: #fdcb6e
+        &.level-four
+          border-color: #b8e994
