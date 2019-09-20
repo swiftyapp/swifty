@@ -89,14 +89,12 @@ export default class Swifty extends Application {
   }
 
   authSuccess() {
-    const configured = this.sync.isConfigured()
     this.window.enlarge()
     this.window.send('auth:success', {
-      sync: configured,
+      sync: this.sync.isConfigured(),
       data: this.vault.read(),
       platform: process.platform
     })
-    if (configured) this.pullVaultData()
   }
 
   authFail() {
@@ -106,7 +104,7 @@ export default class Swifty extends Application {
 
   pullVaultData() {
     this.window.send('vault:pull:started')
-    this.sync
+    return this.sync
       .pull()
       .then(() => {
         this.window.send('vault:pull:stopped', {

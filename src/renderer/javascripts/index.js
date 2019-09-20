@@ -35,6 +35,10 @@ window.onMessage('auth:success', (event, options) => {
   store.dispatch({ type: 'SYNC_INIT', enabled: options.sync })
 })
 
+window.onMessage('audit:done', (event, { data }) => {
+  store.dispatch({ type: 'AUDIT_DONE', data })
+})
+
 window.onMessage('vault:sync:started', () => {
   store.dispatch({ type: 'SYNC_START' })
 })
