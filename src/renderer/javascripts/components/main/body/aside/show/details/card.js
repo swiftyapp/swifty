@@ -1,5 +1,6 @@
 import React from 'react'
 import Item from './item'
+import Tags from './item/tags'
 
 const Card = ({ entry }) => {
   return (
@@ -10,6 +11,7 @@ const Card = ({ entry }) => {
       <Item name="CVC" entry={entry} />
       <Item name="Pin" entry={entry} secure />
       <Item name="Name" entry={entry} />
+      <Tags entry={entry} />
     </div>
   )
 }

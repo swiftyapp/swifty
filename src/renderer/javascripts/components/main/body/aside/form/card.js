@@ -1,8 +1,9 @@
 import React from 'react'
 import Field from './field'
 import SecureField from './secure'
+import TagField from './tag'
 
-const Card = ({ entry, validate, onChange }) => {
+const Card = ({ entry, validate, onChange, onTagsChange }) => {
   return (
     <>
       <Field
@@ -48,6 +49,7 @@ const Card = ({ entry, validate, onChange }) => {
         maxLength="6"
       />
       <Field name="Name" entry={entry} onChange={onChange} />
+      <TagField entry={entry} onChange={onTagsChange} />
     </>
   )
 }

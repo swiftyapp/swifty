@@ -32,6 +32,10 @@ const Form = ({ entry }) => {
     }
   }
 
+  const onTagsChange = tags => {
+    onChange({ target: { name: 'tags', value: tags } })
+  }
+
   const onChange = event => {
     let obj = {}
     const {
@@ -47,11 +51,32 @@ const Form = ({ entry }) => {
   const renderFields = () => {
     switch (scope) {
       case 'login':
-        return <Login entry={model} onChange={onChange} validate={validate} />
+        return (
+          <Login
+            entry={model}
+            onChange={onChange}
+            onTagsChange={onTagsChange}
+            validate={validate}
+          />
+        )
       case 'card':
-        return <Card entry={model} onChange={onChange} validate={validate} />
+        return (
+          <Card
+            entry={model}
+            onChange={onChange}
+            onTagsChange={onTagsChange}
+            validate={validate}
+          />
+        )
       case 'note':
-        return <Note entry={model} onChange={onChange} validate={validate} />
+        return (
+          <Note
+            entry={model}
+            onChange={onChange}
+            onTagsChange={onTagsChange}
+            validate={validate}
+          />
+        )
       default:
         return null
     }
