@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import LoginIcon from 'login.svg'
 import CardIcon from 'card.svg'
 import NoteIcon from 'note.svg'
+import AuditIcon from 'audit.svg'
 
 const Switcher = () => {
   const dispatch = useDispatch()
@@ -14,8 +15,8 @@ const Switcher = () => {
     dispatch({ type: 'SET_FILTER_SCOPE', scope })
   }
 
-  const itemClassname = currentScope => {
-    return classnames('item', { current: scope === currentScope })
+  const itemClassname = (currentScope, className = '') => {
+    return classnames(`item ${className}`, { current: scope === currentScope })
   }
 
   return (
@@ -40,6 +41,13 @@ const Switcher = () => {
         onClick={() => switchScope('card')}
       >
         <CardIcon with="28" height="28" />
+      </div>
+      <div
+        className={itemClassname('audit', 'audit-button')}
+        title="Password Audit"
+        onClick={() => switchScope('audit')}
+      >
+        <AuditIcon with="28" height="28" />
       </div>
     </div>
   )
