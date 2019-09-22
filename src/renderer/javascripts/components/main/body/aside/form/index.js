@@ -50,7 +50,8 @@ const Form = ({ entry }) => {
 
   const renderFields = () => {
     switch (scope) {
-      case ('login', 'audit'):
+      case 'login':
+      case 'audit':
         return (
           <Login
             entry={model}
