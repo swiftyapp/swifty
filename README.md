@@ -43,4 +43,4 @@ bozon package mac
 
 ## License
 
-The MIT License (MIT) © Alex Chaplinsky 2019
+GNU/GPL Version 3
