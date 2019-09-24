@@ -1,4 +1,5 @@
 import React from 'react'
+import Score from './score'
 import { useSelector } from 'react-redux'
 
 export default () => {
@@ -24,6 +25,7 @@ export default () => {
   return (
     <div className="aside">
       <div className="audit">
+        <Score audit={audit} />
         <h3>Password Audit</h3>
         <ul className="stats">
           <li>
