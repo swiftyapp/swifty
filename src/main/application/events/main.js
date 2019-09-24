@@ -4,6 +4,7 @@ export const onDataSave = function() {
   ipcMain.on('data:save', (event, data) => {
     this.vault.write(data)
     this.window.send('data:saved', { data: this.vault.read() })
+    return this.getAudit()
   })
 }
 

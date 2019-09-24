@@ -5,6 +5,7 @@ import Window from '../window'
 import Tray from '../tray'
 import GDrive from './sync/gdrive'
 import Vault from './vault'
+import Auditor from './auditor'
 import { onAuthStart, onAuthTouchId } from './events/auth'
 import mainEvents from './events/main'
 import setupEvents from './events/setup'
@@ -100,6 +101,13 @@ export default class Swifty extends Application {
   authFail() {
     this.window.send('auth:fail')
     this.showAuth()
+  }
+
+  getAudit() {
+    const auditor = new Auditor(this.vault.read(), this.cryptor)
+    auditor.getAudit().then(data => {
+      this.window.send('audit:done', { data })
+    })
   }
 
   pullVaultData() {
