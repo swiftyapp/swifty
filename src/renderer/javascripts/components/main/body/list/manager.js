@@ -4,8 +4,8 @@ import Item from './item'
 import { useSelector } from 'react-redux'
 
 const ManagerList = () => {
-  const { entries, query, scope, ids } = useSelector(state => ({
-    ids: state.filters.ids,
+  const { entries, query, scope, tags } = useSelector(state => ({
+    tags: state.filters.tags,
     scope: state.filters.scope,
     query: state.filters.query,
     entries: state.entries.items
@@ -18,26 +18,24 @@ const ManagerList = () => {
   )
 
   const entriesList = () => {
-    let items
+    let items = entries.filter(entry => entry.type === scope)
 
     if (query !== '') {
-      items = entries.filter(entry => {
+      items = items.filter(entry => {
         return (
           entry.type === scope &&
           entry.title.toLowerCase().match(query.toLowerCase())
         )
       })
-    } else {
-      items = entries.filter(entry => {
-        return entry.type === scope
+    }
+
+    if (tags.length !== 0) {
+      items = items.filter(entry => {
+        if (!entry.tags) return false
+        return entry.tags.some(tag => tags.includes(tag))
       })
     }
 
-    if (ids && ids.length !== 0) {
-      items = entries.filter(entry => {
-        return ids.indexOf(entry.id) !== -1
-      })
-    }
     return items.map(entry => <Item entry={entry} key={shortid.generate()} />)
   }
 
