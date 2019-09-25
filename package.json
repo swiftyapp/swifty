@@ -14,7 +14,7 @@
     "fs-extra": "^8.1.0",
     "generate-password": "^1.4.2",
     "googleapis": "^43.0.0",
-    "luxon": "^1.18.0",
+    "luxon": "^1.19.3",
     "mousetrap": "^1.6.3",
     "nucleon": "^1.0.13",
     "parse-domain": "^2.3.2",
@@ -37,8 +37,8 @@
     "email": "alchaplinsky@gmail.com"
   },
   "devDependencies": {
-    "@babel/core": "^7.6.0",
-    "@babel/preset-env": "^7.6.0",
+    "@babel/core": "^7.6.2",
+    "@babel/preset-env": "^7.6.2",
     "@babel/preset-react": "^7.0.0",
     "babel-jest": "^24.9.0",
     "babel-loader": "^8.0.6",
