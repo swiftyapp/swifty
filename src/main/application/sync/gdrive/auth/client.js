@@ -3,10 +3,17 @@ import { google } from 'googleapis'
 import AuthWindow from '../../../../window/auth'
 import Storage from '../../../storage'
 
+export const credentialsFile = () => {
+  if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
+    return 'gdrive.swftx'
+  }
+  return `gdrive_${process.env.APP_ENV}.swftx`
+}
+
 export default class Client {
   constructor(cryptor) {
     this.cryptor = cryptor
-    this.storage = new Storage(path.join('auth', 'gdrive.swftx'))
+    this.storage = new Storage(path.join('auth', credentialsFile()))
     this.auth = this.buildAuth()
     this.auth.on('tokens', tokens => this.updataTokens(tokens))
   }
