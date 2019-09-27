@@ -33,7 +33,7 @@ export default class Client {
 
   isConfigured() {
     const result = this.readTokens()
-    return result && result.access_token
+    return result && result.access_token !== undefined
   }
 
   authenticate() {

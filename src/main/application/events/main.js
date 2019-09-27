@@ -50,7 +50,7 @@ export const onVaultSyncStart = function() {
     if (this.sync.isConfigured()) {
       this.window.send('vault:sync:started')
       this.sync
-        .sync()
+        .push()
         .then(() => {
           this.window.send('vault:sync:stopped', {
             success: true

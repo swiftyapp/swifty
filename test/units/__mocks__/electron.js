@@ -6,5 +6,6 @@ module.exports = {
     getName: jest.fn(() => 'Swifty')
   },
   remote: jest.fn(),
-  dialog: jest.fn()
+  dialog: jest.fn(),
+  BrowserWindow: jest.fn()
 }
