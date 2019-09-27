@@ -2,7 +2,7 @@ module.exports = {
   require: jest.fn(),
   match: jest.fn(),
   app: {
-    getPath: jest.fn(() => '/Applications'),
+    getPath: jest.fn(() => '/tmp'),
     getName: jest.fn(() => 'Swifty')
   },
   remote: jest.fn(),
