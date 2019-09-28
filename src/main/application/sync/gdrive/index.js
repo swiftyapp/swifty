@@ -51,7 +51,6 @@ export default class GDrive {
 
   push() {
     const drive = google.drive({ version: 'v3', auth: this.client.getAuth() })
-
     return folderExists(this.folderName, drive).then(folderId => {
       if (!folderId) {
         return createFolder(this.folderName, drive).then(folderId => {
@@ -71,9 +70,9 @@ export default class GDrive {
     const drive = google.drive({ version: 'v3', auth: this.client.getAuth() })
     return new Promise(resolve => {
       folderExists(this.folderName, drive).then(folderId => {
-        if (!folderId) return resolve(false)
+        if (!folderId) return resolve(null)
         return fileExists(this.fileName, folderId, drive).then(fileId => {
-          if (!fileId) return resolve(false)
+          if (!fileId) return resolve(null)
           return readFile(fileId, drive).then(data => resolve(data))
         })
       })
