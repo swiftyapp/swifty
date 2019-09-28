@@ -14,12 +14,35 @@ jest.mock('main/window/auth', () => {
   })
 })
 
+const vault = {
+  write: jest.fn()
+}
+
 describe('#import', () => {
-  let sync
+  let sync, folderExistsMock, fileExistsMock, fileContentMock
+  const drive = {
+    files: {
+      get: jest.fn(() => fileContentMock()),
+      list: jest.fn(options => {
+        if (options.q === "name = 'Swifty' and trashed = false") {
+          return folderExistsMock()
+        } else {
+          return fileExistsMock()
+        }
+      }),
+      create: jest.fn()
+    }
+  }
+  google.drive = jest.fn(() => drive)
 
   beforeEach(() => {
+    fileContentMock = () => Promise.resolve({ data: 'VAULT DATA' })
+    folderExistsMock = () =>
+      Promise.resolve({ data: { files: [{ id: 'asdfg' }] } })
+    fileExistsMock = () =>
+      Promise.resolve({ data: { files: [{ id: 'qwerty' }] } })
     sync = new GDrive()
-    sync.initialize({}, {})
+    sync.initialize(vault, {})
   })
 
   afterEach(() => {
@@ -57,6 +80,103 @@ describe('#import', () => {
       expect(google.drive).toHaveBeenCalledWith({
         version: 'v3',
         auth: sync.client.auth
+      })
+    })
+  })
+
+  describe('folder does not exist', () => {
+    beforeEach(() => {
+      folderExistsMock = () => Promise.resolve({})
+    })
+
+    test('checks for presence of swifty folder', () => {
+      return sync.import().then(() => {
+        expect(drive.files.list).toHaveBeenCalledWith({
+          q: "name = 'Swifty' and trashed = false",
+          fields: 'files(id, name)'
+        })
+      })
+    })
+
+    test('does not create swifty folder', () => {
+      return sync.import().then(() => {
+        expect(drive.files.create).not.toHaveBeenCalled()
+      })
+    })
+
+    test('does not write data to vault', () => {
+      return sync.import().then(() => {
+        expect(vault.write).not.toHaveBeenCalled()
+      })
+    })
+
+    test('resolves with null result', () => {
+      return sync.import().then(result => expect(result).toEqual(null))
+    })
+  })
+
+  describe('folder exists', () => {
+    describe('file does not exist', () => {
+      beforeEach(() => {
+        fileExistsMock = () => Promise.resolve({})
+      })
+
+      test('checks for presence of swifty folder', () => {
+        return sync.import().then(() => {
+          expect(drive.files.list).toHaveBeenCalledWith({
+            q: "name = 'Swifty' and trashed = false",
+            fields: 'files(id, name)'
+          })
+        })
+      })
+
+      test('checks for presence of vault file', () => {
+        return sync.import().then(() => {
+          expect(drive.files.list).toHaveBeenCalledWith({
+            q: "name = 'vault.swftx' and 'asdfg' in parents",
+            fields: 'files(id, name)'
+          })
+        })
+      })
+
+      test('does not read vault file', () => {
+        return sync.import().then(() => {
+          expect(drive.files.get).not.toHaveBeenCalled()
+        })
+      })
+    })
+    describe('file exists', () => {
+      test('checks for presence of swifty folder', () => {
+        return sync.import().then(() => {
+          expect(drive.files.list).toHaveBeenCalledWith({
+            q: "name = 'Swifty' and trashed = false",
+            fields: 'files(id, name)'
+          })
+        })
+      })
+
+      test('checks for presence of vault file', () => {
+        return sync.import().then(() => {
+          expect(drive.files.list).toHaveBeenCalledWith({
+            q: "name = 'vault.swftx' and 'asdfg' in parents",
+            fields: 'files(id, name)'
+          })
+        })
+      })
+
+      test('reads vault file', () => {
+        return sync.import().then(() => {
+          expect(drive.files.get).toHaveBeenCalledWith({
+            fileId: 'qwerty',
+            alt: 'media'
+          })
+        })
+      })
+
+      test('resolves with imported data', () => {
+        return sync.import().then(result => {
+          expect(result).toEqual('VAULT DATA')
+        })
       })
     })
   })
