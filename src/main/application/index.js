@@ -125,9 +125,8 @@ export default class Swifty extends Application {
 
   isTouchIdAvailable() {
     return (
+      this.cryptor &&
       process.platform === 'darwin' &&
-      this.sync.client &&
-      this.sync.client.cryptor &&
       systemPreferences.canPromptTouchID()
     )
   }
