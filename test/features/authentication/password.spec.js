@@ -17,6 +17,15 @@ describe('Authentication with master password', function() {
       ).to.eventually.equal('Incorrect Master Password')
     })
 
+    it('does not show touch id icon', () => {
+      return expect(
+        app.client
+          .setValue('input[type=password]', 'word')
+          .keys('\uE007')
+          .isExisting('svg.touchid')
+      ).to.eventually.equal(false)
+    })
+
     it('logs user in on correct password', () => {
       return expect(
         app.client

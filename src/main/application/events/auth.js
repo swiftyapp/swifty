@@ -11,6 +11,7 @@ export const onAuthStart = function() {
         return this.pullVaultData().then(() => this.getAudit())
       else return this.getAudit()
     }
+    this.cryptor = null
     return this.authFail()
   })
 }
