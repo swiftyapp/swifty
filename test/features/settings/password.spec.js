@@ -38,10 +38,10 @@ describe('Password generation settings', function() {
       return expect(
         app.client
           .isExisting('.section:nth-of-type(2) input[type=range]')
-          .setValue('.section:nth-of-type(2) input[type=range]', 13)
+          .setValue('.section:nth-of-type(2) input[type=range]', 28)
           .getText('.section:nth-of-type(1) .password-sample')
           .then(value => value.length)
-      ).to.eventually.equal(13)
+      ).to.eventually.equal(28)
     })
 
     it('contains numbers checkbox', () => {

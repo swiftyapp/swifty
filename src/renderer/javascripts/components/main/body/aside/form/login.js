@@ -33,7 +33,7 @@ const Login = ({ entry, validate, onChange, onTagsChange }) => {
         validate={validate}
         entry={entry}
         onChange={onChange}
-        maxLength="24"
+        maxLength="100"
       >
         <span className="action" onClick={generatePassword}>
           generate
