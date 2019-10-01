@@ -58,5 +58,35 @@ describe('Passwords audit', function() {
         app.client.isExisting('.audit-group.level-four')
       ).to.eventually.equal(false)
     })
+
+    it('displays passwords overal score', () => {
+      return expect(app.client.getText('.aside .score')).to.eventually.equal(
+        '2.5\nOveral Score'
+      )
+    })
+
+    it('displays weak passwords count', () => {
+      return expect(
+        app.client.getText('.aside .stats li:nth-child(1)')
+      ).to.eventually.equal('Weak\n3')
+    })
+
+    it('displays short passwords count', () => {
+      return expect(
+        app.client.getText('.aside .stats li:nth-child(2)')
+      ).to.eventually.equal('Too Short\n0')
+    })
+
+    it('displays duplicate passwords count', () => {
+      return expect(
+        app.client.getText('.aside .stats li:nth-child(3)')
+      ).to.eventually.equal('Duplicates\n3')
+    })
+
+    it('displays old passwords count', () => {
+      return expect(
+        app.client.getText('.aside .stats li:nth-child(4)')
+      ).to.eventually.equal('More than 6 month old\n0')
+    })
   })
 })
