@@ -2,7 +2,7 @@ import React from 'react'
 import shortid from 'shortid'
 
 export default ({ entry }) => {
-  if (!entry.tags) return null
+  if (!entry.tags || entry.tags.length === 0) return null
 
   const value = () => {
     return entry.tags.map(tag => (
