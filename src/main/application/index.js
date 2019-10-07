@@ -9,6 +9,7 @@ import Auditor from './auditor'
 import { onAuthStart, onAuthTouchId } from './events/auth'
 import mainEvents from './events/main'
 import setupEvents from './events/setup'
+import { isWindows } from './helpers/os'
 
 const INACTIVE_TIMEOUT = 60000
 
@@ -28,6 +29,7 @@ export default class Swifty extends Application {
       width: this.settings.width,
       height: this.settings.height,
       devTools: this.settings.devTools,
+      frame: !isWindows(),
       webPreferences: {
         preload: path.join(app.getAppPath(), 'preload', 'index.js')
       }
