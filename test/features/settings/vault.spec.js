@@ -14,7 +14,7 @@ describe('Vault settings', function() {
           .setValue('input[type=password]', 'password')
           .keys('\uE007')
           .waitForExist('.body .list')
-          .click('.settings-toggle')
+          .click('.settings-button')
           .getText('.body h1')
       ).to.eventually.equal('Vault Settings')
     })

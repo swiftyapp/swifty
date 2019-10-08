@@ -14,7 +14,7 @@ describe('Password generation settings', function() {
           .setValue('input[type=password]', 'password')
           .keys('\uE007')
           .waitForExist('.body .list')
-          .click('.settings-toggle')
+          .click('.settings-button')
           .click('.window .navigation li:nth-child(2)')
           .getText('.body h1')
       ).to.eventually.equal('Password Generation')
