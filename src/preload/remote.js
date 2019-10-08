@@ -1,8 +1,12 @@
 import { remote } from 'electron'
-import { isWindows } from '../main/application/helpers/os'
+import { isWindows, platform } from '../main/application/helpers/os'
 
 window.isWindows = () => {
   return isWindows()
+}
+
+window.platform = () => {
+  return platform()
 }
 
 window.showSaveDialog = callback => {

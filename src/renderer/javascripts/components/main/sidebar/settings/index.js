@@ -11,8 +11,8 @@ const Settings = () => {
 
   return (
     <div className="settings">
-      <div className="settings-toggle" onClick={() => setModal(!modal)}>
-        <SettingsIcon width="28" height="28" />
+      <div className="settings-button" onClick={() => setModal(!modal)}>
+        <SettingsIcon />
       </div>
       {modal && (
         <Modal onClose={() => setModal(!modal)}>

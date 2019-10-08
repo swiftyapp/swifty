@@ -12,6 +12,7 @@ import Swifty from './components/swifty'
 const store = createStore(rootReducer, applyMiddleware(thunkMiddleware))
 
 window.onload = () => {
+  document.querySelector('body').setAttribute('platform', window.platform())
   render(
     <Provider store={store}>
       <Swifty />
