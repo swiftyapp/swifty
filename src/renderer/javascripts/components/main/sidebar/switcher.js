@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import LoginIcon from 'login.svg'
 import CardIcon from 'card.svg'
 import NoteIcon from 'note.svg'
-import AuditIcon from 'audit.svg'
+import AuditIcon from 'information.svg'
 
 const Switcher = () => {
   const dispatch = useDispatch()
@@ -47,7 +47,7 @@ const Switcher = () => {
         title="Password Audit"
         onClick={() => switchScope('audit')}
       >
-        <AuditIcon with="28" height="28" />
+        <AuditIcon with="30" height="30" />
       </div>
     </div>
   )
