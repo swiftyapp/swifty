@@ -1,6 +1,7 @@
 import shortid from 'shortid'
 import React from 'react'
 import Item from './item'
+import Empty from './empty'
 import { useSelector } from 'react-redux'
 
 const ManagerList = () => {
@@ -10,12 +11,6 @@ const ManagerList = () => {
     query: state.filters.query,
     entries: state.entries.items
   }))
-
-  const emptyList = () => (
-    <div className="list">
-      <div className="empty">No Items</div>
-    </div>
-  )
 
   const entriesList = () => {
     let items = entries.filter(entry => entry.type === scope)
@@ -39,7 +34,7 @@ const ManagerList = () => {
     return items.map(entry => <Item entry={entry} key={shortid.generate()} />)
   }
 
-  if (entriesList().length == 0) return emptyList()
+  if (entriesList().length == 0) return <Empty />
 
   return <div className="list">{entriesList()}</div>
 }

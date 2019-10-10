@@ -4,6 +4,7 @@ import Weak from './weak'
 import Short from './short'
 import Duplicate from './duplicate'
 import Old from './old'
+import Empty from '../empty'
 import { useSelector } from 'react-redux'
 
 const AuditList = () => {
@@ -22,6 +23,7 @@ const AuditList = () => {
   }
 
   if (!audit) return <Loading />
+  if (Object.keys(audit).length === 0) return <Empty />
 
   return (
     <div className="list">

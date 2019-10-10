@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import Choice from './choice'
-import Setup from '../setup'
-import Restore from '../restore'
+import Setup from './setup'
+import Restore from './restore'
 
 export default () => {
   const [flow, setFlow] = useState(null)
