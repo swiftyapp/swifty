@@ -33,12 +33,6 @@ describe('Passwords audit', function() {
       )
     })
 
-    it('does not contain short passwords section', () => {
-      return expect(
-        app.client.isExisting('.audit-group.level-two')
-      ).to.eventually.equal(false)
-    })
-
     it('contains duplicate passwords section', () => {
       return expect(
         app.client.getText('.audit-group.level-three .title')
@@ -55,13 +49,13 @@ describe('Passwords audit', function() {
 
     it('does not contain short passwords section', () => {
       return expect(
-        app.client.isExisting('.audit-group.level-four')
+        app.client.isExisting('.audit-group.level-two')
       ).to.eventually.equal(false)
     })
 
     it('displays passwords overal score', () => {
       return expect(app.client.getText('.aside .score')).to.eventually.equal(
-        '2.5\nOveral Score'
+        '0\nOveral Score'
       )
     })
 
@@ -86,7 +80,7 @@ describe('Passwords audit', function() {
     it('displays old passwords count', () => {
       return expect(
         app.client.getText('.aside .stats li:nth-child(4)')
-      ).to.eventually.equal('More than 6 month old\n0')
+      ).to.eventually.equal('More than 6 month old\n3')
     })
   })
 })
