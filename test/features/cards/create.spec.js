@@ -12,7 +12,7 @@ describe('Create credit card entry', function() {
       return expect(
         app.client
           .setValue('input[type=password]', 'password')
-          .keys("\uE007")
+          .keys('\uE007')
           .waitForExist('.body .list')
           .getText('.body .list')
       ).to.eventually.equal('No Items')
@@ -21,11 +21,11 @@ describe('Create credit card entry', function() {
     it('switches to credit card scope', () => {
       return expect(
         app.client
-          .click('.switcher .item:nth-child(3)')
+          .click('.switcher .tooltip-context:nth-child(3) .item')
           .getText('.body .list')
       ).to.eventually.equal('No Items')
     })
-    
+
     it('shows add credit card form', () => {
       return expect(
         app.client
@@ -40,7 +40,7 @@ describe('Create credit card entry', function() {
           .getText('.aside .actions')
       ).to.eventually.equal('CancelSave')
     })
-    
+
     it('highlights title field with error', () => {
       return expect(
         app.client
@@ -48,7 +48,7 @@ describe('Create credit card entry', function() {
           .isExisting('.field.error:nth-of-type(1)')
       ).to.eventually.equal(true)
     })
-    
+
     it('highlights credit card number field with error', () => {
       return expect(
         app.client
@@ -56,7 +56,7 @@ describe('Create credit card entry', function() {
           .isExisting('.field.error:nth-of-type(2)')
       ).to.eventually.equal(true)
     })
-    
+
     it('cancels entry creation', () => {
       return expect(
         app.client
@@ -67,11 +67,11 @@ describe('Create credit card entry', function() {
     })
 
     it('hides creation form', () => {
-      return expect(
-        app.client.isExisting('.aside .empty')
-      ).to.eventually.equal(true)
+      return expect(app.client.isExisting('.aside .empty')).to.eventually.equal(
+        true
+      )
     })
-    
+
     it('opens creation form again', () => {
       return expect(
         app.client
@@ -101,17 +101,19 @@ describe('Create credit card entry', function() {
           .getText('.body .list')
       ).to.eventually.equal('Visa Card')
     })
-    
+
     it('shows details of created credit card', () => {
       return expect(
         app.client.getText('.aside .entry-title h1')
       ).to.eventually.equal('Visa Card')
     })
-    
+
     it('shows card detail', () => {
       return expect(
         app.client.getText('.aside .entry-details')
-      ).to.eventually.equal('Number\n4242 4242 4242 4242\nYear\n2050\nMonth\n06\nCVC\n123\nPin\n1234\nName\nMister Miyagi')
+      ).to.eventually.equal(
+        'Number\n4242 4242 4242 4242\nYear\n2050\nMonth\n06\nCVC\n123\nPin\n1234\nName\nMister Miyagi'
+      )
     })
   })
 })

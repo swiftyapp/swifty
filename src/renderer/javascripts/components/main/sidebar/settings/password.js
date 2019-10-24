@@ -40,7 +40,7 @@ const Password = ({ section }) => {
             type="range"
             name="length"
             min="6"
-            max="20"
+            max="50"
             className="slider"
             value={options.length}
             onChange={onValueChange}

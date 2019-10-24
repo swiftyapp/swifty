@@ -1,0 +1,60 @@
+.audit
+  margin: 0 auto
+  min-height: 100px
+  width: 320px
+  .score
+    margin-bottom: 40px
+    .points
+      font-size: 46px
+    .muted
+      color: #8c8c8c
+      font-size: 13px
+  .stats
+    margin: 0
+    padding: 0
+    list-style: none
+    font-size: 13px
+    font-weight: 500
+    line-height: 20px
+    li
+      overflow: hidden
+      padding: 5px
+      border-top: 1px dashed rgba(221, 222, 233, 0.85)
+      color: rgb(55, 56, 87)
+      &:first-child
+        border-top: none
+      &:hover
+        background: rgba(238, 238, 238, .4)
+      .count
+        float: right
+      .marker
+        display: inline-block
+        box-sizing: border-box
+        width: 10px
+        height: 10px
+        border-width: 2.5px
+        border-style: solid
+        margin-right: 10px
+        &.level-one
+          border-color: #d63031
+        &.level-two
+          border-color: #e17055
+        &.level-three
+          border-color: #fdcb6e
+        &.level-four
+          border-color: #b8e994
+
+.audit-group
+  .title
+    font-size: 13px
+    font-weight: 500
+    padding: 5px 10px
+    border-bottom: 1px solid #eee
+  &.level-one .title
+    color: rgba(214, 48, 49, 1)
+  &.level-two .title
+    color: rgba(225, 112, 85, 1)
+  &.level-three .title
+    color: rgba(253, 203, 11, 1)
+  &.level-four .title
+    color: rgba(184, 233, 14, 1)

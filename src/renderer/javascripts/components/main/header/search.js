@@ -11,7 +11,7 @@ const Search = () => {
 
   return (
     <div className="search">
-      <SearchIcon width="16" height="16" />
+      <SearchIcon width="16" height="16" className="search-icon" />
       <input type="text" placeholder="Search" onChange={filterItems} />
     </div>
   )

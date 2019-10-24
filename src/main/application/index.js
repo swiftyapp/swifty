@@ -5,24 +5,21 @@ import Window from '../window'
 import Tray from '../tray'
 import GDrive from './sync/gdrive'
 import Vault from './vault'
-import {
-  onAuthStart,
-  onAuthTouchId,
-  onDataSave,
-  onSetupDone,
-  onBackupSave,
-  onBackupSelect,
-  onVaultSyncImport,
-  onVaultSyncStart,
-  onVaultSyncConnect,
-  onVaultSyncDisconnect
-} from './events'
+import Auditor from './auditor'
+import { onAuthStart, onAuthTouchId } from './events/auth'
+import mainEvents from './events/main'
+import setupEvents from './events/setup'
+import { isWindows } from './helpers/os'
 
 const INACTIVE_TIMEOUT = 60000
 
 export default class Swifty extends Application {
   components() {
     return { Window }
+  }
+
+  call(events) {
+    Object.values(events).forEach(event => event.call(this))
   }
 
   windowOptions() {
@@ -32,6 +29,7 @@ export default class Swifty extends Application {
       width: this.settings.width,
       height: this.settings.height,
       devTools: this.settings.devTools,
+      frame: !isWindows(),
       webPreferences: {
         preload: path.join(app.getAppPath(), 'preload', 'index.js')
       }
@@ -49,7 +47,7 @@ export default class Swifty extends Application {
     this.window.setMenu(null)
     this.window.disableNavigation()
     this.setupWindowEvents()
-    this.subscribeForEvents()
+    this.call(mainEvents)
     if (this.vault.isPristine()) return this.showSetup()
     return this.showAuth()
   }
@@ -76,15 +74,6 @@ export default class Swifty extends Application {
     })
   }
 
-  subscribeForEvents() {
-    onDataSave(this.vault, this.window)
-    onBackupSave(this.vault)
-    onVaultSyncImport(this.vault, this.sync, () => this.showAuth())
-    onVaultSyncConnect(this.sync, this.window, () => this.pullVaultData())
-    onVaultSyncDisconnect(this.sync, this.window)
-    onVaultSyncStart(this.sync, this.window)
-  }
-
   /**
    * Authentication and Setup
    */
@@ -92,31 +81,23 @@ export default class Swifty extends Application {
   showAuth() {
     this.window.webContents.send('auth', this.isTouchIdAvailable())
     if (this.isTouchIdAvailable()) {
-      onAuthTouchId(() => this.authSuccess(), () => this.authFail())
+      onAuthTouchId.call(this)
     }
-    onAuthStart(
-      this.vault,
-      this.sync,
-      () => this.authSuccess(),
-      () => this.authFail()
-    )
+    onAuthStart.call(this)
   }
 
   showSetup() {
     this.window.webContents.send('setup')
-    onBackupSelect(this.vault, this.sync, this.window, () => this.authSuccess())
-    onSetupDone(this.vault, this.sync, () => this.authSuccess())
+    this.call(setupEvents)
   }
 
   authSuccess() {
-    const configured = this.sync.isConfigured()
     this.window.enlarge()
     this.window.send('auth:success', {
-      sync: configured,
+      sync: this.sync.isConfigured(),
       data: this.vault.read(),
       platform: process.platform
     })
-    if (configured) this.pullVaultData()
   }
 
   authFail() {
@@ -124,9 +105,16 @@ export default class Swifty extends Application {
     this.showAuth()
   }
 
+  getAudit() {
+    const auditor = new Auditor(this.vault.read(), this.cryptor)
+    auditor.getAudit().then(data => {
+      this.window.send('audit:done', { data })
+    })
+  }
+
   pullVaultData() {
     this.window.send('vault:pull:started')
-    this.sync
+    return this.sync
       .pull()
       .then(() => {
         this.window.send('vault:pull:stopped', {
@@ -139,9 +127,8 @@ export default class Swifty extends Application {
 
   isTouchIdAvailable() {
     return (
+      this.cryptor &&
       process.platform === 'darwin' &&
-      this.sync.client &&
-      this.sync.client.cryptor &&
       systemPreferences.canPromptTouchID()
     )
   }

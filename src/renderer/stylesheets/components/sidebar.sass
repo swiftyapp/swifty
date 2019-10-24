@@ -1,47 +1,56 @@
 .sidebar
+  display: flex
+  flex-direction: column
   padding-top: 38px
-  .settings
-    padding: 11px 0 3px
-  .add-button
-    padding: 7px 0 7px 0
-  .add-button, .settings
-    width: 50px
+  .switcher
+    display: flex
+    flex-direction: column
+    flex: 1
+    padding-bottom: 60px
+  .add-button, .settings-button
+    display: flex
+    width: 44px
     height: 36px
-    margin: 0 auto 10px auto
+    padding: 4px 0 4px 0
+    margin: 11px auto 6px auto
     cursor: pointer
     text-align: center
     border-radius: 50%
     transition: background .2s ease
+    align-items: center
+    justify-content: center
     path
       fill: #fff
     &:hover
       background: darken(#4792ff, 3%)
-  .add-button
-    color: #fff
-    font-size: 32px
-    font-weight: 400
-    line-height: 42px
   .settings
     position: absolute
-    bottom: 0px
-    left: 12px
-    > svg
-      margin-top: 4px
-      path
-        fill: #fff
+    width: 100%
+    bottom: 5px
+    path
+      fill: #fff
     .dropdown
       bottom: 46px
       left: 20px
+  .tooltip
+    top: 50%
+    left: 78px
+    transform: translateY(-50%)
   .switcher
     .item
       height: 53px
       text-align: center
       transition: background .2s ease
+      display: flex
+      align-items: center
+      justify-content: center
       &:hover
         background: darken(#4792ff, 2%)
       &.current
         background: darken(#4792ff, 5%)
-      svg
-        margin-top: 12px
-        path
-          fill: #fff
+      path
+        fill: #fff
+    .tooltip-context.bottom
+      position: absolute
+      bottom: 65px
+      width: 100%

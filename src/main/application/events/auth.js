@@ -1,26 +1,26 @@
 import { Cryptor } from '@swiftyapp/cryptor'
 import { ipcMain, systemPreferences } from 'electron'
 
-export const onAuthStart = (vault, sync, resolve, reject) => {
+export const onAuthStart = function() {
   ipcMain.once('auth:start', (event, hashedSecret) => {
-    const cryptor = new Cryptor(hashedSecret)
-    if (vault.authenticate(cryptor)) {
-      sync.initialize(vault, cryptor)
-      return resolve()
+    this.cryptor = new Cryptor(hashedSecret)
+    if (this.vault.authenticate(this.cryptor)) {
+      this.sync.initialize(this.vault, this.cryptor)
+      this.authSuccess()
+      if (this.sync.isConfigured())
+        return this.pullVaultData().then(() => this.getAudit())
+      else return this.getAudit()
     }
-    reject()
+    this.cryptor = null
+    return this.authFail()
   })
 }
 
-export const onAuthTouchId = (resolve, reject) => {
+export const onAuthTouchId = function() {
   ipcMain.once('auth:touchid', () => {
     systemPreferences
       .promptTouchID('Confirm your identity')
-      .then(() => {
-        return resolve()
-      })
-      .catch(err => {
-        return reject(err)
-      })
+      .then(() => this.authSuccess())
+      .catch(() => this.authFail())
   })
 }

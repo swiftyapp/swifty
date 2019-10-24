@@ -1,15 +1,5 @@
 import Storage from '../storage'
-import Migrator from './migrator'
-
-const btoa = data => {
-  const buffer = Buffer.from(data, 'utf8')
-  return buffer.toString('base64')
-}
-
-const atob = data => {
-  const buffer = Buffer.from(data, 'base64')
-  return buffer.toString('utf8')
-}
+import { encrypt, decrypt } from '../helpers/encription'
 
 export const vaultFile = () => {
   if (process.env.SPECTRON_STORAGE_PATH) {
@@ -23,35 +13,24 @@ export const vaultFile = () => {
 
 export default class Vault {
   constructor() {
-    this.migrator = new Migrator()
-    this.shouldMigrate = this.migrator.shouldMigrate()
     this.storage = new Storage(vaultFile())
   }
 
   authenticate(cryptor) {
-    if (this.shouldMigrate) {
-      if (this.migrator.migrate(cryptor)) {
-        this.shouldMigrate = false
-        return true
-      }
-      return false
-    }
     return this.isDecryptable(this.read(), cryptor)
   }
 
   setup(cryptor) {
-    return this.storage.write(
-      btoa(cryptor.encrypt(JSON.stringify({ entries: [] })))
-    )
+    return this.storage.write(encrypt({ entries: [] }, cryptor))
   }
 
   isPristine() {
-    return this.read() === '' && !this.shouldMigrate
+    return this.read() === ''
   }
 
   isDecryptable(data, cryptor) {
     try {
-      return !!JSON.parse(cryptor.decrypt(atob(data)))
+      return !!decrypt(data, cryptor)
     } catch (e) {
       return false
     }

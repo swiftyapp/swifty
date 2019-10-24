@@ -12,7 +12,7 @@ describe('Create note entry', function() {
       return expect(
         app.client
           .setValue('input[type=password]', 'password')
-          .keys("\uE007")
+          .keys('\uE007')
           .waitForExist('.body .list')
           .getText('.body .list')
       ).to.eventually.equal('No Items')
@@ -21,11 +21,11 @@ describe('Create note entry', function() {
     it('switches to note scope', () => {
       return expect(
         app.client
-          .click('.switcher .item:nth-child(2)')
+          .click('.switcher .tooltip-context:nth-child(2)')
           .getText('.body .list')
       ).to.eventually.equal('No Items')
     })
-    
+
     it('shows add note form', () => {
       return expect(
         app.client
@@ -35,7 +35,7 @@ describe('Create note entry', function() {
           .getText('.aside .actions')
       ).to.eventually.equal('CancelSave')
     })
-    
+
     it('highlights title field with error', () => {
       return expect(
         app.client
@@ -43,7 +43,7 @@ describe('Create note entry', function() {
           .isExisting('.field.error:nth-of-type(1)')
       ).to.eventually.equal(true)
     })
-    
+
     it('highlights note field with error', () => {
       return expect(
         app.client
@@ -51,7 +51,7 @@ describe('Create note entry', function() {
           .isExisting('.field.error:nth-of-type(2)')
       ).to.eventually.equal(true)
     })
-    
+
     it('cancels entry creation', () => {
       return expect(
         app.client
@@ -62,11 +62,11 @@ describe('Create note entry', function() {
     })
 
     it('hides creation form', () => {
-      return expect(
-        app.client.isExisting('.aside .empty')
-      ).to.eventually.equal(true)
+      return expect(app.client.isExisting('.aside .empty')).to.eventually.equal(
+        true
+      )
     })
-    
+
     it('opens creation form again', () => {
       return expect(
         app.client
@@ -86,7 +86,7 @@ describe('Create note entry', function() {
           .getText('.body .list')
       ).to.eventually.equal('Example')
     })
-    
+
     it('shows details of created note', () => {
       return expect(
         app.client.getText('.aside .entry-title h1')

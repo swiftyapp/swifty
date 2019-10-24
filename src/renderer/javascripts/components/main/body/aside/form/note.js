@@ -1,8 +1,9 @@
 import React from 'react'
 import Field from './field'
 import SecureField from './secure'
+import TagField from './tag'
 
-const Note = ({ entry, validate, onChange }) => {
+const Note = ({ entry, validate, onChange, onTagsChange }) => {
   return (
     <>
       <Field
@@ -19,6 +20,7 @@ const Note = ({ entry, validate, onChange }) => {
         validate={validate}
         rows="15"
       />
+      <TagField entry={entry} onChange={onTagsChange} />
     </>
   )
 }

@@ -3,8 +3,9 @@ import { getProps } from 'defaults/generator'
 
 import Field from './field'
 import SecureField from './secure'
+import TagField from './tag'
 
-const Login = ({ entry, validate, onChange }) => {
+const Login = ({ entry, validate, onChange, onTagsChange }) => {
   const generatePassword = () => {
     const password = window.generatePassword(getProps())
     onChange({ target: { name: 'password', value: password } })
@@ -32,13 +33,14 @@ const Login = ({ entry, validate, onChange }) => {
         validate={validate}
         entry={entry}
         onChange={onChange}
-        maxLength="24"
+        maxLength="100"
       >
         <span className="action" onClick={generatePassword}>
           generate
         </span>
       </SecureField>
       <Field name="Email" entry={entry} onChange={onChange} />
+      <TagField entry={entry} onChange={onTagsChange} />
       <Field name="Note" entry={entry} onChange={onChange} rows="5" />
     </>
   )

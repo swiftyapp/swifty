@@ -1,8 +1,6 @@
 import Vault from 'main/application/vault'
 import Storage from 'main/application/storage'
-import Migrator from 'main/application/vault/migrator'
 jest.mock('main/application/storage')
-jest.mock('main/application/vault/migrator')
 let vault
 
 describe('Vault', () => {
@@ -98,7 +96,6 @@ describe('Vault', () => {
     describe('vault file empty', () => {
       let read = jest.fn(() => '')
       beforeEach(() => {
-        Migrator.mockImplementation(() => ({ shouldMigrate: () => false }))
         Storage.mockImplementation(() => ({ read }))
         vault = new Vault()
       })

@@ -12,6 +12,7 @@ import Swifty from './components/swifty'
 const store = createStore(rootReducer, applyMiddleware(thunkMiddleware))
 
 window.onload = () => {
+  document.querySelector('body').setAttribute('platform', window.platform())
   render(
     <Provider store={store}>
       <Swifty />
@@ -33,6 +34,10 @@ window.onMessage('auth:success', (event, options) => {
   store.dispatch({ type: 'SET_ENTRIES', data: options.data })
   store.dispatch({ type: 'FLOW_MAIN' })
   store.dispatch({ type: 'SYNC_INIT', enabled: options.sync })
+})
+
+window.onMessage('audit:done', (event, { data }) => {
+  store.dispatch({ type: 'AUDIT_DONE', data })
 })
 
 window.onMessage('vault:sync:started', () => {

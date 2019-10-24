@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import Modal from 'components/elements/modal'
+import Tooltip from 'components/elements/tooltip'
 import Navigation from './navigation'
 import Vault from './vault'
 import Password from './password'
@@ -11,9 +12,11 @@ const Settings = () => {
 
   return (
     <div className="settings">
-      <div onClick={() => setModal(!modal)}>
-        <SettingsIcon width="28" height="28" />
-      </div>
+      <Tooltip content="Settings">
+        <div className="settings-button" onClick={() => setModal(!modal)}>
+          <SettingsIcon />
+        </div>
+      </Tooltip>
       {modal && (
         <Modal onClose={() => setModal(!modal)}>
           <div className="preferences">

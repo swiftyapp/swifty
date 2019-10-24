@@ -27,7 +27,7 @@ describe('Storage', () => {
 
         test('reads file content', () => {
           expect(fs.readFileSync).toHaveBeenCalledWith(
-            '/Applications/Swifty/storage_default.swftx'
+            '/tmp/Swifty/storage_default.swftx'
           )
         })
 
@@ -64,7 +64,7 @@ describe('Storage', () => {
 
       test('creates file content', () => {
         expect(fs.ensureFileSync).toHaveBeenCalledWith(
-          '/Applications/Swifty/storage_default.swftx'
+          '/tmp/Swifty/storage_default.swftx'
         )
       })
 
@@ -86,7 +86,7 @@ describe('Storage', () => {
         })
         test('calls fs module to perform write', () => {
           expect(fs.writeFileSync).toHaveBeenCalledWith(
-            '/Applications/Swifty/storage_default.swftx',
+            '/tmp/Swifty/storage_default.swftx',
             'data',
             { flag: 'w' }
           )
@@ -127,7 +127,7 @@ describe('Storage', () => {
 
       test('calls fs module to perform write', () => {
         expect(fs.writeFileSync).toHaveBeenCalledWith(
-          '/Applications/Swifty/storage_default.swftx',
+          '/tmp/Swifty/storage_default.swftx',
           'data',
           { flag: 'w' }
         )
@@ -153,7 +153,7 @@ describe('Storage', () => {
         })
         test('copies file', () => {
           expect(fs.copyFileSync).toHaveBeenCalledWith(
-            '/Applications/Swifty/storage_default.swftx',
+            '/tmp/Swifty/storage_default.swftx',
             '/Desktop/storage_default.swftx'
           )
         })
@@ -170,7 +170,7 @@ describe('Storage', () => {
         })
         test('copies file', () => {
           expect(fs.copyFileSync).toHaveBeenCalledWith(
-            '/Applications/Swifty/storage_default.swftx',
+            '/tmp/Swifty/storage_default.swftx',
             '/Desktop/storage_default.swftx'
           )
         })

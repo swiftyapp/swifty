@@ -6,7 +6,7 @@ export default (
     case 'FLOW_SETUP':
       return { ...state, name: 'setup' }
     case 'FLOW_AUTH':
-      return { name: 'auth', touchID: action.touchID }
+      return { ...state, name: 'auth', touchID: action.touchID }
     case 'FLOW_MAIN':
       return { ...state, name: 'main', sync: action.sync }
     case 'SYNC_DISCONNECTED':

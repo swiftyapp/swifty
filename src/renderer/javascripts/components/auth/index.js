@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import Masterpass from '../elements/masterpass'
+import Controls from '../elements/controls'
 import img from 'swifty.png'
 
 export default ({ touchID }) => {
@@ -23,19 +24,22 @@ export default ({ touchID }) => {
   }
 
   return (
-    <div className="lock-screen">
-      <div className="top-lock">
-        <img src={img} alt="" width="120" />
+    <>
+      <Controls />
+      <div className="lock-screen">
+        <div className="top-lock">
+          <img src={img} alt="" width="120" />
+        </div>
+        <div className="bottom-lock">
+          <Masterpass
+            touchID={touchID}
+            error={error}
+            onChange={handleChange}
+            onEnter={handleEnter}
+            onTouchID={handleTouchId}
+          />
+        </div>
       </div>
-      <div className="bottom-lock">
-        <Masterpass
-          touchID={touchID}
-          error={error}
-          onChange={handleChange}
-          onEnter={handleEnter}
-          onTouchID={handleTouchId}
-        />
-      </div>
-    </div>
+    </>
   )
 }

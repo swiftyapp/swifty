@@ -11,7 +11,7 @@ export const createFile = (name, parentId, content, drive) => {
       })
       .then(response => {
         if (response.status === 200) {
-          return resolve(response.data.id)
+          return resolve(true)
         }
         return resolve(null)
       })
