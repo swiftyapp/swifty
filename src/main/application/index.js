@@ -44,7 +44,7 @@ export default class Swifty extends Application {
   }
 
   onWindowReady() {
-    this.window.setMenu(null)
+    this.window.removeMenu()
     this.window.disableNavigation()
     this.setupWindowEvents()
     this.call(mainEvents)
