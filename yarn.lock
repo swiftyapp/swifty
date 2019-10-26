@@ -3394,7 +3394,7 @@ electron-util@^0.12.2:
     electron-is-dev "^1.1.0"
     new-github-issue-url "^0.2.1"
 
-electron@^6.0.10, electron@^6.0.12:
+electron@^6.0.10:
   version "6.0.12"
   resolved "https://registry.yarnpkg.com/electron/-/electron-6.0.12.tgz#85bf0061e32f660256cfde95488f1cb75253bc94"
   integrity sha512-70ODZa1RP6K0gE9IV9YLCXPSyhLjXksCuYSSPb3MljbfwfHo5uE6X0CGxzm+54YuPdE2e7EPnWZxOOsJYrS5iQ==
@@ -3540,10 +3540,10 @@ escodegen@^1.9.1:
   optionalDependencies:
     source-map "~0.6.1"
 
-eslint-plugin-jest@^22.20.0:
-  version "22.20.0"
-  resolved "https://registry.yarnpkg.com/eslint-plugin-jest/-/eslint-plugin-jest-22.20.0.tgz#a3c3615c516fcbd20d50dbf395ea37361bd9e3b2"
-  integrity sha512-UwHGXaYprxwd84Wer8H7jZS+5C3LeEaU8VD7NqORY6NmPJrs+9Ugbq3wyjqO3vWtSsDaLar2sqEB8COmOZA4zw==
+eslint-plugin-jest@^22.20.1:
+  version "22.20.1"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-jest/-/eslint-plugin-jest-22.20.1.tgz#183688ec8bd65dec043552fcd2fa63b7e54f326f"
+  integrity sha512-bNkII1QUmb7P9KHXqRoDWwFrY1hkxI2bAXCvuZbKuzywcxjPNrCzRqsOEUe9T4fHVfhat2zRN7dS5n61C8rhoA==
   dependencies:
     "@typescript-eslint/experimental-utils" "^1.13.0"
 
@@ -6823,13 +6823,13 @@ nth-check@^1.0.2:
   dependencies:
     boolbase "~1.0.0"
 
-nucleon@^1.0.14:
-  version "1.0.14"
-  resolved "https://registry.yarnpkg.com/nucleon/-/nucleon-1.0.14.tgz#9db4030efe58a851a8b8b3b9e847e21377735f10"
-  integrity sha512-bf78t/PloImWEghsoeIvePhSqEF92IWYlv/nawEmxrZBUFF8SKH4MJbvMH7xv9NxoSwLKeXhjuRDR7kJ4G4u7Q==
+nucleon@^1.0.16:
+  version "1.0.16"
+  resolved "https://registry.yarnpkg.com/nucleon/-/nucleon-1.0.16.tgz#60b3b06acd93148a296c07a9dad4c38fd9498fe1"
+  integrity sha512-ZFMOhfP+IXRYeO0jeJO3K9mdnkKhsguNCuhxVJRIMgfP0E0Mp5MvPgW4ahMK0Y7/Q+AMkjBuUPHFtHnum14rvg==
   dependencies:
     chalk "^2.4.2"
-    electron "^6.0.12"
+    electron "^7.0.0"
     electron-log "^3.0.8"
     electron-updater "^4.1.2"
     file-loader "^4.2.0"

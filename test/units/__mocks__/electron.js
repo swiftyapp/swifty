@@ -3,7 +3,7 @@ module.exports = {
   match: jest.fn(),
   app: {
     getPath: jest.fn(() => '/tmp'),
-    getName: jest.fn(() => 'Swifty')
+    name: 'Swifty'
   },
   remote: jest.fn(),
   dialog: jest.fn(),

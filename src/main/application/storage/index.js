@@ -3,7 +3,7 @@ import path from 'path'
 import { app } from 'electron'
 
 const appDir = () => {
-  return path.join(app.getPath('appData'), app.getName())
+  return path.join(app.getPath('appData'), app.name)
 }
 
 export default class Storage {

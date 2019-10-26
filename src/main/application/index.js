@@ -37,7 +37,7 @@ export default class Swifty extends Application {
   }
 
   onReady() {
-    this.shouldShowAuth = false
+    this.closed = false
     this.vault = new Vault()
     this.tray = new Tray(this)
     this.sync = new GDrive()
@@ -57,21 +57,17 @@ export default class Swifty extends Application {
    */
   setupWindowEvents() {
     this.window.on('close', () => {
-      this.shouldShowAuth = true
-      clearTimeout(this.inactiveTimeout)
+      this.closed = true
+      this.showAuth()
     })
-    this.window.on('hide', () => {
+    this.window.on('show', () => (this.closed = false))
+    this.window.on('blur', () => {
+      if (this.closed) return
       this.inactiveTimeout = setTimeout(() => {
-        if (this.vault.cryptor) this.shouldShowAuth = true
+        if (this.cryptor) this.showAuth()
       }, INACTIVE_TIMEOUT)
     })
-    this.window.on('show', () => {
-      clearTimeout(this.inactiveTimeout)
-      if (this.shouldShowAuth) {
-        this.showAuth()
-        this.shouldShowAuth = false
-      }
-    })
+    this.window.on('focus', () => clearTimeout(this.inactiveTimeout))
   }
 
   /**
