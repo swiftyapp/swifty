@@ -28,7 +28,7 @@ export default ({ touchID }) => {
       <Controls />
       <div className="lock-screen">
         <div className="top-lock">
-          <img src={img} alt="" width="120" />
+          <img src={img} alt="" width="72" />
         </div>
         <div className="bottom-lock">
           <Masterpass
