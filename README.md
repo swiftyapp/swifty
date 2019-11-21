@@ -2,10 +2,16 @@
 
 ![](https://alchaplinsky.com/images/misc/swifty_banner_alpha.png?v=1)
 
-[![CircleCI](https://circleci.com/gh/swiftyapp/swifty/tree/master.svg?style=svg&circle-token=3179a51a22aa66c4c17395eef2952eab42a14057)](https://circleci.com/gh/swiftyapp/swifty/tree/master)
-[![Financial Contributors on Open Collective](https://opencollective.com/swifty/all/badge.svg?label=financial+contributors)](https://opencollective.com/swifty) ![GitHub release (latest SemVer including pre-releases)](https://img.shields.io/github/v/release/swiftyapp/swifty?include_prereleases&label=Release)
-![GitHub All Releases](https://img.shields.io/github/downloads/swiftyapp/swifty/total?label=Downloads)
-[![Encryption](https://img.shields.io/badge/Encryption-AES%20256%20GCM-green.svg)](https://tools.ietf.org/html/rfc5288)
+<div align="center">
+
+  [![](https://img.shields.io/badge/PayPal-Buy%20me%20a%20Coffee-blue)](https://www.paypal.me/alchaplinsky)
+
+  [![CircleCI](https://circleci.com/gh/swiftyapp/swifty/tree/master.svg?style=svg&circle-token=3179a51a22aa66c4c17395eef2952eab42a14057)](https://circleci.com/gh/swiftyapp/swifty/tree/master)
+  [![Financial Contributors on Open Collective](https://opencollective.com/swifty/all/badge.svg?label=financial+contributors)](https://opencollective.com/swifty) ![GitHub release (latest SemVer including pre-releases)](https://img.shields.io/github/v/release/swiftyapp/swifty?include_prereleases&label=Release)
+  ![GitHub All Releases](https://img.shields.io/github/downloads/swiftyapp/swifty/total?label=Downloads)
+  [![Encryption](https://img.shields.io/badge/Encryption-AES%20256%20GCM-green.svg)](https://tools.ietf.org/html/rfc5288)
+  
+</div>
 
 Swifty is a lightweight, fast and free Password Manager for MacOS, Windows and Linux.
 
