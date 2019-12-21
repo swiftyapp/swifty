@@ -3,7 +3,7 @@
 :tada: First off, thanks for taking the time to contribute! :tada:
 
 This project adheres to the Contributor Covenant [code of conduct](CODE_OF_CONDUCT.md).
-By participating, you are expected to uphold this code. 
+By participating, you are expected to uphold this code.
 
 The following are guidelines for contributing to Swifty.
 These are just guidelines, not rules, use your best judgment and feel free to
@@ -51,7 +51,7 @@ dependencies, and tools contained in the `swiftyapp/swifty` repository.
   ```
   yarn test
   ```
-  
+
   * Once your commits are ready to go (with passing tests and linting) begin the process of opening a pull request by pushing your working branch to your fork on GitHub.
   * From within GitHub, opening a new pull request will present you with a template that should be filled out
   * Discuss changes and update pull request
