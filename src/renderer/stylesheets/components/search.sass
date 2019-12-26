@@ -2,12 +2,18 @@
   position: relative
   width: 270px
   -webkit-app-region: no-drag
-  .search-icon
+  .search-icon, .clear-icon
     position: absolute
     top: 8px
-    left: 0px
     path
       fill: #777
+  .search-icon
+    left: 0
+  .clear-icon
+    top: 13px
+    right: 10px
+    &:hover path
+      fill: #333
   input
     box-sizing: border-box
     outline: none

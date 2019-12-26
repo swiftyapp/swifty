@@ -1,6 +1,7 @@
 import React from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import SearchIcon from 'search.svg'
+import ClearIcon from 'clear.svg'
 
 const Search = () => {
   const dispatch = useDispatch()
@@ -8,6 +9,10 @@ const Search = () => {
 
   const filterItems = event => {
     dispatch({ type: 'SET_FILTER_QUERY', query: event.target.value })
+  }
+
+  const clearFilter = () => {
+    dispatch({ type: 'SET_FILTER_QUERY', query: '' })
   }
 
   return (
@@ -19,6 +24,14 @@ const Search = () => {
         value={filterTerm}
         onChange={filterItems}
       />
+      {filterTerm !== '' && (
+        <ClearIcon
+          onClick={clearFilter}
+          width="10"
+          height="10"
+          className="clear-icon"
+        />
+      )}
     </div>
   )
 }
