@@ -35,12 +35,16 @@ export default class AuthWindow extends BrowserWindow {
 
       this.webContents.on('did-navigate', (event, url) => {
         if (this.isAuthSuccess(url)) {
-          return this.on('page-title-updated', (event, code) => {
-            resolve(code)
-          })
+          resolve(this.parseCodeFromURL(url))
         }
       })
     })
+  }
+
+  parseCodeFromURL(url) {
+    const search = new URL(url).search
+    const params = new URLSearchParams(search)
+    return new URLSearchParams(params.get('response')).get('code')
   }
 
   isWhitelisted(url) {
@@ -48,6 +52,6 @@ export default class AuthWindow extends BrowserWindow {
   }
 
   isAuthSuccess(url) {
-    return url.match(`${CONFIG.apiHost}/google_oauth2/callback`)
+    return url.match('https://accounts.google.com/o/oauth2/approval/v2')
   }
 }

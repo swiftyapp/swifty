@@ -3,6 +3,8 @@ import { google } from 'googleapis'
 import AuthWindow from '../../../../window/auth'
 import Storage from '../../../storage'
 
+const AUTH_RETRY_COUNT = 2
+
 export const credentialsFile = () => {
   if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
     return 'gdrive.swftx'
@@ -15,14 +17,14 @@ export default class Client {
     this.cryptor = cryptor
     this.storage = new Storage(path.join('auth', credentialsFile()))
     this.auth = this.buildAuth()
-    this.auth.on('tokens', tokens => this.updataTokens(tokens))
+    this.auth.on('tokens', tokens => this.updateTokens(tokens))
   }
 
   buildAuth() {
     return new google.auth.OAuth2(
       process.env.GOOGLE_OAUTH_CLIENT_ID,
       process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-      `${CONFIG.apiHost}/google_oauth2/callback`
+      'urn:ietf:wg:oauth:2.0:oob'
     )
   }
 
@@ -41,7 +43,7 @@ export default class Client {
     this.authWindow.removeMenu()
     return this.authWindow.authenticate().then(code => {
       this.authWindow.close()
-      return this.auth.getToken(code)
+      return this.retry(() => this.auth.getToken(code), AUTH_RETRY_COUNT)
     })
   }
 
@@ -50,7 +52,7 @@ export default class Client {
     this.writeTokens(Object.assign({}, { refresh_token: tokens.refresh_token }))
   }
 
-  updataTokens(tokens) {
+  updateTokens(tokens) {
     const credentials = this.readTokens() || {}
     this.auth.setCredentials(tokens)
     this.writeTokens(Object.assign(credentials, tokens))
@@ -72,6 +74,20 @@ export default class Client {
     return this.auth.generateAuthUrl({
       access_type: 'offline',
       scope: [CONFIG.googleOauth.scope]
+    })
+  }
+
+  retry(fn, count) {
+    return new Promise((resolve, reject) => {
+      fn()
+        .then(resolve)
+        .catch(error => {
+          if (count === 0) {
+            reject(error)
+            return
+          }
+          this.retry(fn, count - 1)
+        })
     })
   }
 }
