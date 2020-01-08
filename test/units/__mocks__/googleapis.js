@@ -15,7 +15,7 @@ module.exports = {
           on: jest.fn(),
           generateAuthUrl: jest.fn(() => 'https://example.com/google_oauth2'),
           setCredentials: jest.fn(),
-          getToken: jest.fn()
+          getToken: jest.fn(() => Promise.resolve('TOKEN'))
         }
       })
     }
