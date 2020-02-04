@@ -29,7 +29,7 @@ describe('Passwords audit', function() {
       return expect(
         app.client.getText('.audit-group.level-one')
       ).to.eventually.equal(
-        'Weak\nInstagram\nanotheruser\nFacebook\nmyuser\nGoogle\nsomeuser'
+        'Weak\nFacebook\nmyuser\nGoogle\nsomeuser\nInstagram\nanotheruser'
       )
     })
 
@@ -43,7 +43,7 @@ describe('Passwords audit', function() {
       return expect(
         app.client.getText('.audit-group.level-three')
       ).to.eventually.equal(
-        'Duplicates\nInstagram\nanotheruser\nFacebook\nmyuser\nGoogle\nsomeuser'
+        'Duplicates\nFacebook\nmyuser\nGoogle\nsomeuser\nInstagram\nanotheruser'
       )
     })
 
