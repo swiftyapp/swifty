@@ -35,5 +35,4 @@ jobs:
 
       # run tests!
       - run: yarn lint
-      - run: npx jest test/units
-      - run: xvfb-run -a npx bozon start & xvfb-run -a npx bozon test test/features
+      - run: yarn test
