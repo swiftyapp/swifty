@@ -1,5 +1,5 @@
-import Swifty from './application'
 import unhandled from 'electron-unhandled'
+import Swifty from 'application'
 import { openNewGitHubIssue, debugInfo } from 'electron-util'
 
 unhandled({

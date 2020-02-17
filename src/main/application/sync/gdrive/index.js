@@ -1,6 +1,6 @@
 import { google } from 'googleapis'
 import Client from './auth/client'
-import { vaultFile } from '../../vault'
+import { vaultFile } from 'application/vault'
 import {
   folderExists,
   fileExists,

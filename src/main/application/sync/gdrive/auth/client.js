@@ -1,7 +1,7 @@
 import path from 'path'
 import { google } from 'googleapis'
-import AuthWindow from '../../../../window/auth'
-import Storage from '../../../storage'
+import AuthWindow from 'window/auth'
+import Storage from 'application/storage'
 
 const AUTH_RETRY_COUNT = 2
 
