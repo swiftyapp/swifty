@@ -112,13 +112,16 @@ export default class Swifty extends Application {
     this.window.send('vault:pull:started')
     return this.sync
       .pull()
-      .then(() => {
+      .then(data => {
         this.window.send('vault:pull:stopped', {
           success: true,
-          data: this.vault.read()
+          data: data
         })
+        return data
       })
-      .catch(() => this.window.send('vault:pull:stopped', { success: false }))
+      .catch(error => {
+        this.window.send('vault:pull:stopped', { success: false, error })
+      })
   }
 
   isTouchIdAvailable() {

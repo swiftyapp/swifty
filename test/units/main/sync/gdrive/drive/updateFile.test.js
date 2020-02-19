@@ -10,27 +10,27 @@ describe('Drive#updateFile', () => {
 
   afterEach(() => jest.clearAllMocks())
 
-  beforeEach(() => {
-    google.__setUpdateFileResponse({
-      kind: 'drive#file',
-      id: '3cpADaNV9Vy5tzTQfk3jI7P5bZvnJCdsa',
-      name: name,
-      mimeType: mimeType
-    })
-  })
-
-  test('google api is called with correct params', async () => {
-    await drive.updateFile(id, content)
-    expect(google.drive().files.update).toBeCalledWith({
-      fileId: id,
-      media: {
-        mimeType: mimeType,
-        body: content
-      }
-    })
-  })
-
   describe('Successful update', () => {
+    beforeEach(() => {
+      google.__setUpdateFileResponse({
+        kind: 'drive#file',
+        id: '3cpADaNV9Vy5tzTQfk3jI7P5bZvnJCdsa',
+        name: name,
+        mimeType: mimeType
+      })
+    })
+
+    test('google api is called with correct params', async () => {
+      await drive.updateFile(id, content)
+      expect(google.drive().files.update).toBeCalledWith({
+        fileId: id,
+        media: {
+          mimeType: mimeType,
+          body: content
+        }
+      })
+    })
+
     test('returns file id', async () => {
       await expect(drive.updateFile(name, content)).resolves.toEqual(
         '3cpADaNV9Vy5tzTQfk3jI7P5bZvnJCdsa'

@@ -11,21 +11,6 @@ describe('Drive#createFile', () => {
 
   afterEach(() => jest.clearAllMocks())
 
-  test('google api is called with correct params', async () => {
-    await drive.createFile(name, parentId, content)
-    expect(google.drive().files.create).toBeCalledWith({
-      media: {
-        mimeType: mimeType,
-        body: 'DATA'
-      },
-      requestBody: {
-        name: name,
-        mimeType: mimeType,
-        parents: [parentId]
-      }
-    })
-  })
-
   describe('Successful creation', () => {
     beforeEach(() => {
       google.__setCreateFileResponse({
@@ -33,6 +18,21 @@ describe('Drive#createFile', () => {
         id: '3cpADaNV9Vy5tzTQfk3jI7P5bZvnJCdsa',
         name: name,
         mimeType: mimeType
+      })
+    })
+
+    test('google api is called with correct params', async () => {
+      await drive.createFile(name, parentId, content)
+      expect(google.drive().files.create).toBeCalledWith({
+        media: {
+          mimeType: mimeType,
+          body: 'DATA'
+        },
+        requestBody: {
+          name: name,
+          mimeType: mimeType,
+          parents: [parentId]
+        }
       })
     })
 
@@ -44,12 +44,12 @@ describe('Drive#createFile', () => {
   })
 
   describe('Unexpected error', () => {
-    beforeEach(() => google.__setCreateFileError('Unauthorized'))
+    beforeEach(() => google.__setCreateFileError('unauthorized_client'))
 
     test('throws error', async () => {
       await expect(
         drive.createFile(name, parentId, content)
-      ).rejects.toThrowError('Unauthorized')
+      ).rejects.toThrowError('unauthorized_client')
     })
   })
 })

@@ -9,16 +9,6 @@ describe('Drive#createFolder', () => {
 
   afterEach(() => jest.clearAllMocks())
 
-  test('google api is called with correct params', async () => {
-    await drive.createFolder(name)
-    expect(google.drive().files.create).toBeCalledWith({
-      requestBody: {
-        name: name,
-        mimeType: mimeType
-      }
-    })
-  })
-
   describe('Successful creation', () => {
     beforeEach(() => {
       google.__setCreateFileResponse({
@@ -26,6 +16,16 @@ describe('Drive#createFolder', () => {
         id: '1upGfeNV9Vy5tzTQfk3jI7P5bZvnJCqwa',
         name: name,
         mimeType: mimeType
+      })
+    })
+
+    test('google api is called with correct params', async () => {
+      await drive.createFolder(name)
+      expect(google.drive().files.create).toBeCalledWith({
+        requestBody: {
+          name: name,
+          mimeType: mimeType
+        }
       })
     })
 

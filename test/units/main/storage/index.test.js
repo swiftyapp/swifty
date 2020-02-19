@@ -88,7 +88,9 @@ describe('Storage', () => {
           expect(fs.writeFileSync).toHaveBeenCalledWith(
             '/tmp/Swifty/storage_default.swftx',
             'data',
-            { flag: 'w' }
+            {
+              flag: 'w'
+            }
           )
         })
 
@@ -106,7 +108,9 @@ describe('Storage', () => {
           expect(fs.writeFileSync).toHaveBeenCalledWith(
             '/Desktop/storage_default.swftx',
             'data',
-            { flag: 'w' }
+            {
+              flag: 'w'
+            }
           )
         })
 
@@ -129,7 +133,9 @@ describe('Storage', () => {
         expect(fs.writeFileSync).toHaveBeenCalledWith(
           '/tmp/Swifty/storage_default.swftx',
           'data',
-          { flag: 'w' }
+          {
+            flag: 'w'
+          }
         )
       })
 

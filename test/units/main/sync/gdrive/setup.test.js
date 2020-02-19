@@ -18,7 +18,7 @@ describe('#setup', () => {
 
   beforeEach(() => {
     sync = new GDrive()
-    sync.initialize({}, {})
+    sync.initialize({})
   })
 
   afterEach(() => {

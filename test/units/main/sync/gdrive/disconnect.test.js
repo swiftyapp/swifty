@@ -11,7 +11,7 @@ describe('#disconnect', () => {
       encrypt: jest.fn()
     }
     sync = new GDrive()
-    sync.initialize({}, cryptor)
+    sync.initialize(cryptor)
     sync.disconnect()
   })
 

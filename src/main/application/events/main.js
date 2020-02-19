@@ -19,7 +19,7 @@ export const onVaultSyncImport = function() {
     this.sync.import().then(data => {
       this.vault.write(data)
       this.vault.read()
-      this.sync.initialize(this.vault, null)
+      this.sync.initialize(null)
       return this.showAuth()
     })
   })
@@ -50,7 +50,7 @@ export const onVaultSyncStart = function() {
     if (this.sync.isConfigured()) {
       this.window.send('vault:sync:started')
       this.sync
-        .push()
+        .push(this.vault.read())
         .then(() => {
           this.window.send('vault:sync:stopped', {
             success: true

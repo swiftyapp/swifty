@@ -9,19 +9,19 @@ describe('Drive#folderExists', () => {
 
   afterEach(() => jest.clearAllMocks())
 
-  beforeEach(() => {
-    google.__setListFilesResponse({ files: [] })
-  })
-
-  test('google api is called with correct params', async () => {
-    await drive.folderExists(name)
-    expect(google.drive().files.list).toBeCalledWith({
-      q: `name = '${name}' and trashed = false`,
-      fields: 'files(id, name)'
-    })
-  })
-
   describe('Folder does not exist', () => {
+    beforeEach(() => {
+      google.__setListFilesResponse({ files: [] })
+    })
+
+    test('google api is called with correct params', async () => {
+      await drive.folderExists(name)
+      expect(google.drive().files.list).toBeCalledWith({
+        q: `name = '${name}' and trashed = false`,
+        fields: 'files(id, name)'
+      })
+    })
+
     test('returns null', async () => {
       await expect(drive.folderExists(name)).resolves.toEqual(null)
     })

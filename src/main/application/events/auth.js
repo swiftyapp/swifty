@@ -2,13 +2,17 @@ import { Cryptor } from '@swiftyapp/cryptor'
 import { ipcMain, systemPreferences } from 'electron'
 
 export const onAuthStart = function() {
-  ipcMain.once('auth:start', (event, hashedSecret) => {
+  ipcMain.once('auth:start', (_, hashedSecret) => {
     this.cryptor = new Cryptor(hashedSecret)
     if (this.vault.authenticate(this.cryptor)) {
-      this.sync.initialize(this.vault, this.cryptor)
+      this.sync.initialize(this.cryptor)
       this.authSuccess()
       if (this.sync.isConfigured())
-        return this.pullVaultData().then(() => this.getAudit())
+        return this.pullVaultData().then(data => {
+          if (this.vault.isDecryptable(data, this.cryptor))
+            this.vault.write(data)
+          this.getAudit()
+        })
       else return this.getAudit()
     }
     this.cryptor = null

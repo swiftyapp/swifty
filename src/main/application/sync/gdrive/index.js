@@ -1,14 +1,6 @@
-import { google } from 'googleapis'
 import Client from './auth/client'
+import Drive from './drive'
 import { vaultFile } from 'application/vault'
-import {
-  folderExists,
-  fileExists,
-  createFolder,
-  createFile,
-  updateFile,
-  readFile
-} from './files'
 
 export default class GDrive {
   constructor() {
@@ -16,9 +8,9 @@ export default class GDrive {
     this.fileName = vaultFile()
   }
 
-  initialize(vault, cryptor) {
-    this.vault = vault
+  initialize(cryptor) {
     this.client = new Client(cryptor)
+    this.drive = new Drive(this.client.getAuth())
   }
 
   isConfigured() {
@@ -34,48 +26,38 @@ export default class GDrive {
   }
 
   import() {
-    return this.setup().then(() => this.getFileContents())
+    return this.setup().then(() => this.pull())
   }
 
-  pull() {
-    return new Promise(resolve => {
-      if (!this.isConfigured()) return resolve(false)
-      this.getFileContents().then(data => {
-        if (!this.vault.isDecryptable(data, this.client.cryptor))
-          return resolve(false)
-        this.vault.write(data)
-        return resolve(true)
-      })
-    })
+  async pull() {
+    const folderId = await this.drive.folderExists(this.folderName)
+    if (!folderId) throw 'folder_not_found'
+
+    const fileId = await this.drive.fileExists(this.fileName, folderId)
+    if (!fileId) throw 'file_not_found'
+
+    return await this.drive.readFile(fileId)
   }
 
-  push() {
-    const drive = google.drive({ version: 'v3', auth: this.client.getAuth() })
-    return folderExists(this.folderName, drive).then(folderId => {
-      if (!folderId) {
-        return createFolder(this.folderName, drive).then(folderId => {
-          return createFile(this.fileName, folderId, this.vault.read(), drive)
-        })
-      }
-      return fileExists(this.fileName, folderId, drive).then(fileId => {
-        if (!fileId) {
-          return createFile(this.fileName, folderId, this.vault.read(), drive)
-        }
-        return updateFile(fileId, this.vault.read(), drive)
-      })
-    })
+  async push(data) {
+    let folderId = await this.drive.folderExists(this.folderName)
+    if (!folderId) return await this.createRemoteVault(data)
+
+    let fileId = await this.drive.fileExists(this.fileName, folderId)
+    if (!fileId) return await this.createRemoteVaultFile(folderId, data)
+
+    return await this.drive.updateFile(fileId, data)
   }
 
-  getFileContents() {
-    const drive = google.drive({ version: 'v3', auth: this.client.getAuth() })
-    return new Promise(resolve => {
-      folderExists(this.folderName, drive).then(folderId => {
-        if (!folderId) return resolve(null)
-        return fileExists(this.fileName, folderId, drive).then(fileId => {
-          if (!fileId) return resolve(null)
-          return readFile(fileId, drive).then(data => resolve(data))
-        })
-      })
-    })
+  async createRemoteVault(data) {
+    const folderId = await this.drive.createFolder(this.folderName)
+    if (!folderId) throw 'folder_creation_error'
+
+    return await this.createRemoteVaultFile(folderId, data)
+  }
+
+  async createRemoteVaultFile(folderId, data) {
+    const fileId = await this.drive.createFile(this.fileName, folderId, data)
+    if (!fileId) throw 'file_creation_error'
   }
 }

@@ -8,15 +8,15 @@ describe('Drive#readFile', () => {
 
   afterEach(() => jest.clearAllMocks())
 
-  test('google api is called with correct params', async () => {
-    await drive.readFile(id)
-    expect(google.drive().files.get).toBeCalledWith({
-      fileId: id,
-      alt: 'media'
-    })
-  })
-
   describe('File exists', () => {
+    test('google api is called with correct params', async () => {
+      await drive.readFile(id)
+      expect(google.drive().files.get).toBeCalledWith({
+        fileId: id,
+        alt: 'media'
+      })
+    })
+
     test('returns file content', async () => {
       await expect(drive.readFile(id)).resolves.toEqual('CONTENT')
     })
