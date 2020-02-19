@@ -21,15 +21,15 @@ describe('#pull', () => {
       result = await sync.pull()
     })
 
-    test('checks if folder exists on GDrive', async () => {
+    test('checks if folder exists on GDrive', () => {
       expect(drive.folderExists).toHaveBeenCalledWith('Swifty')
     })
 
-    test('checks if vault file exists on GDrive', async () => {
+    test('checks if vault file exists on GDrive', () => {
       expect(drive.fileExists).toHaveBeenCalledWith('vault.swftx', 'FOLDER_ID')
     })
 
-    test('reads file on GDrive', async () => {
+    test('reads file on GDrive', () => {
       expect(drive.readFile).toHaveBeenCalledWith('FILE_ID')
     })
 
@@ -44,7 +44,7 @@ describe('#pull', () => {
     })
 
     test('throws Folder not found error', async () => {
-      await expect(sync.pull()).rejects.toThrowError('Folder not found')
+      await expect(sync.pull()).rejects.toEqual(Error('folder_not_found'))
     })
   })
 
@@ -55,7 +55,7 @@ describe('#pull', () => {
     })
 
     test('throws File not found error', async () => {
-      await expect(sync.pull()).rejects.toThrowError('File not found')
+      await expect(sync.pull()).rejects.toThrowError(Error('file_not_found'))
     })
   })
 

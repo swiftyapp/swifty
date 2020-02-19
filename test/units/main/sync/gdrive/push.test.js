@@ -1,237 +1,131 @@
 import GDrive from 'main/application/sync/gdrive'
-import { google } from 'googleapis'
+import Drive from 'main/application/sync/gdrive/drive'
+
+jest.mock('main/application/sync/gdrive/drive')
 
 describe('#push', () => {
-  // let sync,
-  //   folderExistsMock,
-  //   fileExistsMock,
-  //   folderCreateMock,
-  //   fileCreateMock,
-  //   fileUpdateMock
+  const sync = new GDrive()
+  const drive = new Drive()
 
-  // const drive = {
-  //   files: {
-  //     list: jest.fn(options => {
-  //       if (options.q === "name = 'Swifty' and trashed = false") {
-  //         return folderExistsMock()
-  //       } else {
-  //         return fileExistsMock()
-  //       }
-  //     }),
-  //     create: jest.fn(options => {
-  //       if (!options.media) {
-  //         return folderCreateMock()
-  //       } else {
-  //         return fileCreateMock()
-  //       }
-  //     }),
-  //     update: jest.fn(() => fileUpdateMock())
-  //   }
-  // }
-  // google.drive = jest.fn(() => drive)
+  beforeEach(() => sync.initialize({}))
 
-  // beforeEach(() => {
-  //   folderCreateMock = () =>
-  //     Promise.resolve({ status: 200, data: { id: 'asdfg' } })
-  //   fileCreateMock = () =>
-  //     Promise.resolve({ status: 200, data: { id: 'qwerty' } })
-  //   fileUpdateMock = () => Promise.resolve(true)
-  //   folderExistsMock = () =>
-  //     Promise.resolve({ data: { files: [{ id: 'asdfg' }] } })
-  //   fileExistsMock = () =>
-  //     Promise.resolve({ data: { files: [{ id: 'qwerty' }] } })
-  //   const cryptor = {
-  //     decrypt: () => '{"access_token": "qwert","refresh_token": "asdf"}'
-  //   }
-  //   // const vault = {
-  //   //   read: jest.fn(() => 'VAULT DATA'),
-  //   //   write: jest.fn(),
-  //   //   isDecryptable: () => true
-  //   // }
-  //   sync = new GDrive()
-  //   sync.initialize(cryptor)
-  // })
+  afterEach(() => {
+    Drive.mockClear()
+    jest.clearAllMocks()
+  })
 
-  // afterEach(() => {
-  //   jest.clearAllMocks()
-  // })
+  describe('successful push', () => {
+    let result = null
 
-  // test('initializes drive client', () => {
-  //   return sync.push().then(() => {
-  //     expect(google.drive).toHaveBeenCalledWith({
-  //       version: 'v3',
-  //       auth: sync.client.auth
-  //     })
-  //   })
-  // })
+    beforeEach(async () => {
+      result = await sync.push('DATA')
+    })
 
-  // describe('folder does not exist', () => {
-  //   beforeEach(() => {
-  //     folderExistsMock = () => Promise.resolve({})
-  //   })
+    test('checks if folder exists on GDrive', () => {
+      expect(drive.folderExists).toHaveBeenCalledWith('Swifty')
+    })
 
-  //   test('checks for presence of swifty folder', () => {
-  //     return sync.push().then(() => {
-  //       expect(drive.files.list).toHaveBeenCalledWith({
-  //         q: "name = 'Swifty' and trashed = false",
-  //         fields: 'files(id, name)'
-  //       })
-  //     })
-  //   })
+    test('checks if vault file exists on GDrive', () => {
+      expect(drive.fileExists).toHaveBeenCalledWith('vault.swftx', 'FOLDER_ID')
+    })
 
-  //   test('creates swifty folder', () => {
-  //     return sync.push().then(() => {
-  //       expect(drive.files.create).toHaveBeenCalledWith({
-  //         requestBody: {
-  //           name: 'Swifty',
-  //           mimeType: 'application/vnd.google-apps.folder'
-  //         }
-  //       })
-  //     })
-  //   })
+    test('updates file on GDrive', () => {
+      expect(drive.updateFile).toHaveBeenCalledWith('FILE_ID', 'DATA')
+    })
 
-  //   test('does not check for vault file', () => {
-  //     return sync.push().then(() => {
-  //       expect(drive.files.list).not.toHaveBeenCalledWith({
-  //         q: "name = 'vault.swftx' and 'asdfg' in parents",
-  //         fields: 'files(id, name)'
-  //       })
-  //     })
-  //   })
+    test('returns file id', () => {
+      expect(result).toBe('FILE_ID')
+    })
+  })
 
-  //   test('creates vault file', () => {
-  //     return sync.push().then(() => {
-  //       expect(drive.files.create).toHaveBeenCalledWith({
-  //         requestBody: {
-  //           name: 'vault.swftx',
-  //           mimeType: 'application/vnd.swftx',
-  //           parents: ['asdfg']
-  //         },
-  //         media: { body: 'VAULT DATA' }
-  //       })
-  //     })
-  //   })
+  describe('folder does not exist', () => {
+    let result = null
 
-  //   test('resolves with truthy result', () => {
-  //     return sync.push().then(result => {
-  //       expect(result).toEqual(true)
-  //     })
-  //   })
-  // })
+    describe('folder is creatable', () => {
+      beforeEach(async () => {
+        drive.__setFolderExists(false)
+        result = await sync.push('DATA')
+      })
 
-  // describe('folder exists', () => {
-  //   describe('file does not exist', () => {
-  //     beforeEach(() => {
-  //       fileExistsMock = () => Promise.resolve({})
-  //     })
+      test('it creates folder on GDrive', () => {
+        expect(drive.createFolder).toHaveBeenCalledWith('Swifty')
+      })
 
-  //     test('checks for presence of swifty folder', () => {
-  //       return sync.push().then(() => {
-  //         expect(drive.files.list).toHaveBeenCalledWith({
-  //           q: "name = 'Swifty' and trashed = false",
-  //           fields: 'files(id, name)'
-  //         })
-  //       })
-  //     })
+      test('it creates file on GDrive', () => {
+        expect(drive.createFile).toHaveBeenCalledWith(
+          'vault.swftx',
+          'FOLDER_ID',
+          'DATA'
+        )
+      })
 
-  //     test('does not try to create swifty folder', () => {
-  //       return sync.push().then(() => {
-  //         expect(drive.files.create).not.toHaveBeenCalledWith({
-  //           requestBody: {
-  //             name: 'Swifty',
-  //             mimeType: 'application/vnd.google-apps.folder'
-  //           }
-  //         })
-  //       })
-  //     })
+      test('returns file id', () => {
+        expect(result).toBe('FILE_ID')
+      })
+    })
 
-  //     test('checks for presence of vault file', () => {
-  //       return sync.push().then(() => {
-  //         expect(drive.files.list).toHaveBeenCalledWith({
-  //           q: "name = 'vault.swftx' and 'asdfg' in parents",
-  //           fields: 'files(id, name)'
-  //         })
-  //       })
-  //     })
+    describe('folder is not creatable', () => {
+      beforeEach(async () => {
+        drive.__setFolderExists(false)
+        drive.__setFolderCreatable(false)
+      })
 
-  //     test('creates vault file', () => {
-  //       return sync.push().then(() => {
-  //         expect(drive.files.create).toHaveBeenCalledWith({
-  //           requestBody: {
-  //             name: 'vault.swftx',
-  //             mimeType: 'application/vnd.swftx',
-  //             parents: ['asdfg']
-  //           },
-  //           media: { body: 'VAULT DATA' }
-  //         })
-  //       })
-  //     })
+      test('it resjects with error', async () => {
+        await expect(sync.push('DATA')).rejects.toEqual(
+          Error('folder_creation_error')
+        )
+      })
+    })
+  })
 
-  //     test('resolves with truthy result', () => {
-  //       return sync.push().then(result => {
-  //         expect(result).toEqual(true)
-  //       })
-  //     })
-  //   })
+  describe('file does not exist', () => {
+    let result
 
-  //   describe('file exists', () => {
-  //     test('checks for presence of swifty folder', () => {
-  //       return sync.push().then(() => {
-  //         expect(drive.files.list).toHaveBeenCalledWith({
-  //           q: "name = 'Swifty' and trashed = false",
-  //           fields: 'files(id, name)'
-  //         })
-  //       })
-  //     })
+    describe('file is creatable', () => {
+      beforeEach(async () => {
+        drive.__setFolderExists(true)
+        drive.__setFileExists(false)
+        result = await sync.push('DATA')
+      })
 
-  //     test('does not try to create swifty folder', () => {
-  //       return sync.push().then(() => {
-  //         expect(drive.files.create).not.toHaveBeenCalledWith({
-  //           requestBody: {
-  //             name: 'Swifty',
-  //             mimeType: 'application/vnd.google-apps.folder'
-  //           }
-  //         })
-  //       })
-  //     })
+      test('it creates file on GDrive', () => {
+        expect(drive.createFile).toHaveBeenCalledWith(
+          'vault.swftx',
+          'FOLDER_ID',
+          'DATA'
+        )
+      })
 
-  //     test('checks for presence of vault file', () => {
-  //       return sync.push().then(() => {
-  //         expect(drive.files.list).toHaveBeenCalledWith({
-  //           q: "name = 'vault.swftx' and 'asdfg' in parents",
-  //           fields: 'files(id, name)'
-  //         })
-  //       })
-  //     })
+      test('returns file id', () => {
+        expect(result).toBe('FILE_ID')
+      })
+    })
 
-  //     test('does not try to create vault file', () => {
-  //       return sync.push().then(() => {
-  //         expect(drive.files.create).not.toHaveBeenCalledWith({
-  //           requestBody: {
-  //             name: 'vault.swftx',
-  //             mimeType: 'application/vnd.swftx',
-  //             parents: ['asdfg']
-  //           },
-  //           media: { body: 'VAULT DATA' }
-  //         })
-  //       })
-  //     })
+    describe('file is not creatable', () => {
+      beforeEach(async () => {
+        drive.__setFolderExists(true)
+        drive.__setFileExists(false)
+        drive.__setFileCreatable(false)
+      })
 
-  //     test('updates file', () => {
-  //       return sync.push().then(() => {
-  //         expect(drive.files.update).toHaveBeenCalledWith({
-  //           fileId: 'qwerty',
-  //           mimeType: 'application/vnd.swftx',
-  //           media: { body: 'VAULT DATA' }
-  //         })
-  //       })
-  //     })
+      test('it resjects with error', async () => {
+        await expect(sync.push('DATA')).rejects.toEqual(
+          Error('file_creation_error')
+        )
+      })
+    })
+  })
 
-  //     test('resolves with truthy result', () => {
-  //       return sync.push().then(result => {
-  //         expect(result).toEqual(true)
-  //       })
-  //     })
-  //   })
-  // })
+  describe('error while reading file', () => {
+    beforeEach(() => {
+      drive.__setFileExists(true)
+      drive.__setFileReadable(false)
+    })
+
+    test('throws error while reading', async () => {
+      await expect(sync.push('DATA')).rejects.toThrowError(
+        'Could not update file'
+      )
+    })
+  })
 })

@@ -1,6 +1,8 @@
 let folderExists = true
 let fileExists = true
 let fileReadable = true
+let folderCreatable = true
+let fileCreatable = true
 
 const __setFolderExists = value => {
   folderExists = value
@@ -14,22 +16,28 @@ const __setFileReadable = value => {
   fileReadable = value
 }
 
-const createFileMock = jest.fn()
+const __setFolderCreatable = value => {
+  folderCreatable = value
+}
 
-const folderExistsMock = jest.fn(() => {
-  if (folderExists) {
-    return Promise.resolve('FOLDER_ID')
-  } else {
-    throw Error('Folder not found')
-  }
+const __setFileCreatable = value => {
+  fileCreatable = value
+}
+
+const createFileMock = jest.fn(() => {
+  return Promise.resolve(fileCreatable ? 'FILE_ID' : null)
+})
+
+const createFolderMock = jest.fn(() => {
+  return Promise.resolve(folderCreatable ? 'FOLDER_ID' : null)
+})
+
+const folderExistsMock = jest.fn(async () => {
+  return Promise.resolve(folderExists ? 'FOLDER_ID' : null)
 })
 
 const fileExistsMock = jest.fn(() => {
-  if (fileExists) {
-    return Promise.resolve('FILE_ID')
-  } else {
-    throw Error('File not found')
-  }
+  return Promise.resolve(fileExists ? 'FILE_ID' : null)
 })
 
 const readFileMock = jest.fn(() => {
@@ -39,17 +47,26 @@ const readFileMock = jest.fn(() => {
     throw Error('Could not read file')
   }
 })
-const updateFileMock = jest.fn().mockResolvedValue('FILE_ID')
+const updateFileMock = jest.fn(() => {
+  if (fileReadable) {
+    return Promise.resolve('FILE_ID')
+  } else {
+    throw Error('Could not update file')
+  }
+})
 
 module.exports = jest.fn(() => {
   return {
     folderExists: folderExistsMock,
     fileExists: fileExistsMock,
     readFile: readFileMock,
+    createFolder: createFolderMock,
     createFile: createFileMock,
     updateFile: updateFileMock,
     __setFolderExists: __setFolderExists,
     __setFileExists: __setFileExists,
-    __setFileReadable: __setFileReadable
+    __setFileReadable: __setFileReadable,
+    __setFolderCreatable: __setFolderCreatable,
+    __setFileCreatable: __setFileCreatable
   }
 })

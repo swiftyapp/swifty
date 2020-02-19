@@ -31,10 +31,10 @@ export default class GDrive {
 
   async pull() {
     const folderId = await this.drive.folderExists(this.folderName)
-    if (!folderId) throw 'folder_not_found'
+    if (!folderId) throw Error('folder_not_found')
 
     const fileId = await this.drive.fileExists(this.fileName, folderId)
-    if (!fileId) throw 'file_not_found'
+    if (!fileId) throw Error('file_not_found')
 
     return await this.drive.readFile(fileId)
   }
@@ -51,13 +51,15 @@ export default class GDrive {
 
   async createRemoteVault(data) {
     const folderId = await this.drive.createFolder(this.folderName)
-    if (!folderId) throw 'folder_creation_error'
+    if (!folderId) throw Error('folder_creation_error')
 
     return await this.createRemoteVaultFile(folderId, data)
   }
 
   async createRemoteVaultFile(folderId, data) {
     const fileId = await this.drive.createFile(this.fileName, folderId, data)
-    if (!fileId) throw 'file_creation_error'
+    if (!fileId) throw Error('file_creation_error')
+
+    return fileId
   }
 }
