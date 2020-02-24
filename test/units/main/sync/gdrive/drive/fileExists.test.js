@@ -17,7 +17,7 @@ describe('Drive#fileExists', () => {
     test('google api is called with correct params', async () => {
       await drive.fileExists(filename, parentId)
       expect(google.drive().files.list).toBeCalledWith({
-        q: `name = '${filename}' and '${parentId}' in parents`,
+        q: `name = '${filename}' and trashed = false and '${parentId}' in parents`,
         fields: 'files(id, name)'
       })
     })

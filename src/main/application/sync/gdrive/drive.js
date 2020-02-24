@@ -25,7 +25,9 @@ export default class Drive {
   }
 
   async fileExists(name, parentId) {
-    return await this.exists(`name = '${name}' and '${parentId}' in parents`)
+    return await this.exists(
+      `name = '${name}' and trashed = false and '${parentId}' in parents`
+    )
   }
 
   async folderExists(name) {
