@@ -60,7 +60,9 @@ describe('#import', () => {
     })
 
     test('rejects with error', async () => {
-      await expect(sync.import()).rejects.toEqual(Error('folder_not_found'))
+      await expect(sync.import()).rejects.toEqual(
+        Error('Swifty folder was not found on GDrive')
+      )
     })
   })
 
@@ -72,7 +74,9 @@ describe('#import', () => {
       })
 
       test('rejects with error', async () => {
-        await expect(sync.import()).rejects.toEqual(Error('file_not_found'))
+        await expect(sync.import()).rejects.toEqual(
+          Error('Vault file was not found on GDrive')
+        )
       })
     })
 

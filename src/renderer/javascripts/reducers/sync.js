@@ -1,5 +1,5 @@
 export default (
-  state = { enabled: false, inProgress: false, success: true },
+  state = { enabled: false, inProgress: false, success: true, error: null },
   action
 ) => {
   switch (action.type) {
@@ -10,9 +10,14 @@ export default (
     case 'SYNC_CONNECTED':
       return { ...state, enabled: true }
     case 'SYNC_START':
-      return { ...state, inProgress: true, success: true }
+      return { ...state, inProgress: true, success: true, error: null }
     case 'SYNC_STOP':
-      return { ...state, inProgress: false, success: action.success }
+      return {
+        ...state,
+        inProgress: false,
+        success: action.success,
+        error: action.error
+      }
     default:
       return state
   }

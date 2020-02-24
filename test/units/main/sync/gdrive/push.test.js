@@ -72,7 +72,7 @@ describe('#push', () => {
 
       test('it resjects with error', async () => {
         await expect(sync.push('DATA')).rejects.toEqual(
-          Error('folder_creation_error')
+          Error('Failed to create Swifty folder on GDrive')
         )
       })
     })
@@ -110,7 +110,7 @@ describe('#push', () => {
 
       test('it resjects with error', async () => {
         await expect(sync.push('DATA')).rejects.toEqual(
-          Error('file_creation_error')
+          Error('Failed to create vault file on GDrive')
         )
       })
     })

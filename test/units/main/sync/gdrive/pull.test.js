@@ -44,7 +44,9 @@ describe('#pull', () => {
     })
 
     test('throws Folder not found error', async () => {
-      await expect(sync.pull()).rejects.toEqual(Error('folder_not_found'))
+      await expect(sync.pull()).rejects.toEqual(
+        Error('Swifty folder was not found on GDrive')
+      )
     })
   })
 
@@ -55,7 +57,9 @@ describe('#pull', () => {
     })
 
     test('throws File not found error', async () => {
-      await expect(sync.pull()).rejects.toThrowError(Error('file_not_found'))
+      await expect(sync.pull()).rejects.toThrowError(
+        Error('Vault file was not found on GDrive')
+      )
     })
   })
 

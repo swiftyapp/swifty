@@ -1,6 +1,9 @@
 import React from 'react'
 import classnames from 'classnames'
 import { useSelector } from 'react-redux'
+
+import Tooltip from 'components/elements/tooltip'
+
 import Gdrive from 'google-drive-color.svg'
 import HardDrive from 'hard-drive.svg'
 import Tick from 'success_tick@2x.png'
@@ -36,9 +39,11 @@ const SyncIndicator = () => {
         failure: sync.enabled && !sync.success
       })}
     >
-      <div className="spinner" />
-      {getStatusIcon()}
-      {getIcon()}
+      <Tooltip content={sync.error && sync.error.message}>
+        <div className="spinner" />
+        {getStatusIcon()}
+        {getIcon()}
+      </Tooltip>
     </div>
   )
 }
