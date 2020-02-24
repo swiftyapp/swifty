@@ -46,7 +46,7 @@ describe('#setup', () => {
 
   test('calls get token with auth code', () => {
     return sync.setup().then(() => {
-      expect(sync.client.auth.getToken).toHaveBeenCalledWith('AUTH_CODE')
+      expect(sync.auth.auth.getToken).toHaveBeenCalledWith('AUTH_CODE')
     })
   })
 })

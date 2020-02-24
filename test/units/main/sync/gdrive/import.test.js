@@ -46,12 +46,12 @@ describe('#import', () => {
 
   test('calls get token with auth code', async () => {
     await sync.import()
-    expect(sync.client.auth.getToken).toHaveBeenCalledWith('AUTH_CODE')
+    expect(sync.auth.auth.getToken).toHaveBeenCalledWith('AUTH_CODE')
   })
 
-  test('initializes drive client', async () => {
+  test('initializes drive auth client', async () => {
     await sync.import()
-    expect(Drive).toHaveBeenCalledWith(sync.client.auth)
+    expect(Drive).toHaveBeenCalledWith(sync.auth)
   })
 
   describe('folder does not exist', () => {

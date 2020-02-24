@@ -1,7 +1,7 @@
 const { google } = require('googleapis')
 
 export default class Drive {
-  constructor(auth) {
+  constructor({ auth }) {
     this.drive = google.drive({ version: 'v3', auth: auth })
     this.fields = 'files(id, name)'
     this.fileMimeType = 'application/vnd.swftx'
