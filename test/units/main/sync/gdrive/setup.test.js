@@ -14,11 +14,7 @@ jest.mock('main/window/auth', () => {
 })
 
 describe('#setup', () => {
-  let sync = new GDrive()
-
-  beforeEach(() => {
-    sync.initialize({})
-  })
+  let sync = new GDrive({})
 
   afterEach(() => {
     jest.clearAllMocks()

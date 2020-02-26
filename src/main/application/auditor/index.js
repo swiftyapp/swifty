@@ -1,6 +1,6 @@
 import Validator from 'password-validator'
 import { DateTime } from 'luxon'
-import { decrypt, hash } from 'application/helpers/encription'
+import { decrypt, hash } from 'application/helpers/encryption'
 
 const PASSWORD_LENGTH = 8
 const PASSWORD_FRESHNESS = 90

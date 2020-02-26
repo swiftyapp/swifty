@@ -1,5 +1,5 @@
 import Storage from 'application/storage'
-import { encrypt, decrypt } from 'application/helpers/encription'
+import { encrypt, decrypt } from 'application/helpers/encryption'
 
 export const vaultFile = () => {
   if (process.env.SPECTRON_STORAGE_PATH) {

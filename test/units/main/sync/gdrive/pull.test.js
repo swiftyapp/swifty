@@ -4,10 +4,8 @@ import Drive from 'main/application/sync/gdrive/drive'
 jest.mock('main/application/sync/gdrive/drive')
 
 describe('#pull', () => {
-  const sync = new GDrive()
+  const sync = new GDrive({})
   const drive = new Drive()
-
-  beforeEach(() => sync.initialize({}))
 
   afterEach(() => {
     Drive.mockClear()

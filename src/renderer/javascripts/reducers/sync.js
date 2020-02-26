@@ -8,7 +8,7 @@ export default (
     case 'SYNC_DISCONNECTED':
       return { ...state, enabled: false }
     case 'SYNC_CONNECTED':
-      return { ...state, enabled: true }
+      return { ...state, enabled: true, success: true, error: null }
     case 'SYNC_START':
       return { ...state, inProgress: true, success: true, error: null }
     case 'SYNC_STOP':

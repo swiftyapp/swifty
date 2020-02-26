@@ -12,14 +12,11 @@ export const credentialsFile = () => {
 }
 
 export default class GDrive {
-  constructor() {
+  constructor(cryptor) {
+    this.cryptor = cryptor
     this.folderName = 'Swifty'
     this.fileName = vaultFile()
-  }
-
-  initialize(cryptor) {
-    this.cryptor = cryptor
-    this.storage = new Storage(path.join('auth', credentialsFile()))
+    this.credentials = new Storage(path.join('auth', credentialsFile()))
     this.auth = new Auth(
       () => this.readTokens(),
       tokens => this.writeTokens(tokens)
@@ -85,12 +82,12 @@ export default class GDrive {
   }
 
   writeTokens(tokens) {
-    return this.storage.write(this.cryptor.encrypt(JSON.stringify(tokens)))
+    return this.credentials.write(this.cryptor.encrypt(JSON.stringify(tokens)))
   }
 
   readTokens() {
     try {
-      return JSON.parse(this.cryptor.decrypt(this.storage.read()))
+      return JSON.parse(this.cryptor.decrypt(this.credentials.read()))
     } catch (e) {
       return null
     }

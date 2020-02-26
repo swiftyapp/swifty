@@ -3,7 +3,7 @@ import { app, systemPreferences } from 'electron'
 import { Application } from 'nucleon'
 import Window from 'window'
 import Tray from 'tray/index'
-import GDrive from './sync/gdrive'
+import Sync from './sync'
 import Vault from './vault'
 import Auditor from './auditor'
 import { onAuthStart, onAuthTouchId } from './events/auth'
@@ -40,7 +40,7 @@ export default class Swifty extends Application {
     this.closed = false
     this.vault = new Vault()
     this.tray = new Tray(this)
-    this.sync = new GDrive()
+    this.sync = new Sync()
   }
 
   onWindowReady() {
@@ -111,13 +111,13 @@ export default class Swifty extends Application {
   pullVaultData() {
     this.window.send('vault:pull:started')
     return this.sync
-      .pull()
+      .perform()
       .then(data => {
+        this.getAudit()
         this.window.send('vault:pull:stopped', {
           success: true,
           data: data
         })
-        return data
       })
       .catch(error => {
         this.window.send('vault:pull:stopped', { success: false, error })

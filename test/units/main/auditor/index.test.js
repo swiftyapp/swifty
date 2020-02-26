@@ -1,5 +1,5 @@
 import { Cryptor } from '@swiftyapp/cryptor'
-import { encrypt } from 'main/application/helpers/encription'
+import { encrypt } from 'main/application/helpers/encryption'
 import Auditor from 'main/application/auditor'
 
 let auditor

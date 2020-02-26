@@ -30,7 +30,7 @@ export const onVaultSyncConnect = function() {
     if (!this.sync.isConfigured()) {
       this.sync.setup().then(() => {
         this.window.send('vault:sync:connected')
-        return this.pullVaultData()
+        //return this.pullVaultData()
       })
     }
   })
@@ -50,7 +50,7 @@ export const onVaultSyncStart = function() {
     if (this.sync.isConfigured()) {
       this.window.send('vault:sync:started')
       this.sync
-        .push(this.vault.read())
+        .perform()
         .then(() => {
           this.window.send('vault:sync:stopped', {
             success: true

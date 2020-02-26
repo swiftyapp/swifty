@@ -17,16 +17,17 @@ jest.mock('main/window/auth', () => {
 })
 
 describe('#import', () => {
-  const sync = new GDrive()
+  const sync = new GDrive({})
   const drive = new Drive()
-
-  beforeEach(() => {
-    sync.initialize({})
-  })
 
   afterEach(() => {
     Drive.mockClear()
     jest.clearAllMocks()
+  })
+
+  test('initializes drive auth client', async () => {
+    await sync.import()
+    expect(Drive).toHaveBeenCalledWith(sync.auth)
   })
 
   test('opens auth window with auth url', async () => {
@@ -47,11 +48,6 @@ describe('#import', () => {
   test('calls get token with auth code', async () => {
     await sync.import()
     expect(sync.auth.auth.getToken).toHaveBeenCalledWith('AUTH_CODE')
-  })
-
-  test('initializes drive auth client', async () => {
-    await sync.import()
-    expect(Drive).toHaveBeenCalledWith(sync.auth)
   })
 
   describe('folder does not exist', () => {

@@ -5,8 +5,7 @@ describe('#isConfigured', () => {
 
   beforeEach(() => {
     const cryptor = { decrypt: () => data }
-    sync = new GDrive()
-    sync.initialize(cryptor)
+    sync = new GDrive(cryptor)
   })
 
   afterEach(() => {

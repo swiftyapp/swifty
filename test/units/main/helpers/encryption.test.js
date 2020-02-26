@@ -1,4 +1,4 @@
-import { hash, encrypt, decrypt } from 'main/application/helpers/encription'
+import { hash, encrypt, decrypt } from 'main/application/helpers/encryption'
 
 const cryptor = {
   encrypt: jest.fn(() => 'encrypted data'),
@@ -26,7 +26,7 @@ describe('Encryption helpers', () => {
       expect(cryptor.encrypt).toHaveBeenCalledWith('{"entries":[{"a":"b"}]}')
     })
 
-    test('returns ecnrypted data in base64 format', () => {
+    test('returns encrypted data in base64 format', () => {
       expect(result).toEqual('ZW5jcnlwdGVkIGRhdGE=')
     })
   })
@@ -43,7 +43,7 @@ describe('Encryption helpers', () => {
       expect(cryptor.decrypt).toHaveBeenCalledWith('encrypted data')
     })
 
-    test('returns ecnrypted data in base64 format', () => {
+    test('returns encrypted data in base64 format', () => {
       expect(result).toEqual({ entries: [{ a: 'b' }] })
     })
   })
