@@ -17,7 +17,9 @@ export default class Sync {
     return this.provider.setup().then(() => {
       return this.provider
         .pull()
-        .then(data => this._mergeAndPush(data))
+        .then(data => {
+          this._mergeAndPush(data)
+        })
         .catch(() => this.provider.push(this.vault.read()))
     })
   }
