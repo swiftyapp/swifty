@@ -1,6 +1,6 @@
 import Auth from 'application/sync/gdrive/auth'
-import AuthWindow from 'window/auth'
-jest.mock('window/auth')
+import AuthWindow from 'window/authentication'
+jest.mock('window/authentication')
 
 describe('Auth#authenticate', () => {
   let auth
@@ -44,7 +44,7 @@ describe('Auth#authenticate', () => {
     })
 
     test('token should not be requested', async () => {
-      await expect(auth.authenticate()).resolves
+      await expect(auth.authenticate()).resolves.toBe(null)
       expect(auth.auth.getToken).not.toHaveBeenCalled()
     })
   })
@@ -61,7 +61,7 @@ describe('Auth#authenticate', () => {
     })
 
     test('token should not be requested', async () => {
-      await expect(auth.authenticate()).rejects
+      await expect(auth.authenticate()).rejects.toBe(undefined)
       expect(auth.auth.getToken).not.toHaveBeenCalled()
     })
   })
