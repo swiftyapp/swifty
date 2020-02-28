@@ -38,6 +38,10 @@ const update = jest.fn(() => {
   }
 })
 
+const setCredentials = jest.fn()
+const on = jest.fn()
+const getToken = jest.fn(() => Promise.resolve('TOKEN'))
+
 const __setListFilesResponse = response => {
   listFilesResponse = response
 }
@@ -72,10 +76,10 @@ module.exports = {
     auth: {
       OAuth2: jest.fn(() => {
         return {
-          on: jest.fn(),
+          on: on,
           generateAuthUrl: jest.fn(() => 'https://example.com/google_oauth2'),
-          setCredentials: jest.fn(),
-          getToken: jest.fn(() => Promise.resolve('TOKEN'))
+          setCredentials: setCredentials,
+          getToken: getToken
         }
       })
     },

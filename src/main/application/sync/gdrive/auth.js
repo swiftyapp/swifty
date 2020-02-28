@@ -32,7 +32,8 @@ export default class Auth {
     this.authWindow.removeMenu()
     return this.authWindow.authenticate().then(code => {
       this.authWindow.close()
-      return this.auth.getToken(code)
+      if (code) return this.auth.getToken(code)
+      return null
     })
   }
 
