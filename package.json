@@ -65,7 +65,10 @@
     "style-loader": "^1.1.3"
   },
   "resolutions": {
-    "minimist": "^1.2.5"
+    "acorn": "^7.1.1",
+    "minimist": "^1.2.5",
+    "kind-of": "^6.0.3",
+    "js-yaml": "^3.13.1"
   },
   "build": {
     "appId": "com.electron.swifty",
