@@ -12,10 +12,12 @@ import GoogleIcon from 'web/google.svg'
 import LinkedinIcon from 'web/linkedin.svg'
 import MicrosoftIcon from 'web/microsoft.svg'
 import NetflixIcon from 'web/netflix.svg'
+import PayoneerIcon from 'web/payoneer.svg'
 import PaypalIcon from 'web/paypal.svg'
 import PinterestIcon from 'web/pinterest.svg'
 import RedditIcon from 'web/reddit.svg'
 import SkypeIcon from 'web/skype.svg'
+import SlackIcon from 'web/slack.svg'
 import SnapchatIcon from 'web/snapchat.svg'
 import SpotifyIcon from 'web/spotify.svg'
 import TwitterIcon from 'web/twitter.svg'
@@ -79,6 +81,10 @@ export default {
     color: '#E50914',
     icon: NetflixIcon
   },
+  payoneer: {
+    color: '#FF4800',
+    icon: PayoneerIcon
+  },
   paypal: {
     color: '#00457C',
     icon: PaypalIcon
@@ -94,6 +100,10 @@ export default {
   skype: {
     color: '#00aff0',
     icon: SkypeIcon
+  },
+  slack: {
+    color: '#4A154B',
+    icon: SlackIcon
   },
   snapchat: {
     color: '#ffd200',
