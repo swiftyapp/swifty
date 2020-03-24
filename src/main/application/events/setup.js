@@ -1,7 +1,7 @@
 import { Cryptor } from '@swiftyapp/cryptor'
 import { ipcMain, dialog } from 'electron'
 
-export const onBackupSelect = function() {
+export const onBackupSelect = function () {
   ipcMain.on('backup:select', () => {
     dialog
       .showOpenDialog({ properties: ['openFile'] })
@@ -22,7 +22,7 @@ export const onBackupSelect = function() {
   })
 }
 
-export const onSetupDone = function() {
+export const onSetupDone = function () {
   ipcMain.on('setup:done', (event, hashedSecret) => {
     this.cryptor = new Cryptor(hashedSecret)
     this.vault.setup(this.cryptor)

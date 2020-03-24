@@ -1,7 +1,7 @@
 import { Cryptor } from '@swiftyapp/cryptor'
 import { ipcMain, systemPreferences } from 'electron'
 
-export const onAuthStart = function() {
+export const onAuthStart = function () {
   ipcMain.once('auth:start', (_, hashedSecret) => {
     this.cryptor = new Cryptor(hashedSecret)
     if (this.vault.authenticate(this.cryptor)) {
@@ -15,7 +15,7 @@ export const onAuthStart = function() {
   })
 }
 
-export const onAuthTouchId = function() {
+export const onAuthTouchId = function () {
   ipcMain.once('auth:touchid', () => {
     systemPreferences
       .promptTouchID('Confirm your identity')

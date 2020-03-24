@@ -11,10 +11,7 @@ const atob = data => {
 }
 
 export const hash = value => {
-  return crypto
-    .createHash('sha512')
-    .update(value)
-    .digest('base64')
+  return crypto.createHash('sha512').update(value).digest('base64')
 }
 
 export const decrypt = (data, cryptor) => {

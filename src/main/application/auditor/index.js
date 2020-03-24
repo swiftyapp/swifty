@@ -52,15 +52,7 @@ export default class Auditor {
 
   isWeak(password) {
     const schema = new Validator()
-    schema
-      .has()
-      .uppercase()
-      .has()
-      .lowercase()
-      .has()
-      .digits()
-      .has()
-      .symbols()
+    schema.has().uppercase().has().lowercase().has().digits().has().symbols()
     return !schema.validate(password)
   }
 

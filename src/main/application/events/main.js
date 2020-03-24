@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 
-export const onDataSave = function() {
+export const onDataSave = function () {
   ipcMain.on('data:save', (event, data) => {
     this.vault.write(data)
     this.window.send('data:saved', { data: this.vault.read() })
@@ -8,13 +8,13 @@ export const onDataSave = function() {
   })
 }
 
-export const onBackupSave = function() {
+export const onBackupSave = function () {
   ipcMain.on('backup:save', (event, filepath) => {
     this.vault.export(filepath)
   })
 }
 
-export const onVaultSyncImport = function() {
+export const onVaultSyncImport = function () {
   ipcMain.on('vault:sync:import', () => {
     this.sync.import().then(data => {
       this.vault.write(data)
@@ -25,7 +25,7 @@ export const onVaultSyncImport = function() {
   })
 }
 
-export const onVaultSyncConnect = function() {
+export const onVaultSyncConnect = function () {
   ipcMain.on('vault:sync:connect', () => {
     if (!this.sync.isConfigured()) {
       this.sync.setup().then(() => {
@@ -36,7 +36,7 @@ export const onVaultSyncConnect = function() {
   })
 }
 
-export const onVaultSyncDisconnect = function() {
+export const onVaultSyncDisconnect = function () {
   ipcMain.on('vault:sync:disconnect', () => {
     if (this.sync.isConfigured()) {
       this.sync.disconnect()
@@ -45,7 +45,7 @@ export const onVaultSyncDisconnect = function() {
   })
 }
 
-export const onVaultSyncStart = function() {
+export const onVaultSyncStart = function () {
   ipcMain.on('vault:sync:start', () => {
     if (this.sync.isConfigured()) {
       this.window.send('vault:sync:started')

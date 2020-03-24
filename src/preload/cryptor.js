@@ -4,10 +4,7 @@ import { Cryptor } from '@swiftyapp/cryptor'
 let cryptor
 
 window.hashSecret = value => {
-  return crypto
-    .createHash('sha512')
-    .update(value)
-    .digest('base64')
+  return crypto.createHash('sha512').update(value).digest('base64')
 }
 
 window.setupCryptor = secret => {
