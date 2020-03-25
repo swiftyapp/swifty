@@ -41,6 +41,17 @@
         width: 280px
         max-height: 100%
         overflow: auto
+        &::-webkit-scrollbar,
+        &::-webkit-scrollbar-thumb
+          width: 8px
+          border-radius: 5px
+        &::-webkit-scrollbar
+          border-left: 1px solid #eee
+          background: transparent
+        &::-webkit-scrollbar-thumb
+          background-color: rgba(100,100,100, .15)
+          &:hover
+            background-color: rgba(100,100,100, .2)
       .aside
         position: relative
         display: flex
