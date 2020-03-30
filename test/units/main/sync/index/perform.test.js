@@ -1,26 +1,18 @@
 import Sync from 'main/application/sync'
+import Vault from 'main/application/vault'
 
 jest.mock('main/application/sync/gdrive/index')
 jest.mock('application/helpers/encryption')
 
 describe('#perform', () => {
   let sync
-  const vault = {
-    isDecryptable: jest.fn().mockReturnValue(true),
-    read: jest.fn().mockReturnValue({
-      entries: [{ id: '2', password: 'qwerty' }]
-    }),
-    write: jest.fn()
-  }
+  let vault = new Vault()
+  const currentDate = mockDate()
 
   beforeEach(async () => {
     sync = new Sync()
     sync.initialize({}, vault)
     await sync.perform()
-  })
-
-  afterEach(() => {
-    jest.clearAllMocks()
   })
 
   test('pulls data from cloud', () => {
@@ -39,7 +31,8 @@ describe('#perform', () => {
       entries: [
         { id: '1', password: 'password' },
         { id: '2', password: 'qwerty' }
-      ]
+      ],
+      updated_at: currentDate.toISOString()
     })
   })
 
@@ -48,7 +41,8 @@ describe('#perform', () => {
       entries: [
         { id: '1', password: 'password' },
         { id: '2', password: 'qwerty' }
-      ]
+      ],
+      updated_at: currentDate.toISOString()
     })
   })
 })

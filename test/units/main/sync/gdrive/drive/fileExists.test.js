@@ -7,8 +7,6 @@ describe('Drive#fileExists', () => {
   const filename = 'vault.swftx'
   const parentId = '1upGfeNV9Vy5tzTQfk3jI7P5bZvnJCqwa'
 
-  afterEach(() => jest.clearAllMocks())
-
   describe('File does not exist', () => {
     beforeEach(() => {
       google.__setListFilesResponse({ files: [] })

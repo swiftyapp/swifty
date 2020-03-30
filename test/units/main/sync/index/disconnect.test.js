@@ -10,10 +10,6 @@ describe('#disconnect', () => {
     sync.initialize({}, {})
   })
 
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
   test('calls provider disconnect', async () => {
     sync.disconnect()
     expect(sync.provider.disconnect).toHaveBeenCalled()

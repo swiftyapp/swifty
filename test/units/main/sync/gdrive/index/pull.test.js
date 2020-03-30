@@ -7,11 +7,6 @@ describe('#pull', () => {
   const sync = new GDrive({})
   const drive = new Drive()
 
-  afterEach(() => {
-    Drive.mockClear()
-    jest.clearAllMocks()
-  })
-
   describe('successful pull', () => {
     let result = null
 

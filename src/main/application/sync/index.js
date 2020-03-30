@@ -53,7 +53,8 @@ export default class Sync {
         entries: this._mergeArrays(
           decrypt(localData, cryptor).entries,
           decrypt(remoteData, cryptor).entries
-        )
+        ),
+        updated_at: new Date().toISOString()
       },
       cryptor
     )

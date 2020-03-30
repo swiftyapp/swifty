@@ -6,8 +6,6 @@ describe('Auth#isConfigured', () => {
   const invalidCredentials = { refresh_token: 'REFRESH_TOKEN' }
   const writeTokens = jest.fn()
 
-  afterEach(() => jest.clearAllMocks())
-
   describe('auth credentials exist', () => {
     beforeEach(() => {
       const readTokens = jest.fn().mockReturnValue(validCredentials)

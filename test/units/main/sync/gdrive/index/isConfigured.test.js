@@ -8,10 +8,6 @@ describe('#isConfigured', () => {
     sync = new GDrive(cryptor)
   })
 
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
   describe('access_token is present', () => {
     beforeEach(() => {
       data = '{"access_token": "qwert","refresh_token": "asdf"}'

@@ -8,8 +8,6 @@ describe('Drive#updateFile', () => {
   const content = 'DATA'
   const mimeType = 'application/vnd.swftx'
 
-  afterEach(() => jest.clearAllMocks())
-
   describe('Successful update', () => {
     beforeEach(() => {
       google.__setUpdateFileResponse({

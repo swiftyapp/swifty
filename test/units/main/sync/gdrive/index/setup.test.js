@@ -16,10 +16,6 @@ jest.mock('main/window/authentication', () => {
 describe('#setup', () => {
   let sync = new GDrive({})
 
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
   test('opens auth window with auth url', () => {
     return sync.setup().then(() => {
       expect(AuthWindow).toHaveBeenCalledWith(

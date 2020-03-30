@@ -12,10 +12,6 @@ describe('#disconnect', () => {
     sync.disconnect()
   })
 
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
   test('calls auth disconnect method', () => {
     expect(auth.disconnect).toHaveBeenCalled()
   })

@@ -13,8 +13,6 @@ describe('Auth#authenticate', () => {
     auth = new Auth(readTokens, writeTokens)
   })
 
-  afterEach(() => jest.clearAllMocks())
-
   test('returns true', () => {
     expect(auth.disconnect()).toBe(true)
   })

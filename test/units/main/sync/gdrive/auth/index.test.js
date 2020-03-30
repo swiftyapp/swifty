@@ -7,8 +7,6 @@ const writeTokens = () => jest.fn()
 describe('Auth', () => {
   beforeEach(() => new Auth(readTokens, writeTokens))
 
-  afterEach(() => jest.clearAllMocks())
-
   test('it cerates google auth', () => {
     expect(google.auth.OAuth2).toBeCalledWith(
       'google-api-client-key',

@@ -6,8 +6,6 @@ describe('Drive#readFile', () => {
   const drive = new Drive({})
   const id = '1upGfeNV9Vy5tzTQfk3jI7P5bZvnJCqwa'
 
-  afterEach(() => jest.clearAllMocks())
-
   describe('File exists', () => {
     test('google api is called with correct params', async () => {
       await drive.readFile(id)

@@ -1,5 +1,6 @@
 import Vault from 'main/application/vault'
 import Storage from 'main/application/storage'
+jest.unmock('main/application/vault')
 jest.mock('main/application/storage')
 let vault
 

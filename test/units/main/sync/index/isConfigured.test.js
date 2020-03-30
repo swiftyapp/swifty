@@ -10,10 +10,6 @@ describe('#isConfigured', () => {
     sync.initialize({}, {})
   })
 
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
   test('check if provider is configured', async () => {
     expect(sync.isConfigured()).toBe(true)
     expect(sync.provider.isConfigured).toHaveBeenCalled()

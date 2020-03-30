@@ -10,12 +10,8 @@ describe('#import', () => {
     sync.initialize({}, {})
   })
 
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
   test('calls provider import', async () => {
-    sync.import()
+    await sync.import()
     expect(sync.provider.import).toHaveBeenCalled()
   })
 })

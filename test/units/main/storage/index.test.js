@@ -6,10 +6,6 @@ jest.mock('fs')
 let storage
 
 describe('Storage', () => {
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
-
   describe('#read', () => {
     let result
 

@@ -7,8 +7,6 @@ describe('Auth#authenticate', () => {
   const readTokens = jest.fn()
   const writeTokens = jest.fn()
 
-  afterEach(() => jest.clearAllMocks())
-
   describe('user successfully authenticate', () => {
     beforeEach(async () => {
       auth = new Auth(readTokens, writeTokens)

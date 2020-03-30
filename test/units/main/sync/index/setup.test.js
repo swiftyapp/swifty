@@ -1,27 +1,20 @@
 import Sync from 'main/application/sync'
+import Vault from 'main/application/vault'
 
 jest.mock('main/application/sync/gdrive/index')
 jest.mock('application/helpers/encryption')
 
 describe('#setup', () => {
   let sync
+  let vault = new Vault()
+  let currentDate = mockDate()
+
   const cryptor = {}
-  const vault = {
-    read: jest.fn().mockReturnValue({
-      entries: [{ id: '2', password: 'qwerty' }]
-    }),
-    write: jest.fn(),
-    isDecryptable: jest.fn().mockReturnValue(true)
-  }
 
   beforeEach(async () => {
     sync = new Sync()
     sync.initialize(cryptor, vault)
     await sync.setup()
-  })
-
-  afterEach(() => {
-    jest.clearAllMocks()
   })
 
   test('calls provider setup', () => {
@@ -44,7 +37,8 @@ describe('#setup', () => {
       entries: [
         { id: '1', password: 'password' },
         { id: '2', password: 'qwerty' }
-      ]
+      ],
+      updated_at: currentDate.toISOString()
     })
   })
 
@@ -53,7 +47,8 @@ describe('#setup', () => {
       entries: [
         { id: '1', password: 'password' },
         { id: '2', password: 'qwerty' }
-      ]
+      ],
+      updated_at: currentDate.toISOString()
     })
   })
 })

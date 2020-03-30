@@ -16,13 +16,12 @@ jest.mock('main/window/authentication', () => {
   })
 })
 
-describe('#import', () => {
-  const sync = new GDrive({})
-  const drive = new Drive()
+let sync, drive
 
-  afterEach(() => {
-    Drive.mockClear()
-    jest.clearAllMocks()
+describe('#import', () => {
+  beforeEach(() => {
+    sync = new GDrive({})
+    drive = new Drive()
   })
 
   test('initializes drive auth client', async () => {

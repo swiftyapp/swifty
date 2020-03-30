@@ -7,8 +7,6 @@ describe('Drive#createFolder', () => {
   const name = 'Swifty'
   const mimeType = 'application/vnd.google-apps.folder'
 
-  afterEach(() => jest.clearAllMocks())
-
   describe('Successful creation', () => {
     beforeEach(() => {
       google.__setCreateFileResponse({

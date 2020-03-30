@@ -40,9 +40,6 @@ describe('Auditor', () => {
       }
     ]
   }
-  afterEach(() => {
-    jest.clearAllMocks()
-  })
 
   beforeEach(() => {
     let cryptor = new Cryptor('password')

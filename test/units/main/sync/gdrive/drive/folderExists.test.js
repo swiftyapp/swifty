@@ -7,8 +7,6 @@ describe('Drive#folderExists', () => {
   const drive = new Drive({})
   const name = 'Swifty'
 
-  afterEach(() => jest.clearAllMocks())
-
   describe('Folder does not exist', () => {
     beforeEach(() => {
       google.__setListFilesResponse({ files: [] })

@@ -9,8 +9,6 @@ describe('Drive#createFile', () => {
   const content = 'DATA'
   const mimeType = 'application/vnd.swftx'
 
-  afterEach(() => jest.clearAllMocks())
-
   describe('Successful creation', () => {
     beforeEach(() => {
       google.__setCreateFileResponse({
