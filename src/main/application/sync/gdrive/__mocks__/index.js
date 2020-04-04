@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon'
 const isConfigured = jest.fn().mockReturnValue(true)
 
 const setup = jest.fn(() => {
@@ -10,7 +11,10 @@ const push = jest.fn(() => {
   return Promise.resolve()
 })
 const pull = jest.fn(() => {
-  return Promise.resolve({ entries: [{ id: '1', password: 'password' }] })
+  return Promise.resolve({
+    entries: [{ id: '1', password: 'password' }],
+    updatedAt: DateTime.local().toISO()
+  })
 })
 
 module.exports = jest.fn(() => {

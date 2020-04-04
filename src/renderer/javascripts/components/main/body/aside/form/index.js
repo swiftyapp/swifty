@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { DateTime } from 'luxon'
 import { useSelector, useDispatch } from 'react-redux'
 
 import Login from './login'
@@ -42,7 +43,7 @@ const Form = ({ entry }) => {
       target: { name, value }
     } = event
     if (name === 'password') {
-      obj['password_updated_at'] = new Date().toISOString()
+      obj['password_updated_at'] = DateTime.local().toISO()
     }
     obj[name] = value
     setModel({ ...model, ...obj })

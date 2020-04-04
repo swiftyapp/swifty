@@ -7,9 +7,3 @@ global.CONFIG = {
     scope: 'user,email'
   }
 }
-global.mockDate = () => {
-  let currentDate = new Date()
-  const RealDate = Date
-  global.Date = jest.fn(() => new RealDate(currentDate.toISOString()))
-  return currentDate
-}

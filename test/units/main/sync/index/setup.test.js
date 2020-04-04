@@ -1,5 +1,6 @@
 import Sync from 'main/application/sync'
 import Vault from 'main/application/vault'
+import { DateTime } from 'luxon'
 
 jest.mock('main/application/sync/gdrive/index')
 jest.mock('application/helpers/encryption')
@@ -7,7 +8,7 @@ jest.mock('application/helpers/encryption')
 describe('#setup', () => {
   let sync
   let vault = new Vault()
-  let currentDate = mockDate()
+  let currentTime = DateTime.local()
 
   const cryptor = {}
 
@@ -27,28 +28,25 @@ describe('#setup', () => {
 
   test('it checks if pulled data is decryptable', () => {
     expect(vault.isDecryptable).toBeCalledWith(
-      { entries: [{ id: '1', password: 'password' }] },
+      {
+        entries: [{ id: '1', password: 'password' }],
+        updatedAt: DateTime.local().toISO()
+      },
       {}
     )
   })
 
   test('writes merged data to vault', () => {
     expect(vault.write).toBeCalledWith({
-      entries: [
-        { id: '1', password: 'password' },
-        { id: '2', password: 'qwerty' }
-      ],
-      updated_at: currentDate.toISOString()
+      entries: [{ id: '2', password: 'qwerty' }],
+      updatedAt: currentTime.toISO()
     })
   })
 
   test('pushes merged data to cloud', () => {
     expect(sync.provider.push).toBeCalledWith({
-      entries: [
-        { id: '1', password: 'password' },
-        { id: '2', password: 'qwerty' }
-      ],
-      updated_at: currentDate.toISOString()
+      entries: [{ id: '2', password: 'qwerty' }],
+      updatedAt: currentTime.toISO()
     })
   })
 })

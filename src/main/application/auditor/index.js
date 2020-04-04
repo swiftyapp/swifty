@@ -57,7 +57,9 @@ export default class Auditor {
   }
 
   isOld(item) {
-    const time = DateTime.fromISO(item.password_updated_at || item.updated_at)
+    const time = DateTime.fromISO(
+      item.password_updated_at || item.updatedAt || item.updated_at
+    )
     return Math.abs(time.diffNow('days').days) > PASSWORD_FRESHNESS
   }
 }

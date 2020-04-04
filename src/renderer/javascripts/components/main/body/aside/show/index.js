@@ -36,11 +36,15 @@ const Show = ({ entry }) => {
       <div className="entry-extra">
         <div className="item">
           <div className="label">Last Modified</div>
-          <div className="value">{formatDate(entry.updated_at)}</div>
+          <div className="value">
+            {formatDate(entry.updatedAt || entry.updated_at)}
+          </div>
         </div>
         <div className="item">
           <div className="label">Created</div>
-          <div className="value">{formatDate(entry.created_at)}</div>
+          <div className="value">
+            {formatDate(entry.createdAt || entry.created_at)}
+          </div>
         </div>
       </div>
     </div>

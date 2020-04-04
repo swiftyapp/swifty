@@ -9,8 +9,7 @@
   "globals": {
     "Atomics": "readonly",
     "SharedArrayBuffer": "readonly",
-    "CONFIG": "readonly",
-    "mockDate": "readonly"
+    "CONFIG": "readonly"
   },
   "parserOptions": {
     "ecmaFeatures": {

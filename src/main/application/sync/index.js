@@ -1,6 +1,5 @@
-import { merge, groupBy } from 'lodash'
-import { encrypt, decrypt } from 'application/helpers/encryption'
 import GDrive from './gdrive'
+import { mergeData } from './base/merge'
 
 export default class Sync {
   initialize(cryptor, vault) {
@@ -18,7 +17,7 @@ export default class Sync {
       return this.provider
         .pull()
         .then(data => {
-          this._mergeAndPush(data)
+          this.mergeAndPush(data)
         })
         .catch(() => this.provider.push(this.vault.read()))
     })
@@ -33,39 +32,16 @@ export default class Sync {
   }
 
   perform() {
-    return this.provider.pull().then(data => this._mergeAndPush(data))
+    return this.provider.pull().then(data => this.mergeAndPush(data))
   }
 
-  async _mergeAndPush(data) {
+  async mergeAndPush(data) {
     if (this.vault.isDecryptable(data, this.cryptor)) {
-      const merged = this._merge(this.vault.read(), data, this.cryptor)
+      const merged = mergeData(this.vault.read(), data, this.cryptor)
       this.vault.write(merged)
       await this.provider.push(merged)
       return merged
     }
     throw Error('Remote vault file is invalid')
-  }
-
-  _merge(localData, remoteData, cryptor) {
-    if (!remoteData) return localData
-    return encrypt(
-      {
-        entries: this._mergeArrays(
-          decrypt(localData, cryptor).entries,
-          decrypt(remoteData, cryptor).entries
-        ),
-        updated_at: new Date().toISOString()
-      },
-      cryptor
-    )
-  }
-
-  _mergeArrays(local, remote) {
-    return Object.values(groupBy(local.concat(remote), item => item.id)).map(
-      group => {
-        if (group.length === 1) return group[0]
-        return merge(group[0], group[1])
-      }
-    )
   }
 }

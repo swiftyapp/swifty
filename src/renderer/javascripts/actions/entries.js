@@ -1,4 +1,5 @@
 import shortid from 'shortid'
+import { DateTime } from 'luxon'
 import { encryptData } from 'services/cryptor'
 const { sendSaveData, onOnce, sendVaultSyncStart } = window
 
@@ -55,7 +56,7 @@ const save = (data, state) => {
 
 const update = (entries, data) => {
   const index = entries.findIndex(item => item.id === data.id)
-  data.updated_at = date()
+  data.updatedAt = date()
   entries[index] = data
   return [entries, data]
 }
@@ -67,7 +68,7 @@ const create = (entries, data) => {
 }
 
 const date = () => {
-  return new Date().toISOString()
+  return DateTime.local().toISO()
 }
 
 const buildItem = data => {
@@ -75,7 +76,7 @@ const buildItem = data => {
   return {
     id: shortid.generate(),
     ...data,
-    created_at: now,
-    updated_at: now
+    createdAt: now,
+    updatedAt: now
   }
 }
