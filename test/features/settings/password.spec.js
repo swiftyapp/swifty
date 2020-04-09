@@ -1,6 +1,6 @@
 const { beforeHelper, afterHelper } = require('./../../helper')
 
-describe('Password generation settings', function() {
+describe('Password generation settings', function () {
   this.timeout(10000)
 
   describe('User opens password settings', () => {
@@ -15,7 +15,7 @@ describe('Password generation settings', function() {
           .keys('\uE007')
           .waitForExist('.body .list')
           .click('.settings-button')
-          .click('.window .navigation li:nth-child(2)')
+          .click('.window .navigation li:nth-child(3)')
           .getText('.body h1')
       ).to.eventually.equal('Password Generation')
     })

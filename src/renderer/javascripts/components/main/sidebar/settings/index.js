@@ -4,6 +4,7 @@ import Tooltip from 'components/elements/tooltip'
 import Navigation from './navigation'
 import Vault from './vault'
 import Password from './password'
+import MasterPassword from './master_password'
 import SettingsIcon from 'settings.svg'
 
 const Settings = () => {
@@ -24,6 +25,7 @@ const Settings = () => {
             <div className="body">
               <Vault section={section} />
               <Password section={section} />
+              <MasterPassword section={section} />
             </div>
           </div>
         </Modal>

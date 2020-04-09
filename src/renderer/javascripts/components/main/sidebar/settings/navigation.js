@@ -11,10 +11,16 @@ const Navigation = ({ section, onClick }) => {
         Vault Settings
       </li>
       <li
+        className={classnames({ current: section === 'masterpassword' })}
+        onClick={() => onClick('masterpassword')}
+      >
+        Master Password
+      </li>
+      <li
         className={classnames({ current: section === 'password' })}
         onClick={() => onClick('password')}
       >
-        Password
+        Password Generation
       </li>
     </ul>
   )

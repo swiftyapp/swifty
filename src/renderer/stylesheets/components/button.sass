@@ -8,9 +8,9 @@
   cursor: pointer
   border-radius: 3px
   transition: box-shadow .1s ease
-  &:hover
+  &:hover:not(.disabled)
     box-shadow: 0 5px 4px -3px rgba(0,0,0,.2), 0 3px 5px 1px rgba(0,0,0,.14), 0 3px 5px 2px rgba(0,0,0,.12)
-  &:active
+  &:active:not(.disabled)
     box-shadow: none
   &.loading
     padding-right: 35px
@@ -29,6 +29,11 @@
       border-left: 2px solid rgba(255, 255, 255, 0.7)
       transform: translateZ(0)
       animation: spin 1s infinite linear
+  &.pale
+    background: #b2bec3
+  &.disabled
+    cursros: default
+    background: #b2bec3
 
 @keyframes spin
   0%

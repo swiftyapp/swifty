@@ -1,14 +1,12 @@
 import path from 'path'
-import { app, systemPreferences } from 'electron'
+import { app, systemPreferences, ipcMain } from 'electron'
 import { Application } from 'nucleon'
 import Window from 'window'
 import Tray from 'tray/index'
 import Sync from './sync'
 import Vault from './vault'
 import Auditor from './auditor'
-import { onAuthStart, onAuthTouchId } from './events/auth'
-import mainEvents from './events/main'
-import setupEvents from './events/setup'
+import { EVENTS } from './events'
 import { isWindows } from './helpers/os'
 
 const INACTIVE_TIMEOUT = 60000
@@ -20,6 +18,12 @@ export default class Swifty extends Application {
 
   call(events) {
     Object.values(events).forEach(event => event.call(this))
+  }
+
+  subscribe() {
+    Object.keys(EVENTS).forEach(event => {
+      ipcMain.on(event, (e, data) => EVENTS[event].call(this, e, data))
+    })
   }
 
   windowOptions() {
@@ -47,7 +51,7 @@ export default class Swifty extends Application {
     this.window.removeMenu()
     this.window.disableNavigation()
     this.setupWindowEvents()
-    this.call(mainEvents)
+    this.subscribe()
     if (this.vault.isPristine()) return this.showSetup()
     return this.showAuth()
   }
@@ -76,15 +80,10 @@ export default class Swifty extends Application {
 
   showAuth() {
     this.window.webContents.send('auth', this.isTouchIdAvailable())
-    if (this.isTouchIdAvailable()) {
-      onAuthTouchId.call(this)
-    }
-    onAuthStart.call(this)
   }
 
   showSetup() {
     this.window.webContents.send('setup')
-    this.call(setupEvents)
   }
 
   authSuccess() {

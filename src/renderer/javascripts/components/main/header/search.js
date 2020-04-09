@@ -19,7 +19,7 @@ const Search = () => {
     <div className="search">
       <SearchIcon width="16" height="16" className="search-icon" />
       <input
-        type="text"
+        type="search"
         placeholder="Search"
         value={filterTerm}
         onChange={filterItems}
