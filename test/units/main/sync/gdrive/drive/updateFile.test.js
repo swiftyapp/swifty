@@ -7,6 +7,7 @@ describe('Drive#updateFile', () => {
   const id = '1upGfeNV9Vy5tzTQfk3jI7P5bZvnJCqwa'
   const content = 'DATA'
   const mimeType = 'application/vnd.swftx'
+  const name = 'vault.swftx'
 
   describe('Successful update', () => {
     beforeEach(() => {

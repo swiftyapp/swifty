@@ -1,86 +1,74 @@
-const { beforeHelper, afterHelper } = require('./../../helper')
-
-describe('Passwords audit', function() {
-  this.timeout(10000)
-
+describe('Passwords audit', () => {
   describe('User opens vault settings', () => {
-    before(() => beforeHelper({ storage: 'collection' }))
+    beforeAll(async () => await before({ storage: 'collection' }))
 
-    after(() => afterHelper())
+    afterAll(async () => await after())
 
-    it('shows vault settings', () => {
-      return expect(
-        app.client
+    it('shows vault settings', async () => {
+      expect(
+        await app.client
           .setValue('input[type=password]', 'password')
           .keys('\uE007')
           .waitForExist('.body .list')
           .click('.audit-button')
           .getText('.aside .audit h3')
-      ).to.eventually.equal('Password Audit')
+      ).toBe('Password Audit')
     })
 
-    it('contains weak passwords section', () => {
-      return expect(
-        app.client.getText('.audit-group.level-one .title')
-      ).to.eventually.equal('Weak')
+    it('contains weak passwords section', async () => {
+      expect(await app.client.getText('.audit-group.level-one .title')).toBe(
+        'Weak'
+      )
     })
 
-    it('contains list of weak passwords', () => {
-      return expect(
-        app.client.getText('.audit-group.level-one')
-      ).to.eventually.equal(
+    it('contains list of weak passwords', async () => {
+      expect(await app.client.getText('.audit-group.level-one')).toBe(
         'Weak\nFacebook\nmyuser\nGoogle\nsomeuser\nInstagram\nanotheruser'
       )
     })
 
-    it('contains duplicate passwords section', () => {
-      return expect(
-        app.client.getText('.audit-group.level-three .title')
-      ).to.eventually.equal('Duplicates')
+    it('contains duplicate passwords section', async () => {
+      expect(await app.client.getText('.audit-group.level-three .title')).toBe(
+        'Duplicates'
+      )
     })
 
-    it('contains list of duplicate passwords', () => {
-      return expect(
-        app.client.getText('.audit-group.level-three')
-      ).to.eventually.equal(
+    it('contains list of duplicate passwords', async () => {
+      expect(await app.client.getText('.audit-group.level-three')).toBe(
         'Duplicates\nFacebook\nmyuser\nGoogle\nsomeuser\nInstagram\nanotheruser'
       )
     })
 
-    it('does not contain short passwords section', () => {
-      return expect(
-        app.client.isExisting('.audit-group.level-two')
-      ).to.eventually.equal(false)
+    it('does not contain short passwords section', async () => {
+      expect(await app.client.isExisting('.audit-group.level-two')).toBe(false)
     })
 
-    it('displays passwords overal score', () => {
-      return expect(app.client.getText('.aside .score')).to.eventually.equal(
-        '0\nOveral Score'
+    it('displays passwords overal score', async () => {
+      expect(await app.client.getText('.aside .score')).toBe('0\nOveral Score')
+    })
+
+    it('displays weak passwords count', async () => {
+      expect(await app.client.getText('.aside .stats li:nth-child(1)')).toBe(
+        'Weak\n3'
       )
     })
 
-    it('displays weak passwords count', () => {
-      return expect(
-        app.client.getText('.aside .stats li:nth-child(1)')
-      ).to.eventually.equal('Weak\n3')
+    it('displays short passwords count', async () => {
+      expect(await app.client.getText('.aside .stats li:nth-child(2)')).toBe(
+        'Too Short\n0'
+      )
     })
 
-    it('displays short passwords count', () => {
-      return expect(
-        app.client.getText('.aside .stats li:nth-child(2)')
-      ).to.eventually.equal('Too Short\n0')
+    it('displays duplicate passwords count', async () => {
+      expect(await app.client.getText('.aside .stats li:nth-child(3)')).toBe(
+        'Duplicates\n3'
+      )
     })
 
-    it('displays duplicate passwords count', () => {
-      return expect(
-        app.client.getText('.aside .stats li:nth-child(3)')
-      ).to.eventually.equal('Duplicates\n3')
-    })
-
-    it('displays old passwords count', () => {
-      return expect(
-        app.client.getText('.aside .stats li:nth-child(4)')
-      ).to.eventually.equal('More than 6 month old\n3')
+    it('displays old passwords count', async () => {
+      expect(await app.client.getText('.aside .stats li:nth-child(4)')).toBe(
+        'More than 6 month old\n3'
+      )
     })
   })
 })

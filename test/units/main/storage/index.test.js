@@ -1,7 +1,7 @@
 import Storage from 'main/application/storage'
 import fs from 'fs-extra'
 
-jest.mock('fs')
+jest.mock('fs-extra')
 
 let storage
 

@@ -1,34 +1,30 @@
-const { beforeHelper, afterHelper } = require('./../../helper')
-
-describe('Vault settings', function() {
-  this.timeout(10000)
-
+describe('Vault settings', () => {
   describe('User opens vault settings', () => {
-    before(() => beforeHelper({ storage: 'empty' }))
+    beforeAll(async () => await before({ storage: 'empty' }))
 
-    after(() => afterHelper())
+    afterAll(async () => await after())
 
-    it('shows vault settings', () => {
-      return expect(
-        app.client
+    it('shows vault settings', async () => {
+      expect(
+        await app.client
           .setValue('input[type=password]', 'password')
           .keys('\uE007')
           .waitForExist('.body .list')
           .click('.settings-button')
           .getText('.body h1')
-      ).to.eventually.equal('Vault Settings')
+      ).toBe('Vault Settings')
     })
 
-    it('contains connect to google drive button', () => {
-      return expect(
-        app.client.getText('.section:nth-of-type(1) .button')
-      ).to.eventually.equal('Connect your Google Drive')
+    it('contains connect to google drive button', async () => {
+      expect(await app.client.getText('.section:nth-of-type(1) .button')).toBe(
+        'Connect your Google Drive'
+      )
     })
 
-    it('contains save vault file button', () => {
-      return expect(
-        app.client.getText('.section:nth-of-type(2) .button')
-      ).to.eventually.equal('Save Vault File')
+    it('contains save vault file button', async () => {
+      expect(await app.client.getText('.section:nth-of-type(2) .button')).toBe(
+        'Save Vault File'
+      )
     })
   })
 })

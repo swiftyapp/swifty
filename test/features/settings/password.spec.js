@@ -1,65 +1,67 @@
-const { beforeHelper, afterHelper } = require('./../../helper')
-
-describe('Password generation settings', function() {
-  this.timeout(10000)
-
+describe('Password generation settings', () => {
   describe('User opens password settings', () => {
-    before(() => beforeHelper({ storage: 'empty' }))
+    beforeAll(async () => await before({ storage: 'empty' }))
 
-    after(() => afterHelper())
+    afterAll(async () => await after())
 
-    it('shows password settings', () => {
-      return expect(
-        app.client
+    it('shows password settings', async () => {
+      expect(
+        await app.client
           .setValue('input[type=password]', 'password')
           .keys('\uE007')
           .waitForExist('.body .list')
           .click('.settings-button')
           .click('.window .navigation li:nth-child(2)')
           .getText('.body h1')
-      ).to.eventually.equal('Password Generation')
+      ).toBe('Password Settings')
     })
 
-    it('contains password preview', () => {
-      return expect(
-        app.client.isExisting('.section:nth-of-type(1) .password-sample')
-      ).to.eventually.equal(true)
+    it('contains password preview', async () => {
+      expect(
+        await app.client.isExisting('.section:nth-of-type(1) .password-sample')
+      ).toBe(true)
     })
 
-    it('password preview of default length', () => {
-      return expect(
-        app.client
+    it('password preview of default length', async () => {
+      expect(
+        await app.client
           .getText('.section:nth-of-type(1) .password-sample')
           .then(value => value.length)
-      ).to.eventually.equal(12)
+      ).toBe(12)
     })
 
-    it('changes password preview length', () => {
-      return expect(
-        app.client
+    it('changes password preview length', async () => {
+      expect(
+        await app.client
           .isExisting('.section:nth-of-type(2) input[type=range]')
           .setValue('.section:nth-of-type(2) input[type=range]', 28)
           .getText('.section:nth-of-type(1) .password-sample')
           .then(value => value.length)
-      ).to.eventually.equal(28)
+      ).toBe(28)
     })
 
-    it('contains numbers checkbox', () => {
-      return expect(
-        app.client.isExisting('.section:nth-of-type(3) input[name=numbers]')
-      ).to.eventually.equal(true)
+    it('contains numbers checkbox', async () => {
+      expect(
+        await app.client.isExisting(
+          '.section:nth-of-type(3) input[name=numbers]'
+        )
+      ).toBe(true)
     })
 
-    it('contains uppercase checkbox', () => {
-      return expect(
-        app.client.isExisting('.section:nth-of-type(3) input[name=uppercase]')
-      ).to.eventually.equal(true)
+    it('contains uppercase checkbox', async () => {
+      expect(
+        await app.client.isExisting(
+          '.section:nth-of-type(3) input[name=uppercase]'
+        )
+      ).toBe(true)
     })
 
-    it('contains special symbols checkbox', () => {
-      return expect(
-        app.client.isExisting('.section:nth-of-type(3) input[name=symbols]')
-      ).to.eventually.equal(true)
+    it('contains special symbols checkbox', async () => {
+      expect(
+        await app.client.isExisting(
+          '.section:nth-of-type(3) input[name=symbols]'
+        )
+      ).toBe(true)
     })
   })
 })

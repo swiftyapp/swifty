@@ -1,57 +1,50 @@
-const { beforeHelper, afterHelper } = require('./../../helper')
-
-describe('Password field on entry form', function() {
-  this.timeout(10000)
-
+describe('Password field on entry form', () => {
   describe('show/hide password', () => {
-    before(() => beforeHelper({ storage: 'empty' }))
+    beforeAll(async () => await before({ storage: 'empty' }))
 
-    after(() => afterHelper())
+    afterAll(async () => await after())
 
-    it('shows credentials form', () => {
-      return expect(
-        app.client
+    it('shows credentials form', async () => {
+      expect(
+        await app.client
           .setValue('input[type=password]', 'password')
-          .keys("\uE007")
+          .keys('\uE007')
           .click('.add-button')
           .isExisting('input[name=password]')
-      ).to.eventually.equal(true)
+      ).toBe(true)
     })
 
-    it('password is hidden by defaul', () => {
-      return expect(
-        app.client
+    it('password is hidden by defaul', async () => {
+      expect(
+        await app.client
           .setValue('input[name=password]', 'password')
           .isExisting('.secure-on input[name=password]')
-      ).to.eventually.equal(true)
+      ).toBe(true)
     })
-    
-    it('shows password on click reveal', () => {
-      return expect(
-        app.client
+
+    it('shows password on click reveal', async () => {
+      expect(
+        await app.client
           .click('.secure-on .view')
           .isExisting('.secure-off input[name=password]')
-      ).to.eventually.equal(true)
+      ).toBe(true)
     })
-    
-    it('shows password on click reveal', () => {
-      return expect(
-        app.client.getValue('input[name=password]')
-      ).to.eventually.equal('password')
+
+    it('shows password on click reveal', async () => {
+      expect(await app.client.getValue('input[name=password]')).toBe('password')
     })
-    
-    it('generates password', () => {
-      return expect(
-        app.client
+
+    it('generates password', async () => {
+      expect(
+        await app.client
           .click('.secure-off .action')
           .getValue('input[name=password]')
-      ).to.not.eventually.equal('password')
+      ).not.toBe('password')
     })
-    
-    it('replaces current password', () => {
-      return app.client.getValue('input[name=password]').then(value => {
-        expect(value.length).to.equal(12)
-      })
+
+    it('replaces current password', async () => {
+      const value = await app.client.getValue('input[name=password]')
+      expect(value.length).toBe(12)
     })
   })
 })

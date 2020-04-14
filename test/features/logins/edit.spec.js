@@ -1,69 +1,63 @@
-const { beforeHelper, afterHelper, prepareSotrage } = require('./../../helper')
-
-describe('Edit credential entry', function() {
-  this.timeout(10000)
-
+describe('Edit credential entry', () => {
   describe('user edits credentials entry', () => {
-    before(() => beforeHelper({ storage: 'example' }))
+    beforeAll(async () => await before({ storage: 'example' }))
 
-    after(() => afterHelper())
+    afterAll(async () => await after())
 
-    it('shows credentials view', () => {
-      return expect(
-        app.client
+    it('shows credentials view', async () => {
+      expect(
+        await app.client
           .setValue('input[type=password]', 'password')
           .keys('\uE007')
           .waitForExist('.body .list .entry')
           .click('.list .entry')
           .getText('.entry-details')
-      ).to.eventually.equal(
+      ).toBe(
         `Website\nhttps://example.com\nUsername\nmyuser\nPassword\nmypassword`
       )
     })
 
-    it('shows edit form', () => {
-      return expect(
-        app.client
+    it('shows edit form', async () => {
+      expect(
+        await app.client
           .click('.entry-title .action:nth-of-type(1)')
           .getText('.aside .actions')
-      ).to.eventually.equal('CancelSave')
+      ).toBe('CancelSave')
     })
 
-    it('cancels update', () => {
-      return expect(
-        app.client
+    it('cancels update', async () => {
+      expect(
+        await app.client
           .setValue('input[name=title]', 'Example Updated')
           .click('.actions .cancel')
           .getText('.list .entry')
-      ).to.eventually.equal('Example\nmyuser')
+      ).toBe('Example\nmyuser')
     })
 
-    it('hides edit form', () => {
-      return expect(app.client.getText('.entry-title h1')).to.eventually.equal(
-        'Example'
-      )
+    it('hides edit form', async () => {
+      expect(await app.client.getText('.entry-title h1')).toBe('Example')
     })
 
-    it('shows editor form again', () => {
-      return expect(
-        app.client
+    it('shows editor form again', async () => {
+      expect(
+        await app.client
           .click('.entry-title .action:nth-of-type(1)')
           .waitForExist('input[name=title]')
           .getValue('input[name=title]')
-      ).to.eventually.equal('Example')
+      ).toBe('Example')
     })
 
-    it('updates credential entry', () => {
-      return expect(
-        app.client
+    it('updates credential entry', async () => {
+      expect(
+        await app.client
           .setValue('input[name=title]', 'Example Updated')
           .click('.actions .button')
           .getText('.list .entry')
-      ).to.eventually.equal('Example Updated\nmyuser')
+      ).toBe('Example Updated\nmyuser')
     })
 
-    it('displays show view in a sidebar', () => {
-      return expect(app.client.getText('.entry-title h1')).to.eventually.equal(
+    it('displays show view in a sidebar', async () => {
+      expect(await app.client.getText('.entry-title h1')).toBe(
         'Example Updated'
       )
     })

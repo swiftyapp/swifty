@@ -1,38 +1,34 @@
-const { beforeHelper, afterHelper } = require('./../../helper')
-
-describe('Authentication with master password', function() {
-  this.timeout(10000)
-
+describe('Authentication with master password', () => {
   describe('user enters password', () => {
-    beforeEach(() => beforeHelper({ storage: 'empty' }))
+    beforeAll(async () => await before({ storage: 'empty' }))
 
-    afterEach(() => afterHelper())
+    afterAll(async () => await after())
 
-    it('shows invalid password error', () => {
-      return expect(
-        app.client
+    it('shows invalid password error', async () => {
+      expect(
+        await app.client
           .setValue('input[type=password]', 'word')
           .keys('\uE007')
           .getText('.error-message')
-      ).to.eventually.equal('Incorrect Master Password')
+      ).toBe('Incorrect Master Password')
     })
 
-    it('does not show touch id icon', () => {
-      return expect(
-        app.client
+    it('does not show touch id icon', async () => {
+      expect(
+        await app.client
           .setValue('input[type=password]', 'word')
           .keys('\uE007')
           .isExisting('svg.touchid')
-      ).to.eventually.equal(false)
+      ).toBe(false)
     })
 
-    it('logs user in on correct password', () => {
-      return expect(
-        app.client
+    it('logs user in on correct password', async () => {
+      expect(
+        await app.client
           .setValue('input[type=password]', 'password')
           .keys('\uE007')
           .isExisting('.sync-indicator')
-      ).to.eventually.equal(true)
+      ).toBe(true)
     })
   })
 })
