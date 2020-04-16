@@ -28,7 +28,7 @@ const Password = ({ section }) => {
   if (section !== 'password') return null
   return (
     <>
-      <h1>Password Generation</h1>
+      <h1>Password Settings</h1>
       <div className="section">
         <strong>Example</strong>
         <div className="password-sample">{example}</div>

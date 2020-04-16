@@ -1,35 +1,31 @@
-const { beforeHelper, afterHelper } = require('./../../helper')
-
-describe('Setting up master password', function() {
-  this.timeout(10000)
-
+describe('Setting up master password', () => {
   describe('user password setup', () => {
-    beforeEach(() => beforeHelper({ storage: 'pristine' }))
+    beforeEach(() => before({ storage: 'pristine' }))
 
-    afterEach(() => afterHelper())
+    afterEach(() => after())
 
-    it('shows non-matching password error', () => {
-      return expect(
-        app.client
+    it('shows non-matching password error', async () => {
+      expect(
+        await app.client
           .click('.top-lock .button')
           .setValue('input[type=password]', 'password')
           .click('.button')
           .setValue('input[type=password]', 'pass')
           .click('.button')
           .getText('.error-message')
-      ).to.eventually.equal('Passwords do not match')
+      ).toBe('Passwords do not match')
     })
 
-    it('shows app main window on password match', () => {
-      return expect(
-        app.client
+    it('shows app main window on password match', async () => {
+      expect(
+        await app.client
           .click('.top-lock .button')
           .setValue('input[type=password]', 'password')
           .click('.button')
           .setValue('input[type=password]', 'password')
           .click('.button')
           .isExisting('.sync-indicator')
-      ).to.eventually.equal(true)
+      ).toBe(true)
     })
   })
 })

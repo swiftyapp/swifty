@@ -1,74 +1,70 @@
-const { beforeHelper, afterHelper } = require('./../../helper')
-
-describe('Create credentials entry', function() {
-  this.timeout(10000)
-
+describe('Create credentials entry', () => {
   describe('user createst credentials entry', () => {
-    before(() => beforeHelper({ storage: 'empty' }))
+    beforeAll(async () => await before({ storage: 'empty' }))
 
-    after(() => afterHelper())
+    afterAll(async () => await after())
 
-    it('shows credentials form', () => {
-      return expect(
-        app.client
+    it('shows credentials form', async () => {
+      expect(
+        await app.client
           .setValue('input[type=password]', 'password')
-          .keys("\uE007")
+          .keys('\uE007')
           .waitForExist('.body .list .empty')
           .click('.add-button')
           .getText('.aside .actions')
-      ).to.eventually.equal('CancelSave')
-    })
-    
-    it('shows validation errors', () => {
-      return expect(
-        app.client
-          .click('.aside .actions .button')
-          .isExisting('.field.error:nth-of-type(3)')
-      ).to.eventually.equal(true)
+      ).toBe('CancelSave')
     })
 
-    it('cancels entry creation', () => {
-      return expect(
-        app.client
+    it('shows validation errors', async () => {
+      expect(
+        await app.client
+          .click('.aside .actions .button')
+          .isExisting('.field.error:nth-of-type(3)')
+      ).toBe(true)
+    })
+
+    it('cancels entry creation', async () => {
+      expect(
+        await app.client
           .setValue('input[name=title]', 'Example')
           .click('.aside .actions .cancel')
           .isExisting('.list .entry')
-      ).to.eventually.equal(false)
+      ).toBe(false)
     })
 
-    it('hides creation form', () => {
-      return expect(
-        app.client.isExisting('.aside .empty')
-      ).to.eventually.equal(true)
+    it('hides creation form', async () => {
+      expect(await app.client.isExisting('.aside .empty')).toBe(true)
     })
 
-    it('opens creation form again', () => {
-      return expect(
-        app.client
+    it('opens creation form again', async () => {
+      expect(
+        await app.client
           .click('.add-button')
           .waitForExist('input[name=title]')
           .getValue('input[name=title]')
-      ).to.eventually.equal('')
+      ).toBe('')
     })
 
-    it('creates credentials entry', () => {
-      return expect(
-        app.client
+    it('creates credentials entry', async () => {
+      expect(
+        await app.client
           .setValue('input[name=title]', 'Example')
           .setValue('input[name=website]', 'https://example.com')
           .setValue('input[name=username]', 'myuser')
           .setValue('input[name=password]', 'mypassword')
           .click('.aside .actions .button')
           .getText('.body .list')
-      ).to.eventually.equal('Example\nmyuser')
+      ).toBe('Example\nmyuser')
     })
 
-    it('displays show view instead of form', () => {
-      return expect(
-        app.client
+    it('displays show view instead of form', async () => {
+      expect(
+        await app.client
           .waitForExist('.entry-details')
           .getText('.entry-details')
-      ).to.eventually.equal(`Website\nhttps://example.com\nUsername\nmyuser\nPassword\nmypassword`)
+      ).toBe(
+        `Website\nhttps://example.com\nUsername\nmyuser\nPassword\nmypassword`
+      )
     })
   })
 })

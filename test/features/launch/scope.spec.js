@@ -1,77 +1,67 @@
-const { beforeHelper, afterHelper } = require('./../../helper')
-
-describe('Scope switching', function() {
-  this.timeout(10000)
-
+describe('Scope switching', () => {
   describe('user launches application', () => {
-    before(() => beforeHelper({ storage: 'example' }))
+    beforeAll(async () => await before({ storage: 'example' }))
 
-    after(() => afterHelper())
+    afterAll(async () => await after())
 
-    it('shows 3 scopes', () => {
-      return expect(
-        app.client
+    it('shows 3 scopes', async () => {
+      expect(
+        await app.client
           .setValue('input[type=password]', 'password')
           .keys('\uE007')
           .waitForExist('.sidebar')
           .isExisting('.switcher .tooltip-context:nth-child(3)')
-      ).to.eventually.equal(true)
+      ).toBe(true)
     })
 
-    it('highlights logins scope as current', () => {
-      return expect(
-        app.client.isExisting(
+    it('highlights logins scope as current', async () => {
+      expect(
+        await app.client.isExisting(
           '.switcher .tooltip-context:nth-child(1) .item.current'
         )
-      ).to.eventually.equal(true)
+      ).toBe(true)
     })
 
-    it('displays entries for given scope', () => {
-      return expect(
-        app.client.getText('.body .list .entry')
-      ).to.eventually.equal('Example\nmyuser')
-    })
-
-    it('switches scope to notes', () => {
-      return expect(
-        app.client
-          .click('.switcher .tooltip-context:nth-child(2)')
-          .isExisting('.switcher .tooltip-context:nth-child(2) .item.current')
-      ).to.eventually.equal(true)
-    })
-
-    it('displays entries for given scope', () => {
-      return expect(app.client.getText('.body .list')).to.eventually.equal(
-        'No Items'
-      )
-    })
-
-    it('switches scope to cards', () => {
-      return expect(
-        app.client
-          .click('.switcher .tooltip-context:nth-child(3)')
-          .isExisting('.switcher .tooltip-context:nth-child(3) .item.current')
-      ).to.eventually.equal(true)
-    })
-
-    it('displays entries for given scope', () => {
-      return expect(app.client.getText('.body .list')).to.eventually.equal(
-        'No Items'
-      )
-    })
-
-    it('switches scope back to logins', () => {
-      return expect(
-        app.client
-          .click('.switcher .tooltip-context:nth-child(1)')
-          .isExisting('.switcher .tooltip-context:nth-child(1) .item.current')
-      ).to.eventually.equal(true)
-    })
-
-    it('displays entries for given scope', () => {
-      return expect(app.client.getText('.body .list')).to.eventually.equal(
+    it('displays entries for given scope', async () => {
+      expect(await app.client.getText('.body .list .entry')).toBe(
         'Example\nmyuser'
       )
+    })
+
+    it('switches scope to notes', async () => {
+      expect(
+        await app.client
+          .click('.switcher .tooltip-context:nth-child(2)')
+          .isExisting('.switcher .tooltip-context:nth-child(2) .item.current')
+      ).toBe(true)
+    })
+
+    it('displays entries for given scope', async () => {
+      expect(await app.client.getText('.body .list')).toBe('No Items')
+    })
+
+    it('switches scope to cards', async () => {
+      expect(
+        await app.client
+          .click('.switcher .tooltip-context:nth-child(3)')
+          .isExisting('.switcher .tooltip-context:nth-child(3) .item.current')
+      ).toBe(true)
+    })
+
+    it('displays entries for given scope', async () => {
+      expect(await app.client.getText('.body .list')).toBe('No Items')
+    })
+
+    it('switches scope back to logins', async () => {
+      expect(
+        await app.client
+          .click('.switcher .tooltip-context:nth-child(1)')
+          .isExisting('.switcher .tooltip-context:nth-child(1) .item.current')
+      ).toBe(true)
+    })
+
+    it('displays entries for given scope', async () => {
+      expect(await app.client.getText('.body .list')).toBe('Example\nmyuser')
     })
   })
 })

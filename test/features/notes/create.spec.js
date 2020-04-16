@@ -1,96 +1,88 @@
-const { beforeHelper, afterHelper } = require('./../../helper')
-
-describe('Create note entry', function() {
-  this.timeout(10000)
-
+describe('Create note entry', () => {
   describe('user creates note entry', () => {
-    before(() => beforeHelper({ storage: 'empty' }))
+    beforeAll(async () => await before({ storage: 'empty' }))
 
-    after(() => afterHelper())
+    afterAll(async () => await after())
 
-    it('shows credentials view', () => {
-      return expect(
-        app.client
+    it('shows credentials view', async () => {
+      expect(
+        await app.client
           .setValue('input[type=password]', 'password')
           .keys('\uE007')
           .waitForExist('.body .list')
           .getText('.body .list')
-      ).to.eventually.equal('No Items')
+      ).toBe('No Items')
     })
 
-    it('switches to note scope', () => {
-      return expect(
-        app.client
+    it('switches to note scope', async () => {
+      expect(
+        await app.client
           .click('.switcher .tooltip-context:nth-child(2)')
           .getText('.body .list')
-      ).to.eventually.equal('No Items')
+      ).toBe('No Items')
     })
 
-    it('shows add note form', () => {
-      return expect(
-        app.client
+    it('shows add note form', async () => {
+      expect(
+        await app.client
           .click('.add-button')
           .waitForExist('.aside input[name=title]')
           .waitForExist('.aside textarea[name=note]')
           .getText('.aside .actions')
-      ).to.eventually.equal('CancelSave')
+      ).toBe('CancelSave')
     })
 
-    it('highlights title field with error', () => {
-      return expect(
-        app.client
+    it('highlights title field with error', async () => {
+      expect(
+        await app.client
           .click('.aside .actions .button')
           .isExisting('.field.error:nth-of-type(1)')
-      ).to.eventually.equal(true)
+      ).toBe(true)
     })
 
-    it('highlights note field with error', () => {
-      return expect(
-        app.client
+    it('highlights note field with error', async () => {
+      expect(
+        await app.client
           .click('.aside .actions .button')
           .isExisting('.field.error:nth-of-type(2)')
-      ).to.eventually.equal(true)
+      ).toBe(true)
     })
 
-    it('cancels entry creation', () => {
-      return expect(
-        app.client
+    it('cancels entry creation', async () => {
+      expect(
+        await app.client
           .setValue('input[name=title]', 'Example')
           .click('.aside .actions .cancel')
           .isExisting('.list .entry')
-      ).to.eventually.equal(false)
+      ).toBe(false)
     })
 
-    it('hides creation form', () => {
-      return expect(app.client.isExisting('.aside .empty')).to.eventually.equal(
-        true
-      )
+    it('hides creation form', async () => {
+      expect(await app.client.isExisting('.aside .empty')).toBe(true)
     })
 
-    it('opens creation form again', () => {
-      return expect(
-        app.client
+    it('opens creation form again', async () => {
+      expect(
+        await app.client
           .click('.add-button')
           .waitForExist('.aside input[name=title]')
           .waitForExist('.aside textarea[name=note]')
           .getText('.aside .actions')
-      ).to.eventually.equal('CancelSave')
+      ).toBe('CancelSave')
     })
 
-    it('creates note entry', () => {
-      return expect(
-        app.client
+    it('creates note entry', async () => {
+      expect(
+        await app.client
           .setValue('input[name=title]', 'Example')
           .setValue('textarea[name=note]', 'This is secure note')
           .click('.aside .actions .button')
           .getText('.body .list')
-      ).to.eventually.equal('Example')
+      ).toBe('Example')
     })
 
-    it('shows details of created note', () => {
-      return expect(
-        app.client.getText('.aside .entry-title h1')
-      ).to.eventually.equal('Example')
+    it('shows details of created note', async () => {
+      expect(await app.client.getText('.aside .entry-title h1')).toBe('Example')
     })
   })
 })
