@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { Cryptor } from '@swiftyapp/cryptor'
+import { Cryptor } from 'application/cryptor'
 
 let cryptor
 

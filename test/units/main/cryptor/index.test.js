@@ -4,6 +4,8 @@ import { Cryptor } from 'main/application/cryptor'
 const cryptor = new Cryptor('secret')
 let result
 
+jest.unmock('main/application/cryptor')
+
 describe('Cryptor', () => {
   describe('#encryptData', () => {
     beforeEach(() => {

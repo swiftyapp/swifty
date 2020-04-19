@@ -1,7 +1,7 @@
-import { mergeData } from 'main/application/sync/base/merge'
 import { DateTime } from 'luxon'
 
-jest.mock('application/helpers/encryption')
+import { mergeData } from 'main/application/sync/base/merge'
+import { Cryptor } from 'main/application/cryptor'
 
 const currentTime = DateTime.local()
 const secondsAgo = currentTime.__minus(5, 'seconds')
@@ -9,7 +9,7 @@ const fourMinutesAgo = currentTime.__minus(4, 'minutes')
 const fiveMinutesAgo = currentTime.__minus(5, 'minutes')
 
 describe('#mergeData', () => {
-  const cryptor = {}
+  const cryptor = new Cryptor()
   let local, remote
 
   describe('remote data is empty', () => {

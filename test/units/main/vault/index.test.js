@@ -1,8 +1,13 @@
 import Vault from 'main/application/vault'
 import Storage from 'main/application/storage'
+import { Cryptor } from 'main/application/cryptor'
+
 jest.unmock('main/application/vault')
+jest.unmock('main/application/cryptor')
 jest.mock('main/application/storage')
+
 let vault
+let cryptor = new Cryptor()
 
 describe('Vault', () => {
   afterEach(() => {
@@ -19,8 +24,6 @@ describe('Vault', () => {
       })
 
       describe('valid cryptor', () => {
-        let cryptor = { decrypt: jest.fn(data => data) }
-
         test('returns true', () => {
           expect(vault.authenticate(cryptor)).toBe(true)
         })
@@ -40,8 +43,6 @@ describe('Vault', () => {
     })
 
     describe('invalid data and correct cryptor', () => {
-      let cryptor = { decrypt: jest.fn(data => data) }
-
       beforeEach(() => {
         Storage.mockImplementation(() => ({
           read: jest.fn(() => 'eyJwYXXdlcnR5In0=')
@@ -56,7 +57,6 @@ describe('Vault', () => {
   })
 
   describe('#setup', () => {
-    let cryptor = { encrypt: jest.fn(data => data) }
     let result
 
     describe('successfull setup', () => {
@@ -151,7 +151,6 @@ describe('Vault', () => {
     describe('valid backup', () => {
       let importMock = jest.fn(() => 'eyJwYXNzd29yZCI6ICJhc2RmcXdlcnR5In0=')
       let write = jest.fn(() => true)
-      let cryptor = { decrypt: jest.fn(data => data) }
 
       beforeEach(() => {
         Storage.mockImplementation(() => ({ import: importMock, write }))
@@ -177,7 +176,6 @@ describe('Vault', () => {
     describe('invalid backup', () => {
       let importMock = jest.fn(() => 'hello')
       let write = jest.fn(() => true)
-      let cryptor = { decrypt: jest.fn(data => data) }
 
       beforeEach(() => {
         Storage.mockImplementation(() => ({ import: importMock, write }))

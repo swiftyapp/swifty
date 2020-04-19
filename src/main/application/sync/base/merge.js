@@ -1,19 +1,15 @@
 import { merge, keyBy } from 'lodash'
 import { DateTime } from 'luxon'
-import { encrypt, decrypt } from 'application/helpers/encryption'
 
 export const mergeData = (local, remote, cryptor) => {
   if (!remote) {
     local.updatedAt = now()
     return local
   }
-  return encrypt(
-    {
-      entries: combine(group(local, cryptor), group(remote, cryptor)),
-      updatedAt: now()
-    },
-    cryptor
-  )
+  return cryptor.encryptData({
+    entries: combine(group(local, cryptor), group(remote, cryptor)),
+    updatedAt: now()
+  })
 }
 
 const combine = (local, remote) => {
@@ -39,7 +35,7 @@ const mergeInto = (base, update) => {
 }
 
 const group = (encrypted, cryptor) => {
-  const data = decrypt(encrypted, cryptor)
+  const data = cryptor.decryptData(encrypted)
   return {
     data: keyBy(data.entries, 'id'),
     timestamp: DateTime.fromISO(data.updatedAt)

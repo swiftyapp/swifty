@@ -1,4 +1,4 @@
-import { Cryptor } from '@swiftyapp/cryptor'
+import { Cryptor } from 'application/cryptor'
 import { systemPreferences } from 'electron'
 
 export const onAuthStart = function (_, hashedSecret) {

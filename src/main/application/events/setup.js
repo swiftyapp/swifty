@@ -1,4 +1,4 @@
-import { Cryptor } from '@swiftyapp/cryptor'
+import { Cryptor } from 'application/cryptor'
 import { ipcMain, dialog } from 'electron'
 
 export const onBackupSelect = function () {

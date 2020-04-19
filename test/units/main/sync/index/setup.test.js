@@ -1,17 +1,16 @@
+import { DateTime } from 'luxon'
 import Sync from 'main/application/sync'
 import Vault from 'main/application/vault'
-import { DateTime } from 'luxon'
+import { Cryptor } from 'main/application/cryptor'
 
 jest.unmock('main/application/sync')
 jest.mock('main/application/sync/gdrive/index')
-jest.mock('application/helpers/encryption')
 
 describe('#setup', () => {
   let sync
   let vault = new Vault()
   let currentTime = DateTime.local()
-
-  const cryptor = {}
+  const cryptor = new Cryptor()
 
   beforeEach(async () => {
     sync = new Sync()
@@ -33,7 +32,7 @@ describe('#setup', () => {
         entries: [{ id: '1', password: 'password' }],
         updatedAt: DateTime.local().toISO()
       },
-      {}
+      cryptor
     )
   })
 

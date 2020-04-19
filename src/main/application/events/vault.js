@@ -1,5 +1,4 @@
-import { Cryptor } from '@swiftyapp/cryptor'
-import { encrypt, decrypt } from 'application/helpers/encryption'
+import { Cryptor } from 'main/application/cryptor'
 
 const SENSITIVE_FIELDS = {
   login: ['password'],
@@ -31,11 +30,11 @@ export const onMasterPasswordChange = function (_, data) {
   // newCryptor.new = true
   const encrypted = this.vault.read()
   if (this.vault.isDecryptable(encrypted, currentCryptor)) {
-    let decrypted = decrypt(this.vault.read(), currentCryptor)
+    let decrypted = currentCryptor.decryptData(this.vault.read())
     decrypted.entries = decrypted.entries.map(entry => {
       return obscure(expose(entry, currentCryptor), newCryptor)
     })
-    const newEncrypted = encrypt(decrypted, newCryptor)
+    const newEncrypted = newCryptor.encryptData(decrypted)
     // Store newly encrypted credentials to vault
     this.vault.write(newEncrypted)
     // read tokens
