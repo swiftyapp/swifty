@@ -15,11 +15,19 @@ export class Cryptor {
     this.cryptor = new BaseCryptor(secret)
   }
 
-  encrypt(data) {
+  encryptData(data) {
     return btoa(this.cryptor.encrypt(JSON.stringify(data)))
   }
 
-  decrypt(encypted) {
-    return JSON.parse(this.cryptor.decrypt(atob(encypted)))
+  decryptData(encrypted) {
+    return JSON.parse(this.cryptor.decrypt(atob(encrypted)))
+  }
+
+  encrypt(data) {
+    return this.cryptor.encrypt(data)
+  }
+
+  decrypt(data) {
+    return this.cryptor.decrypt(data)
   }
 }

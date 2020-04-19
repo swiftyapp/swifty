@@ -5,9 +5,9 @@ const cryptor = new Cryptor('secret')
 let result
 
 describe('Cryptor', () => {
-  describe('#encrypt', () => {
+  describe('#encryptData', () => {
     beforeEach(() => {
-      result = cryptor.encrypt({ id: 1 })
+      result = cryptor.encryptData({ id: 1 })
     })
 
     it('calls cryptor with stringified data', () => {
@@ -19,17 +19,37 @@ describe('Cryptor', () => {
     })
   })
 
-  describe('#decrypt', () => {
+  describe('#decryptData', () => {
     beforeEach(() => {
-      result = cryptor.decrypt('eyJpZCI6MX0=')
+      result = cryptor.decryptData('eyJpZCI6MX0=')
     })
 
-    it('calls ryptor with with stringified data', () => {
+    it('calls cryptor with with stringified data', () => {
       expect(BaseCryptor.decrypt).toHaveBeenCalledWith('{"id":1}')
     })
 
     it('returns decrypted object', () => {
       expect(result).toEqual({ id: 1 })
+    })
+  })
+
+  describe('#encrypt', () => {
+    beforeEach(() => {
+      result = cryptor.encrypt('unencrypted')
+    })
+
+    it('calls cryptor with data', () => {
+      expect(BaseCryptor.encrypt).toHaveBeenCalledWith('unencrypted')
+    })
+  })
+
+  describe('#decrypt', () => {
+    beforeEach(() => {
+      result = cryptor.decrypt('encrypted')
+    })
+
+    it('calls cryptor with with data', () => {
+      expect(BaseCryptor.decrypt).toHaveBeenCalledWith('encrypted')
     })
   })
 })
