@@ -103,7 +103,6 @@ module.exports = {
     ],
     resolve: {
       modules: [
-        path.resolve(__dirname, 'src'),
         path.resolve(__dirname, 'src', 'main'),
         path.resolve(__dirname, 'resources'),
         path.resolve(__dirname, 'node_modules')

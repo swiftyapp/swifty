@@ -1,4 +1,4 @@
-import Storage from 'main/application/storage'
+import Storage from 'application/storage'
 import fs from 'fs-extra'
 
 jest.mock('fs-extra')

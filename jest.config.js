@@ -25,7 +25,11 @@ module.exports = {
 
   // Automatically clear mock calls and instances between every test
   clearMocks: true,
-  modulePaths: ['<rootDir>/src', '<rootDir>/src/main'],
+  modulePaths: [
+    '<rootDir>/src/renderer',
+    '<rootDir>/src/preload',
+    '<rootDir>/src/main'
+  ],
   // moduleNameMapper: {
   //   electron: '<rootDir>/test/units/__mocks__/electron.js'
   // },

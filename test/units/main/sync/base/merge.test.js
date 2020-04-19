@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon'
 
-import { mergeData } from 'main/application/sync/base/merge'
-import { Cryptor } from 'main/application/cryptor'
+import { mergeData } from 'application/sync/base/merge'
+import { Cryptor } from 'application/cryptor'
 
 const currentTime = DateTime.local()
 const secondsAgo = currentTime.__minus(5, 'seconds')

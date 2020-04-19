@@ -1,7 +1,7 @@
-import GDrive from 'main/application/sync/gdrive'
-import Auth from 'main/application/sync/gdrive/auth'
+import GDrive from 'application/sync/gdrive'
+import Auth from 'application/sync/gdrive/auth'
 
-jest.mock('main/application/sync/gdrive/auth')
+jest.mock('application/sync/gdrive/auth')
 
 describe('#disconnect', () => {
   let sync, auth

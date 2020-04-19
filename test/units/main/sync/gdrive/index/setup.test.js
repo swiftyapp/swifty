@@ -1,9 +1,9 @@
-import GDrive from 'main/application/sync/gdrive'
-import AuthWindow from 'main/window/authentication'
+import GDrive from 'application/sync/gdrive'
+import AuthWindow from 'window/authentication'
 
 const mockCloseAuth = jest.fn()
 const mockRemoveMenu = jest.fn()
-jest.mock('main/window/authentication', () => {
+jest.mock('window/authentication', () => {
   return jest.fn().mockImplementation(() => {
     return {
       removeMenu: mockRemoveMenu,

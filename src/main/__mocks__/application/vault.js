@@ -9,4 +9,5 @@ const Vault = jest.fn(() => {
     write: jest.fn()
   }
 })
+export const vaultFile = jest.fn().mockReturnValue('vault.swftx')
 export default Vault

@@ -1,5 +1,5 @@
 import { remote } from 'electron'
-import { isWindows, platform } from '../main/application/helpers/os'
+import { isWindows, platform } from 'application/helpers/os'
 
 window.isWindows = () => {
   return isWindows()

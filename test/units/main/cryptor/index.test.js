@@ -1,10 +1,10 @@
 import { Cryptor as BaseCryptor } from '@swiftyapp/cryptor'
-import { Cryptor } from 'main/application/cryptor'
+import { Cryptor } from 'application/cryptor'
 
 const cryptor = new Cryptor('secret')
 let result
 
-jest.unmock('main/application/cryptor')
+jest.unmock('application/cryptor')
 
 describe('Cryptor', () => {
   describe('#encryptData', () => {

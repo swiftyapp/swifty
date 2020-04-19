@@ -1,6 +1,6 @@
-import { hash } from 'main/application/helpers/encryption'
+import { hash } from 'application/helpers/encryption'
 
-jest.unmock('main/application/helpers/encryption')
+jest.unmock('application/helpers/encryption')
 
 describe('Encryption helpers', () => {
   describe('#hash', () => {

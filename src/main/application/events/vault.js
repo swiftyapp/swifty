@@ -1,4 +1,4 @@
-import { Cryptor } from 'main/application/cryptor'
+import { Cryptor } from 'application/cryptor'
 
 const SENSITIVE_FIELDS = {
   login: ['password'],

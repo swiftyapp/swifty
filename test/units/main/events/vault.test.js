@@ -1,8 +1,8 @@
 import { BrowserWindow } from 'electron'
 import { DateTime } from 'luxon'
-import Vault from 'main/application/vault'
-import Sync from 'main/application/sync'
-import { Cryptor } from 'main/application/cryptor'
+import Vault from 'application/vault'
+import Sync from 'application/sync'
+import { Cryptor } from 'application/cryptor'
 
 import { onMasterPasswordChange } from 'application/events/vault'
 

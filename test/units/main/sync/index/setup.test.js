@@ -1,10 +1,10 @@
 import { DateTime } from 'luxon'
-import Sync from 'main/application/sync'
-import Vault from 'main/application/vault'
-import { Cryptor } from 'main/application/cryptor'
+import Sync from 'application/sync'
+import Vault from 'application/vault'
+import { Cryptor } from 'application/cryptor'
 
-jest.unmock('main/application/sync')
-jest.mock('main/application/sync/gdrive/index')
+jest.unmock('application/sync')
+jest.mock('application/sync/gdrive/index')
 
 describe('#setup', () => {
   let sync

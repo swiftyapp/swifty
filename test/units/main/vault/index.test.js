@@ -1,10 +1,10 @@
-import Vault from 'main/application/vault'
-import Storage from 'main/application/storage'
-import { Cryptor } from 'main/application/cryptor'
+import Vault from 'application/vault'
+import Storage from 'application/storage'
+import { Cryptor } from 'application/cryptor'
 
-jest.unmock('main/application/vault')
-jest.unmock('main/application/cryptor')
-jest.mock('main/application/storage')
+jest.unmock('application/vault')
+jest.unmock('application/cryptor')
+jest.mock('application/storage')
 
 let vault
 let cryptor = new Cryptor()
