@@ -7,5 +7,9 @@ module.exports = {
   },
   remote: jest.fn(),
   dialog: jest.fn(),
-  BrowserWindow: jest.fn()
+  BrowserWindow: jest.fn(() => {
+    return {
+      send: jest.fn()
+    }
+  })
 }

@@ -1,5 +1,7 @@
 import { hash, encrypt, decrypt } from 'main/application/helpers/encryption'
 
+jest.unmock('main/application/helpers/encryption')
+
 const cryptor = {
   encrypt: jest.fn(() => 'encrypted data'),
   decrypt: jest.fn(() => '{"entries":[{"a":"b"}]}')

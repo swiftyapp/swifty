@@ -1,5 +1,6 @@
 import Sync from 'main/application/sync'
 
+jest.unmock('main/application/sync')
 jest.mock('main/application/sync/gdrive/index')
 
 describe('#import', () => {

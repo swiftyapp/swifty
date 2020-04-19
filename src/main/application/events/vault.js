@@ -7,11 +7,11 @@ const SENSITIVE_FIELDS = {
   card: ['pin']
 }
 
-export const obscure = (data, cryptor) => {
+const obscure = (data, cryptor) => {
   return prepareFields(data, property => cryptor.encrypt(property))
 }
 
-export const expose = (data, cryptor) => {
+const expose = (data, cryptor) => {
   return prepareFields(data, property => cryptor.decrypt(property))
 }
 
@@ -27,16 +27,31 @@ const prepareFields = (data, callback) => {
 export const onMasterPasswordChange = function (_, data) {
   const currentCryptor = new Cryptor(data.current)
   const newCryptor = new Cryptor(data.new)
+  // currentCryptor.new = false
+  // newCryptor.new = true
   const encrypted = this.vault.read()
   if (this.vault.isDecryptable(encrypted, currentCryptor)) {
     let decrypted = decrypt(this.vault.read(), currentCryptor)
-    decrypted.entries.forEach(entry => {
-      expose(entry, currentCryptor)
-      obscure(entry, newCryptor)
+    decrypted.entries = decrypted.entries.map(entry => {
+      return obscure(expose(entry, currentCryptor), newCryptor)
     })
     const newEncrypted = encrypt(decrypted, newCryptor)
-    // this.vault.write(newEncrypted)
-    // this.cryptor = newCryptor
+    // Store newly encrypted credentials to vault
+    this.vault.write(newEncrypted)
+    // read tokens
+    const tokens = this.sync.provider.readTokens()
+    // update cryptor to new
+    this.cryptor = newCryptor
+    // Reinitialize sync
+    this.sync.initialize(newCryptor, this.vault)
+    // Write tokens
+    this.sync.provider.writeTokens(tokens)
+    // Reinitialize sync with newly written credentials
+    this.sync.initialize(newCryptor, this.vault)
+    this.window.send('vault:sync:started')
+    this.sync.provider.push(newEncrypted).then(() => {
+      this.window.send('vault:sync:stopped', { success: true })
+    })
     this.window.send('masterpassword:update:success')
   } else {
     this.window.send('masterpassword:update:failure', {

@@ -2,6 +2,10 @@ import { Cryptor } from '@swiftyapp/cryptor'
 import { encrypt } from 'main/application/helpers/encryption'
 import Auditor from 'main/application/auditor'
 
+// running tests with real encryption
+jest.unmock('@swiftyapp/cryptor')
+jest.unmock('main/application/helpers/encryption')
+
 let auditor
 Date.now = jest.fn(() => 1568926362163) // Thu Sep 19 2019 22:52:42 GMT+0200 (Central European Summer Time)
 

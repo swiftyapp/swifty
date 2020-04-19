@@ -1,4 +1,4 @@
 module.exports = {
-  decrypt: data => data,
-  encrypt: data => data
+  decrypt: jest.fn(data => data),
+  encrypt: jest.fn(data => data)
 }

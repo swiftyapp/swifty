@@ -2,6 +2,7 @@ import Sync from 'main/application/sync'
 import Vault from 'main/application/vault'
 import { DateTime } from 'luxon'
 
+jest.unmock('main/application/sync')
 jest.mock('main/application/sync/gdrive/index')
 jest.mock('application/helpers/encryption')
 
@@ -32,14 +33,14 @@ describe('#perform', () => {
 
   test('writes merged data to vault', () => {
     expect(vault.write).toBeCalledWith({
-      entries: [{ id: '2', password: 'qwerty' }],
+      entries: [{ id: '2', password: 'qwerty', type: 'login' }],
       updatedAt: currentTime.toISO()
     })
   })
 
   test('pushes merged data to cloud', () => {
     expect(sync.provider.push).toBeCalledWith({
-      entries: [{ id: '2', password: 'qwerty' }],
+      entries: [{ id: '2', password: 'qwerty', type: 'login' }],
       updatedAt: currentTime.toISO()
     })
   })
