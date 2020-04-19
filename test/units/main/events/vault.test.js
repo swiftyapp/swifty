@@ -1,16 +1,11 @@
-import { BrowserWindow } from 'electron'
-import { DateTime } from 'luxon'
-import Vault from 'application/vault'
-import Sync from 'application/sync'
 import { Cryptor } from 'application/cryptor'
 
 import { onMasterPasswordChange } from 'application/events/vault'
 
+import { app } from './setup'
+
 const event = {}
-const currentTime = DateTime.local()
-const vault = new Vault()
-const sync = new Sync()
-const window = new BrowserWindow()
+
 const newCryptor = {
   __secret: 'newpassword',
   encrypt: expect.any(Function),
@@ -19,14 +14,9 @@ const newCryptor = {
   decryptData: expect.any(Function)
 }
 
-const app = {
-  vault: vault,
-  window: window,
-  sync: sync
-}
-
 describe('onMasterPasswordChange', () => {
   beforeEach(() => {
+    Cryptor.__setEncryption(true)
     onMasterPasswordChange.call(app, event, {
       current: 'password',
       new: 'newpassword'
@@ -39,20 +29,13 @@ describe('onMasterPasswordChange', () => {
   })
 
   it('writes re-crypted data to vault', () => {
-    expect(vault.write).toHaveBeenCalledWith({
-      entries: [
-        {
-          id: '2',
-          password: 'qwerty',
-          type: 'login'
-        }
-      ],
-      updatedAt: currentTime.toISO()
-    })
+    expect(app.vault.write).toHaveBeenCalledWith(
+      '{"entries":[{"id":"2","password":"qwerty.newpassword","type":"login"}],"updatedAt":"2030-06-01T10:00:00.000+02:00"}|newpassword'
+    )
   })
 
   it('writes re-crypted credentials to a file', () => {
-    expect(sync.provider.writeTokens).toHaveBeenCalledWith({
+    expect(app.sync.provider.writeTokens).toHaveBeenCalledWith({
       access_token: 'access_token',
       refresh_token: 'refresh_token'
     })
@@ -63,6 +46,6 @@ describe('onMasterPasswordChange', () => {
   })
 
   it('sets new cryptor to sync module', () => {
-    expect(sync.initialize).toHaveBeenCalledWith(newCryptor, vault)
+    expect(app.sync.initialize).toHaveBeenCalledWith(newCryptor, app.vault)
   })
 })
