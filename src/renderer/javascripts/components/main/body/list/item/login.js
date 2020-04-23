@@ -1,6 +1,6 @@
-import parseDomain from 'parse-domain'
-import icons from 'defaults/icons'
 import React from 'react'
+import { parseDomain } from 'parse-domain'
+import icons from 'defaults/icons'
 
 const Login = ({ entry }) => {
   const getIconKey = () => {

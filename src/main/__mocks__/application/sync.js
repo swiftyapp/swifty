@@ -1,6 +1,7 @@
 const Sync = jest.fn(() => {
   return {
     initialize: jest.fn(),
+    isConfigured: jest.fn().mockReturnValue(true),
     provider: {
       readTokens: jest.fn(() => {
         return {
