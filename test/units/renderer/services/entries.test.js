@@ -1,4 +1,4 @@
-import { filterEntries } from 'renderer/javascripts/services/entries'
+import { filterEntries } from 'javascripts/services/entries'
 
 let entries = [
   {

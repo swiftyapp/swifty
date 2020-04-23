@@ -11,7 +11,7 @@ describe('Password generation settings', () => {
           .keys('\uE007')
           .waitForExist('.body .list')
           .click('.settings-button')
-          .click('.window .navigation li:nth-child(2)')
+          .click('.window .navigation li:nth-child(3)')
           .getText('.body h1')
       ).toBe('Password Settings')
     })

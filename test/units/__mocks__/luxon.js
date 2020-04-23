@@ -1,6 +1,6 @@
 import { DateTime as Datetime } from 'luxon'
 
-const now = Datetime.local()
+const now = Datetime.local(2030, 6, 1, 10)
 
 export const DateTime = {
   local: () => {

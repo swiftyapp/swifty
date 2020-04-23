@@ -1,5 +1,4 @@
 import Storage from 'application/storage'
-import { encrypt, decrypt } from 'application/helpers/encryption'
 
 export const vaultFile = () => {
   if (process.env.SPECTRON_STORAGE_PATH) {
@@ -21,7 +20,7 @@ export default class Vault {
   }
 
   setup(cryptor) {
-    return this.storage.write(encrypt({ entries: [] }, cryptor))
+    return this.storage.write(cryptor.encryptData({ entries: [] }))
   }
 
   isPristine() {
@@ -30,7 +29,7 @@ export default class Vault {
 
   isDecryptable(data, cryptor) {
     try {
-      return !!decrypt(data, cryptor)
+      return !!cryptor.decryptData(data)
     } catch (e) {
       return false
     }

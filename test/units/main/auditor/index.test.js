@@ -1,6 +1,9 @@
-import { Cryptor } from '@swiftyapp/cryptor'
-import { encrypt } from 'main/application/helpers/encryption'
-import Auditor from 'main/application/auditor'
+import { Cryptor } from 'application/cryptor'
+import Auditor from 'application/auditor'
+
+// running tests with real encryption
+jest.unmock('@swiftyapp/cryptor')
+jest.unmock('application/cryptor')
 
 let auditor
 Date.now = jest.fn(() => 1568926362163) // Thu Sep 19 2019 22:52:42 GMT+0200 (Central European Summer Time)
@@ -43,7 +46,7 @@ describe('Auditor', () => {
 
   beforeEach(() => {
     let cryptor = new Cryptor('password')
-    auditor = new Auditor(encrypt(data, cryptor), cryptor)
+    auditor = new Auditor(cryptor.encryptData(data), cryptor)
   })
 
   test('#getAudit', () => {

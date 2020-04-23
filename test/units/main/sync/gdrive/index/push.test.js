@@ -1,7 +1,8 @@
-import GDrive from 'main/application/sync/gdrive'
-import Drive from 'main/application/sync/gdrive/drive'
+import GDrive from 'application/sync/gdrive'
+import Drive from 'application/sync/gdrive/drive'
 
-jest.mock('main/application/sync/gdrive/drive')
+jest.mock('application/sync/gdrive/drive')
+jest.mock('application/vault')
 
 describe('#push', () => {
   const sync = new GDrive({})

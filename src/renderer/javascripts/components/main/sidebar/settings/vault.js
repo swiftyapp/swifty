@@ -55,7 +55,7 @@ const Vault = ({ section }) => {
       <div className="section">
         <strong>Backup</strong>
         <div>Allows you to save a backup of your default vault file</div>
-        <div className="button iconed" onClick={onClickSaveBackup}>
+        <div className="button pale iconed" onClick={onClickSaveBackup}>
           <DownloadIcon width="16" height="16" /> Save Vault File
         </div>
       </div>

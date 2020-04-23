@@ -1,6 +1,8 @@
-import Sync from 'main/application/sync'
+import Sync from 'application/sync'
 
-jest.mock('main/application/sync/gdrive/index')
+jest.unmock('application/sync')
+jest.mock('application/vault')
+jest.mock('application/sync/gdrive/index')
 
 describe('#import', () => {
   let sync

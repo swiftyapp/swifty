@@ -1,16 +1,16 @@
-import Sync from 'main/application/sync'
-import Vault from 'main/application/vault'
 import { DateTime } from 'luxon'
+import Sync from 'application/sync'
+import Vault from 'application/vault'
+import { Cryptor } from 'application/cryptor'
 
-jest.mock('main/application/sync/gdrive/index')
-jest.mock('application/helpers/encryption')
+jest.unmock('application/sync')
+jest.mock('application/sync/gdrive/index')
 
 describe('#setup', () => {
   let sync
   let vault = new Vault()
   let currentTime = DateTime.local()
-
-  const cryptor = {}
+  const cryptor = new Cryptor()
 
   beforeEach(async () => {
     sync = new Sync()
@@ -32,20 +32,20 @@ describe('#setup', () => {
         entries: [{ id: '1', password: 'password' }],
         updatedAt: DateTime.local().toISO()
       },
-      {}
+      cryptor
     )
   })
 
   test('writes merged data to vault', () => {
     expect(vault.write).toBeCalledWith({
-      entries: [{ id: '2', password: 'qwerty' }],
+      entries: [{ id: '2', password: 'qwerty', type: 'login' }],
       updatedAt: currentTime.toISO()
     })
   })
 
   test('pushes merged data to cloud', () => {
     expect(sync.provider.push).toBeCalledWith({
-      entries: [{ id: '2', password: 'qwerty' }],
+      entries: [{ id: '2', password: 'qwerty', type: 'login' }],
       updatedAt: currentTime.toISO()
     })
   })

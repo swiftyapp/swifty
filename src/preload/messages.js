@@ -70,4 +70,14 @@ window.onDataSaved = callback => {
   ipcRenderer.once('data:saved', callback)
 }
 
+window.updateMasterPassword = data => {
+  return new Promise((resolve, reject) => {
+    ipcRenderer.send('masterpassword:update', data)
+    ipcRenderer.once('masterpassword:update:success', resolve)
+    ipcRenderer.once('masterpassword:update:failure', (_, errors) => {
+      reject(errors)
+    })
+  })
+}
+
 export default {}

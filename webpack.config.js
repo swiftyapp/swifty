@@ -71,7 +71,14 @@ module.exports = {
       ]
     }
   },
-  preload: {},
+  preload: {
+    resolve: {
+      modules: [
+        path.resolve(__dirname, 'node_modules'),
+        path.resolve(__dirname, 'src', 'main')
+      ]
+    }
+  },
   main: {
     target: 'electron-main',
     module: {

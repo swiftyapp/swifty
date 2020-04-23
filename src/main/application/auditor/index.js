@@ -1,6 +1,6 @@
 import Validator from 'password-validator'
 import { DateTime } from 'luxon'
-import { decrypt, hash } from 'application/helpers/encryption'
+import { hash } from 'application/helpers/encryption'
 
 const PASSWORD_LENGTH = 8
 const PASSWORD_FRESHNESS = 90
@@ -15,7 +15,7 @@ export default class Auditor {
     return new Promise(resolve => {
       let audit = {}
       let hashes = []
-      decrypt(this.data, this.cryptor).entries.forEach(item => {
+      this.cryptor.decryptData(this.data).entries.forEach(item => {
         if (!item.password) return
         this.buildItemAudit(audit, hashes, item)
       })

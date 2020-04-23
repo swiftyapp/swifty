@@ -1,4 +1,4 @@
-import GDrive from 'main/application/sync/gdrive'
+import GDrive from 'application/sync/gdrive'
 
 describe('#isConfigured', () => {
   let sync, data
