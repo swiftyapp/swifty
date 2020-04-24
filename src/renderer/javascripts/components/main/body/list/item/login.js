@@ -5,7 +5,8 @@ import icons from 'defaults/icons'
 const Login = ({ entry }) => {
   const getIconKey = () => {
     try {
-      return parseDomain(entry.website).domain
+      const url = new URL(entry.website)
+      return parseDomain(url.host).domain
     } catch (e) {
       return 'default'
     }
