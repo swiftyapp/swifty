@@ -7,6 +7,9 @@ const MasterPassword = ({ section }) => {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('')
+  const [processing, setProcessing] = useState(false)
+  const [success, setSuccess] = useState(null)
+  const [error, setError] = useState(null)
 
   const isButtonDisabled = () => {
     return (
@@ -19,6 +22,9 @@ const MasterPassword = ({ section }) => {
 
   const onButtonClick = e => {
     if (!e.target.classList.contains('disabled')) {
+      setProcessing(true)
+      setError(null)
+      setSuccess(null)
       window
         .updateMasterPassword({
           current: hashSecret(currentPassword),
@@ -26,16 +32,18 @@ const MasterPassword = ({ section }) => {
         })
         .then(handleSuccess)
         .catch(handleErrors)
+        .finally(() => setProcessing(false))
     }
   }
   const handleSuccess = () => {
     setCurrentPassword('')
     setNewPassword('')
     setNewPasswordConfirmation('')
+    setSuccess('Successfully changed password')
   }
 
-  const handleErrors = errors => {
-    console.log(errors)
+  const handleErrors = error => {
+    setError(error.message)
   }
 
   return (
@@ -71,13 +79,18 @@ const MasterPassword = ({ section }) => {
           />
         </div>
       </div>
-      <div>
+      <div className="status-button">
         <span
           onClick={onButtonClick}
-          className={classnames('button', { disabled: isButtonDisabled() })}
+          className={classnames('button', {
+            disabled: isButtonDisabled(),
+            loading: processing
+          })}
         >
           Update
         </span>
+        {error && <span className="danger">{error}</span>}
+        {success && <span className="success">{success}</span>}
       </div>
     </>
   )

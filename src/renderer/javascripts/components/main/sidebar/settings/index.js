@@ -24,8 +24,8 @@ const Settings = () => {
             <Navigation section={section} onClick={setSection} />
             <div className="body">
               <Vault section={section} />
-              <Password section={section} />
               <MasterPassword section={section} />
+              <Password section={section} />
             </div>
           </div>
         </Modal>

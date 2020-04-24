@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSelector } from 'react-redux'
+import classNames from 'classnames'
 import DownloadIcon from 'download.svg'
 
 const {
@@ -10,7 +11,11 @@ const {
 } = window
 
 const Vault = ({ section }) => {
+  const [connecting, setConnecting] = useState(false)
+
   const syncEnabled = useSelector(state => state.sync.enabled)
+
+  useEffect(() => setConnecting(false), [syncEnabled])
 
   const onClickSaveBackup = () => {
     showSaveDialog(({ canceled, filePath }) => {
@@ -19,6 +24,7 @@ const Vault = ({ section }) => {
   }
 
   const onClickConnect = () => {
+    setConnecting(true)
     sendVaultConnect()
   }
 
@@ -35,7 +41,10 @@ const Vault = ({ section }) => {
       )
     }
     return (
-      <div className="button" onClick={onClickConnect}>
+      <div
+        className={classNames('button', { loading: connecting })}
+        onClick={onClickConnect}
+      >
         Connect your Google Drive
       </div>
     )
