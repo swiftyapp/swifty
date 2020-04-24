@@ -45,7 +45,7 @@ Check [Latest Releases](https://github.com/alchaplinsky/swifty/releases) page fo
 Alternatively you can build app yourself:
 
 ```
-git clone git@github.com:alchaplinsky/swifty.git
+git clone git@github.com:swiftyapp/swifty.git
 yarn install
 bozon package mac
 ```
