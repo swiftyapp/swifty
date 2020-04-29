@@ -54,13 +54,24 @@ const appPath = () => {
   }
 }
 
+const processName = () => {
+  switch (process.platform) {
+    case 'darwin':
+      return /MacOS\/Swifty$/
+    case 'linux':
+      return /swifty$/
+    default:
+      throw Error('Unsupported platform')
+  }
+}
+
 global.before = options => {
   if (options && options.storage) prepareStorage(options.storage)
   return app.start()
 }
 
 global.after = () => {
-  ps.lookup({ command: /MacOS\/Swifty$/ }, (err, items) => {
+  ps.lookup({ command: processName() }, (err, items) => {
     items.forEach(item => {
       ps.kill(item.pid, err => {
         if (err) throw new Error(err)
