@@ -59,7 +59,7 @@ const processName = () => {
     case 'darwin':
       return /MacOS\/Swifty$/
     case 'linux':
-      return /swifty$/
+      return /swifty/
     default:
       throw Error('Unsupported platform')
   }
@@ -71,7 +71,7 @@ global.before = options => {
 }
 
 global.after = () => {
-  ps.lookup({ command: processName() }, (err, items) => {
+  ps.lookup({ command: processName() }, (_, items) => {
     items.forEach(item => {
       ps.kill(item.pid, err => {
         if (err) throw new Error(err)
