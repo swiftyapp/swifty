@@ -46,8 +46,6 @@
     "babel-jest": "^25.4.0",
     "babel-loader": "^8.1.0",
     "bozon": "^1.0.2",
-    "chai": "^4.2.0",
-    "chai-as-promised": "^7.1.1",
     "css-loader": "^3.5.3",
     "dotenv-webpack": "^1.7.0",
     "electron": "^8.2.3",
