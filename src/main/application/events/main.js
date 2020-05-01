@@ -1,6 +1,9 @@
+import { trackVaultEvent } from 'analytics'
+
 export const onDataSave = function (_, data) {
   this.vault.write(data)
   this.window.send('data:saved', { data: this.vault.read() })
+  trackVaultEvent('Saved')
   return this.getAudit()
 }
 

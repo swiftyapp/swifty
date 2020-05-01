@@ -3,6 +3,7 @@
   "devTools": false,
   "apiHost": "https://getswifty.pro",
   "autoUpdate": true,
+  "analytics": "UA-164713737-1",
   "googleOauth": {
     "scope": "https://www.googleapis.com/auth/drive.file"
   }

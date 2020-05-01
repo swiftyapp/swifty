@@ -25,7 +25,8 @@
     "react-tagsinput": "^3.19.0",
     "redux": "^4.0.5",
     "redux-thunk": "^2.3.0",
-    "shortid": "^2.2.15"
+    "shortid": "^2.2.15",
+    "universal-analytics": "^0.4.20"
   },
   "scripts": {
     "lint": "npx eslint --color src",
