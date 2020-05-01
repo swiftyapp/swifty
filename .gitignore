@@ -2,7 +2,6 @@
 .tmp
 .env
 .env.development
-.env.test
 node_modules
 builds
 packages
