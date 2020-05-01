@@ -4,11 +4,6 @@ describe('Empty tag filter', () => {
 
     afterAll(async () => await after())
 
-    it('shows an initial window', async () => {
-      const count = await app.client.getWindowCount()
-      expect(count).toBe(1)
-    })
-
     it('shows tag filter toggle', async () => {
       expect(
         await app.client

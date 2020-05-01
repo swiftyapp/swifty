@@ -55,7 +55,10 @@ const appPath = () => {
 }
 
 const processID = app => {
-  return app.chromeDriver.logLines[1].replace('[', '').split(':')[0]
+  return app.chromeDriver.logLines
+    .find(item => item.match(/\[.*:.*\]/))
+    .replace('[', '')
+    .split(':')[0]
 }
 
 global.before = options => {
