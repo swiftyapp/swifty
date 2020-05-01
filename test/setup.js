@@ -1,6 +1,6 @@
 const fs = require('fs')
-const ps = require('ps-node')
 const path = require('path')
+const { exec } = require('child_process')
 
 const { Application } = require('spectron')
 
@@ -54,15 +54,8 @@ const appPath = () => {
   }
 }
 
-const processName = () => {
-  switch (process.platform) {
-    case 'darwin':
-      return /MacOS\/Swifty$/
-    case 'linux':
-      return /swifty/
-    default:
-      throw Error('Unsupported platform')
-  }
+const processID = app => {
+  return app.chromeDriver.logLines[1].replace('[', '').split(':')[0]
 }
 
 global.before = options => {
@@ -70,17 +63,10 @@ global.before = options => {
   return app.start()
 }
 
-global.after = () => {
-  ps.lookup({ command: processName() }, (_, items) => {
-    items.forEach(item => {
-      ps.kill(item.pid, err => {
-        if (err) throw new Error(err)
-      })
-    })
-  })
-  if (app && app.isRunning()) {
-    return app.stop()
-  }
+global.after = async () => {
+  const pid = processID(app)
+  await app.stop()
+  exec(`kill -9 ${pid}`)
 }
 
 global.app = new Application({
