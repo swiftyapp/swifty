@@ -8,6 +8,7 @@ import Vault from './vault'
 import Auditor from './auditor'
 import { EVENTS } from './events'
 import { isWindows } from './helpers/os'
+import { trackAppEvent, trackVaultEvent } from 'analytics'
 
 const INACTIVE_TIMEOUT = 60000
 
@@ -45,6 +46,7 @@ export default class Swifty extends Application {
     this.vault = new Vault()
     this.tray = new Tray(this)
     this.sync = new Sync()
+    trackAppEvent('Launch')
   }
 
   onWindowReady() {
@@ -93,6 +95,7 @@ export default class Swifty extends Application {
       data: this.vault.read(),
       platform: process.platform
     })
+    trackAppEvent('Authenticate')
   }
 
   authFail() {
@@ -113,6 +116,7 @@ export default class Swifty extends Application {
       .perform()
       .then(data => {
         this.getAudit()
+        trackVaultEvent('Sync')
         this.window.send('vault:pull:stopped', {
           success: true,
           data: data

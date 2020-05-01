@@ -1,6 +1,6 @@
 const fs = require('fs')
-const ps = require('ps-node')
 const path = require('path')
+const { exec } = require('child_process')
 
 const { Application } = require('spectron')
 
@@ -54,22 +54,22 @@ const appPath = () => {
   }
 }
 
+const processID = app => {
+  return app.chromeDriver.logLines
+    .find(item => item.match(/\[.*:.*\]/))
+    .replace('[', '')
+    .split(':')[0]
+}
+
 global.before = options => {
   if (options && options.storage) prepareStorage(options.storage)
   return app.start()
 }
 
-global.after = () => {
-  ps.lookup({ command: /MacOS\/Swifty$/ }, (err, items) => {
-    items.forEach(item => {
-      ps.kill(item.pid, err => {
-        if (err) throw new Error(err)
-      })
-    })
-  })
-  if (app && app.isRunning()) {
-    return app.stop()
-  }
+global.after = async () => {
+  const pid = processID(app)
+  await app.stop()
+  exec(`kill -9 ${pid}`)
 }
 
 global.app = new Application({
