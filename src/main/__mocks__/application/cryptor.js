@@ -4,15 +4,30 @@ const __setEncryption = value => {
   encryption = value
 }
 
+const encrypt = (secret, value) => {
+  if (encryption) return `${value}.${secret}`
+  return value
+}
+
+const decrypt = (secret, value) => {
+  if (encryption) return value.split('.')[0]
+  return value
+}
 const constructor = jest.fn(secret => {
   return {
     encrypt: jest.fn(value => {
-      if (encryption) return `${value}.${secret}`
-      return value
+      return encrypt(secret, value)
     }),
     decrypt: jest.fn(value => {
-      if (encryption) return value.split('.')[0]
-      return value
+      return decrypt(secret, value)
+    }),
+    obscure: jest.fn(data => {
+      data.password = encrypt(secret, data.password)
+      return data
+    }),
+    expose: jest.fn(data => {
+      data.password = decrypt(secret, data.password)
+      return data
     }),
     encryptData: jest.fn(data => {
       if (encryption) {
@@ -26,6 +41,7 @@ const constructor = jest.fn(secret => {
       }
       return data
     }),
+
     __secret: secret
   }
 })

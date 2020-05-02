@@ -1,7 +1,7 @@
 import shortid from 'shortid'
 import { DateTime } from 'luxon'
-import { encryptData } from 'services/cryptor'
-const { sendSaveData, onOnce, sendVaultSyncStart } = window
+
+const { sendSaveData, onOnce, sendVaultSyncStart, encryptData } = window
 
 export const deleteEntry = id => {
   return (dispatch, getState) => {

@@ -11,7 +11,9 @@ const newCryptor = {
   encrypt: expect.any(Function),
   decrypt: expect.any(Function),
   encryptData: expect.any(Function),
-  decryptData: expect.any(Function)
+  decryptData: expect.any(Function),
+  obscure: expect.any(Function),
+  expose: expect.any(Function)
 }
 
 describe('onMasterPasswordChange', () => {

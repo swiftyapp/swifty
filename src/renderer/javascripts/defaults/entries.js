@@ -6,7 +6,8 @@ export default {
     username: '',
     password: '',
     email: '',
-    note: ''
+    note: '',
+    otp: ''
   },
   note: {
     type: 'note',

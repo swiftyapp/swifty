@@ -39,6 +39,7 @@ const Login = ({ entry, validate, onChange, onTagsChange }) => {
           generate
         </span>
       </SecureField>
+      <SecureField name="OTP" entry={entry} onChange={onChange} />
       <Field name="Email" entry={entry} onChange={onChange} />
       <TagField entry={entry} onChange={onTagsChange} />
       <Field name="Note" entry={entry} onChange={onChange} rows="5" />

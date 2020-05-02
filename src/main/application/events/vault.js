@@ -1,28 +1,5 @@
 import { Cryptor } from 'application/cryptor'
 
-const SENSITIVE_FIELDS = {
-  login: ['password'],
-  note: ['note'],
-  card: ['pin']
-}
-
-const obscure = (data, cryptor) => {
-  return prepareFields(data, property => cryptor.encrypt(property))
-}
-
-const expose = (data, cryptor) => {
-  return prepareFields(data, property => cryptor.decrypt(property))
-}
-
-const prepareFields = (data, callback) => {
-  if (!data) return
-  const object = Object.assign({}, data)
-  SENSITIVE_FIELDS[object.type].forEach(field => {
-    object[field] = callback(object[field])
-  })
-  return object
-}
-
 export const onMasterPasswordChange = function (_, data) {
   const currentCryptor = new Cryptor(data.current)
   const newCryptor = new Cryptor(data.new)
@@ -32,7 +9,7 @@ export const onMasterPasswordChange = function (_, data) {
   if (this.vault.isDecryptable(encrypted, currentCryptor)) {
     let decrypted = currentCryptor.decryptData(this.vault.read())
     decrypted.entries = decrypted.entries.map(entry => {
-      return obscure(expose(entry, currentCryptor), newCryptor)
+      return newCryptor.obscure(currentCryptor.expose(entry))
     })
     const newEncrypted = newCryptor.encryptData(decrypted)
     this.vault.write(newEncrypted)

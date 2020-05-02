@@ -3,7 +3,7 @@ import Sidebar from './sidebar'
 import Header from './header'
 import Body from './body'
 
-export default () => {
+export const Main = () => {
   return (
     <div className="layout">
       <Sidebar />

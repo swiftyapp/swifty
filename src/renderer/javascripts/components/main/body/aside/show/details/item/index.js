@@ -1,20 +1,10 @@
 import React from 'react'
 import Copy from 'copy.svg'
+import { copy } from 'services/copy'
 
 const { decrypt } = window
 
 export default ({ entry, name, link, cc, secure }) => {
-  const copy = value => {
-    const notification = document.getElementsByClassName(
-      'copied-notification'
-    )[0]
-    window.copyToClipboard(value, 60000)
-    notification.classList.remove('hidden')
-    setTimeout(() => {
-      notification.classList.add('hidden')
-    }, 2000)
-  }
-
   const onClick = event => {
     window.openLink(event.target.href)
   }

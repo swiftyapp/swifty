@@ -3,7 +3,7 @@ import Choice from './choice'
 import Setup from './setup'
 import Restore from './restore'
 
-export default () => {
+export const Start = () => {
   const [flow, setFlow] = useState(null)
 
   if (!flow) return <Choice onSelect={setFlow} />
