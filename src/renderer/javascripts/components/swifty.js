@@ -1,7 +1,7 @@
 import React from 'react'
-import Start from './start'
-import Auth from './auth'
-import Main from './main'
+import { Start } from './start'
+import { Auth } from './auth'
+import { Main } from './main'
 import { useSelector } from 'react-redux'
 
 const Swifty = () => {

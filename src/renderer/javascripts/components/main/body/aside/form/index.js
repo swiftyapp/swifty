@@ -7,8 +7,9 @@ import Card from './card'
 import Note from './note'
 
 import { saveEntry, isValid } from 'actions/entries'
-import { obscure, expose } from 'services/cryptor'
 import entries from 'defaults/entries'
+
+const { obscure, expose } = window
 
 const Form = ({ entry }) => {
   const dispatch = useDispatch()

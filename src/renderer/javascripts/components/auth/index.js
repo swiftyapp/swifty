@@ -3,7 +3,7 @@ import Masterpass from '../elements/masterpass'
 import Controls from '../elements/controls'
 import img from 'swifty.png'
 
-export default ({ touchID }) => {
+export const Auth = ({ touchID }) => {
   const [error, setError] = useState(null)
 
   const handleEnter = value => {

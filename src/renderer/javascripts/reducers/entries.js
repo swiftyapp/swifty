@@ -1,5 +1,3 @@
-import { decryptData } from 'services/cryptor'
-
 export default (state = initialState(), action) => {
   switch (action.type) {
     case 'SET_FILTER_SCOPE':
@@ -39,7 +37,7 @@ export default (state = initialState(), action) => {
 }
 
 const decodeEntries = data => {
-  return decryptData(data).entries
+  return window.decryptData(data).entries
 }
 
 const findEntry = (state, id) => {
