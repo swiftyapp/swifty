@@ -33,7 +33,9 @@ export default ({ name, entry }) => {
   return (
     <div className="item">
       <div className="label">{name}</div>
-      <div className="value">{formattedValue()}</div>
+      <div className="value">
+        <strong className="muted">{formattedValue()}</strong>
+      </div>
       <div className="secondary">{time}</div>
       <Copy width="16" height="16" onClick={() => copy(code)} />
     </div>
