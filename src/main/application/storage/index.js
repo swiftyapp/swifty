@@ -2,13 +2,11 @@ import fs from 'fs-extra'
 import path from 'path'
 import { app } from 'electron'
 
-const appDir = () => {
-  return path.join(app.getPath('appData'), app.name)
-}
-
 export default class Storage {
   constructor(file) {
-    this.path = !path.isAbsolute(file) ? path.join(appDir(), file) : file
+    this.path = !path.isAbsolute(file)
+      ? path.join(app.getPath('userData'), file)
+      : file
     fs.ensureFileSync(this.path)
   }
 
