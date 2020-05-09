@@ -1,9 +1,9 @@
-# Swifty
-
 ![](https://alchaplinsky.com/images/misc/swifty_banner_alpha.png?v=1)
 
-<div align="center">
+## Free Offline-first Password Manager for MacOS, Windows and Linux.
 
+<div align="center">
+  
   [![](https://img.shields.io/badge/PayPal-Buy%20me%20a%20Coffee-blue)](https://www.paypal.me/alchaplinsky)
 
   [![CircleCI](https://circleci.com/gh/swiftyapp/swifty/tree/master.svg?style=svg&circle-token=3179a51a22aa66c4c17395eef2952eab42a14057)](https://circleci.com/gh/swiftyapp/swifty/tree/master)
@@ -13,24 +13,20 @@
   
 </div>
 
-Swifty is a lightweight, fast and free Password Manager for MacOS, Windows and Linux.
 
 ## Features
 
 - Store Login/Password credentials
-- Store Credit card Information
-- Create secure notes to store sensitive information
+- Credit card Information 
+- Secure notes to store sensitive information
+- One-click Strong Password Generation
+- Time-based One Time Passwords support (TOTP)
+- Google Drive Sync (optional)
 - No data is leaving your computer:
   - Everything is encrypted, stored and decrypted on your local file system
   - Decryption happens once on entering Master Password
   - Ability to migrate from one computer to another using backup file or GDrive sync
-- Single Master Password to encrypt all data added to Swifty
-  - All data is encrypted with single Master Password
-- Integrated Password Generator
-  - One-click Strong Password Generation
-- Google Drive Sync
-  - Enable synchronization with Google Drive
-- There's a lot more to come...
+- There's more to come...
 
 ## Screenshots
 
