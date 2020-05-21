@@ -1,6 +1,12 @@
+import querystring from 'querystring'
+import { createServer } from 'http'
+import { parse } from 'url'
+import { shell } from 'electron'
 import { google } from 'googleapis'
-import AuthWindow from 'window/authentication'
 
+const HOST = '127.0.0.1'
+const PORT = '4567'
+const PATH = '/auth/callback'
 export default class Auth {
   constructor(readTokens, writeTokens) {
     this.readTokens = readTokens
@@ -8,7 +14,7 @@ export default class Auth {
     this.auth = new google.auth.OAuth2(
       process.env.GOOGLE_OAUTH_CLIENT_ID,
       process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-      'urn:ietf:wg:oauth:2.0:oob'
+      `http://${HOST}:${PORT}${PATH}`
     )
     this.auth.setCredentials(this.readTokens())
     this.auth.on('tokens', tokens => this._updateTokens(tokens))
@@ -20,16 +26,26 @@ export default class Auth {
   }
 
   authenticate() {
-    const url = this.auth.generateAuthUrl({
-      access_type: 'offline',
-      scope: [CONFIG.googleOauth.scope]
-    })
-    this.authWindow = new AuthWindow(url)
-    this.authWindow.removeMenu()
-    return this.authWindow.authenticate().then(code => {
-      this.authWindow.close()
-      if (code) return this.auth.getToken(code)
-      return null
+    return new Promise((resolve, reject) => {
+      const server = createServer((req, res) => {
+        const { pathname, query } = parse(req.url)
+        if (req.url && pathname === '/auth/callback') {
+          const { code } = querystring.parse(query)
+          res.writeHead(200, { 'Content-Type': 'text/html' })
+          res.end('You can now close this Window')
+          this.auth.getToken(code)
+          server.close()
+          resolve(code)
+        }
+      })
+      server.on('error', error => reject(error))
+      server.listen(4567)
+
+      const url = this.auth.generateAuthUrl({
+        access_type: 'offline',
+        scope: [CONFIG.googleOauth.scope]
+      })
+      shell.openExternal(url)
     })
   }
 
