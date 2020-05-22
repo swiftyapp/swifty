@@ -1,20 +1,9 @@
 import GDrive from 'application/sync/gdrive'
-import AuthWindow from 'window/authentication'
 import Drive from 'application/sync/gdrive/drive'
+import { shell } from 'electron'
+
+jest.mock('http')
 jest.mock('application/sync/gdrive/drive')
-
-const mockCloseAuth = jest.fn()
-const mockRemoveMenu = jest.fn()
-
-jest.mock('window/authentication', () => {
-  return jest.fn().mockImplementation(() => {
-    return {
-      removeMenu: mockRemoveMenu,
-      authenticate: jest.fn(() => Promise.resolve('AUTH_CODE')),
-      close: mockCloseAuth
-    }
-  })
-})
 
 let sync, drive
 
@@ -29,19 +18,11 @@ describe('#import', () => {
     expect(Drive).toHaveBeenCalledWith(sync.auth)
   })
 
-  test('opens auth window with auth url', async () => {
+  test('opens auth url in browser tab', async () => {
     await sync.import()
-    expect(AuthWindow).toHaveBeenCalledWith('https://example.com/google_oauth2')
-  })
-
-  test('removes menu from auth window', async () => {
-    await sync.import()
-    expect(mockRemoveMenu).toHaveBeenCalledTimes(1)
-  })
-
-  test('closes auth window on authentication done', async () => {
-    await sync.import()
-    expect(mockCloseAuth).toHaveBeenCalledTimes(1)
+    expect(shell.openExternal).toHaveBeenCalledWith(
+      'https://example.com/google_oauth2'
+    )
   })
 
   test('calls get token with auth code', async () => {

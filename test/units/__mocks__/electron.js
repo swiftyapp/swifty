@@ -10,5 +10,8 @@ module.exports = {
     return {
       send: jest.fn()
     }
-  })
+  }),
+  shell: {
+    openExternal: jest.fn()
+  }
 }

@@ -1,6 +1,10 @@
+import { shell } from 'electron'
 import { google } from 'googleapis'
-import AuthWindow from 'window/authentication'
+import { loopback } from '../base/loopback'
 
+const HOST = '127.0.0.1'
+const PORT = '4567'
+const PATH = '/auth/callback'
 export default class Auth {
   constructor(readTokens, writeTokens) {
     this.readTokens = readTokens
@@ -8,7 +12,7 @@ export default class Auth {
     this.auth = new google.auth.OAuth2(
       process.env.GOOGLE_OAUTH_CLIENT_ID,
       process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-      'urn:ietf:wg:oauth:2.0:oob'
+      `http://${HOST}:${PORT}${PATH}`
     )
     this.auth.setCredentials(this.readTokens())
     this.auth.on('tokens', tokens => this._updateTokens(tokens))
@@ -24,12 +28,10 @@ export default class Auth {
       access_type: 'offline',
       scope: [CONFIG.googleOauth.scope]
     })
-    this.authWindow = new AuthWindow(url)
-    this.authWindow.removeMenu()
-    return this.authWindow.authenticate().then(code => {
-      this.authWindow.close()
-      if (code) return this.auth.getToken(code)
-      return null
+    shell.openExternal(url)
+    return loopback.startServer(PORT).then(code => {
+      this.auth.getToken(code)
+      loopback.stopServer()
     })
   }
 
