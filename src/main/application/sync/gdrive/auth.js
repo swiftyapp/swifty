@@ -1,8 +1,6 @@
-import querystring from 'querystring'
-import { createServer } from 'http'
-import { parse } from 'url'
 import { shell } from 'electron'
 import { google } from 'googleapis'
+import { loopback } from '../base/loopback'
 
 const HOST = '127.0.0.1'
 const PORT = '4567'
@@ -26,26 +24,14 @@ export default class Auth {
   }
 
   authenticate() {
-    return new Promise((resolve, reject) => {
-      const server = createServer((req, res) => {
-        const { pathname, query } = parse(req.url)
-        if (req.url && pathname === '/auth/callback') {
-          const { code } = querystring.parse(query)
-          res.writeHead(200, { 'Content-Type': 'text/html' })
-          res.end('You can now close this Window')
-          this.auth.getToken(code)
-          server.close()
-          resolve(code)
-        }
-      })
-      server.on('error', error => reject(error))
-      server.listen(4567)
-
-      const url = this.auth.generateAuthUrl({
-        access_type: 'offline',
-        scope: [CONFIG.googleOauth.scope]
-      })
-      shell.openExternal(url)
+    const url = this.auth.generateAuthUrl({
+      access_type: 'offline',
+      scope: [CONFIG.googleOauth.scope]
+    })
+    shell.openExternal(url)
+    return loopback.startServer(PORT).then(code => {
+      this.auth.getToken(code)
+      loopback.stopServer()
     })
   }
 

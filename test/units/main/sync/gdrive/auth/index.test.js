@@ -11,7 +11,7 @@ describe('Auth', () => {
     expect(google.auth.OAuth2).toBeCalledWith(
       'google-api-client-key',
       'google-api-client-secret',
-      'urn:ietf:wg:oauth:2.0:oob'
+      'http://127.0.0.1:4567/auth/callback'
     )
   })
 
