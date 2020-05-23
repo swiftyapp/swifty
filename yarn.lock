@@ -1117,10 +1117,10 @@
   dependencies:
     "@sinonjs/commons" "^1.7.0"
 
-"@swiftyapp/cryptor@^1.0.4":
-  version "1.0.4"
-  resolved "https://registry.yarnpkg.com/@swiftyapp/cryptor/-/cryptor-1.0.4.tgz#ef5c4620c961bda85eb4786c5e90e6f951c8d57c"
-  integrity sha512-VMTBoPYC0xhU2bgGT3omSosXRDvkTlF9ZMt3MI1ZT45ZBVu6Bmj2f3mUxTm5QttoA4YNnAh6u9mkDphWvrMLog==
+"@swiftyapp/cryptor@^1.1.0":
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/@swiftyapp/cryptor/-/cryptor-1.1.0.tgz#175344f1c0a36e6062c1d60fda09dfe0dc0f64ee"
+  integrity sha512-184qx3XzNMxXS3mEEGtKfYXkie613xdf8F9JyAFloclA7pO2A3lnpelStY/BIzao6XXknpKl90VIqgTdgFBHcA==
 
 "@szmarczak/http-timer@^1.1.2":
   version "1.1.2"
