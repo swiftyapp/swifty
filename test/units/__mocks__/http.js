@@ -13,6 +13,7 @@ export const createServer = callback => {
       },
       {
         writeHead: jest.fn(),
+        write: jest.fn(),
         end: jest.fn()
       }
     )
