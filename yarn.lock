@@ -2471,10 +2471,10 @@ boxen@^4.2.0:
     type-fest "^0.8.1"
     widest-line "^3.1.0"
 
-bozon@^1.0.4:
-  version "1.0.4"
-  resolved "https://registry.yarnpkg.com/bozon/-/bozon-1.0.4.tgz#7b86fa4c257b76d1a5340aab6bb10b640c8cb52c"
-  integrity sha512-/kTh2zHn/Fi8WRjSPbalCqCKFzgG2umrUXzl5/fxNdLSBNj/rYeodVwsMVxURgyIvHXmjXvPASOJc7sBeqvZWQ==
+bozon@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/bozon/-/bozon-1.0.5.tgz#df3e02f540e7d88ff3a51e071ba838cb9298bdc5"
+  integrity sha512-t5a0d5sdMZjDAXWJdWxVbWsi9HsaB8QVyUzyNsBTfOtWCGcVh4TlP+T2/OXfsUyEDDCDauU9HFV9QrJ7TGw9Yw==
   dependencies:
     chalk "^4.0.0"
     chokidar "^3.4.0"

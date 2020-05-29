@@ -47,7 +47,7 @@
     "@babel/preset-react": "^7.10.1",
     "babel-jest": "^26.0.1",
     "babel-loader": "^8.1.0",
-    "bozon": "^1.0.4",
+    "bozon": "^1.0.5",
     "css-loader": "^3.5.3",
     "dotenv-webpack": "^1.8.0",
     "electron": "^9.0.0",
