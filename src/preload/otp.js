@@ -1,7 +1,6 @@
 import Speakeasy from 'speakeasy'
 
 window.generateOTP = secret => {
-  console.log(secret)
   const code = Speakeasy.totp({
     secret: secret,
     encoding: 'base32'
