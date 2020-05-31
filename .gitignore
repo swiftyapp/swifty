@@ -5,6 +5,7 @@
 node_modules
 builds
 packages
+private
 bower_components
 test/.storage/*.swftx
 yarn-error.log

@@ -99,7 +99,7 @@
     },
     "mac": {
       "icon": "build/icon.icns",
-      "category": "your.app.category.type"
+      "category": "public.app-category.utilities"
     }
   }
 }
