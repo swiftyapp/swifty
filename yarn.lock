@@ -1954,6 +1954,11 @@ acorn@^7.1.1:
   resolved "https://registry.yarnpkg.com/acorn/-/acorn-7.1.1.tgz#e35668de0b402f359de515c5482a1ab9f89a69bf"
   integrity sha512-add7dgA5ppRPxCFJoAGfMDi7PIBXq1RtGo7BhbLaxwrXPOmw8gq48Y9ozT01hUKy9byMjlR20EJhu5zlkErEkg==
 
+acorn@^7.2.0:
+  version "7.2.0"
+  resolved "https://registry.yarnpkg.com/acorn/-/acorn-7.2.0.tgz#17ea7e40d7c8640ff54a694c889c26f31704effe"
+  integrity sha512-apwXVmYVpQ34m/i71vrApRrRKCWQnZZF1+npOD0WV5xZFfwWOmKGQ2RWlfdy9vWITsenisM8M0Qeq8agcFHNiQ==
+
 agent-base@6:
   version "6.0.0"
   resolved "https://registry.yarnpkg.com/agent-base/-/agent-base-6.0.0.tgz#5d0101f19bbfaed39980b22ae866de153b93f09a"
@@ -2495,17 +2500,17 @@ boxen@^4.2.0:
     type-fest "^0.8.1"
     widest-line "^3.1.0"
 
-bozon@^1.0.5:
-  version "1.0.5"
-  resolved "https://registry.yarnpkg.com/bozon/-/bozon-1.0.5.tgz#df3e02f540e7d88ff3a51e071ba838cb9298bdc5"
-  integrity sha512-t5a0d5sdMZjDAXWJdWxVbWsi9HsaB8QVyUzyNsBTfOtWCGcVh4TlP+T2/OXfsUyEDDCDauU9HFV9QrJ7TGw9Yw==
+bozon@^1.0.6:
+  version "1.0.6"
+  resolved "https://registry.yarnpkg.com/bozon/-/bozon-1.0.6.tgz#e34eb688bf94ed9f6aa3192e9d48cacb33413e0b"
+  integrity sha512-lCyxa0sBLfcNYskhni+TY53dF2DtERPzehPeKQliQVHiVxPAUcGGbxyfGuXBHbhcUa/4fgqIUop+tTL+Y47+pw==
   dependencies:
     chalk "^4.0.0"
     chokidar "^3.4.0"
     commander "^5.1.0"
     css-loader "^3.5.3"
     ejs "^3.1.3"
-    electron "^9.0.0"
+    electron "^9.0.3"
     electron-builder "^22.7.0"
     inquirer "^7.1.0"
     latest-version "^5.1.0"
@@ -3842,10 +3847,10 @@ electron-log@^4.0.7:
   resolved "https://registry.yarnpkg.com/electron-log/-/electron-log-4.1.2.tgz#da1fdf1950965ec0cf3a04803054e4202083251d"
   integrity sha512-MGPjGBEj6p0JdJmbqxbGud7kkHdV+T+D7gq1U+mfsnUM+o0bd4nPsQjVdgqQPsj0epoKdGbNIZ4FPpTQKhRfZA==
 
-electron-log@^4.2.0:
-  version "4.2.0"
-  resolved "https://registry.yarnpkg.com/electron-log/-/electron-log-4.2.0.tgz#44ef0987fcc53097ad0574b94672fc6712b234e1"
-  integrity sha512-Yy1X8iZEzoBA8pu5b7YU07dRHi1GPM9C5jLEOn87Uqtdc9rbe6KbvvQ/AAAtGvn4/GC3azRW/eeiSI4ZF+Hm2A==
+electron-log@^4.2.1:
+  version "4.2.1"
+  resolved "https://registry.yarnpkg.com/electron-log/-/electron-log-4.2.1.tgz#a5e9f5b7a9c8cffb6ae5af78b76e68012d5e68da"
+  integrity sha512-tUI9w3kUP3qhwXJ92RDUPFVZfwtBwKCy/1TsSHndXYLlNCB/7+vkiQG0uxv9D2Leuxc/DJKfYyrdEBpzi/vyZg==
 
 electron-publish@22.7.0:
   version "22.7.0"
@@ -3906,10 +3911,10 @@ electron@^8.1.1:
     "@types/node" "^12.0.12"
     extract-zip "^1.0.3"
 
-electron@^9.0.0:
-  version "9.0.0"
-  resolved "https://registry.yarnpkg.com/electron/-/electron-9.0.0.tgz#335cd426a8a542ad8d4c96c0c40a8668ab5527b8"
-  integrity sha512-JsaSQNPh+XDYkLj8APtVKTtvpb86KIG57W5OOss4TNrn8L3isC9LsCITwfnVmGIXHhvX6oY/weCtN5hAAytjVg==
+electron@^9.0.3:
+  version "9.0.3"
+  resolved "https://registry.yarnpkg.com/electron/-/electron-9.0.3.tgz#72a7ea08abadd494794735d90666d1b95fc90d28"
+  integrity sha512-rY59wy50z0oWp/q69zq0UIzvtcM5j2BJbLAwEoLfVNS3DLt9wDZqRqSIBvLEBl+xWbafCnRA9haEqi7ssM94GA==
   dependencies:
     "@electron/get" "^1.0.1"
     "@types/node" "^12.0.12"
@@ -4118,6 +4123,14 @@ eslint-scope@^5.0.0:
     esrecurse "^4.1.0"
     estraverse "^4.1.1"
 
+eslint-scope@^5.1.0:
+  version "5.1.0"
+  resolved "https://registry.yarnpkg.com/eslint-scope/-/eslint-scope-5.1.0.tgz#d0f971dfe59c69e0cada684b23d49dbf82600ce5"
+  integrity sha512-iiGRvtxWqgtx5m8EyQUJihBloE4EnYeGE/bz1wSPwJE6tZuJUtHlhqDM4Xj2ukE8Dyy1+HCZ4hE0fzIVMzb58w==
+  dependencies:
+    esrecurse "^4.1.0"
+    estraverse "^4.1.1"
+
 eslint-utils@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/eslint-utils/-/eslint-utils-2.0.0.tgz#7be1cc70f27a72a76cd14aa698bcabed6890e1cd"
@@ -4130,10 +4143,15 @@ eslint-visitor-keys@^1.1.0:
   resolved "https://registry.yarnpkg.com/eslint-visitor-keys/-/eslint-visitor-keys-1.1.0.tgz#e2a82cea84ff246ad6fb57f9bde5b46621459ec2"
   integrity sha512-8y9YjtM1JBJU/A9Kc+SbaOV4y29sSWckBwMHa+FGtVj5gN/sbnKDf6xJUl+8g7FAij9LVaP8C24DUiH/f/2Z9A==
 
-eslint@^7.1.0:
-  version "7.1.0"
-  resolved "https://registry.yarnpkg.com/eslint/-/eslint-7.1.0.tgz#d9a1df25e5b7859b0a3d86bb05f0940ab676a851"
-  integrity sha512-DfS3b8iHMK5z/YLSme8K5cge168I8j8o1uiVmFCgnnjxZQbCGyraF8bMl7Ju4yfBmCuxD7shOF7eqGkcuIHfsA==
+eslint-visitor-keys@^1.2.0:
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/eslint-visitor-keys/-/eslint-visitor-keys-1.2.0.tgz#74415ac884874495f78ec2a97349525344c981fa"
+  integrity sha512-WFb4ihckKil6hu3Dp798xdzSfddwKKU3+nGniKF6HfeW6OLd2OUDEPP7TcHtB5+QXOKg2s6B2DaMPE1Nn/kxKQ==
+
+eslint@^7.2.0:
+  version "7.2.0"
+  resolved "https://registry.yarnpkg.com/eslint/-/eslint-7.2.0.tgz#d41b2e47804b30dbabb093a967fb283d560082e6"
+  integrity sha512-B3BtEyaDKC5MlfDa2Ha8/D6DsS4fju95zs0hjS3HdGazw+LNayai38A25qMppK37wWGWNYSPOR6oYzlz5MHsRQ==
   dependencies:
     "@babel/code-frame" "^7.0.0"
     ajv "^6.10.0"
@@ -4141,10 +4159,10 @@ eslint@^7.1.0:
     cross-spawn "^7.0.2"
     debug "^4.0.1"
     doctrine "^3.0.0"
-    eslint-scope "^5.0.0"
+    eslint-scope "^5.1.0"
     eslint-utils "^2.0.0"
-    eslint-visitor-keys "^1.1.0"
-    espree "^7.0.0"
+    eslint-visitor-keys "^1.2.0"
+    espree "^7.1.0"
     esquery "^1.2.0"
     esutils "^2.0.2"
     file-entry-cache "^5.0.1"
@@ -4172,14 +4190,14 @@ eslint@^7.1.0:
     text-table "^0.2.0"
     v8-compile-cache "^2.0.3"
 
-espree@^7.0.0:
-  version "7.0.0"
-  resolved "https://registry.yarnpkg.com/espree/-/espree-7.0.0.tgz#8a7a60f218e69f120a842dc24c5a88aa7748a74e"
-  integrity sha512-/r2XEx5Mw4pgKdyb7GNLQNsu++asx/dltf/CI8RFi9oGHxmQFgvLbc5Op4U6i8Oaj+kdslhJtVlEZeAqH5qOTw==
+espree@^7.1.0:
+  version "7.1.0"
+  resolved "https://registry.yarnpkg.com/espree/-/espree-7.1.0.tgz#a9c7f18a752056735bf1ba14cb1b70adc3a5ce1c"
+  integrity sha512-dcorZSyfmm4WTuTnE5Y7MEN1DyoPYy1ZR783QW1FJoenn7RailyWFsq/UL6ZAAA7uXurN9FIpYyUs3OfiIW+Qw==
   dependencies:
-    acorn "^7.1.1"
+    acorn "^7.2.0"
     acorn-jsx "^5.2.0"
-    eslint-visitor-keys "^1.1.0"
+    eslint-visitor-keys "^1.2.0"
 
 esprima@^4.0.0, esprima@^4.0.1:
   version "4.0.1"
@@ -4608,6 +4626,16 @@ fs-extra@^9.0.0:
     jsonfile "^6.0.1"
     universalify "^1.0.0"
 
+fs-extra@^9.0.1:
+  version "9.0.1"
+  resolved "https://registry.yarnpkg.com/fs-extra/-/fs-extra-9.0.1.tgz#910da0062437ba4c39fedd863f1675ccfefcb9fc"
+  integrity sha512-h2iAoN838FqAFJY2/qVpzFXy+EBxfVE220PalAqQLDVsFOHLJrZvut5puAbCdNv6WJk+B8ihI+k0c7JK5erwqQ==
+  dependencies:
+    at-least-node "^1.0.0"
+    graceful-fs "^4.2.0"
+    jsonfile "^6.0.1"
+    universalify "^1.0.0"
+
 fs-write-stream-atomic@^1.0.8:
   version "1.0.10"
   resolved "https://registry.yarnpkg.com/fs-write-stream-atomic/-/fs-write-stream-atomic-1.0.10.tgz#b47df53493ef911df75731e70a9ded0189db40c9"
@@ -4854,10 +4882,10 @@ google-p12-pem@^3.0.0:
   dependencies:
     node-forge "^0.9.0"
 
-googleapis-common@^4.1.0:
-  version "4.1.1"
-  resolved "https://registry.yarnpkg.com/googleapis-common/-/googleapis-common-4.1.1.tgz#433069ce463e50c631c5e1b5871f9d44881c90af"
-  integrity sha512-Br3EPgm1f7Zb/Vi8R+1Jc5jjhaFZMgQpvGaGAKcBq81BAi7m8NCHBaaR0XF3p4RbMjA4Wiz1RkPD0A8/5aP+xw==
+googleapis-common@^4.3.0:
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/googleapis-common/-/googleapis-common-4.3.0.tgz#39d2d44216bc44a09853260b9c4edc1f46362428"
+  integrity sha512-9xFX0A+PkJ9DUh2Cq81+Nx+J+v0Geo5Vgte8PKEQP5Wrbt5UfX964AGb+QhkfirlxlHrfpm7n5FRmr2FxktB/A==
   dependencies:
     extend "^3.0.2"
     gaxios "^3.0.0"
@@ -4866,13 +4894,13 @@ googleapis-common@^4.1.0:
     url-template "^2.0.8"
     uuid "^8.0.0"
 
-googleapis@^51.0.0:
-  version "51.0.0"
-  resolved "https://registry.yarnpkg.com/googleapis/-/googleapis-51.0.0.tgz#59ca84a578f8bc41f6257b49fc439bb17b91fe4a"
-  integrity sha512-ZicnODSX5apolF05lNXc3AHW/zazeaWL8zSiQ7a/Bd4pfHU+TJzX7GP38phjyOVPzIG3qnrJ0SMASJgljlFZlQ==
+googleapis@^52.1.0:
+  version "52.1.0"
+  resolved "https://registry.yarnpkg.com/googleapis/-/googleapis-52.1.0.tgz#d9480469c3021d8ca0bc98bef5b785dde2eb3648"
+  integrity sha512-8eHVXidZv/C/xos/rEIlWZCwuR638yaqjlBMMk2y9iT8hOe7ebkgW0pENUv8KeSFowTQFKCfQ/nLdBRM8z2hUg==
   dependencies:
     google-auth-library "^6.0.0"
-    googleapis-common "^4.1.0"
+    googleapis-common "^4.3.0"
 
 got@^9.6.0:
   version "9.6.0"
