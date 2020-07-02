@@ -3561,7 +3561,7 @@ debug@^2.2.0, debug@^2.3.3, debug@^2.6.9:
   dependencies:
     ms "2.0.0"
 
-debug@^3.0.0, debug@^3.2.6:
+debug@^3.2.6:
   version "3.2.6"
   resolved "https://registry.yarnpkg.com/debug/-/debug-3.2.6.tgz#e83d17de16d8a7efb7717edbe5fb10135eee629b"
   integrity sha512-mel+jf7nrtEl5Pn1Qx46zARXKDpBbvzezse7p7LqINmdoIk8PYP5SySaxEmYv6TZ0JyEKA1hsCId6DIhgITtWQ==
@@ -3932,10 +3932,10 @@ electron-updater@^4.2.4:
     lodash.isequal "^4.5.0"
     semver "^7.1.3"
 
-electron-util@^0.14.1:
-  version "0.14.1"
-  resolved "https://registry.yarnpkg.com/electron-util/-/electron-util-0.14.1.tgz#047095c9ac76582612e7e496b0b9c70b73e9ca6c"
-  integrity sha512-MvwYywBZ+8P3pSILIEuWHVcykxsaRZOE3iSfHZibfDem/lEK5L1V9UfykmCJJBVL2voJM0o+LdjfuKxtH5kjOQ==
+electron-util@^0.14.2:
+  version "0.14.2"
+  resolved "https://registry.yarnpkg.com/electron-util/-/electron-util-0.14.2.tgz#793ebd61f75435363b0dbbba61dddb0f17812fb1"
+  integrity sha512-pnnRJiWajDcTtEAS33RgP3XVO+9cJjOlBA0BKk6cABjcPxihgCwiGWplCOHc0lH43f68ZJZweiunwomJC+TWng==
   dependencies:
     electron-is-dev "^1.1.0"
     new-github-issue-url "^0.2.1"
@@ -3958,10 +3958,10 @@ electron@^9.0.3:
     "@types/node" "^12.0.12"
     extract-zip "^1.0.3"
 
-electron@^9.0.4:
-  version "9.0.4"
-  resolved "https://registry.yarnpkg.com/electron/-/electron-9.0.4.tgz#5aa72c1576c82c19f6e087311ffe1d7b74358d25"
-  integrity sha512-QzkeZNAiNB7KxcdoQKSoaiVT/GQdB4Vt0/ZZOuU8tIKABAsni2I7ztiAbUzxcsnQsqEBSfChuPuDQ5A4VbbzPg==
+electron@^9.0.5:
+  version "9.0.5"
+  resolved "https://registry.yarnpkg.com/electron/-/electron-9.0.5.tgz#189ee117cc2a2777cccf40fae0766acec5faae57"
+  integrity sha512-bnL9H48LuQ250DML8xUscsKiuSu+xv5umXbpBXYJ0BfvYVmFfNbG3jCfhrsH7aP6UcQKVxOG1R/oQExd0EFneQ==
   dependencies:
     "@electron/get" "^1.0.1"
     "@types/node" "^12.0.12"
@@ -6851,6 +6851,11 @@ nanomatch@^1.2.9:
     snapdragon "^0.8.1"
     to-regex "^3.0.1"
 
+native-request@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/native-request/-/native-request-1.0.5.tgz#da67637c0a0ed0758243d1a688d647612f2d5a0a"
+  integrity sha512-7wU3DvBGAJQxWuMR3F62zrhB7hxNj2DdlC/eBVrCgavc6+ZpFZOqS/PsR7QyUPLMkFk0GvvzoeeOAZGLLnObnA==
+
 natural-compare@^1.4.0:
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/natural-compare/-/natural-compare-1.4.0.tgz#4abebfeed7541f2c27acfb29bdbbd15c8d5ba4f7"
@@ -8400,16 +8405,16 @@ sass-graph@2.2.5:
     scss-tokenizer "^0.2.3"
     yargs "^13.3.2"
 
-sass-loader@^8.0.2:
-  version "8.0.2"
-  resolved "https://registry.yarnpkg.com/sass-loader/-/sass-loader-8.0.2.tgz#debecd8c3ce243c76454f2e8290482150380090d"
-  integrity sha512-7o4dbSK8/Ol2KflEmSco4jTjQoV988bM82P9CZdmo9hR3RLnvNc0ufMNdMrB0caq38JQ/FgF4/7RcbcfKzxoFQ==
+sass-loader@^9.0.0:
+  version "9.0.0"
+  resolved "https://registry.yarnpkg.com/sass-loader/-/sass-loader-9.0.0.tgz#06f2624c8d9efc2d989997d351aaad2d46ee1b44"
+  integrity sha512-GRHB5AT35QXVKbdqKMSU29x0tVDIFSUZeTzK7SGlHu4sm2dhRqGfMx5HnIdiMyRvLJJHaWmmabR1h0gNSHipPw==
   dependencies:
     clone-deep "^4.0.1"
-    loader-utils "^1.2.3"
+    loader-utils "^2.0.0"
     neo-async "^2.6.1"
-    schema-utils "^2.6.1"
-    semver "^6.3.0"
+    schema-utils "^2.7.0"
+    semver "^7.3.2"
 
 sax@^1.2.4, sax@~1.2.4:
   version "1.2.4"
@@ -8440,7 +8445,7 @@ schema-utils@^1.0.0:
     ajv-errors "^1.0.0"
     ajv-keywords "^3.1.0"
 
-schema-utils@^2.5.0, schema-utils@^2.6.1, schema-utils@^2.6.5, schema-utils@^2.6.6:
+schema-utils@^2.5.0, schema-utils@^2.6.5, schema-utils@^2.6.6:
   version "2.6.6"
   resolved "https://registry.yarnpkg.com/schema-utils/-/schema-utils-2.6.6.tgz#299fe6bd4a3365dc23d99fd446caff8f1d6c330c"
   integrity sha512-wHutF/WPSbIi9x6ctjGGk2Hvl0VOz5l3EKEuKbjPlB30mKZUzb9A5k9yEXRX3pwyqVLPvpfZZEllaFq/M718hA==
@@ -9537,14 +9542,14 @@ unique-string@^2.0.0:
   dependencies:
     crypto-random-string "^2.0.0"
 
-universal-analytics@^0.4.20:
-  version "0.4.20"
-  resolved "https://registry.yarnpkg.com/universal-analytics/-/universal-analytics-0.4.20.tgz#d6b64e5312bf74f7c368e3024a922135dbf24b03"
-  integrity sha512-gE91dtMvNkjO+kWsPstHRtSwHXz0l2axqptGYp5ceg4MsuurloM0PU3pdOfpb5zBXUvyjT4PwhWK2m39uczZuw==
+universal-analytics@^0.4.21:
+  version "0.4.21"
+  resolved "https://registry.yarnpkg.com/universal-analytics/-/universal-analytics-0.4.21.tgz#fbdf87455c0389666a2b22f707a422eb84ca0616"
+  integrity sha512-8V37z6iO4qIgC3SYKwGGYGbFTc+mkz3WYLwc8TxIFbwAwckWsEIomETLQdrnAsGFInRQz5DyolBEYgSCDRlh2Q==
   dependencies:
-    debug "^3.0.0"
-    request "^2.88.0"
-    uuid "^3.0.0"
+    debug "^4.1.1"
+    native-request "^1.0.5"
+    uuid "^8.0.0"
 
 universalify@^0.1.0:
   version "0.1.2"
@@ -9676,7 +9681,7 @@ util@^0.11.0:
   dependencies:
     inherits "2.0.3"
 
-uuid@^3.0.0, uuid@^3.3.2:
+uuid@^3.3.2:
   version "3.4.0"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.4.0.tgz#b23e4358afa8a202fe7a100af1f5f883f02007ee"
   integrity sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==
