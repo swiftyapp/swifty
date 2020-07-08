@@ -1,6 +1,6 @@
 ![](https://alchaplinsky.com/images/misc/swifty_banner_alpha.png?v=1)
 
-### Free Offline-first Password Manager for MacOS, Windows and Linux.
+## Free Offline-first Password Manager for MacOS, Windows and Linux.
 
 <div align="center">
   
