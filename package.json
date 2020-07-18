@@ -13,7 +13,7 @@
     "fs-extra": "^9.0.1",
     "generate-password": "^1.5.1",
     "googleapis": "^52.1.0",
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.19",
     "luxon": "^1.24.1",
     "mousetrap": "^1.6.5",
     "nucleon": "^1.0.17",
