@@ -41,7 +41,7 @@ dependencies, and tools contained in the `swiftyapp/swifty` repository.
   ```
 * Making Changes
   * Make a change to the code
-  * Commit your cahnges using [semantic commit messages](https://www.conventionalcommits.org/en/v1.0.0-beta.4/) to streamline the release process. A good commit message should describe what changed and why.
+  * Commit your changes using [semantic commit messages](https://www.conventionalcommits.org/en/v1.0.0-beta.4/) to streamline the release process. A good commit message should describe what changed and why.
   * Once you have committed your changes, it is a good idea to use git rebase
   ```
   $ git fetch upstream
