@@ -9,10 +9,10 @@
     "electron-log": "^4.2.2",
     "electron-unhandled": "^3.0.2",
     "electron-util": "^0.14.2",
-    "eslint-plugin-jest": "^23.17.1",
+    "eslint-plugin-jest": "^23.18.0",
     "fs-extra": "^9.0.1",
     "generate-password": "^1.5.1",
-    "googleapis": "^52.1.0",
+    "googleapis": "^56.0.0",
     "lodash": "^4.17.19",
     "luxon": "^1.24.1",
     "mousetrap": "^1.6.5",
@@ -27,7 +27,7 @@
     "redux-thunk": "^2.3.0",
     "shortid": "^2.2.15",
     "speakeasy": "^2.0.0",
-    "universal-analytics": "^0.4.21"
+    "universal-analytics": "^0.4.23"
   },
   "scripts": {
     "lint": "npx eslint --color src",
@@ -41,17 +41,17 @@
     "email": "alchaplinsky@gmail.com"
   },
   "devDependencies": {
-    "@babel/core": "^7.10.4",
-    "@babel/node": "^7.10.4",
+    "@babel/core": "^7.10.5",
+    "@babel/node": "^7.10.5",
     "@babel/preset-env": "^7.10.4",
     "@babel/preset-react": "^7.10.4",
     "babel-jest": "^26.1.0",
     "babel-loader": "^8.1.0",
     "bozon": "^1.0.6",
     "css-loader": "^3.6.0",
-    "dotenv-webpack": "^1.8.0",
+    "dotenv-webpack": "^2.0.0",
     "electron": "^9.0.5",
-    "eslint": "^7.3.1",
+    "eslint": "^7.5.0",
     "eslint-plugin-jsx-a11y": "^6.3.1",
     "eslint-plugin-prettier": "^3.1.4",
     "eslint-plugin-react": "^7.20.3",
@@ -60,10 +60,10 @@
     "node-sass": "^4.14.1",
     "prettier": "^2.0.5",
     "react-svg-loader": "^3.0.3",
-    "sass-loader": "^9.0.0",
+    "sass-loader": "^9.0.2",
     "spectron": "^11.0.0",
     "style-loader": "^1.2.1",
-    "webpack": "^4.43.0"
+    "webpack": "^4.44.0"
   },
   "resolutions": {
     "minimist": "^1.2.5",
