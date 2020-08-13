@@ -88,7 +88,8 @@
       }
     ],
     "win": {
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "publisherName": "Developer ID Application: Oleksandr Chaplinsky (UFBL3F444A)"
     },
     "linux": {
       "category": "Utilities",
