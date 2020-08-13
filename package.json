@@ -12,7 +12,7 @@
     "eslint-plugin-jest": "^23.20.0",
     "fs-extra": "^9.0.1",
     "generate-password": "^1.5.1",
-    "googleapis": "^58.0.0",
+    "googleapis": "^59.0.0",
     "lodash": "^4.17.19",
     "luxon": "^1.24.1",
     "mousetrap": "^1.6.5",
@@ -68,7 +68,7 @@
   "resolutions": {
     "minimist": "^1.2.5",
     "js-yaml": "^3.14.0",
-    "serialize-javascript": "^3.1.0"
+    "serialize-javascript": "^4.0.0"
   },
   "build": {
     "appId": "com.electron.swifty",
