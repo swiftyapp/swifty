@@ -3,13 +3,16 @@ import electron, { Menu, shell } from 'electron'
 import trayIcon from 'iconTemplate@2x.png'
 import lightTrayIcon from 'iconLightTemplate@2x.png'
 
-export default class Tray extends electron.Tray {
+export default class Tray {
   constructor(app) {
-    const icon = process.platform === 'darwin' ? trayIcon : lightTrayIcon
-    super(path.resolve(__dirname, icon))
     this.app = app
-    this.setToolTip(CONFIG.name)
-    this.setContextMenu(this.menu())
+    this.tray = new electron.Tray(path.resolve(__dirname, this.icon()))
+    this.tray.setToolTip(CONFIG.name)
+    this.tray.setContextMenu(this.menu())
+  }
+
+  icon() {
+    return process.platform === 'darwin' ? trayIcon : lightTrayIcon
   }
 
   menu() {
