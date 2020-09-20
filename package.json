@@ -70,7 +70,7 @@
     "minimist": "^1.2.5",
     "node-forge": "^0.10.0",
     "js-yaml": "^3.14.0",
-    "yargs-parser": "^20.0.0",
+    "yargs-parser": "^20.1.0",
     "serialize-javascript": "^5.0.1"
   },
   "build": {
