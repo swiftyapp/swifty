@@ -54,7 +54,7 @@
     "eslint-plugin-jest": "^24.0.2",
     "eslint-plugin-jsx-a11y": "^6.3.1",
     "eslint-plugin-prettier": "^3.1.4",
-    "eslint-plugin-react": "^7.20.6",
+    "eslint-plugin-react": "^7.21.0",
     "file-loader": "^6.1.0",
     "jest": "^26.4.2",
     "node-sass": "^4.14.1",
@@ -70,7 +70,7 @@
     "minimist": "^1.2.5",
     "node-forge": "^0.10.0",
     "js-yaml": "^3.14.0",
-    "yargs-parser": "^20.1.0",
+    "yargs-parser": "^20.2.0",
     "serialize-javascript": "^5.0.1"
   },
   "build": {
