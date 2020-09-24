@@ -1,4 +1,4 @@
-describe('Master password change', () => {
+describe.skip('Master password change', () => {
   beforeAll(async () => await before({ storage: 'empty' }))
 
   afterAll(async () => await after())

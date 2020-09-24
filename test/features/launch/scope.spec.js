@@ -1,5 +1,5 @@
 describe('Scope switching', () => {
-  describe('user launches application', () => {
+  describe.skip('user launches application', () => {
     beforeAll(async () => await before({ storage: 'example' }))
 
     afterAll(async () => await after())

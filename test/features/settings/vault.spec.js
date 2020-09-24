@@ -1,4 +1,4 @@
-describe('Vault settings', () => {
+describe.skip('Vault settings', () => {
   describe('User opens vault settings', () => {
     beforeAll(async () => await before({ storage: 'empty' }))
 

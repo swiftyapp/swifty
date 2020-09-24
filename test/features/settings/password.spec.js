@@ -1,4 +1,4 @@
-describe('Password generation settings', () => {
+describe.skip('Password generation settings', () => {
   describe('User opens password settings', () => {
     beforeAll(async () => await before({ storage: 'empty' }))
 

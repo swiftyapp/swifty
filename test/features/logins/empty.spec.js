@@ -1,4 +1,4 @@
-describe('Empty entries list', () => {
+describe.skip('Empty entries list', () => {
   describe('user loads main application window', () => {
     beforeAll(async () => await before({ storage: 'empty' }))
 

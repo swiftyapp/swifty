@@ -1,4 +1,4 @@
-describe('Delete credentials entry', () => {
+describe.skip('Delete credentials entry', () => {
   describe('user deletes credentials entry', () => {
     beforeAll(async () => await before({ storage: 'example' }))
 

@@ -1,4 +1,4 @@
-describe('Password field on entry form', () => {
+describe.skip('Password field on entry form', () => {
   describe('show/hide password', () => {
     beforeAll(async () => await before({ storage: 'empty' }))
 

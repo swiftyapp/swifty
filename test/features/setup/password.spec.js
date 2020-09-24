@@ -5,27 +5,38 @@ describe('Setting up master password', () => {
     afterEach(() => after())
 
     it('shows non-matching password error', async () => {
-      expect(
-        await app.client
-          .click('.top-lock .button')
-          .setValue('input[type=password]', 'password')
-          .click('.button')
-          .setValue('input[type=password]', 'pass')
-          .click('.button')
-          .getText('.error-message')
-      ).toBe('Passwords do not match')
+      const button = await app.client.$('.top-lock .button')
+      await button.click()
+
+      const input = await app.client.$('input[type=password]')
+      await input.setValue('password')
+
+      const nextButton = await app.client.$('.button')
+      await nextButton.click()
+
+      await input.setValue('pass')
+      await nextButton.click()
+
+      const errorMessage = await app.client.$('.error-message')
+      expect(await errorMessage.getText()).toBe('Passwords do not match')
     })
 
     it('shows app main window on password match', async () => {
-      expect(
-        await app.client
-          .click('.top-lock .button')
-          .setValue('input[type=password]', 'password')
-          .click('.button')
-          .setValue('input[type=password]', 'password')
-          .click('.button')
-          .isExisting('.sync-indicator')
-      ).toBe(true)
+      const button = await app.client.$('.top-lock .button')
+      await button.click()
+
+      const input = await app.client.$('input[type=password]')
+      await input.setValue('password')
+
+      const nextButton = await app.client.$('.button')
+      await nextButton.click()
+
+      await input.setValue('password')
+      await nextButton.click()
+
+      const syncIndicator = await app.client.$('.sync-indicator')
+
+      expect(await syncIndicator.isExisting()).toBe(true)
     })
   })
 })

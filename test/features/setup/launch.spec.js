@@ -1,27 +1,17 @@
 describe('Application first launch', () => {
-  beforeAll(async () => await before({ storage: 'pristine' }))
+  beforeEach(async () => await before({ storage: 'pristine' }))
 
-  afterAll(async () => await after())
+  afterEach(async () => await after())
 
   it('shows new user section', async () => {
-    expect(await app.client.getText('.top-lock h2')).toBe('I am a new User')
-  })
+    const topHeader = await app.client.$('.top-lock h2')
+    const topButton = await app.client.$('.top-lock .button')
+    const bottomHeader = await app.client.$('.bottom-lock h2')
+    const bottomButton = await app.client.$('.bottom-lock .button')
 
-  it('shows new user button', async () => {
-    expect(await app.client.getText('.top-lock .button')).toBe(
-      'Setup Master Password'
-    )
-  })
-
-  it('shows restore backup section', async () => {
-    expect(await app.client.getText('.bottom-lock h2')).toBe(
-      'I am existing User'
-    )
-  })
-
-  it('shows restore button', async () => {
-    expect(await app.client.getText('.bottom-lock .button')).toBe(
-      'Restore from Backup'
-    )
+    expect(await topHeader.getText()).toBe('I am a new User')
+    expect(await topButton.getText()).toBe('Setup Master Password')
+    expect(await bottomHeader.getText()).toBe('I am existing User')
+    expect(await bottomButton.getText()).toBe('Restore from Backup')
   })
 })
