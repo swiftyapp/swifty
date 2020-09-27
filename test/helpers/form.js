@@ -9,7 +9,7 @@ export const clickCancel = async app => {
 }
 
 export const setValue = async (app, name, value) => {
-  const input = await app.client.$(`input[name=${name}]`)
+  const input = await app.client.$(`[name=${name}]`)
   await input.setValue(value)
 }
 

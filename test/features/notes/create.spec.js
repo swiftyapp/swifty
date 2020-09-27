@@ -1,88 +1,58 @@
-describe.skip('Create note entry', () => {
-  describe('user creates note entry', () => {
-    beforeAll(async () => await before({ storage: 'empty' }))
+import { login } from 'helpers/login'
+import { clickAddButton } from 'helpers/content'
+import { setValue } from 'helpers/form'
 
-    afterAll(async () => await after())
+describe('Create note entry', () => {
+  beforeAll(async () => await before({ storage: 'empty' }))
 
-    it('shows credentials view', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'password')
-          .keys('\uE007')
-          .waitForExist('.body .list')
-          .getText('.body .list')
-      ).toBe('No Items')
-    })
+  afterAll(async () => await after())
 
-    it('switches to note scope', async () => {
-      expect(
-        await app.client
-          .click('.switcher .tooltip-context:nth-child(2)')
-          .getText('.body .list')
-      ).toBe('No Items')
-    })
+  it('shows credentials view', async () => {
+    await login(app)
 
-    it('shows add note form', async () => {
-      expect(
-        await app.client
-          .click('.add-button')
-          .waitForExist('.aside input[name=title]')
-          .waitForExist('.aside textarea[name=note]')
-          .getText('.aside .actions')
-      ).toBe('CancelSave')
-    })
+    const list = await app.client.$('.body .list')
+    expect(await list.getText()).toBe('No Items')
 
-    it('highlights title field with error', async () => {
-      expect(
-        await app.client
-          .click('.aside .actions .button')
-          .isExisting('.field.error:nth-of-type(1)')
-      ).toBe(true)
-    })
+    const notesButton = await app.client.$(
+      '.switcher .tooltip-context:nth-child(2)'
+    )
+    await notesButton.click()
+    expect(await list.getText()).toBe('No Items')
 
-    it('highlights note field with error', async () => {
-      expect(
-        await app.client
-          .click('.aside .actions .button')
-          .isExisting('.field.error:nth-of-type(2)')
-      ).toBe(true)
-    })
+    await clickAddButton(app)
 
-    it('cancels entry creation', async () => {
-      expect(
-        await app.client
-          .setValue('input[name=title]', 'Example')
-          .click('.aside .actions .cancel')
-          .isExisting('.list .entry')
-      ).toBe(false)
-    })
+    const actions = await app.client.$('.aside .actions')
+    expect(await actions.getText()).toBe('CancelSave')
 
-    it('hides creation form', async () => {
-      expect(await app.client.isExisting('.aside .empty')).toBe(true)
-    })
+    const saveButton = await app.client.$('.aside .actions .button')
+    await saveButton.click()
 
-    it('opens creation form again', async () => {
-      expect(
-        await app.client
-          .click('.add-button')
-          .waitForExist('.aside input[name=title]')
-          .waitForExist('.aside textarea[name=note]')
-          .getText('.aside .actions')
-      ).toBe('CancelSave')
-    })
+    await app.client.$('.field.error:nth-of-type(1)')
+    await app.client.$('.field.error:nth-of-type(2)')
 
-    it('creates note entry', async () => {
-      expect(
-        await app.client
-          .setValue('input[name=title]', 'Example')
-          .setValue('textarea[name=note]', 'This is secure note')
-          .click('.aside .actions .button')
-          .getText('.body .list')
-      ).toBe('Example')
-    })
+    await setValue(app, 'title', 'Example')
 
-    it('shows details of created note', async () => {
-      expect(await app.client.getText('.aside .entry-title h1')).toBe('Example')
-    })
+    const cancelButton = await app.client.$('.aside .actions .cancel')
+    await cancelButton.click()
+
+    expect(await list.getText()).toBe('No Items')
+
+    const aside = await app.client.$('.aside')
+
+    expect(await aside.getText()).toBe(
+      'Swifty\nKeep your passwords safe and organized\nCreate First Entry\nor\nImport from Gdrive'
+    )
+
+    await clickAddButton(app)
+    expect(await actions.getText()).toBe('CancelSave')
+
+    await setValue(app, 'title', 'Example')
+    await setValue(app, 'note', 'This is secure note')
+    await saveButton.click()
+
+    expect(await list.getText()).toBe('Example')
+
+    const entryTitle = await app.client.$('.aside .entry-title')
+    expect(await entryTitle.getText()).toBe('Example')
   })
 })
