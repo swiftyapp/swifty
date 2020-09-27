@@ -1,30 +1,24 @@
-describe.skip('Vault settings', () => {
+import { login } from 'helpers/login'
+import { openSettingsSection } from 'helpers/settings'
+
+describe('Vault settings', () => {
   describe('User opens vault settings', () => {
     beforeAll(async () => await before({ storage: 'empty' }))
 
     afterAll(async () => await after())
 
     it('shows vault settings', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'password')
-          .keys('\uE007')
-          .waitForExist('.body .list')
-          .click('.settings-button')
-          .getText('.body h1')
-      ).toBe('Vault Settings')
-    })
+      await login(app)
+      await openSettingsSection(app, 'vault')
 
-    it('contains connect to google drive button', async () => {
-      expect(await app.client.getText('.section:nth-of-type(1) .button')).toBe(
-        'Connect your Google Drive'
-      )
-    })
+      const header = await app.client.$('.body h1')
+      expect(await header.getText()).toBe('Vault Settings')
 
-    it('contains save vault file button', async () => {
-      expect(await app.client.getText('.section:nth-of-type(2) .button')).toBe(
-        'Save Vault File'
-      )
+      const button1 = await app.client.$('.section:nth-of-type(1) .button')
+      const button2 = await app.client.$('.section:nth-of-type(2) .button')
+
+      expect(await button1.getText()).toBe('Connect your Google Drive')
+      expect(await button2.getText()).toBe('Save Vault File')
     })
   })
 })
