@@ -49,22 +49,33 @@ export default class GDrive {
   }
 
   async writeRemoteVault(data) {
-    let folderId = await this.drive.folderExists(this.folderName)
-    if (!folderId) return await this.createRemoteVault(data)
+    try {
+      let folderId = await this.drive.folderExists(this.folderName)
+      if (!folderId) return await this.createRemoteVault(data)
 
-    let fileId = await this.drive.fileExists(this.fileName, folderId)
-    if (!fileId) return await this.createRemoteVaultFile(folderId, data)
+      let fileId = await this.drive.fileExists(this.fileName, folderId)
+      if (!fileId) return await this.createRemoteVaultFile(folderId, data)
 
-    return await this.drive.updateFile(fileId, data)
+      return await this.drive.updateFile(fileId, data)
+    } catch (error) {
+      this.auth.loadCredentials()
+      return this.writeRemoteVault(data)
+    }
   }
+
   async readRemoteVault() {
-    const folderId = await this.drive.folderExists(this.folderName)
-    if (!folderId) throw Error('Swifty folder was not found on GDrive')
+    try {
+      const folderId = await this.drive.folderExists(this.folderName)
+      if (!folderId) throw Error('Swifty folder was not found on GDrive')
 
-    const fileId = await this.drive.fileExists(this.fileName, folderId)
-    if (!fileId) throw Error('Vault file was not found on GDrive')
+      const fileId = await this.drive.fileExists(this.fileName, folderId)
+      if (!fileId) throw Error('Vault file was not found on GDrive')
 
-    return await this.drive.readFile(fileId)
+      return await this.drive.readFile(fileId)
+    } catch (error) {
+      this.auth.loadCredentials()
+      return this.readRemoteVault()
+    }
   }
 
   async createRemoteVault(data) {
