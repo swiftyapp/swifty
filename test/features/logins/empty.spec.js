@@ -1,23 +1,19 @@
-describe.skip('Empty entries list', () => {
-  describe('user loads main application window', () => {
-    beforeAll(async () => await before({ storage: 'empty' }))
+import { login } from 'helpers/login'
 
-    afterAll(async () => await after())
+describe('Empty entries list', () => {
+  beforeAll(async () => await before({ storage: 'empty' }))
 
-    it('shows empty entries list', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'password')
-          .keys('\uE007')
-          .waitForExist('.body .list')
-          .getText('.body .list')
-      ).toBe('No Items')
-    })
+  afterAll(async () => await after())
 
-    it('shows empty state for item form', async () => {
-      expect(await app.client.getText('.aside .empty')).toBe(
-        'Swifty\nKeep your passwords safe and organized\nCreate First Entry\nor\nImport from Gdrive'
-      )
-    })
+  it('shows empty entries list', async () => {
+    await login(app)
+
+    const list = await app.client.$('.body .list')
+    expect(await list.getText()).toBe('No Items')
+
+    const aside = await app.client.$('.aside .empty')
+    expect(await aside.getText()).toBe(
+      'Swifty\nKeep your passwords safe and organized\nCreate First Entry\nor\nImport from Gdrive'
+    )
   })
 })

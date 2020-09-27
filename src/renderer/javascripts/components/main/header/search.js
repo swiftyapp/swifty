@@ -20,6 +20,7 @@ const Search = () => {
       <SearchIcon width="16" height="16" className="search-icon" />
       <input
         type="search"
+        name="search"
         placeholder="Search"
         value={filterTerm}
         onChange={filterItems}

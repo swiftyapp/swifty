@@ -1,42 +1,27 @@
-describe.skip('Search credential entries', () => {
-  describe('user searches credentials', () => {
-    beforeAll(async () => await before({ storage: 'collection' }))
+import { login } from 'helpers/login'
+import { setValue } from 'helpers/form'
 
-    afterAll(async () => await after())
+describe('Search credential entries', () => {
+  beforeAll(async () => await before({ storage: 'collection' }))
 
-    it('shows credentials', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'password')
-          .keys('\uE007')
-          .waitForExist('.body .list .entry')
-          .isExisting('.list .entry:nth-child(3)')
-      ).toBe(true)
-    })
+  afterAll(async () => await after())
 
-    it('filters entries', async () => {
-      expect(
-        await app.client
-          .setValue('.search input', 'in')
-          .isExisting('.list .entry:nth-child(2)')
-      ).toBe(false)
-    })
+  it('shows credentials', async () => {
+    await login(app)
 
-    it('shows only matching entries', async () => {
-      expect(
-        await app.client
-          .setValue('.search input', 'in')
-          .getText('.list .entry:nth-child(1)')
-      ).toBe('Instagram\nanotheruser')
-    })
+    const list = await app.client.$('.body .list')
+    expect(await list.getText()).toBe(
+      'Facebook\nmyuser\nGoogle\nsomeuser\nInstagram\nanotheruser'
+    )
 
-    it('adds entries back on clear filter', async () => {
-      expect(
-        await app.client
-          .keys('\uE003')
-          .keys('\uE003')
-          .isExisting('.list .entry:nth-child(3)')
-      ).toBe(true)
-    })
+    await setValue(app, 'search', 'in')
+    expect(await list.getText()).toBe('Instagram\nanotheruser')
+
+    await app.client.keys('\uE003')
+    await app.client.keys('\uE003')
+
+    expect(await list.getText()).toBe(
+      'Facebook\nmyuser\nGoogle\nsomeuser\nInstagram\nanotheruser'
+    )
   })
 })

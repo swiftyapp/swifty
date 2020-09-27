@@ -1,28 +1,26 @@
-describe.skip('Delete credentials entry', () => {
-  describe('user deletes credentials entry', () => {
-    beforeAll(async () => await before({ storage: 'example' }))
+import { login } from 'helpers/login'
 
-    afterAll(async () => await after())
+describe('Delete credentials entry', () => {
+  beforeAll(async () => await before({ storage: 'example' }))
 
-    it('shows credentials view', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'password')
-          .keys('\uE007')
-          .waitForExist('.body .list .entry')
-          .click('.list .entry')
-          .getText('.entry-details')
-      ).toBe(
-        `Website\nhttps://example.com\nUsername\nmyuser\nPassword\nmypassword`
-      )
-    })
+  afterAll(async () => await after())
 
-    it('deletes credentials entry', async () => {
-      expect(
-        await app.client
-          .click('.entry-title .action:nth-of-type(2)')
-          .getText('.body .list')
-      ).toBe('No Items')
-    })
+  it('deletes credentials entry', async () => {
+    await login(app)
+
+    const entry = await app.client.$('.list .entry')
+    await entry.click()
+
+    const details = await app.client.$('.entry-details')
+    expect(await details.getText()).toBe(
+      `Website\nhttps://example.com\nUsername\nmyuser\nPassword\nmypassword`
+    )
+    const deleteButton = await app.client.$(
+      '.entry-title .action:nth-of-type(2)'
+    )
+    await deleteButton.click()
+
+    const list = await app.client.$('.body .list')
+    expect(await list.getText()).toBe('No Items')
   })
 })
