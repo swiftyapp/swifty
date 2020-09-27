@@ -1,65 +1,51 @@
-describe.skip('Edit credential entry', () => {
-  describe('user edits credentials entry', () => {
-    beforeAll(async () => await before({ storage: 'example' }))
+import { login } from 'helpers/login'
+import { setValue } from '../../helpers/form'
 
-    afterAll(async () => await after())
+describe('Edit credential entry', () => {
+  beforeAll(async () => await before({ storage: 'example' }))
 
-    it('shows credentials view', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'password')
-          .keys('\uE007')
-          .waitForExist('.body .list .entry')
-          .click('.list .entry')
-          .getText('.entry-details')
-      ).toBe(
-        `Website\nhttps://example.com\nUsername\nmyuser\nPassword\nmypassword`
-      )
-    })
+  afterAll(async () => await after())
 
-    it('shows edit form', async () => {
-      expect(
-        await app.client
-          .click('.entry-title .action:nth-of-type(1)')
-          .getText('.aside .actions')
-      ).toBe('CancelSave')
-    })
+  it('shows credentials view', async () => {
+    await login(app)
 
-    it('cancels update', async () => {
-      expect(
-        await app.client
-          .setValue('input[name=title]', 'Example Updated')
-          .click('.actions .cancel')
-          .getText('.list .entry')
-      ).toBe('Example\nmyuser')
-    })
+    const entry = await app.client.$('.list .entry')
+    await entry.click()
 
-    it('hides edit form', async () => {
-      expect(await app.client.getText('.entry-title h1')).toBe('Example')
-    })
+    const details = await app.client.$('.entry-details')
+    expect(await details.getText()).toBe(
+      `Website\nhttps://example.com\nUsername\nmyuser\nPassword\nmypassword`
+    )
 
-    it('shows editor form again', async () => {
-      expect(
-        await app.client
-          .click('.entry-title .action:nth-of-type(1)')
-          .waitForExist('input[name=title]')
-          .getValue('input[name=title]')
-      ).toBe('Example')
-    })
+    const editIcon = await app.client.$('.entry-title .action:nth-of-type(1)')
+    await editIcon.click()
 
-    it('updates credential entry', async () => {
-      expect(
-        await app.client
-          .setValue('input[name=title]', 'Example Updated')
-          .click('.actions .button')
-          .getText('.list .entry')
-      ).toBe('Example Updated\nmyuser')
-    })
+    const actions = await app.client.$('.aside .actions')
+    expect(await actions.getText()).toBe('CancelSave')
 
-    it('displays show view in a sidebar', async () => {
-      expect(await app.client.getText('.entry-title h1')).toBe(
-        'Example Updated'
-      )
-    })
+    await setValue(app, 'title', 'Example Updated')
+
+    const cancelButton = await app.client.$('.actions .cancel')
+    await cancelButton.click()
+
+    const list = await app.client.$('.body .list')
+    expect(await list.getText()).toBe('Example\nmyuser')
+
+    const viewTitle = await app.client.$('.entry-title h1')
+    expect(await viewTitle.getText()).toBe('Example')
+
+    await editIcon.click()
+
+    const titleInput = await app.client.$('input[name=title]')
+    expect(await titleInput.getValue()).toBe('Example')
+
+    await setValue(app, 'title', 'Example Updated')
+
+    const saveButton = await app.client.$('.actions .button')
+    await saveButton.click()
+
+    expect(await list.getText()).toBe('Example Updated\nmyuser')
+
+    expect(await viewTitle.getText()).toBe('Example Updated')
   })
 })
