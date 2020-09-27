@@ -1,4 +1,4 @@
-describe('Create note entry', () => {
+describe.skip('Create note entry', () => {
   describe('user creates note entry', () => {
     beforeAll(async () => await before({ storage: 'empty' }))
 

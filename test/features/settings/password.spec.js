@@ -1,3 +1,7 @@
+import { login } from 'helpers/login'
+import { openSettingsSection } from 'helpers/settings'
+import { setValue } from 'helpers/form'
+
 describe('Password generation settings', () => {
   describe('User opens password settings', () => {
     beforeAll(async () => await before({ storage: 'empty' }))
@@ -5,63 +9,26 @@ describe('Password generation settings', () => {
     afterAll(async () => await after())
 
     it('shows password settings', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'password')
-          .keys('\uE007')
-          .waitForExist('.body .list')
-          .click('.settings-button')
-          .click('.window .navigation li:nth-child(3)')
-          .getText('.body h1')
-      ).toBe('Password Settings')
-    })
+      await login(app)
+      await openSettingsSection(app, 'generator')
 
-    it('contains password preview', async () => {
-      expect(
-        await app.client.isExisting('.section:nth-of-type(1) .password-sample')
-      ).toBe(true)
-    })
+      const header = await app.client.$('.body h1')
+      expect(await header.getText()).toBe('Password Settings')
 
-    it('password preview of default length', async () => {
-      expect(
-        await app.client
-          .getText('.section:nth-of-type(1) .password-sample')
-          .then(value => value.length)
-      ).toBe(12)
-    })
+      const preview = await app.client.$(
+        '.section:nth-of-type(1) .password-sample'
+      )
+      let previewValue = await preview.getText()
+      expect(previewValue.length).toBe(12)
 
-    it('changes password preview length', async () => {
-      expect(
-        await app.client
-          .isExisting('.section:nth-of-type(2) input[type=range]')
-          .setValue('.section:nth-of-type(2) input[type=range]', 28)
-          .getText('.section:nth-of-type(1) .password-sample')
-          .then(value => value.length)
-      ).toBe(28)
-    })
+      await setValue(app, 'length', 28)
 
-    it('contains numbers checkbox', async () => {
-      expect(
-        await app.client.isExisting(
-          '.section:nth-of-type(3) input[name=numbers]'
-        )
-      ).toBe(true)
-    })
+      previewValue = await preview.getText()
+      expect(previewValue.length).toBe(28)
 
-    it('contains uppercase checkbox', async () => {
-      expect(
-        await app.client.isExisting(
-          '.section:nth-of-type(3) input[name=uppercase]'
-        )
-      ).toBe(true)
-    })
-
-    it('contains special symbols checkbox', async () => {
-      expect(
-        await app.client.isExisting(
-          '.section:nth-of-type(3) input[name=symbols]'
-        )
-      ).toBe(true)
+      await app.client.$('.section:nth-of-type(3) input[name=numbers]')
+      await app.client.$('.section:nth-of-type(3) input[name=uppercase]')
+      await app.client.$('.section:nth-of-type(3) input[name=symbols]')
     })
   })
 })

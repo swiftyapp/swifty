@@ -1,4 +1,4 @@
-describe('Create credentials entry', () => {
+describe.skip('Create credentials entry', () => {
   describe('user createst credentials entry', () => {
     beforeAll(async () => await before({ storage: 'empty' }))
 

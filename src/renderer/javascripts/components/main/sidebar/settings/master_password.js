@@ -54,6 +54,7 @@ const MasterPassword = ({ section }) => {
         <div className="threefour">
           <input
             type="password"
+            name="current_password"
             value={currentPassword}
             onChange={e => setCurrentPassword(e.target.value)}
           />
@@ -64,6 +65,7 @@ const MasterPassword = ({ section }) => {
         <div className="threefour">
           <input
             type="password"
+            name="new_password"
             value={newPassword}
             onChange={e => setNewPassword(e.target.value)}
           />
@@ -74,6 +76,7 @@ const MasterPassword = ({ section }) => {
         <div className="threefour">
           <input
             type="password"
+            name="new_password_repeat"
             value={newPasswordConfirmation}
             onChange={e => setNewPasswordConfirmation(e.target.value)}
           />

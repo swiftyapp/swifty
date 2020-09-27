@@ -1,6 +1,5 @@
 const fs = require('fs')
 const path = require('path')
-const { exec } = require('child_process')
 
 const { Application } = require('spectron')
 
@@ -54,23 +53,12 @@ const appPath = () => {
   }
 }
 
-const processID = app => {
-  return app.chromeDriver.logLines
-    .find(item => item.match(/\[.*:.*\]/))
-    .replace('[', '')
-    .split(':')[0]
-}
-
-global.before = options => {
+global.before = async options => {
   if (options && options.storage) prepareStorage(options.storage)
-  return app.start()
+  return await app.start()
 }
 
-global.after = async () => {
-  const pid = processID(app)
-  await app.stop()
-  exec(`kill -9 ${pid}`)
-}
+global.after = async () => await app.stop()
 
 global.app = new Application({
   path: appPath(),

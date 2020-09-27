@@ -1,97 +1,59 @@
-describe('Filter entries by tag', () => {
-  describe('user filters credentials', () => {
-    beforeAll(async () => await before({ storage: 'tagged' }))
+import { login } from 'helpers/login'
 
-    afterAll(async () => await after())
+describe('Empty tag filter', () => {
+  beforeAll(async () => await before({ storage: 'tagged' }))
 
-    it('shows all credentials', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'password')
-          .keys('\uE007')
-          .waitForExist('.body .list .entry')
-          .isExisting('.list .entry:nth-child(3)')
-      ).toBe(true)
-    })
+  afterAll(async () => await after())
 
-    it('displays tags dropdown', async () => {
-      expect(
-        await app.client.click('.tag-icon').getText('.tag-filter .dropdown')
-      ).toBe('personal\nwork\ntest')
-    })
+  it('shows tag filter toggle and empty state for tags', async () => {
+    await login(app)
 
-    it('filters entries by tag', async () => {
-      expect(
-        await app.client
-          .click('.tag-filter .dropdown .dropdown-item:first-child')
-          .isExisting('.list .entry:nth-child(2)')
-      ).toBe(false)
-    })
+    const list = await app.client.$('.list')
+    expect(await list.getText()).toBe(
+      'Facebook\nmyuser\nGoogle\nsomeuser\nInstagram\nanotheruser'
+    )
 
-    it('displays only matching entry', async () => {
-      expect(await app.client.getText('.list .entry')).toBe('Facebook\nmyuser')
-    })
+    const tagIcon = await app.client.$('.tag-icon')
+    await tagIcon.click()
 
-    it('shows selected tag', async () => {
-      expect(await app.client.getText('.tag-filter .tag-selected')).toBe(
-        'personalx'
-      )
-    })
+    const dropdown = await app.client.$('.tag-filter .dropdown')
+    expect(await dropdown.getText()).toBe('personal\nwork\ntest')
 
-    it('unfilters entries on clear tag', async () => {
-      expect(
-        await app.client
-          .click('.tag-selected .tag-clear')
-          .isExisting('.list .entry:nth-child(3)')
-      ).toBe(true)
-    })
+    const tag1 = await app.client.$(
+      '.tag-filter .dropdown .dropdown-item:first-child'
+    )
+    await tag1.click()
 
-    it('removes selected tag on clear', async () => {
-      expect(await app.client.isExisting('.tag-filter .tag-selected')).toBe(
-        false
-      )
-    })
+    expect(await list.getText()).toBe('Facebook\nmyuser')
 
-    it('filters entries by another tag', async () => {
-      expect(
-        await app.client
-          .click('.tag-icon')
-          .click('.tag-filter .dropdown .dropdown-item:nth-child(2)')
-          .isExisting('.list .entry:nth-child(2)')
-      ).toBe(true)
-    })
+    const selectedTag = await app.client.$('.tag-filter .tag-selected')
+    expect(await selectedTag.getText()).toBe('personalx')
 
-    it('shows first matching entry', async () => {
-      expect(await app.client.getText('.list .entry:nth-child(1)')).toBe(
-        'Google\nsomeuser'
-      )
-    })
+    const clearTags = await app.client.$('.tag-selected .tag-clear')
+    await clearTags.click()
 
-    it('shows second matching entry', async () => {
-      expect(await app.client.getText('.list .entry:nth-child(2)')).toBe(
-        'Instagram\nanotheruser'
-      )
-    })
+    const tagFilter = await app.client.$('.tag-filter')
+    expect(await tagFilter.getText()).toBe('')
 
-    it('replaces currently selected tag', async () => {
-      expect(
-        await app.client
-          .click('.tag-icon')
-          .click('.tag-filter .dropdown .dropdown-item:nth-child(3)')
-          .getText('.tag-filter .tag-selected')
-      ).toBe('testx')
-    })
+    await tagIcon.click()
+    const tag2 = await app.client.$(
+      '.tag-filter .dropdown .dropdown-item:nth-child(2)'
+    )
+    await tag2.click()
 
-    it('filters mathing entries', async () => {
-      expect(await app.client.getText('.list .entry:nth-child(1)')).toBe(
-        'Instagram\nanotheruser'
-      )
-    })
+    expect(await list.getText()).toBe(
+      'Google\nsomeuser\nInstagram\nanotheruser'
+    )
 
-    it('shows no other entries', async () => {
-      expect(await app.client.isExisting('.list .entry:nth-child(2)')).toBe(
-        false
-      )
-    })
+    await tagIcon.click()
+
+    const tag3 = await app.client.$(
+      '.tag-filter .dropdown .dropdown-item:nth-child(3)'
+    )
+    await tag3.click()
+
+    expect(await selectedTag.getText()).toBe('testx')
+
+    expect(await list.getText()).toBe('Instagram\nanotheruser')
   })
 })

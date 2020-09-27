@@ -1,4 +1,4 @@
-describe('Edit credential entry', () => {
+describe.skip('Edit credential entry', () => {
   describe('user edits credentials entry', () => {
     beforeAll(async () => await before({ storage: 'example' }))
 

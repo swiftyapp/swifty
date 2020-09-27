@@ -1,3 +1,7 @@
+import { login } from 'helpers/login'
+import { openSettingsSection } from 'helpers/settings'
+import { setValue } from 'helpers/form'
+
 describe('Master password change', () => {
   beforeAll(async () => await before({ storage: 'empty' }))
 
@@ -6,27 +10,20 @@ describe('Master password change', () => {
   const newpassword = 'newpassword'
 
   it('shows change password settings', async () => {
-    expect(
-      await app.client
-        .setValue('input[type=password]', password)
-        .keys('\uE007')
-        .waitForExist('.body .list')
-        .click('.settings-button')
-        .click('.window .navigation li:nth-child(2)')
-        .getText('.body h1')
-    ).toBe('Change Master Password')
-  })
+    await login(app)
+    await openSettingsSection(app, 'password')
 
-  it('changes password preview length', async () => {
-    expect(
-      await app.client
-        .isExisting('.section:nth-of-type(2) input[type=range]')
-        .setValue('.section:nth-of-type(1) input', password)
-        .setValue('.section:nth-of-type(2) input', newpassword)
-        .setValue('.section:nth-of-type(3) input', newpassword)
-        .click('span.button')
-        .getText('.section:nth-of-type(1) input')
-        .then(value => value.length)
-    ).toBe(0)
+    const header = await app.client.$('.body h1')
+    expect(await header.getText()).toBe('Change Master Password')
+
+    await setValue(app, 'current_password', password)
+    await setValue(app, 'new_password', newpassword)
+    await setValue(app, 'new_password_repeat', newpassword)
+
+    const button = await app.client.$('span.button')
+    await button.click()
+
+    const input = await app.client.$('.section:nth-of-type(1) input')
+    expect(await input.getText()).toBe('')
   })
 })

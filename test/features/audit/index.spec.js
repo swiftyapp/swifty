@@ -1,74 +1,46 @@
+import { login } from 'helpers/login'
+
 describe('Passwords audit', () => {
-  describe('User opens vault settings', () => {
-    beforeAll(async () => await before({ storage: 'collection' }))
+  beforeAll(async () => await before({ storage: 'collection' }))
 
-    afterAll(async () => await after())
+  afterAll(async () => await after())
 
-    it('shows vault settings', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'password')
-          .keys('\uE007')
-          .waitForExist('.body .list')
-          .click('.audit-button')
-          .getText('.aside .audit h3')
-      ).toBe('Password Audit')
-    })
+  it('shows vault audit', async () => {
+    await login(app)
 
-    it('contains weak passwords section', async () => {
-      expect(await app.client.getText('.audit-group.level-one .title')).toBe(
-        'Weak'
-      )
-    })
+    const auditButton = await app.client.$('.audit-button')
+    await auditButton.click()
 
-    it('contains list of weak passwords', async () => {
-      expect(await app.client.getText('.audit-group.level-one')).toBe(
-        'Weak\nFacebook\nmyuser\nGoogle\nsomeuser\nInstagram\nanotheruser'
-      )
-    })
+    const header = await app.client.$('.aside .audit h3')
+    expect(await header.getText()).toBe('Password Audit')
 
-    it('contains duplicate passwords section', async () => {
-      expect(await app.client.getText('.audit-group.level-three .title')).toBe(
-        'Duplicates'
-      )
-    })
+    const weakSection = await app.client.$('.audit-group.level-one .title')
+    const weakPasswords = await app.client.$('.audit-group.level-one')
+    expect(await weakSection.getText()).toBe('Weak')
+    expect(await weakPasswords.getText()).toBe(
+      'Weak\nFacebook\nmyuser\nGoogle\nsomeuser\nInstagram\nanotheruser'
+    )
 
-    it('contains list of duplicate passwords', async () => {
-      expect(await app.client.getText('.audit-group.level-three')).toBe(
-        'Duplicates\nFacebook\nmyuser\nGoogle\nsomeuser\nInstagram\nanotheruser'
-      )
-    })
+    const duplicateSection = await app.client.$(
+      '.audit-group.level-three .title'
+    )
+    const duplicatePasswords = await app.client.$('.audit-group.level-three')
+    expect(await duplicateSection.getText()).toBe('Duplicates')
+    expect(await duplicatePasswords.getText()).toBe(
+      'Duplicates\nFacebook\nmyuser\nGoogle\nsomeuser\nInstagram\nanotheruser'
+    )
 
-    it('does not contain short passwords section', async () => {
-      expect(await app.client.isExisting('.audit-group.level-two')).toBe(false)
-    })
+    const score = await app.client.$('.aside .score')
+    expect(await score.getText()).toBe('0\nOveral Score')
 
-    it('displays passwords overal score', async () => {
-      expect(await app.client.getText('.aside .score')).toBe('0\nOveral Score')
-    })
+    const stats1 = await app.client.$('.aside .stats li:nth-child(1)')
+    const stats2 = await app.client.$('.aside .stats li:nth-child(2)')
+    const stats3 = await app.client.$('.aside .stats li:nth-child(3)')
+    const stats4 = await app.client.$('.aside .stats li:nth-child(4)')
 
-    it('displays weak passwords count', async () => {
-      expect(await app.client.getText('.aside .stats li:nth-child(1)')).toBe(
-        'Weak\n3'
-      )
-    })
-
-    it('displays short passwords count', async () => {
-      expect(await app.client.getText('.aside .stats li:nth-child(2)')).toBe(
-        'Too Short\n0'
-      )
-    })
-
-    it('displays duplicate passwords count', async () => {
-      expect(await app.client.getText('.aside .stats li:nth-child(3)')).toBe(
-        'Duplicates\n3'
-      )
-    })
-
-    it('displays old passwords count', async () => {
-      expect(await app.client.getText('.aside .stats li:nth-child(4)')).toBe(
-        'More than 6 month old\n3'
-      )
-    })
+    expect(await stats1.getText()).toBe('Weak\n3')
+    expect(await stats2.getText()).toBe('Too Short\n0')
+    expect(await stats3.getText()).toBe('Duplicates\n3')
+    expect(await stats4.getText()).toBe('More than 6 month old\n3')
   })
 })

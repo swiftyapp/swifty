@@ -1,34 +1,20 @@
+import { login } from 'helpers/login'
 describe('Authentication with master password', () => {
-  describe('user enters password', () => {
-    beforeAll(async () => await before({ storage: 'empty' }))
+  beforeEach(async () => await before({ storage: 'empty' }))
 
-    afterAll(async () => await after())
+  afterEach(async () => await after())
 
-    it('shows invalid password error', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'word')
-          .keys('\uE007')
-          .getText('.error-message')
-      ).toBe('Incorrect Master Password')
-    })
+  it('shows invalid password error', async () => {
+    await login(app, 'word')
 
-    it('does not show touch id icon', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'word')
-          .keys('\uE007')
-          .isExisting('svg.touchid')
-      ).toBe(false)
-    })
+    const errorMessage = await app.client.$('.error-message')
+    expect(await errorMessage.getText()).toBe('Incorrect Master Password')
+  })
 
-    it('logs user in on correct password', async () => {
-      expect(
-        await app.client
-          .setValue('input[type=password]', 'password')
-          .keys('\uE007')
-          .isExisting('.sync-indicator')
-      ).toBe(true)
-    })
+  it('logs user in on correct password', async () => {
+    await login(app)
+
+    const syncIndicator = await app.client.$('.sync-indicator')
+    expect(await syncIndicator.isExisting()).toBe(true)
   })
 })

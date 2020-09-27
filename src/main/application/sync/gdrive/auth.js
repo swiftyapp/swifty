@@ -14,7 +14,7 @@ export default class Auth {
       process.env.GOOGLE_OAUTH_CLIENT_SECRET,
       `http://${HOST}:${PORT}${PATH}`
     )
-    this.auth.setCredentials(this.readTokens())
+    this.loadCredentials()
     this.auth.on('tokens', tokens => this._updateTokens(tokens))
   }
 
@@ -38,6 +38,10 @@ export default class Auth {
   disconnect() {
     const { refresh_token } = this.readTokens()
     return this.writeTokens(Object.assign({}, { refresh_token }))
+  }
+
+  loadCredentials() {
+    this.auth.setCredentials(this.readTokens())
   }
 
   _updateTokens(tokens) {

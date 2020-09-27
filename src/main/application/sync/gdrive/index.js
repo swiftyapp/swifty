@@ -49,6 +49,7 @@ export default class GDrive {
   }
 
   async writeRemoteVault(data) {
+    this.auth.loadCredentials()
     let folderId = await this.drive.folderExists(this.folderName)
     if (!folderId) return await this.createRemoteVault(data)
 
@@ -57,7 +58,9 @@ export default class GDrive {
 
     return await this.drive.updateFile(fileId, data)
   }
+
   async readRemoteVault() {
+    this.auth.loadCredentials()
     const folderId = await this.drive.folderExists(this.folderName)
     if (!folderId) throw Error('Swifty folder was not found on GDrive')
 

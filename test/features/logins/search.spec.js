@@ -1,4 +1,4 @@
-describe('Search credential entries', () => {
+describe.skip('Search credential entries', () => {
   describe('user searches credentials', () => {
     beforeAll(async () => await before({ storage: 'collection' }))
 
