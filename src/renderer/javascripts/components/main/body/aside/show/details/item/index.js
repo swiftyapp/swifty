@@ -2,11 +2,9 @@ import React from 'react'
 import Copy from 'copy.svg'
 import { copy } from 'services/copy'
 
-const { decrypt } = window
-
 export default ({ entry, name, link, cc, secure }) => {
   const onClick = event => {
-    window.openLink(event.target.href)
+    window.RemoteAPI.openLink(event.target.href)
   }
 
   const value = () => {
@@ -19,14 +17,14 @@ export default ({ entry, name, link, cc, secure }) => {
     } else if (cc) {
       return entry[name.toLowerCase()].match(/.{1,4}/g).join(' ')
     } else if (secure) {
-      return decrypt(entry[name.toLowerCase()])
+      return window.CryptorAPI.decrypt(entry[name.toLowerCase()])
     } else {
       return entry[name.toLowerCase()]
     }
   }
 
   const copyValue = () => {
-    if (secure) return decrypt(entry[name.toLowerCase()])
+    if (secure) return window.CryptorAPI.decrypt(entry[name.toLowerCase()])
     return entry[name.toLowerCase()]
   }
 

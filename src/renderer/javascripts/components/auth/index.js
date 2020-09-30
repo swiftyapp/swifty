@@ -7,16 +7,16 @@ export const Auth = ({ touchID }) => {
   const [error, setError] = useState(null)
 
   const handleEnter = value => {
-    const hashedSecret = window.hashSecret(value)
-    window.setupCryptor(hashedSecret)
-    window.sendAuthStart(hashedSecret)
-    window.onAuthFail(() => {
+    const hashedSecret = window.CryptorAPI.hashSecret(value)
+    window.CryptorAPI.setupCryptor(hashedSecret)
+    window.MessagesAPI.sendAuthStart(hashedSecret)
+    window.MessagesAPI.onAuthFail(() => {
       setError('Incorrect Master Password')
     })
   }
 
   const handleTouchId = () => {
-    window.sendAuthTouchId()
+    window.MessagesAPI.sendAuthTouchId()
   }
 
   const handleChange = () => {

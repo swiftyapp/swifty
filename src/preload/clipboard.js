@@ -1,10 +1,12 @@
-import { clipboard } from 'electron'
+import { contextBridge, clipboard } from 'electron'
 
-window.copyToClipboard = (value, timeout = false) => {
-  clipboard.writeText(value)
-  if (timeout) {
-    setTimeout(() => {
-      clipboard.clear()
-    }, timeout)
+contextBridge.exposeInMainWorld('ClipboardAPI', {
+  copyToClipboard: (value, timeout = false) => {
+    clipboard.writeText(value)
+    if (timeout) {
+      setTimeout(() => {
+        clipboard.clear()
+      }, timeout)
+    }
   }
-}
+})

@@ -13,7 +13,7 @@ export default () => {
 
   const onImport = () => {
     setIsLoading(true)
-    window.sendVaultImport()
+    window.MessagesAPI.sendVaultImport()
   }
 
   if (!isPristine) return null

@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import classnames from 'classnames'
-const { hashSecret } = window
 
 const MasterPassword = ({ section }) => {
   if (section !== 'masterpassword') return null
@@ -25,11 +24,10 @@ const MasterPassword = ({ section }) => {
       setProcessing(true)
       setError(null)
       setSuccess(null)
-      window
-        .updateMasterPassword({
-          current: hashSecret(currentPassword),
-          new: hashSecret(newPassword)
-        })
+      window.MessagesAPI.updateMasterPassword({
+        current: window.CryptorAPI.hashSecret(currentPassword),
+        new: window.CryptorAPI.hashSecret(newPassword)
+      })
         .then(handleSuccess)
         .catch(handleErrors)
         .finally(() => setProcessing(false))

@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react'
 import Copy from 'copy.svg'
 import { copy } from 'services/copy'
 
-const { generateOTP, decrypt } = window
-
 export default ({ name, entry }) => {
   if (!entry.otp || entry.otp == '') return null
 
@@ -23,7 +21,9 @@ export default ({ name, entry }) => {
   }, [])
 
   const setOTPData = () => {
-    const otp = generateOTP(decrypt(entry.otp))
+    const otp = window.GeneratorAPI.generateOTP(
+      window.CryptorAPI.decrypt(entry.otp)
+    )
     setTime(otp.time)
     setCode(otp.code)
   }

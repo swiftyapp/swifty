@@ -7,7 +7,7 @@ import TagField from './tag'
 
 const Login = ({ entry, validate, onChange, onTagsChange }) => {
   const generatePassword = () => {
-    const password = window.generatePassword(getProps())
+    const password = window.GeneratorAPI.generatePassword(getProps())
     onChange({ target: { name: 'password', value: password } })
   }
 

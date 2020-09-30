@@ -37,7 +37,7 @@ export default (state = initialState(), action) => {
 }
 
 const decodeEntries = data => {
-  return window.decryptData(data).entries
+  return window.CryptorAPI.decryptData(data).entries
 }
 
 const findEntry = (state, id) => {

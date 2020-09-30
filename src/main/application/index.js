@@ -37,6 +37,7 @@ export default class Swifty extends Application {
       frame: !isWindows(),
       transparent: true,
       webPreferences: {
+        contextIsolation: true,
         preload: path.join(app.getAppPath(), 'preload', 'index.js')
       }
     }

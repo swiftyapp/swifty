@@ -7,13 +7,13 @@ export default ({ display, hashedSecret }) => {
 
   const onChange = event => {
     setError(null)
-    setConfirmation(window.hashSecret(event.currentTarget.value))
+    setConfirmation(window.CryptorAPI.hashSecret(event.currentTarget.value))
   }
 
   const onSend = () => {
     if (hashedSecret === confirmation) {
-      window.setupCryptor(hashedSecret)
-      window.sendSetupDone(hashedSecret)
+      window.CryptorAPI.setupCryptor(hashedSecret)
+      window.MessagesAPI.sendSetupDone(hashedSecret)
     } else {
       setError('Passwords do not match')
     }

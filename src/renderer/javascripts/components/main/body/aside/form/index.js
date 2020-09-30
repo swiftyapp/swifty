@@ -9,14 +9,14 @@ import Note from './note'
 import { saveEntry, isValid } from 'actions/entries'
 import entries from 'defaults/entries'
 
-const { obscure, expose } = window
-
 const Form = ({ entry }) => {
   const dispatch = useDispatch()
   const { scope } = useSelector(state => state.filters)
 
   const [validate, setValidate] = useState(false)
-  const [model, setModel] = useState(expose(entry) || entries[scope])
+  const [model, setModel] = useState(
+    window.CryptorAPI.expose(entry) || entries[scope]
+  )
 
   const onCancel = () => {
     if (model.id) {
@@ -28,7 +28,7 @@ const Form = ({ entry }) => {
 
   const onSave = () => {
     if (isValid(model)) {
-      dispatch(saveEntry(obscure(model)))
+      dispatch(saveEntry(window.CryptorAPI.obscure(model)))
     } else {
       setValidate(true)
     }

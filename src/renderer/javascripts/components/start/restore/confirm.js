@@ -7,13 +7,13 @@ export default ({ display }) => {
 
   const onChange = event => {
     setError(null)
-    setHashedSecret(window.hashSecret(event.currentTarget.value))
+    setHashedSecret(window.CryptorAPI.hashSecret(event.currentTarget.value))
   }
 
   const onSend = () => {
-    window.setupCryptor(hashedSecret)
-    window.sendBackupPassword(hashedSecret)
-    window.onBackupPasswordFail(() => {
+    window.CryptorAPI.setupCryptor(hashedSecret)
+    window.MessagesAPI.sendBackupPassword(hashedSecret)
+    window.MessagesAPI.onBackupPasswordFail(() => {
       setError('Invalid password for backup')
     })
   }

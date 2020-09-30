@@ -8,7 +8,7 @@ export default ({ display, onEnter, goBack }) => {
 
   const onChange = event => {
     setError(null)
-    setHashedSecret(window.hashSecret(event.currentTarget.value))
+    setHashedSecret(window.CryptorAPI.hashSecret(event.currentTarget.value))
   }
 
   const onSend = () => {

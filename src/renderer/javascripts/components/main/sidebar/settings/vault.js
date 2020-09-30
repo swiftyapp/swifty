@@ -3,13 +3,6 @@ import { useSelector } from 'react-redux'
 import classNames from 'classnames'
 import DownloadIcon from 'download.svg'
 
-const {
-  showSaveDialog,
-  sendBackupSave,
-  sendVaultConnect,
-  sendVaultDisconnect
-} = window
-
 const Vault = ({ section }) => {
   const [connecting, setConnecting] = useState(false)
 
@@ -18,18 +11,18 @@ const Vault = ({ section }) => {
   useEffect(() => setConnecting(false), [syncEnabled])
 
   const onClickSaveBackup = () => {
-    showSaveDialog(({ canceled, filePath }) => {
-      if (!canceled) sendBackupSave(filePath)
+    window.RemoteAPI.showSaveDialog(({ canceled, filePath }) => {
+      if (!canceled) window.MessagesAPI.sendBackupSave(filePath)
     })
   }
 
   const onClickConnect = () => {
     setConnecting(true)
-    sendVaultConnect()
+    window.MessagesAPI.sendVaultConnect()
   }
 
   const onClickDisconnect = () => {
-    sendVaultDisconnect()
+    window.MessagesAPI.sendVaultDisconnect()
   }
 
   const syncAction = () => {

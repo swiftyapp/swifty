@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { getProps, setProps } from 'defaults/generator'
-const { generatePassword } = window
 
 const Password = ({ section }) => {
   const [options, setOptions] = useState(getProps())
-  const [example, setExample] = useState(generatePassword(getProps()))
+  const [example, setExample] = useState(
+    window.GeneratorAPI.generatePassword(getProps())
+  )
 
   const onChange = event => {
     const option = {}
@@ -20,7 +21,7 @@ const Password = ({ section }) => {
 
   const updateOption = option => {
     const upadtedOptions = { ...options, ...option }
-    setExample(generatePassword(upadtedOptions))
+    setExample(window.GeneratorAPI.generatePassword(upadtedOptions))
     setProps(upadtedOptions)
     setOptions(upadtedOptions)
   }

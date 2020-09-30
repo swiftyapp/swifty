@@ -3,8 +3,8 @@ import Back from 'back.svg'
 
 export default ({ display, onImport, goBack }) => {
   const chooseFle = () => {
-    window.sendBackupSelect()
-    window.onBackupLoaded(() => onImport())
+    window.MessagesAPI.sendBackupSelect()
+    window.MessagesAPI.onBackupLoaded(() => onImport())
   }
   if (!display) return null
 

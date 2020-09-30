@@ -1,28 +1,26 @@
 import shortid from 'shortid'
 import { DateTime } from 'luxon'
 
-const { sendSaveData, onOnce, sendVaultSyncStart, encryptData } = window
-
 export const deleteEntry = id => {
   return (dispatch, getState) => {
     const entries = getState().entries.items.filter(item => item.id !== id)
-    sendSaveData(encryptData({ entries }))
-    onOnce('data:saved', (event, data) => {
+    window.MessagesAPI.sendSaveData(window.CryptorAPI.encryptData({ entries }))
+    window.MessagesAPI.onOnce('data:saved', (event, data) => {
       dispatch({ type: 'ENTRY_REMOVED', ...data })
     })
-    sendVaultSyncStart()
+    window.MessagesAPI.sendVaultSyncStart()
   }
 }
 
 export const saveEntry = credentials => {
   return (dispatch, getState) => {
     const [entries, item] = save(credentials, getState())
-    sendSaveData(encryptData({ entries }))
-    onOnce('data:saved', (event, data) => {
+    window.MessagesAPI.sendSaveData(window.CryptorAPI.encryptData({ entries }))
+    window.MessagesAPI.onOnce('data:saved', (event, data) => {
       dispatch({ type: 'SET_ENTRIES', ...data })
       dispatch({ type: 'ENTRY_SAVED', currentId: item.id, ...data })
     })
-    sendVaultSyncStart()
+    window.MessagesAPI.sendVaultSyncStart()
   }
 }
 
