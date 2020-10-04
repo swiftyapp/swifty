@@ -1,22 +1,6 @@
-const fs = require('fs')
-const shortid = require('shortid')
-const { DateTime } = require('luxon')
-
-const readFile = path => {
-  const data = fs.readFileSync(path).toString('utf-8')
-  return data
-    .split(/\*\*\*.*\*\*\*/)
-    .map(datum => {
-      if (datum.trim() === '') return null
-      return JSON.parse(datum.trim())
-    })
-    .filter(item => item !== null)
-}
-
 const processLogin = item => {
   const fields = item.secureContents.fields
   return {
-    id: shortid.generate(),
     type: 'login',
     title: item.title,
     website: item.location,
@@ -26,27 +10,25 @@ const processLogin = item => {
     note: item.secureContents.notesPlain || '',
     tags: getTags(item),
     otp: '',
-    createdAt: getTime(item.createdAt),
-    updatedAt: getTime(item.updatedAt)
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt
   }
 }
 
 const processNote = item => {
   return {
-    id: shortid.generate(),
     type: 'note',
     title: item.title,
     note: item.secureContents.notesPlain,
     tags: getTags(item),
-    createdAt: getTime(item.createdAt),
-    updatedAt: getTime(item.updatedAt)
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt
   }
 }
 
 const processCard = item => {
   const { secureContents } = item
   return {
-    id: shortid.generate(),
     type: 'card',
     title: item.title,
     number: secureContents.ccnum || '',
@@ -56,13 +38,9 @@ const processCard = item => {
     pin: secureContents.pin || '',
     name: secureContents.cardholder || '',
     tags: getTags(item),
-    createdAt: getTime(item.createdAt),
-    updatedAt: getTime(item.updatedAt)
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt
   }
-}
-
-const getTime = stamp => {
-  return DateTime.fromSeconds(parseInt(stamp)).toISO()
 }
 
 const getTags = item => {
@@ -74,9 +52,18 @@ const getTags = item => {
   )
 }
 
-const importData = path => {
-  const data = readFile(path)
-  const entries = data.map(item => {
+const parse = data => {
+  return data
+    .split(/\*\*\*.*\*\*\*/)
+    .map(datum => {
+      if (datum.trim() === '') return null
+      return JSON.parse(datum.trim())
+    })
+    .filter(item => item !== null)
+}
+
+const transform = data => {
+  const entries = parse(data).map(item => {
     switch (item.typeName) {
       case 'webforms.WebForm':
         return processLogin(item)
@@ -89,4 +76,4 @@ const importData = path => {
   return entries
 }
 
-module.exports = { readFile, importData }
+module.exports = { transform }
