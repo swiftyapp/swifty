@@ -1,12 +1,13 @@
 {
   "name": "Swifty",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Modern, Lightweight, Fast and Free Password Manager",
   "repository": "https://github.com/alchaplinsky/swifty.git",
   "dependencies": {
     "@swiftyapp/cryptor": "^1.1.0",
     "classnames": "^2.2.6",
     "electron-log": "^4.2.4",
+    "electron-notarize": "^1.0.0",
     "electron-unhandled": "^3.0.2",
     "electron-util": "^0.14.2",
     "fs-extra": "^9.0.1",
@@ -24,6 +25,7 @@
     "react-tagsinput": "^3.19.0",
     "redux": "^4.0.5",
     "redux-thunk": "^2.3.0",
+    "remove": "^0.1.5",
     "shortid": "^2.2.15",
     "speakeasy": "^2.0.0",
     "universal-analytics": "^0.4.23"
@@ -48,6 +50,7 @@
     "babel-loader": "^8.1.0",
     "bozon": "^1.1.1",
     "css-loader": "^5.0.0",
+    "dotenv": "^8.2.0",
     "dotenv-webpack": "^2.0.0",
     "electron": "^10.1.3",
     "eslint": "^7.11.0",
@@ -75,6 +78,7 @@
   },
   "build": {
     "appId": "com.electron.swifty",
+    "afterSign": "scripts/notarize.js",
     "fileAssociations": [
       {
         "ext": "swftx",
@@ -104,7 +108,10 @@
     },
     "mac": {
       "icon": "build/icon.icns",
-      "category": "public.app-category.utilities"
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     }
   }
 }
