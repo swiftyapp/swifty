@@ -78,6 +78,7 @@
   },
   "build": {
     "appId": "com.electron.swifty",
+    "afterSign": "scripts/notarize.js",
     "fileAssociations": [
       {
         "ext": "swftx",
