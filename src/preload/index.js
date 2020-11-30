@@ -1,5 +1,5 @@
+import './app'
 import './messages'
-import './remote'
 import './clipboard'
 import './generator'
 import './cryptor'

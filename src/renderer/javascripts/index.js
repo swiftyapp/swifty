@@ -14,7 +14,7 @@ const store = createStore(rootReducer, applyMiddleware(thunkMiddleware))
 window.onload = () => {
   document
     .querySelector('body')
-    .setAttribute('platform', window.RemoteAPI.platform())
+    .setAttribute('platform', window.AppAPI.platform())
   render(
     <Provider store={store}>
       <Swifty />

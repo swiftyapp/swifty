@@ -2,26 +2,27 @@ import React from 'react'
 
 const Controls = () => {
   const minimize = () => {
-    window.RemoteAPI.minimizeWindow()
+    window.AppAPI.minimizeWindow()
   }
 
   const maximize = () => {
-    window.RemoteAPI.maximizeWindow()
+    window.AppAPI.maximizeWindow()
     document.querySelector('.max-button').style.display = 'none'
     document.querySelector('.restore-button').style.display = 'flex'
   }
 
   const unmaximize = () => {
-    window.RemoteAPI.unmaximizeWindow()
+    window.AppAPI.unmaximizeWindow()
     document.querySelector('.max-button').style.display = 'flex'
     document.querySelector('.restore-button').style.display = 'none'
   }
 
   const close = () => {
-    window.RemoteAPI.closeWindow()
+    window.AppAPI.closeWindow()
   }
 
-  if (!window.RemoteAPI.isWindows()) return null
+  if (!window.AppAPI.isWindows()) return null
+
   return (
     <div className="controls">
       <div className="control min-button" onClick={minimize}>

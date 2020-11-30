@@ -11,7 +11,7 @@ const Vault = ({ section }) => {
   useEffect(() => setConnecting(false), [syncEnabled])
 
   const onClickSaveBackup = () => {
-    window.RemoteAPI.showSaveDialog(({ canceled, filePath }) => {
+    window.AppAPI.showSaveDialog(({ canceled, filePath }) => {
       if (!canceled) window.MessagesAPI.sendBackupSave(filePath)
     })
   }

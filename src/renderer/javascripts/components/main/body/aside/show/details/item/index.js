@@ -4,7 +4,7 @@ import { copy } from 'services/copy'
 
 export default ({ entry, name, link, cc, secure }) => {
   const onClick = event => {
-    window.RemoteAPI.openLink(event.target.href)
+    window.AppAPI.openLink(event.target.href)
   }
 
   const value = () => {
