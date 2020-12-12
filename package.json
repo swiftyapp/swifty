@@ -18,7 +18,7 @@
     "mousetrap": "^1.6.5",
     "nucleon": "^1.0.19",
     "parse-domain": "^3.0.3",
-    "password-validator": "^5.1.0",
+    "password-validator": "^5.1.1",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
     "react-redux": "^7.2.2",
