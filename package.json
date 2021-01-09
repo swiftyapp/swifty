@@ -72,7 +72,7 @@
     "bl": "^4.0.3",
     "minimist": "^1.2.5",
     "node-forge": "^0.10.0",
-    "js-yaml": "^4.0.0",
+    "js-yaml": "^3.14.1",
     "yargs-parser": "^20.2.4",
     "serialize-javascript": "^5.0.1"
   },
