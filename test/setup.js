@@ -1,4 +1,5 @@
 const fs = require('fs')
+const ps = require('ps-node')
 const path = require('path')
 
 const { Application } = require('spectron')
@@ -53,12 +54,25 @@ const appPath = () => {
   }
 }
 
-global.before = async options => {
-  if (options && options.storage) prepareStorage(options.storage)
-  return await app.start()
+const killProcess = () => {
+  ps.lookup({ command: appPath() }, (_, items) => {
+    items.forEach(item => {
+      ps.kill(item.pid, err => {
+        if (err) throw new Error(err)
+      })
+    })
+  })
 }
 
-global.after = async () => await app.stop()
+global.before = async ({ storage } = {}) => {
+  if (storage) prepareStorage(storage)
+  await app.start()
+}
+
+global.after = async () => {
+  if (app.running) await app.stop()
+  killProcess()
+}
 
 global.app = new Application({
   path: appPath(),
