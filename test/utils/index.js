@@ -65,6 +65,7 @@ const kill = pss => {
     const items = pss.filter(
       item => !item.arguments.find(i => /--type/.test(i))
     )
-    ps.kill(items[0].pid)
+    const pid = items[0] && items[0].pid
+    pid && ps.kill(pid)
   }
 }
