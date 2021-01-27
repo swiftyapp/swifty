@@ -1,4 +1,5 @@
 import { trackVaultEvent } from 'analytics'
+import { dialog } from 'electron'
 
 export const onDataSave = function (_, data) {
   this.vault.write(data)
@@ -7,8 +8,12 @@ export const onDataSave = function (_, data) {
   return this.getAudit()
 }
 
-export const onBackupSave = function (_, filepath) {
-  this.vault.export(filepath)
+export const onBackupSave = function () {
+  dialog
+    .showSaveDialog({ defaultPath: 'vault.swftx' })
+    .then(({ canceled, filePath }) => {
+      if (!canceled) this.vault.export(filePath)
+    })
 }
 
 export const onVaultSyncImport = function () {

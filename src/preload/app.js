@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, dialog, shell } from 'electron'
+import { contextBridge, ipcRenderer, shell } from 'electron'
 import { isWindows, platform } from 'application/helpers/os'
 
 contextBridge.exposeInMainWorld('AppAPI', {
@@ -8,10 +8,6 @@ contextBridge.exposeInMainWorld('AppAPI', {
 
   platform: () => {
     return platform()
-  },
-
-  showSaveDialog: callback => {
-    dialog.showSaveDialog({ defaultPath: 'vault.swftx' }).then(callback)
   },
 
   minimizeWindow: () => {

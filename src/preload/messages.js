@@ -22,8 +22,8 @@ contextBridge.exposeInMainWorld('MessagesAPI', {
   sendBackupSelect: () => {
     ipcRenderer.send('backup:select')
   },
-  sendBackupSave: filePath => {
-    ipcRenderer.send('backup:save', filePath)
+  sendBackupSave: () => {
+    ipcRenderer.send('backup:save')
   },
   onBackupLoaded: callback => {
     ipcRenderer.once('backup:loaded', callback)
