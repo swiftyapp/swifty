@@ -98,7 +98,7 @@
       "publisherName": "Developer ID Application: Oleksandr Chaplinsky (UFBL3F444A)"
     },
     "linux": {
-      "category": "Utilities",
+      "category": "Utility",
       "target": [
         "deb",
         "rpm",
