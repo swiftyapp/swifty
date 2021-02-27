@@ -99,7 +99,7 @@
       "verifyUpdateCodeSignature": false
     },
     "linux": {
-      "category": "Utilities",
+      "category": "Utility",
       "target": [
         "deb",
         "rpm",
