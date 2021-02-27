@@ -67,7 +67,7 @@
     "sass-loader": "^11.0.1",
     "spectron": "^13.0.0",
     "style-loader": "^2.0.0",
-    "webpack": "^4.44.2"
+    "webpack": "^5.24.2"
   },
   "resolutions": {
     "node-forge": "^0.10.0",
