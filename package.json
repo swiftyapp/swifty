@@ -6,15 +6,15 @@
   "dependencies": {
     "@swiftyapp/cryptor": "^1.1.1",
     "classnames": "^2.2.6",
-    "electron-log": "^4.3.1",
+    "electron-log": "^4.3.2",
     "electron-notarize": "^1.0.0",
     "electron-unhandled": "^3.0.2",
     "electron-util": "^0.14.2",
     "fs-extra": "^9.1.0",
     "generate-password": "^1.6.0",
     "googleapis": "^67.0.0",
-    "lodash": "^4.17.20",
-    "luxon": "^1.25.0",
+    "lodash": "^4.17.21",
+    "luxon": "^1.26.0",
     "mousetrap": "^1.6.5",
     "nucleon": "^1.0.19",
     "parse-domain": "^3.0.3",
@@ -72,7 +72,7 @@
   "resolutions": {
     "node-forge": "^0.10.0",
     "js-yaml": "^3.14.1",
-    "yargs-parser": "^20.2.4",
+    "yargs-parser": "^20.2.6",
     "serialize-javascript": "^5.0.1"
   },
   "build": {
