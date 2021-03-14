@@ -52,7 +52,7 @@
     "css-loader": "^5.1.2",
     "dotenv": "^8.2.0",
     "dotenv-webpack": "^7.0.1",
-    "electron": "^11.3.0",
+    "electron": "^12.0.1",
     "eslint": "^7.22.0",
     "eslint-plugin-jest": "^24.3.1",
     "eslint-plugin-jsx-a11y": "^6.4.1",
@@ -65,7 +65,7 @@
     "ps-node": "^0.1.6",
     "react-svg-loader": "^3.0.3",
     "sass-loader": "^11.0.1",
-    "spectron": "^13.0.0",
+    "spectron": "^14.0.0",
     "style-loader": "^2.0.0",
     "webpack": "^5.25.1"
   },
@@ -73,7 +73,8 @@
     "node-forge": "^0.10.0",
     "js-yaml": "^3.14.1",
     "yargs-parser": "^20.2.7",
-    "serialize-javascript": "^5.0.1"
+    "serialize-javascript": "^5.0.1",
+    "xmldom": ">=0.5.0"
   },
   "build": {
     "appId": "com.electron.swifty",
