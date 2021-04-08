@@ -3414,10 +3414,10 @@ class-utils@^0.3.5:
     isobject "^3.0.0"
     static-extend "^0.1.1"
 
-classnames@^2.2.6:
-  version "2.2.6"
-  resolved "https://registry.yarnpkg.com/classnames/-/classnames-2.2.6.tgz#43935bffdd291f326dad0a205309b38d00f650ce"
-  integrity sha512-JR/iSQOSt+LQIWwrwEzJ9uk0xfN3mTVYMwt1Ir5mUcSN6pU+V4zQFFaJsclJbPuAUQH+yfWef6tm7l1quW3C8Q==
+classnames@^2.3.1:
+  version "2.3.1"
+  resolved "https://registry.yarnpkg.com/classnames/-/classnames-2.3.1.tgz#dfcfa3891e306ec1dad105d0e88f4417b8535e8e"
+  integrity sha512-OlQdbZ7gLfGarSqxesMesDa5uz7KFbID8Kpq/SxIoNGDqY8lSYs0D+hhtBXhcdB3rcbXArFr7vlHheLk1voeNA==
 
 clean-stack@^2.1.0:
   version "2.2.0"
@@ -3767,24 +3767,6 @@ crypto-random-string@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/crypto-random-string/-/crypto-random-string-2.0.0.tgz#ef2a7a966ec11083388369baa02ebead229b30d5"
   integrity sha512-v1plID3y9r/lPhviJ1wrXpLeyUIGAZ2SHNYTEapm7/8A9nLPoyvVp3RK/EPFqn5kEznyWgYZNsRtYYIWbuG8KA==
-
-css-loader@^5.1.2:
-  version "5.1.2"
-  resolved "https://registry.yarnpkg.com/css-loader/-/css-loader-5.1.2.tgz#b93dba498ec948b543b49d4fab5017205d4f5c3e"
-  integrity sha512-T7vTXHSx0KrVEg/xjcl7G01RcVXpcw4OELwDPvkr7izQNny85A84dK3dqrczuEfBcu7Yg7mdTjJLSTibRUoRZg==
-  dependencies:
-    camelcase "^6.2.0"
-    cssesc "^3.0.0"
-    icss-utils "^5.1.0"
-    loader-utils "^2.0.0"
-    postcss "^8.2.8"
-    postcss-modules-extract-imports "^3.0.0"
-    postcss-modules-local-by-default "^4.0.0"
-    postcss-modules-scope "^3.0.0"
-    postcss-modules-values "^4.0.0"
-    postcss-value-parser "^4.1.0"
-    schema-utils "^3.0.0"
-    semver "^7.3.4"
 
 css-loader@^5.2.0:
   version "5.2.0"
@@ -4349,10 +4331,10 @@ electron-updater@^4.3.5:
     lodash.isequal "^4.5.0"
     semver "^7.3.2"
 
-electron-util@^0.14.2:
-  version "0.14.2"
-  resolved "https://registry.yarnpkg.com/electron-util/-/electron-util-0.14.2.tgz#793ebd61f75435363b0dbbba61dddb0f17812fb1"
-  integrity sha512-pnnRJiWajDcTtEAS33RgP3XVO+9cJjOlBA0BKk6cABjcPxihgCwiGWplCOHc0lH43f68ZJZweiunwomJC+TWng==
+electron-util@^0.15.0:
+  version "0.15.0"
+  resolved "https://registry.yarnpkg.com/electron-util/-/electron-util-0.15.0.tgz#6965c2b72e8c5be2f2c55d060ed35e6f1cf8f469"
+  integrity sha512-9PNH5Kfg/vwcuGu1MKUiUesisbIdcBM9v8t3kyUCoQ5VTSbLZ5L7v/I2Sh0/VQagLpPF9S7xber8SxHxghapcQ==
   dependencies:
     electron-is-dev "^1.1.0"
     new-github-issue-url "^0.2.1"
@@ -5409,10 +5391,10 @@ google-p12-pem@^3.0.3:
   dependencies:
     node-forge "^0.10.0"
 
-googleapis-common@^5.0.1:
-  version "5.0.1"
-  resolved "https://registry.yarnpkg.com/googleapis-common/-/googleapis-common-5.0.1.tgz#443888c8eca85a7f005b7b244e5c80eff92352e3"
-  integrity sha512-b6SfpxLKVxFM7EQkRjhMrSWKLnRXf7r3Y4L4PZI8Yu8SWsGzfw+0ar7eqdwXnjZ2s+jwRHmxwnHaSP8anlgN5w==
+googleapis-common@^5.0.2:
+  version "5.0.2"
+  resolved "https://registry.yarnpkg.com/googleapis-common/-/googleapis-common-5.0.2.tgz#e2c4e777050b921e90657de1f2edec4e7c64a3e0"
+  integrity sha512-TL7qronKNZwE/XBvqshwzCPmZGq2gz/beXzANF7EVoO7FsQjOd7dk40DYrXkoCpvbnJHCQKWESq6NansiIPFqA==
   dependencies:
     extend "^3.0.2"
     gaxios "^4.0.0"
@@ -5421,13 +5403,13 @@ googleapis-common@^5.0.1:
     url-template "^2.0.8"
     uuid "^8.0.0"
 
-googleapis@^67.1.1:
-  version "67.1.1"
-  resolved "https://registry.yarnpkg.com/googleapis/-/googleapis-67.1.1.tgz#e67690ca0ed08b84c54b5eb9d66a89e3a80abde4"
-  integrity sha512-WLYk8R4dpW/oIxXhj0PQGhu+eOUpQbtWYTCxx/jeENr4arE9UmV5qmz0h1Gs1SPF/O/8PjCQIsPwOuHAlj78GA==
+googleapis@^71.0.0:
+  version "71.0.0"
+  resolved "https://registry.yarnpkg.com/googleapis/-/googleapis-71.0.0.tgz#93f81d3b0a67529502803d655ab7968b386e981d"
+  integrity sha512-pi3aWckvsEJbZmJ/+MeO8eIWOK2wmSKRRLvCQbgqTLrFce/jEHLusPly+H3FkpmbO3oTtYRUMJJ07Y4F3DeOgA==
   dependencies:
     google-auth-library "^7.0.2"
-    googleapis-common "^5.0.1"
+    googleapis-common "^5.0.2"
 
 got@^11.0.2:
   version "11.7.0"
@@ -10389,36 +10371,7 @@ webpack-sources@^2.1.1:
     source-list-map "^2.0.1"
     source-map "^0.6.1"
 
-webpack@^5.25.1:
-  version "5.25.1"
-  resolved "https://registry.yarnpkg.com/webpack/-/webpack-5.25.1.tgz#d3564440ed2569253fa45864405a313916bef6f6"
-  integrity sha512-dzFTJwehoLZkeHUkvMSwAgVdGL+PerfX0mke9tOWjJs4OzFctkxCqD8Zj5J387jLkC4gNqSin0/EurhH28boCg==
-  dependencies:
-    "@types/eslint-scope" "^3.7.0"
-    "@types/estree" "^0.0.46"
-    "@webassemblyjs/ast" "1.11.0"
-    "@webassemblyjs/wasm-edit" "1.11.0"
-    "@webassemblyjs/wasm-parser" "1.11.0"
-    acorn "^8.0.4"
-    browserslist "^4.14.5"
-    chrome-trace-event "^1.0.2"
-    enhanced-resolve "^5.7.0"
-    es-module-lexer "^0.4.0"
-    eslint-scope "^5.1.1"
-    events "^3.2.0"
-    glob-to-regexp "^0.4.1"
-    graceful-fs "^4.2.4"
-    json-parse-better-errors "^1.0.2"
-    loader-runner "^4.2.0"
-    mime-types "^2.1.27"
-    neo-async "^2.6.2"
-    schema-utils "^3.0.0"
-    tapable "^2.1.1"
-    terser-webpack-plugin "^5.1.1"
-    watchpack "^2.0.0"
-    webpack-sources "^2.1.1"
-
-webpack@^5.28.0:
+webpack@^5.28.0, webpack@^5.31.0:
   version "5.31.0"
   resolved "https://registry.yarnpkg.com/webpack/-/webpack-5.31.0.tgz#fab61d0be896feca4af87bdad5c18815c0d63455"
   integrity sha512-3fUfZT/FUuThWSSyL32Fsh7weUUfYP/Fjc/cGSbla5KiSo0GtI1JMssCRUopJTvmLjrw05R2q7rlLtiKdSzkzQ==
