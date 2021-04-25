@@ -16,7 +16,7 @@ export default ({
   }
 
   const placeholderText = () => {
-    return placeholder || 'Master Password'
+    return placeholder || window.i18n('Master Password')
   }
 
   const handleKeyDown = event => {

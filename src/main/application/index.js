@@ -9,6 +9,7 @@ import Auditor from './auditor'
 import { EVENTS } from './events'
 import { isWindows } from './helpers/os'
 import { trackAppEvent, trackVaultEvent } from 'analytics'
+import { i18n } from './i18n'
 
 const INACTIVE_TIMEOUT = 60000
 
@@ -45,6 +46,7 @@ export default class Swifty extends Application {
   }
 
   onReady() {
+    this.i18n = i18n
     this.closed = false
     this.vault = new Vault()
     this.tray = new Tray(this)
@@ -57,6 +59,7 @@ export default class Swifty extends Application {
     this.window.disableNavigation()
     this.setupWindowEvents()
     this.subscribe()
+    this.window.send('onload', this.i18n.data())
     if (this.vault.isPristine()) return this.showSetup()
     return this.showAuth()
   }

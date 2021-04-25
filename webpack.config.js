@@ -1,5 +1,6 @@
 var path = require('path')
 var Dotenv = require('dotenv-webpack')
+var CopyPlugin = require('copy-webpack-plugin')
 
 const envFile = () => {
   const NODE_ENV = process.env.NODE_ENV
@@ -99,12 +100,16 @@ module.exports = {
     plugins: [
       new Dotenv({
         path: envFile()
+      }),
+      new CopyPlugin({
+        patterns: [{ from: path.resolve(__dirname, 'locales'), to: 'locales' }]
       })
     ],
     resolve: {
       modules: [
         path.resolve(__dirname, 'src', 'main'),
         path.resolve(__dirname, 'resources'),
+        path.resolve(__dirname, 'locales'),
         path.resolve(__dirname, 'node_modules')
       ]
     }

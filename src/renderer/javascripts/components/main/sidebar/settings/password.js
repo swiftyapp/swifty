@@ -84,7 +84,7 @@ const Password = ({ section }) => {
               value={options.symbols}
               onChange={onChange}
             />
-            Speciall symbols
+            Special symbols
           </label>
         </div>
       </div>

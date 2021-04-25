@@ -31,7 +31,7 @@ describe('Passwords audit', () => {
     )
 
     const score = await app.client.$('.aside .score')
-    expect(await score.getText()).toBe('0\nOveral Score')
+    expect(await score.getText()).toBe('0\nOverall Score')
 
     const stats1 = await app.client.$('.aside .stats li:nth-child(1)')
     const stats2 = await app.client.$('.aside .stats li:nth-child(2)')

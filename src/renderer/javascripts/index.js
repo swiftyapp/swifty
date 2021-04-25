@@ -11,7 +11,8 @@ import Swifty from './components/swifty'
 
 const store = createStore(rootReducer, applyMiddleware(thunkMiddleware))
 
-window.onload = () => {
+window.MessagesAPI.onMessage('onload', (_, i18n) => {
+  window.i18n = key => i18n[key] || key
   document
     .querySelector('body')
     .setAttribute('platform', window.AppAPI.platform())
@@ -21,7 +22,7 @@ window.onload = () => {
     </Provider>,
     document.getElementById('root')
   )
-}
+})
 
 window.MessagesAPI.onMessage('setup', () => {
   store.dispatch({ type: 'FLOW_SETUP' })

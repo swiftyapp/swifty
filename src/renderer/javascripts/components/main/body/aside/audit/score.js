@@ -21,7 +21,7 @@ const Score = ({ audit }) => {
   return (
     <div className="score">
       <div className="points">{getScore()}</div>
-      <div className="muted">Overal Score</div>
+      <div className="muted">Overall Score</div>
     </div>
   )
 }
