@@ -4,6 +4,7 @@ import Import from './import'
 import Confirm from './confirm'
 
 export default ({ goBack }) => {
+  const { i18n } = window
   const [step, setStep] = useState(null)
   const onImport = () => {
     setStep('confirmation')
@@ -13,11 +14,8 @@ export default ({ goBack }) => {
     <div className="lock-screen">
       <div className="top-lock">
         <Backup width="48" />
-        <h2>Restore Backup</h2>
-        <div className="instructions">
-          If you've been using Swifty before you can restore your data from
-          backup file. Your Master Password will be required for this.
-        </div>
+        <h2>{i18n('Restore Backup')}</h2>
+        <div className="instructions">{i18n('Restore Instructions')}</div>
       </div>
       <div className="bottom-lock">
         <Import

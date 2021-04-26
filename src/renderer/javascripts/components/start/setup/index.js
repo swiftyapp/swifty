@@ -4,18 +4,15 @@ import Enter from './enter'
 import Confirm from './confirm'
 
 export default ({ goBack }) => {
+  const { i18n } = window
   const [hashedSecret, setHashedSecret] = useState(null)
 
   return (
     <div className="lock-screen">
       <div className="top-lock">
         <NewUser width="48" />
-        <h2>Account Setup</h2>
-        <div className="instructions">
-          You need to set a Master Password to use Swifty. <br />
-          This is the only password you have to remember. Make sure you never
-          forget it.
-        </div>
+        <h2>{i18n('Account Setup')}</h2>
+        <div className="instructions">{i18n('Setup Instructions')}</div>
       </div>
       <Enter
         display={hashedSecret === null}

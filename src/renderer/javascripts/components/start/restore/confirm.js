@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import Masterpass from 'components/elements/masterpass'
 
 export default ({ display }) => {
+  const { i18n } = window
   const [hashedSecret, setHashedSecret] = useState()
   const [error, setError] = useState()
 
@@ -14,7 +15,7 @@ export default ({ display }) => {
     window.CryptorAPI.setupCryptor(hashedSecret)
     window.MessagesAPI.sendBackupPassword(hashedSecret)
     window.MessagesAPI.onBackupPasswordFail(() => {
-      setError('Invalid password for backup')
+      setError(i18n('Invalid password for backup'))
     })
   }
 
@@ -23,14 +24,14 @@ export default ({ display }) => {
   return (
     <>
       <Masterpass
-        placeholder="Enter Master Password"
+        placeholder={i18n('Enter Master Password')}
         error={error}
         onEnter={onSend}
         onChange={onChange}
       />
       <br />
       <div className="button" onClick={onSend}>
-        Finish
+        {i18n('Finish')}
       </div>
     </>
   )

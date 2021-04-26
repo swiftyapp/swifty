@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import Masterpass from 'components/elements/masterpass'
 
 export default ({ display, hashedSecret }) => {
+  const { i18n } = window
   const [confirmation, setConfirmation] = useState(null)
   const [error, setError] = useState(null)
 
@@ -15,7 +16,7 @@ export default ({ display, hashedSecret }) => {
       window.CryptorAPI.setupCryptor(hashedSecret)
       window.MessagesAPI.sendSetupDone(hashedSecret)
     } else {
-      setError('Passwords do not match')
+      setError(i18n('Passwords do not match'))
     }
   }
 
@@ -24,14 +25,14 @@ export default ({ display, hashedSecret }) => {
   return (
     <div className="bottom-lock">
       <Masterpass
-        placeholder="Confirm Master Password"
+        placeholder={i18n('Confirm Master Password')}
         error={error}
         onEnter={onSend}
         onChange={onChange}
       />
       <br />
       <div className="button" onClick={onSend}>
-        Finish
+        {i18n('Finish')}
       </div>
     </div>
   )
