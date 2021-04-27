@@ -4,17 +4,18 @@ import SecureField from './secure'
 import TagField from './tag'
 
 const Note = ({ entry, validate, onChange, onTagsChange }) => {
+  const { i18n } = window
   return (
     <>
       <Field
-        name="Title"
+        name={i18n('Title')}
         entry={entry}
         onChange={onChange}
         validate={validate}
         maxLength="40"
       />
       <SecureField
-        name="Note"
+        name={i18n('Note')}
         entry={entry}
         onChange={onChange}
         validate={validate}

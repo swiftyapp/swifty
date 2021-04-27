@@ -8,12 +8,13 @@ import MasterPassword from './master_password'
 import SettingsIcon from 'settings.svg'
 
 const Settings = () => {
+  const { i18n } = window
   const [modal, setModal] = useState(false)
   const [section, setSection] = useState('vault')
 
   return (
     <div className="settings">
-      <Tooltip content="Settings">
+      <Tooltip content={i18n('Settings')}>
         <div className="settings-button" onClick={() => setModal(!modal)}>
           <SettingsIcon />
         </div>

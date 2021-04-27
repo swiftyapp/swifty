@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { getProps, setProps } from 'defaults/generator'
 
 const Password = ({ section }) => {
+  const { i18n } = window
   const [options, setOptions] = useState(getProps())
   const [example, setExample] = useState(
     window.GeneratorAPI.generatePassword(getProps())
@@ -29,13 +30,13 @@ const Password = ({ section }) => {
   if (section !== 'password') return null
   return (
     <>
-      <h1>Password Settings</h1>
+      <h1>{i18n('Password Settings')}</h1>
       <div className="section">
-        <strong>Example</strong>
+        <strong>{i18n('Example')}</strong>
         <div className="password-sample">{example}</div>
       </div>
       <div className="section">
-        <strong>Length</strong>
+        <strong>{i18n('Length')}</strong>
         <div>
           <input
             type="range"
@@ -50,7 +51,7 @@ const Password = ({ section }) => {
         </div>
       </div>
       <div className="section">
-        <strong>Symbols</strong>
+        <strong>{i18n('Symbols')}</strong>
         <div>
           <label>
             <input
@@ -60,7 +61,7 @@ const Password = ({ section }) => {
               value={options.numbers}
               onChange={onChange}
             />
-            Numbers
+            {i18n('Numbers')}
           </label>
         </div>
         <div>
@@ -72,7 +73,7 @@ const Password = ({ section }) => {
               value={options.uppercase}
               onChange={onChange}
             />
-            Uppercase
+            {i18n('Uppercase')}
           </label>
         </div>
         <div>
@@ -84,7 +85,7 @@ const Password = ({ section }) => {
               value={options.symbols}
               onChange={onChange}
             />
-            Special symbols
+            {i18n('Special characters')}
           </label>
         </div>
       </div>

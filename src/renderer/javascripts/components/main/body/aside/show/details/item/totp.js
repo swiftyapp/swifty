@@ -3,6 +3,7 @@ import Copy from 'copy.svg'
 import { copy } from 'services/copy'
 
 export default ({ name, entry }) => {
+  const { i18n } = window
   if (!entry.otp || entry.otp == '') return null
 
   const [time, setTime] = useState(0)
@@ -32,7 +33,7 @@ export default ({ name, entry }) => {
 
   return (
     <div className="item">
-      <div className="label">{name}</div>
+      <div className="label">{i18n(name)}</div>
       <div className="value">
         <strong className="muted">{formattedValue()}</strong>
       </div>

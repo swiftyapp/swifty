@@ -1,13 +1,8 @@
 import React from 'react'
 
 export default ({ tags }) => {
+  const { i18n } = window
   if (tags.length !== 0) return null
 
-  return (
-    <div className="dropdown-empty">
-      Start tagging your entries
-      <br />
-      to filter them by tags.
-    </div>
-  )
+  return <div className="dropdown-empty">{i18n('Start tagging')}</div>
 }

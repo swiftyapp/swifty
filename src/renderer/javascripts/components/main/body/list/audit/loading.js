@@ -1,7 +1,8 @@
 import React from 'react'
 
 const Loading = () => {
-  return <div>Loading Results..</div>
+  const { i18n } = window
+  return <div>{i18n('Loading Results..')}</div>
 }
 
 export default Loading

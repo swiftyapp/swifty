@@ -3,11 +3,12 @@ import shortid from 'shortid'
 import Item from '../item'
 
 const Duplicates = ({ entries }) => {
+  const { i18n } = window
   if (entries.length === 0) return null
 
   return (
     <div className="audit-group level-three">
-      <div className="title">Duplicates</div>
+      <div className="title">{i18n('Duplicates')}</div>
       {entries.map(item => (
         <Item entry={item} key={shortid.generate()} />
       ))}

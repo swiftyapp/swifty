@@ -10,6 +10,7 @@ import { saveEntry, isValid } from 'actions/entries'
 import entries from 'defaults/entries'
 
 const Form = ({ entry }) => {
+  const { i18n } = window
   const dispatch = useDispatch()
   const { scope } = useSelector(state => state.filters)
 
@@ -90,10 +91,10 @@ const Form = ({ entry }) => {
       {renderFields()}
       <div className="actions">
         <span className="cancel" onClick={onCancel}>
-          Cancel
+          {i18n('Cancel')}
         </span>
         <span className="button" onClick={onSave}>
-          Save
+          {i18n('Save')}
         </span>
       </div>
     </div>

@@ -6,6 +6,7 @@ import SecureField from './secure'
 import TagField from './tag'
 
 const Login = ({ entry, validate, onChange, onTagsChange }) => {
+  const { i18n } = window
   const generatePassword = () => {
     const password = window.GeneratorAPI.generatePassword(getProps())
     onChange({ target: { name: 'password', value: password } })
@@ -14,22 +15,22 @@ const Login = ({ entry, validate, onChange, onTagsChange }) => {
   return (
     <>
       <Field
-        name="Title"
+        name={i18n('Title')}
         validate={validate}
         entry={entry}
         onChange={onChange}
         maxLength="40"
       />
-      <Field name="Website" entry={entry} onChange={onChange} />
+      <Field name={i18n('Website')} entry={entry} onChange={onChange} />
       <Field
-        name="Username"
+        name={i18n('Username')}
         validate={validate}
         entry={entry}
         onChange={onChange}
         maxLength="40"
       />
       <SecureField
-        name="Password"
+        name={i18n('Password')}
         validate={validate}
         entry={entry}
         onChange={onChange}
@@ -39,10 +40,10 @@ const Login = ({ entry, validate, onChange, onTagsChange }) => {
           generate
         </span>
       </SecureField>
-      <SecureField name="OTP" entry={entry} onChange={onChange} />
-      <Field name="Email" entry={entry} onChange={onChange} />
+      <SecureField name={i18n('OTP')} entry={entry} onChange={onChange} />
+      <Field name={i18n('Email')} entry={entry} onChange={onChange} />
       <TagField entry={entry} onChange={onTagsChange} />
-      <Field name="Note" entry={entry} onChange={onChange} rows="5" />
+      <Field name={i18n('Note')} entry={entry} onChange={onChange} rows="5" />
     </>
   )
 }

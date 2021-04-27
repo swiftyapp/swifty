@@ -3,12 +3,13 @@ import fs from 'fs-extra'
 import { app } from 'electron'
 
 let loadedLanguage
+const DEFAULT_LOCALE = 'en'
 
 function I18n() {
   const locale = app.getLocale().split('-')[0]
   const localesPath = path.join(app.getAppPath(), 'main', 'locales')
   const localeFile = path.join(localesPath, locale + '.json')
-  const defaultLocaleFile = path.join(localesPath, 'en.json')
+  const defaultLocaleFile = path.join(localesPath, `${DEFAULT_LOCALE}.json`)
 
   loadedLanguage = fs.existsSync(localeFile)
     ? fs.readJSONSync(localeFile)

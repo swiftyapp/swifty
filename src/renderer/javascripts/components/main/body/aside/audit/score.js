@@ -1,6 +1,7 @@
 import React from 'react'
 
 const Score = ({ audit }) => {
+  const { i18n } = window
   const getScore = () => {
     const records = Object.values(audit)
     const result = records.reduce((accumulator, record) => {
@@ -21,7 +22,7 @@ const Score = ({ audit }) => {
   return (
     <div className="score">
       <div className="points">{getScore()}</div>
-      <div className="muted">Overall Score</div>
+      <div className="muted">{i18n('Overall Score')}</div>
     </div>
   )
 }

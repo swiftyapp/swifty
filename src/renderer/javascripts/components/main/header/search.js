@@ -4,6 +4,7 @@ import SearchIcon from 'search.svg'
 import ClearIcon from 'clear.svg'
 
 const Search = () => {
+  const { i18n } = window
   const dispatch = useDispatch()
   const filterTerm = useSelector(state => state.filters.query)
 
@@ -21,7 +22,7 @@ const Search = () => {
       <input
         type="search"
         name="search"
-        placeholder="Search"
+        placeholder={i18n('Search')}
         value={filterTerm}
         onChange={filterItems}
       />

@@ -2,25 +2,26 @@ import React from 'react'
 import classnames from 'classnames'
 
 const Navigation = ({ section, onClick }) => {
+  const { i18n } = window
   return (
     <ul className="navigation">
       <li
         className={classnames({ current: section === 'vault' })}
         onClick={() => onClick('vault')}
       >
-        Vault Settings
+        {i18n('Vault Settings')}
       </li>
       <li
         className={classnames({ current: section === 'masterpassword' })}
         onClick={() => onClick('masterpassword')}
       >
-        Master Password
+        {i18n('Master Password')}
       </li>
       <li
         className={classnames({ current: section === 'password' })}
         onClick={() => onClick('password')}
       >
-        Password Generation
+        {i18n('Password Generation')}
       </li>
     </ul>
   )

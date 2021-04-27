@@ -9,6 +9,7 @@ import NoteIcon from 'note.svg'
 import AuditIcon from 'information.svg'
 
 const Switcher = () => {
+  const { i18n } = window
   const dispatch = useDispatch()
   const { scope } = useSelector(state => state.filters)
 
@@ -22,7 +23,7 @@ const Switcher = () => {
 
   return (
     <div className="switcher">
-      <Tooltip content="Logins">
+      <Tooltip content={i18n('Logins')}>
         <div
           className={itemClassname('login')}
           onClick={() => switchScope('login')}
@@ -30,7 +31,7 @@ const Switcher = () => {
           <LoginIcon with="28" height="28" />
         </div>
       </Tooltip>
-      <Tooltip content="Secure Notes">
+      <Tooltip content={i18n('Secure Notes')}>
         <div
           className={itemClassname('note')}
           onClick={() => switchScope('note')}
@@ -38,7 +39,7 @@ const Switcher = () => {
           <NoteIcon with="28" height="28" />
         </div>
       </Tooltip>
-      <Tooltip content="Credit Cards">
+      <Tooltip content={i18n('Credit Cards')}>
         <div
           className={itemClassname('card')}
           onClick={() => switchScope('card')}
@@ -46,7 +47,7 @@ const Switcher = () => {
           <CardIcon with="28" height="28" />
         </div>
       </Tooltip>
-      <Tooltip content="Password Audit" className="bottom">
+      <Tooltip content={i18n('Password Audit')} className="bottom">
         <div
           className={itemClassname('audit', 'audit-button')}
           onClick={() => switchScope('audit')}

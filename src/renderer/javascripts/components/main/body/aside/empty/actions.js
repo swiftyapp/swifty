@@ -3,6 +3,7 @@ import classnames from 'classnames'
 import { useSelector, useDispatch } from 'react-redux'
 
 export default () => {
+  const { i18n } = window
   const dispatch = useDispatch()
   const { isPristine } = useSelector(state => ({
     isPristine: state.entries.items.length === 0
@@ -22,16 +23,16 @@ export default () => {
     <div className="actions">
       <div>
         <a href="#" onClick={onAddEntry}>
-          Create First Entry
+          {i18n('Create First Entry')}
         </a>
       </div>
-      <div>or</div>
+      <div>{i18n('or')}</div>
       <div>
         <span
           className={classnames('button', { loading: isLoading })}
           onClick={onImport}
         >
-          Import from Gdrive
+          {i18n('Import from Gdrive')}
         </span>
       </div>
     </div>

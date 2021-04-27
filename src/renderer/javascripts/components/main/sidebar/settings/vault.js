@@ -4,6 +4,7 @@ import classNames from 'classnames'
 import DownloadIcon from 'download.svg'
 
 const Vault = ({ section }) => {
+  const { i18n } = window
   const [connecting, setConnecting] = useState(false)
 
   const syncEnabled = useSelector(state => state.sync.enabled)
@@ -27,7 +28,7 @@ const Vault = ({ section }) => {
     if (syncEnabled) {
       return (
         <div className="button danger" onClick={onClickDisconnect}>
-          Disconnect Google Drive
+          {i18n('Disconnect Google Drive')}
         </div>
       )
     }
@@ -36,7 +37,7 @@ const Vault = ({ section }) => {
         className={classNames('button', { loading: connecting })}
         onClick={onClickConnect}
       >
-        Connect your Google Drive
+        {i18n('Connect your Google Drive')}
       </div>
     )
   }
@@ -45,18 +46,20 @@ const Vault = ({ section }) => {
 
   return (
     <>
-      <h1>Vault Settings</h1>
+      <h1>{i18n('Vault Settings')}</h1>
       <div className="section">
-        <strong>Synchronize</strong>
-        <div>Synchronize your vault with Google Drive</div>
+        <strong>{i18n('Synchronize')}</strong>
+        <div>{i18n('Synchronize your vault with Google Drive')}</div>
         {syncAction()}
       </div>
 
       <div className="section">
-        <strong>Backup</strong>
-        <div>Allows you to save a backup of your default vault file</div>
+        <strong>{i18n('Backup')}</strong>
+        <div>
+          {i18n('Allows you to save a backup of your default vault file')}
+        </div>
         <div className="button pale iconed" onClick={onClickSaveBackup}>
-          <DownloadIcon width="16" height="16" /> Save Vault File
+          <DownloadIcon width="16" height="16" /> {i18n('Save Vault File')}
         </div>
       </div>
     </>

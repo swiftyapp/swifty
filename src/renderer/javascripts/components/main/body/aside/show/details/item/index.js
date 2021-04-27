@@ -3,6 +3,7 @@ import Copy from 'copy.svg'
 import { copy } from 'services/copy'
 
 export default ({ entry, name, link, cc, secure }) => {
+  const { i18n } = window
   const onClick = event => {
     window.AppAPI.openLink(event.target.href)
   }
@@ -36,7 +37,7 @@ export default ({ entry, name, link, cc, secure }) => {
 
   return (
     <div className={className()}>
-      <div className="label">{name}</div>
+      <div className="label">{i18n(name)}</div>
       <div className="value">{value()}</div>
       <Copy width="16" height="16" onClick={() => copy(copyValue())} />
     </div>

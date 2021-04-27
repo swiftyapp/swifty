@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import classnames from 'classnames'
 
 const MasterPassword = ({ section }) => {
+  const { i18n } = window
   if (section !== 'masterpassword') return null
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -37,7 +38,7 @@ const MasterPassword = ({ section }) => {
     setCurrentPassword('')
     setNewPassword('')
     setNewPasswordConfirmation('')
-    setSuccess('Successfully changed password')
+    setSuccess(i18n('Successfully changed password'))
   }
 
   const handleErrors = error => {
@@ -46,9 +47,9 @@ const MasterPassword = ({ section }) => {
 
   return (
     <>
-      <h1>Change Master Password</h1>
+      <h1>{i18n('Change Master Password')}</h1>
       <div className="section">
-        <strong>Current Password</strong>
+        <strong>{i18n('Current Password')}</strong>
         <div className="threefour">
           <input
             type="password"
@@ -59,7 +60,7 @@ const MasterPassword = ({ section }) => {
         </div>
       </div>
       <div className="section">
-        <strong>New Password</strong>
+        <strong>{i18n('New Password')}</strong>
         <div className="threefour">
           <input
             type="password"
@@ -70,7 +71,7 @@ const MasterPassword = ({ section }) => {
         </div>
       </div>
       <div className="section">
-        <strong>Repeat New Password</strong>
+        <strong>{i18n('Repeat New Password')}</strong>
         <div className="threefour">
           <input
             type="password"
@@ -88,7 +89,7 @@ const MasterPassword = ({ section }) => {
             loading: processing
           })}
         >
-          Update
+          {i18n('Update')}
         </span>
         {error && <span className="danger">{error}</span>}
         {success && <span className="success">{success}</span>}

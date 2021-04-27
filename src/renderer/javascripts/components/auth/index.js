@@ -4,6 +4,7 @@ import Controls from '../elements/controls'
 import img from 'swifty.png'
 
 export const Auth = ({ touchID }) => {
+  const { i18n } = window
   const [error, setError] = useState(null)
 
   const handleEnter = value => {
@@ -11,7 +12,7 @@ export const Auth = ({ touchID }) => {
     window.CryptorAPI.setupCryptor(hashedSecret)
     window.MessagesAPI.sendAuthStart(hashedSecret)
     window.MessagesAPI.onAuthFail(() => {
-      setError('Incorrect Master Password')
+      setError(i18n('Incorrect Master Password'))
     })
   }
 

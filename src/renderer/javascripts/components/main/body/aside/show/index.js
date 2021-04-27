@@ -7,6 +7,7 @@ import { deleteEntry } from 'actions/entries'
 import Details from './details'
 
 const Show = ({ entry }) => {
+  const { i18n } = window
   const dispatch = useDispatch()
 
   const onEdit = () => {
@@ -26,7 +27,9 @@ const Show = ({ entry }) => {
 
   return (
     <div className="aside shaded">
-      <div className="copied-notification hidden">Copied to Clipboard</div>
+      <div className="copied-notification hidden">
+        {i18n('Copied to Clipboard')}
+      </div>
       <div className="entry-title">
         <h1>{entry.title}</h1>
         <Pencil width="16" height="16" onClick={onEdit} className="action" />
@@ -35,13 +38,13 @@ const Show = ({ entry }) => {
       <Details entry={entry} />
       <div className="entry-extra">
         <div className="item">
-          <div className="label">Last Modified</div>
+          <div className="label">{i18n('Last Modified')}</div>
           <div className="value">
             {formatDate(entry.updatedAt || entry.updated_at)}
           </div>
         </div>
         <div className="item">
-          <div className="label">Created</div>
+          <div className="label">{i18n('Created')}</div>
           <div className="value">
             {formatDate(entry.createdAt || entry.created_at)}
           </div>
