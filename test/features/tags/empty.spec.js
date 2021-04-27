@@ -13,7 +13,7 @@ describe('Empty tag filter', () => {
 
     const dropdown = await app.client.$('.tag-filter .dropdown')
     expect(await dropdown.getText()).toBe(
-      'Start tagging your entries\nto filter them by tags.'
+      'Start tagging your entries to filter them by tags.'
     )
   })
 })
