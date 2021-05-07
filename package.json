@@ -6,7 +6,7 @@
   "dependencies": {
     "@swiftyapp/cryptor": "^1.1.1",
     "classnames": "^2.3.1",
-    "electron-log": "^4.3.4",
+    "electron-log": "^4.3.5",
     "electron-notarize": "^1.0.0",
     "electron-unhandled": "^3.0.2",
     "electron-util": "^0.15.1",
@@ -53,7 +53,7 @@
     "css-loader": "^5.2.4",
     "dotenv": "^8.2.0",
     "dotenv-webpack": "^7.0.2",
-    "electron": "^12.0.5",
+    "electron": "^12.0.6",
     "eslint": "^7.25.0",
     "eslint-plugin-jest": "^24.3.6",
     "eslint-plugin-jsx-a11y": "^6.4.1",
