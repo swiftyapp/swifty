@@ -71,9 +71,11 @@
     "webpack": "^5.36.2"
   },
   "resolutions": {
+    "hosted-git-info": ">=3.0.8",
     "node-forge": "^0.10.0",
     "js-yaml": "^3.14.1",
     "yargs-parser": "^20.2.7",
+    "lodash": "^4.17.21",
     "serialize-javascript": "^5.0.1",
     "xmldom": ">=0.6.0"
   },
