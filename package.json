@@ -14,7 +14,7 @@
     "generate-password": "^1.6.0",
     "googleapis": "^73.0.0",
     "lodash": "^4.17.21",
-    "luxon": "^1.26.0",
+    "luxon": "^1.27.0",
     "mousetrap": "^1.6.5",
     "nucleon": "^1.0.19",
     "parse-domain": "^3.0.3",
@@ -65,10 +65,10 @@
     "prettier": "^2.3.0",
     "ps-node": "^0.1.6",
     "react-svg-loader": "^3.0.3",
-    "sass-loader": "^11.0.1",
+    "sass-loader": "^11.1.1",
     "spectron": "^14.0.0",
     "style-loader": "^2.0.0",
-    "webpack": "^5.36.2"
+    "webpack": "^5.37.0"
   },
   "resolutions": {
     "hosted-git-info": ">=3.0.8",
