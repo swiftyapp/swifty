@@ -16,7 +16,7 @@
     "lodash": "^4.17.21",
     "luxon": "^1.27.0",
     "mousetrap": "^1.6.5",
-    "nucleon": "^1.0.19",
+    "nucleon": "^1.0.20",
     "parse-domain": "^3.0.3",
     "password-validator": "^5.1.1",
     "react": "^17.0.2",
