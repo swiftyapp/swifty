@@ -78,7 +78,7 @@
     "lodash": "^4.17.21",
     "serialize-javascript": "^5.0.1",
     "trim-newlines": "4.0.2",
-    "xmldom": ">=0.6.0"
+    "xmldom": "xmldom/xmldom#0.7.0"
   },
   "build": {
     "appId": "com.electron.swifty",
