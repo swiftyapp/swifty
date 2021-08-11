@@ -1,7 +1,21 @@
+.select
+  position: relative
+  &::after
+    position: absolute
+    display: block
+    content: ""
+    width: 0.8em
+    height: 0.5em
+    top: 14px
+    right: 14px
+    background-color: #777
+    clip-path: polygon(100% 0%, 0 0%, 50% 100%)
+
 select
   font-size: 14px
   width: 100%
   padding: 8px 10px
   border: 1px solid #ddd
   border-radius: 5px
+  outline: none
   -webkit-appearance: none

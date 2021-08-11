@@ -19,16 +19,18 @@ const Language = ({ section }) => {
   return (
     <>
       <h1>{i18n('Language')}</h1>
-      <select
-        name="locale"
-        onChange={({ target }) => setLanguage(target.value)}
-      >
-        {Object.keys(languages).map(key => (
-          <option key={key} value={key}>
-            {languages[key]}
-          </option>
-        ))}
-      </select>
+      <div className="select">
+        <select
+          name="locale"
+          onChange={({ target }) => setLanguage(target.value)}
+        >
+          {Object.keys(languages).map(key => (
+            <option key={key} value={key}>
+              {languages[key]}
+            </option>
+          ))}
+        </select>
+      </div>
     </>
   )
 }
