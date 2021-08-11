@@ -11,8 +11,12 @@ import Swifty from './components/swifty'
 
 const store = createStore(rootReducer, applyMiddleware(thunkMiddleware))
 
-window.MessagesAPI.onMessage('onload', (_, i18n) => {
-  window.i18n = key => i18n[key] || key
+const renderApplication = i18n => {
+  const locale = localStorage.getItem('locale')
+  i18n.locale = locale ? locale : i18n.locale
+  window._i18n = i18n
+  window.i18n = key => i18n.translations[i18n.locale][key] || key
+
   document
     .querySelector('body')
     .setAttribute('platform', window.AppAPI.platform())
@@ -22,6 +26,11 @@ window.MessagesAPI.onMessage('onload', (_, i18n) => {
     </Provider>,
     document.getElementById('root')
   )
+}
+window.refreshApplication = () => renderApplication(window._i18n)
+
+window.MessagesAPI.onMessage('onload', (_, i18n) => {
+  renderApplication(i18n)
 })
 
 window.MessagesAPI.onMessage('setup', () => {

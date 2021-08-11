@@ -5,6 +5,7 @@ import Navigation from './navigation'
 import Vault from './vault'
 import Password from './password'
 import MasterPassword from './master_password'
+import Language from './language'
 import SettingsIcon from 'settings.svg'
 
 const Settings = () => {
@@ -27,6 +28,7 @@ const Settings = () => {
               <Vault section={section} />
               <MasterPassword section={section} />
               <Password section={section} />
+              <Language section={section} />
             </div>
           </div>
         </Modal>

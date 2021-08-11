@@ -2,23 +2,25 @@ import path from 'path'
 import fs from 'fs-extra'
 import { app } from 'electron'
 
-let loadedLanguage
-const DEFAULT_LOCALE = 'en'
+let translations = {}
+const AVAILABLE_LOCALES = ['en-US', 'ru-RU', 'tr-TR', 'zh-CN']
+const DEFAULT_LOCALE = 'en-US'
 
 function I18n() {
-  const locale = app.getLocale().split('-')[0]
   const localesPath = path.join(app.getAppPath(), 'main', 'locales')
-  const localeFile = path.join(localesPath, locale + '.json')
-  const defaultLocaleFile = path.join(localesPath, `${DEFAULT_LOCALE}.json`)
 
-  loadedLanguage = fs.existsSync(localeFile)
-    ? fs.readJSONSync(localeFile)
-    : fs.readJSONSync(defaultLocaleFile)
+  AVAILABLE_LOCALES.forEach(locale => {
+    translations[locale] = fs.readJSONSync(
+      path.join(localesPath, locale + '.json')
+    )
+  })
+
+  return {
+    availableLocales: AVAILABLE_LOCALES,
+    locale: DEFAULT_LOCALE,
+    translations: translations
+  }
 }
-
-I18n.prototype.data = () => loadedLanguage
-
-I18n.prototype._ = phrase => loadedLanguage[phrase] || phrase
 
 const i18n = new I18n()
 

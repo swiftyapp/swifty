@@ -59,7 +59,7 @@ export default class Swifty extends Application {
     this.window.disableNavigation()
     this.setupWindowEvents()
     this.subscribe()
-    this.window.send('onload', this.i18n.data())
+    this.window.send('onload', this.i18n)
     if (this.vault.isPristine()) return this.showSetup()
     return this.showAuth()
   }

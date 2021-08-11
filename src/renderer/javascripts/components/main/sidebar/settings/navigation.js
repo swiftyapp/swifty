@@ -23,6 +23,12 @@ const Navigation = ({ section, onClick }) => {
       >
         {i18n('Password Generation')}
       </li>
+      <li
+        className={classnames({ current: section === 'language' })}
+        onClick={() => onClick('language')}
+      >
+        {i18n('Language')}
+      </li>
     </ul>
   )
 }
