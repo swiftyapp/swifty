@@ -4581,10 +4581,10 @@ electron-updater@^4.3.9:
     lodash.isequal "^4.5.0"
     semver "^7.3.5"
 
-electron-util@^0.16.0:
-  version "0.16.0"
-  resolved "https://registry.yarnpkg.com/electron-util/-/electron-util-0.16.0.tgz#00ef60b23aa5a47b454c07fb353bc4d203d3ceb1"
-  integrity sha512-r13cauuQ8p8d++ZVdeMDtQ2VlpblJBcpKnK7sf2tGnN8CCWyRGYerS2K5f3FiblFIQkyS0rE4tFVG0IOEc2F3A==
+electron-util@^0.17.0:
+  version "0.17.0"
+  resolved "https://registry.yarnpkg.com/electron-util/-/electron-util-0.17.0.tgz#9cb27a0a583a9ecbb10821702b4a705b6e69f196"
+  integrity sha512-61+NEPdIN68EBC9XDPNAKs14HlPdc7HsL6lfQ+QTiya+3BMzayBqUsvN1LrT7IoGpPuuZns+iaCKf1N78dEF+w==
   dependencies:
     electron-is-dev "^1.1.0"
     new-github-issue-url "^0.2.1"
@@ -5429,10 +5429,10 @@ gcp-metadata@^4.2.0:
     gaxios "^4.0.0"
     json-bigint "^1.0.0"
 
-generate-password@^1.6.0:
-  version "1.6.0"
-  resolved "https://registry.yarnpkg.com/generate-password/-/generate-password-1.6.0.tgz#9dff4fcca7f831e6832d464509910fab333d0323"
-  integrity sha512-YUJTQkApkLT/fru0QdYWP0lVZdPKhF5kXCP24sgI4gR/vFMJFopCj5t1+9FAKIYcML/nxzx2PMkA1ymO1FC+tQ==
+generate-password@^1.6.1:
+  version "1.6.1"
+  resolved "https://registry.yarnpkg.com/generate-password/-/generate-password-1.6.1.tgz#c2a7a2af74abb353dd855c16b3e13336b9d80272"
+  integrity sha512-JvtWSiN4KVmF6kBFi89Uz9LLN7l/EuGZYiKrIxddFlKcjSgc3D3va0Z5faooNwN85O0VBlt/ZtTdqhbQKhAOyw==
 
 gensync@^1.0.0-beta.1:
   version "1.0.0-beta.1"
@@ -5660,10 +5660,10 @@ googleapis-common@^5.0.2:
     url-template "^2.0.8"
     uuid "^8.0.0"
 
-googleapis@^76.0.0:
-  version "76.0.0"
-  resolved "https://registry.yarnpkg.com/googleapis/-/googleapis-76.0.0.tgz#44bed361e92df7e44646bdc1a51df031c1ddf0bd"
-  integrity sha512-l/TFSW7IRFcb7wF641BlmuP8Ox1ncuzJk5Fcs2947otlGBm5ktDxFhPkmrcNDaG+LWPQsuDwP1ojL0xV39cpmw==
+googleapis@^84.0.0:
+  version "84.0.0"
+  resolved "https://registry.yarnpkg.com/googleapis/-/googleapis-84.0.0.tgz#55b534b234c2df1af0b0f33c0394f31ac23a20d0"
+  integrity sha512-5WWLwmraulw3p55lu0gNpLz2FME1gcuR7QxgmUdAVHMiVN4LEasYjJV9p36gxcf2TMe6bn6+PgQ/63+CvBEgoQ==
   dependencies:
     google-auth-library "^7.0.2"
     googleapis-common "^5.0.2"
@@ -7356,10 +7356,10 @@ lru-cache@^6.0.0:
   dependencies:
     yallist "^4.0.0"
 
-luxon@^1.27.0:
-  version "1.27.0"
-  resolved "https://registry.yarnpkg.com/luxon/-/luxon-1.27.0.tgz#ae10c69113d85dab8f15f5e8390d0cbeddf4f00f"
-  integrity sha512-VKsFsPggTA0DvnxtJdiExAucKdAnwbCCNlMM5ENvHlxubqWd0xhZcdb4XgZ7QFNhaRhilXCFxHuoObP5BNA4PA==
+luxon@^2.0.2:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/luxon/-/luxon-2.0.2.tgz#11f2cd4a11655fdf92e076b5782d7ede5bcdd133"
+  integrity sha512-ZRioYLCgRHrtTORaZX1mx+jtxKtKuI5ZDvHNAmqpUzGqSrR+tL4FVLn/CUGMA3h0+AKD1MAxGI5GnCqR5txNqg==
 
 make-dir@^2.0.0, make-dir@^2.1.0:
   version "2.1.0"
@@ -8674,10 +8674,10 @@ redux@^4.0.0:
     loose-envify "^1.4.0"
     symbol-observable "^1.2.0"
 
-redux@^4.1.0:
-  version "4.1.0"
-  resolved "https://registry.yarnpkg.com/redux/-/redux-4.1.0.tgz#eb049679f2f523c379f1aff345c8612f294c88d4"
-  integrity sha512-uI2dQN43zqLWCt6B/BMGRMY6db7TTY4qeHHfGeKb3EOhmOKjU3KdWvNLJyqaHRksv/ErdNH7cFZWg9jXtewy4g==
+redux@^4.1.1:
+  version "4.1.1"
+  resolved "https://registry.yarnpkg.com/redux/-/redux-4.1.1.tgz#76f1c439bb42043f985fbd9bf21990e60bd67f47"
+  integrity sha512-hZQZdDEM25UY2P493kPYuKqviVwZ58lEmGQNeQ+gXa+U0gYPUBf7NKYazbe3m+bs/DzM/ahN12DbF+NG8i0CWw==
   dependencies:
     "@babel/runtime" "^7.9.2"
 
@@ -10588,10 +10588,10 @@ yallist@^4.0.0:
   resolved "https://registry.yarnpkg.com/yallist/-/yallist-4.0.0.tgz#9bb92790d9c0effec63be73519e11a35019a3a72"
   integrity sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==
 
-yargs-parser@^13.1.2, yargs-parser@^2.4.1, yargs-parser@^20.2.2, yargs-parser@^20.2.3, yargs-parser@^20.2.7:
-  version "20.2.7"
-  resolved "https://registry.yarnpkg.com/yargs-parser/-/yargs-parser-20.2.7.tgz#61df85c113edfb5a7a4e36eb8aa60ef423cbc90a"
-  integrity sha512-FiNkvbeHzB/syOjIUxFDCnhSfzAL8R5vs40MgLFBorXACCOAEaWu0gRZl14vG8MR9AOJIZbmkjhusqBYZ3HTHw==
+yargs-parser@^13.1.2, yargs-parser@^2.4.1, yargs-parser@^20.2.2, yargs-parser@^20.2.3, yargs-parser@^20.2.9:
+  version "20.2.9"
+  resolved "https://registry.yarnpkg.com/yargs-parser/-/yargs-parser-20.2.9.tgz#2eb7dc3b0289718fc295f362753845c41a0c94ee"
+  integrity sha512-y11nGElTIV+CT3Zv9t7VKl+Q3hTQoT9a1Qzezhhl6Rp21gJ/IVTW7Z3y9EWXhuUBC2Shnf+DX0antecpAwSP8w==
 
 yargs@^13.3.2:
   version "13.3.2"
