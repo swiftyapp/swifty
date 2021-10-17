@@ -50,7 +50,7 @@
     "babel-loader": "^8.2.2",
     "bozon": "^1.2.7",
     "copy-webpack-plugin": "^9.0.1",
-    "css-loader": "^6.3.0",
+    "css-loader": "^6.4.0",
     "dotenv": "^10.0.0",
     "dotenv-webpack": "^7.0.3",
     "electron": "^13.3.0",
@@ -65,10 +65,10 @@
     "prettier": "^2.4.1",
     "ps-node": "^0.1.6",
     "react-svg-loader": "^3.0.3",
-    "sass-loader": "^12.1.0",
+    "sass-loader": "^12.2.0",
     "spectron": "^15.0.0",
     "style-loader": "^3.3.0",
-    "webpack": "^5.55.1"
+    "webpack": "^5.58.2"
   },
   "resolutions": {
     "js-yaml": "^3.14.1",
