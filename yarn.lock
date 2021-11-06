@@ -5558,10 +5558,10 @@ googleapis-common@^5.0.2:
     url-template "^2.0.8"
     uuid "^8.0.0"
 
-googleapis@^88.2.0:
-  version "88.2.0"
-  resolved "https://registry.yarnpkg.com/googleapis/-/googleapis-88.2.0.tgz#956cdc45ebce82215a246b1069eb475770408c26"
-  integrity sha512-z3iDvGVqaJ+4TZ7YulK530q5vkY0BifvAWqcu2JiUSgpnIHzsA89k005+McoaYB+lAgv7lPY2Y4OPMT6iloWRA==
+googleapis@^89.0.0:
+  version "89.0.0"
+  resolved "https://registry.yarnpkg.com/googleapis/-/googleapis-89.0.0.tgz#03de7b1467c066d48b989f6a8384857ef6971e69"
+  integrity sha512-eH91BN+6R/Mp5uulrhKWGwKAbibfDNOIu1Oq8n12aFTiqb23/A9kVdRhituYVqhRqSWLr/kv1dpFbd6n+uN+7Q==
   dependencies:
     google-auth-library "^7.0.2"
     googleapis-common "^5.0.2"
@@ -8050,10 +8050,10 @@ pascal-case@^1.1.0:
     camel-case "^1.1.1"
     upper-case-first "^1.1.0"
 
-password-validator@^5.1.1:
-  version "5.1.1"
-  resolved "https://registry.yarnpkg.com/password-validator/-/password-validator-5.1.1.tgz#f1dd03a862fa73abf6cbff437acb516aaa784684"
-  integrity sha512-PsnXRlCHzZGviGro9iJXo76vj7Y7Txd0OyJhLsF4pCpsDn53iIuhX5h0mYr93KqkNrc7Htk4jocaYFGVjG/Ohw==
+password-validator@^5.2.1:
+  version "5.2.1"
+  resolved "https://registry.yarnpkg.com/password-validator/-/password-validator-5.2.1.tgz#51f67c33e768acbef24d8719a52ad544f7dce004"
+  integrity sha512-EfNW0akQ+YrMawF5KNXoDBTdUvXwx2vxvIuq1XXUiDmti7aaBDnqTl/IAruxztWTCN0Bt+og3LL3I9E4blCRqQ==
 
 path-case@^1.1.0:
   version "1.1.2"
