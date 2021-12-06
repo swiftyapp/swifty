@@ -49,7 +49,7 @@
     "babel-jest": "^27.4.2",
     "babel-loader": "^8.2.3",
     "bozon": "^1.2.7",
-    "copy-webpack-plugin": "^9.0.1",
+    "copy-webpack-plugin": "^10.0.0",
     "css-loader": "^6.5.1",
     "dotenv": "^10.0.0",
     "dotenv-webpack": "^7.0.3",
