@@ -10,7 +10,7 @@ export const appPath = () => {
         '..',
         '..',
         '.tmp',
-        'mac',
+        'mac-arm64',
         'Swifty.app',
         'Contents',
         'MacOS',
