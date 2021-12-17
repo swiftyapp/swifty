@@ -42,11 +42,11 @@
     "email": "alchaplinsky@gmail.com"
   },
   "devDependencies": {
-    "@babel/core": "^7.16.0",
-    "@babel/node": "^7.16.0",
-    "@babel/preset-env": "^7.16.4",
-    "@babel/preset-react": "^7.16.0",
-    "babel-jest": "^27.4.4",
+    "@babel/core": "^7.16.5",
+    "@babel/node": "^7.16.5",
+    "@babel/preset-env": "^7.16.5",
+    "@babel/preset-react": "^7.16.5",
+    "babel-jest": "^27.4.5",
     "babel-loader": "^8.2.3",
     "bozon": "^1.2.7",
     "copy-webpack-plugin": "^10.0.0",
