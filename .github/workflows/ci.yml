@@ -23,6 +23,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v2
         with:
+          registry-url: 'https://npm.pkg.github.com'
           node-version: ${{ matrix.node }}
 
       - uses: c-hive/gha-yarn-cache@v2
