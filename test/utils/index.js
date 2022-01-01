@@ -3,13 +3,6 @@ const ps = require('ps-node')
 const path = require('path')
 
 export const appPath = () => {
-  const result = fs.readdirSync(path.join(__dirname, '..', '..'))
-  console.log('+=======>', fs.readdirSync(path.join(__dirname, '..', '..')))
-
-  if (result.includes('.tmp')) {
-    console.log('=======>', fs.readdirSync(path.join(__dirname, '..', '..', '.tmp')))
-  }
-
   switch (process.platform) {
     case 'darwin':
       return path.join(
