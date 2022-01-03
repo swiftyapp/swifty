@@ -6,11 +6,11 @@ exports.default = async function notarizing(context) {
   if (electronPlatformName !== 'darwin' || process.env.NODE_ENV === 'test') {
     return
   }
-
   return await notarize({
-    appBundleId: 'com.electron.swifty',
-    appPath: `packages/mac/Swifty.app`,
+    tool: process.env.NOTARIZE_TOOL,
+    appPath: process.env.MAC_APP_PATH,
     appleId: process.env.APPLEID,
-    appleIdPassword: process.env.APPLEIDPASSWORD
+    appleIdPassword: process.env.APPLEIDPASSWORD,
+    teamId: process.env.APPLETEAMID
   })
 }
