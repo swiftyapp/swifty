@@ -1,7 +1,7 @@
 import { DateTime } from 'luxon'
 
 import Sync from 'application/sync'
-import Vault from 'application/vault'
+import LegacyVault from 'application/legacy_vault'
 import { Cryptor } from 'application/cryptor'
 
 jest.unmock('application/sync')
@@ -10,7 +10,7 @@ jest.mock('application/sync/gdrive/index')
 describe('#perform', () => {
   let sync
   const cryptor = new Cryptor()
-  let vault = new Vault()
+  let vault = new LegacyVault()
   const currentTime = DateTime.local()
 
   beforeEach(async () => {

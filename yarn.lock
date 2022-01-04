@@ -2025,10 +2025,25 @@
   dependencies:
     "@sinonjs/commons" "^1.7.0"
 
+"@swiftyapp/aes-256-gcm@^1.0.1":
+  version "1.0.1"
+  resolved "https://npm.pkg.github.com/download/@swiftyapp/aes-256-gcm/1.0.1/4fcdc1587aa9e4a979343965c2f1277e62bc73630734fcd8fdcc06d2c4ccbac9#2e1cbac96bdef54122a87e8b38b78cd29c736491"
+  integrity sha512-lbsJAlBehZuSwcq/tzE9mKOPFysbsk/gkCdxWq4Cik8eBS2jJH1B2MzGIr0llo5PeY1iaSwt6/PceBgHiS22hQ==
+
 "@swiftyapp/cryptor@^1.1.2":
   version "1.1.2"
   resolved "https://npm.pkg.github.com/download/@swiftyapp/cryptor/1.1.2/8e96965782fa635ab9a7e9cdaa422faf97b1c9447cb44dc872ab06f46fd11d61#5c44412585bd8713257707f781615d88315bad16"
   integrity sha512-gUdGUi01HmRpNnCDgEtqq+cOmhMgQhnqCu+v1RRABHVwI+dY6GPWCDMLgGVQShpN0l0MtZvgtBc+KMJ+/a6U6A==
+
+"@swiftyapp/vault@^0.1.0":
+  version "0.1.0"
+  resolved "https://npm.pkg.github.com/download/@swiftyapp/vault/0.1.0/389fac026dc6adf0f739be1eb4036d82ec0fccaa3197afc3b90b1d57ad950630#6fd6ac5882fd968e350f9d21244bd815b3192a27"
+  integrity sha512-p1OSzCVAAgAkdGmb9ziHoakJZbSYlUjRGPvLbraT7DjDixrW0eZS6pryNOD3dK9ElHPZ3BHHMQ8EU2k6vwgzxA==
+  dependencies:
+    "@swiftyapp/aes-256-gcm" "^1.0.1"
+    fs-extra "^10.0.0"
+    lodash "^4.17.21"
+    nanoid "^3.1.30"
 
 "@szmarczak/http-timer@^1.1.2":
   version "1.1.2"
@@ -7424,6 +7439,11 @@ nanoid@^3.1.23:
   version "3.1.23"
   resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-3.1.23.tgz#f744086ce7c2bc47ee0a8472574d5c78e4183a81"
   integrity sha512-FiB0kzdP0FFVGDKlRLEQ1BgDzU87dy5NnzjeW9YZNt+/c3+q82EQDUwniSAUxp/F0gFNI1ZhKU1FqYsMuqZVnw==
+
+nanoid@^3.1.30:
+  version "3.1.30"
+  resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-3.1.30.tgz#63f93cc548d2a113dc5dfbc63bfa09e2b9b64362"
+  integrity sha512-zJpuPDwOv8D2zq2WRoMe1HsfZthVewpel9CAvTfc/2mBD1uUT/agc5f7GHGWXlYkFvi1mVxe4IjvP2HNrop7nQ==
 
 natural-compare@^1.4.0:
   version "1.4.0"

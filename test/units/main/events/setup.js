@@ -1,8 +1,8 @@
 import { BrowserWindow } from 'electron'
-import Vault from 'application/vault'
+import LegacyVault from 'application/legacy_vault'
 import Sync from 'application/sync'
 
-const vault = new Vault()
+const vault = new LegacyVault()
 const sync = new Sync()
 const window = new BrowserWindow()
 

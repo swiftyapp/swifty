@@ -2,7 +2,7 @@ import path from 'path'
 import Auth from './auth'
 import Drive from './drive'
 import Storage from 'application/storage'
-import { vaultFile } from 'application/vault'
+import { vaultFile } from 'application/legacy_vault'
 
 export const credentialsFile = () => {
   if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {

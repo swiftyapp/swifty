@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon'
-const Vault = jest.fn(() => {
+const LegacyVault = jest.fn(() => {
   return {
     isDecryptable: jest.fn().mockReturnValue(true),
     read: jest.fn().mockReturnValue({
@@ -10,4 +10,4 @@ const Vault = jest.fn(() => {
   }
 })
 export const vaultFile = jest.fn().mockReturnValue('vault.swftx')
-export default Vault
+export default LegacyVault

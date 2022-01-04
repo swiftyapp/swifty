@@ -10,7 +10,7 @@ export const vaultFile = () => {
   return `vault_${process.env.APP_ENV}.swftx`
 }
 
-export default class Vault {
+export default class LegacyVault {
   constructor() {
     this.storage = new Storage(vaultFile())
   }

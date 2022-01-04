@@ -1,8 +1,8 @@
-import Vault from 'application/vault'
+import LegacyVault from 'application/legacy_vault'
 import Storage from 'application/storage'
 import { Cryptor } from 'application/cryptor'
 
-jest.unmock('application/vault')
+jest.unmock('application/legacy_vault')
 jest.unmock('application/cryptor')
 jest.mock('application/storage')
 
@@ -20,7 +20,7 @@ describe('Vault', () => {
         Storage.mockImplementation(() => ({
           read: jest.fn(() => 'eyJwYXNzd29yZCI6ICJhc2RmcXdlcnR5In0=')
         }))
-        vault = new Vault()
+        vault = new LegacyVault()
       })
 
       describe('valid cryptor', () => {
@@ -47,7 +47,7 @@ describe('Vault', () => {
         Storage.mockImplementation(() => ({
           read: jest.fn(() => 'eyJwYXXdlcnR5In0=')
         }))
-        vault = new Vault()
+        vault = new LegacyVault()
       })
 
       test('returns false', () => {
@@ -64,7 +64,7 @@ describe('Vault', () => {
 
       beforeEach(() => {
         Storage.mockImplementation(() => ({ write }))
-        vault = new Vault()
+        vault = new LegacyVault()
         result = vault.setup(cryptor)
       })
       test('returns true', () => {
@@ -80,7 +80,7 @@ describe('Vault', () => {
       let write = jest.fn(() => false)
       beforeEach(() => {
         Storage.mockImplementation(() => ({ write }))
-        vault = new Vault()
+        vault = new LegacyVault()
         result = vault.setup(cryptor)
       })
       test('returns true', () => {
@@ -98,7 +98,7 @@ describe('Vault', () => {
       let read = jest.fn(() => '')
       beforeEach(() => {
         Storage.mockImplementation(() => ({ read }))
-        vault = new Vault()
+        vault = new LegacyVault()
       })
 
       test('returns true', () => {
@@ -110,7 +110,7 @@ describe('Vault', () => {
       let read = jest.fn(() => 'eyJlbnRyaWVzIjpbXX0=')
       beforeEach(() => {
         Storage.mockImplementation(() => ({ read }))
-        vault = new Vault()
+        vault = new LegacyVault()
       })
 
       test('returns true', () => {
@@ -123,7 +123,7 @@ describe('Vault', () => {
     let write = jest.fn()
     beforeEach(() => {
       Storage.mockImplementation(() => ({ write }))
-      vault = new Vault()
+      vault = new LegacyVault()
       vault.write('data')
     })
 
@@ -136,7 +136,7 @@ describe('Vault', () => {
     let read = jest.fn()
     beforeEach(() => {
       Storage.mockImplementation(() => ({ read }))
-      vault = new Vault()
+      vault = new LegacyVault()
       vault.read()
     })
 
@@ -154,7 +154,7 @@ describe('Vault', () => {
 
       beforeEach(() => {
         Storage.mockImplementation(() => ({ import: importMock, write }))
-        vault = new Vault()
+        vault = new LegacyVault()
         result = vault.import('/users/test', cryptor)
       })
 
@@ -179,7 +179,7 @@ describe('Vault', () => {
 
       beforeEach(() => {
         Storage.mockImplementation(() => ({ import: importMock, write }))
-        vault = new Vault()
+        vault = new LegacyVault()
         result = vault.import('/users/test', cryptor)
       })
 
@@ -201,7 +201,7 @@ describe('Vault', () => {
     let exportMock = jest.fn()
     beforeEach(() => {
       Storage.mockImplementation(() => ({ export: exportMock }))
-      vault = new Vault()
+      vault = new LegacyVault()
       vault.export('/users/test')
     })
 

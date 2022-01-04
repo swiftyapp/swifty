@@ -1,7 +1,7 @@
 import Sync from 'application/sync'
 
 jest.unmock('application/sync')
-jest.mock('application/vault')
+jest.mock('application/legacy_vault')
 jest.mock('application/sync/gdrive/index')
 
 describe('#import', () => {
