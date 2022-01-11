@@ -1,4 +1,4 @@
-import { Cryptor as BaseCryptor } from '@swiftyapp/cryptor'
+import { encrypt, decrypt } from '@swiftyapp/aes-256-gcm'
 
 const SENSITIVE_FIELDS = {
   login: ['password', 'otp'],
@@ -31,7 +31,7 @@ const prepareFields = (data, callback) => {
 
 export class Cryptor {
   constructor(secret) {
-    this.cryptor = new BaseCryptor(secret)
+    this.secret = secret
   }
 
   encryptData(data) {
@@ -43,18 +43,18 @@ export class Cryptor {
   }
 
   encrypt(data) {
-    return this.cryptor.encrypt(data)
+    return encrypt(data, this.secret)
   }
 
   decrypt(data) {
-    return this.cryptor.decrypt(data)
+    return decrypt(data, this.secret)
   }
 
   obscure(data) {
-    return prepareFields(data, property => this.encrypt(property))
+    return prepareFields(data, property => encrypt(property, this.secret))
   }
 
   expose(data) {
-    return prepareFields(data, property => this.decrypt(property))
+    return prepareFields(data, property => decrypt(property, this.secret))
   }
 }

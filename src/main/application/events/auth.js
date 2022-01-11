@@ -3,7 +3,7 @@ import { systemPreferences } from 'electron'
 
 export const onAuthStart = function (_, hashedSecret) {
   this.cryptor = new Cryptor(hashedSecret)
-  if (this.vault.authenticate(this.cryptor)) {
+  if (this.vaultManager.authenticate(hashedSecret)) {
     this.sync.initialize(this.cryptor, this.vault)
     this.authSuccess()
     if (this.sync.isConfigured()) return this.pullVaultData()

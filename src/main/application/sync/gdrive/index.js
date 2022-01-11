@@ -2,7 +2,7 @@ import path from 'path'
 import Auth from './auth'
 import Drive from './drive'
 import Storage from 'application/storage'
-import { vaultFile } from 'application/legacy_vault'
+import { legacyVaultPath } from 'application/legacy_vault'
 
 export const credentialsFile = () => {
   if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
@@ -15,7 +15,7 @@ export default class GDrive {
   constructor(cryptor) {
     this.cryptor = cryptor
     this.folderName = 'Swifty'
-    this.fileName = vaultFile()
+    this.fileName = legacyVaultPath()
     this.credentials = new Storage(path.join('auth', credentialsFile()))
     this.auth = new Auth(
       () => this.readTokens(),

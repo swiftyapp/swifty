@@ -5,6 +5,7 @@ import Window from 'window'
 import Tray from 'tray/index'
 import Sync from './sync'
 import LegacyVault from './legacy_vault'
+import VaultManager from './vault_manager'
 import Auditor from './auditor'
 import { EVENTS } from './events'
 import { isWindows } from './helpers/os'
@@ -48,8 +49,9 @@ export default class Swifty extends Application {
   onReady() {
     this.i18n = i18n
     this.closed = false
-    this.vault = new LegacyVault()
     this.tray = new Tray(this)
+    this.vaultManager = new VaultManager()
+    this.vault = new LegacyVault()
     this.sync = new Sync()
     trackAppEvent('Launch')
   }
@@ -60,7 +62,9 @@ export default class Swifty extends Application {
     this.setupWindowEvents()
     this.subscribe()
     this.window.send('onload', this.i18n)
-    if (this.vault.isPristine()) return this.showSetup()
+
+    if (!this.vaultManager.vaultExists()) return this.showSetup()
+
     return this.showAuth()
   }
 
@@ -98,7 +102,7 @@ export default class Swifty extends Application {
     this.window.enlarge()
     this.window.send('auth:success', {
       sync: this.sync.isConfigured(),
-      data: this.vault.read(),
+      data: this.vaultManager.read(),
       platform: process.platform
     })
     trackAppEvent('Authenticate')
@@ -110,7 +114,7 @@ export default class Swifty extends Application {
   }
 
   getAudit() {
-    const auditor = new Auditor(this.vault.read(), this.cryptor)
+    const auditor = new Auditor(this.vaultManager.read(), this.cryptor)
     auditor.getAudit().then(data => {
       this.window.send('audit:done', { data })
     })

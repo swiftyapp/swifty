@@ -1,18 +1,16 @@
+import { join } from 'path'
+import { app } from 'electron'
 import Storage from 'application/storage'
 
-export const vaultFile = () => {
-  if (process.env.SPECTRON_STORAGE_PATH) {
-    return process.env.SPECTRON_STORAGE_PATH
-  }
-  if (!process.env.APP_ENV || process.env.APP_ENV === 'production') {
-    return 'vault.swftx'
-  }
-  return `vault_${process.env.APP_ENV}.swftx`
+export const legacyVaultPath = () => {
+  if (process.env.LEGACY_VAULT_PATH) return process.env.LEGACY_VAULT_PATH
+
+  return join(app.getPath('userData'), 'vault.swftx')
 }
 
 export default class LegacyVault {
   constructor() {
-    this.storage = new Storage(vaultFile())
+    this.storage = new Storage(legacyVaultPath())
   }
 
   authenticate(cryptor) {

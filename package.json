@@ -5,8 +5,7 @@
   "repository": "https://github.com/alchaplinsky/swifty.git",
   "dependencies": {
     "@swiftyapp/aes-256-gcm": "^1.0.1",
-    "@swiftyapp/cryptor": "^1.1.2",
-    "@swiftyapp/vault": "^0.1.0",
+    "@swiftyapp/vault": "^0.1.1",
     "classnames": "^2.3.1",
     "electron-log": "^4.4.4",
     "electron-notarize": "^1.1.1",

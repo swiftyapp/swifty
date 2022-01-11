@@ -22,7 +22,7 @@ export const onBackupSelect = function () {
 
 export const onSetupDone = function (_, hashedSecret) {
   this.cryptor = new Cryptor(hashedSecret)
-  this.vault.setup(this.cryptor)
+  this.vaultManager.setup(hashedSecret)
   this.sync.initialize(this.cryptor)
   return this.authSuccess()
 }

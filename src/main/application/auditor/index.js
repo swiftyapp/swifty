@@ -15,7 +15,7 @@ export default class Auditor {
     return new Promise(resolve => {
       let audit = {}
       let hashes = []
-      this.cryptor.decryptData(this.data).entries.forEach(item => {
+      JSON.parse(this.data).contents.forEach(item => {
         if (!item.password) return
         this.buildItemAudit(audit, hashes, item)
       })

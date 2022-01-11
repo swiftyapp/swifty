@@ -1,4 +1,4 @@
-import { Cryptor as BaseCryptor } from '@swiftyapp/cryptor'
+import { encrypt, decrypt } from '@swiftyapp/aes-256-gcm'
 import { Cryptor } from 'application/cryptor'
 
 const cryptor = new Cryptor('secret')
@@ -13,7 +13,7 @@ describe('Cryptor', () => {
     })
 
     it('calls cryptor with stringified data', () => {
-      expect(BaseCryptor.encrypt).toHaveBeenCalledWith('{"id":1}')
+      expect(encrypt).toHaveBeenCalledWith('{"id":1}', 'secret')
     })
 
     it('returns base64 encrypted string', () => {
@@ -27,7 +27,7 @@ describe('Cryptor', () => {
     })
 
     it('calls cryptor with with stringified data', () => {
-      expect(BaseCryptor.decrypt).toHaveBeenCalledWith('{"id":1}')
+      expect(decrypt).toHaveBeenCalledWith('{"id":1}', 'secret')
     })
 
     it('returns decrypted object', () => {
@@ -41,7 +41,7 @@ describe('Cryptor', () => {
     })
 
     it('calls cryptor with data', () => {
-      expect(BaseCryptor.encrypt).toHaveBeenCalledWith('unencrypted')
+      expect(encrypt).toHaveBeenCalledWith('unencrypted', 'secret')
     })
   })
 
@@ -51,7 +51,7 @@ describe('Cryptor', () => {
     })
 
     it('calls cryptor with with data', () => {
-      expect(BaseCryptor.decrypt).toHaveBeenCalledWith('encrypted')
+      expect(decrypt).toHaveBeenCalledWith('encrypted', 'secret')
     })
   })
 })

@@ -9,5 +9,5 @@ const LegacyVault = jest.fn(() => {
     write: jest.fn()
   }
 })
-export const vaultFile = jest.fn().mockReturnValue('vault.swftx')
+export const legacyVaultPath = jest.fn().mockReturnValue('vault.swftx')
 export default LegacyVault

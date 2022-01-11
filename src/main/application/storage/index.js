@@ -7,6 +7,7 @@ export default class Storage {
     this.path = !path.isAbsolute(file)
       ? path.join(app.getPath('userData'), file)
       : file
+
     fs.ensureFileSync(this.path)
   }
 
