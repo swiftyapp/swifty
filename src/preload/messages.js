@@ -46,18 +46,6 @@ contextBridge.exposeInMainWorld('MessagesAPI', {
   sendVaultSyncStart: () => {
     ipcRenderer.send('vault:sync:start')
   },
-  sendAddItem: data => {
-    ipcRenderer.send('item:add', data)
-  },
-  sendUpdateItem: data => {
-    ipcRenderer.send('item:update', data)
-  },
-  sendRemoveItem: data => {
-    ipcRenderer.send('item:remove', data)
-  },
-  onDataSaved: callback => {
-    ipcRenderer.once('data:saved', callback)
-  },
   updateMasterPassword: data => {
     return new Promise((resolve, reject) => {
       ipcRenderer.send('masterpassword:update', data)

@@ -59,19 +59,19 @@ export default class VaultManager {
   }
 
   read() {
-    return this.vaults[0].serialize()
+    return this.vault.serialize()
   }
 
   add(data, hashedSecret) {
-    this.vaults[0].add(data, hashedSecret)
+    this.vault.add(data, hashedSecret)
   }
 
   update(id, data, hashedSecret) {
-    this.vaults[0].update(id, data, hashedSecret)
+    this.vault.update(id, data, hashedSecret)
   }
 
   remove(id, hashedSecret) {
-    this.vaults[0].remove(id, hashedSecret)
+    this.vault.remove(id, hashedSecret)
   }
 
   existingVaults() {
