@@ -46,8 +46,32 @@ export default class VaultManager {
     }
   }
 
+  import() {
+    // TODO: implement import
+  }
+
+  export() {
+    // TODO: implement import
+  }
+
+  write() {
+    // TODO: review and implement sync
+  }
+
   read() {
     return this.vaults[0].serialize()
+  }
+
+  add(data, hashedSecret) {
+    this.vaults[0].add(data, hashedSecret)
+  }
+
+  update(id, data, hashedSecret) {
+    this.vaults[0].update(id, data, hashedSecret)
+  }
+
+  remove(id, hashedSecret) {
+    this.vaults[0].remove(id, hashedSecret)
   }
 
   existingVaults() {

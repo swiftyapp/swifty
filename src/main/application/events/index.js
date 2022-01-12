@@ -1,20 +1,21 @@
+import { onItemAdd, onItemUpdate, onItemRemove } from './main'
+import { onWindowMessage } from './window'
+import { onSetupDone, onBackupSelect } from './setup'
+import { onAuthStart, onAuthTouchId } from './auth'
+import { onMasterPasswordChange, onBackupSave } from './vault'
 import {
-  onDataSave,
-  onBackupSave,
   onVaultSyncImport,
   onVaultSyncConnect,
   onVaultSyncDisconnect,
   onVaultSyncStart
-} from './main'
-import { onWindowMessage } from './window'
-import { onSetupDone, onBackupSelect } from './setup'
-import { onAuthStart, onAuthTouchId } from './auth'
-import { onMasterPasswordChange } from './vault'
+} from './sync'
 
 export const EVENTS = {
   'auth:start': onAuthStart,
   'auth:touchid': onAuthTouchId,
-  'data:save': onDataSave,
+  'item:add': onItemAdd,
+  'item:update': onItemUpdate,
+  'item:remove': onItemRemove,
   'backup:save': onBackupSave,
   'window:message': onWindowMessage,
   'vault:sync:import': onVaultSyncImport,

@@ -9,7 +9,7 @@ export const onBackupSelect = function () {
 
       ipcMain.on('backup:password', (_, hashedSecret) => {
         this.cryptor = new Cryptor(hashedSecret)
-        if (this.vault.import(filePaths[0], this.cryptor)) {
+        if (this.vaultManager.import(filePaths[0], hashedSecret)) {
           this.sync.initialize(this.cryptor)
           return this.authSuccess()
         }

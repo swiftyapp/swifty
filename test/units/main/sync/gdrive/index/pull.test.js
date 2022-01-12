@@ -2,7 +2,6 @@ import GDrive from 'application/sync/gdrive'
 import Drive from 'application/sync/gdrive/drive'
 
 jest.mock('application/sync/gdrive/drive')
-jest.mock('application/legacy_vault')
 
 describe('#pull', () => {
   const sync = new GDrive({})

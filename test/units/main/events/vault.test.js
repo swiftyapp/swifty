@@ -30,12 +30,12 @@ describe('onMasterPasswordChange', () => {
 
   describe('invalid current password', () => {
     beforeEach(() => {
-      app.vault.isDecryptable.mockReturnValue(false)
+      app.vaultManager.isDecryptable.mockReturnValue(false)
       subject()
     })
 
     it('does not re-crypt vault', () => {
-      expect(app.vault.write).not.toHaveBeenCalled()
+      expect(app.vaultManager.write).not.toHaveBeenCalled()
     })
 
     it('does not set new cryptor to application', () => {
@@ -59,7 +59,7 @@ describe('onMasterPasswordChange', () => {
   describe('valid current password', () => {
     describe('re-crypts vault', () => {
       beforeEach(() => {
-        app.vault.isDecryptable.mockReturnValue(true)
+        app.vaultManager.isDecryptable.mockReturnValue(true)
         subject()
       })
 
@@ -69,7 +69,7 @@ describe('onMasterPasswordChange', () => {
       })
 
       it('writes re-crypted data to vault', () => {
-        expect(app.vault.write).toHaveBeenCalledWith(
+        expect(app.vaultManager.write).toHaveBeenCalledWith(
           '{"entries":[{"id":"2","password":"qwerty.newpassword","type":"login"}],"updatedAt":"2030-06-01T10:00:00.000+02:00"}|newpassword'
         )
       })

@@ -3,9 +3,9 @@ import { DateTime } from 'luxon'
 
 export const deleteEntry = id => {
   return (dispatch, getState) => {
-    const entries = getState().entries.items.filter(item => item.id !== id)
-    window.MessagesAPI.sendSaveData(window.CryptorAPI.encryptData({ entries }))
-    window.MessagesAPI.onOnce('data:saved', (event, data) => {
+    const item = getState().entries.items.find(item => item.id !== id)
+    window.MessagesAPI.sendRemoveItem(item)
+    window.MessagesAPI.onOnce('data:saved', (_, data) => {
       dispatch({ type: 'ENTRY_REMOVED', ...data })
     })
     window.MessagesAPI.sendVaultSyncStart()
@@ -14,8 +14,7 @@ export const deleteEntry = id => {
 
 export const saveEntry = credentials => {
   return (dispatch, getState) => {
-    const [entries, item] = save(credentials, getState())
-    window.MessagesAPI.sendSaveData(window.CryptorAPI.encryptData({ entries }))
+    const item = save(credentials, getState())
     window.MessagesAPI.onOnce('data:saved', (event, data) => {
       dispatch({ type: 'SET_ENTRIES', ...data })
       dispatch({ type: 'ENTRY_SAVED', currentId: item.id, ...data })
@@ -56,13 +55,15 @@ const update = (entries, data) => {
   const index = entries.findIndex(item => item.id === data.id)
   data.updatedAt = date()
   entries[index] = data
-  return [entries, data]
+  window.MessagesAPI.sendUpdateItem(data)
+  return data
 }
 
 const create = (entries, data) => {
   const item = buildItem(data)
   entries.push(item)
-  return [entries, item]
+  window.MessagesAPI.sendAddItem(item)
+  return item
 }
 
 const date = () => {

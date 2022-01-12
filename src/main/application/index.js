@@ -4,7 +4,6 @@ import { Application } from 'nucleon'
 import Window from 'window'
 import Tray from 'tray/index'
 import Sync from './sync'
-import LegacyVault from './legacy_vault'
 import VaultManager from './vault_manager'
 import Auditor from './auditor'
 import { EVENTS } from './events'
@@ -51,7 +50,6 @@ export default class Swifty extends Application {
     this.closed = false
     this.tray = new Tray(this)
     this.vaultManager = new VaultManager()
-    this.vault = new LegacyVault()
     this.sync = new Sync()
     trackAppEvent('Launch')
   }
