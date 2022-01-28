@@ -12,12 +12,12 @@
     "electron-util": "^0.17.2",
     "fs-extra": "^10.0.0",
     "generate-password": "^1.7.0",
-    "googleapis": "^89.0.0",
+    "googleapis": "^92.0.0",
     "lodash": "^4.17.21",
-    "luxon": "^2.2.0",
+    "luxon": "^2.3.0",
     "mousetrap": "^1.6.5",
     "nucleon": "^1.0.20",
-    "parse-domain": "^4.1.0",
+    "parse-domain": "^7.0.0",
     "password-validator": "^5.2.1",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
@@ -28,7 +28,7 @@
     "remove": "^0.1.5",
     "shortid": "^2.2.16",
     "speakeasy": "^2.0.0",
-    "universal-analytics": "^0.4.23"
+    "universal-analytics": "^0.5.3"
   },
   "scripts": {
     "lint": "npx eslint --color src",
