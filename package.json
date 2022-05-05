@@ -6,7 +6,7 @@
   "dependencies": {
     "@swiftyapp/cryptor": "^1.1.2",
     "classnames": "^2.3.1",
-    "electron-log": "^4.4.5",
+    "electron-log": "^4.4.7",
     "electron-notarize": "^1.1.1",
     "electron-unhandled": "^3.0.2",
     "electron-util": "^0.17.2",
@@ -49,7 +49,7 @@
     "babel-jest": "^28.0.3",
     "babel-loader": "^8.2.5",
     "bozon": "^1.2.9",
-    "copy-webpack-plugin": "^10.2.2",
+    "copy-webpack-plugin": "^10.2.4",
     "css-loader": "^6.5.1",
     "dotenv": "^14.3.2",
     "dotenv-webpack": "^7.1.0",
