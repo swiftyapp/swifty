@@ -42,12 +42,12 @@
     "email": "alchaplinsky@gmail.com"
   },
   "devDependencies": {
-    "@babel/core": "^7.16.12",
-    "@babel/node": "^7.16.8",
-    "@babel/preset-env": "^7.16.11",
+    "@babel/core": "^7.17.10",
+    "@babel/node": "^7.17.10",
+    "@babel/preset-env": "^7.17.10",
     "@babel/preset-react": "^7.16.7",
-    "babel-jest": "^27.4.6",
-    "babel-loader": "^8.2.3",
+    "babel-jest": "^28.0.3",
+    "babel-loader": "^8.2.5",
     "bozon": "^1.2.9",
     "copy-webpack-plugin": "^10.2.2",
     "css-loader": "^6.5.1",
