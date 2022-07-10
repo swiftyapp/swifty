@@ -7686,6 +7686,13 @@ nth-check@>=2.0.1, nth-check@^1.0.2:
   dependencies:
     boolbase "^1.0.0"
 
+nth-check@^2.1.1:
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/nth-check/-/nth-check-2.1.1.tgz#c9eab428effce36cd6b92c924bdb000ef1f1ed1d"
+  integrity sha512-lqjrjmaOoAnWfMmBPL+XNnynZh2+swxiX3WUE0s4yEHI6m+AwrK2UZOimIRl3X/4QctVqS8AiZjFqyOGrMXb/w==
+  dependencies:
+    boolbase "^1.0.0"
+
 nucleon@^1.0.21:
   version "1.0.21"
   resolved "https://registry.yarnpkg.com/nucleon/-/nucleon-1.0.21.tgz#b8b62f897f2b53f81671d80c105dbf265dea9b4f"
@@ -7947,10 +7954,10 @@ parent-module@^1.0.0:
   dependencies:
     callsites "^3.0.0"
 
-parse-domain@^7.0.0:
-  version "7.0.0"
-  resolved "https://registry.yarnpkg.com/parse-domain/-/parse-domain-7.0.0.tgz#989ee2b54d485e8ce95b155a58a541d0f28a4f01"
-  integrity sha512-zTUcZpubnyZCb6h0cK3n9gTKYWm22klJyf01Ofx7SbD/mYZMcL3Z9C6vAwILC0bs2zfVFf6uac4+AsR1LqljWA==
+parse-domain@^7.0.1:
+  version "7.0.1"
+  resolved "https://registry.yarnpkg.com/parse-domain/-/parse-domain-7.0.1.tgz#37c12347acfa17d6e7835be48867ba035a9384ef"
+  integrity sha512-HsVmJkfoZB/Rb7Ai/QYVqZa95zkemNMerP70ZzIFpvvnvWbSSp+ZmUOQsdY1wxuFrB8cdA33E9fwwAT/OjWViA==
   dependencies:
     is-ip "^4.0.0"
     node-fetch "^3.2.0"
@@ -7985,10 +7992,10 @@ pascal-case@^1.1.0:
     camel-case "^1.1.1"
     upper-case-first "^1.1.0"
 
-password-validator@^5.2.1:
-  version "5.2.1"
-  resolved "https://registry.yarnpkg.com/password-validator/-/password-validator-5.2.1.tgz#51f67c33e768acbef24d8719a52ad544f7dce004"
-  integrity sha512-EfNW0akQ+YrMawF5KNXoDBTdUvXwx2vxvIuq1XXUiDmti7aaBDnqTl/IAruxztWTCN0Bt+og3LL3I9E4blCRqQ==
+password-validator@^5.3.0:
+  version "5.3.0"
+  resolved "https://registry.yarnpkg.com/password-validator/-/password-validator-5.3.0.tgz#472b89997c71c185eb22b7917b225726b4d64577"
+  integrity sha512-Q+bSEM5pjokZqzWGoQaoylkeWeH4+9uMYlVImiPD0EOJClQ2RPBhrJ5h0OjhMKtwOmu5rRcLaTZo5Gk9RBl0ig==
 
 path-case@^1.1.0:
   version "1.1.2"
@@ -8489,10 +8496,10 @@ redux@^4.0.0:
     loose-envify "^1.4.0"
     symbol-observable "^1.2.0"
 
-redux@^4.1.2:
-  version "4.1.2"
-  resolved "https://registry.yarnpkg.com/redux/-/redux-4.1.2.tgz#140f35426d99bb4729af760afcf79eaaac407104"
-  integrity sha512-SH8PglcebESbd/shgf6mii6EIoRM0zrQyjcuQ+ojmfxjTtE0z9Y8pa62iA/OJ58qjP6j27uyW4kUF4jl/jd6sw==
+redux@^4.2.0:
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/redux/-/redux-4.2.0.tgz#46f10d6e29b6666df758780437651eeb2b969f13"
+  integrity sha512-oSBmcKKIuIR4ME29/AeNUnl5L+hvBq7OaJWzaptTQJAntaPvxIJqfnjbaEiCzzaIz+XmVILfqAM3Ob0aXLPfjA==
   dependencies:
     "@babel/runtime" "^7.9.2"
 
@@ -8789,18 +8796,18 @@ sanitize-filename@^1.6.3:
   dependencies:
     truncate-utf8-bytes "^1.0.0"
 
-sass-loader@^12.6.0:
-  version "12.6.0"
-  resolved "https://registry.yarnpkg.com/sass-loader/-/sass-loader-12.6.0.tgz#5148362c8e2cdd4b950f3c63ac5d16dbfed37bcb"
-  integrity sha512-oLTaH0YCtX4cfnJZxKSLAyglED0naiYfNG1iXfU5w1LNZ+ukoA5DtyDIN5zmKVZwYNJP4KRc5Y3hkWga+7tYfA==
+sass-loader@^13.0.2:
+  version "13.0.2"
+  resolved "https://registry.yarnpkg.com/sass-loader/-/sass-loader-13.0.2.tgz#e81a909048e06520e9f2ff25113a801065adb3fe"
+  integrity sha512-BbiqbVmbfJaWVeOOAu2o7DhYWtcNmTfvroVgFXa6k2hHheMxNAeDHLNoDy/Q5aoaVlz0LH+MbMktKwm9vN/j8Q==
   dependencies:
     klona "^2.0.4"
     neo-async "^2.6.2"
 
-sass@^1.52.3:
-  version "1.52.3"
-  resolved "https://registry.yarnpkg.com/sass/-/sass-1.52.3.tgz#b7cc7ffea2341ccc9a0c4fd372bf1b3f9be1b6cb"
-  integrity sha512-LNNPJ9lafx+j1ArtA7GyEJm9eawXN8KlA1+5dF6IZyoONg1Tyo/g+muOsENWJH/2Q1FHbbV4UwliU0cXMa/VIA==
+sass@^1.53.0:
+  version "1.53.0"
+  resolved "https://registry.yarnpkg.com/sass/-/sass-1.53.0.tgz#eab73a7baac045cc57ddc1d1ff501ad2659952eb"
+  integrity sha512-zb/oMirbKhUgRQ0/GFz8TSAwRq2IlR29vOUJZOx0l8sV+CkHUfHa4u5nqrG+1VceZp7Jfj59SVW9ogdhTvJDcQ==
   dependencies:
     chokidar ">=3.0.0 <4.0.0"
     immutable "^4.0.0"
