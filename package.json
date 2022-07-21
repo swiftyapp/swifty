@@ -12,7 +12,7 @@
     "electron-util": "^0.17.2",
     "fs-extra": "^10.1.0",
     "generate-password": "^1.7.0",
-    "googleapis": "^92.0.0",
+    "googleapis": "^105.0.0",
     "lodash": "^4.17.21",
     "luxon": "^2.3.2",
     "mousetrap": "^1.6.5",
