@@ -42,7 +42,7 @@ export default class MainWindow {
 
   enlarge() {
     this.window.setMinimumSize(740, 400)
-    this.window.resize({ width: 900, height: 700 }, true)
+    this.resize({ width: 900, height: 700 }, true)
   }
 
   show() {
@@ -56,7 +56,7 @@ export default class MainWindow {
   resize(options, animate) {
     const currentBounds = this.window.getBounds()
     const newBounds = getNewBounds(currentBounds, options)
-    this.setBounds(newBounds, animate)
+    this.window.setBounds(newBounds, animate)
   }
 
   disableNavigation() {
