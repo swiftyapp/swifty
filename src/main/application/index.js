@@ -91,7 +91,7 @@ export default class Swifty {
   }
 
   onWindowReady() {
-    this.window.removeMenu()
+    this.window.window.removeMenu()
     this.window.disableNavigation()
     this.setupWindowEvents()
     this.subscribe()
@@ -123,11 +123,11 @@ export default class Swifty {
    */
 
   showAuth() {
-    this.window.webContents.send('auth', this.isTouchIdAvailable())
+    this.window.send('auth', this.isTouchIdAvailable())
   }
 
   showSetup() {
-    this.window.webContents.send('setup')
+    this.window.send('setup')
   }
 
   authSuccess() {
