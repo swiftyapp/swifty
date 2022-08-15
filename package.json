@@ -9,6 +9,7 @@
     "electron-log": "^4.4.8",
     "electron-notarize": "^1.2.1",
     "electron-unhandled": "^4.0.1",
+    "electron-updater": "^5.2.1",
     "electron-util": "^0.17.2",
     "fs-extra": "^10.1.0",
     "generate-password": "^1.7.0",

@@ -2701,6 +2701,11 @@
   resolved "https://registry.yarnpkg.com/@types/scheduler/-/scheduler-0.16.1.tgz#18845205e86ff0038517aab7a18a62a6b9f71275"
   integrity sha512-EaCxbanVeyxDRTQBkdLb3Bvl/HK7PBK6UJjsSixB0iHKoWxE5uu2Q/DgtpOhPIojN0Zl1whvOd7PoHs2P0s5eA==
 
+"@types/semver@^7.3.6":
+  version "7.3.12"
+  resolved "https://registry.yarnpkg.com/@types/semver/-/semver-7.3.12.tgz#920447fdd78d76b19de0438b7f60df3c4a80bf1c"
+  integrity sha512-WwA1MW0++RfXmCr12xeYOOC5baSC9mSb0ZqCquFzKhcoF4TvHu5MKOuXsncgZcpVFhB1pXd5hZmM0ryAoCp12A==
+
 "@types/stack-utils@^2.0.0":
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/@types/stack-utils/-/stack-utils-2.0.0.tgz#7036640b4e21cc2f259ae826ce843d277dad8cff"
@@ -3653,6 +3658,14 @@ builder-util-runtime@9.0.2:
   version "9.0.2"
   resolved "https://registry.yarnpkg.com/builder-util-runtime/-/builder-util-runtime-9.0.2.tgz#dc54f8581bbcf1e0428da4483fa46d09524be857"
   integrity sha512-xF55W/8mgfT6+sMbX0TeiJkTusA5GMOzckM4rajN4KirFcUIuLTH8oEaTYmM86YwVCZaTwa/7GyFhauXaEICwA==
+  dependencies:
+    debug "^4.3.4"
+    sax "^1.2.4"
+
+builder-util-runtime@9.0.3:
+  version "9.0.3"
+  resolved "https://registry.yarnpkg.com/builder-util-runtime/-/builder-util-runtime-9.0.3.tgz#6c62c493ba2b73c2af92432db4013b5a327f02b2"
+  integrity sha512-SfG2wnyjpUbbdtpnqDpWwklujofC6GarGpvdWrEkg9p5AD/xJmTF2buTNaqs3qtsNBEVQDDjZz9xc2GGpVyMfA==
   dependencies:
     debug "^4.3.4"
     sax "^1.2.4"
@@ -4786,6 +4799,21 @@ electron-unhandled@^4.0.1:
     ensure-error "^2.0.0"
     lodash.debounce "^4.0.8"
     serialize-error "^8.1.0"
+
+electron-updater@^5.2.1:
+  version "5.2.1"
+  resolved "https://registry.yarnpkg.com/electron-updater/-/electron-updater-5.2.1.tgz#297795e6e8ad9179c7ae2738a7b67cf0a5022be1"
+  integrity sha512-OQZVIvqcK8j03HjT07uVPgvguP/r8RY2wZcwCM26+fcDOjtrm01Dfz3G8Eru+69znbrR+F9pDzr98ewMavBrWQ==
+  dependencies:
+    "@types/semver" "^7.3.6"
+    builder-util-runtime "9.0.3"
+    fs-extra "^10.0.0"
+    js-yaml "^4.1.0"
+    lazy-val "^1.0.5"
+    lodash.escaperegexp "^4.1.2"
+    lodash.isequal "^4.5.0"
+    semver "^7.3.5"
+    typed-emitter "^2.1.0"
 
 electron-util@^0.17.2:
   version "0.17.2"
@@ -7313,10 +7341,20 @@ lodash.difference@^4.5.0:
   resolved "https://registry.yarnpkg.com/lodash.difference/-/lodash.difference-4.5.0.tgz#9ccb4e505d486b91651345772885a2df27fd017c"
   integrity sha1-nMtOUF1Ia5FlE0V3KIWi3yf9AXw=
 
+lodash.escaperegexp@^4.1.2:
+  version "4.1.2"
+  resolved "https://registry.yarnpkg.com/lodash.escaperegexp/-/lodash.escaperegexp-4.1.2.tgz#64762c48618082518ac3df4ccf5d5886dae20347"
+  integrity sha512-TM9YBvyC84ZxE3rgfefxUWiQKLilstD6k7PTGt6wfbtXF8ixIJLOL3VYyV/z+ZiPLsVxAsKAFVwWlWeb2Y8Yyw==
+
 lodash.flatten@^4.4.0:
   version "4.4.0"
   resolved "https://registry.yarnpkg.com/lodash.flatten/-/lodash.flatten-4.4.0.tgz#f31c22225a9632d2bbf8e4addbef240aa765a61f"
   integrity sha1-8xwiIlqWMtK7+OSt2+8kCqdlph8=
+
+lodash.isequal@^4.5.0:
+  version "4.5.0"
+  resolved "https://registry.yarnpkg.com/lodash.isequal/-/lodash.isequal-4.5.0.tgz#415c4478f2bcc30120c22ce10ed3226f7d3e18e0"
+  integrity sha512-pDo3lu8Jhfjqls6GkMgpahsF9kCyayhgykjyLMNFTKWrpVdAQtYyB4muAMWozBB4ig/dtWAmsMxLEI8wuz+DYQ==
 
 lodash.isobject@^3.0.2:
   version "3.0.2"
@@ -8860,6 +8898,13 @@ run-parallel@^1.1.9:
   resolved "https://registry.yarnpkg.com/run-parallel/-/run-parallel-1.1.9.tgz#c9dd3a7cf9f4b2c4b6244e173a6ed866e61dd679"
   integrity sha512-DEqnSRTDw/Tc3FXf49zedI638Z9onwUotBMiUFKmrO2sdFKIbXamXGQ3Axd4qgphxKB4kw/qP1w5kTxnfU1B9Q==
 
+rxjs@^7.5.2:
+  version "7.5.6"
+  resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-7.5.6.tgz#0446577557862afd6903517ce7cae79ecb9662bc"
+  integrity sha512-dnyv2/YsXhnm461G+R/Pe5bWP41Nm6LBXEYWI6eiFP4fiwx6WRI/CD0zbdVAudd9xwLEF2IDcKXLHit0FYjUzw==
+  dependencies:
+    tslib "^2.1.0"
+
 rxjs@^7.5.5:
   version "7.5.5"
   resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-7.5.5.tgz#2ebad89af0f560f460ad5cc4213219e1f7dd4e9f"
@@ -9772,6 +9817,13 @@ type-fest@^0.8.0:
   version "0.8.1"
   resolved "https://registry.yarnpkg.com/type-fest/-/type-fest-0.8.1.tgz#09e249ebde851d3b1e48d27c105444667f17b83d"
   integrity sha512-4dbzIzqvjtgiM5rw1k5rEHtBANKmdudhGyBEajN01fEyhaAIhsoKNy6y7+IN93IfpFtwY9iqi7kD+xwKhQsNJA==
+
+typed-emitter@^2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/typed-emitter/-/typed-emitter-2.1.0.tgz#ca78e3d8ef1476f228f548d62e04e3d4d3fd77fb"
+  integrity sha512-g/KzbYKbH5C2vPkaXGu8DJlHrGKHLsM25Zg9WuC9pMGfuvT+X25tZQWo5fK1BjBm8+UrVE9LDCvaY0CQk+fXDA==
+  optionalDependencies:
+    rxjs "^7.5.2"
 
 typedarray-to-buffer@^3.1.5:
   version "3.1.5"
