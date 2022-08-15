@@ -3,7 +3,6 @@ import { BrowserWindow, shell } from 'electron'
 import { getOptimalDimentions, getNewBounds } from 'helpers'
 
 export default class MainWindow {
-
   constructor(options) {
     let settings = { ...options, ...getOptimalDimentions(options) }
     this.settings = settings

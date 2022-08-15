@@ -8,10 +8,10 @@ exports.default = async function notarizing(context) {
     return
   }
 
-  return await notarize({
-    appBundleId: 'com.electron.swifty',
-    appPath: `packages/mac-arm64/Swifty.app`,
-    appleId: process.env.APPLEID,
-    appleIdPassword: process.env.APPLEIDPASSWORD
-  })
+  // return await notarize({
+  //   appBundleId: 'com.electron.swifty',
+  //   appPath: `packages/mac-arm64/Swifty.app`,
+  //   appleId: process.env.APPLEID,
+  //   appleIdPassword: process.env.APPLEIDPASSWORD
+  // })
 }
