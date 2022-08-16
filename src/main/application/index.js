@@ -65,6 +65,7 @@ export default class Swifty {
       transparent: true,
       webPreferences: {
         worldSafeExecuteJavaScript: true,
+        sandbox: false,
         contextIsolation: true,
         preload: path.join(app.getAppPath(), 'preload', 'index.js')
       },
@@ -88,6 +89,10 @@ export default class Swifty {
     Object.keys(EVENTS).forEach(event => {
       ipcMain.on(event, (e, data) => EVENTS[event].call(this, e, data))
     })
+  }
+
+  showMainWindow() {
+    return this.window.show()
   }
 
   onWindowReady() {
