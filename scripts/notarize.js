@@ -13,7 +13,7 @@ exports.default = async function notarizing(context) {
       tool: process.env.NOTARIZE_TOOL,
       teamId: process.env.APPLETEAMID,
       appBundleId: 'com.electron.swifty',
-      appPath: `packages/mac-arm64/Swifty.app`,
+      appPath: `packages/mac/Swifty.app`,
       appleId: process.env.APPLEID,
       appleIdPassword: process.env.APPLEIDPASSWORD
     })
