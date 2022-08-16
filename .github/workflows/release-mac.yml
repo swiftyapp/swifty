@@ -1,4 +1,4 @@
-name: Package Mac App
+name: Release Mac App
 
 on:
   push:
@@ -15,7 +15,7 @@ env:
   GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
 
 jobs:
-  package-macos-application:
+  release-macos-application:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
