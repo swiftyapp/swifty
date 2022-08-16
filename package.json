@@ -115,11 +115,7 @@
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "target": [
-        "dmg",
-        "zip",
-        "mas"
-      ]
+      "target": ["dmg"]
     }
   }
 }
