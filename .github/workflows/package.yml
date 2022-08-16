@@ -1,0 +1,11 @@
+name: Package Mac App
+
+on:
+  push:
+    branches: [release]
+
+jobs:
+  package-macos-application:
+    runs-on: macos-latest
+    steps:
+      - run: echo "⚙️ Building MacOS application"
