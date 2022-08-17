@@ -1,8 +1,10 @@
 name: Release Linux App
 
 on:
-  push:
-    branches: [release]
+  pull_request:
+    branches:
+      - master
+    types: [closed]
 
 env:
   NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
