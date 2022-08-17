@@ -16,8 +16,7 @@ env:
 
 jobs:
   release-windows-application:
-    runs-on: ubuntu-latest
-    container: electronuserland/builder:wine
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
