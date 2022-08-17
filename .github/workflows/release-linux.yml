@@ -15,7 +15,7 @@ env:
   GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
 
 jobs:
-  release-macos-application:
+  release-linux-application:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -27,4 +27,4 @@ jobs:
         run: yarn install
 
       - name: 👷‍♂️ Building Linux application
-        run: ./node_modules/.bin/bozon package linux
+        run: ./node_modules/.bin/bozon package linux --publish
