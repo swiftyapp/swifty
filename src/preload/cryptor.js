@@ -1,12 +1,10 @@
 import { contextBridge } from 'electron'
-import crypto from 'crypto'
-import { Cryptor } from 'application/cryptor'
+import { Cryptor, hashSecret } from 'application/cryptor'
 
 let cryptor
 
 contextBridge.exposeInMainWorld('CryptorAPI', {
-  hashSecret: value =>
-    crypto.createHash('sha512').update(value).digest('base64'),
+  hashSecret: hashSecret,
   setupCryptor: secret => {
     cryptor = new Cryptor(secret)
   },
