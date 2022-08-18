@@ -13,9 +13,9 @@ export const onBackupSelect = function () {
           this.sync.initialize(this.cryptor)
           return this.authSuccess()
         }
-        this.window.webContents.send('backup:password:fail')
+        this.window.send('backup:password:fail')
       })
-      this.window.webContents.send('backup:loaded')
+      this.window.send('backup:loaded')
     })
     .catch(() => {})
 }
