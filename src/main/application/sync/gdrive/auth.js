@@ -1,5 +1,6 @@
 import { shell } from 'electron'
 import { google } from 'googleapis'
+import log from 'electron-log'
 import { loopback } from '../base/loopback'
 
 const HOST = '127.0.0.1'
@@ -20,6 +21,7 @@ export default class Auth {
 
   isConfigured() {
     const result = this.readTokens()
+    log.info('Google oAuth is configured', result)
     return result && result.access_token !== undefined
   }
 
