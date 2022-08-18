@@ -7,6 +7,7 @@ on:
     types: [closed]
 
 env:
+  NODE_ENV: production
   NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
   GH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
   NOTARIZE_TOOL: notarytool
