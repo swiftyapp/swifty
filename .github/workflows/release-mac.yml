@@ -43,4 +43,4 @@ jobs:
         run: yarn install
 
       - name: 👷‍♂️ Building MacOS application
-        run: ./node_modules/.bin/bozon package mac --publish
+        run: yarn bozon package linux --publish
