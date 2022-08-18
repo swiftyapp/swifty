@@ -1,6 +1,7 @@
-var path = require('path')
-var Dotenv = require('dotenv-webpack')
-var CopyPlugin = require('copy-webpack-plugin')
+let path = require('path')
+let webpack = require('webpack')
+let Dotenv = require('dotenv-webpack')
+let CopyPlugin = require('copy-webpack-plugin')
 
 const envFile = () => {
   const NODE_ENV = process.env.NODE_ENV
@@ -98,6 +99,10 @@ module.exports = {
       ]
     },
     plugins: [
+      new webpack.DefinePlugin({
+        'process.env.GOOGLE_OAUTH_CLIENT_ID': JSON.stringify(process.env.GOOGLE_OAUTH_CLIENT_ID),
+        'process.env.GOOGLE_OAUTH_CLIENT_SECRET': JSON.stringify(process.env.GOOGLE_OAUTH_CLIENT_SECRET)
+      }),
       new Dotenv({
         path: envFile()
       }),
