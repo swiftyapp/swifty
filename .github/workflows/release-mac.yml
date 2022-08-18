@@ -1,13 +1,14 @@
 name: Release Mac App
 
 on:
+  push:
+    branches: [releases]
   pull_request:
     branches:
       - master
     types: [closed]
 
 env:
-  NODE_ENV: production
   NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
   GH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
   NOTARIZE_TOOL: notarytool
@@ -43,4 +44,4 @@ jobs:
         run: yarn install
 
       - name: 👷‍♂️ Building MacOS application
-        run: yarn bozon package linux --publish
+        run: NODE_ENV=production yarn bozon package mac --publish
