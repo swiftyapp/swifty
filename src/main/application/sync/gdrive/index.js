@@ -1,4 +1,5 @@
 import path from 'path'
+import log from 'electron-log'
 import Auth from './auth'
 import Drive from './drive'
 import Storage from 'application/storage'
@@ -61,10 +62,14 @@ export default class GDrive {
 
   async readRemoteVault() {
     this.auth.loadCredentials()
+    log.info('Reading remote vault folder')
     const folderId = await this.drive.folderExists(this.folderName)
+    log.info('Swifty folder was not found on GDrive', folderId)
     if (!folderId) throw Error('Swifty folder was not found on GDrive')
 
+    log.info('Reading remote vault file')
     const fileId = await this.drive.fileExists(this.fileName, folderId)
+    log.info('Swifty file was not found on GDrive', fileId)
     if (!fileId) throw Error('Vault file was not found on GDrive')
 
     return await this.drive.readFile(fileId)
