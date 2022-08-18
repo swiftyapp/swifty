@@ -67,7 +67,7 @@ export default class GDrive {
     log.info('Swifty folder was not found on GDrive', folderId)
     if (!folderId) throw Error('Swifty folder was not found on GDrive')
 
-    log.info('Reading remote vault file')
+    log.info('Reading remote vault file', this.fileName)
     const fileId = await this.drive.fileExists(this.fileName, folderId)
     log.info('Swifty file was not found on GDrive', fileId)
     if (!fileId) throw Error('Vault file was not found on GDrive')
