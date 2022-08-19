@@ -6,6 +6,7 @@ const Language = ({ section }) => {
 
   const languages = {
     'en-US': 'English',
+    'fr-FR': 'French',
     'ru-RU': 'Russian',
     'tr-TR': 'Turkish',
     'zh-CN': 'Chinese'
