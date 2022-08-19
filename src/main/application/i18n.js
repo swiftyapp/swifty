@@ -3,7 +3,17 @@ import fs from 'fs-extra'
 import { app } from 'electron'
 
 let translations = {}
-const AVAILABLE_LOCALES = ['en-US','fr-FR','ru-RU', 'tr-TR', 'zh-CN']
+
+const AVAILABLE_LOCALES = [
+  'en-US',
+  'ru-RU',
+  'tr-TR',
+  'zh-CN',
+  'pt-BR',
+  'sv-SE',
+  'fr-FR'
+]
+
 const DEFAULT_LOCALE = 'en-US'
 
 function I18n() {

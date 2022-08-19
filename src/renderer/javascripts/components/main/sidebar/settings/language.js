@@ -9,7 +9,10 @@ const Language = ({ section }) => {
     'fr-FR': 'French',
     'ru-RU': 'Russian',
     'tr-TR': 'Turkish',
-    'zh-CN': 'Chinese'
+    'zh-CN': 'Chinese',
+    'pt-BR': 'Portuguese',
+    'sv-SE': 'Swedish',
+    'fr-FR': 'French'
   }
 
   const setLanguage = lang => {

@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { Cryptor as BaseCryptor } from '@swiftyapp/cryptor'
 
 const SENSITIVE_FIELDS = {
@@ -14,6 +15,10 @@ const btoa = data => {
 const atob = data => {
   const buffer = Buffer.from(data, 'base64')
   return buffer.toString('utf8')
+}
+
+export const hashSecret = value => {
+  return crypto.createHash('sha512').update(value).digest('base64')
 }
 
 const prepareFields = (data, callback) => {
