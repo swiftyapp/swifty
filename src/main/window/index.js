@@ -68,7 +68,7 @@ export default class MainWindow {
   }
 
   on(event, callback) {
-    this.window.webContents.on(event, callback)
+    this.window.on(event, callback)
   }
 
   send(event, data) {
