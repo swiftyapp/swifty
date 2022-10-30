@@ -6,12 +6,13 @@ const Language = ({ section }) => {
 
   const languages = {
     'en-US': 'English',
-    'ru-RU': 'Russian',
-    'tr-TR': 'Turkish',
-    'zh-CN': 'Chinese',
-    'pt-BR': 'Portuguese',
-    'sv-SE': 'Swedish',
-    'fr-FR': 'French'
+    'de-DE': 'Deutsch',
+    'fr-FR': 'Français',
+    'pt-BR': 'Português',
+    'ru-RU': 'Русский',
+    'sv-SE': 'Svenska',
+    'tr-TR': 'Türkçe',
+    'zh-CN': 'Chinese'
   }
 
   const setLanguage = lang => {
