@@ -21,7 +21,7 @@ export default class Auth {
 
   isConfigured() {
     const result = this.readTokens()
-    log.info('Google oAuth is configured', result)
+    log.info('Google oAuth is configured')
     return result && result.access_token !== undefined
   }
 
