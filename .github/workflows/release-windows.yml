@@ -1,12 +1,13 @@
 name: Release Windows App
 
 on:
-  push:
-    branches: [releases]
-  pull_request:
-    branches:
-      - master
-    types: [closed]
+  workflow_dispatch
+  # push:
+  #   branches: [releases]
+  # pull_request:
+  #   branches:
+  #     - master
+  #   types: [closed]
 
 env:
   NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
