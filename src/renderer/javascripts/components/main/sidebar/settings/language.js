@@ -12,6 +12,7 @@ const Language = ({ section }) => {
     'ru-RU': 'Русский',
     'sv-SE': 'Svenska',
     'tr-TR': 'Türkçe',
+    'uk-UA': 'Українська',
     'zh-CN': 'Chinese'
   }
 

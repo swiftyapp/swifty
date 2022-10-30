@@ -11,7 +11,8 @@ const AVAILABLE_LOCALES = [
   'pt-BR',
   'sv-SE',
   'fr-FR',
-  'de-DE'
+  'de-DE',
+  'uk-UA'
 ]
 const DEFAULT_LOCALE = 'en-US'
 
