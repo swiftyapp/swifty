@@ -11,7 +11,8 @@ const Language = ({ section }) => {
     'zh-CN': 'Chinese',
     'pt-BR': 'Portuguese',
     'sv-SE': 'Swedish',
-    'fr-FR': 'French'
+    'fr-FR': 'French',
+    'de-DE': 'German'
   }
 
   const setLanguage = lang => {
