@@ -45,11 +45,7 @@ export default class MainWindow {
   }
 
   show() {
-    if (!this.window.isVisible()) {
-      this.window.show()
-    } else {
-      this.window.focus()
-    }
+    this.window.show()
   }
 
   resize(options, animate) {
