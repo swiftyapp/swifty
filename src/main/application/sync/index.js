@@ -31,8 +31,16 @@ export default class Sync {
     return this.provider.import()
   }
 
-  perform() {
-    return this.provider.pull().then(data => this.mergeAndPush(data))
+  async perform() {
+    return this.provider
+      .pull()
+      .then(data => this.mergeAndPush(data))
+      .catch(error => {
+        if (error.message === 'Vault file was not found on GDrive') {
+          return this.provider.push(this.vault.read())
+        }
+        throw error
+      })
   }
 
   async mergeAndPush(data) {

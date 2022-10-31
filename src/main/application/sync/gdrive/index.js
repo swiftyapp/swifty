@@ -64,12 +64,12 @@ export default class GDrive {
     this.auth.loadCredentials()
     log.info('Reading remote vault folder')
     const folderId = await this.drive.folderExists(this.folderName)
-    log.info('Swifty folder was not found on GDrive', folderId)
+    log.info('Swifty folder found on GDrive', folderId)
     if (!folderId) throw Error('Swifty folder was not found on GDrive')
 
     log.info('Reading remote vault file', this.fileName)
     const fileId = await this.drive.fileExists(this.fileName, folderId)
-    log.info('Swifty file was not found on GDrive', fileId)
+    log.info('Swifty file found on GDrive', fileId)
     if (!fileId) throw Error('Vault file was not found on GDrive')
 
     return await this.drive.readFile(fileId)
