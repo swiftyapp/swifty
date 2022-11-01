@@ -10,6 +10,8 @@ const _import = jest.fn()
 const push = jest.fn(() => {
   return Promise.resolve()
 })
+const fileExists = jest.fn(() => Promise.resolve(true))
+
 const pull = jest.fn(() => {
   return Promise.resolve({
     entries: [{ id: '1', password: 'password' }],
@@ -21,6 +23,7 @@ module.exports = jest.fn(() => {
   return {
     isConfigured: isConfigured,
     setup: setup,
+    fileExists: fileExists,
     disconnect: disconnect,
     import: _import,
     pull: pull,

@@ -27,9 +27,8 @@ export const onVaultSyncImport = function () {
 
 export const onVaultSyncConnect = function () {
   if (!this.sync.isConfigured()) {
-    this.sync.setup().then(() => {
+    this.sync.perform().then(() => {
       this.window.send('vault:sync:connected')
-      //return this.pullVaultData()
     })
   }
 }
@@ -47,16 +46,13 @@ export const onVaultSyncStart = function () {
     this.sync
       .perform()
       .then(() => {
-        this.window.send('vault:sync:stopped', {
-          success: true
-        })
+        this.window.send('vault:sync:stopped', { success: true })
       })
       .catch(error => {
         this.window.send('vault:sync:stopped', {
-          success: false
+          success: false,
+          error
         })
-        /* eslint-disable-next-line no-console */
-        console.log(error)
       })
   }
 }

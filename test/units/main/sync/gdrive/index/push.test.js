@@ -38,6 +38,7 @@ describe('#push', () => {
     describe('folder is creatable', () => {
       beforeEach(async () => {
         drive.__setFolderExists(false)
+        drive.__setFileExists(false)
         result = await sync.push('DATA')
       })
 

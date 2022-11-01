@@ -75,15 +75,32 @@ export default class GDrive {
     return await this.drive.readFile(fileId)
   }
 
+  async fileExists() {
+    this.auth.loadCredentials()
+    const folderId = await this.drive.folderExists(this.folderName)
+    if (!folderId) return false
+
+    const fileId = await this.drive.fileExists(this.fileName, folderId)
+    return !!fileId
+  }
+
   async createRemoteVault(data) {
-    const folderId = await this.drive.createFolder(this.folderName)
+    let folderId = await this.drive.folderExists(this.folderName)
+    if (!folderId) {
+      folderId = await this.drive.createFolder(this.folderName)
+    }
+
     if (!folderId) throw Error('Failed to create Swifty folder on GDrive')
 
     return await this.createRemoteVaultFile(folderId, data)
   }
 
   async createRemoteVaultFile(folderId, data) {
-    const fileId = await this.drive.createFile(this.fileName, folderId, data)
+    let fileId = await this.drive.fileExists(this.fileName, folderId)
+    if (!fileId) {
+      fileId = await this.drive.createFile(this.fileName, folderId, data)
+    }
+
     if (!fileId) throw Error('Failed to create vault file on GDrive')
 
     return fileId

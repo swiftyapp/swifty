@@ -29,6 +29,12 @@ const SyncIndicator = () => {
       )
     }
   }
+  const getMessage = () => {
+    if (sync.inProgress) return 'Syncing...'
+    if (sync.success) return 'Sync Successful'
+
+    return (sync.error && sync.error.message) || 'Something went wrong'
+  }
 
   return (
     <div
@@ -39,7 +45,7 @@ const SyncIndicator = () => {
         failure: sync.enabled && !sync.success
       })}
     >
-      <Tooltip content={sync.error && sync.error.message}>
+      <Tooltip content={getMessage()}>
         <div className="spinner" />
         {getStatusIcon()}
         {getIcon()}
