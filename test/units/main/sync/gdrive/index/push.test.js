@@ -27,8 +27,8 @@ describe('#push', () => {
       expect(drive.updateFile).toHaveBeenCalledWith('FILE_ID', 'DATA')
     })
 
-    test('returns file id', () => {
-      expect(result).toBe('FILE_ID')
+    test('returns data', () => {
+      expect(result).toBe('DATA')
     })
   })
 
