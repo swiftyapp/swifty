@@ -24,7 +24,7 @@ const Login = ({ entry, validate, onChange, onTagsChange }) => {
       />
       <Field
         label={i18n('Website')}
-        name="wbsite"
+        name="website"
         entry={entry}
         onChange={onChange}
       />
