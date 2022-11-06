@@ -4,6 +4,7 @@ import View from 'view.svg'
 import Hide from 'hide.svg'
 
 export default ({
+  label,
   name,
   entry,
   validate,
@@ -58,7 +59,7 @@ export default ({
 
   return (
     <div className={className()}>
-      <label htmlFor="">{name}</label>
+      <label htmlFor="">{label}</label>
       <div className="value">
         <div className="wrapper">
           {renderInput()}

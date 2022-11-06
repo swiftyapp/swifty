@@ -15,22 +15,30 @@ const Login = ({ entry, validate, onChange, onTagsChange }) => {
   return (
     <>
       <Field
-        name={i18n('Title')}
+        label={i18n('Title')}
+        name="title"
         validate={validate}
         entry={entry}
         onChange={onChange}
         maxLength="40"
       />
-      <Field name={i18n('Website')} entry={entry} onChange={onChange} />
       <Field
-        name={i18n('Username')}
+        label={i18n('Website')}
+        name="wbsite"
+        entry={entry}
+        onChange={onChange}
+      />
+      <Field
+        label={i18n('Username')}
+        name="username"
         validate={validate}
         entry={entry}
         onChange={onChange}
         maxLength="40"
       />
       <SecureField
-        name={i18n('Password')}
+        label={i18n('Password')}
+        name="password"
         validate={validate}
         entry={entry}
         onChange={onChange}
@@ -40,10 +48,26 @@ const Login = ({ entry, validate, onChange, onTagsChange }) => {
           generate
         </span>
       </SecureField>
-      <SecureField name={i18n('OTP')} entry={entry} onChange={onChange} />
-      <Field name={i18n('Email')} entry={entry} onChange={onChange} />
+      <SecureField
+        label={i18n('OTP')}
+        name="otp"
+        entry={entry}
+        onChange={onChange}
+      />
+      <Field
+        label={i18n('Email')}
+        name="email"
+        entry={entry}
+        onChange={onChange}
+      />
       <TagField entry={entry} onChange={onTagsChange} />
-      <Field name={i18n('Note')} entry={entry} onChange={onChange} rows="5" />
+      <Field
+        label={i18n('Note')}
+        name="note"
+        entry={entry}
+        onChange={onChange}
+        rows="5"
+      />
     </>
   )
 }

@@ -4,6 +4,7 @@
   "description": "Modern, Lightweight, Fast and Free Password Manager",
   "repository": "https://github.com/alchaplinsky/swifty.git",
   "dependencies": {
+    "@reduxjs/toolkit": "^1.9.0",
     "@swiftyapp/cryptor": "^1.1.2",
     "classnames": "^2.3.1",
     "electron-log": "^4.4.8",

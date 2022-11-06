@@ -1,7 +1,15 @@
 import React from 'react'
 import classnames from 'classnames'
 
-export default ({ name, entry, validate, onChange, rows, maxLength }) => {
+export default ({
+  label,
+  name,
+  entry,
+  validate,
+  onChange,
+  rows,
+  maxLength
+}) => {
   const isEmpty = () => {
     return entry[name.toLowerCase()].trim() === ''
   }
@@ -36,7 +44,7 @@ export default ({ name, entry, validate, onChange, rows, maxLength }) => {
 
   return (
     <div className={classNames()}>
-      <label htmlFor="">{name}</label>
+      <label htmlFor="">{label}</label>
       {renderInput()}
     </div>
   )

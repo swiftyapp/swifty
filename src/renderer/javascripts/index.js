@@ -1,15 +1,25 @@
 import 'application.sass'
 import React from 'react'
-import { render } from 'react-dom'
+import ReactDOM from 'react-dom/client'
 import { Provider } from 'react-redux'
-import { createStore, applyMiddleware } from 'redux'
+import { configureStore } from '@reduxjs/toolkit'
 import thunkMiddleware from 'redux-thunk'
 import rootReducer from 'reducers'
 import './shortcuts'
 
 import Swifty from './components/swifty'
 
-const store = createStore(rootReducer, applyMiddleware(thunkMiddleware))
+const store = configureStore({
+  reducer: rootReducer,
+  middleware: getDefaultMiddleware =>
+    getDefaultMiddleware().concat([thunkMiddleware])
+})
+
+let root
+
+window.onload = () => {
+  root = ReactDOM.createRoot(document.getElementById('root'))
+}
 
 const renderApplication = i18n => {
   const locale = localStorage.getItem('locale')
@@ -20,11 +30,11 @@ const renderApplication = i18n => {
   document
     .querySelector('body')
     .setAttribute('platform', window.AppAPI.platform())
-  render(
+
+  root.render(
     <Provider store={store}>
       <Swifty />
-    </Provider>,
-    document.getElementById('root')
+    </Provider>
   )
 }
 window.refreshApplication = () => renderApplication(window._i18n)

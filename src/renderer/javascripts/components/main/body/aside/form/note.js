@@ -8,14 +8,16 @@ const Note = ({ entry, validate, onChange, onTagsChange }) => {
   return (
     <>
       <Field
-        name={i18n('Title')}
+        label={i18n('Title')}
+        name="title"
         entry={entry}
         onChange={onChange}
         validate={validate}
         maxLength="40"
       />
       <SecureField
-        name={i18n('Note')}
+        label={i18n('Note')}
+        name="note"
         entry={entry}
         onChange={onChange}
         validate={validate}

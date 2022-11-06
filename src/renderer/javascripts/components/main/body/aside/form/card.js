@@ -8,48 +8,59 @@ const Card = ({ entry, validate, onChange, onTagsChange }) => {
   return (
     <>
       <Field
-        name={i18n('Title')}
+        label={i18n('Title')}
+        name="title"
         validate={validate}
         entry={entry}
         onChange={onChange}
         maxLength="40"
       />
       <Field
-        name={i18n('Number')}
+        label={i18n('Number')}
+        name="number"
         validate={validate}
         entry={entry}
         onChange={onChange}
         maxLength="19"
       />
       <Field
-        name={i18n('Month')}
+        label={i18n('Month')}
+        name="month"
         validate={validate}
         entry={entry}
         onChange={onChange}
         maxLength="2"
       />
       <Field
-        name={i18n('Year')}
+        label={i18n('Year')}
+        name="year"
         validate={validate}
         entry={entry}
         onChange={onChange}
         maxLength="4"
       />
       <Field
-        name={i18n('CVC')}
+        label={i18n('CVC')}
+        name="cvc"
         validate={validate}
         entry={entry}
         onChange={onChange}
         maxLength="4"
       />
       <SecureField
-        name={i18n('Pin')}
+        label={i18n('Pin')}
+        name="pin"
         validate={validate}
         entry={entry}
         onChange={onChange}
         maxLength="6"
       />
-      <Field name={i18n('Name')} entry={entry} onChange={onChange} />
+      <Field
+        label={i18n('Name')}
+        name="name"
+        entry={entry}
+        onChange={onChange}
+      />
       <TagField entry={entry} onChange={onTagsChange} />
     </>
   )
