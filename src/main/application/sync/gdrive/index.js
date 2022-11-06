@@ -57,7 +57,10 @@ export default class GDrive {
     let fileId = await this.drive.fileExists(this.fileName, folderId)
     if (!fileId) return await this.createRemoteVaultFile(folderId, data)
 
-    return await this.drive.updateFile(fileId, data)
+    const id = await this.drive.updateFile(fileId, data)
+    if (!id) throw Error('Failed to update vault file on GDrive')
+
+    return data
   }
 
   async readRemoteVault() {
