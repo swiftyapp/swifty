@@ -26,7 +26,7 @@ export const getNewBounds = (bounds, options) => {
 
 export const checkInternet = cb => {
   require('dns').lookup('google.com', function (err) {
-    if (err && err.code == 'ENOTFOUND') {
+    if (err) {
       cb(false)
     } else {
       cb(true)
