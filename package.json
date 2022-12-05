@@ -4,7 +4,7 @@
   "description": "Modern, Lightweight, Fast and Free Password Manager",
   "repository": "https://github.com/alchaplinsky/swifty.git",
   "dependencies": {
-    "@reduxjs/toolkit": "^1.9.0",
+    "@reduxjs/toolkit": "^1.9.1",
     "@swiftyapp/cryptor": "^1.1.2",
     "classnames": "^2.3.1",
     "electron-log": "^4.4.8",
@@ -16,7 +16,7 @@
     "generate-password": "^1.7.0",
     "googleapis": "^109.0.1",
     "lodash": "^4.17.21",
-    "luxon": "^3.1.0",
+    "luxon": "^3.1.1",
     "mousetrap": "^1.6.5",
     "nth-check": "^2.1.1",
     "parse-domain": "^7.0.1",
