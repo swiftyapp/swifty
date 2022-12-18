@@ -1,3 +1,3 @@
 export const onWindowMessage = function (_, data) {
-  this.window[data.message]()
+  this.window.window[data.message]()
 }
