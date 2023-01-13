@@ -1,4 +1,4 @@
-![](https://alchaplinsky.com/images/misc/swifty_banner_alpha.png?v=1)
+![swifty_banner_alpha](https://user-images.githubusercontent.com/695947/211563458-93194014-d14b-4f1a-be03-ce368b4456e3.png)
 
 ## Free Offline-first Password Manager for MacOS, Windows and Linux.
 
@@ -31,9 +31,9 @@
 
 ## Screenshots
 
-![img](https://alchaplinsky.com/images/misc/swifty_screen_01.png)
+<img width="1012" alt="swifty_screen_01" src="https://user-images.githubusercontent.com/695947/211563356-eb75a92d-2582-4034-9e53-a596159f4892.png">
+<img width="1012" alt="swifty_screen_02" src="https://user-images.githubusercontent.com/695947/211563370-6d965b21-5be8-410a-97b0-d528af4c0efc.png">
 
-![img](https://alchaplinsky.com/images/misc/swifty_screen_02.png)
 
 ## Install
 
