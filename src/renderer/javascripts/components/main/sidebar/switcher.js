@@ -6,7 +6,7 @@ import Tooltip from 'components/elements/tooltip'
 import LoginIcon from 'login.svg'
 import CardIcon from 'card.svg'
 import NoteIcon from 'note.svg'
-import AuditIcon from 'information.svg'
+// import AuditIcon from 'information.svg'
 
 const Switcher = () => {
   const { i18n } = window
@@ -47,14 +47,14 @@ const Switcher = () => {
           <CardIcon with="28" height="28" />
         </div>
       </Tooltip>
-      <Tooltip content={i18n('Password Audit')} className="bottom">
+      {/* <Tooltip content={i18n('Password Audit')} className="bottom">
         <div
           className={itemClassname('audit', 'audit-button')}
           onClick={() => switchScope('audit')}
         >
           <AuditIcon with="30" height="30" />
         </div>
-      </Tooltip>
+      </Tooltip> */}
     </div>
   )
 }
