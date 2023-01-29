@@ -4,7 +4,7 @@
   "description": "Modern, Lightweight, Fast and Free Password Manager",
   "repository": "https://github.com/alchaplinsky/swifty.git",
   "dependencies": {
-    "@reduxjs/toolkit": "^1.9.1",
+    "@reduxjs/toolkit": "^1.9.2",
     "@swiftyapp/cryptor": "^1.1.2",
     "classnames": "^2.3.1",
     "electron-log": "^4.4.8",
@@ -25,7 +25,7 @@
     "react-dom": "^18.2.0",
     "react-redux": "^8.0.5",
     "react-tagsinput": "^3.19.0",
-    "redux": "^4.2.0",
+    "redux": "^4.2.1",
     "redux-thunk": "^2.4.2",
     "remove": "^0.1.5",
     "shortid": "^2.2.16",
