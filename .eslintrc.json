@@ -21,11 +21,12 @@
     "ecmaVersion": 2018,
     "sourceType": "module"
   },
-  "plugins": ["react", "prettier", "jest"],
+  "plugins": ["react", "prettier", "jest", "react-hooks"],
   "rules": {
     "prettier/prettier": ["error", { "singlQuote": true, "parser": "flow" }],
     "react/jsx-uses-react": 1,
     "react/jsx-uses-vars": 1,
+    "react-hooks/exhaustive-deps": "warn",
     "no-console": "warn"
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Copy from 'copy.svg'
 import { copy } from 'services/copy'
 
@@ -10,24 +10,22 @@ export default ({ name, entry }) => {
   const [code, setCode] = useState('')
 
   useEffect(() => {
-    setOTPData()
-    const interval = setInterval(() => {
+    setOTPData(entry.otp)
+    const interval = setTimeout(() => {
       if (time > 0) {
         setTime(time - 1)
       } else {
-        setOTPData()
+        setOTPData(entry.otp)
       }
     }, 1000)
-    return () => clearInterval(interval)
-  }, [])
+    return () => clearTimeout(interval)
+  }, [entry.otp, setOTPData, time])
 
-  const setOTPData = () => {
-    const otp = window.GeneratorAPI.generateOTP(
-      window.CryptorAPI.decrypt(entry.otp)
-    )
+  const setOTPData = useCallback(code => {
+    const otp = window.GeneratorAPI.generateOTP(window.CryptorAPI.decrypt(code))
     setTime(otp.time)
     setCode(otp.code)
-  }
+  }, [])
 
   const formattedValue = () => `${code.substr(0, 3)} ${code.substr(3)}`
 
