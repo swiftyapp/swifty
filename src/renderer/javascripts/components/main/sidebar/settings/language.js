@@ -1,13 +1,16 @@
 import React from 'react'
 
 const Language = ({ section }) => {
-  const { i18n } = window
+  const {
+    _i18n: { locale },
+    i18n
+  } = window
   if (section !== 'language') return null
-
   const languages = {
     'en-US': 'English',
     'de-DE': 'Deutsch',
     'fr-FR': 'Français',
+    'pl-PL': 'Polski',
     'pt-BR': 'Português',
     'ru-RU': 'Русский',
     'sv-SE': 'Svenska',
@@ -27,6 +30,7 @@ const Language = ({ section }) => {
       <div className="select">
         <select
           name="locale"
+          value={locale}
           onChange={({ target }) => setLanguage(target.value)}
         >
           {Object.keys(languages).map(key => (
