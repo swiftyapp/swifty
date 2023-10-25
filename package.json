@@ -100,7 +100,10 @@
     "win": {
       "icon": "build/icon.ico",
       "publisherName": "Developer ID Application: Oleksandr Chaplinsky (UFBL3F444A)",
-      "verifyUpdateCodeSignature": false
+      "verifyUpdateCodeSignature": false,
+      "target": [
+        "nsis"
+      ]
     },
     "linux": {
       "category": "Utility",
