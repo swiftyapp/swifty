@@ -2,7 +2,6 @@ import GDrive from './gdrive'
 import { mergeData } from './base/merge'
 
 const NO_INTERNET_CONNECTION = 'Swifty seems to be offline'
-const NOT_CONFIGURED = 'Sync is not configured'
 const FAILED_TO_FIND_REMOTE_VAULT = 'Failed to find remote vault file'
 const FAILED_TO_CREATE_REMOTE_VAULT = 'Failed to create remote vault file'
 const FAILED_TO_READ_REMOTE_VAULT = 'Failed to read remote vault file'
@@ -19,7 +18,9 @@ export default class Sync {
   }
 
   async perform() {
-    if (!this.isConfigured()) throw Error(NOT_CONFIGURED)
+    if (!this.isConfigured()) {
+      this.provider.setup()
+    }
 
     if (!(await this.remoteVaultExists())) {
       await this.createRemoteVault()

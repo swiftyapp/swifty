@@ -10,7 +10,7 @@ export default class Drive {
 
   async readFile(id) {
     const { data } = await this.drive.files.get({ fileId: id, alt: 'media' })
-    return data
+    return data.text()
   }
 
   async updateFile(id, content) {
