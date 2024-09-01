@@ -9,7 +9,7 @@
     "classnames": "^2.3.1",
     "electron-log": "^5.0.0",
     "electron-unhandled": "^4.0.1",
-    "electron-updater": "^6.1.4",
+    "electron-updater": "^6.3.0",
     "electron-util": "^0.17.2",
     "fs-extra": "^11.1.1",
     "generate-password": "^1.7.1",
