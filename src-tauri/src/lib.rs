@@ -1,4 +1,5 @@
 mod commands;
+pub mod crypto;
 mod error;
 mod models;
 mod state;
