@@ -15,6 +15,7 @@
       {
         "label": "main",
         "title": "Swifty",
+        "create": false,
         "width": 460,
         "height": 500,
         "resizable": true,
