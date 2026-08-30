@@ -1,0 +1,35 @@
+.entry
+  display: flex
+  flex-direction: row
+  padding: 8px 10px
+  background: #fff
+  border-bottom: 1px solid #eee
+  cursor: pointer
+  min-height: 52px
+  box-sizing: border-box
+  transition: background .2s ease
+  .icon
+    width: 32px
+    margin-right: 10px
+    border-radius: 50%
+    &.web
+      height: 32px
+      align-items: center
+      path, circle
+        fill: #fff
+  .description, .icon
+    display: flex
+    flex-direction: column
+    justify-content: center
+  .description
+    flex: 1
+  .primary
+    font-weight: 500
+    max-width: 215px
+    overflow: hidden
+    text-overflow: ellipsis
+    white-space: nowrap
+  .secondary
+    color: #777
+  &.current
+    background: #f7f8fa

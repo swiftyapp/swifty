@@ -1,0 +1,25 @@
+import { useAppSelector } from '@/store'
+import { filterEntries } from '@/services/entries'
+import Item from './Item'
+import Empty from './Empty'
+
+export default function Manager() {
+  const { items, query, scope, tags } = useAppSelector(state => ({
+    tags: state.filters.tags,
+    scope: state.filters.scope,
+    query: state.filters.query,
+    items: state.entries.items
+  }))
+
+  const entries = filterEntries(items, { scope, query, tags })
+
+  if (entries.length === 0) return <Empty />
+
+  return (
+    <div className="list">
+      {entries.map(entry => (
+        <Item entry={entry} key={entry.id} />
+      ))}
+    </div>
+  )
+}
