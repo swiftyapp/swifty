@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 // The Rust backend is built in parallel; mock the whole command/event layer so
 // screens render without a live backend. Individual tests override as needed.
 vi.mock('@/lib/commands', () => ({
+  isInitialized: vi.fn().mockResolvedValue(true),
   setup: vi.fn().mockResolvedValue(undefined),
   unlock: vi.fn().mockResolvedValue({ vault: { entries: [] }, syncConfigured: false }),
   lock: vi.fn().mockResolvedValue(undefined),

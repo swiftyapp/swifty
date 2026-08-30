@@ -11,3 +11,7 @@ dist-ssr
 # Rust / Tauri
 src-tauri/target
 src-tauri/gen/schemas
+
+# Updater signing keys — never commit
+*.key
+*.key.pub

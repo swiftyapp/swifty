@@ -6,7 +6,7 @@
   
   [![](https://img.shields.io/badge/PayPal-Buy%20me%20a%20Coffee-blue)](https://www.paypal.me/alchaplinsky)
   
-  [![Actions Status](https://github.com/swiftyapp/swifty/workflows/Node.js%20CI/badge.svg)](https://github.com/swiftyapp/swifty/actions)
+  [![Actions Status](https://github.com/swiftyapp/swifty/workflows/CI/badge.svg)](https://github.com/swiftyapp/swifty/actions)
   [![Financial Contributors on Open Collective](https://opencollective.com/swifty/all/badge.svg?label=financial+contributors)](https://opencollective.com/swifty) ![GitHub release (latest SemVer including pre-releases)](https://img.shields.io/github/v/release/swiftyapp/swifty?include_prereleases&label=Release)
   ![GitHub All Releases](https://img.shields.io/github/downloads/swiftyapp/swifty/total?label=Downloads)
   [![Encryption](https://img.shields.io/badge/Encryption-AES%20256%20GCM-green.svg)](https://tools.ietf.org/html/rfc5288)
@@ -37,15 +37,68 @@
 
 ## Install
 
-Check [Latest Releases](https://github.com/alchaplinsky/swifty/releases) page for recent version of packaged app for MacOS, Windows or Linux.
+Check the [Latest Releases](https://github.com/swiftyapp/swifty/releases) page for the
+most recent packaged app for MacOS, Windows or Linux.
 
-Alternatively you can build app yourself:
+## Development
 
-```
+Swifty is built with [Tauri 2](https://v2.tauri.app) (Rust backend + TypeScript/React/Vite frontend).
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org) 20+
+- [Rust](https://rustup.rs) (stable toolchain)
+- Platform build dependencies for Tauri — see the
+  [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/)
+  (on Linux: `libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgtk-3-dev`)
+
+### Commands
+
+```bash
 git clone git@github.com:swiftyapp/swifty.git
-yarn install
-bozon package mac
+cd swifty
+npm install
+
+npm run tauri:dev     # run the app in development
+npm run tauri:build   # produce a signed, packaged build for the current OS
+
+npm run build         # build the frontend only (tsc + vite)
+npm test              # frontend unit tests (Vitest)
+cd src-tauri && cargo test   # backend tests
 ```
+
+## Configuration
+
+### Google Drive sync (optional)
+
+Drive sync uses **your own** Google OAuth **Desktop** client — no credentials
+are bundled with the app. To enable it:
+
+1. In the [Google Cloud Console](https://console.cloud.google.com) create an
+   OAuth 2.0 Client ID of type **Desktop app**.
+2. Enable the **Google Drive API** for the project.
+3. The app requests the `https://www.googleapis.com/auth/drive.file` scope and
+   listens on the loopback redirect URI `http://127.0.0.1:4567/auth/callback`.
+4. Provide the credentials as environment/build variables when running or
+   building:
+
+   ```bash
+   export GOOGLE_OAUTH_CLIENT_ID=your-desktop-client-id.apps.googleusercontent.com
+   export GOOGLE_OAUTH_CLIENT_SECRET=your-desktop-client-secret   # optional
+   ```
+
+   They are read at runtime (`std::env::var`) and, if absent, fall back to the
+   value baked in at compile time (`option_env!`). The build succeeds without
+   them — sync simply reports "Google OAuth client not configured" until a
+   client id is supplied.
+
+### Auto-update signing
+
+Release builds are signed for `tauri-plugin-updater`. The public key lives in
+`src-tauri/tauri.conf.json`; the matching **private key is never committed** and
+is provided to CI via the `TAURI_SIGNING_PRIVATE_KEY` (and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) secrets. Generate a keypair with
+`npm run tauri signer generate -- -w ~/.swifty/updater.key`.
 
 ## Contributors
 

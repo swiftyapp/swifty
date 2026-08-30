@@ -96,6 +96,8 @@ export interface SyncStatus {
 // Auth & setup
 // ---------------------------------------------------------------------------
 
+export const isInitialized = (): Promise<boolean> => invoke('is_initialized')
+
 export const setup = (password: string): Promise<void> =>
   invoke('setup', { password })
 

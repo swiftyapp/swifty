@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
-import { isBiometricAvailable } from './lib/commands'
+import { isBiometricAvailable, isInitialized } from './lib/commands'
 import { useAppDispatch, useAppSelector } from './store'
-import { flowAuth } from './store/flowSlice'
+import { flowAuth, flowSetup } from './store/flowSlice'
 import { subscribeToEvents } from './store/events'
 import Start from './components/Start'
 import Auth from './components/Auth'
@@ -25,8 +25,10 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = subscribeToEvents(dispatch)
-    isBiometricAvailable()
-      .then(available => dispatch(flowAuth(available)))
+    Promise.all([isInitialized(), isBiometricAvailable().catch(() => false)])
+      .then(([initialized, biometric]) =>
+        dispatch(initialized ? flowAuth(biometric) : flowSetup())
+      )
       .catch(() => {})
     return unsubscribe
   }, [dispatch])

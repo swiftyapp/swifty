@@ -7,6 +7,12 @@ use tauri::{AppHandle, State};
 
 // Create a brand-new vault protected by `password`.
 #[tauri::command]
+pub fn is_initialized(app: AppHandle) -> Result<bool> {
+    storage::ensure_migrated(&app);
+    Ok(storage::vault_exists(&app))
+}
+
+#[tauri::command]
 pub fn setup(password: String, app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     let secret = crypto::hash_secret(&password);
     let cryptor = crypto::Cryptor::new(&secret);
