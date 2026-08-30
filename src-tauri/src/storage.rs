@@ -75,6 +75,14 @@ pub fn export_vault(app: &AppHandle, dest: PathBuf) -> Result<PathBuf> {
 }
 
 // Sync is configured when the encrypted gdrive credentials file has content.
+pub fn vault_exists(app: &AppHandle) -> bool {
+    vault_path(app)
+        .ok()
+        .filter(|p| p.exists())
+        .and_then(|p| fs::metadata(p).ok())
+        .is_some_and(|m| m.len() > 0)
+}
+
 pub fn sync_configured(app: &AppHandle) -> bool {
     gdrive_path(app)
         .ok()

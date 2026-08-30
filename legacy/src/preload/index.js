@@ -1,6 +1,0 @@
-import './app'
-import './messages'
-import './clipboard'
-import './generator'
-import './cryptor'
-import './utils'
