@@ -6,6 +6,7 @@ mod error;
 mod models;
 mod state;
 mod storage;
+mod sync;
 mod tray;
 mod window;
 
