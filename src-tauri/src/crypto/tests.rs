@@ -1,0 +1,119 @@
+//! Compatibility tests. Golden fixtures are produced by the independent Node
+//! reference implementation (`scripts/crypto-ref.mjs gen-fixtures`); these tests
+//! prove the Rust cryptor reads exactly what Node wrote.
+
+use super::*;
+use crate::models::VaultData;
+use serde_json::Value;
+
+const FIXTURES: &str = include_str!("../../tests/fixtures/fixtures.json");
+
+fn fixtures() -> Value {
+    serde_json::from_str(FIXTURES).unwrap()
+}
+
+#[test]
+fn hash_secret_matches_reference() {
+    for case in fixtures()["hashSecret"].as_array().unwrap() {
+        let pw = case["password"].as_str().unwrap();
+        let expected = case["secret"].as_str().unwrap();
+        assert_eq!(hash_secret(pw), expected);
+    }
+}
+
+#[test]
+fn decrypts_golden_fields() {
+    let f = fixtures();
+    let cryptor = Cryptor::new(f["secret"].as_str().unwrap());
+    for case in f["encrypt"].as_array().unwrap() {
+        let hex = case["hex"].as_str().unwrap();
+        let plaintext = case["plaintext"].as_str().unwrap();
+        assert_eq!(cryptor.decrypt(hex).unwrap(), plaintext, "{}", case["name"]);
+    }
+}
+
+#[test]
+fn decrypts_golden_data_blobs() {
+    let f = fixtures();
+    let cryptor = Cryptor::new(f["secret"].as_str().unwrap());
+    for case in f["encryptData"].as_array().unwrap() {
+        let blob = case["blob"].as_str().unwrap();
+        let value: Value = cryptor.decrypt_data(blob).unwrap();
+        assert_eq!(value, case["value"], "{}", case["name"]);
+    }
+}
+
+#[test]
+fn decrypts_and_exposes_golden_vault() {
+    let f = fixtures();
+    let cryptor = Cryptor::new(f["secret"].as_str().unwrap());
+    let vault = &f["vault"];
+
+    let data: VaultData = cryptor
+        .decrypt_data(vault["blob"].as_str().unwrap())
+        .unwrap();
+    let expected = vault["exposed"].as_array().unwrap();
+    assert_eq!(data.entries.len(), expected.len());
+
+    for (entry, want) in data.entries.iter().zip(expected) {
+        let exposed = cryptor.expose(entry).unwrap();
+        let got = serde_json::to_value(&exposed).unwrap();
+        assert_eq!(&got, want, "entry {}", entry.id);
+    }
+}
+
+#[test]
+fn field_round_trip() {
+    let cryptor = Cryptor::new(&hash_secret("master-pw"));
+    for value in ["", "simple", "unicode 密码 🔑", &"x".repeat(9000)] {
+        let hex = cryptor.encrypt(value).unwrap();
+        assert_eq!(cryptor.decrypt(&hex).unwrap(), value);
+    }
+}
+
+#[test]
+fn data_round_trip() {
+    let cryptor = Cryptor::new(&hash_secret("master-pw"));
+    let value = serde_json::json!({ "entries": [], "n": 42, "s": "два" });
+    let blob = cryptor.encrypt_data(&value).unwrap();
+    let back: Value = cryptor.decrypt_data(&blob).unwrap();
+    assert_eq!(back, value);
+}
+
+#[test]
+fn obscure_expose_round_trip() {
+    let cryptor = Cryptor::new(&hash_secret("master-pw"));
+    let entry: Entry = serde_json::from_value(serde_json::json!({
+        "id": "1", "type": "login", "title": "T",
+        "password": "hunter2", "otp": "SEED"
+    }))
+    .unwrap();
+
+    let obscured = cryptor.obscure(&entry).unwrap();
+    // Sensitive fields become hex, not the plaintext.
+    assert_ne!(obscured.password.as_deref(), Some("hunter2"));
+    assert!(obscured.otp.as_ref().unwrap().len() > 32);
+
+    let exposed = cryptor.expose(&obscured).unwrap();
+    assert_eq!(exposed.password.as_deref(), Some("hunter2"));
+    assert_eq!(exposed.otp.as_deref(), Some("SEED"));
+}
+
+#[test]
+fn empty_sensitive_fields_stay_empty() {
+    let cryptor = Cryptor::new(&hash_secret("master-pw"));
+    let entry: Entry =
+        serde_json::from_value(serde_json::json!({ "id": "1", "type": "login", "title": "T" }))
+            .unwrap();
+    let obscured = cryptor.obscure(&entry).unwrap();
+    assert_eq!(obscured.password.as_deref(), Some(""));
+    assert_eq!(obscured.otp.as_deref(), Some(""));
+}
+
+#[test]
+fn wrong_secret_fails() {
+    let f = fixtures();
+    let bad = Cryptor::new("not-the-secret");
+    let case = &f["encrypt"][0];
+    assert!(bad.decrypt(case["hex"].as_str().unwrap()).is_err());
+}

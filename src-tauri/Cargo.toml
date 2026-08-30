@@ -22,6 +22,13 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
+aes-gcm = "0.10"
+pbkdf2 = { version = "0.12", default-features = false }
+sha2 = "0.10"
+hmac = "0.12"
+rand = "0.8"
+hex = "0.4"
+base64 = "0.22"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"

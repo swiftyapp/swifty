@@ -22,6 +22,9 @@ pub enum Error {
     #[error(transparent)]
     Serde(#[from] serde_json::Error),
 
+    #[error("crypto error: {0}")]
+    Crypto(String),
+
     #[error("{0}")]
     Other(String),
 }
