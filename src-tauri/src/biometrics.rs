@@ -1,13 +1,85 @@
-//! Biometric-unlock seam. PR-7 replaces these stub bodies with real
-//! macOS (LocalAuthentication) / Windows (Hello) implementations. Keep the
-//! signatures exactly as-is so the calling commands stay untouched.
+//! Biometric-unlock seam. In-session re-unlock only (parity with legacy Touch
+//! ID): prompt the OS biometric dialog; the master key never leaves memory.
 
-use crate::error::Result;
+use crate::error::{Error, Result};
+
+#[cfg(target_os = "macos")]
+mod imp {
+    use super::*;
+    use block2::RcBlock;
+    use objc2::runtime::Bool;
+    use objc2_foundation::{NSError, NSString};
+    use objc2_local_authentication::{LAContext, LAPolicy};
+    use std::sync::mpsc;
+
+    const POLICY: LAPolicy = LAPolicy::DeviceOwnerAuthenticationWithBiometrics;
+
+    pub fn is_available() -> bool {
+        unsafe { LAContext::new().canEvaluatePolicy_error(POLICY).is_ok() }
+    }
+
+    pub fn authenticate() -> Result<()> {
+        let ctx = unsafe { LAContext::new() };
+        let reason = NSString::from_str("Confirm your identity");
+        // evaluatePolicy fires its reply on an internal queue; block on a channel.
+        let (tx, rx) = mpsc::channel();
+        let reply = RcBlock::new(move |success: Bool, _err: *mut NSError| {
+            let _ = tx.send(success.as_bool());
+        });
+        unsafe { ctx.evaluatePolicy_localizedReason_reply(POLICY, &reason, &reply) };
+        match rx.recv() {
+            Ok(true) => Ok(()),
+            _ => Err(Error::Other("biometric authentication failed".into())),
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+mod imp {
+    use super::*;
+    use windows::core::HSTRING;
+    use windows::Security::Credentials::UI::{
+        UserConsentVerificationResult, UserConsentVerifier, UserConsentVerifierAvailability,
+    };
+
+    pub fn is_available() -> bool {
+        UserConsentVerifier::CheckAvailabilityAsync()
+            .and_then(|op| op.get())
+            .map(|a| a == UserConsentVerifierAvailability::Available)
+            .unwrap_or(false)
+    }
+
+    pub fn authenticate() -> Result<()> {
+        let message = HSTRING::from("Confirm your identity");
+        let verified = UserConsentVerifier::RequestVerificationAsync(&message)
+            .and_then(|op| op.get())
+            .map(|r| r == UserConsentVerificationResult::Verified)
+            .unwrap_or(false);
+        if verified {
+            Ok(())
+        } else {
+            Err(Error::Other("biometric authentication failed".into()))
+        }
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+mod imp {
+    use super::*;
+
+    pub fn is_available() -> bool {
+        false
+    }
+
+    pub fn authenticate() -> Result<()> {
+        Err(Error::Other("biometrics not supported on this platform".into()))
+    }
+}
 
 pub fn is_available() -> bool {
-    false
+    imp::is_available()
 }
 
 pub fn authenticate() -> Result<()> {
-    Ok(())
+    imp::authenticate()
 }
