@@ -1,11 +1,13 @@
 .DS_Store
-.tmp
 .env
-.env.development
+.env.local
+
+# JS / Vite
 node_modules
-builds
-packages
-private
-bower_components
-test/.storage/*.swftx
-yarn-error.log
+dist
+dist-ssr
+*.local
+
+# Rust / Tauri
+src-tauri/target
+src-tauri/gen/schemas

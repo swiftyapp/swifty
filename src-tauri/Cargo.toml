@@ -1,0 +1,28 @@
+[package]
+name = "swifty"
+version = "1.0.0"
+description = "Modern, Lightweight, Fast and Free Password Manager"
+authors = ["Alex Chaplinsky"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "swifty_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api"] }
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-log = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"

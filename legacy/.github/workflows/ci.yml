@@ -1,0 +1,40 @@
+# This workflow will do a clean install of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
+
+name: Node.js CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup node
+        uses: actions/setup-node@v2
+        with:
+          registry-url: 'https://npm.pkg.github.com'
+          node-version: ${{ matrix.node }}
+
+      - uses: c-hive/gha-yarn-cache@v2
+
+      - name: Install JS dependencies
+        run: yarn install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GPR_READ_TOKEN }}
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Test
+        run: NODE_ENV=test npx jest test/units #&& NODE_ENV=test xvfb-run --auto-servernum npx bozon test test/features

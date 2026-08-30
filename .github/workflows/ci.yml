@@ -1,40 +1,65 @@
-# This workflow will do a clean install of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
-
-name: Node.js CI
+name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, v1-0-0]
   pull_request:
-    branches: [master]
 
 jobs:
-  build:
+  frontend:
+    name: Frontend (build + lint)
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [18.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup node
-        uses: actions/setup-node@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          registry-url: 'https://npm.pkg.github.com'
-          node-version: ${{ matrix.node }}
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
 
-      - uses: c-hive/gha-yarn-cache@v2
+  rust:
+    name: Rust (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Install JS dependencies
-        run: yarn install
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GPR_READ_TOKEN }}
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgtk-3-dev
 
-      - name: Lint
-        run: yarn lint
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
 
-      - name: Test
-        run: NODE_ENV=test npx jest test/units #&& NODE_ENV=test xvfb-run --auto-servernum npx bozon test test/features
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # generate_context! needs the built frontend (../dist) to exist.
+      - run: npm ci
+      - run: npm run build
+
+      - name: Format check
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build
+        working-directory: src-tauri
+        run: cargo build --locked
