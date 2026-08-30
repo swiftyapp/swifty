@@ -87,15 +87,21 @@ pub fn change_master_password(
     let reobscured = VaultData {
         entries: obscure_all(&new_cryptor, &exposed)?,
     };
-    storage::write_vault(&app, &new_cryptor.encrypt_data(&reobscured)?)?;
+    let new_blob = new_cryptor.encrypt_data(&reobscured)?;
+    storage::write_vault(&app, &new_blob)?;
 
     // Re-encrypt the Drive token file under the new key if present.
-    // Full sync re-initialization/push is PR-6's concern.
     let token = storage::read_gdrive(&app).unwrap_or_default();
     if !token.is_empty() {
         if let Ok(plain) = current_cryptor.decrypt(&token) {
             storage::write_gdrive(&app, &new_cryptor.encrypt(&plain)?)?;
         }
+    }
+
+    // Push the re-encrypted vault so the remote matches the new key (parity with
+    // legacy). Best-effort: a re-key must still succeed offline.
+    if crate::sync::is_configured(&app, &new_cryptor) {
+        let _ = crate::sync::push(&app, &new_cryptor, &new_blob);
     }
 
     let sync_configured = storage::sync_configured(&app);
