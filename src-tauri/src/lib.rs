@@ -1,9 +1,11 @@
 mod autolock;
+mod biometrics;
 mod commands;
 pub mod crypto;
 mod error;
 mod models;
 mod state;
+mod storage;
 mod tray;
 mod window;
 
@@ -40,6 +42,7 @@ pub fn run() {
         .manage(AppState::default())
         .manage(autolock::AutoLock::default())
         .setup(|app| {
+            storage::ensure_migrated(app.handle()); // one-time copy from the legacy Electron vault
             window::create(app.handle())?;
             tray::create(app.handle())?;
             Ok(())

@@ -1,49 +1,108 @@
-use crate::error::Result;
-use crate::models::UnlockResult;
+use crate::commands::{expose_all, obscure_all};
+use crate::error::{Error, Result};
+use crate::models::{UnlockResult, VaultData};
 use crate::state::AppState;
+use crate::{biometrics, crypto, storage};
 use tauri::{AppHandle, State};
 
 // Create a brand-new vault protected by `password`.
 #[tauri::command]
-#[allow(unused_variables)]
-pub fn setup(password: String, state: State<'_, AppState>) -> Result<()> {
-    todo!("PR-3: derive key, create empty encrypted vault")
+pub fn setup(password: String, app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    let secret = crypto::hash_secret(&password);
+    let cryptor = crypto::Cryptor::new(&secret);
+    let vault = VaultData { entries: vec![] };
+    storage::write_vault(&app, &cryptor.encrypt_data(&vault)?)?;
+    state.session.lock().unwrap().set(secret, vault, false);
+    Ok(())
 }
 
 // Unlock the vault with the master password. Returns decrypted data for display;
 // the derived key stays in Rust.
 #[tauri::command]
-#[allow(unused_variables)]
-pub fn unlock(password: String, state: State<'_, AppState>) -> Result<UnlockResult> {
-    todo!("PR-3: verify password, decrypt vault, hold key in session")
+pub fn unlock(password: String, app: AppHandle, state: State<'_, AppState>) -> Result<UnlockResult> {
+    storage::ensure_migrated(&app);
+    let blob = storage::read_vault(&app)?;
+    let secret = crypto::hash_secret(&password);
+    let cryptor = crypto::Cryptor::new(&secret);
+    // Any decrypt failure means the password (or vault) is wrong.
+    let stored: VaultData = cryptor.decrypt_data(&blob).map_err(|_| Error::InvalidPassword)?;
+    let vault = VaultData {
+        entries: expose_all(&cryptor, &stored.entries)?,
+    };
+    let sync_configured = storage::sync_configured(&app);
+    state
+        .session
+        .lock()
+        .unwrap()
+        .set(secret, vault.clone(), sync_configured);
+    Ok(UnlockResult {
+        vault,
+        sync_configured,
+    })
 }
 
 // Clear the in-memory key and lock the vault.
 #[tauri::command]
 pub fn lock(state: State<'_, AppState>) -> Result<()> {
-    state.session.lock().unwrap().master_key = None;
+    state.session.lock().unwrap().clear();
     Ok(())
 }
 
+// Re-unlock within an active session, gated by a biometric prompt. The key is
+// already in memory (parity with legacy Touch ID), so no password is needed.
 #[tauri::command]
-#[allow(unused_variables)]
 pub fn unlock_biometric(state: State<'_, AppState>) -> Result<UnlockResult> {
-    todo!("PR-3: unlock via stored key gated by biometric prompt")
+    biometrics::authenticate()?;
+    let session = state.session.lock().unwrap();
+    let vault = session.vault.clone().ok_or(Error::Locked)?;
+    Ok(UnlockResult {
+        vault,
+        sync_configured: session.sync_configured,
+    })
 }
 
 #[tauri::command]
 pub fn is_biometric_available() -> Result<bool> {
-    // PR-5 wires the real platform check; false keeps the flow working until then.
-    Ok(false)
+    Ok(biometrics::is_available())
 }
 
 #[tauri::command]
-#[allow(unused_variables)]
 pub fn change_master_password(
     current: String,
     new: String,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<()> {
-    todo!("PR-3: re-encrypt vault under new key, re-push to sync")
+    let current_cryptor = crypto::Cryptor::new(&crypto::hash_secret(&current));
+    let blob = storage::read_vault(&app)?;
+    let stored: VaultData = current_cryptor
+        .decrypt_data(&blob)
+        .map_err(|_| Error::InvalidPassword)?;
+
+    let new_secret = crypto::hash_secret(&new);
+    let new_cryptor = crypto::Cryptor::new(&new_secret);
+
+    // Expose under the old key, re-obscure under the new one.
+    let exposed = expose_all(&current_cryptor, &stored.entries)?;
+    let reobscured = VaultData {
+        entries: obscure_all(&new_cryptor, &exposed)?,
+    };
+    storage::write_vault(&app, &new_cryptor.encrypt_data(&reobscured)?)?;
+
+    // Re-encrypt the Drive token file under the new key if present.
+    // Full sync re-initialization/push is PR-6's concern.
+    let token = storage::read_gdrive(&app).unwrap_or_default();
+    if !token.is_empty() {
+        if let Ok(plain) = current_cryptor.decrypt(&token) {
+            storage::write_gdrive(&app, &new_cryptor.encrypt(&plain)?)?;
+        }
+    }
+
+    let sync_configured = storage::sync_configured(&app);
+    state.session.lock().unwrap().set(
+        new_secret,
+        VaultData { entries: exposed },
+        sync_configured,
+    );
+    Ok(())
 }
