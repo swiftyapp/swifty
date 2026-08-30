@@ -1,7 +1,10 @@
+mod autolock;
 mod commands;
 mod error;
 mod models;
 mod state;
+mod tray;
+mod window;
 
 use state::AppState;
 
@@ -14,7 +17,7 @@ pub fn run() {
     {
         builder = builder
             .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-                let _ = app;
+                window::show(app); // focus existing window on a second launch
             }))
             .plugin(tauri_plugin_updater::Builder::new().build());
     }
@@ -23,8 +26,23 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Stderr,
+                ))
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::LogDir { file_name: None },
+                ))
+                .build(),
+        )
         .manage(AppState::default())
+        .manage(autolock::AutoLock::default())
+        .setup(|app| {
+            window::create(app.handle())?;
+            tray::create(app.handle())?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::auth::setup,
             commands::auth::unlock,

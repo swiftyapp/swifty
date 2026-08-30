@@ -8,9 +8,13 @@ pub struct Session {
 }
 
 impl Session {
-    #[allow(dead_code)] // used by later PRs that implement the command bodies
     pub fn is_unlocked(&self) -> bool {
         self.master_key.is_some()
+    }
+
+    // Drop the in-memory key. Used by the inactivity auto-lock.
+    pub fn clear(&mut self) {
+        self.master_key = None;
     }
 }
 
