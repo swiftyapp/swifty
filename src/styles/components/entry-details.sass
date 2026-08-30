@@ -1,0 +1,67 @@
+.entry-title
+  display: flex
+  flex-direction: row
+  .action
+    width: 16px
+    height: 16px
+    margin: 5px 0 0 10px
+    cursor: pointer
+    path
+      transition: fill .3s ease
+      fill: #aaa
+    &:hover path
+      fill: #777
+  h1
+    flex: 1
+.entry-details
+  background: #fff
+  border: 1px solid #ebedf2
+  border-radius: 5px
+
+.entry-details, .entry-extra
+  .item
+    display: flex
+    flex-direction: row
+    padding: 12px 10px
+    border-bottom: 1px solid #ebedf2
+    word-break: break-all
+    .label
+      width: 110px
+      font-size: 14px
+      text-align: right
+      color: #777
+      padding-right: 20px
+      word-break: normal
+    .value
+      flex: 1
+      padding-right: 8px
+    .secondary
+      padding: 0 10px
+      font-size: 12px
+      line-height: 1.5
+      color: #777
+    svg
+      cursor: pointer
+      path
+        fill: #aaa
+      &:hover
+        path
+          fill: #777
+    .tag
+      background: #4792ff
+      color: #fff
+      margin-right: 5px
+      padding: 0 5px 2px 5px
+      font-size: 13px
+      border-radius: 3px
+    &:last-child
+      border: none
+    &.secure .value
+      -webkit-text-security: disc
+
+.entry-extra .item
+  border-bottom: none
+  padding-bottom: 0
+  .value
+    padding-top: 2px
+    font-size: 12px

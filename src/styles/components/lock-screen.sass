@@ -1,0 +1,31 @@
+.lock-screen
+  display: flex
+  height: 100%
+  flex-direction: column
+  user-select: none
+  background: #f8f8f8
+  .top-lock, .bottom-lock
+    display: flex
+    flex-direction: column
+    justify-content: center
+    align-items: center
+  .top-lock
+    height: 50%
+    display: flex
+    border-bottom: 1px solid #3081c6
+  .bottom-lock
+    position: relative
+    height: 50%
+    flex-direction: column
+    background: #4792ff
+  .navigate-back
+    position: absolute
+    bottom: 30px
+    color: #fff
+    font-size: 13px
+    cursor: pointer
+    svg
+      position: relative
+      top: 2px
+      path
+        fill: #fff

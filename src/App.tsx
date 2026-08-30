@@ -1,25 +1,36 @@
-import { useEffect, useState } from 'react'
-import { isBiometricAvailable, syncStatus } from './lib/commands'
+import { useEffect } from 'react'
+import { isBiometricAvailable } from './lib/commands'
+import { useAppDispatch, useAppSelector } from './store'
+import { flowAuth } from './store/flowSlice'
+import { subscribeToEvents } from './store/events'
+import Start from './components/Start'
+import Auth from './components/Auth'
+import Main from './components/Main'
 
-// Placeholder shell. PR-5 replaces this with the real UI. It exists to prove
-// the typed command wrappers round-trip to the Rust backend.
+function Shell() {
+  const flow = useAppSelector(state => state.flow)
+  switch (flow.name) {
+    case 'setup':
+      return <Start />
+    case 'auth':
+      return <Auth touchID={flow.touchID} />
+    case 'main':
+      return <Main />
+  }
+}
+
 export default function App() {
-  const [status, setStatus] = useState('connecting…')
+  const dispatch = useAppDispatch()
+  const locale = useAppSelector(state => state.i18n.locale)
 
   useEffect(() => {
-    Promise.all([isBiometricAvailable(), syncStatus()])
-      .then(([biometric, sync]) =>
-        setStatus(
-          `backend ok — biometric: ${biometric}, sync configured: ${sync.configured}`
-        )
-      )
-      .catch(err => setStatus(`error: ${String(err)}`))
-  }, [])
+    const unsubscribe = subscribeToEvents(dispatch)
+    isBiometricAvailable()
+      .then(available => dispatch(flowAuth(available)))
+      .catch(() => {})
+    return unsubscribe
+  }, [dispatch])
 
-  return (
-    <main style={{ fontFamily: 'system-ui', padding: 24 }}>
-      <h1>Swifty</h1>
-      <p>{status}</p>
-    </main>
-  )
+  // `locale` as key remounts the tree on language change so `t()` re-runs.
+  return <Shell key={locale} />
 }

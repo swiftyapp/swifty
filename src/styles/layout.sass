@@ -1,0 +1,67 @@
+.layout
+  display: flex
+  height: 100%
+  flex-direction: row
+  user-select: none
+  .sidebar
+    position: relative
+    width: 76px
+    background: #4792ff
+  .mainbar
+    display: flex
+    flex-direction: column
+    flex: 1
+    background: #f8f8f8
+    .header
+      display: flex
+      flex-direction: row
+      position: relative
+      flex: 0 1 auto
+      z-index: 2
+      background: #fff
+      font-weight: 300
+      height: 28px
+      padding: 10px 20px 10px 10px
+      box-shadow: 0 2px 3px rgba(57, 63, 72, 0.1)
+      color: #858b8f
+      .logobar
+        display: none
+        flex: 1
+        line-height: 28px
+        text-align: right
+        font-size: 18px
+        font-weight: 500
+        color: #4792ff
+    .body
+      display: flex
+      flex: 1
+      flex-direction: row
+      max-height: calc(100% - 48px)
+      .list
+        width: 280px
+        max-height: 100%
+        overflow: auto
+        &::-webkit-scrollbar,
+        &::-webkit-scrollbar-thumb
+          width: 8px
+          border-radius: 5px
+        &::-webkit-scrollbar
+          border-left: 1px solid #eee
+          background: transparent
+        &::-webkit-scrollbar-thumb
+          background-color: rgba(100,100,100, .15)
+          &:hover
+            background-color: rgba(100,100,100, .2)
+      .aside
+        position: relative
+        display: flex
+        flex: 1
+        flex-direction: column
+        background: #fff
+        padding: 20px 40px
+        border-left: 1px solid #eee
+        &.shaded
+          background: #fafafa
+
+[platform="darwin"] .layout .mainbar .header .logobar
+  display: block

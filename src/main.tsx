@@ -3,6 +3,11 @@ import ReactDOM from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { store } from './store'
 import App from './App'
+import { applyPlatform } from './utils/platform'
+import './shortcuts'
+import './styles/application.sass'
+
+applyPlatform()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
