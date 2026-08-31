@@ -7,6 +7,7 @@ import Touchid from '@/assets/images/touchid.svg?react'
 interface Props {
   error?: string | null
   touchID?: boolean
+  disabled?: boolean
   placeholder?: string
   onEnter?: (value: string) => void
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void
@@ -16,13 +17,14 @@ interface Props {
 export default function Masterpass({
   error,
   touchID,
+  disabled,
   placeholder,
   onEnter,
   onChange,
   onTouchID
 }: Props) {
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' && event.currentTarget.value !== '') {
+    if (!disabled && event.key === 'Enter' && event.currentTarget.value !== '') {
       onEnter?.(event.currentTarget.value)
     }
   }
@@ -33,6 +35,7 @@ export default function Masterpass({
       <input
         type="password"
         placeholder={placeholder || t('Master Password')}
+        disabled={disabled}
         onChange={onChange}
         onKeyDown={handleKeyDown}
       />

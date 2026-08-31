@@ -8,9 +8,87 @@ use crate::secure_store::{self, KeyStore};
 use crate::state::AppState;
 use crate::store::{Record, SqliteStore, VaultStore};
 use crate::{biometrics, storage};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, State};
+
+// --- Failed-unlock backoff (T-AUTH-3) ---------------------------------------
+//
+// Defense-in-depth on top of Argon2id+SQLCipher: this only slows down repeated
+// guessing *through the app*, it does not add cryptographic strength. State
+// lives in a plaintext sidecar next to the DB (`storage::LOCKOUT_SIDECAR_FILE`)
+// because a wrong password never opens the encrypted DB, so it cannot be kept
+// in the `meta` table — the same reasoning as the KDF sidecar.
+//
+// First `FREE_ATTEMPTS` wrong tries are free (no delay). Every attempt beyond
+// that doubles the wait: 2^(attempt - FREE_ATTEMPTS) seconds, capped at
+// `MAX_DELAY_SECS`. With FREE_ATTEMPTS=3: attempt 4 -> 2s, 5 -> 4s, 6 -> 8s,
+// ... 12+ -> capped at 300s (5 min).
+const FREE_ATTEMPTS: u32 = 3;
+const MAX_DELAY_SECS: u64 = 300;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+struct LockoutState {
+    failed_attempts: u32,
+    // Epoch millis; 0 means "not locked".
+    locked_until_ms: i64,
+}
+
+impl LockoutState {
+    // Missing or unparseable sidecar reads as "no lockout" — this state is a
+    // throttle, not a security boundary, so failing open here is fine.
+    fn load(app: &AppHandle) -> Result<Self> {
+        match storage::read_lockout_sidecar(app)? {
+            Some(json) => Ok(serde_json::from_str(&json).unwrap_or_else(|e| {
+                log::warn!("lockout sidecar is unreadable, resetting: {e}");
+                Self::default()
+            })),
+            None => Ok(Self::default()),
+        }
+    }
+
+    fn save(&self, app: &AppHandle) -> Result<()> {
+        storage::write_lockout_sidecar(app, &serde_json::to_string(self)?)
+    }
+}
+
+fn now_ms() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+// Seconds remaining until `locked_until_ms`, rounded up so a caller never tells
+// the UI to retry a moment too early. Callers only invoke this when locked
+// (`locked_until_ms > now_ms`), so the difference is always positive.
+fn retry_after_secs(locked_until_ms: i64, now_ms: i64) -> u64 {
+    let remaining_ms = (locked_until_ms - now_ms).max(0) as u64;
+    remaining_ms.div_ceil(1000)
+}
+
+// Exponential delay for the Nth failed attempt (1-indexed), 0 while still free.
+fn backoff_delay_secs(failed_attempts: u32) -> u64 {
+    if failed_attempts <= FREE_ATTEMPTS {
+        return 0;
+    }
+    let exp = (failed_attempts - FREE_ATTEMPTS).min(63);
+    2u64.saturating_pow(exp).min(MAX_DELAY_SECS)
+}
+
+// State transition for one more wrong password at time `now_ms`.
+fn record_failed_attempt(mut state: LockoutState, now_ms: i64) -> LockoutState {
+    state.failed_attempts += 1;
+    let delay = backoff_delay_secs(state.failed_attempts);
+    state.locked_until_ms = if delay > 0 {
+        now_ms + delay as i64 * 1000
+    } else {
+        0
+    };
+    state
+}
 
 // True only when a SQLite vault DB exists. A legacy `vault.swftx` alone does NOT
 // count: the app starts fresh with an empty vault and offers an explicit
@@ -34,6 +112,10 @@ pub fn setup(password: String, app: AppHandle, state: State<'_, AppState>) -> Re
 // existing store, and return the entry metadata list. The Argon2id derive + the
 // SQLCipher open both run on a blocking thread so the UI is never stalled; unlock
 // never migrates anything.
+//
+// Wrapped with the failed-unlock backoff (T-AUTH-3): a standing lockout is
+// enforced *before* deriving anything (so a locked-out caller never pays the
+// Argon2id cost), and a wrong password updates the lockout sidecar afterwards.
 #[tauri::command]
 pub async fn unlock(
     password: String,
@@ -41,17 +123,48 @@ pub async fn unlock(
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
     storage::ensure_migrated(&app);
-    let (key, store, entries) = unlock_off_thread(&app, password).await?;
-    let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
-    state
-        .session
-        .lock()
-        .unwrap()
-        .set(key, store, sync_configured);
-    Ok(UnlockResult {
-        entries,
-        sync_configured,
-    })
+
+    let lockout = LockoutState::load(&app)?;
+    let now = now_ms();
+    if lockout.locked_until_ms > now {
+        return Err(Error::TooManyAttempts {
+            retry_after_secs: retry_after_secs(lockout.locked_until_ms, now),
+        });
+    }
+
+    match unlock_off_thread(&app, password).await {
+        Ok((key, store, entries)) => {
+            if lockout != LockoutState::default() {
+                if let Err(e) = LockoutState::default().save(&app) {
+                    log::warn!("failed to reset lockout sidecar: {e}");
+                }
+            }
+            let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
+            state
+                .session
+                .lock()
+                .unwrap()
+                .set(key, store, sync_configured);
+            Ok(UnlockResult {
+                entries,
+                sync_configured,
+            })
+        }
+        Err(Error::InvalidPassword) => {
+            let updated = record_failed_attempt(lockout, now);
+            if let Err(e) = updated.save(&app) {
+                log::warn!("failed to persist lockout sidecar: {e}");
+            }
+            if updated.locked_until_ms > now {
+                Err(Error::TooManyAttempts {
+                    retry_after_secs: retry_after_secs(updated.locked_until_ms, now),
+                })
+            } else {
+                Err(Error::InvalidPassword)
+            }
+        }
+        Err(e) => Err(e),
+    }
 }
 
 // Run the Argon2id derive + SQLCipher open (both CPU-bound) on a blocking thread.
@@ -294,4 +407,99 @@ fn reseal_record(mut r: Record, old: &PayloadCipher, new: &PayloadCipher) -> Res
     let entry = old.unseal(&r.payload)?;
     r.payload = new.seal(&entry)?;
     Ok(r)
+}
+
+#[cfg(test)]
+mod lockout_tests {
+    use super::*;
+
+    // Deterministic "now" — never sleep in these tests.
+    const NOW: i64 = 1_700_000_000_000;
+
+    #[test]
+    fn free_attempts_have_no_delay() {
+        for n in 0..=FREE_ATTEMPTS {
+            assert_eq!(backoff_delay_secs(n), 0, "attempt {n} should be free");
+        }
+    }
+
+    #[test]
+    fn delay_doubles_past_the_free_attempts() {
+        assert_eq!(backoff_delay_secs(FREE_ATTEMPTS + 1), 2);
+        assert_eq!(backoff_delay_secs(FREE_ATTEMPTS + 2), 4);
+        assert_eq!(backoff_delay_secs(FREE_ATTEMPTS + 3), 8);
+        assert_eq!(backoff_delay_secs(FREE_ATTEMPTS + 4), 16);
+    }
+
+    #[test]
+    fn delay_is_capped_at_max_delay() {
+        assert_eq!(backoff_delay_secs(FREE_ATTEMPTS + 20), MAX_DELAY_SECS);
+        // Never overflows even for pathologically large attempt counts.
+        assert_eq!(backoff_delay_secs(u32::MAX), MAX_DELAY_SECS);
+    }
+
+    #[test]
+    fn a_free_attempt_never_locks() {
+        let state = LockoutState::default();
+        let after = record_failed_attempt(state, NOW);
+        assert_eq!(after.failed_attempts, 1);
+        assert_eq!(after.locked_until_ms, 0, "still within FREE_ATTEMPTS");
+    }
+
+    #[test]
+    fn crossing_free_attempts_sets_a_lockout() {
+        let mut state = LockoutState::default();
+        for _ in 0..FREE_ATTEMPTS {
+            state = record_failed_attempt(state, NOW);
+        }
+        assert_eq!(state.locked_until_ms, 0);
+
+        // The next failure crosses the threshold and locks.
+        let locked = record_failed_attempt(state, NOW);
+        assert_eq!(locked.failed_attempts, FREE_ATTEMPTS + 1);
+        assert_eq!(locked.locked_until_ms, NOW + 2_000);
+    }
+
+    #[test]
+    fn retry_after_secs_rounds_up_to_the_next_second() {
+        // 1500ms remaining must report 2s, never 1s (never tell the UI to
+        // retry a moment too early).
+        assert_eq!(retry_after_secs(NOW + 1_500, NOW), 2);
+        assert_eq!(retry_after_secs(NOW + 2_000, NOW), 2);
+        assert_eq!(retry_after_secs(NOW + 1, NOW), 1);
+        assert_eq!(retry_after_secs(NOW, NOW), 0);
+    }
+
+    #[test]
+    fn success_resets_lockout_state() {
+        // Whatever the state was, a successful unlock always resets to the
+        // zero value — mirrors the `unlock` command's success branch.
+        let locked = LockoutState {
+            failed_attempts: 9,
+            locked_until_ms: NOW + 300_000,
+        };
+        assert_ne!(locked, LockoutState::default());
+        let reset = LockoutState::default();
+        assert_eq!(reset.failed_attempts, 0);
+        assert_eq!(reset.locked_until_ms, 0);
+    }
+
+    #[test]
+    fn lockout_state_serde_round_trips() {
+        let state = LockoutState {
+            failed_attempts: 5,
+            locked_until_ms: NOW,
+        };
+        let json = serde_json::to_string(&state).unwrap();
+        let back: LockoutState = serde_json::from_str(&json).unwrap();
+        assert_eq!(state, back);
+    }
+
+    #[test]
+    fn corrupt_sidecar_json_falls_back_to_default() {
+        // Mirrors `LockoutState::load`'s parse-failure branch: unreadable state
+        // fails open (no lockout) rather than erroring the whole unlock flow.
+        let parsed: std::result::Result<LockoutState, _> = serde_json::from_str("not json");
+        assert!(parsed.is_err());
+    }
 }

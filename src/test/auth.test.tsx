@@ -32,6 +32,16 @@ describe('Auth', () => {
     expect(await screen.findByText('Incorrect Master Password')).toBeInTheDocument()
   })
 
+  it('disables the input and shows a countdown on too many attempts', async () => {
+    vi.mocked(unlock).mockRejectedValue({ retryAfterSecs: 2 })
+    renderWithStore(<Auth touchID={false} />)
+
+    await userEvent.type(screen.getByPlaceholderText('Master Password'), 'bad{Enter}')
+
+    expect(await screen.findByText(/Try again in 2s/)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Master Password')).toBeDisabled()
+  })
+
   it('unlocks with biometrics', async () => {
     vi.mocked(unlockBiometric).mockResolvedValue({ entries: [], syncConfigured: false })
     const { container, store } = renderWithStore(<Auth touchID />)

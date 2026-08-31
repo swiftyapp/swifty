@@ -9,6 +9,8 @@
   "Repeat New Password": "Repeat New Password",
   "Confirm Master Password": "Confirm Master Password",
   "Incorrect Master Password": "Incorrect Master Password",
+  "Too many failed attempts": "Too many failed attempts",
+  "Try again in": "Try again in",
   "Current password is invalid": "Current password is invalid",
   "Passwords do not match": "Passwords do not match",
   "Successfully changed password": "Successfully changed password",
