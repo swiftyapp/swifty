@@ -1,5 +1,4 @@
-import { generatePassword } from '@/lib/commands'
-import { getProps } from '@/defaults/generator'
+import { openGenerator } from '@/store'
 import type { EntryDraft } from '@/defaults/entries'
 import { t } from '@/i18n'
 import Field from './Field'
@@ -24,9 +23,7 @@ export default function Login({
   setField
 }: Props) {
   const generate = () =>
-    generatePassword(getProps())
-      .then(password => setField('password', password))
-      .catch(() => {})
+    openGenerator(password => setField('password', password))
 
   return (
     <>
