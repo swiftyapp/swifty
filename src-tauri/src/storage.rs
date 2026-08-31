@@ -10,6 +10,7 @@ use tauri::{AppHandle, Manager};
 use crate::error::{Error, Result};
 
 pub const VAULT_FILE: &str = "vault.swftx";
+pub const DB_FILE: &str = "vault.db";
 pub const GDRIVE_FILE: &str = "auth/gdrive.swftx";
 // Marker for "biometric unlock is enabled". The key itself lives in the OS
 // secure store; this flag lets us report availability without a biometric prompt.
@@ -31,6 +32,20 @@ fn app_dir(app: &AppHandle) -> Result<PathBuf> {
 
 pub fn vault_path(app: &AppHandle) -> Result<PathBuf> {
     Ok(app_dir(app)?.join(VAULT_FILE))
+}
+
+// The SQLCipher database that supersedes the JSON vault.
+pub fn db_path(app: &AppHandle) -> Result<PathBuf> {
+    Ok(app_dir(app)?.join(DB_FILE))
+}
+
+// Whether the SQLite store has been created (non-empty file present).
+pub fn db_exists(app: &AppHandle) -> bool {
+    db_path(app)
+        .ok()
+        .filter(|p| p.exists())
+        .and_then(|p| fs::metadata(p).ok())
+        .is_some_and(|m| m.len() > 0)
 }
 
 fn gdrive_path(app: &AppHandle) -> Result<PathBuf> {
@@ -73,25 +88,6 @@ pub fn read_gdrive(app: &AppHandle) -> Result<String> {
 
 pub fn write_gdrive(app: &AppHandle, data: &str) -> Result<()> {
     write_file(&gdrive_path(app)?, data)
-}
-
-// Copy the encrypted vault to `dest`, appending `.swftx` if missing (legacy).
-pub fn export_vault(app: &AppHandle, dest: PathBuf) -> Result<PathBuf> {
-    let dest = match dest.extension() {
-        Some(e) if e == "swftx" => dest,
-        _ => dest.with_extension("swftx"),
-    };
-    fs::copy(vault_path(app)?, &dest)?;
-    Ok(dest)
-}
-
-// Sync is configured when the encrypted gdrive credentials file has content.
-pub fn vault_exists(app: &AppHandle) -> bool {
-    vault_path(app)
-        .ok()
-        .filter(|p| p.exists())
-        .and_then(|p| fs::metadata(p).ok())
-        .is_some_and(|m| m.len() > 0)
 }
 
 // Whether the user opted into biometric unlock (marker file present).

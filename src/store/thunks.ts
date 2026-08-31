@@ -1,7 +1,8 @@
 import type { StateCreator } from 'zustand'
-import type { Entry, UnlockResult } from '@/lib/commands'
+import type { Entry, EntryMeta, UnlockResult } from '@/lib/commands'
 import {
-  saveVault,
+  saveEntry as saveEntryCmd,
+  deleteEntry as deleteEntryCmd,
   getAudit,
   syncNow,
   setup,
@@ -28,22 +29,20 @@ const trySync = () => {
 
 const now = () => new Date().toISOString()
 
-const buildEntries = (draft: EntryDraft, items: Entry[]): [Entry[], Entry] => {
-  const entries = items.slice()
-  const index = entries.findIndex(e => e.id === draft.id)
-  if (draft.id && index !== -1) {
-    const updated = { ...draft, updatedAt: now() } as Entry
-    entries[index] = updated
-    return [entries, updated]
-  }
-  const created = {
-    ...draft,
-    id: crypto.randomUUID(),
-    createdAt: now(),
-    updatedAt: now()
-  } as Entry
-  entries.push(created)
-  return [entries, created]
+// Complete a draft into a full entry: existing entries keep their id/createdAt,
+// new ones get a fresh id and timestamps. The backend restamps updatedAt on save.
+const buildEntry = (draft: EntryDraft): Entry =>
+  draft.id
+    ? ({ ...draft, updatedAt: now() } as Entry)
+    : ({ ...draft, id: crypto.randomUUID(), createdAt: now(), updatedAt: now() } as Entry)
+
+// Insert or replace one metadata row in the list, keeping it a fresh array.
+const upsertMeta = (items: EntryMeta[], meta: EntryMeta): EntryMeta[] => {
+  const next = items.slice()
+  const index = next.findIndex(e => e.id === meta.id)
+  if (index === -1) next.push(meta)
+  else next[index] = meta
+  return next
 }
 
 export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_set, get) => {
@@ -55,23 +54,22 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
   return {
     runAudit: refreshAudit,
     saveEntry: async draft => {
-      const [entries, item] = buildEntries(draft, get().entries.items)
-      const vault = await saveVault(entries)
-      get().setEntries(vault.entries)
-      get().entrySaved(item.id)
+      const entry = buildEntry(draft)
+      const meta = await saveEntryCmd(entry)
+      get().setEntries(upsertMeta(get().entries.items, meta))
+      get().entrySaved(meta.id)
       trySync()
       refreshAudit()
     },
     deleteEntry: async id => {
-      const remaining = get().entries.items.filter(e => e.id !== id)
-      const vault = await saveVault(remaining)
-      get().entryRemoved(vault.entries)
+      await deleteEntryCmd(id)
+      get().entryRemoved(get().entries.items.filter(e => e.id !== id))
       trySync()
       refreshAudit()
     },
     enterMain: async result => {
       await enlarge().catch(() => {})
-      get().setEntries(result.vault.entries)
+      get().setEntries(result.entries)
       get().flowMain()
       get().syncInit(SYNC_ENABLED && result.syncConfigured)
       if (SYNC_ENABLED && result.syncConfigured) syncNow().catch(() => {})
@@ -79,8 +77,8 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
     },
     completeSetup: async password => {
       await setup(password)
-      const vault = await readVault()
-      await get().enterMain({ vault, syncConfigured: false })
+      const entries = await readVault()
+      await get().enterMain({ entries, syncConfigured: false })
     },
     restoreBackup: async (path, password) => {
       const result = await importBackup(path, password)

@@ -4,7 +4,7 @@ import AuditList from '@/components/Main/Body/List/Audit'
 import AuditAside from '@/components/Main/Body/Aside/Audit'
 import type { Audit } from '@/lib/commands'
 import { makeStore, setBreachCheck } from '@/store'
-import { renderWithStore, withEntries, loginEntry } from './utils'
+import { renderWithStore, withEntries, loginMeta } from './utils'
 
 const audit: Audit = {
   l1: { score: 0, isWeak: true, isRepeating: false, breached: false },
@@ -15,7 +15,7 @@ const seed = () => {
   const store = makeStore()
   withEntries(
     store,
-    [loginEntry({ id: 'l1', title: 'Weakling' }), loginEntry({ id: 'l2', title: 'Reuser' })],
+    [loginMeta({ id: 'l1', title: 'Weakling' }), loginMeta({ id: 'l2', title: 'Reuser' })],
     audit
   )
   return store
@@ -45,7 +45,7 @@ describe('Audit list', () => {
 
   it('shows a loading state before results arrive', () => {
     const store = makeStore()
-    withEntries(store, [loginEntry()])
+    withEntries(store, [loginMeta()])
     renderWithStore(<AuditList />, { store })
     expect(screen.getByText('Loading Results..')).toBeInTheDocument()
   })

@@ -1,19 +1,19 @@
 import type { StateCreator } from 'zustand'
-import type { Entry } from '@/lib/commands'
+import type { EntryMeta } from '@/lib/commands'
 import type { StoreState } from './index'
 
 export interface EntriesSlice {
-  entries: { new: boolean; edit: boolean; current: Entry | null; items: Entry[] }
+  entries: { new: boolean; edit: boolean; current: EntryMeta | null; items: EntryMeta[] }
   newEntry: () => void
   setNoEntry: () => void
   editEntry: () => void
-  setEntries: (items: Entry[]) => void
+  setEntries: (items: EntryMeta[]) => void
   setCurrentEntry: (id: string) => void
   entrySaved: (id: string) => void
-  entryRemoved: (items: Entry[]) => void
+  entryRemoved: (items: EntryMeta[]) => void
 }
 
-const find = (items: Entry[], id?: string) =>
+const find = (items: EntryMeta[], id?: string) =>
   items.find(item => item.id === id) ?? null
 
 export const createEntriesSlice: StateCreator<StoreState, [], [], EntriesSlice> = (set, get) => ({

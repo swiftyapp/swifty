@@ -1,5 +1,6 @@
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { on, EVENTS } from '@/lib/events'
+import { toEntryMeta } from '@/lib/commands'
 import {
   setEntries,
   auditDone,
@@ -20,7 +21,7 @@ export const subscribeToEvents = (): (() => void) => {
     on(EVENTS.pullStarted, () => syncStart()),
     on(EVENTS.pullStopped, payload => {
       syncStop(payload)
-      if (payload.data) setEntries(payload.data.entries)
+      if (payload.data) setEntries(payload.data.entries.map(toEntryMeta))
     }),
     on(EVENTS.auditDone, payload => auditDone(payload.data)),
     on(EVENTS.vaultLocked, () => flowAuth(false))

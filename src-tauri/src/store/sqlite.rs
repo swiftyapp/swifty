@@ -6,27 +6,33 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use rusqlite::{params, Connection, OptionalExtension, Row};
+use rusqlite_migration::{Migrations, M};
 
 use super::{now_ms, EntryMeta, Record, Result, StoreError, VaultStore};
 
-const SCHEMA_VERSION: &str = "1";
-
-const SCHEMA: &str = "\
-CREATE TABLE IF NOT EXISTS meta (
-  key   TEXT PRIMARY KEY,
-  value TEXT
-);
-CREATE TABLE IF NOT EXISTS entries (
-  id         TEXT PRIMARY KEY,
-  kind       TEXT,
-  title      TEXT,
-  tags       TEXT,
-  url_host   TEXT,
-  created_at INTEGER,
-  updated_at INTEGER,
-  deleted_at INTEGER,
-  payload    BLOB
-);";
+// Ordered schema migrations, versioned via SQLite's `user_version` pragma. This
+// is the DDL history — append (never edit) an `M::up` for each future schema
+// change (Phase 2 KDF columns, Phase 3 sync columns). The `meta` k/v table holds
+// APP data (KDF descriptor, biometric flag, settings), not schema versioning.
+fn migrations() -> Migrations<'static> {
+    Migrations::new(vec![M::up(
+        "CREATE TABLE meta (
+           key   TEXT PRIMARY KEY,
+           value TEXT
+         );
+         CREATE TABLE entries (
+           id         TEXT PRIMARY KEY,
+           kind       TEXT,
+           title      TEXT,
+           tags       TEXT,
+           url_host   TEXT,
+           created_at INTEGER,
+           updated_at INTEGER,
+           deleted_at INTEGER,
+           payload    BLOB
+         );",
+    )])
+}
 
 const COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, payload";
 const META_COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at";
@@ -46,7 +52,7 @@ impl SqliteStore {
             set_mode(parent, 0o700);
         }
 
-        let conn = Connection::open(path)?;
+        let mut conn = Connection::open(path)?;
         // Raw-key pragma: the hex bytes are the key, not a passphrase. Must run
         // before any other pragma that touches the (encrypted) file.
         conn.execute_batch(&format!("PRAGMA key = \"x'{}'\";", hex(key)))?;
@@ -70,11 +76,11 @@ impl SqliteStore {
             .map_err(|_| StoreError::Other("cannot open database (wrong key?)".into()))?;
         }
 
-        conn.execute_batch(SCHEMA)?;
-        conn.execute(
-            "INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?1)",
-            params![SCHEMA_VERSION],
-        )?;
+        // Apply pending schema migrations on the decrypted DB (tracked via
+        // `user_version`; idempotent — a no-op once the DB is at the latest).
+        migrations()
+            .to_latest(&mut conn)
+            .map_err(|e| StoreError::Other(e.to_string()))?;
 
         set_mode(path, 0o600);
         Ok(Self {
@@ -101,6 +107,16 @@ impl SqliteStore {
         drop(backup);
         drop(dst);
         set_mode(dest, 0o600);
+        Ok(())
+    }
+
+    /// Re-encrypt the whole database in place under `new_key` (SQLCipher
+    /// `PRAGMA rekey`). The open connection stays valid and keyed with the new
+    /// key afterwards. Used by change-master-password after the payloads have
+    /// been re-encrypted under the new app key.
+    pub fn rekey(&self, new_key: &[u8]) -> Result<()> {
+        self.lock()
+            .execute_batch(&format!("PRAGMA rekey = \"x'{}'\";", hex(new_key)))?;
         Ok(())
     }
 }

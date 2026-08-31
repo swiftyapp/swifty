@@ -17,12 +17,7 @@ pub fn migrate_from_json(path: &Path, cryptor: &Cryptor, store: &impl VaultStore
     let blob = fs::read_to_string(path)?;
     let vault: VaultData = cryptor.decrypt_data(&blob)?;
 
-    let records: Vec<Record> = vault
-        .entries
-        .iter()
-        .map(|e| to_record(e, cryptor))
-        .collect::<Result<_>>()?;
-
+    let records = records_from_entries(&vault.entries, cryptor)?;
     store
         .import(&records)
         .map_err(|e| Error::Other(e.to_string()))?;
@@ -31,7 +26,26 @@ pub fn migrate_from_json(path: &Path, cryptor: &Cryptor, store: &impl VaultStore
     Ok(records.len())
 }
 
-// One legacy entry → one Record. Metadata goes to columns; the whole entry is
+/// Map obscured (per-field-encrypted) entries to store `Record`s: metadata to
+/// columns, the whole entry re-sealed into the opaque payload. Shared by the
+/// JSON migration, backup restore, and per-entry save so the payload/metadata
+/// convention lives in exactly one place.
+pub fn records_from_entries(entries: &[Entry], cryptor: &Cryptor) -> Result<Vec<Record>> {
+    entries.iter().map(|e| to_record(e, cryptor)).collect()
+}
+
+/// Re-key one obscured entry from a *source* cryptor to the *current* one: expose
+/// its fields under `src`, re-obscure under `cur`, then seal a fresh `Record`.
+/// Used by `import_swftx` to merge a foreign `.swftx` encrypted under a different
+/// master password than the open vault's. Reuses `to_record`, so the
+/// payload/metadata convention stays in one place.
+pub fn rekey_record(src: &Cryptor, cur: &Cryptor, entry: &Entry) -> Result<Record> {
+    let exposed = src.expose(entry)?;
+    let reobscured = cur.obscure(&exposed)?;
+    to_record(&reobscured, cur)
+}
+
+// One obscured entry → one Record. Metadata goes to columns; the whole entry is
 // re-sealed by the app cryptor into the opaque payload (lossless round-trip).
 fn to_record(entry: &Entry, cryptor: &Cryptor) -> Result<Record> {
     let payload = cryptor.encrypt_data(entry)?.into_bytes();

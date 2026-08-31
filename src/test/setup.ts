@@ -6,20 +6,24 @@ import { vi } from 'vitest'
 vi.mock('@/lib/commands', () => ({
   isInitialized: vi.fn().mockResolvedValue(true),
   setup: vi.fn().mockResolvedValue(undefined),
-  unlock: vi.fn().mockResolvedValue({ vault: { entries: [] }, syncConfigured: false }),
+  unlock: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
   lock: vi.fn().mockResolvedValue(undefined),
-  unlockBiometric: vi.fn().mockResolvedValue({ vault: { entries: [] }, syncConfigured: false }),
+  unlockBiometric: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
   isBiometricAvailable: vi.fn().mockResolvedValue(false),
   enableBiometric: vi.fn().mockResolvedValue(undefined),
   disableBiometric: vi.fn().mockResolvedValue(undefined),
   changeMasterPassword: vi.fn().mockResolvedValue(undefined),
-  readVault: vi.fn().mockResolvedValue({ entries: [] }),
+  readVault: vi.fn().mockResolvedValue([]),
   revealEntry: vi.fn().mockImplementation((id: string) =>
     Promise.resolve({ id, type: 'login', title: '' })
   ),
-  saveVault: vi.fn().mockResolvedValue({ entries: [] }),
+  saveEntry: vi.fn().mockImplementation((entry: { id: string; type: string; title: string }) =>
+    Promise.resolve({ id: entry.id, type: entry.type, title: entry.title, tags: [], urlHost: '' })
+  ),
+  deleteEntry: vi.fn().mockResolvedValue(undefined),
   pickBackup: vi.fn().mockResolvedValue(null),
-  importBackup: vi.fn().mockResolvedValue({ vault: { entries: [] }, syncConfigured: false }),
+  importBackup: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
+  importSwftx: vi.fn().mockResolvedValue(0),
   exportVault: vi.fn().mockResolvedValue(null),
   generatePassword: vi.fn().mockResolvedValue('Generated123!'),
   generateOtp: vi.fn().mockResolvedValue({ code: '123456', time: 30 }),
@@ -30,7 +34,16 @@ vi.mock('@/lib/commands', () => ({
   syncDisconnect: vi.fn().mockResolvedValue(undefined),
   syncNow: vi.fn().mockResolvedValue(undefined),
   syncImport: vi.fn().mockResolvedValue(undefined),
-  syncStatus: vi.fn().mockResolvedValue({ configured: false })
+  syncStatus: vi.fn().mockResolvedValue({ configured: false }),
+  // Pure helper (not a command); mirror the real projection so tests and the
+  // dead sync path can use it against the mocked module.
+  toEntryMeta: (entry: { id: string; type: string; title: string; tags?: string[] }) => ({
+    id: entry.id,
+    type: entry.type,
+    title: entry.title,
+    tags: entry.tags ?? [],
+    urlHost: ''
+  })
 }))
 
 vi.mock('@/lib/events', async orig => ({

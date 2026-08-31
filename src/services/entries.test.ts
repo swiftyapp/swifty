@@ -1,15 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { filterEntries, isValid } from './entries'
-import type { Entry } from '@/lib/commands'
+import type { EntryMeta } from '@/lib/commands'
 
-const login = (title: string, tags?: string[]): Entry =>
-  ({ id: title, type: 'login', title, username: 'u', password: 'p', tags }) as Entry
+const login = (title: string, tags: string[] = [], urlHost = ''): EntryMeta =>
+  ({ id: title, type: 'login', title, tags, urlHost })
 
-const card = (title: string): Entry =>
-  ({ id: title, type: 'card', title, number: '4242' }) as Entry
-
-const richLogin = (fields: Partial<Entry> & { id: string; title: string }): Entry =>
-  ({ type: 'login', username: '', website: '', note: '', password: 'p', ...fields }) as Entry
+const card = (title: string): EntryMeta => ({ id: title, type: 'card', title, tags: [], urlHost: '' })
 
 describe('filterEntries', () => {
   const entries = [login('Google', ['personal']), login('Airbnb'), login('Facebook', ['personal'])]
@@ -31,22 +27,22 @@ describe('filterEntries', () => {
     expect(filterEntries(entries, { scope: 'login', query: 'fa', tags: [] }).map(e => e.title)).toEqual(['Facebook'])
   })
 
-  it('matches non-title fields (username, website, note, tags)', () => {
+  it('matches metadata fields (site host, tags)', () => {
+    // Secret fields (username/notes) live in the encrypted payload, so search
+    // covers only the non-secret list metadata: title, url_host, tags.
     const items = [
-      richLogin({ id: '1', title: 'GitHub', username: 'octocat', website: 'github.com', note: 'work stuff' }),
-      richLogin({ id: '2', title: 'Bank', username: 'alice', website: 'bank.example', note: 'savings', tags: ['money'] })
+      login('GitHub', [], 'github.com'),
+      login('Bank', ['money'], 'bank.example')
     ]
     const q = (query: string) =>
       filterEntries(items, { scope: 'login', query, tags: [] }).map(e => e.title)
 
-    expect(q('octocat')).toEqual(['GitHub']) // username
-    expect(q('github.com')).toEqual(['GitHub']) // website
-    expect(q('savings')).toEqual(['Bank']) // note
+    expect(q('github.com')).toEqual(['GitHub']) // url_host
     expect(q('money')).toEqual(['Bank']) // tag
   })
 
   it('is typo-tolerant (fuzzy)', () => {
-    const items = [richLogin({ id: '1', title: 'Facebook', username: 'me' })]
+    const items = [login('Facebook')]
     expect(filterEntries(items, { scope: 'login', query: 'facbook', tags: [] }).map(e => e.title)).toEqual(['Facebook'])
   })
 

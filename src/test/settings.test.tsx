@@ -8,7 +8,9 @@ import {
   generatePassword,
   enableBiometric,
   disableBiometric,
-  isBiometricAvailable
+  isBiometricAvailable,
+  pickBackup,
+  importSwftx
 } from '@/lib/commands'
 import { renderWithStore } from './utils'
 
@@ -79,6 +81,37 @@ describe('Settings', () => {
 
     expect(disableBiometric).toHaveBeenCalledOnce()
     expect(await screen.findByText('Enable Biometric Unlock')).toBeInTheDocument()
+  })
+
+  it('imports a .swftx file into the current vault with the source password', async () => {
+    vi.mocked(pickBackup).mockResolvedValue('/tmp/other.swftx')
+    vi.mocked(importSwftx).mockResolvedValue(3)
+    await open()
+    await userEvent.click(screen.getByText('Import Vault'))
+
+    await userEvent.click(screen.getByText('Choose backup File'))
+    // The chosen file name replaces the picker label.
+    await screen.findByText('other.swftx')
+
+    const input = document.querySelector<HTMLInputElement>('.preferences input[type="password"]')!
+    await userEvent.type(input, 'source-pw')
+    await userEvent.click(screen.getByText('Run import'))
+
+    expect(importSwftx).toHaveBeenCalledWith('/tmp/other.swftx', 'source-pw')
+    expect(await screen.findByText(/Imported/)).toBeInTheDocument()
+  })
+
+  it('shows an error when the source password is wrong', async () => {
+    vi.mocked(pickBackup).mockResolvedValue('/tmp/other.swftx')
+    vi.mocked(importSwftx).mockRejectedValue(new Error('invalid password'))
+    await open()
+    await userEvent.click(screen.getByText('Import Vault'))
+
+    await userEvent.click(screen.getByText('Choose backup File'))
+    await screen.findByText('other.swftx')
+    await userEvent.click(screen.getByText('Run import'))
+
+    expect(await screen.findByText('Invalid password for backup')).toBeInTheDocument()
   })
 
   it('lists language options', async () => {

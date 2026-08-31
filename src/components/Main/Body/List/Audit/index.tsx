@@ -1,5 +1,5 @@
 import { useStore } from '@/store'
-import type { Audit, AuditItem, Entry } from '@/lib/commands'
+import type { Audit, AuditItem, EntryMeta } from '@/lib/commands'
 import { t } from '@/i18n'
 import Empty from '../Empty'
 import Group from './Group'
@@ -9,11 +9,11 @@ export default function AuditList() {
   const breachCheck = useStore(state => state.breachCheck)
   const items = useStore(state => state.entries.items)
 
-  const byProperty = (property: keyof AuditItem): Entry[] =>
+  const byProperty = (property: keyof AuditItem): EntryMeta[] =>
     Object.keys(audit as Audit)
       .filter(id => (audit as Audit)[id][property])
       .map(id => items.find(entry => entry.id === id))
-      .filter((entry): entry is Entry => entry !== undefined)
+      .filter((entry): entry is EntryMeta => entry !== undefined)
 
   if (!audit) return <div>{t('Loading Results..')}</div>
   if (Object.keys(audit).length === 0) return <Empty />

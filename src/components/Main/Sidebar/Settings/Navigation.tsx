@@ -3,6 +3,7 @@ import { t } from '@/i18n'
 
 export type Section =
   | 'vault'
+  | 'import'
   | 'masterpassword'
   | 'biometric'
   | 'password'
@@ -17,6 +18,7 @@ interface Props {
 
 const items: { key: Section; label: string }[] = [
   { key: 'vault', label: 'Vault Settings' },
+  { key: 'import', label: 'Import Vault' },
   { key: 'masterpassword', label: 'Master Password' },
   { key: 'biometric', label: 'Biometric Unlock' },
   { key: 'password', label: 'Password Generation' },

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::commands::live_records;
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::hibp;
@@ -18,13 +19,28 @@ const WEAK_SCORE: u8 = 3;
 // stored encrypted, so decryption and the network call run off the UI thread.
 #[tauri::command]
 pub async fn get_audit(state: State<'_, AppState>, check_breaches: bool) -> Result<Audit> {
-    let (cryptor, vault) = {
+    // Collect the encrypted payloads under the lock, then unseal + score off the
+    // UI thread (payload unseal and each password decrypt run PBKDF2).
+    let (cryptor, payloads) = {
         let s = state.session.lock().unwrap();
-        (s.cryptor()?, s.vault.clone().ok_or(Error::Locked)?)
+        let payloads: Vec<Vec<u8>> = live_records(s.store()?)?
+            .into_iter()
+            .map(|r| r.payload)
+            .collect();
+        (s.cryptor()?, payloads)
     };
-    tauri::async_runtime::spawn_blocking(move || audit(&cryptor, &vault.entries, check_breaches))
-        .await
-        .map_err(|e| Error::Crypto(e.to_string()))?
+    tauri::async_runtime::spawn_blocking(move || {
+        let entries: Vec<Entry> = payloads
+            .iter()
+            .map(|p| {
+                let blob = std::str::from_utf8(p).map_err(|e| Error::Crypto(e.to_string()))?;
+                cryptor.decrypt_data(blob)
+            })
+            .collect::<Result<_>>()?;
+        audit(&cryptor, &entries, check_breaches)
+    })
+    .await
+    .map_err(|e| Error::Crypto(e.to_string()))?
 }
 
 // Decrypt each non-empty password once, then flag weak / reused / breached.

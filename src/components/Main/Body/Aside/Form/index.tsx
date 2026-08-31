@@ -3,15 +3,16 @@ import { useStore, setCurrentEntry, setNoEntry, saveEntry } from '@/store'
 import { useRevealed } from '@/hooks/useRevealed'
 import { isValid } from '@/services/entries'
 import defaults, { type EntryDraft } from '@/defaults/entries'
-import type { Entry, EntryType } from '@/lib/commands'
+import type { EntryMeta, EntryType } from '@/lib/commands'
 import { t } from '@/i18n'
 import Login from './Login'
 import Card from './Card'
 import Note from './Note'
+import Error from '@/components/elements/Error'
 import type { FieldChange } from './helpers'
 
 interface Props {
-  entry?: Entry
+  entry?: EntryMeta
 }
 
 export default function Form({ entry }: Props) {
@@ -19,6 +20,7 @@ export default function Form({ entry }: Props) {
   const type: EntryType = scope === 'audit' ? 'login' : scope
 
   const [validate, setValidate] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [model, setModel] = useState<EntryDraft>(
     entry ? { ...entry } : defaults[type]
   )
@@ -48,8 +50,13 @@ export default function Form({ entry }: Props) {
   }
 
   const onSave = () => {
-    if (isValid(model)) saveEntry(model)
-    else setValidate(true)
+    if (!isValid(model)) {
+      setValidate(true)
+      return
+    }
+    setSaveError(null)
+    // Never imply success on a failed write: surface the error, leave the form open.
+    saveEntry(model).catch(() => setSaveError(t('Could not save. Please try again.')))
   }
 
   const fields = () => {
@@ -74,6 +81,7 @@ export default function Form({ entry }: Props) {
   return (
     <div className="aside">
       {fields()}
+      <Error error={saveError} />
       <div className="actions">
         <span className="cancel" onClick={onCancel}>
           {t('Cancel')}

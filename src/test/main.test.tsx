@@ -2,22 +2,22 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
-import type { Entry } from '@/lib/commands'
+import type { EntryMeta } from '@/lib/commands'
 import { revealEntry } from '@/lib/commands'
 import { makeStore } from '@/store'
-import { renderWithStore, withEntries, loginEntry } from './utils'
+import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 
-const note = (id: string, title: string): Entry =>
-  ({ id, type: 'note', title, note: 'body' }) as Entry
-const card = (id: string, title: string): Entry =>
-  ({ id, type: 'card', title, number: '4242424242424242', month: '01', year: '30', cvc: '123', pin: '1234', name: 'ME' }) as Entry
+const note = (id: string, title: string): EntryMeta =>
+  ({ id, type: 'note', title, tags: [], urlHost: '' })
+const card = (id: string, title: string): EntryMeta =>
+  ({ id, type: 'card', title, tags: [], urlHost: '' })
 
 beforeEach(() => vi.clearAllMocks())
 
 describe('Main', () => {
   const seed = () => {
     const store = makeStore()
-    withEntries(store, [loginEntry({ id: 'l1', title: 'Google' }), note('n1', 'Journal'), card('c1', 'Visa')])
+    withEntries(store, [loginMeta({ id: 'l1', title: 'Google' }), note('n1', 'Journal'), card('c1', 'Visa')])
     return store
   }
 
@@ -39,7 +39,7 @@ describe('Main', () => {
 
   it('filters entries by search query', async () => {
     const store = makeStore()
-    withEntries(store, [loginEntry({ id: 'a', title: 'Airbnb' }), loginEntry({ id: 'g', title: 'Google' })])
+    withEntries(store, [loginMeta({ id: 'a', title: 'Airbnb' }), loginMeta({ id: 'g', title: 'Google' })])
     renderWithStore(<Main />, { store })
 
     await userEvent.type(screen.getByPlaceholderText('Search'), 'air')
