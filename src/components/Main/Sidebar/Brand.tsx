@@ -4,9 +4,10 @@ import logo from '@/assets/images/swifty.png'
 export default function Brand() {
   return (
     <div
-      className="grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-[11px]"
+      className="grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-lg"
       style={{
-        background: 'linear-gradient(150deg, var(--c-accent), #2b3a8f)',
+        background:
+          'linear-gradient(150deg, var(--c-accent), var(--c-accent-deep))',
         boxShadow: '0 1px 0 rgba(255,255,255,.18) inset'
       }}
       title="Swifty"

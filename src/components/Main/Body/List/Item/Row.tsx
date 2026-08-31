@@ -13,7 +13,7 @@ interface Props {
 export default function Row({ glyph, title, sub }: Props) {
   return (
     <>
-      <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-[9px] bg-tile text-text2">
+      <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg bg-tile text-text2">
         {glyph}
       </div>
       <div className="min-w-0 flex-1">

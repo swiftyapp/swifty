@@ -42,7 +42,7 @@ export default function VaultHealth() {
       <div
         onClick={() => setFilterScope('audit')}
         className={cx(
-          'grid h-9 w-9 cursor-pointer place-items-center rounded-[11px] transition-colors',
+          'grid h-9 w-9 cursor-pointer place-items-center rounded-lg transition-colors',
           selected
             ? 'bg-accent-soft text-accent'
             : 'text-text2 hover:bg-hover hover:text-text'

@@ -84,7 +84,7 @@ export default function Totp({ name, entry }: Props) {
       <button
         type="button"
         onClick={() => copy(code)}
-        className="mt-3 grid h-7 w-full cursor-pointer place-items-center rounded-lg border border-line2 text-[12px] text-text2 transition-colors hover:border-accent-line hover:text-text"
+        className="mt-3 grid h-7 w-full cursor-pointer place-items-center rounded-sm border border-line2 text-[12px] text-text2 transition-colors hover:border-accent-line hover:text-text"
       >
         {t('Copy code')}
       </button>

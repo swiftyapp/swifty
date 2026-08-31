@@ -1,7 +1,13 @@
-import { useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import { cx } from '@/utils/cx'
 import { t } from '@/i18n'
 import Error from '../Error'
+import IconButton from '../IconButton'
+import {
+  EyeGlyph,
+  FingerprintGlyph,
+  LockGlyph
+} from '@/components/Main/icons'
 import Dots from './Dots'
 import KeyCuts from './KeyCuts'
 
@@ -22,55 +28,9 @@ interface Props {
   onTouchID?: () => void
 }
 
-function IconButton({
-  children,
-  label,
-  className,
-  active,
-  onClick
-}: {
-  children: ReactNode
-  label: string
-  className?: string
-  active?: boolean
-  onClick?: () => void
-}) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      onClick={onClick}
-      className={cx(
-        'grid h-[30px] w-[30px] place-items-center rounded-lg border-0 bg-transparent transition-colors hover:bg-hover',
-        active ? 'text-accent' : 'text-text3 hover:text-text',
-        className
-      )}
-    >
-      {children}
-    </button>
-  )
-}
-
-const EyeIcon = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M2.9 12S6.7 6 12 6s9.1 6 9.1 6-3.8 6-9.1 6-9.1-6-9.1-6Z" />
-    <circle cx="12" cy="12" r="2.8" />
-  </svg>
-)
-
-const FingerprintIcon = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
-    <path d="M12 4.6c-3.6 0-6.5 2.7-6.5 6v3.1M12 4.6c3.6 0 6.5 2.7 6.5 6v5.1M9 12.3c0-1.6 1.3-2.8 3-2.8s3 1.2 3 2.8v5.5M12 13v6.4M5.9 17.6v1.8M18.4 18.7v.9" />
-  </svg>
-)
-
-const LockIcon = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="4.8" y="11" width="14.4" height="9.2" rx="2.4" />
-    <path d="M7.7 11V8.2a4.3 4.3 0 0 1 8.6 0V11" />
-  </svg>
-)
+const EyeIcon = <EyeGlyph size={16} />
+const FingerprintIcon = <FingerprintGlyph size={16} />
+const LockIcon = <LockGlyph size={16} />
 
 // Shared master-passphrase field. The real value lives in the (uncontrolled)
 // input; a mirrored copy drives the dot overlay and key-cut count. Masking is
@@ -130,7 +90,7 @@ export default function Masterpass({
       >
         <input
           type={reveal ? 'text' : 'password'}
-          className="absolute inset-0 w-full border-0 bg-transparent text-center font-mono tracking-[0.3em] outline-none placeholder:text-base placeholder:tracking-normal placeholder:text-text3"
+          className="absolute inset-0 w-full border-0 bg-transparent text-center font-mono tracking-[0.3em] outline-none placeholder:text-[15px] placeholder:tracking-[0em] placeholder:text-text3"
           style={{
             fontSize: lock ? 26 : 22,
             color: reveal ? 'var(--c-text)' : 'transparent',
@@ -166,7 +126,7 @@ export default function Masterpass({
           <div className="mt-5 flex items-center justify-between gap-4">
             <span
               className={cx(
-                'font-mono text-[11px] uppercase tracking-[0.14em] transition-colors',
+                'font-mono text-xs uppercase tracking-label transition-colors',
                 bad ? 'text-bad' : 'text-text3'
               )}
             >

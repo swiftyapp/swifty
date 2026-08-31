@@ -35,7 +35,7 @@ export default function Navigation({ section, onClick }: Props) {
           key={item.key}
           onClick={() => onClick(item.key)}
           className={cx(
-            'cursor-pointer rounded-lg px-3 py-2 text-[13px] transition-colors',
+            'cursor-pointer rounded-sm px-3 py-2 text-[13px] transition-colors',
             section === item.key
               ? 'bg-accent-soft font-medium text-accent'
               : 'text-text2 hover:bg-hover hover:text-text'

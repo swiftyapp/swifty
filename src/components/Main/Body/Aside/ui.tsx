@@ -3,7 +3,12 @@ import { cx } from '@/utils/cx'
 import { copy } from '@/services/copy'
 import { useStrength } from '@/hooks/useStrength'
 import { t } from '@/i18n'
+import IconButton from '@/components/elements/IconButton'
 import { CopyGlyph } from '../../icons'
+
+// Re-export so existing detail-pane imports keep working; the primitive itself
+// now lives in elements/ and is shared with the header and Masterpass.
+export { IconButton }
 
 const STRENGTH_LABELS = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']
 const STRENGTH_COLOR = [
@@ -18,8 +23,7 @@ const STRENGTH_COLOR = [
 // mono label and copy affordance in Show / Form / Audit routes through these so
 // the token styling lives in one place.
 
-export const MONO_LABEL =
-  'font-mono text-[11px] uppercase tracking-[0.12em] text-text3'
+export const MONO_LABEL = 'font-mono text-xs uppercase tracking-label text-text3'
 
 // A bordered card surface on the gradient `--card` background.
 export function Panel({
@@ -32,44 +36,12 @@ export function Panel({
   return (
     <div
       className={cx(
-        'overflow-hidden rounded-xl border border-line bg-[image:var(--card)]',
+        'overflow-hidden rounded-lg border border-line bg-[image:var(--card)]',
         className
       )}
     >
       {children}
     </div>
-  )
-}
-
-// A 28px square icon button used for reveal/copy/edit affordances.
-export function IconButton({
-  onClick,
-  title,
-  active,
-  className,
-  children
-}: {
-  onClick?: () => void
-  title?: string
-  active?: boolean
-  className?: string
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={cx(
-        'grid h-7 w-7 flex-none cursor-pointer place-items-center rounded-[7px] transition-colors',
-        active
-          ? 'bg-accent-soft text-accent'
-          : 'text-text2 hover:bg-hover hover:text-text',
-        className
-      )}
-    >
-      {children}
-    </button>
   )
 }
 
@@ -102,7 +74,7 @@ export function StrengthBar({ password }: { password: string }) {
           />
         ))}
       </span>
-      <span className="font-mono text-[11px] text-text3">
+      <span className="font-mono text-xs text-text3">
         {score !== null ? t(STRENGTH_LABELS[score]) : ''}
       </span>
     </div>

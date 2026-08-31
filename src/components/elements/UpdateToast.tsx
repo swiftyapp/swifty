@@ -48,13 +48,13 @@ function ReadyToast({ version, notes }: { version: string; notes: string | null 
         <div className="mt-3 flex gap-2">
           <Button
             variant="pale"
-            size="sm"
+            size="md"
             onClick={restarting ? undefined : dismiss}
           >
             {t('Later')}
           </Button>
           <Button
-            size="sm"
+            size="md"
             loading={restarting}
             onClick={restarting ? undefined : onRestart}
           >
