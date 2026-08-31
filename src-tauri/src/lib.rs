@@ -6,6 +6,7 @@ mod error;
 mod models;
 mod state;
 mod storage;
+pub mod store;
 mod sync;
 mod tray;
 #[cfg(desktop)]

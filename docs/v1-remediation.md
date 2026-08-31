@@ -76,7 +76,7 @@ entries(
 )
 ```
 
-### T-STORE-1 · Introduce the SQLite storage engine  ❌ 🔴 (D1, S7, T4, T7)
+### T-STORE-1 · Introduce the SQLite storage engine  module ✅ (implemented in PR `feat/storage-engine`) — app integration pending 🔴 (D1, S7, T4, T7)
 **Evidence:** `storage.rs:46-52` plain `fs::write` (non-atomic, no fsync/`.bak`, 0644); the whole `VaultData` is re-serialized and rewritten on every save (`commands/vault.rs:42-43`).
 **Steps:**
 1. Add `rusqlite` (`bundled-sqlcipher`). Open the DB in WAL mode, keyed via `PRAGMA key` from the derived vault key.
@@ -85,7 +85,7 @@ entries(
 4. File mode `0600`, dir `0700` at create.
 **Acceptance:** CRUD works per-row; a process kill mid-write leaves the DB intact (ACID/WAL); the DB file is `0600`; opening without the key fails; inspecting the raw DB shows no plaintext secret field.
 
-### T-STORE-2 · Migrate existing JSON vaults on first unlock  ❌ 🔴
+### T-STORE-2 · Migrate existing JSON vaults on first unlock  module ✅ (adapter + round-trip test in PR `feat/storage-engine`) — app integration pending 🔴
 **Evidence:** real users hold a `vault.swftx` JSON blob. The byte-compat golden harness (`crypto/tests.rs` + `crypto/fixtures.json`) tests the **crypto primitive, not the container**, so switching containers is safe as long as legacy decrypt keeps working.
 **Steps:**
 1. On unlock, if only a JSON vault exists, decrypt it with the current cryptor, write every entry into a fresh DB, and keep the JSON as `vault.swftx.bak` (never deleted until the DB round-trips).
