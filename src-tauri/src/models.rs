@@ -88,10 +88,10 @@ pub struct OtpResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuditItem {
-    pub is_short: bool,
+    pub score: u8,
     pub is_weak: bool,
-    pub is_old: bool,
     pub is_repeating: bool,
+    pub breached: bool,
 }
 
 // Audit results keyed by entry id.

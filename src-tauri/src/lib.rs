@@ -3,6 +3,7 @@ mod biometrics;
 mod commands;
 pub mod crypto;
 mod error;
+mod hibp;
 mod models;
 mod state;
 mod storage;

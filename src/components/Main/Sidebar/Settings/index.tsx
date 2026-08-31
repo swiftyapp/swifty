@@ -6,6 +6,7 @@ import Navigation, { type Section } from './Navigation'
 import Vault from './Vault'
 import MasterPassword from './MasterPassword'
 import Password from './Password'
+import Audit from './Audit'
 import Language from './Language'
 import SettingsIcon from '@/assets/images/settings.svg?react'
 
@@ -28,6 +29,7 @@ export default function Settings() {
               <Vault section={section} />
               <MasterPassword section={section} />
               <Password section={section} />
+              <Audit section={section} />
               <Language section={section} />
             </div>
           </div>

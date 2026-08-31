@@ -19,6 +19,7 @@ export interface AsyncSlice {
   enterMain: (result: UnlockResult) => Promise<void>
   completeSetup: (password: string) => Promise<void>
   restoreBackup: (path: string, password: string) => Promise<void>
+  runAudit: () => Promise<void>
 }
 
 const trySync = () => {
@@ -47,11 +48,12 @@ const buildEntries = (draft: EntryDraft, items: Entry[]): [Entry[], Entry] => {
 
 export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_set, get) => {
   const refreshAudit = () =>
-    getAudit()
+    getAudit(get().breachCheck)
       .then(data => get().auditDone(data))
       .catch(() => {})
 
   return {
+    runAudit: refreshAudit,
     saveEntry: async draft => {
       const [entries, item] = buildEntries(draft, get().entries.items)
       const vault = await saveVault(entries)
@@ -73,6 +75,7 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       get().flowMain()
       get().syncInit(SYNC_ENABLED && result.syncConfigured)
       if (SYNC_ENABLED && result.syncConfigured) syncNow().catch(() => {})
+      refreshAudit()
     },
     completeSetup: async password => {
       await setup(password)

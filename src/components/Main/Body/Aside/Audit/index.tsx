@@ -8,6 +8,7 @@ const count = (audit: Audit, property: keyof AuditItem) =>
 
 export default function Audit() {
   const audit = useStore(state => state.audit)
+  const breachCheck = useStore(state => state.breachCheck)
   const isPristine = useStore(state => state.entries.items.length === 0)
 
   if (isPristine || !audit) return null
@@ -24,19 +25,16 @@ export default function Audit() {
           </li>
           <li>
             <span className="marker level-two"></span>
-            {t('Too Short')}{' '}
-            <span className="count">{count(audit, 'isShort')}</span>
-          </li>
-          <li>
-            <span className="marker level-three"></span>
-            {t('Duplicates')}{' '}
+            {t('Reused')}{' '}
             <span className="count">{count(audit, 'isRepeating')}</span>
           </li>
-          <li>
-            <span className="marker level-four"></span>
-            {t('More than 6 month old')}{' '}
-            <span className="count">{count(audit, 'isOld')}</span>
-          </li>
+          {breachCheck && (
+            <li>
+              <span className="marker level-three"></span>
+              {t('Breached')}{' '}
+              <span className="count">{count(audit, 'breached')}</span>
+            </li>
+          )}
         </ul>
       </div>
     </div>

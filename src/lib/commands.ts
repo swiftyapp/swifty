@@ -79,10 +79,10 @@ export interface OtpResult {
 }
 
 export interface AuditItem {
-  isShort: boolean
+  score: number // zxcvbn strength, 0 (weakest) to 4 (strongest)
   isWeak: boolean
-  isOld: boolean
   isRepeating: boolean
+  breached: boolean // exposed in a known breach (only when the breach check is enabled)
 }
 
 // Keyed by entry id; only entries that have a password are included.
@@ -156,7 +156,8 @@ export const verifyOtp = (secret: string, token: string): Promise<boolean> =>
 // Audit
 // ---------------------------------------------------------------------------
 
-export const getAudit = (): Promise<Audit> => invoke('get_audit')
+export const getAudit = (checkBreaches: boolean): Promise<Audit> =>
+  invoke('get_audit', { checkBreaches })
 
 // ---------------------------------------------------------------------------
 // Clipboard

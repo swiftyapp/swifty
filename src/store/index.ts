@@ -31,6 +31,7 @@ const pickData = (s: StoreState) => ({
   filters: s.filters,
   entries: s.entries,
   audit: s.audit,
+  breachCheck: s.breachCheck,
   sync: s.sync,
   i18n: s.i18n
 })
@@ -61,6 +62,8 @@ export const {
   entrySaved,
   entryRemoved,
   auditDone,
+  setBreachCheck,
+  runAudit,
   syncInit,
   syncConnected,
   syncDisconnected,
