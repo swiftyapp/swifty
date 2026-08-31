@@ -11,10 +11,8 @@ import '@fontsource-variable/geist/wght.css'
 import '@fontsource/ibm-plex-mono/400.css'
 import '@fontsource/ibm-plex-mono/500.css'
 import '@fontsource/ibm-plex-mono/600.css'
-// Design tokens (Tailwind v4). Imported before the legacy SASS so the SASS
-// still wins for anything it styles during the incremental migration.
+// Design tokens + base (Tailwind v4). Sole stylesheet now the SASS is gone.
 import './styles/theme.css'
-import './styles/application.sass'
 
 applyPlatform()
 applyTheme(getTheme())

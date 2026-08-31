@@ -61,7 +61,6 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.5.5",
     "jsdom": "^30.0.1",
-    "sass": "^1.103.1",
     "tailwindcss": "^4.3.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
