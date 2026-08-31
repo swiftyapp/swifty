@@ -32,7 +32,6 @@ export default function Masterpass({
       <Error error={error} />
       <input
         type="password"
-        maxLength={24}
         placeholder={placeholder || t('Master Password')}
         onChange={onChange}
         onKeyDown={handleKeyDown}

@@ -43,8 +43,9 @@ tauri-plugin-updater = "2"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = "0.3"
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard"] }
 objc2-local-authentication = { version = "0.3", features = ["LAContext", "block2"] }
 block2 = "0.6"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.61", features = ["Security_Credentials_UI"] }
+windows = { version = "0.61", features = ["Security_Credentials_UI", "Win32_Foundation", "Win32_System_DataExchange", "Win32_System_Memory"] }

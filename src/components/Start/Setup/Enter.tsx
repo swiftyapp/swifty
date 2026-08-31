@@ -1,6 +1,8 @@
 import { useState, type ChangeEvent } from 'react'
 import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
+import PasswordStrength from '@/components/elements/PasswordStrength'
+import { evaluate, MIN_LENGTH } from '@/services/strength'
 import Back from '@/assets/images/back.svg?react'
 
 interface Props {
@@ -19,8 +21,11 @@ export default function Enter({ display, onEnter, goBack }: Props) {
   }
 
   const onSend = () => {
-    if (password) onEnter(password)
-    else setError(t('Fill in the password'))
+    if (!password) return setError(t('Fill in the password'))
+    const { tooShort, acceptable } = evaluate(password)
+    if (tooShort) return setError(`${t('Use at least')} ${MIN_LENGTH} ${t('characters')}`)
+    if (!acceptable) return setError(t('Choose a stronger master password'))
+    onEnter(password)
   }
 
   if (!display) return null
@@ -33,6 +38,7 @@ export default function Enter({ display, onEnter, goBack }: Props) {
         onEnter={onSend}
         onChange={onChange}
       />
+      <PasswordStrength password={password} />
       <br />
       <div className="button" onClick={onSend}>
         {t('Continue')}
