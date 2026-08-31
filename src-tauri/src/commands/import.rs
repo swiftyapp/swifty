@@ -1,6 +1,7 @@
 //! Import/export commands — the boundary between the pure `import` parser and the
 //! app's crypto/store. Parsing produces plaintext `ImportedEntry` values; writing
-//! reuses the same seal (`obscure` + `records_from_entries`) and upsert path as
+//! seals each with the session payload cipher (`PayloadCipher::seal` +
+//! `migrate::build_record`) and upserts — the same seal/record convention as
 //! `import_swftx`, so payload sealing is never reimplemented here.
 
 use std::fs;
@@ -108,23 +109,18 @@ pub async fn import_entries(
         });
     }
 
-    let cryptor = state.session.lock().unwrap().cryptor()?;
+    let cipher = state.session.lock().unwrap().payload_cipher()?;
     let entries: Vec<Entry> = parsed.entries.iter().map(imported_to_entry).collect();
 
-    // Seal every entry off the UI thread (obscure + build a Record), emitting
-    // progress — the same seal helper the rest of the app uses.
+    // Seal every plaintext entry off the UI thread (seal payload + build a
+    // Record), emitting progress — the same seal helper the rest of the app uses.
     let emitter = app.clone();
     let records = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<Record>> {
         let total = entries.len();
         let mut records = Vec::with_capacity(total);
         for (i, entry) in entries.iter().enumerate() {
-            let obscured = cryptor.obscure(entry)?;
-            let mut built = migrate::records_from_entries(&[obscured], &cryptor)?;
-            records.push(
-                built
-                    .pop()
-                    .ok_or_else(|| Error::Other("record build failed".into()))?,
-            );
+            let payload = cipher.seal(entry)?;
+            records.push(migrate::build_record(entry, payload)?);
             let _ = emitter.emit("import:progress", json!({ "done": i + 1, "total": total }));
         }
         Ok(records)
