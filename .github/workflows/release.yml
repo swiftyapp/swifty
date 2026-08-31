@@ -25,17 +25,22 @@ on:
 jobs:
   release:
     permissions:
-      contents: write
+      contents: write # create/update the GitHub release + upload assets
+      id-token: write # OIDC token for SLSA build-provenance attestation (T-CI-4)
+      attestations: write # record the provenance attestation
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: macos-latest
             args: '--target universal-apple-darwin'
+            bundlePath: src-tauri/target/universal-apple-darwin/release/bundle
           - platform: ubuntu-latest
             args: ''
+            bundlePath: src-tauri/target/release/bundle
           - platform: windows-latest
             args: ''
+            bundlePath: src-tauri/target/release/bundle
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -54,12 +59,14 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - uses: actions/setup-node@v4
+      # Frontend toolchain is bun (matches ci.yml and the bun-based
+      # beforeBuildCommand in tauri.conf.json; the repo ships bun.lock, not an
+      # npm lockfile).
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: npm
+          bun-version: 1.3.3
 
-      - run: npm ci
+      - run: bun install --frozen-lockfile
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -84,3 +91,43 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+      # --- SLSA build provenance (T-CI-4) ---------------------------------
+      # Attest the installers this platform produced. Each pattern that matches
+      # nothing is simply skipped; every platform matches at least its own
+      # installers, so the attestation always has a subject.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            ${{ matrix.bundlePath }}/**/*.dmg
+            ${{ matrix.bundlePath }}/**/*.app.tar.gz
+            ${{ matrix.bundlePath }}/**/*.deb
+            ${{ matrix.bundlePath }}/**/*.rpm
+            ${{ matrix.bundlePath }}/**/*.AppImage
+            ${{ matrix.bundlePath }}/**/*.msi
+            ${{ matrix.bundlePath }}/**/*-setup.exe
+
+      # --- CycloneDX SBOM (T-CI-4) ----------------------------------------
+      # Generated once, on Linux, and attached to the release. The Rust SBOM is
+      # authoritative (cargo-cyclonedx over the full Cargo.lock); the JS SBOM is
+      # best-effort and never fails the release.
+      - name: Install cargo-cyclonedx
+        if: matrix.platform == 'ubuntu-latest'
+        run: cargo install cargo-cyclonedx --locked
+
+      - name: Generate CycloneDX SBOMs
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          mkdir -p sbom
+          cargo cyclonedx --manifest-path src-tauri/Cargo.toml --format json
+          mv src-tauri/swifty.cdx.json sbom/swifty-rust.cdx.json
+          npx --yes @cyclonedx/cdxgen@11 -t npm -o sbom/swifty-js.cdx.json . \
+            || echo "JS SBOM generation skipped"
+
+      - name: Attach SBOMs to the release
+        if: matrix.platform == 'ubuntu-latest'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.run_number) }}
+        run: gh release upload "$TAG" sbom/* --clobber

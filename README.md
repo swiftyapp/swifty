@@ -40,6 +40,34 @@
 Check the [Latest Releases](https://github.com/swiftyapp/swifty/releases) page for the
 most recent packaged app for MacOS, Windows or Linux.
 
+## Verifying a release
+
+Every release is built in GitHub Actions and ships with supply-chain evidence:
+
+- **SLSA build provenance** — each installer is attested with
+  [`actions/attest-build-provenance`](https://github.com/actions/attest-build-provenance)
+  (keyless OIDC signing). You can prove an installer was built by this repo's
+  workflow, from this source, with the [GitHub CLI](https://cli.github.com):
+
+  ```bash
+  gh attestation verify ./Swifty_1.0.0_amd64.AppImage --repo swiftyapp/swifty
+  ```
+
+  (works for the `.dmg`, `.msi`, `-setup.exe`, `.deb`, `.rpm` and `.AppImage`
+  assets — point it at whichever you downloaded).
+
+- **CycloneDX SBOM** — every release attaches `swifty-rust.cdx.json` (the full
+  Rust dependency graph) and, when available, `swifty-js.cdx.json` (the
+  frontend). Feed them to any CycloneDX-aware scanner (e.g. `grype sbom:./swifty-rust.cdx.json`)
+  to audit the exact dependencies a build shipped.
+
+- **Update signature** — the auto-updater only installs updates signed with the
+  project's minisign key (public key in `src-tauri/tauri.conf.json`); the
+  matching private key never leaves CI.
+
+The Rust toolchain (`rust-toolchain.toml`) and the bun version are both pinned,
+so builds are reproducible from a fixed toolchain.
+
 ## Development
 
 Swifty is built with [Tauri 2](https://v2.tauri.app) (Rust backend + TypeScript/React/Vite frontend).

@@ -1,0 +1,78 @@
+# cargo-deny configuration — supply-chain gate for the Rust backend (T-CI-1).
+# Run in CI (and locally) as: `cargo deny check` from src-tauri/.
+# Covers three axes: security advisories, license policy, and dependency bans.
+# https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+# Only analyse the platforms we actually ship for; avoids failing on advisories
+# in crates that are only ever compiled for targets we don't build.
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+]
+all-features = false
+
+[advisories]
+# RustSec advisory DB. Yanked and *vulnerable* crates still fail the build —
+# the ignores below are ALL `unmaintained`/informational advisories (no CVE,
+# no code fix), pulled in transitively by Tauri itself with no safe upgrade
+# available. Reviewed 2026-08-31; revisit when Tauri migrates off GTK3 (gtk4-rs)
+# and when the transitive proc-macro/unic crates are replaced upstream.
+ignore = [
+  # --- Tauri's Linux GTK3 stack (gtk-rs archived; awaiting Tauri gtk4 move) ---
+  # tauri -> tray-icon/wry/webkit2gtk -> gtk 0.18. "No safe upgrade available."
+  { id = "RUSTSEC-2024-0411", reason = "unmaintained gtk-rs GTK3 binding (transitive via tauri); no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2024-0412", reason = "unmaintained gtk-rs GTK3 binding (transitive via tauri); no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2024-0413", reason = "unmaintained gtk-rs GTK3 binding (transitive via tauri); no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2024-0414", reason = "unmaintained gtk-rs GTK3 binding (transitive via tauri); no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2024-0415", reason = "unmaintained gtk-rs GTK3 binding (transitive via tauri); no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2024-0416", reason = "unmaintained gtk-rs GTK3 binding (transitive via tauri); no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2024-0417", reason = "unmaintained gtk-rs GTK3 binding (transitive via tauri); no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2024-0418", reason = "unmaintained gtk-rs GTK3 binding (transitive via tauri); no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2024-0419", reason = "unmaintained gtk-rs GTK3 binding (transitive via tauri); no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2024-0420", reason = "unmaintained gtk-rs GTK3 binding (transitive via tauri); no fix upstream — 2026-08-31" },
+  # --- Other transitive unmaintained crates (informational, no CVE) ---
+  { id = "RUSTSEC-2024-0370", reason = "proc-macro-error unmaintained; transitive build-time dep, no runtime impact — 2026-08-31" },
+  { id = "RUSTSEC-2025-0075", reason = "unic-char-range unmaintained; transitive dep, no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2025-0080", reason = "unic-common unmaintained; transitive dep, no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2025-0081", reason = "unic-char-property unmaintained; transitive dep, no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2025-0098", reason = "unic-ucd-version unmaintained; transitive dep, no fix upstream — 2026-08-31" },
+  { id = "RUSTSEC-2025-0100", reason = "unic-ucd-ident unmaintained; transitive dep, no fix upstream — 2026-08-31" },
+]
+
+[licenses]
+# Permissive licenses acceptable for a GPL-3.0 distributed desktop app.
+# Deny-by-default: a dependency on a license not listed here fails CI.
+confidence-threshold = 0.8
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "CC0-1.0",
+  "BSL-1.0",
+]
+
+# The swifty crate itself is a private application, never published to
+# crates.io, so it carries no SPDX license field — skip the license check for
+# unpublished workspace members (it is marked `publish = false` in Cargo.toml).
+private = { ignore = true }
+
+[bans]
+# Warn (not deny) on duplicate versions — a monorepo of transitive deps will
+# always have some; failing on them is noise, not a supply-chain signal.
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+# Only crates.io (and explicitly allow-listed git sources, if any) are trusted.
+unknown-registry = "deny"
+unknown-git = "deny"

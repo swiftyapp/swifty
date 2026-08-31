@@ -1,0 +1,51 @@
+# CodeQL static analysis (SAST). JavaScript/TypeScript is the committed,
+# blocking gate. Rust is included as a non-blocking leg (continue-on-error)
+# because CodeQL's Rust support is still maturing — once it has proven green
+# on this tree, drop the `continue-on-error` below to make it blocking too.
+#
+# Both legs use `build-mode: none`: CodeQL extracts from source without a full
+# compile, so the Rust leg does not need the built frontend (`../dist`, which
+# `generate_context!` otherwise requires) or the platform build dependencies.
+name: CodeQL
+
+on:
+  push:
+    branches: [master, v1-0-0]
+  pull_request:
+    branches: [master, v1-0-0]
+  schedule:
+    # Weekly re-scan so advisories added to the CodeQL packs after merge surface.
+    - cron: '27 3 * * 1'
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            experimental: false
+          # TODO: promote Rust to a blocking gate (experimental: false) once
+          # CodeQL's Rust analysis has run green here a few times.
+          - language: rust
+            experimental: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'

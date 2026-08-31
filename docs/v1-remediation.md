@@ -195,7 +195,7 @@ on Phase 1.
 
 ## Phase 8 — Supply chain, CI assurance & docs
 
-### T-CI-1 · Supply-chain gates  ❌ (C4, T3)
+### T-CI-1 · Supply-chain gates  ✅ (PR) (C4, T3)
 **Steps:** add blocking CI steps `cargo audit` + `cargo-deny` and `bun audit` (or `npm audit --audit-level=high`); add a **CodeQL** workflow (JS + Rust); add `.github/dependabot.yml` covering **npm (root) + cargo (src-tauri) + github-actions**, targeting `v1-0-0`; unpause repo automated security fixes; enable secret scanning. **Acceptance:** CI fails on a known-vuln dependency; Dependabot opens PRs across all three ecosystems.
 
 ### T-CI-2 · E2E smoke suite  ❌ (C1, T1)
@@ -204,7 +204,7 @@ on Phase 1.
 ### T-CI-3 · Vault-corruption regression suite  ❌ (T2) — after T-STORE-1 / T-SYNC-1
 **Steps:** the three audit tests, adapted to SQLite — crash-mid-write leaves a valid DB; two-DB non-destructive merge; `updated_at` round-trip. **Acceptance:** all three pass on the fixed code and fail if the fix is reverted.
 
-### T-CI-4 · Build attestation & reproducibility  🟡 (C6, T22)
+### T-CI-4 · Build attestation & reproducibility  ✅ (PR) (C6, T22)
 **Evidence:** signing exists (notarization + Windows cert + minisign updater) but no provenance. **Steps:** add `actions/attest-build-provenance` (OIDC/SLSA) to `release.yml`; add CycloneDX SBOM to release assets; pin `rust-toolchain.toml` + the bun version; document verification in the README. **Acceptance:** releases carry provenance + SBOM; a documented verify procedure exists.
 
 ### T-DOC-1 · SECURITY.md  ❌ (T23)
