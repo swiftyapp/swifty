@@ -3,6 +3,7 @@ import { generatePassword, type GeneratorOptions } from '@/lib/commands'
 import { getProps, setProps } from '@/defaults/generator'
 import { t } from '@/i18n'
 import type { Section } from './Navigation'
+import { H1, Section as Row, LABEL, Checkbox } from './ui'
 
 interface Props {
   section: Section
@@ -32,62 +33,42 @@ export default function Password({ section }: Props) {
 
   return (
     <>
-      <h1>{t('Password Settings')}</h1>
-      <div className="section">
-        <strong>{t('Example')}</strong>
-        <div className="password-sample">{example}</div>
-      </div>
-      <div className="section">
-        <strong>{t('Length')}</strong>
-        <div>
+      <h1 className={H1}>{t('Password Settings')}</h1>
+      <Row>
+        <strong className={LABEL}>{t('Example')}</strong>
+        <div className="rounded-lg border border-line bg-field px-3 py-2.5 font-mono text-[14px] text-text">
+          {example}
+        </div>
+      </Row>
+      <Row>
+        <strong className={LABEL}>{t('Length')}</strong>
+        <div className="flex items-center gap-4">
           <input
             type="range"
             name="length"
             min="6"
             max="50"
-            className="slider"
+            className="h-1.5 flex-1 accent-accent"
             value={options.length}
             onChange={onLength}
           />
-          <div className="pass-count">{options.length}</div>
+          <div className="grid h-6 min-w-[32px] place-items-center rounded-md bg-accent-soft px-1.5 font-mono text-[12px] text-accent">
+            {options.length}
+          </div>
         </div>
-      </div>
-      <div className="section">
-        <strong>{t('Symbols')}</strong>
-        <div>
-          <label>
-            <input
-              type="checkbox"
-              name="numbers"
-              checked={options.numbers}
-              onChange={onToggle}
-            />
-            {t('Numbers')}
-          </label>
-        </div>
-        <div>
-          <label>
-            <input
-              type="checkbox"
-              name="uppercase"
-              checked={options.uppercase}
-              onChange={onToggle}
-            />
-            {t('Uppercase')}
-          </label>
-        </div>
-        <div>
-          <label>
-            <input
-              type="checkbox"
-              name="symbols"
-              checked={options.symbols}
-              onChange={onToggle}
-            />
-            {t('Special characters')}
-          </label>
-        </div>
-      </div>
+      </Row>
+      <Row>
+        <strong className={LABEL}>{t('Symbols')}</strong>
+        <Checkbox name="numbers" checked={options.numbers} onChange={onToggle}>
+          {t('Numbers')}
+        </Checkbox>
+        <Checkbox name="uppercase" checked={options.uppercase} onChange={onToggle}>
+          {t('Uppercase')}
+        </Checkbox>
+        <Checkbox name="symbols" checked={options.symbols} onChange={onToggle}>
+          {t('Special characters')}
+        </Checkbox>
+      </Row>
     </>
   )
 }

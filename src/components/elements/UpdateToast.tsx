@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useStore } from '@/store'
 import { restartForUpdate } from '@/services/autoUpdate'
 import { t } from '@/i18n'
-import DownloadIcon from '@/assets/images/download.svg?react'
+import Button from './Button'
+import { DownloadGlyph } from '../Main/icons'
 
 // Bottom-right toast. Prefers the sticky "update ready → restart" prompt when one
 // is staged; otherwise shows transient feedback from a manual check. Renders
@@ -14,6 +15,9 @@ export default function UpdateToast() {
   if (status) return <StatusToast status={status} />
   return null
 }
+
+const shell =
+  'fixed bottom-5 right-5 z-[1000] max-w-[340px] rounded-xl border border-line bg-detail text-text shadow-[var(--shadow)]'
 
 function ReadyToast({ version, notes }: { version: string; notes: string | null }) {
   const dismiss = useStore(state => state.dismissUpdate)
@@ -31,19 +35,31 @@ function ReadyToast({ version, notes }: { version: string; notes: string | null 
   }
 
   return (
-    <div className="update-toast" role="alert">
-      <DownloadIcon width="18" height="18" />
-      <div className="body">
-        <strong>{t('Update Ready')}</strong>
-        <span>{t('Version {v} has been downloaded.').replace('{v}', version)}</span>
-        {notes && <p className="notes">{notes}</p>}
-        <div className="actions">
-          <div className="button pale" onClick={restarting ? undefined : dismiss}>
+    <div className={`${shell} flex gap-3 p-4`} role="alert">
+      <DownloadGlyph size={18} className="mt-0.5 flex-none text-accent" />
+      <div className="flex flex-col gap-1">
+        <strong className="text-[14px]">{t('Update Ready')}</strong>
+        <span className="text-[13px] text-text2">
+          {t('Version {v} has been downloaded.').replace('{v}', version)}
+        </span>
+        {notes && (
+          <p className="mt-1 whitespace-pre-wrap text-[12px] text-text3">{notes}</p>
+        )}
+        <div className="mt-3 flex gap-2">
+          <Button
+            variant="pale"
+            size="sm"
+            onClick={restarting ? undefined : dismiss}
+          >
             {t('Later')}
-          </div>
-          <div className="button" onClick={restarting ? undefined : onRestart}>
+          </Button>
+          <Button
+            size="sm"
+            loading={restarting}
+            onClick={restarting ? undefined : onRestart}
+          >
             {restarting ? t('Restarting…') : t('Restart Now')}
-          </div>
+          </Button>
         </div>
       </div>
     </div>
@@ -58,10 +74,8 @@ const STATUS_COPY: Record<'checking' | 'uptodate' | 'error', string> = {
 
 function StatusToast({ status }: { status: 'checking' | 'uptodate' | 'error' }) {
   return (
-    <div className="update-toast" role="status">
-      <div className="body">
-        <span>{t(STATUS_COPY[status])}</span>
-      </div>
+    <div className={`${shell} px-4 py-3`} role="status">
+      <span className="text-[13px] text-text2">{t(STATUS_COPY[status])}</span>
     </div>
   )
 }

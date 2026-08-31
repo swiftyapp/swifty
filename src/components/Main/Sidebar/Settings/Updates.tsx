@@ -1,6 +1,8 @@
 import { useStore } from '@/store'
 import { t } from '@/i18n'
 import type { Section } from './Navigation'
+import Button from '@/components/elements/Button'
+import { H1, Section as Row, LABEL, DESC } from './ui'
 
 interface Props {
   section: Section
@@ -14,14 +16,18 @@ export default function Updates({ section }: Props) {
 
   return (
     <>
-      <h1>{t('Updates')}</h1>
-      <div className="section">
-        <strong>{t('Automatic Updates')}</strong>
-        <div>{t('Updates download in the background and apply when you restart.')}</div>
-        <div className="button" onClick={checking ? undefined : () => runUpdateCheck()}>
-          {checking ? t('Checking…') : t('Check for Updates')}
+      <h1 className={H1}>{t('Updates')}</h1>
+      <Row>
+        <strong className={LABEL}>{t('Automatic Updates')}</strong>
+        <p className={DESC}>
+          {t('Updates download in the background and apply when you restart.')}
+        </p>
+        <div>
+          <Button loading={checking} onClick={() => runUpdateCheck()}>
+            {checking ? t('Checking…') : t('Check for Updates')}
+          </Button>
         </div>
-      </div>
+      </Row>
     </>
   )
 }

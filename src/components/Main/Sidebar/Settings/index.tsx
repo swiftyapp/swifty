@@ -30,9 +30,9 @@ export default function Settings() {
       </Tooltip>
       {modal && (
         <Modal onClose={() => setModal(false)}>
-          <div className="preferences">
+          <div className="preferences flex max-h-[80vh] min-h-[560px] w-full text-text">
             <Navigation section={section} onClick={setSection} />
-            <div className="body">
+            <div className="body flex-1 overflow-y-auto p-7">
               <Vault section={section} />
               <Import section={section} />
               <MasterPassword section={section} />

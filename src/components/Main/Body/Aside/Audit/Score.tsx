@@ -14,15 +14,46 @@ const healthOf = (record: AuditItem) => {
   return Math.max(0, value)
 }
 
+const R = 40
+const CIRCUMFERENCE = 2 * Math.PI * R
+
+const toneOf = (score: number) =>
+  score >= 7 ? 'var(--c-good)' : score >= 4 ? 'var(--c-warn)' : 'var(--c-bad)'
+
 export default function Score({ audit }: Props) {
   const records = Object.values(audit)
   const health = records.reduce((total, record) => total + healthOf(record), 0)
   const score = Math.round((health / records.length) * 100) / 10
+  const dash = `${(score / 10) * CIRCUMFERENCE} ${CIRCUMFERENCE}`
 
   return (
-    <div className="score">
-      <div className="points">{score}</div>
-      <div className="muted">{t('Overall Score')}</div>
+    <div className="relative grid h-[132px] w-[132px] place-items-center">
+      <svg
+        width="132"
+        height="132"
+        viewBox="0 0 96 96"
+        fill="none"
+        className="absolute inset-0 -rotate-90"
+      >
+        <circle cx="48" cy="48" r={R} stroke="var(--c-line2)" strokeWidth="4" />
+        <circle
+          cx="48"
+          cy="48"
+          r={R}
+          stroke={toneOf(score)}
+          strokeWidth="4"
+          strokeLinecap="round"
+          strokeDasharray={dash}
+        />
+      </svg>
+      <div className="text-center">
+        <div className="text-[34px] font-semibold tracking-[-0.03em] text-text">
+          {score}
+        </div>
+        <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-text3">
+          {t('Overall Score')}
+        </div>
+      </div>
     </div>
   )
 }

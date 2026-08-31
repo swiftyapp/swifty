@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { cx } from '@/utils/cx'
 import { setEntries } from '@/store'
 import {
   pickImportFile,
@@ -12,6 +11,9 @@ import { t } from '@/i18n'
 import { useProgress } from './useProgress'
 import Progress from './Progress'
 import RowErrors from './RowErrors'
+import Button from '@/components/elements/Button'
+import Select from '@/components/elements/Select'
+import { Section as Row, LABEL, DESC, DANGER, SUCCESS, StatusRow } from '../ui'
 
 const FORMATS: { value: ImportFormat; label: string }[] = [
   { value: 'auto', label: 'Auto-detect' },
@@ -75,75 +77,70 @@ export default function ThirdParty() {
   }
 
   return (
-    <div className="section">
-      <strong>{t('Import from another app')}</strong>
-      <div>{t('Bitwarden, Chrome, Safari, LastPass, KeePass or a generic CSV')}</div>
+    <Row>
+      <strong className={LABEL}>{t('Import from another app')}</strong>
+      <p className={DESC}>
+        {t('Bitwarden, Chrome, Safari, LastPass, KeePass or a generic CSV')}
+      </p>
 
-      <div className="select">
-        <select
-          name="import_format"
-          value={format}
-          disabled={running}
-          onChange={e => {
-            setFormat(e.target.value as ImportFormat)
-            clear()
-          }}
-        >
-          {FORMATS.map(f => (
-            <option key={f.value} value={f.value}>
-              {t(f.label)}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Select
+        name="import_format"
+        value={format}
+        disabled={running}
+        onChange={e => {
+          setFormat(e.target.value as ImportFormat)
+          clear()
+        }}
+        className="max-w-xs"
+      >
+        {FORMATS.map(f => (
+          <option key={f.value} value={f.value}>
+            {t(f.label)}
+          </option>
+        ))}
+      </Select>
 
-      <div className={cx('button pale', { disabled: running })} onClick={choose}>
-        {path ? fileName(path) : t('Choose file')}
+      <div>
+        <Button variant="pale" disabled={running} onClick={choose}>
+          {path ? fileName(path) : t('Choose file')}
+        </Button>
       </div>
 
       {preview && (
-        <div className="import-preview">
-          <div>
-            {t('Ready to import')}: <strong>{preview.total}</strong>
-            {preview.skipped > 0 && (
-              <span className="danger">
-                {' '}
-                · {preview.skipped} {t('rows skipped')}
-              </span>
-            )}
-          </div>
+        <div className="text-[13px] text-text2">
+          {t('Ready to import')}: <strong className="text-text">{preview.total}</strong>
+          {preview.skipped > 0 && (
+            <span className={DANGER}>
+              {' '}
+              · {preview.skipped} {t('rows skipped')}
+            </span>
+          )}
           <RowErrors errors={preview.errors} />
         </div>
       )}
 
       {running && <Progress done={progress.done} total={progress.total} />}
 
-      <div className="status-button">
+      <StatusRow>
         {!preview ? (
-          <span
-            onClick={runPreview}
-            className={cx('button pale', { disabled: !path || running })}
-          >
+          <Button variant="pale" onClick={runPreview} disabled={!path || running}>
             {t('Preview')}
-          </span>
+          </Button>
         ) : (
-          <span
-            onClick={commit}
-            className={cx('button', { disabled: running, loading: running })}
-          >
+          <Button onClick={commit} loading={running}>
             {t('Import')} {preview.total}
-          </span>
+          </Button>
         )}
-        {error && <span className="danger">{error}</span>}
+        {error && <span className={DANGER}>{error}</span>}
         {result && (
-          <span className="success">
+          <span className={SUCCESS}>
             {t('Imported')} {result.imported}
             {result.skipped > 0 && ` · ${result.skipped} ${t('skipped')}`}
           </span>
         )}
-      </div>
+      </StatusRow>
 
       {result && <RowErrors errors={result.errors} />}
-    </div>
+    </Row>
   )
 }

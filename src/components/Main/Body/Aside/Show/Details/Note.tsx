@@ -1,6 +1,6 @@
 import type { NoteEntry } from '@/lib/commands'
-import Item from './Item'
 import Tags from './Item/Tags'
+import { Panel } from '../../ui'
 
 interface Props {
   entry: NoteEntry
@@ -8,8 +8,15 @@ interface Props {
 
 export default function Note({ entry }: Props) {
   return (
-    <div className="entry-details">
-      <Item name="Note" entry={entry} secure />
+    <div className="mt-3">
+      <Panel>
+        <div
+          className="whitespace-pre-wrap break-words px-4 py-4 text-[13px] leading-relaxed text-text2"
+          data-testid="entry-value-note"
+        >
+          {entry.note}
+        </div>
+      </Panel>
       <Tags entry={entry} />
     </div>
   )

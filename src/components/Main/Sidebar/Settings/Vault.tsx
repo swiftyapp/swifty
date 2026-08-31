@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { cx } from '@/utils/cx'
 import { useStore, flowAuth } from '@/store'
 import { syncConnect, syncDisconnect, exportVault, lock } from '@/lib/commands'
 import { SYNC_ENABLED } from '@/config'
 import { t } from '@/i18n'
 import type { Section } from './Navigation'
-import DownloadIcon from '@/assets/images/download.svg?react'
+import Button from '@/components/elements/Button'
+import { inputClass } from '@/components/elements/formStyles'
+import { H1, Section as Row, LABEL, DESC, DANGER } from './ui'
+import { DownloadGlyph } from '../../icons'
 
 interface Props {
   section: Section
@@ -42,15 +44,15 @@ export default function Vault({ section }: Props) {
   const syncAction = () => {
     if (syncEnabled) {
       return (
-        <div className="button danger" onClick={() => syncDisconnect()}>
+        <Button variant="danger" onClick={() => syncDisconnect()}>
           {t('Disconnect Google Drive')}
-        </div>
+        </Button>
       )
     }
     return (
-      <div className={cx('button', { loading: connecting })} onClick={onConnect}>
+      <Button variant="pale" loading={connecting} onClick={onConnect}>
         {t('Connect your Google Drive')}
-      </div>
+      </Button>
     )
   }
 
@@ -58,43 +60,49 @@ export default function Vault({ section }: Props) {
 
   return (
     <>
-      <h1>{t('Vault Settings')}</h1>
-      <div className="section">
-        <div className="button pale" onClick={onLock}>
-          {t('Lock Screen')}
+      <h1 className={H1}>{t('Vault Settings')}</h1>
+      <Row>
+        <div>
+          <Button variant="pale" onClick={onLock}>
+            {t('Lock Screen')}
+          </Button>
         </div>
-      </div>
+      </Row>
       {SYNC_ENABLED && (
-        <div className="section">
-          <strong>{t('Synchronize')}</strong>
-          <div>{t('Synchronize your vault with Google Drive')}</div>
-          {syncAction()}
-        </div>
+        <Row>
+          <strong className={LABEL}>{t('Synchronize')}</strong>
+          <p className={DESC}>{t('Synchronize your vault with Google Drive')}</p>
+          <div>{syncAction()}</div>
+        </Row>
       )}
-      <div className="section">
-        <strong>{t('Backup')}</strong>
-        <div>{t('Allows you to save a backup of your default vault file')}</div>
-        <div className="threefour">
-          <input
-            type="password"
-            name="export_password"
-            placeholder={t('Master password')}
-            value={password}
-            disabled={exporting}
-            onChange={event => {
-              setError(null)
-              setPassword(event.target.value)
-            }}
-          />
+      <Row>
+        <strong className={LABEL}>{t('Backup')}</strong>
+        <p className={DESC}>
+          {t('Allows you to save a backup of your default vault file')}
+        </p>
+        <input
+          type="password"
+          name="export_password"
+          placeholder={t('Master password')}
+          className={`${inputClass} max-w-md`}
+          value={password}
+          disabled={exporting}
+          onChange={event => {
+            setError(null)
+            setPassword(event.target.value)
+          }}
+        />
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="pale"
+            disabled={!password || exporting}
+            onClick={onExport}
+          >
+            <DownloadGlyph size={16} /> {t('Save Vault File')}
+          </Button>
+          {error && <span className={DANGER}>{error}</span>}
         </div>
-        <div
-          className={cx('button pale iconed', { disabled: !password || exporting })}
-          onClick={onExport}
-        >
-          <DownloadIcon width="16" height="16" /> {t('Save Vault File')}
-        </div>
-        {error && <span className="danger">{error}</span>}
-      </div>
+      </Row>
     </>
   )
 }

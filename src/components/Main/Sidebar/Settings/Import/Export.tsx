@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { cx } from '@/utils/cx'
 import { exportEntries, type ExportFormat } from '@/lib/commands'
 import { t } from '@/i18n'
+import Button from '@/components/elements/Button'
+import Select from '@/components/elements/Select'
+import { Section as Row, LABEL, DESC, DANGER, SUCCESS, StatusRow } from '../ui'
 
 const FORMATS: { value: ExportFormat; label: string }[] = [
   { value: 'bitwarden', label: 'Bitwarden (JSON)' },
@@ -30,36 +32,35 @@ export default function Export() {
   }
 
   return (
-    <div className="section">
-      <strong>{t('Export vault')}</strong>
-      <div>{t('Save every entry to a portable file')}</div>
+    <Row>
+      <strong className={LABEL}>{t('Export vault')}</strong>
+      <p className={DESC}>{t('Save every entry to a portable file')}</p>
 
-      <div className="select">
-        <select
-          name="export_format"
-          value={format}
-          disabled={running}
-          onChange={e => setFormat(e.target.value as ExportFormat)}
-        >
-          {FORMATS.map(f => (
-            <option key={f.value} value={f.value}>
-              {t(f.label)}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Select
+        name="export_format"
+        value={format}
+        disabled={running}
+        onChange={e => setFormat(e.target.value as ExportFormat)}
+        className="max-w-xs"
+      >
+        {FORMATS.map(f => (
+          <option key={f.value} value={f.value}>
+            {t(f.label)}
+          </option>
+        ))}
+      </Select>
 
-      <div className="status-button">
-        <span onClick={run} className={cx('button', { loading: running })}>
+      <StatusRow>
+        <Button onClick={run} loading={running}>
           {t('Export')}
-        </span>
-        {error && <span className="danger">{error}</span>}
+        </Button>
+        {error && <span className={DANGER}>{error}</span>}
         {saved && (
-          <span className="success">
+          <span className={SUCCESS}>
             {t('Saved to')} {fileName(saved)}
           </span>
         )}
-      </div>
-    </div>
+      </StatusRow>
+    </Row>
   )
 }

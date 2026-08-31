@@ -1,10 +1,12 @@
 import { useState, type ChangeEvent } from 'react'
-import { cx } from '@/utils/cx'
 import { setEntries } from '@/store'
 import { pickBackup, importSwftx, readVault } from '@/lib/commands'
 import { t } from '@/i18n'
 import { useProgress } from './useProgress'
 import Progress from './Progress'
+import Button from '@/components/elements/Button'
+import { inputClass } from '@/components/elements/formStyles'
+import { Section as Row, LABEL, DESC, DANGER, SUCCESS, StatusRow } from '../ui'
 
 const fileName = (path: string) => path.replace(/^.*[\\/]/, '')
 
@@ -47,39 +49,39 @@ export default function Swftx() {
   }
 
   return (
-    <div className="section">
-      <strong>{t('Import from .swftx')}</strong>
-      <div>{t('Merge entries from a Swifty vault file into your current vault')}</div>
-      <div className={cx('button pale', { disabled: running })} onClick={choose}>
-        {path ? fileName(path) : t('Choose backup File')}
+    <Row>
+      <strong className={LABEL}>{t('Import from .swftx')}</strong>
+      <p className={DESC}>
+        {t('Merge entries from a Swifty vault file into your current vault')}
+      </p>
+      <div>
+        <Button variant="pale" disabled={running} onClick={choose}>
+          {path ? fileName(path) : t('Choose backup File')}
+        </Button>
       </div>
       {path && (
-        <div className="threefour">
-          <input
-            type="password"
-            name="import_password"
-            placeholder={t('Vault File Password')}
-            value={password}
-            disabled={running}
-            onChange={onChange}
-          />
-        </div>
+        <input
+          type="password"
+          name="import_password"
+          placeholder={t('Vault File Password')}
+          className={`${inputClass} max-w-md`}
+          value={password}
+          disabled={running}
+          onChange={onChange}
+        />
       )}
       {running && <Progress done={progress.done} total={progress.total} />}
-      <div className="status-button">
-        <span
-          onClick={run}
-          className={cx('button', { disabled: !path || running, loading: running })}
-        >
+      <StatusRow>
+        <Button onClick={run} disabled={!path} loading={running}>
           {t('Run import')}
-        </span>
-        {error && <span className="danger">{error}</span>}
+        </Button>
+        {error && <span className={DANGER}>{error}</span>}
         {count !== null && (
-          <span className="success">
+          <span className={SUCCESS}>
             {t('Imported')} {count}
           </span>
         )}
-      </div>
-    </div>
+      </StatusRow>
+    </Row>
   )
 }

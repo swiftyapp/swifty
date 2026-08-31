@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { cx } from '@/utils/cx'
 import { changeMasterPassword } from '@/lib/commands'
 import { t } from '@/i18n'
 import type { Section } from './Navigation'
+import Button from '@/components/elements/Button'
+import { inputClass } from '@/components/elements/formStyles'
+import { H1, Section as Row, LABEL, DANGER, SUCCESS, StatusRow } from './ui'
 
 interface Props {
   section: Section
@@ -38,50 +40,44 @@ export default function MasterPassword({ section }: Props) {
 
   return (
     <>
-      <h1>{t('Change Master Password')}</h1>
-      <div className="section">
-        <strong>{t('Current Password')}</strong>
-        <div className="threefour">
-          <input
-            type="password"
-            name="current_password"
-            value={current}
-            onChange={e => setCurrent(e.target.value)}
-          />
-        </div>
-      </div>
-      <div className="section">
-        <strong>{t('New Password')}</strong>
-        <div className="threefour">
-          <input
-            type="password"
-            name="new_password"
-            value={next}
-            onChange={e => setNext(e.target.value)}
-          />
-        </div>
-      </div>
-      <div className="section">
-        <strong>{t('Repeat New Password')}</strong>
-        <div className="threefour">
-          <input
-            type="password"
-            name="new_password_repeat"
-            value={confirmation}
-            onChange={e => setConfirmation(e.target.value)}
-          />
-        </div>
-      </div>
-      <div className="status-button">
-        <span
-          onClick={onSubmit}
-          className={cx('button', { disabled, loading: processing })}
-        >
+      <h1 className={H1}>{t('Change Master Password')}</h1>
+      <Row>
+        <strong className={LABEL}>{t('Current Password')}</strong>
+        <input
+          type="password"
+          name="current_password"
+          className={`${inputClass} max-w-md`}
+          value={current}
+          onChange={e => setCurrent(e.target.value)}
+        />
+      </Row>
+      <Row>
+        <strong className={LABEL}>{t('New Password')}</strong>
+        <input
+          type="password"
+          name="new_password"
+          className={`${inputClass} max-w-md`}
+          value={next}
+          onChange={e => setNext(e.target.value)}
+        />
+      </Row>
+      <Row>
+        <strong className={LABEL}>{t('Repeat New Password')}</strong>
+        <input
+          type="password"
+          name="new_password_repeat"
+          className={`${inputClass} max-w-md`}
+          value={confirmation}
+          onChange={e => setConfirmation(e.target.value)}
+        />
+      </Row>
+      <StatusRow>
+        <Button onClick={onSubmit} disabled={disabled} loading={processing}>
           {t('Update')}
-        </span>
-        {error && <span className="danger">{error}</span>}
-        {success && <span className="success">{success}</span>}
-      </div>
+        </Button>
+        {error && <span className={DANGER}>{error}</span>}
+        {success && <span className={SUCCESS}>{success}</span>}
+      </StatusRow>
     </>
   )
 }

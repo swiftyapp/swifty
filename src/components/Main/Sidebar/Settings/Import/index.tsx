@@ -3,6 +3,7 @@ import type { Section } from '../Navigation'
 import ThirdParty from './ThirdParty'
 import Swftx from './Swftx'
 import Export from './Export'
+import { H1 } from '../ui'
 
 interface Props {
   section: Section
@@ -13,7 +14,7 @@ export default function Import({ section }: Props) {
 
   return (
     <>
-      <h1>{t('Import & Export')}</h1>
+      <h1 className={H1}>{t('Import & Export')}</h1>
       <ThirdParty />
       <Swftx />
       <Export />

@@ -8,11 +8,18 @@ import { t } from '@/i18n'
 import Login from './Login'
 import Card from './Card'
 import Note from './Note'
-import Error from '@/components/elements/Error'
+import Button from '@/components/elements/Button'
+import { MONO_LABEL } from '../ui'
 import type { FieldChange } from './helpers'
 
 interface Props {
   entry?: EntryMeta
+}
+
+const KIND_LABEL: Record<EntryType, string> = {
+  login: 'Login',
+  card: 'Card',
+  note: 'Secure note'
 }
 
 export default function Form({ entry }: Props) {
@@ -79,16 +86,32 @@ export default function Form({ entry }: Props) {
   }
 
   return (
-    <div className="aside">
-      {fields()}
-      <Error error={saveError} />
-      <div className="actions">
-        <span className="cancel" data-testid="cancel-entry-button" onClick={onCancel}>
+    <div className="mx-auto max-w-[560px]">
+      <div className={MONO_LABEL}>{t(KIND_LABEL[type])}</div>
+      <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-text">
+        {entry ? t('Edit') : t('New Secret')}
+      </h1>
+
+      <div className="mt-6 flex flex-col gap-4">{fields()}</div>
+
+      {saveError && (
+        <div className="mt-4 rounded-xl border border-bad/40 bg-bad/5 px-4 py-3 text-[13px] text-bad">
+          {saveError}
+        </div>
+      )}
+
+      <div className="mt-6 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          data-testid="cancel-entry-button"
+          onClick={onCancel}
+          className="h-9 cursor-pointer rounded-lg px-4 text-[13px] text-text2 transition-colors hover:text-text"
+        >
           {t('Cancel')}
-        </span>
-        <span className="button" data-testid="save-entry-button" onClick={onSave}>
+        </button>
+        <Button testid="save-entry-button" onClick={onSave}>
           {t('Save')}
-        </span>
+        </Button>
       </div>
     </div>
   )

@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import { cx } from '@/utils/cx'
 import type { EntryDraft } from '@/defaults/entries'
 import { valueOf, type FieldChange } from './helpers'
-import View from '@/assets/images/view.svg?react'
-import Hide from '@/assets/images/hide.svg?react'
+import { inputClass, labelClass } from '@/components/elements/formStyles'
+import { IconButton } from '../ui'
+import { EyeGlyph, EyeOffGlyph } from '../../../icons'
 
 interface Props {
   label: string
@@ -29,41 +30,45 @@ export default function SecureField({
   const [show, setShow] = useState(false)
   const value = valueOf(entry, name)
   const error = validate && value.trim() === ''
+  const mask: CSSProperties = {
+    WebkitTextSecurity: show ? 'none' : 'disc'
+  } as CSSProperties
+  const control = cx(inputClass, '!pr-10', error && '!border-bad')
 
   return (
-    <div
-      className={cx('field', {
-        'secure-on': !show,
-        'secure-off': show,
-        error
-      })}
-    >
-      <label>{label}</label>
-      <div className="value">
-        <div className="wrapper">
-          {rows ? (
-            <textarea
-              name={name}
-              cols={10}
-              rows={rows}
-              value={value}
-              onChange={onChange}
-              maxLength={maxLength}
-            />
-          ) : (
-            <input
-              name={name}
-              type="text"
-              value={value}
-              onChange={onChange}
-              maxLength={maxLength}
-            />
-          )}
-          <View width="16" height="16" onClick={() => setShow(!show)} className="view" />
-          <Hide width="16" height="16" onClick={() => setShow(!show)} className="hide" />
-        </div>
-        <div>{children}</div>
+    <div>
+      <label className={labelClass}>{label}</label>
+      <div className="relative">
+        {rows ? (
+          <textarea
+            className={cx(control, 'resize-none')}
+            name={name}
+            rows={rows}
+            value={value}
+            style={mask}
+            onChange={onChange}
+            maxLength={maxLength}
+          />
+        ) : (
+          <input
+            className={control}
+            name={name}
+            type="text"
+            value={value}
+            style={mask}
+            onChange={onChange}
+            maxLength={maxLength}
+          />
+        )}
+        <IconButton
+          className="absolute right-1.5 top-1.5"
+          active={show}
+          onClick={() => setShow(!show)}
+        >
+          {show ? <EyeOffGlyph /> : <EyeGlyph />}
+        </IconButton>
       </div>
+      {children && <div className="mt-2 flex justify-end">{children}</div>}
     </div>
   )
 }

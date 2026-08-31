@@ -11,12 +11,15 @@ export default function RowErrors({ errors }: { errors: RowError[] }) {
   if (errors.length === 0) return null
 
   return (
-    <div className="row-errors">
-      <span className="toggle danger" onClick={() => setOpen(!open)}>
+    <div className="mt-2 text-[13px]">
+      <span
+        className="cursor-pointer select-none text-bad"
+        onClick={() => setOpen(!open)}
+      >
         {errors.length} {t('rows could not be read')} {open ? '▾' : '▸'}
       </span>
       {open && (
-        <ul>
+        <ul className="mt-1.5 max-h-[140px] list-disc overflow-y-auto pl-5 text-text3">
           {errors.slice(0, MAX_SHOWN).map((e, i) => (
             <li key={i}>
               {t('Row')} {e.row}: {e.message}

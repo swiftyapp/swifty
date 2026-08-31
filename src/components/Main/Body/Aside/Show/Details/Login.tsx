@@ -2,21 +2,39 @@ import type { LoginEntry } from '@/lib/commands'
 import Item from './Item'
 import Totp from './Item/Totp'
 import Tags from './Item/Tags'
+import { Panel, StrengthBar } from '../../ui'
 
 interface Props {
   entry: LoginEntry
 }
 
 export default function Login({ entry }: Props) {
+  const hasOtp = !!entry.otp
+
   return (
-    <div className="entry-details">
-      <Item name="Website" entry={entry} link />
-      <Item name="Username" entry={entry} />
-      <Item name="Password" entry={entry} secure />
-      <Totp name="OTP" entry={entry} />
-      <Item name="Email" entry={entry} />
+    <div className="mt-3">
+      <div
+        className={
+          hasOtp
+            ? 'grid grid-cols-[minmax(0,1fr)_208px] items-start gap-3'
+            : 'grid gap-3'
+        }
+      >
+        <Panel>
+          <Item name="Website" entry={entry} link />
+          <Item name="Username" entry={entry} />
+          <Item name="Password" entry={entry} secure big />
+          {entry.password && (
+            <div className="px-3.5 py-3 shadow-[inset_0_-1px_0_var(--c-line)] last:shadow-none">
+              <StrengthBar password={entry.password} />
+            </div>
+          )}
+          <Item name="Email" entry={entry} />
+          <Item name="Note" entry={entry} />
+        </Panel>
+        {hasOtp && <Totp name="OTP" entry={entry} />}
+      </div>
       <Tags entry={entry} />
-      <Item name="Note" entry={entry} />
     </div>
   )
 }

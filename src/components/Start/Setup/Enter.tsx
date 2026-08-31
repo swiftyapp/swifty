@@ -41,7 +41,7 @@ export default function Enter({ display, onEnter }: Props) {
       />
       <PasswordStrength password={password} />
       <div className="mx-auto mt-8 w-72 max-w-full">
-        <Button testid="setup-continue-button" onClick={onSend}>
+        <Button block testid="setup-continue-button" onClick={onSend}>
           {t('Continue')}
         </Button>
       </div>

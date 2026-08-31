@@ -6,6 +6,7 @@ import Field from './Field'
 import SecureField from './SecureField'
 import type { FieldChange } from './helpers'
 import TagField from './TagField'
+import { RefreshGlyph } from '../../../icons'
 
 interface Props {
   entry: EntryDraft
@@ -33,7 +34,11 @@ export default function Login({
       <Field label={t('Website')} name="website" entry={entry} onChange={onChange} />
       <Field label={t('Username')} name="username" validate={validate} entry={entry} onChange={onChange} maxLength={40} />
       <SecureField label={t('Password')} name="password" validate={validate} entry={entry} onChange={onChange} maxLength={100}>
-        <span className="action" onClick={generate}>
+        <span
+          className="flex cursor-pointer items-center gap-1.5 text-[12px] text-accent hover:brightness-110"
+          onClick={generate}
+        >
+          <RefreshGlyph size={13} />
           generate
         </span>
       </SecureField>

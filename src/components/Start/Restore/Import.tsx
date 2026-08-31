@@ -18,7 +18,7 @@ export default function Import({ display, onImport }: Props) {
 
   return (
     <div className="mx-auto w-72 max-w-full">
-      <Button variant="ghost" onClick={chooseFile}>
+      <Button block variant="ghost" onClick={chooseFile}>
         {t('Choose backup File')}
       </Button>
     </div>
