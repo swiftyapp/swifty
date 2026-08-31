@@ -13,6 +13,32 @@
 @import 'tailwindcss/utilities.css' layer(utilities);
 
 /*
+ * Shared motion primitives for the redesign: a blinking text caret and a
+ * slow "breathing" status dot (both from the Keyring lock prototype). Kept as
+ * top-level @keyframes so any component can reference them via an arbitrary
+ * `animate-[...]` utility regardless of theme.
+ */
+@keyframes caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/*
  * The one piece of reset we need before Preflight returns: border-box sizing,
  * which every redesign component (and the prototype) assumes. Scoped to the
  * `base` layer so legacy SASS — unlayered, thus higher priority — keeps winning

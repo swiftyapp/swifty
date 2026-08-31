@@ -2,6 +2,7 @@ import { useState, type ChangeEvent } from 'react'
 import { restoreBackup } from '@/store'
 import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
+import Button from '@/components/elements/Button'
 
 interface Props {
   display: boolean
@@ -26,17 +27,16 @@ export default function Confirm({ display, path }: Props) {
   if (!display) return null
 
   return (
-    <>
+    <div>
       <Masterpass
         placeholder={t('Enter Master Password')}
         error={error}
         onEnter={onSend}
         onChange={onChange}
       />
-      <br />
-      <div className="button" onClick={onSend}>
-        {t('Finish')}
+      <div className="mx-auto mt-8 w-72 max-w-full">
+        <Button onClick={onSend}>{t('Finish')}</Button>
       </div>
-    </>
+    </div>
   )
 }

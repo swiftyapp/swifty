@@ -4,5 +4,9 @@ interface Props {
 
 export default function Error({ error }: Props) {
   if (!error) return null
-  return <div className="error-message">{error}</div>
+  return (
+    <div className="mt-2.5 text-center font-mono text-[11px] tracking-[0.02em] text-bad">
+      {error}
+    </div>
+  )
 }
