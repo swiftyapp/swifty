@@ -19,7 +19,7 @@ describe('Start', () => {
 
   it('completes setup when passwords match', async () => {
     vi.mocked(setup).mockResolvedValue(undefined)
-    vi.mocked(readVault).mockResolvedValue({ entries: [] })
+    vi.mocked(readVault).mockResolvedValue([])
     const { store } = renderWithStore(<Start />)
 
     await userEvent.click(screen.getByText('Setup Master Password'))

@@ -14,7 +14,7 @@ describe('Auth', () => {
   })
 
   it('unlocks the vault on Enter', async () => {
-    vi.mocked(unlock).mockResolvedValue({ vault: { entries: [] }, syncConfigured: false })
+    vi.mocked(unlock).mockResolvedValue({ entries: [], syncConfigured: false })
     const { store } = renderWithStore(<Auth touchID={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'hunter2{Enter}')
@@ -33,7 +33,7 @@ describe('Auth', () => {
   })
 
   it('unlocks with biometrics', async () => {
-    vi.mocked(unlockBiometric).mockResolvedValue({ vault: { entries: [] }, syncConfigured: false })
+    vi.mocked(unlockBiometric).mockResolvedValue({ entries: [], syncConfigured: false })
     const { container, store } = renderWithStore(<Auth touchID />)
 
     await userEvent.click(container.querySelector('.touchid')!)

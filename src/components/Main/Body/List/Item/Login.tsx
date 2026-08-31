@@ -1,12 +1,12 @@
-import type { LoginEntry } from '@/lib/commands'
+import type { EntryMeta } from '@/lib/commands'
 import icons, { iconKeyForWebsite } from '@/defaults/icons'
 
 interface Props {
-  entry: LoginEntry
+  entry: EntryMeta
 }
 
 export default function Login({ entry }: Props) {
-  const icon = icons[iconKeyForWebsite(entry.website)] ?? icons.default
+  const icon = icons[iconKeyForWebsite(entry.urlHost)] ?? icons.default
   const Icon = icon.icon
 
   return (
@@ -16,7 +16,7 @@ export default function Login({ entry }: Props) {
       </div>
       <div className="description">
         <div className="primary">{entry.title}</div>
-        <div className="secondary">{entry.username}</div>
+        <div className="secondary">{entry.urlHost}</div>
       </div>
     </>
   )

@@ -52,10 +52,52 @@ pub struct VaultData {
     pub entries: Vec<Entry>,
 }
 
+// Non-secret entry metadata sent to the frontend for the list. Never carries a
+// secret field; secrets stay in the encrypted payload, revealed one at a time.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntryMetaDto {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub title: String,
+    pub tags: Vec<String>,
+    pub url_host: String,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
+impl EntryMetaDto {
+    // Build from the shared metadata columns (timestamps are ms → RFC3339).
+    pub fn from_parts(
+        id: String,
+        kind: String,
+        title: String,
+        tags: &str,
+        url_host: String,
+        created_at: i64,
+        updated_at: i64,
+    ) -> Self {
+        Self {
+            id,
+            kind,
+            title,
+            tags: serde_json::from_str(tags).unwrap_or_default(),
+            url_host,
+            created_at: iso(created_at),
+            updated_at: iso(updated_at),
+        }
+    }
+}
+
+fn iso(ms: i64) -> Option<String> {
+    chrono::DateTime::from_timestamp_millis(ms).map(|d| d.to_rfc3339())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UnlockResult {
-    pub vault: VaultData,
+    pub entries: Vec<EntryMetaDto>,
     pub sync_configured: bool,
 }
 

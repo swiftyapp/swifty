@@ -57,8 +57,37 @@ export interface VaultData {
   entries: Entry[]
 }
 
+// Non-secret entry metadata for the list. Secrets live in the encrypted store
+// and arrive only via revealEntry, one entry at a time.
+export interface EntryMeta {
+  id: string
+  type: EntryType
+  title: string
+  tags: string[]
+  urlHost: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+// Project a full entry down to its list metadata (used on the disabled sync path).
+export const toEntryMeta = (entry: Entry): EntryMeta => ({
+  id: entry.id,
+  type: entry.type,
+  title: entry.title,
+  tags: entry.tags ?? [],
+  urlHost: entry.type === 'login' ? hostOf(entry.website) : '',
+  createdAt: entry.createdAt ?? entry.created_at,
+  updatedAt: entry.updatedAt ?? entry.updated_at
+})
+
+const hostOf = (website: string): string =>
+  website
+    .trim()
+    .replace(/^https?:\/\//, '')
+    .split('/')[0]
+
 export interface UnlockResult {
-  vault: VaultData
+  entries: EntryMeta[]
   syncConfigured: boolean
 }
 
@@ -127,14 +156,19 @@ export const changeMasterPassword = (
 // Vault
 // ---------------------------------------------------------------------------
 
-export const readVault = (): Promise<VaultData> => invoke('read_vault')
+export const readVault = (): Promise<EntryMeta[]> => invoke('read_vault')
 
 // Decrypt one entry's secret fields on demand (view/edit).
 export const revealEntry = (id: string): Promise<Entry> =>
   invoke('reveal_entry', { id })
 
-export const saveVault = (entries: Entry[]): Promise<VaultData> =>
-  invoke('save_vault', { entries })
+// Persist one entry (upsert a single row); returns its refreshed metadata.
+export const saveEntry = (entry: Entry): Promise<EntryMeta> =>
+  invoke('save_entry', { entry })
+
+// Tombstone one entry.
+export const deleteEntry = (id: string): Promise<void> =>
+  invoke('delete_entry', { id })
 
 export const pickBackup = (): Promise<string | null> => invoke('pick_backup')
 

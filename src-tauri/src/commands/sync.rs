@@ -67,11 +67,6 @@ fn perform(app: &AppHandle, state: &AppState) -> Result<()> {
         local
     };
     sync::push(app, &cryptor, &merged)?;
-
-    // Reflect the merged vault in the live session.
-    let stored: VaultData = cryptor.decrypt_data(&merged)?;
-    let exposed = expose_all(&cryptor, &stored.entries)?;
-    state.session.lock().unwrap().vault = Some(VaultData { entries: exposed });
     Ok(())
 }
 
@@ -86,7 +81,7 @@ pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     state.session.lock().unwrap().sync_configured = true;
 
     let _ = app.emit("vault:pull:started", ());
-    let result = import_remote(&app, &state, &cryptor);
+    let result = import_remote(&app, &cryptor);
     let _ = match &result {
         Ok(vault) => app.emit(
             "vault:pull:stopped",
@@ -100,22 +95,16 @@ pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     result.map(|_| ())
 }
 
-fn import_remote(
-    app: &AppHandle,
-    state: &AppState,
-    cryptor: &crate::crypto::Cryptor,
-) -> Result<VaultData> {
+fn import_remote(app: &AppHandle, cryptor: &crate::crypto::Cryptor) -> Result<VaultData> {
     let remote = sync::pull(app, cryptor)?;
     let stored: VaultData = cryptor
         .decrypt_data(&remote)
         .map_err(|_| Error::Crypto("Failed to decrypt remote vault file".into()))?;
     storage::write_vault(app, &remote)?;
 
-    let vault = VaultData {
+    Ok(VaultData {
         entries: expose_all(cryptor, &stored.entries)?,
-    };
-    state.session.lock().unwrap().vault = Some(vault.clone());
-    Ok(vault)
+    })
 }
 
 #[tauri::command]

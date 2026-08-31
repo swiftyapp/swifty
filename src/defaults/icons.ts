@@ -58,16 +58,12 @@ const icons: Record<string, IconEntry> = {
   wordpress: { color: '#282828', icon: WordpressIcon }
 }
 
-// Derives an icon key from a website URL (second-level domain), e.g.
-// "https://mail.google.com" -> "google".
+// Derives an icon key from a website URL or bare host (second-level domain),
+// e.g. "https://mail.google.com" or "mail.google.com" -> "google".
 export const iconKeyForWebsite = (website: string): string => {
-  try {
-    const { hostname } = new URL(website)
-    const parts = hostname.replace(/^www\./, '').split('.')
-    return parts.length >= 2 ? parts[parts.length - 2] : 'default'
-  } catch {
-    return 'default'
-  }
+  const host = website.trim().replace(/^https?:\/\//, '').split('/')[0]
+  const parts = host.replace(/^www\./, '').split('.')
+  return parts.length >= 2 ? parts[parts.length - 2] : 'default'
 }
 
 export default icons

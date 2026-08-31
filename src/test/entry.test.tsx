@@ -3,13 +3,13 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Form from '@/components/Main/Body/Aside/Form'
 import Show from '@/components/Main/Body/Aside/Show'
-import { saveVault, revealEntry, generatePassword, generateOtp, copyToClipboard } from '@/lib/commands'
+import { saveEntry, revealEntry, generatePassword, generateOtp, copyToClipboard, toEntryMeta } from '@/lib/commands'
 import type { LoginEntry } from '@/lib/commands'
-import { renderWithStore, loginEntry } from './utils'
+import { renderWithStore, loginEntry, loginMeta } from './utils'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(saveVault).mockImplementation(entries => Promise.resolve({ entries }))
+  vi.mocked(saveEntry).mockImplementation(entry => Promise.resolve(toEntryMeta(entry)))
 })
 
 describe('Form', () => {
@@ -27,14 +27,14 @@ describe('Form', () => {
     await userEvent.type(document.querySelector('input[name="password"]')!, 'pw')
     await userEvent.click(screen.getByText('Save'))
 
-    expect(saveVault).toHaveBeenCalledOnce()
+    expect(saveEntry).toHaveBeenCalledOnce()
     await waitFor(() => expect(store.getState().entries.items[0].title).toBe('GitHub'))
   })
 
   it('blocks saving an invalid entry', async () => {
     renderWithStore(<Form />)
     await userEvent.click(screen.getByText('Save'))
-    expect(saveVault).not.toHaveBeenCalled()
+    expect(saveEntry).not.toHaveBeenCalled()
   })
 
   it('generates a password', async () => {
@@ -49,27 +49,24 @@ describe('Form', () => {
 
 describe('Show', () => {
   it('renders entry details', async () => {
-    const entry = loginEntry({ title: 'Google' })
-    vi.mocked(revealEntry).mockResolvedValue(entry)
-    renderWithStore(<Show entry={entry} />)
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google' }))
+    renderWithStore(<Show entry={loginMeta({ title: 'Google' })} />)
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
     expect(await screen.findByText('me@example.com')).toBeInTheDocument()
   })
 
   it('renders and copies a TOTP code', async () => {
     vi.mocked(generateOtp).mockResolvedValue({ code: '123456', time: 25 })
-    const entry = loginEntry({ otp: 'BASE32SECRET' }) as LoginEntry
-    vi.mocked(revealEntry).mockResolvedValue(entry)
-    renderWithStore(<Show entry={entry} />)
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ otp: 'BASE32SECRET' }) as LoginEntry)
+    renderWithStore(<Show entry={loginMeta()} />)
 
     expect(await screen.findByText('123 456')).toBeInTheDocument()
     expect(generateOtp).toHaveBeenCalledWith('BASE32SECRET')
   })
 
   it('copies a field value', async () => {
-    const entry = loginEntry({ username: 'copyme' })
-    vi.mocked(revealEntry).mockResolvedValue(entry)
-    renderWithStore(<Show entry={entry} />)
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ username: 'copyme' }))
+    renderWithStore(<Show entry={loginMeta()} />)
     await userEvent.click(await screen.findByText('copyme'))
     await userEvent.click(document.querySelector('.item svg')!)
     expect(copyToClipboard).toHaveBeenCalled()

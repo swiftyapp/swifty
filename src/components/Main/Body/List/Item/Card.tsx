@@ -1,27 +1,18 @@
-import type { CardEntry } from '@/lib/commands'
-import Visa from '@/assets/images/cards/visa.svg?react'
-import Master from '@/assets/images/cards/master.svg?react'
+import type { EntryMeta } from '@/lib/commands'
 import CardIcon from '@/assets/images/cards/card.svg?react'
 
 interface Props {
-  entry: CardEntry
+  entry: EntryMeta
 }
 
+// The card number is a secret (in the payload), so the list can't brand by
+// issuer; a generic card icon is shown until the entry is revealed.
 export default function Card({ entry }: Props) {
-  const icon = () => {
-    switch (entry.number[0]) {
-      case '5':
-        return <Master width="32" />
-      case '4':
-        return <Visa width="32" />
-      default:
-        return <CardIcon width="30" />
-    }
-  }
-
   return (
     <>
-      <div className="icon">{icon()}</div>
+      <div className="icon">
+        <CardIcon width="30" />
+      </div>
       <div className="description">
         <div className="primary">{entry.title}</div>
       </div>

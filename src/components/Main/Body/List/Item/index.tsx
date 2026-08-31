@@ -1,12 +1,12 @@
 import { cx } from '@/utils/cx'
 import { useStore, setCurrentEntry } from '@/store'
-import type { Entry } from '@/lib/commands'
+import type { EntryMeta } from '@/lib/commands'
 import Login from './Login'
 import Card from './Card'
 import Note from './Note'
 
 interface Props {
-  entry: Entry
+  entry: EntryMeta
 }
 
 export default function Item({ entry }: Props) {

@@ -98,11 +98,8 @@ fn meta_get_set() {
     assert_eq!(store.meta_get("kdf").unwrap(), None);
     store.meta_set("kdf", "argon2id").unwrap();
     assert_eq!(store.meta_get("kdf").unwrap().as_deref(), Some("argon2id"));
-    // schema_version is stamped on open.
-    assert_eq!(
-        store.meta_get("schema_version").unwrap().as_deref(),
-        Some("1")
-    );
+    // Schema DDL versioning lives in `user_version`, not the app `meta` table.
+    assert_eq!(store.meta_get("schema_version").unwrap(), None);
 }
 
 #[test]
@@ -149,6 +146,84 @@ fn snapshot_is_encrypted_and_reopens() {
     assert_eq!(restored.get("1").unwrap().unwrap().payload, b"durable");
     // It is genuinely encrypted: a wrong key cannot open it.
     assert!(SqliteStore::open(&snap, &[0x22; 32]).is_err());
+}
+
+#[test]
+fn rekey_reencrypts_db_in_place() {
+    let path = tmp_db();
+    let store = SqliteStore::open(&path, KEY).unwrap();
+    store.upsert(&rec("1", b"durable")).unwrap();
+
+    const KEY2: &[u8] = &[0x22; 32];
+    store.rekey(KEY2).unwrap();
+    // The live handle keeps working after rekey.
+    assert_eq!(store.get("1").unwrap().unwrap().payload, b"durable");
+    drop(store);
+
+    // Reopening requires the new key; the old key no longer opens it.
+    assert!(SqliteStore::open(&path, KEY).is_err());
+    let store = SqliteStore::open(&path, KEY2).unwrap();
+    assert_eq!(store.get("1").unwrap().unwrap().payload, b"durable");
+}
+
+#[test]
+fn reopening_a_migrated_db_is_idempotent() {
+    let path = tmp_db();
+    {
+        let store = SqliteStore::open(&path, KEY).unwrap();
+        store.upsert(&rec("1", b"x")).unwrap();
+    }
+    // Opening an already-at-latest DB re-runs no migration and does not error.
+    let store = SqliteStore::open(&path, KEY).unwrap();
+    assert_eq!(store.list().unwrap().len(), 1);
+    // schema DDL versioning lives in user_version, not the app `meta` table.
+    assert_eq!(store.meta_get("schema_version").unwrap(), None);
+}
+
+#[test]
+fn save_then_reveal_round_trips_one_row() {
+    use super::migrate::records_from_entries;
+    use crate::crypto::Cryptor;
+    use crate::models::Entry;
+
+    let cryptor = Cryptor::new(&crate::crypto::hash_secret("pw"));
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+
+    // save_entry: obscure the plaintext entry, seal it into one payload, upsert.
+    let plain: Entry = serde_json::from_value(serde_json::json!({
+        "id": "1", "type": "login", "title": "Site",
+        "website": "https://ex.com/login", "username": "alice",
+        "password": "s3cret", "tags": ["work"]
+    }))
+    .unwrap();
+    let obscured = cryptor.obscure(&plain).unwrap();
+    let recs = records_from_entries(&[obscured], &cryptor).unwrap();
+    store.upsert(&recs[0]).unwrap();
+
+    // Saving the same id again updates the single row (no whole-vault rewrite).
+    store.upsert(&recs[0]).unwrap();
+    let list = store.list().unwrap();
+    assert_eq!(list.len(), 1);
+
+    // The list carries only non-secret metadata — the password never appears.
+    assert_eq!(list[0].url_host, "ex.com");
+    let meta_json = serde_json::to_string(&(
+        &list[0].title,
+        &list[0].tags,
+        &list[0].url_host,
+        &list[0].kind,
+    ))
+    .unwrap();
+    assert!(!meta_json.contains("s3cret"));
+
+    // reveal_entry: unseal the payload, then decrypt the per-field secrets.
+    let rec = store.get("1").unwrap().unwrap();
+    let blob = String::from_utf8(rec.payload).unwrap();
+    let revealed = cryptor
+        .expose(&cryptor.decrypt_data::<Entry>(&blob).unwrap())
+        .unwrap();
+    assert_eq!(revealed.password.as_deref(), Some("s3cret"));
+    assert_eq!(revealed.username.as_deref(), Some("alice"));
 }
 
 #[test]

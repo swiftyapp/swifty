@@ -17,12 +17,7 @@ pub fn migrate_from_json(path: &Path, cryptor: &Cryptor, store: &impl VaultStore
     let blob = fs::read_to_string(path)?;
     let vault: VaultData = cryptor.decrypt_data(&blob)?;
 
-    let records: Vec<Record> = vault
-        .entries
-        .iter()
-        .map(|e| to_record(e, cryptor))
-        .collect::<Result<_>>()?;
-
+    let records = records_from_entries(&vault.entries, cryptor)?;
     store
         .import(&records)
         .map_err(|e| Error::Other(e.to_string()))?;
@@ -31,7 +26,15 @@ pub fn migrate_from_json(path: &Path, cryptor: &Cryptor, store: &impl VaultStore
     Ok(records.len())
 }
 
-// One legacy entry → one Record. Metadata goes to columns; the whole entry is
+/// Map obscured (per-field-encrypted) entries to store `Record`s: metadata to
+/// columns, the whole entry re-sealed into the opaque payload. Shared by the
+/// JSON migration, backup restore, and per-entry save so the payload/metadata
+/// convention lives in exactly one place.
+pub fn records_from_entries(entries: &[Entry], cryptor: &Cryptor) -> Result<Vec<Record>> {
+    entries.iter().map(|e| to_record(e, cryptor)).collect()
+}
+
+// One obscured entry → one Record. Metadata goes to columns; the whole entry is
 // re-sealed by the app cryptor into the opaque payload (lossless round-trip).
 fn to_record(entry: &Entry, cryptor: &Cryptor) -> Result<Record> {
     let payload = cryptor.encrypt_data(entry)?.into_bytes();

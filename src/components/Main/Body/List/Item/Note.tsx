@@ -1,8 +1,8 @@
-import type { NoteEntry } from '@/lib/commands'
+import type { EntryMeta } from '@/lib/commands'
 import NoteIcon from '@/assets/images/notes/note.svg?react'
 
 interface Props {
-  entry: NoteEntry
+  entry: EntryMeta
 }
 
 export default function Note({ entry }: Props) {

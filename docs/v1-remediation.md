@@ -76,7 +76,7 @@ entries(
 )
 ```
 
-### T-STORE-1 · Introduce the SQLite storage engine  module ✅ (implemented in PR `feat/storage-engine`) — app integration pending 🔴 (D1, S7, T4, T7)
+### T-STORE-1 · Introduce the SQLite storage engine  ✅ (integrated — app persists through `VaultStore`; per-row upsert/tombstone, `save_entry`/`delete_entry`/`reveal_entry`; SQLCipher key = HKDF subkey of the session secret; schema versioned via `rusqlite_migration`/`user_version`) (D1, S7, T4, T7)
 **Evidence:** `storage.rs:46-52` plain `fs::write` (non-atomic, no fsync/`.bak`, 0644); the whole `VaultData` is re-serialized and rewritten on every save (`commands/vault.rs:42-43`).
 **Steps:**
 1. Add `rusqlite` (`bundled-sqlcipher`). Open the DB in WAL mode, keyed via `PRAGMA key` from the derived vault key.
@@ -85,7 +85,7 @@ entries(
 4. File mode `0600`, dir `0700` at create.
 **Acceptance:** CRUD works per-row; a process kill mid-write leaves the DB intact (ACID/WAL); the DB file is `0600`; opening without the key fails; inspecting the raw DB shows no plaintext secret field.
 
-### T-STORE-2 · Migrate existing JSON vaults on first unlock  module ✅ (adapter + round-trip test in PR `feat/storage-engine`) — app integration pending 🔴
+### T-STORE-2 · Migrate existing JSON vaults on first unlock  ✅ (integrated — `unlock`/`unlock_biometric` run `migrate_from_json` once when a `vault.swftx` exists and no DB does; password validated against the JSON before the DB is created; `.bak` retained forever, JSON never deleted; round-trip test green)
 **Evidence:** real users hold a `vault.swftx` JSON blob. The byte-compat golden harness (`crypto/tests.rs` + `crypto/fixtures.json`) tests the **crypto primitive, not the container**, so switching containers is safe as long as legacy decrypt keeps working.
 **Steps:**
 1. On unlock, if only a JSON vault exists, decrypt it with the current cryptor, write every entry into a fresh DB, and keep the JSON as `vault.swftx.bak` (never deleted until the DB round-trips).
@@ -93,7 +93,7 @@ entries(
 3. Add a migration round-trip test (JSON in → DB → identical plaintext out).
 **Acceptance:** a legacy JSON vault opens as a DB with identical entries; the `.bak` JSON is retained; all golden fixtures stay green.
 
-### T-STORE-3 · Surface save failures in the UI  🟡 (D5 remainder)
+### T-STORE-3 · Surface save failures in the UI  ✅ (integrated — `Form/index.tsx` and `Show/index.tsx` `.catch` the save/delete thunks into an inline `<Error>`; a failed write never mutates the list as saved) (D5 remainder)
 **Evidence:** save thunks are `await`ed but call sites (`Form/index.tsx`, `Show/index.tsx`) dispatch without `.catch`, so a failed write is an unhandled rejection, not a visible error.
 **Steps:** add error handling on the save/delete paths → user-visible toast/inline error; never imply success on a failed write.
 **Acceptance:** a forced write failure shows a visible error and does not mutate displayed state as if saved.

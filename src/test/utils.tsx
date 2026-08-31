@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { render } from '@testing-library/react'
 import { makeStore, setEntries, flowMain, auditDone } from '@/store'
-import type { Entry, Audit } from '@/lib/commands'
+import type { Entry, EntryMeta, Audit } from '@/lib/commands'
 
 type Store = ReturnType<typeof makeStore>
 
@@ -15,12 +15,24 @@ export const renderWithStore = (ui: ReactElement, { store = makeStore() }: Optio
   ...render(ui)
 })
 
-// Puts the store into the unlocked "main" flow with the given entries.
-export const withEntries = (_store: Store, entries: Entry[], audit?: Audit) => {
+// Puts the store into the unlocked "main" flow with the given entry metadata.
+export const withEntries = (_store: Store, entries: EntryMeta[], audit?: Audit) => {
   setEntries(entries)
   flowMain()
   if (audit) auditDone(audit)
 }
+
+// List metadata for a login, as the backend returns it (no secret fields).
+export const loginMeta = (overrides: Partial<EntryMeta> = {}): EntryMeta => ({
+  id: 'l1',
+  type: 'login',
+  title: 'Google',
+  tags: [],
+  urlHost: 'google.com',
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+  ...overrides
+})
 
 export const loginEntry = (overrides: Partial<Entry> = {}): Entry => ({
   id: 'l1',

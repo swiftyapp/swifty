@@ -1,11 +1,11 @@
-import type { Entry } from '@/lib/commands'
+import type { EntryMeta } from '@/lib/commands'
 import { t } from '@/i18n'
 import Item from '../Item'
 
 interface Props {
   title: string
   level: string
-  entries: Entry[]
+  entries: EntryMeta[]
 }
 
 export default function Group({ title, level, entries }: Props) {

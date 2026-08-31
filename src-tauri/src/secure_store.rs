@@ -12,9 +12,7 @@
 //! - **other (Linux, …):** unsupported — we report biometric unavailable rather
 //!   than store a key that nothing can gate.
 
-use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
-use crate::models::VaultData;
 use zeroize::Zeroizing;
 
 const SERVICE: &str = "pro.getswifty.app.vault";
@@ -50,18 +48,6 @@ impl KeyStore for Platform {
 /// Whether this platform can biometric-gate the secure store at all.
 pub fn is_supported() -> bool {
     imp::SUPPORTED
-}
-
-/// Retrieve the key material (triggering the biometric gate) and decrypt `blob`.
-/// Returns the key (so the caller can seed the session) and the decrypted vault.
-/// Shared by the real `unlock_biometric` command and its unit tests.
-pub fn open_vault<S: KeyStore>(store: &S, blob: &str) -> Result<(Zeroizing<Vec<u8>>, VaultData)> {
-    let key = store.retrieve()?;
-    let secret = std::str::from_utf8(&key).map_err(|e| Error::Crypto(e.to_string()))?;
-    let vault = Cryptor::new(secret)
-        .decrypt_data(blob)
-        .map_err(|_| Error::InvalidPassword)?;
-    Ok((key, vault))
 }
 
 #[cfg(target_os = "macos")]
@@ -177,7 +163,6 @@ mod imp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Entry;
     use std::cell::RefCell;
 
     // In-memory stand-in for the OS secure store (no biometric prompt).
@@ -204,81 +189,24 @@ mod tests {
         }
     }
 
-    fn sample_blob(secret: &str) -> String {
-        let vault = VaultData {
-            entries: vec![Entry {
-                id: "1".into(),
-                kind: "note".into(),
-                title: "t".into(),
-                username: None,
-                password: None,
-                website: None,
-                email: None,
-                otp: None,
-                note: Some("hi".into()),
-                number: None,
-                month: None,
-                year: None,
-                cvc: None,
-                pin: None,
-                name: None,
-                tags: None,
-                created_at: None,
-                updated_at: None,
-                password_updated_at: None,
-            }],
-        };
-        Cryptor::new(secret).encrypt_data(&vault).unwrap()
-    }
-
     #[test]
-    fn enable_retrieve_unlock_roundtrip() {
+    fn store_then_retrieve_roundtrips_the_key() {
         let secret = crate::crypto::hash_secret("hunter2");
-        let blob = sample_blob(&secret);
         let store = MockStore::default();
-
-        // enable: store the session key material.
         store.store(secret.as_bytes()).unwrap();
-
-        // unlock: retrieve the key (gated in production) and decrypt the vault.
-        let (key, vault) = open_vault(&store, &blob).unwrap();
-        assert_eq!(&*key, secret.as_bytes());
-        assert_eq!(vault.entries.len(), 1);
-        assert_eq!(vault.entries[0].id, "1");
+        assert_eq!(&*store.retrieve().unwrap(), secret.as_bytes());
     }
 
     #[test]
-    fn wrong_key_fails_to_unlock() {
-        let blob = sample_blob(&crate::crypto::hash_secret("hunter2"));
+    fn restore_overwrites_a_stale_key() {
+        // change_master_password re-stores the new material over the old.
         let store = MockStore::default();
         store
-            .store(crate::crypto::hash_secret("different").as_bytes())
+            .store(crate::crypto::hash_secret("old-pass").as_bytes())
             .unwrap();
-        assert!(matches!(
-            open_vault(&store, &blob),
-            Err(Error::InvalidPassword)
-        ));
-    }
-
-    #[test]
-    fn change_password_invalidates_stored_key() {
-        // After a re-key, unlocking with the OLD stored key must fail; re-storing
-        // the NEW key restores biometric unlock.
-        let old = crate::crypto::hash_secret("old-pass");
         let new = crate::crypto::hash_secret("new-pass");
-        let new_blob = sample_blob(&new);
-        let store = MockStore::default();
-
-        store.store(old.as_bytes()).unwrap();
-        assert!(matches!(
-            open_vault(&store, &new_blob),
-            Err(Error::InvalidPassword)
-        ));
-
-        // change_master_password re-stores the new key material.
         store.store(new.as_bytes()).unwrap();
-        let (_, vault) = open_vault(&store, &new_blob).unwrap();
-        assert_eq!(vault.entries.len(), 1);
+        assert_eq!(&*store.retrieve().unwrap(), new.as_bytes());
     }
 
     #[test]

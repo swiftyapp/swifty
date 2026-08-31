@@ -34,6 +34,22 @@ pub fn hash_secret(password: &str) -> String {
     STANDARD.encode(Sha512::digest(password.as_bytes()))
 }
 
+/// Derive the 32-byte SQLCipher database key from the session secret via HKDF,
+/// as a subkey distinct from the per-entry payload key (which uses `secret`
+/// directly through PBKDF2). One password yields both keys with no extra prompt.
+/// Phase 2 will swap the input for an Argon2id output without changing this glue.
+pub fn sqlcipher_key(secret: &str) -> [u8; KEY_LEN] {
+    const SALT: &[u8] = b"swifty-sqlcipher-v1";
+    const INFO: &[u8] = b"sqlcipher-db-key";
+    let prk = ring::hkdf::Salt::new(ring::hkdf::HKDF_SHA256, SALT).extract(secret.as_bytes());
+    let okm = prk
+        .expand(&[INFO], ring::hkdf::HKDF_SHA256)
+        .expect("hkdf expand");
+    let mut key = [0u8; KEY_LEN];
+    okm.fill(&mut key).expect("hkdf fill");
+    key
+}
+
 fn err<E: std::fmt::Display>(e: E) -> Error {
     Error::Crypto(e.to_string())
 }
