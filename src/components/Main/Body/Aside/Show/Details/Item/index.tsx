@@ -38,7 +38,9 @@ export default function Item({ entry, name, link, cc, secure }: Props) {
   return (
     <div className={secure ? 'item secure' : 'item'}>
       <div className="label">{t(name)}</div>
-      <div className="value">{value()}</div>
+      <div className="value" data-testid={`entry-value-${name.toLowerCase()}`}>
+        {value()}
+      </div>
       <Copy width="16" height="16" onClick={() => copy(raw)} />
     </div>
   )

@@ -26,6 +26,7 @@ export default function Item({ entry }: Props) {
   return (
     <div
       className={cx('entry', { current: current?.id === entry.id })}
+      data-testid="entry-item"
       onClick={() => setCurrentEntry(entry.id)}
     >
       {content()}

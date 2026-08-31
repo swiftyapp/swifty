@@ -31,6 +31,13 @@ pub fn run() {
             .plugin(tauri_plugin_process::init());
     }
 
+    // In-app W3C WebDriver server (port 4445) for the E2E smoke suite. Never
+    // compiled into a release binary.
+    #[cfg(debug_assertions)]
+    {
+        builder = builder.plugin(tauri_plugin_webdriver::init());
+    }
+
     builder
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())

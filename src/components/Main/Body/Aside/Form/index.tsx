@@ -83,10 +83,10 @@ export default function Form({ entry }: Props) {
       {fields()}
       <Error error={saveError} />
       <div className="actions">
-        <span className="cancel" onClick={onCancel}>
+        <span className="cancel" data-testid="cancel-entry-button" onClick={onCancel}>
           {t('Cancel')}
         </span>
-        <span className="button" onClick={onSave}>
+        <span className="button" data-testid="save-entry-button" onClick={onSave}>
           {t('Save')}
         </span>
       </div>

@@ -9,6 +9,7 @@ interface Props {
   touchID?: boolean
   disabled?: boolean
   placeholder?: string
+  testid?: string
   onEnter?: (value: string) => void
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void
   onTouchID?: () => void
@@ -19,6 +20,7 @@ export default function Masterpass({
   touchID,
   disabled,
   placeholder,
+  testid,
   onEnter,
   onChange,
   onTouchID
@@ -36,6 +38,7 @@ export default function Masterpass({
         type="password"
         placeholder={placeholder || t('Master Password')}
         disabled={disabled}
+        data-testid={testid}
         onChange={onChange}
         onKeyDown={handleKeyDown}
       />

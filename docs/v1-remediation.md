@@ -200,7 +200,7 @@ on Phase 1.
 ### T-CI-1 · Supply-chain gates  ✅ (PR) (C4, T3)
 **Steps:** add blocking CI steps `cargo audit` + `cargo-deny` and `bun audit` (or `npm audit --audit-level=high`); add a **CodeQL** workflow (JS + Rust); add `.github/dependabot.yml` covering **npm (root) + cargo (src-tauri) + github-actions**, targeting `v1-0-0`; unpause repo automated security fixes; enable secret scanning. **Acceptance:** CI fails on a known-vuln dependency; Dependabot opens PRs across all three ecosystems.
 
-### T-CI-2 · E2E smoke suite  ❌ (C1, T1)
+### T-CI-2 · E2E smoke suite  ✅ (PR) (C1, T1)
 **Steps:** add `tauri-driver` + WebdriverIO covering unlock → add/edit/delete entry → lock → export; wire into CI. **Acceptance:** the smoke suite runs the built app in CI and fails on a broken flow.
 
 ### T-CI-3 · Vault-corruption regression suite  ❌ (T2) — after T-STORE-1 / T-SYNC-1

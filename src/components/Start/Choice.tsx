@@ -12,7 +12,11 @@ export default function Choice({ onSelect }: Props) {
       <div className="top-lock">
         <NewUser width="48" />
         <h2>{t('I am a new User')}</h2>
-        <div className="button" onClick={() => onSelect('setup')}>
+        <div
+          className="button"
+          data-testid="start-setup-button"
+          onClick={() => onSelect('setup')}
+        >
           {t('Setup Master Password')}
         </div>
       </div>

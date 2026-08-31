@@ -28,12 +28,13 @@ export default function Confirm({ display, password }: Props) {
     <div className="bottom-lock">
       <Masterpass
         placeholder={t('Confirm Master Password')}
+        testid="setup-confirm-password-input"
         error={error}
         onEnter={onSend}
         onChange={onChange}
       />
       <br />
-      <div className="button" onClick={onSend}>
+      <div className="button" data-testid="setup-finish-button" onClick={onSend}>
         {t('Finish')}
       </div>
     </div>
