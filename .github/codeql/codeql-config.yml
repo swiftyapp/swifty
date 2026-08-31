@@ -1,0 +1,11 @@
+name: "Swifty CodeQL config"
+
+# Test code intentionally embeds hard-coded fixtures (passwords, salts, keys) to
+# exercise the crypto/store code. Exclude tests so the "Hard-coded cryptographic
+# value" query — which we KEEP for production, where a real hard-coded key should
+# fail the build — doesn't flag fixtures on every test change.
+paths-ignore:
+  - '**/tests.rs'
+  - 'src/test'
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
