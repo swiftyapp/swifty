@@ -207,10 +207,10 @@ on Phase 1.
 ### T-CI-4 · Build attestation & reproducibility  🟡 (C6, T22)
 **Evidence:** signing exists (notarization + Windows cert + minisign updater) but no provenance. **Steps:** add `actions/attest-build-provenance` (OIDC/SLSA) to `release.yml`; add CycloneDX SBOM to release assets; pin `rust-toolchain.toml` + the bun version; document verification in the README. **Acceptance:** releases carry provenance + SBOM; a documented verify procedure exists.
 
-### T-DOC-1 · SECURITY.md  ❌ (T23)
+### T-DOC-1 · SECURITY.md  ✅ (PR) (T23)
 Supported versions, contact, response-time SLA, disclosure policy. **Acceptance:** file present, non-template.
 
-### T-DOC-2 · Threat model  ❌ (T24)
+### T-DOC-2 · Threat model  ✅ (PR) (T24)
 One page: defends against device theft / cloud-provider compromise / remote breach; explicitly **not** compromised OS / keylogger / local root; key lifecycle across the Tauri process split. **Acceptance:** published under `docs/`.
 
 ---
