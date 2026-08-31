@@ -23,6 +23,7 @@ vi.mock('@/lib/commands', () => ({
   deleteEntry: vi.fn().mockResolvedValue(undefined),
   pickBackup: vi.fn().mockResolvedValue(null),
   importBackup: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
+  importSwftx: vi.fn().mockResolvedValue(0),
   exportVault: vi.fn().mockResolvedValue(null),
   generatePassword: vi.fn().mockResolvedValue('Generated123!'),
   generateOtp: vi.fn().mockResolvedValue({ code: '123456', time: 30 }),

@@ -71,6 +71,7 @@ pub fn run() {
             commands::vault::delete_entry,
             commands::vault::pick_backup,
             commands::vault::import_backup,
+            commands::vault::import_swftx,
             commands::vault::export_vault,
             commands::generator::generate_password,
             commands::generator::generate_otp,

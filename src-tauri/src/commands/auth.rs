@@ -7,12 +7,13 @@ use crate::store::{Record, SqliteStore, VaultStore};
 use crate::{biometrics, crypto, storage};
 use tauri::{AppHandle, State};
 
-// True when a vault exists in either form — the SQLite DB, or a legacy JSON
-// vault that unlock will migrate on first open.
+// True only when a SQLite vault DB exists. A legacy `vault.swftx` alone does NOT
+// count: the app starts fresh with an empty vault and offers an explicit
+// "Import from .swftx" instead (see `import_swftx`).
 #[tauri::command]
 pub fn is_initialized(app: AppHandle) -> Result<bool> {
     storage::ensure_migrated(&app);
-    Ok(storage::db_exists(&app) || storage::vault_exists(&app))
+    Ok(storage::db_exists(&app))
 }
 
 // Create a brand-new, empty encrypted store protected by `password`.
@@ -26,17 +27,18 @@ pub fn setup(password: String, app: AppHandle, state: State<'_, AppState>) -> Re
     Ok(())
 }
 
-// Unlock with the master password: derive the keys, open the store (migrating a
-// legacy JSON vault on first open), and return the entry metadata list.
+// Unlock with the master password: derive the keys, open the existing store, and
+// return the entry metadata list. Opening SQLCipher runs an internal KDF, so the
+// crypto/DB-open runs off the UI thread and unlock never migrates anything.
 #[tauri::command]
-pub fn unlock(
+pub async fn unlock(
     password: String,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
     storage::ensure_migrated(&app);
     let secret = crypto::hash_secret(&password);
-    let (store, entries) = open_and_load(&app, &secret)?;
+    let (store, entries) = open_off_thread(&app, &secret).await?;
     let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
     state
         .session
@@ -49,6 +51,19 @@ pub fn unlock(
     })
 }
 
+// Run the key-derive + SQLCipher open (both CPU-bound) on a blocking thread so
+// the UI thread is never stalled. Shared by password and biometric unlock.
+async fn open_off_thread(
+    app: &AppHandle,
+    secret: &str,
+) -> Result<(SqliteStore, Vec<crate::models::EntryMetaDto>)> {
+    let app = app.clone();
+    let secret = secret.to_owned();
+    tauri::async_runtime::spawn_blocking(move || open_and_load(&app, &secret))
+        .await
+        .map_err(|e| Error::Other(e.to_string()))?
+}
+
 // Clear the in-memory key and close the store.
 #[tauri::command]
 pub fn lock(state: State<'_, AppState>) -> Result<()> {
@@ -58,9 +73,9 @@ pub fn lock(state: State<'_, AppState>) -> Result<()> {
 
 // Unlock from a locked start using the biometric-gated key in the OS secure
 // store. Retrieving the key triggers the biometric prompt; the key then opens
-// the store (and migrates a legacy JSON vault if needed).
+// the existing store off the UI thread. No migration on unlock.
 #[tauri::command]
-pub fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<UnlockResult> {
+pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<UnlockResult> {
     storage::ensure_migrated(&app);
     if !storage::biometric_enrolled(&app) {
         return Err(Error::Other("biometric unlock is not enabled".into()));
@@ -76,7 +91,7 @@ pub fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<Un
         Err(e) => return Err(e),
     };
     let secret = String::from_utf8(key.to_vec()).map_err(|e| Error::Crypto(e.to_string()))?;
-    let (store, entries) = open_and_load(&app, &secret)?;
+    let (store, entries) = open_off_thread(&app, &secret).await?;
     let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
     state
         .session

@@ -2,10 +2,11 @@ use crate::commands::{list_metas, live_records, record_meta_dto, store_err};
 use crate::error::{Error, Result};
 use crate::models::{Entry, EntryMetaDto, UnlockResult, VaultData};
 use crate::state::AppState;
-use crate::store::{migrate, VaultStore};
+use crate::store::{migrate, Record, VaultStore};
 use crate::{crypto, storage};
+use serde_json::json;
 use std::fs;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_dialog::DialogExt;
 
 // The entry list: non-secret metadata only. Secrets stay encrypted in the store
@@ -111,6 +112,54 @@ pub fn import_backup(
         entries: metas,
         sync_configured,
     })
+}
+
+// Import a `.swftx` backup into the *currently unlocked* vault. The file is
+// independently encrypted and carries its own master password (which may differ
+// from the current vault's). Each entry is decrypted under the source key and
+// re-sealed under the current session key, then upserted (merge/add by id). The
+// CPU-bound re-encrypt loop runs off the UI thread and emits `import:progress`.
+#[tauri::command]
+pub async fn import_swftx(
+    path: String,
+    password: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<usize> {
+    let blob = storage::read_backup(&path)?;
+    let src_cryptor = crypto::Cryptor::new(&crypto::hash_secret(&password));
+    // Validate the source password before touching the store.
+    let src: VaultData = src_cryptor
+        .decrypt_data(&blob)
+        .map_err(|_| Error::InvalidPassword)?;
+    let cur_cryptor = state.session.lock().unwrap().cryptor()?;
+
+    // Re-key every entry off the UI thread: expose under the source key, re-obscure
+    // under the current key, seal one payload each — emitting progress as it goes.
+    let emitter = app.clone();
+    let records = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<Record>> {
+        let total = src.entries.len();
+        let mut records = Vec::with_capacity(total);
+        for (i, obscured) in src.entries.iter().enumerate() {
+            records.push(migrate::rekey_record(&src_cryptor, &cur_cryptor, obscured)?);
+            let _ = emitter.emit("import:progress", json!({ "done": i + 1, "total": total }));
+        }
+        Ok(records)
+    })
+    .await
+    .map_err(|e| Error::Other(e.to_string()))??;
+
+    // Merge into the open store (upsert by id).
+    {
+        let session = state.session.lock().unwrap();
+        let store = session.store()?;
+        for record in &records {
+            store.upsert(record).map_err(store_err)?;
+        }
+    }
+    let count = records.len();
+    let _ = app.emit("import:done", json!({ "count": count }));
+    Ok(count)
 }
 
 // Export the vault to a user-chosen file. Reconstructs the legacy `.swftx` blob

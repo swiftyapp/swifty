@@ -90,15 +90,6 @@ pub fn write_gdrive(app: &AppHandle, data: &str) -> Result<()> {
     write_file(&gdrive_path(app)?, data)
 }
 
-// Sync is configured when the encrypted gdrive credentials file has content.
-pub fn vault_exists(app: &AppHandle) -> bool {
-    vault_path(app)
-        .ok()
-        .filter(|p| p.exists())
-        .and_then(|p| fs::metadata(p).ok())
-        .is_some_and(|m| m.len() > 0)
-}
-
 // Whether the user opted into biometric unlock (marker file present).
 pub fn biometric_enrolled(app: &AppHandle) -> bool {
     app_dir(app)

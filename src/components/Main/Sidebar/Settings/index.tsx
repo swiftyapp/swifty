@@ -4,6 +4,7 @@ import Modal from '@/components/elements/Modal'
 import Tooltip from '@/components/elements/Tooltip'
 import Navigation, { type Section } from './Navigation'
 import Vault from './Vault'
+import Import from './Import'
 import MasterPassword from './MasterPassword'
 import Biometric from './Biometric'
 import Password from './Password'
@@ -28,6 +29,7 @@ export default function Settings() {
             <Navigation section={section} onClick={setSection} />
             <div className="body">
               <Vault section={section} />
+              <Import section={section} />
               <MasterPassword section={section} />
               <Biometric section={section} />
               <Password section={section} />

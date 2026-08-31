@@ -15,7 +15,9 @@ export const EVENTS = {
   pullStarted: 'vault:pull:started',
   pullStopped: 'vault:pull:stopped',
   auditDone: 'audit:done',
-  vaultLocked: 'vault:locked'
+  vaultLocked: 'vault:locked',
+  importProgress: 'import:progress',
+  importDone: 'import:done'
 } as const
 
 export interface SyncStoppedPayload {
@@ -33,6 +35,15 @@ export interface AuditDonePayload {
   data: Audit
 }
 
+export interface ImportProgressPayload {
+  done: number
+  total: number
+}
+
+export interface ImportDonePayload {
+  count: number
+}
+
 // Maps each event to its payload type (void = no payload).
 export interface EventPayloads {
   'sync:started': void
@@ -43,6 +54,8 @@ export interface EventPayloads {
   'vault:pull:stopped': PullStoppedPayload
   'audit:done': AuditDonePayload
   'vault:locked': void
+  'import:progress': ImportProgressPayload
+  'import:done': ImportDonePayload
 }
 
 export type EventName = keyof EventPayloads

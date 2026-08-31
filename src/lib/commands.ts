@@ -177,6 +177,14 @@ export const importBackup = (
   password: string
 ): Promise<UnlockResult> => invoke('import_backup', { path, password })
 
+// Merge a `.swftx` file (encrypted under its own `password`) into the currently
+// unlocked vault. Runs off the UI thread and emits `import:progress`; resolves
+// to the number of imported entries.
+export const importSwftx = (
+  path: string,
+  password: string
+): Promise<number> => invoke('import_swftx', { path, password })
+
 export const exportVault = (): Promise<string | null> => invoke('export_vault')
 
 // ---------------------------------------------------------------------------

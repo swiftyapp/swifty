@@ -34,6 +34,17 @@ pub fn records_from_entries(entries: &[Entry], cryptor: &Cryptor) -> Result<Vec<
     entries.iter().map(|e| to_record(e, cryptor)).collect()
 }
 
+/// Re-key one obscured entry from a *source* cryptor to the *current* one: expose
+/// its fields under `src`, re-obscure under `cur`, then seal a fresh `Record`.
+/// Used by `import_swftx` to merge a foreign `.swftx` encrypted under a different
+/// master password than the open vault's. Reuses `to_record`, so the
+/// payload/metadata convention stays in one place.
+pub fn rekey_record(src: &Cryptor, cur: &Cryptor, entry: &Entry) -> Result<Record> {
+    let exposed = src.expose(entry)?;
+    let reobscured = cur.obscure(&exposed)?;
+    to_record(&reobscured, cur)
+}
+
 // One obscured entry → one Record. Metadata goes to columns; the whole entry is
 // re-sealed by the app cryptor into the opaque payload (lossless round-trip).
 fn to_record(entry: &Entry, cryptor: &Cryptor) -> Result<Record> {

@@ -226,6 +226,88 @@ fn save_then_reveal_round_trips_one_row() {
     assert_eq!(revealed.username.as_deref(), Some("alice"));
 }
 
+// import_swftx re-keys a `.swftx` encrypted under a *different* master password
+// into the open store: expose under the source key, re-obscure under the current
+// key, upsert. Reveal with the current key must return the original plaintext,
+// and importing twice must merge by id (no duplicate rows).
+#[test]
+fn import_swftx_rekeys_across_passwords_and_upserts_by_id() {
+    use super::migrate::rekey_record;
+    use crate::crypto::{hash_secret, Cryptor};
+    use crate::models::{Entry, VaultData};
+
+    let src = Cryptor::new(&hash_secret("source-pw"));
+    let cur = Cryptor::new(&hash_secret("current-pw"));
+
+    let plain: Vec<Entry> = ["1", "2"]
+        .iter()
+        .map(|id| {
+            serde_json::from_value(serde_json::json!({
+                "id": id, "type": "login", "title": format!("Site {id}"),
+                "website": "https://example.com/login", "username": "alice",
+                "password": "hunter2", "tags": ["work"]
+            }))
+            .unwrap()
+        })
+        .collect();
+
+    // The source `.swftx`: entries obscured and sealed under the source password.
+    let blob = src
+        .encrypt_data(&VaultData {
+            entries: plain.iter().map(|e| src.obscure(e).unwrap()).collect(),
+        })
+        .unwrap();
+
+    // Decrypt the file with the source cryptor (as the command does), then re-key
+    // each entry into a store opened for the *current* session.
+    let file: VaultData = src.decrypt_data(&blob).unwrap();
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    for obscured in &file.entries {
+        store
+            .upsert(&rekey_record(&src, &cur, obscured).unwrap())
+            .unwrap();
+    }
+
+    // Re-importing the same file merges by id — the count stays at 2.
+    for obscured in &file.entries {
+        store
+            .upsert(&rekey_record(&src, &cur, obscured).unwrap())
+            .unwrap();
+    }
+    let list = store.list().unwrap();
+    assert_eq!(list.len(), 2);
+
+    // Reveal with the *current* key returns the original plaintext secrets.
+    let rec = store.get("1").unwrap().unwrap();
+    let payload = String::from_utf8(rec.payload).unwrap();
+    let revealed = cur
+        .expose(&cur.decrypt_data::<Entry>(&payload).unwrap())
+        .unwrap();
+    assert_eq!(revealed.password.as_deref(), Some("hunter2"));
+    assert_eq!(revealed.username.as_deref(), Some("alice"));
+}
+
+// A wrong source password fails the file decrypt before the store is touched.
+#[test]
+fn import_swftx_wrong_source_password_errors() {
+    use crate::crypto::{hash_secret, Cryptor};
+    use crate::models::{Entry, VaultData};
+
+    let src = Cryptor::new(&hash_secret("source-pw"));
+    let entry: Entry = serde_json::from_value(serde_json::json!({
+        "id": "1", "type": "login", "title": "Site", "password": "hunter2"
+    }))
+    .unwrap();
+    let blob = src
+        .encrypt_data(&VaultData {
+            entries: vec![src.obscure(&entry).unwrap()],
+        })
+        .unwrap();
+
+    let wrong = Cryptor::new(&hash_secret("not-the-password"));
+    assert!(wrong.decrypt_data::<VaultData>(&blob).is_err());
+}
+
 #[test]
 fn migrate_from_json_round_trips_and_keeps_bak() {
     use crate::crypto::Cryptor;
