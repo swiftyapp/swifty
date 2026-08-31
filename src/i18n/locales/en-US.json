@@ -126,5 +126,9 @@
   "Automatic Updates": "Automatic Updates",
   "Updates download in the background and apply when you restart.": "Updates download in the background and apply when you restart.",
   "Check for Updates": "Check for Updates",
-  "Checking…": "Checking…"
+  "Checking…": "Checking…",
+  "New entry": "New entry",
+  "Edit entry": "Edit entry",
+  "Discard changes?": "Discard changes?",
+  "Close": "Close"
 }
