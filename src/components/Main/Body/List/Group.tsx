@@ -1,14 +1,15 @@
 import type { EntryMeta } from '@/lib/commands'
 import { t } from '@/i18n'
-import Item from '../Item'
+import Item from './Item'
 
 interface Props {
   title: string
   entries: EntryMeta[]
 }
 
-// A severity group in the audit list: a sticky mono header (label + hairline
-// rule + count) over its entries. Rendered only when the group has members.
+// A labelled run of entries in either list — an audit severity ("Weak") or a
+// recency bucket ("Today"). A sticky mono header (label + hairline rule +
+// count) over its rows; rendered only when the group has members.
 export default function Group({ title, entries }: Props) {
   if (entries.length === 0) return null
 
