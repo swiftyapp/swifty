@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Form from '@/components/Main/Body/Aside/Form'
 import Show from '@/components/Main/Body/Aside/Show'
-import { saveVault, generatePassword, generateOtp, copyToClipboard } from '@/lib/commands'
+import { saveVault, revealEntry, generatePassword, generateOtp, copyToClipboard } from '@/lib/commands'
 import type { LoginEntry } from '@/lib/commands'
 import { renderWithStore, loginEntry } from './utils'
 
@@ -48,15 +48,18 @@ describe('Form', () => {
 })
 
 describe('Show', () => {
-  it('renders entry details', () => {
-    renderWithStore(<Show entry={loginEntry({ title: 'Google' })} />)
+  it('renders entry details', async () => {
+    const entry = loginEntry({ title: 'Google' })
+    vi.mocked(revealEntry).mockResolvedValue(entry)
+    renderWithStore(<Show entry={entry} />)
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
-    expect(screen.getByText('me@example.com')).toBeInTheDocument()
+    expect(await screen.findByText('me@example.com')).toBeInTheDocument()
   })
 
   it('renders and copies a TOTP code', async () => {
     vi.mocked(generateOtp).mockResolvedValue({ code: '123456', time: 25 })
     const entry = loginEntry({ otp: 'BASE32SECRET' }) as LoginEntry
+    vi.mocked(revealEntry).mockResolvedValue(entry)
     renderWithStore(<Show entry={entry} />)
 
     expect(await screen.findByText('123 456')).toBeInTheDocument()
@@ -64,7 +67,10 @@ describe('Show', () => {
   })
 
   it('copies a field value', async () => {
-    renderWithStore(<Show entry={loginEntry({ username: 'copyme' })} />)
+    const entry = loginEntry({ username: 'copyme' })
+    vi.mocked(revealEntry).mockResolvedValue(entry)
+    renderWithStore(<Show entry={entry} />)
+    await userEvent.click(await screen.findByText('copyme'))
     await userEvent.click(document.querySelector('.item svg')!)
     expect(copyToClipboard).toHaveBeenCalled()
   })

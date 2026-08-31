@@ -2,6 +2,7 @@ import { useAppDispatch } from '@/store'
 import { editEntry } from '@/store/entriesSlice'
 import { deleteEntry } from '@/store/thunks'
 import type { Entry } from '@/lib/commands'
+import { useRevealed } from '@/hooks/useRevealed'
 import { t } from '@/i18n'
 import Details from './Details'
 import Pencil from '@/assets/images/pencil.svg?react'
@@ -16,6 +17,7 @@ const formatDate = (value?: string) =>
 
 export default function Show({ entry }: Props) {
   const dispatch = useAppDispatch()
+  const revealed = useRevealed(entry)
 
   const onDelete = () => {
     if (window.confirm(t('Are you sure you want to delete this item?'))) {
@@ -33,7 +35,7 @@ export default function Show({ entry }: Props) {
         <Pencil width="16" height="16" onClick={() => dispatch(editEntry())} className="action" />
         <Delete width="16" height="16" onClick={onDelete} className="action" />
       </div>
-      <Details entry={entry} />
+      {revealed && <Details entry={revealed} />}
       <div className="entry-extra">
         <div className="item">
           <div className="label">{t('Last Modified')}</div>

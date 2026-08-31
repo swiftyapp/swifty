@@ -15,3 +15,6 @@ src-tauri/gen/schemas
 # Updater signing keys — never commit
 *.key
 *.key.pub
+
+# Claude Code local state & agent worktrees
+.claude/

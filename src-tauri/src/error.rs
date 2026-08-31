@@ -10,6 +10,9 @@ pub enum Error {
     #[error("vault is locked")]
     Locked,
 
+    #[error("entry not found")]
+    NotFound,
+
     #[error("operation was cancelled")]
     Cancelled,
 

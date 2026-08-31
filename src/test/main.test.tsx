@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
 import type { Entry } from '@/lib/commands'
+import { revealEntry } from '@/lib/commands'
 import { makeStore } from '@/store'
 import { renderWithStore, withEntries, loginEntry } from './utils'
 
@@ -27,11 +28,13 @@ describe('Main', () => {
   })
 
   it('selects an entry and shows its details', async () => {
+    // Details are revealed (decrypted) on demand for the selected entry.
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
     renderWithStore(<Main />, { store: seed() })
     await userEvent.click(screen.getByText('Google'))
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
     // email only appears in the details pane, not the list row
-    expect(screen.getByText('contact@example.com')).toBeInTheDocument()
+    expect(await screen.findByText('contact@example.com')).toBeInTheDocument()
   })
 
   it('filters entries by search query', async () => {

@@ -12,6 +12,9 @@ vi.mock('@/lib/commands', () => ({
   isBiometricAvailable: vi.fn().mockResolvedValue(false),
   changeMasterPassword: vi.fn().mockResolvedValue(undefined),
   readVault: vi.fn().mockResolvedValue({ entries: [] }),
+  revealEntry: vi.fn().mockImplementation((id: string) =>
+    Promise.resolve({ id, type: 'login', title: '' })
+  ),
   saveVault: vi.fn().mockResolvedValue({ entries: [] }),
   pickBackup: vi.fn().mockResolvedValue(null),
   importBackup: vi.fn().mockResolvedValue({ vault: { entries: [] }, syncConfigured: false }),

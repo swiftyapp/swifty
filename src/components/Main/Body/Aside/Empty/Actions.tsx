@@ -3,6 +3,7 @@ import { cx } from '@/utils/cx'
 import { useAppDispatch, useAppSelector } from '@/store'
 import { newEntry } from '@/store/entriesSlice'
 import { syncImport } from '@/lib/commands'
+import { SYNC_ENABLED } from '@/config'
 import { t } from '@/i18n'
 
 export default function Actions() {
@@ -24,12 +25,16 @@ export default function Actions() {
           {t('Create First Entry')}
         </a>
       </div>
-      <div>{t('or')}</div>
-      <div>
-        <span className={cx('button', { loading })} onClick={onImport}>
-          {t('Import from Gdrive')}
-        </span>
-      </div>
+      {SYNC_ENABLED && (
+        <>
+          <div>{t('or')}</div>
+          <div>
+            <span className={cx('button', { loading })} onClick={onImport}>
+              {t('Import from Gdrive')}
+            </span>
+          </div>
+        </>
+      )}
     </div>
   )
 }

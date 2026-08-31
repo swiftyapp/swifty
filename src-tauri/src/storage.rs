@@ -13,9 +13,17 @@ pub const VAULT_FILE: &str = "vault.swftx";
 pub const GDRIVE_FILE: &str = "auth/gdrive.swftx";
 
 fn app_dir(app: &AppHandle) -> Result<PathBuf> {
-    app.path()
+    let dir = app
+        .path()
         .app_data_dir()
-        .map_err(|e| Error::Other(e.to_string()))
+        .map_err(|e| Error::Other(e.to_string()))?;
+    // Dev builds share the prod identifier, so isolate their data in a subdir
+    // to avoid mutating the real vault while iterating.
+    Ok(if cfg!(debug_assertions) {
+        dir.join("dev")
+    } else {
+        dir
+    })
 }
 
 pub fn vault_path(app: &AppHandle) -> Result<PathBuf> {

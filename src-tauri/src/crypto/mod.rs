@@ -7,10 +7,10 @@ use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::aes::Aes256;
 use aes_gcm::{AesGcm, Nonce};
 use base64::{engine::general_purpose::STANDARD, Engine};
-use hmac::Hmac;
 use rand::RngCore;
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha512};
+use std::num::NonZeroU32;
 
 use crate::error::{Error, Result};
 use crate::models::Entry;
@@ -50,7 +50,10 @@ impl Cryptor {
 
     fn cipher(&self, salt: &[u8]) -> Result<Aes256Gcm16> {
         let mut key = [0u8; KEY_LEN];
-        pbkdf2::pbkdf2::<Hmac<Sha512>>(&self.secret, salt, ITERATIONS, &mut key).map_err(err)?;
+        // ring's PBKDF2 is assembly-optimized; the pure-Rust one is ~10-20x slower
+        // and froze the UI while deriving a key per field. Output is identical.
+        let iters = NonZeroU32::new(ITERATIONS).unwrap();
+        ring::pbkdf2::derive(ring::pbkdf2::PBKDF2_HMAC_SHA512, iters, salt, &self.secret, &mut key);
         Aes256Gcm16::new_from_slice(&key).map_err(err)
     }
 
@@ -129,6 +132,31 @@ impl Cryptor {
         self.transform(entry, |v| self.decrypt(v))
     }
 
+    /// Obscure `new`, re-encrypting only fields that differ from `old`'s stored
+    /// ciphertext. Unchanged fields keep their ciphertext (no extra derivation),
+    /// so saving one edited entry never re-encrypts the whole vault.
+    pub fn obscure_changed(&self, new: &Entry, old: Option<&Entry>) -> Result<Entry> {
+        let old_vals = old.map(sensitive_values).unwrap_or_default();
+        let mut e = new.clone();
+        let slots: Vec<&mut Option<String>> = match e.kind.as_str() {
+            "login" => vec![&mut e.password, &mut e.otp],
+            "note" => vec![&mut e.note],
+            "card" => vec![&mut e.pin],
+            _ => vec![],
+        };
+        for (i, slot) in slots.into_iter().enumerate() {
+            let value = slot.take().unwrap_or_default();
+            *slot = Some(if value.is_empty() {
+                String::new()
+            } else if old_vals.get(i).copied().flatten() == Some(value.as_str()) {
+                value
+            } else {
+                self.encrypt(&value)?
+            });
+        }
+        Ok(e)
+    }
+
     fn transform(&self, entry: &Entry, f: impl Fn(&str) -> Result<String>) -> Result<Entry> {
         let mut e = entry.clone();
         let slots: Vec<&mut Option<String>> = match e.kind.as_str() {
@@ -147,5 +175,15 @@ impl Cryptor {
             });
         }
         Ok(e)
+    }
+}
+
+// The sensitive field values of an entry, in the same order `transform` visits them.
+fn sensitive_values(entry: &Entry) -> Vec<Option<&str>> {
+    match entry.kind.as_str() {
+        "login" => vec![entry.password.as_deref(), entry.otp.as_deref()],
+        "note" => vec![entry.note.as_deref()],
+        "card" => vec![entry.pin.as_deref()],
+        _ => vec![],
     }
 }

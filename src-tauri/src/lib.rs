@@ -61,6 +61,7 @@ pub fn run() {
             commands::auth::is_biometric_available,
             commands::auth::change_master_password,
             commands::vault::read_vault,
+            commands::vault::reveal_entry,
             commands::vault::save_vault,
             commands::vault::pick_backup,
             commands::vault::import_backup,

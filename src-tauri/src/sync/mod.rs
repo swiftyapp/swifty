@@ -16,6 +16,10 @@ use crate::error::{Error, Result};
 const FOLDER_NAME: &str = "Swifty";
 const FILE_NAME: &str = "vault.swftx";
 
+// Temporarily disabled: Drive sync blocks the UI thread and needs an async
+// rework before it ships. Flip to true to re-enable. See commands/sync.rs.
+pub const ENABLED: bool = false;
+
 // Build an HTTPS client, installing the ring rustls provider once per process
 // (reqwest is built with `rustls-no-provider`).
 pub(crate) fn http_client() -> Client {

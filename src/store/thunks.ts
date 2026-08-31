@@ -14,6 +14,11 @@ import { setEntries, entrySaved, entryRemoved } from './entriesSlice'
 import { auditDone } from './auditSlice'
 import { flowMain } from './flowSlice'
 import { syncInit } from './syncSlice'
+import { SYNC_ENABLED } from '@/config'
+
+const trySync = () => {
+  if (SYNC_ENABLED) syncNow().catch(() => {})
+}
 
 type Thunk = (dispatch: AppDispatch, getState: () => RootState) => Promise<void>
 
@@ -52,7 +57,7 @@ export const saveEntry =
     const vault = await saveVault(entries)
     dispatch(setEntries(vault.entries))
     dispatch(entrySaved(item.id))
-    syncNow().catch(() => {})
+    trySync()
     refreshAudit(dispatch)
   }
 
@@ -62,7 +67,7 @@ export const deleteEntry =
     const remaining = getState().entries.items.filter(e => e.id !== id)
     const vault = await saveVault(remaining)
     dispatch(entryRemoved(vault.entries))
-    syncNow().catch(() => {})
+    trySync()
     refreshAudit(dispatch)
   }
 
@@ -72,8 +77,8 @@ export const enterMain =
     await enlarge().catch(() => {})
     dispatch(setEntries(result.vault.entries))
     dispatch(flowMain())
-    dispatch(syncInit(result.syncConfigured))
-    if (result.syncConfigured) syncNow().catch(() => {})
+    dispatch(syncInit(SYNC_ENABLED && result.syncConfigured))
+    if (SYNC_ENABLED && result.syncConfigured) syncNow().catch(() => {})
   }
 
 export const completeSetup =

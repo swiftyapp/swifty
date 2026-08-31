@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppDispatch, useAppSelector } from '@/store'
 import { setCurrentEntry, setNoEntry } from '@/store/entriesSlice'
 import { saveEntry } from '@/store/thunks'
+import { useRevealed } from '@/hooks/useRevealed'
 import { isValid } from '@/services/entries'
 import defaults, { type EntryDraft } from '@/defaults/entries'
 import type { Entry, EntryType } from '@/lib/commands'
@@ -24,6 +25,12 @@ export default function Form({ entry }: Props) {
   const [model, setModel] = useState<EntryDraft>(
     entry ? { ...entry } : defaults[type]
   )
+
+  // When editing, secret fields arrive encrypted; swap in the decrypted values.
+  const revealed = useRevealed(entry)
+  useEffect(() => {
+    if (revealed) setModel({ ...revealed })
+  }, [revealed])
 
   const patch = (name: string, value: string | string[]) =>
     setModel(current => ({

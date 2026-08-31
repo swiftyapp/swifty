@@ -30,12 +30,10 @@ pub fn unlock(password: String, app: AppHandle, state: State<'_, AppState>) -> R
     let blob = storage::read_vault(&app)?;
     let secret = crypto::hash_secret(&password);
     let cryptor = crypto::Cryptor::new(&secret);
-    // Any decrypt failure means the password (or vault) is wrong.
-    let stored: VaultData = cryptor.decrypt_data(&blob).map_err(|_| Error::InvalidPassword)?;
-    let vault = VaultData {
-        entries: expose_all(&cryptor, &stored.entries)?,
-    };
-    let sync_configured = storage::sync_configured(&app);
+    // One derivation decrypts the outer blob. Sensitive fields stay encrypted and
+    // are exposed lazily (reveal_entry) so plaintext secrets aren't all in memory.
+    let vault: VaultData = cryptor.decrypt_data(&blob).map_err(|_| Error::InvalidPassword)?;
+    let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
     state
         .session
         .lock()
@@ -106,11 +104,11 @@ pub fn change_master_password(
 
     // Push the re-encrypted vault so the remote matches the new key (parity with
     // legacy). Best-effort: a re-key must still succeed offline.
-    if crate::sync::is_configured(&app, &new_cryptor) {
+    if crate::sync::ENABLED && crate::sync::is_configured(&app, &new_cryptor) {
         let _ = crate::sync::push(&app, &new_cryptor, &new_blob);
     }
 
-    let sync_configured = storage::sync_configured(&app);
+    let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
     state.session.lock().unwrap().set(
         new_secret,
         VaultData { entries: exposed },

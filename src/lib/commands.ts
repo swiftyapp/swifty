@@ -123,6 +123,10 @@ export const changeMasterPassword = (
 
 export const readVault = (): Promise<VaultData> => invoke('read_vault')
 
+// Decrypt one entry's secret fields on demand (view/edit).
+export const revealEntry = (id: string): Promise<Entry> =>
+  invoke('reveal_entry', { id })
+
 export const saveVault = (entries: Entry[]): Promise<VaultData> =>
   invoke('save_vault', { entries })
 

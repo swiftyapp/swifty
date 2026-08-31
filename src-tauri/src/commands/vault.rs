@@ -1,4 +1,3 @@
-use crate::commands::{expose_all, obscure_all};
 use crate::error::{Error, Result};
 use crate::models::{Entry, UnlockResult, VaultData};
 use crate::state::AppState;
@@ -6,25 +5,42 @@ use crate::{crypto, storage};
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
-// Return the currently unlocked vault, decrypted.
+// Return the currently unlocked vault. Sensitive fields stay encrypted; the
+// frontend reveals individual entries on demand (reveal_entry).
 #[tauri::command]
 pub fn read_vault(state: State<'_, AppState>) -> Result<VaultData> {
     state.session.lock().unwrap().vault.clone().ok_or(Error::Locked)
 }
 
-// Persist plaintext entries; Rust encrypts and writes. Returns the saved vault.
+// Decrypt one entry's sensitive fields on demand (view/edit).
+#[tauri::command]
+pub fn reveal_entry(id: String, state: State<'_, AppState>) -> Result<Entry> {
+    let session = state.session.lock().unwrap();
+    let cryptor = session.cryptor()?;
+    let vault = session.vault.as_ref().ok_or(Error::Locked)?;
+    let entry = vault.entries.iter().find(|e| e.id == id).ok_or(Error::NotFound)?;
+    cryptor.expose(entry)
+}
+
+// Persist entries. Only fields that changed vs. the held ciphertext are
+// re-encrypted, so saving one edited entry doesn't re-derive keys for the vault.
 #[tauri::command]
 pub fn save_vault(
     entries: Vec<Entry>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<VaultData> {
-    let cryptor = state.session.lock().unwrap().cryptor()?;
-    let obscured = VaultData {
-        entries: obscure_all(&cryptor, &entries)?,
+    let (cryptor, current) = {
+        let s = state.session.lock().unwrap();
+        (s.cryptor()?, s.vault.clone())
     };
-    storage::write_vault(&app, &cryptor.encrypt_data(&obscured)?)?;
-    let vault = VaultData { entries };
+    let previous = current.map(|v| v.entries).unwrap_or_default();
+    let obscured: Vec<Entry> = entries
+        .iter()
+        .map(|e| cryptor.obscure_changed(e, previous.iter().find(|p| p.id == e.id)))
+        .collect::<Result<_>>()?;
+    let vault = VaultData { entries: obscured };
+    storage::write_vault(&app, &cryptor.encrypt_data(&vault)?)?;
     state.session.lock().unwrap().vault = Some(vault.clone());
     Ok(vault)
 }
@@ -53,13 +69,11 @@ pub fn import_backup(
     let blob = storage::read_backup(&path)?;
     let secret = crypto::hash_secret(&password);
     let cryptor = crypto::Cryptor::new(&secret);
-    let stored: VaultData = cryptor.decrypt_data(&blob).map_err(|_| Error::InvalidPassword)?;
+    // Validate it decrypts, then adopt it; fields stay encrypted (revealed lazily).
+    let vault: VaultData = cryptor.decrypt_data(&blob).map_err(|_| Error::InvalidPassword)?;
 
     storage::write_vault(&app, &blob)?;
-    let vault = VaultData {
-        entries: expose_all(&cryptor, &stored.entries)?,
-    };
-    let sync_configured = storage::sync_configured(&app);
+    let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
     state
         .session
         .lock()

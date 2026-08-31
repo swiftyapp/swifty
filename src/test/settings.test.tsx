@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import { setLocale } from '@/i18n'
-import { changeMasterPassword, syncConnect, generatePassword } from '@/lib/commands'
+import { changeMasterPassword, generatePassword } from '@/lib/commands'
 import { renderWithStore } from './utils'
 
 beforeEach(() => vi.clearAllMocks())
@@ -19,13 +19,12 @@ describe('Settings', () => {
   it('opens the preferences modal on the vault section', async () => {
     await open()
     expect(screen.getByRole('heading', { name: 'Vault Settings' })).toBeInTheDocument()
-    expect(screen.getByText('Connect your Google Drive')).toBeInTheDocument()
+    expect(screen.getByText('Save Vault File')).toBeInTheDocument()
   })
 
-  it('connects Google Drive', async () => {
+  it('hides Google Drive sync while it is disabled', async () => {
     await open()
-    await userEvent.click(screen.getByText('Connect your Google Drive'))
-    expect(syncConnect).toHaveBeenCalledOnce()
+    expect(screen.queryByText('Connect your Google Drive')).toBeNull()
   })
 
   it('shows a generated example on the password section', async () => {

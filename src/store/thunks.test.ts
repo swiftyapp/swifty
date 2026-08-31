@@ -24,7 +24,8 @@ describe('saveEntry', () => {
     expect(items[0].title).toBe('New')
     expect(current?.id).toBe(items[0].id)
     expect(saveVault).toHaveBeenCalledOnce()
-    expect(syncNow).toHaveBeenCalledOnce()
+    // Sync is disabled for now, so saving must not trigger it.
+    expect(syncNow).not.toHaveBeenCalled()
   })
 
   it('updates an existing entry', async () => {
@@ -58,7 +59,8 @@ describe('enterMain', () => {
     const state = store.getState()
     expect(state.flow.name).toBe('main')
     expect(state.entries.items.map(e => e.id)).toEqual(['a'])
-    expect(state.sync.enabled).toBe(true)
-    expect(syncNow).toHaveBeenCalledOnce()
+    // Sync is disabled for now: never enabled, never triggered on unlock.
+    expect(state.sync.enabled).toBe(false)
+    expect(syncNow).not.toHaveBeenCalled()
   })
 })

@@ -9,6 +9,9 @@ use tauri::{AppHandle, Emitter, State};
 // Connect a sync provider (OAuth). Emits sync:connected on success.
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    if !sync::ENABLED {
+        return Ok(());
+    }
     let cryptor = state.session.lock().unwrap().cryptor()?;
     sync::setup(&app, &cryptor)?;
     state.session.lock().unwrap().sync_configured = true;
@@ -19,6 +22,9 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 // Disconnect the sync provider (keeps the refresh token, per legacy). Emits sync:disconnected.
 #[tauri::command]
 pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    if !sync::ENABLED {
+        return Ok(());
+    }
     let cryptor = state.session.lock().unwrap().cryptor()?;
     sync::disconnect(&app, &cryptor)?;
     state.session.lock().unwrap().sync_configured = false;
@@ -29,6 +35,9 @@ pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()>
 // Run a sync now (pull, merge, push). Emits sync:started then sync:stopped.
 #[tauri::command]
 pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    if !sync::ENABLED {
+        return Ok(());
+    }
     let _ = app.emit("sync:started", ());
     let result = perform(&app, &state);
     let _ = match &result {
@@ -66,6 +75,9 @@ fn perform(app: &AppHandle, state: &AppState) -> Result<()> {
 // Connect, then replace the local vault with the remote one. Emits vault:pull:started/stopped.
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    if !sync::ENABLED {
+        return Ok(());
+    }
     let cryptor = state.session.lock().unwrap().cryptor()?;
     sync::setup(&app, &cryptor)?;
     state.session.lock().unwrap().sync_configured = true;
@@ -100,6 +112,6 @@ fn import_remote(
 #[tauri::command]
 pub fn sync_status(state: State<'_, AppState>) -> Result<SyncStatus> {
     Ok(SyncStatus {
-        configured: state.session.lock().unwrap().sync_configured,
+        configured: sync::ENABLED && state.session.lock().unwrap().sync_configured,
     })
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { cx } from '@/utils/cx'
 import { useAppSelector } from '@/store'
 import { syncConnect, syncDisconnect, exportVault } from '@/lib/commands'
+import { SYNC_ENABLED } from '@/config'
 import { t } from '@/i18n'
 import type { Section } from './Navigation'
 import DownloadIcon from '@/assets/images/download.svg?react'
@@ -41,11 +42,13 @@ export default function Vault({ section }: Props) {
   return (
     <>
       <h1>{t('Vault Settings')}</h1>
-      <div className="section">
-        <strong>{t('Synchronize')}</strong>
-        <div>{t('Synchronize your vault with Google Drive')}</div>
-        {syncAction()}
-      </div>
+      {SYNC_ENABLED && (
+        <div className="section">
+          <strong>{t('Synchronize')}</strong>
+          <div>{t('Synchronize your vault with Google Drive')}</div>
+          {syncAction()}
+        </div>
+      )}
       <div className="section">
         <strong>{t('Backup')}</strong>
         <div>{t('Allows you to save a backup of your default vault file')}</div>

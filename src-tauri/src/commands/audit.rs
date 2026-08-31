@@ -1,3 +1,4 @@
+use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::models::{Audit, AuditItem, Entry};
 use crate::state::AppState;
@@ -8,19 +9,29 @@ const MIN_LENGTH: usize = 8;
 const FRESHNESS_DAYS: i64 = 90;
 
 // Audit every password in the unlocked vault (weak / short / old / repeating).
+// Passwords are stored encrypted, so decryption runs off the UI thread.
 #[tauri::command]
-pub fn get_audit(state: State<'_, AppState>) -> Result<Audit> {
-    let vault = state.session.lock().unwrap().vault.clone().ok_or(Error::Locked)?;
-    Ok(audit(&vault.entries))
+pub async fn get_audit(state: State<'_, AppState>) -> Result<Audit> {
+    let (cryptor, vault) = {
+        let s = state.session.lock().unwrap();
+        (s.cryptor()?, s.vault.clone().ok_or(Error::Locked)?)
+    };
+    tauri::async_runtime::spawn_blocking(move || audit(&cryptor, &vault.entries))
+        .await
+        .map_err(|e| Error::Crypto(e.to_string()))?
 }
 
-// Pure auditor over exposed (plaintext) entries. Only entries with a non-empty
-// password are included, matching legacy `auditor`.
-fn audit(entries: &[Entry]) -> Audit {
-    let passwords: Vec<&str> = entries.iter().filter_map(password).collect();
-    entries
+// Decrypt each non-empty password once, then flag weak / short / old / repeating.
+fn audit(cryptor: &Cryptor, entries: &[Entry]) -> Result<Audit> {
+    let creds: Vec<(&Entry, String)> = entries
         .iter()
-        .filter_map(|e| password(e).map(|p| (e, p)))
+        .filter_map(|e| e.password.as_deref().filter(|p| !p.is_empty()).map(|p| (e, p)))
+        .map(|(e, p)| Ok((e, cryptor.decrypt(p)?)))
+        .collect::<Result<_>>()?;
+
+    let passwords: Vec<&str> = creds.iter().map(|(_, p)| p.as_str()).collect();
+    Ok(creds
+        .iter()
         .map(|(e, p)| {
             let repeating = passwords.iter().filter(|&&x| x == p).count() > 1;
             (
@@ -33,11 +44,7 @@ fn audit(entries: &[Entry]) -> Audit {
                 },
             )
         })
-        .collect()
-}
-
-fn password(entry: &Entry) -> Option<&str> {
-    entry.password.as_deref().filter(|p| !p.is_empty())
+        .collect())
 }
 
 // Weak if it lacks any of: uppercase, lowercase, digit, symbol.
@@ -72,26 +79,34 @@ mod tests {
         serde_json::from_value(v).unwrap()
     }
 
-    fn login(id: &str, password: &str, updated: Option<&str>) -> Entry {
-        entry(json!({
+    fn cryptor() -> Cryptor {
+        Cryptor::new("audit-test-secret")
+    }
+
+    // Build a login with its password encrypted, as it is on disk.
+    fn login(c: &Cryptor, id: &str, password: &str, updated: Option<&str>) -> Entry {
+        c.obscure(&entry(json!({
             "id": id, "type": "login", "title": "t",
             "password": password,
             "password_updated_at": updated,
-        }))
+        })))
+        .unwrap()
     }
 
     #[test]
     fn skips_entries_without_password() {
+        let c = cryptor();
         let entries = vec![
             entry(json!({ "id": "n", "type": "note", "title": "t", "note": "x" })),
-            login("empty", "", None),
+            login(&c, "empty", "", None),
         ];
-        assert!(audit(&entries).is_empty());
+        assert!(audit(&c, &entries).unwrap().is_empty());
     }
 
     #[test]
     fn flags_short_and_weak() {
-        let a = audit(&[login("1", "abc", None)]);
+        let c = cryptor();
+        let a = audit(&c, &[login(&c, "1", "abc", None)]).unwrap();
         let item = &a["1"];
         assert!(item.is_short);
         assert!(item.is_weak);
@@ -100,18 +115,24 @@ mod tests {
 
     #[test]
     fn strong_password_is_not_weak_or_short() {
-        let a = audit(&[login("1", "Abcdef1!ghij", None)]);
+        let c = cryptor();
+        let a = audit(&c, &[login(&c, "1", "Abcdef1!ghij", None)]).unwrap();
         assert!(!a["1"].is_short);
         assert!(!a["1"].is_weak);
     }
 
     #[test]
     fn detects_repeating_passwords() {
-        let a = audit(&[
-            login("1", "Repeated1!", None),
-            login("2", "Repeated1!", None),
-            login("3", "Unique2@ab", None),
-        ]);
+        let c = cryptor();
+        let a = audit(
+            &c,
+            &[
+                login(&c, "1", "Repeated1!", None),
+                login(&c, "2", "Repeated1!", None),
+                login(&c, "3", "Unique2@ab", None),
+            ],
+        )
+        .unwrap();
         assert!(a["1"].is_repeating);
         assert!(a["2"].is_repeating);
         assert!(!a["3"].is_repeating);
@@ -119,13 +140,18 @@ mod tests {
 
     #[test]
     fn detects_old_passwords() {
+        let c = cryptor();
         let old = (Utc::now() - chrono::Duration::days(120)).to_rfc3339();
         let fresh = (Utc::now() - chrono::Duration::days(10)).to_rfc3339();
-        let a = audit(&[
-            login("old", "Str0ng!pass", Some(&old)),
-            login("fresh", "Str0ng!pass", Some(&fresh)),
-            login("missing", "Str0ng!pass", None),
-        ]);
+        let a = audit(
+            &c,
+            &[
+                login(&c, "old", "Str0ng!pass", Some(&old)),
+                login(&c, "fresh", "Str0ng!pass", Some(&fresh)),
+                login(&c, "missing", "Str0ng!pass", None),
+            ],
+        )
+        .unwrap();
         assert!(a["old"].is_old);
         assert!(!a["fresh"].is_old);
         assert!(!a["missing"].is_old);
