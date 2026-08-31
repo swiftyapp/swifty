@@ -68,12 +68,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # JS dependency vulnerabilities. Blocks on high/critical advisories.
+      # JS dependency vulnerabilities. The blocking gate audits PRODUCTION
+      # dependencies only — those are what ship in the app bundle (Tauri packages
+      # the Rust binary + the built frontend; dev tooling like the wdio E2E stack
+      # never enters the shipped artifact). A real advisory in a shipped dep still
+      # hard-fails here.
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.3
       - run: bun install --frozen-lockfile
-      - name: bun audit
+      - name: bun audit (production deps — blocking)
+        run: bun audit --audit-level=high --production
+
+      # Dev-dependency advisories are surfaced but non-blocking: they matter for
+      # local hygiene, but a transitive CVE in test tooling shouldn't gate a
+      # release of code that never contains it. Review the log periodically.
+      - name: bun audit (all deps — advisory only)
+        continue-on-error: true
         run: bun audit --audit-level=high
 
       # Rust supply-chain gate: RustSec advisories + license policy + bans +
