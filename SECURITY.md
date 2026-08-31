@@ -1,9 +1,10 @@
 # Security Policy
 
 Swifty is an offline-first password manager. Your vault lives on your own device
-as an encrypted file, and the app has no backend that holds your secrets. We take
-reports about the encryption, key handling, update channel, and platform
-integration seriously.
+as an encrypted SQLite database (SQLCipher), with each entry's secrets sealed in
+an additional application-level AEAD layer, and the app has no backend that holds
+your secrets. We take reports about the encryption, key derivation and handling,
+update channel, and platform integration seriously.
 
 ## Supported Versions
 
@@ -28,10 +29,7 @@ Preferred channel — GitHub private security advisories:
 3. We triage from there and, if needed, invite you into the advisory thread.
 
 If you cannot use GitHub advisories, email the maintainers at
-`<SECURITY_CONTACT_EMAIL>`.
-
-> **Maintainer note:** replace `<SECURITY_CONTACT_EMAIL>` with a monitored
-> security address before publishing this file.
+`security@getswifty.pro`.
 
 What to include:
 
@@ -53,8 +51,9 @@ What to include:
 
 ## Scope
 
-In scope: the desktop app and its Rust core — vault encryption, key derivation
-and lifecycle, the OS keychain / biometric integration, the Tauri command
+In scope: the desktop app and its Rust core — the SQLCipher at-rest encryption
+and the per-entry application AEAD layer, key derivation and lifecycle, the
+`.swftx` import path, the OS keychain / biometric integration, the Tauri command
 surface and capabilities, the webview CSP, and the signed updater.
 
 Out of scope: issues that require an already-compromised operating system,
