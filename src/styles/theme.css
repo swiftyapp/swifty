@@ -1,16 +1,12 @@
 /*
- * Design system tokens for the v1 redesign (Tailwind v4, CSS-first).
+ * Design system tokens + base for the v1 UI (Tailwind v4, CSS-first).
  *
- * Preflight (Tailwind's reset) is intentionally NOT imported yet: during the
- * incremental SASS -> Tailwind migration the legacy `application.sass` still
- * owns the base/element styling, and layering Preflight on top would fight it.
- * The final cleanup PR (once SASS is gone) switches to a plain
- * `@import "tailwindcss"` so Preflight comes back. Until then we pull in only
- * the theme (design tokens) and utilities layers.
+ * The SASS migration is complete, so this pulls in the full Tailwind bundle —
+ * theme, Preflight (reset, incl. global border-box), and utilities. The base
+ * layer below re-establishes the few app-wide element styles the old
+ * `base.sass` / `typography.sass` provided.
  */
-@layer theme, base, components, utilities;
-@import 'tailwindcss/theme.css' layer(theme);
-@import 'tailwindcss/utilities.css' layer(utilities);
+@import 'tailwindcss';
 
 /*
  * Shared motion primitives for the redesign: a blinking text caret and a
@@ -39,16 +35,24 @@
 }
 
 /*
- * The one piece of reset we need before Preflight returns: border-box sizing,
- * which every redesign component (and the prototype) assumes. Scoped to the
- * `base` layer so legacy SASS — unlayered, thus higher priority — keeps winning
- * anywhere the two overlap during the migration.
+ * App-wide base (replaces the old base.sass / typography.sass). Preflight
+ * already handles the reset + border-box; this only sets the full-height shell,
+ * the default type family/size, and the themed page ground.
  */
 @layer base {
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--c-app);
+    color: var(--c-text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
