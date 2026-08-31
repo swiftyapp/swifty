@@ -18,6 +18,8 @@ const FILE_NAME: &str = "vault.swftx";
 
 // Temporarily disabled: Drive sync blocks the UI thread and needs an async
 // rework before it ships. Flip to true to re-enable. See commands/sync.rs.
+// When enabling: add the Google Drive/OAuth origins to `connect-src` in the
+// `security.csp` string in tauri.conf.json (currently `'self'` only).
 pub const ENABLED: bool = false;
 
 // Build an HTTPS client, installing the ring rustls provider once per process

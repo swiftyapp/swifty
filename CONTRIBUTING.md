@@ -54,4 +54,8 @@ dependencies, and tools contained in the `swiftyapp/swifty` repository.
 
   * Once your commits are ready to go (with passing tests and linting) begin the process of opening a pull request by pushing your working branch to your fork on GitHub.
   * From within GitHub, opening a new pull request will present you with a template that should be filled out
+
+## Security
+
+* **Never log secret-bearing values.** `log::*!` / `console.*` calls must not interpolate an `Entry`, its secret fields (password, notes, card, OTP), the master password, or any derived key. Log opaque errors and identifiers only.
   * Discuss changes and update pull request

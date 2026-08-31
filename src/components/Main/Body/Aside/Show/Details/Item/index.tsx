@@ -1,7 +1,7 @@
-import { openUrl } from '@tauri-apps/plugin-opener'
 import type { Entry } from '@/lib/commands'
 import { t } from '@/i18n'
 import { copy } from '@/services/copy'
+import { openLink } from '@/services/openLink'
 import Copy from '@/assets/images/copy.svg?react'
 
 interface Props {
@@ -25,7 +25,7 @@ export default function Item({ entry, name, link, cc, secure }: Props) {
           href={raw}
           onClick={e => {
             e.preventDefault()
-            openUrl(raw)
+            openLink(raw)
           }}
         >
           {raw}
