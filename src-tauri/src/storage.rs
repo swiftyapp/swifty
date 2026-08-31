@@ -11,6 +11,10 @@ use crate::error::{Error, Result};
 
 pub const VAULT_FILE: &str = "vault.swftx";
 pub const DB_FILE: &str = "vault.db";
+// Plaintext KDF descriptor stored next to the DB. It holds the Argon2id params +
+// salt (public by design) and is read *before* deriving the key — the salt/params
+// cannot live inside the encrypted DB, since deriving the key is what opens it.
+pub const KDF_SIDECAR_FILE: &str = "vault.kdf.json";
 pub const GDRIVE_FILE: &str = "auth/gdrive.swftx";
 // Marker for "biometric unlock is enabled". The key itself lives in the OS
 // secure store; this flag lets us report availability without a biometric prompt.
@@ -50,6 +54,24 @@ pub fn db_exists(app: &AppHandle) -> bool {
 
 fn gdrive_path(app: &AppHandle) -> Result<PathBuf> {
     Ok(app_dir(app)?.join(GDRIVE_FILE))
+}
+
+fn kdf_sidecar_path(app: &AppHandle) -> Result<PathBuf> {
+    Ok(app_dir(app)?.join(KDF_SIDECAR_FILE))
+}
+
+// The KDF descriptor JSON, or `None` when absent (a sidecar-less legacy/dev DB).
+pub fn read_kdf_sidecar(app: &AppHandle) -> Result<Option<String>> {
+    let path = kdf_sidecar_path(app)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    Ok(Some(fs::read_to_string(path)?))
+}
+
+// Write (or overwrite) the KDF descriptor sidecar. Authoritative for opening.
+pub fn write_kdf_sidecar(app: &AppHandle, json: &str) -> Result<()> {
+    write_file(&kdf_sidecar_path(app)?, json)
 }
 
 // Read a file as utf8, returning "" when it doesn't exist (legacy ensure-file).

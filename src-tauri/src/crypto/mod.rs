@@ -19,6 +19,9 @@ use crate::models::Entry;
 pub mod kdf;
 pub use kdf::{derive, KdfParams};
 
+mod vault;
+pub use vault::{PayloadCipher, VaultKey};
+
 #[cfg(test)]
 mod tests;
 
@@ -37,10 +40,9 @@ pub fn hash_secret(password: &str) -> String {
     STANDARD.encode(Sha512::digest(password.as_bytes()))
 }
 
-/// Derive the 32-byte SQLCipher database key from the session secret via HKDF,
-/// as a subkey distinct from the per-entry payload key (which uses `secret`
-/// directly through PBKDF2). One password yields both keys with no extra prompt.
-/// Phase 2 will swap the input for an Argon2id output without changing this glue.
+/// Legacy deterministic SQLCipher key: HKDF of the `hash_secret` string, with no
+/// per-vault salt. Retained only for sidecar-less interim/dev DBs so they still
+/// open; Argon2id vaults derive their SQLCipher key via [`VaultKey`] instead.
 pub fn sqlcipher_key(secret: &str) -> [u8; KEY_LEN] {
     const SALT: &[u8] = b"swifty-sqlcipher-v1";
     const INFO: &[u8] = b"sqlcipher-db-key";
@@ -51,6 +53,62 @@ pub fn sqlcipher_key(secret: &str) -> [u8; KEY_LEN] {
     let mut key = [0u8; KEY_LEN];
     okm.fill(&mut key).expect("hkdf fill");
     key
+}
+
+/// Derive a 32-byte subkey from `ikm` (an Argon2id master key) for the given
+/// `info` label via HKDF-SHA256. One master yields the SQLCipher key and the
+/// payload key as independent subkeys (distinct `info`), so a single KDF pass
+/// covers both without either revealing the other.
+pub(crate) fn hkdf_subkey(ikm: &[u8], info: &[u8]) -> [u8; KEY_LEN] {
+    const SALT: &[u8] = b"swifty-kdf-hkdf-v1";
+    let prk = ring::hkdf::Salt::new(ring::hkdf::HKDF_SHA256, SALT).extract(ikm);
+    let info = [info];
+    let okm = prk
+        .expand(&info, ring::hkdf::HKDF_SHA256)
+        .expect("hkdf expand");
+    let mut key = [0u8; KEY_LEN];
+    okm.fill(&mut key).expect("hkdf fill");
+    key
+}
+
+/// Seal `plaintext` with AES-256-GCM under `key` and a fresh random 16-byte
+/// nonce, returning `nonce ‖ ciphertext ‖ tag`. This is the per-payload AEAD for
+/// Argon2id-keyed vaults — no per-payload KDF; the caller derives `key` once.
+pub(crate) fn seal_aead(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
+    let cipher = Aes256Gcm16::new_from_slice(key).map_err(err)?;
+    let mut nonce = [0u8; IV_LEN];
+    rand::thread_rng().fill_bytes(&mut nonce);
+    let sealed = cipher
+        .encrypt(
+            Nonce::from_slice(&nonce),
+            Payload {
+                msg: plaintext,
+                aad: &[],
+            },
+        )
+        .map_err(err)?;
+    let mut out = Vec::with_capacity(IV_LEN + sealed.len());
+    out.extend_from_slice(&nonce);
+    out.extend_from_slice(&sealed);
+    Ok(out)
+}
+
+/// Reverse of [`seal_aead`]: split off the 16-byte nonce and decrypt the rest.
+pub(crate) fn unseal_aead(key: &[u8], blob: &[u8]) -> Result<Vec<u8>> {
+    if blob.len() < IV_LEN + TAG_LEN {
+        return Err(Error::Crypto("payload too short".into()));
+    }
+    let (nonce, sealed) = blob.split_at(IV_LEN);
+    let cipher = Aes256Gcm16::new_from_slice(key).map_err(err)?;
+    cipher
+        .decrypt(
+            Nonce::from_slice(nonce),
+            Payload {
+                msg: sealed,
+                aad: &[],
+            },
+        )
+        .map_err(err)
 }
 
 fn err<E: std::fmt::Display>(e: E) -> Error {

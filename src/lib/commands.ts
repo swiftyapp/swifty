@@ -185,7 +185,11 @@ export const importSwftx = (
   password: string
 ): Promise<number> => invoke('import_swftx', { path, password })
 
-export const exportVault = (): Promise<string | null> => invoke('export_vault')
+// Export a portable `.swftx` backup, encrypted under the master `password` so it
+// can be restored via import_backup on any install. The password must match the
+// unlocked vault.
+export const exportVault = (password: string): Promise<string | null> =>
+  invoke('export_vault', { password })
 
 // ---------------------------------------------------------------------------
 // Generator & OTP

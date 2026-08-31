@@ -7,19 +7,78 @@ pub mod vault;
 
 use tauri::AppHandle;
 
-use crate::crypto::{self, Cryptor};
+use crate::crypto::{self, Cryptor, KdfParams, VaultKey};
 use crate::error::{Error, Result};
 use crate::models::{Entry, EntryMetaDto};
 use crate::storage;
 use crate::store::{EntryMeta, Record, SqliteStore, StoreError, VaultStore};
 
-// KDF descriptor recorded in the store `meta` table. A placeholder for Phase 2
-// (Argon2id): the app still derives keys from the current PBKDF2-based secret,
-// but the descriptor makes the on-disk format self-describing for the upgrade.
-pub const KDF_DESCRIPTOR: &str = "pbkdf2-sha512-100000";
-
 pub fn store_err(e: StoreError) -> Error {
     Error::Other(e.to_string())
+}
+
+// Resolve the vault key for `password`: Argon2id when the KDF sidecar is present
+// (the current scheme), or the legacy deterministic key when a DB exists without
+// a sidecar (interim/dev vaults created before this wiring). Feeds the password
+// **directly** to Argon2id — no `hash_secret` pre-hash on this path.
+pub fn derive_key(app: &AppHandle, password: &str) -> Result<VaultKey> {
+    match storage::read_kdf_sidecar(app)? {
+        Some(json) => {
+            let params = KdfParams::from_json(&json)?;
+            Ok(VaultKey::Argon2 {
+                master: crypto::derive(password.as_bytes(), &params)?,
+            })
+        }
+        None => Ok(VaultKey::legacy_from_password(password)),
+    }
+}
+
+// Open the existing store with `key` and return its handle + entry metadata. A
+// wrong key fails SQLCipher's open verification -> surfaced as invalid password.
+pub fn open_with_key(app: &AppHandle, key: &VaultKey) -> Result<(SqliteStore, Vec<EntryMetaDto>)> {
+    let store = SqliteStore::open(&storage::db_path(app)?, &key.sqlcipher_key())
+        .map_err(|_| Error::InvalidPassword)?;
+    let metas = list_metas(&store)?;
+    Ok((store, metas))
+}
+
+// Password unlock (run inside spawn_blocking): derive the key, then open + list.
+// Fresh-start default: a legacy `vault.swftx` is never migrated here — importing
+// one is an explicit, off-thread action (see `import_swftx`).
+pub fn unlock_with_password(
+    app: &AppHandle,
+    password: &str,
+) -> Result<(VaultKey, SqliteStore, Vec<EntryMetaDto>)> {
+    let key = derive_key(app, password)?;
+    let (store, metas) = open_with_key(app, &key)?;
+    Ok((key, store, metas))
+}
+
+// Create a brand-new Argon2id-keyed vault: fresh params -> write the sidecar
+// (authoritative) -> derive the master -> create the encrypted DB keyed with the
+// SQLCipher subkey -> record the KDF descriptor in `meta` too (for reference).
+pub fn create_vault(app: &AppHandle, password: &str) -> Result<(VaultKey, SqliteStore)> {
+    let params = KdfParams::default_argon2id();
+    let descriptor = params.to_json()?;
+    // Sidecar first: a DB must never exist without the descriptor needed to open it.
+    storage::write_kdf_sidecar(app, &descriptor)?;
+    let key = VaultKey::Argon2 {
+        master: crypto::derive(password.as_bytes(), &params)?,
+    };
+    let store =
+        SqliteStore::open(&storage::db_path(app)?, &key.sqlcipher_key()).map_err(store_err)?;
+    record_kdf_meta(&store, &params)?;
+    Ok((key, store))
+}
+
+// Mirror the KDF descriptor into `meta` (the sidecar stays authoritative for
+// opening; `meta` is reference/integrity only).
+pub fn record_kdf_meta(store: &SqliteStore, params: &KdfParams) -> Result<()> {
+    store.meta_set("kdf", params.algo()).map_err(store_err)?;
+    store
+        .meta_set("kdf_params", &params.to_json()?)
+        .map_err(store_err)?;
+    Ok(())
 }
 
 // Decrypt one entry's sensitive fields (legacy per-field ciphertext -> plaintext).
@@ -71,17 +130,4 @@ pub fn live_records(store: &SqliteStore) -> Result<Vec<Record>> {
         .into_iter()
         .filter(|r| r.deleted_at.is_none())
         .collect())
-}
-
-// Open the existing store for `secret` and return the open handle plus the entry
-// metadata list. Fresh-start default: a legacy `vault.swftx` is never migrated
-// here — importing one is an explicit, off-thread action (see `import_swftx`).
-pub fn open_and_load(app: &AppHandle, secret: &str) -> Result<(SqliteStore, Vec<EntryMetaDto>)> {
-    let db_key = crypto::sqlcipher_key(secret);
-    let db = storage::db_path(app)?;
-    // A wrong password derives a wrong SQLCipher key and the open fails
-    // verification -> surface as an invalid password.
-    let store = SqliteStore::open(&db, &db_key).map_err(|_| Error::InvalidPassword)?;
-    let metas = list_metas(&store)?;
-    Ok((store, metas))
 }

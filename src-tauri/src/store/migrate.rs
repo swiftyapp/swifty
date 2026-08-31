@@ -1,54 +1,16 @@
-//! Boundary adapter: legacy JSON `vault.swftx` → the new store. This is the one
+//! Boundary adapter between app entries and store `Record`s. This is the one
 //! file in the module that references the app's crypto/models — it is glue, not
-//! part of the pure trait, and stays thin. The store itself never sees this.
+//! part of the pure trait, and stays thin. The store itself never sees it.
 
-use std::fs;
-use std::path::Path;
+use super::Record;
+use crate::crypto::{Cryptor, PayloadCipher};
+use crate::error::Result;
+use crate::models::Entry;
 
-use super::{Record, VaultStore};
-use crate::crypto::Cryptor;
-use crate::error::{Error, Result};
-use crate::models::{Entry, VaultData};
-
-/// Read the encrypted legacy vault at `path`, decrypt it with `cryptor`, write
-/// every entry into `store` as a `Record` (payload = the app-encrypted blob),
-/// and retain the JSON alongside as `<path>.bak`. Returns the entry count.
-pub fn migrate_from_json(path: &Path, cryptor: &Cryptor, store: &impl VaultStore) -> Result<usize> {
-    let blob = fs::read_to_string(path)?;
-    let vault: VaultData = cryptor.decrypt_data(&blob)?;
-
-    let records = records_from_entries(&vault.entries, cryptor)?;
-    store
-        .import(&records)
-        .map_err(|e| Error::Other(e.to_string()))?;
-
-    backup(path)?;
-    Ok(records.len())
-}
-
-/// Map obscured (per-field-encrypted) entries to store `Record`s: metadata to
-/// columns, the whole entry re-sealed into the opaque payload. Shared by the
-/// JSON migration, backup restore, and per-entry save so the payload/metadata
-/// convention lives in exactly one place.
-pub fn records_from_entries(entries: &[Entry], cryptor: &Cryptor) -> Result<Vec<Record>> {
-    entries.iter().map(|e| to_record(e, cryptor)).collect()
-}
-
-/// Re-key one obscured entry from a *source* cryptor to the *current* one: expose
-/// its fields under `src`, re-obscure under `cur`, then seal a fresh `Record`.
-/// Used by `import_swftx` to merge a foreign `.swftx` encrypted under a different
-/// master password than the open vault's. Reuses `to_record`, so the
-/// payload/metadata convention stays in one place.
-pub fn rekey_record(src: &Cryptor, cur: &Cryptor, entry: &Entry) -> Result<Record> {
-    let exposed = src.expose(entry)?;
-    let reobscured = cur.obscure(&exposed)?;
-    to_record(&reobscured, cur)
-}
-
-// One obscured entry → one Record. Metadata goes to columns; the whole entry is
-// re-sealed by the app cryptor into the opaque payload (lossless round-trip).
-fn to_record(entry: &Entry, cryptor: &Cryptor) -> Result<Record> {
-    let payload = cryptor.encrypt_data(entry)?.into_bytes();
+/// Package a plaintext entry + its already-sealed payload into a store `Record`:
+/// non-secret metadata to columns, the opaque payload as-is. The single place the
+/// metadata/payload convention lives, shared by save and the `.swftx` imports.
+pub fn build_record(entry: &Entry, payload: Vec<u8>) -> Result<Record> {
     Ok(Record {
         id: entry.id.clone(),
         kind: entry.kind.clone(),
@@ -62,12 +24,23 @@ fn to_record(entry: &Entry, cryptor: &Cryptor) -> Result<Record> {
     })
 }
 
-// Copy the JSON vault to `<path>.bak`, never removing the original.
-fn backup(path: &Path) -> Result<()> {
-    let mut bak = path.as_os_str().to_owned();
-    bak.push(".bak");
-    fs::copy(path, bak)?;
-    Ok(())
+/// Re-seal `.swftx` entries (obscured under the source `Cryptor`, possibly a
+/// different master password) under the current session's payload cipher: expose
+/// each entry's plaintext, seal it, build a `Record`. Used by `import_backup` and
+/// `import_swftx`.
+pub fn reseal_swftx(
+    entries: &[Entry],
+    src: &Cryptor,
+    cipher: &PayloadCipher,
+) -> Result<Vec<Record>> {
+    entries.iter().map(|e| reseal_one(e, src, cipher)).collect()
+}
+
+/// Re-seal a single `.swftx` entry (used by the progress-emitting import loop).
+pub fn reseal_one(obscured: &Entry, src: &Cryptor, cipher: &PayloadCipher) -> Result<Record> {
+    let plain = src.expose(obscured)?;
+    let payload = cipher.seal(&plain)?;
+    build_record(&plain, payload)
 }
 
 fn host_of(website: &str) -> String {

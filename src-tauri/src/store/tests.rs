@@ -1,10 +1,32 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::migrate::migrate_from_json;
-use super::{Record, SqliteStore, VaultStore};
+use super::{migrate, Record, SqliteStore, VaultStore};
+use crate::crypto::{self, KdfParams, VaultKey};
+use crate::models::Entry;
 
 const KEY: &[u8] = &[0x11; 32];
+
+// Low-cost Argon2id params keep the key-schedule tests fast; production uses the
+// 64 MiB defaults.
+fn argon2_params(salt: &[u8]) -> KdfParams {
+    KdfParams::argon2id(salt, 256, 1, 1)
+}
+
+fn argon2_key(password: &str, params: &KdfParams) -> VaultKey {
+    VaultKey::Argon2 {
+        master: crypto::derive(password.as_bytes(), params).unwrap(),
+    }
+}
+
+fn sample_entry() -> Entry {
+    serde_json::from_value(serde_json::json!({
+        "id": "1", "type": "login", "title": "Site",
+        "website": "https://ex.com/login", "username": "alice",
+        "password": "s3cret", "tags": ["work"]
+    }))
+    .unwrap()
+}
 
 // A fresh, unique DB path under the temp dir for each test.
 fn tmp_db() -> PathBuf {
@@ -180,31 +202,23 @@ fn reopening_a_migrated_db_is_idempotent() {
     assert_eq!(store.meta_get("schema_version").unwrap(), None);
 }
 
+// save_entry then reveal_entry, exercised through the Argon2id key schedule:
+// seal a plaintext entry under the payload key, upsert one row, unseal it back.
 #[test]
 fn save_then_reveal_round_trips_one_row() {
-    use super::migrate::records_from_entries;
-    use crate::crypto::Cryptor;
-    use crate::models::Entry;
+    let key = argon2_key("pw", &argon2_params(b"salt-a-01234567890123456789012345"));
+    let cipher = key.payload_cipher();
+    let store = SqliteStore::open(&tmp_db(), &key.sqlcipher_key()).unwrap();
 
-    let cryptor = Cryptor::new(&crate::crypto::hash_secret("pw"));
-    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
-
-    // save_entry: obscure the plaintext entry, seal it into one payload, upsert.
-    let plain: Entry = serde_json::from_value(serde_json::json!({
-        "id": "1", "type": "login", "title": "Site",
-        "website": "https://ex.com/login", "username": "alice",
-        "password": "s3cret", "tags": ["work"]
-    }))
-    .unwrap();
-    let obscured = cryptor.obscure(&plain).unwrap();
-    let recs = records_from_entries(&[obscured], &cryptor).unwrap();
-    store.upsert(&recs[0]).unwrap();
-
+    let entry = sample_entry();
+    let payload = cipher.seal(&entry).unwrap();
+    let record = migrate::build_record(&entry, payload).unwrap();
+    store.upsert(&record).unwrap();
     // Saving the same id again updates the single row (no whole-vault rewrite).
-    store.upsert(&recs[0]).unwrap();
+    store.upsert(&record).unwrap();
+
     let list = store.list().unwrap();
     assert_eq!(list.len(), 1);
-
     // The list carries only non-secret metadata — the password never appears.
     assert_eq!(list[0].url_host, "ex.com");
     let meta_json = serde_json::to_string(&(
@@ -216,29 +230,132 @@ fn save_then_reveal_round_trips_one_row() {
     .unwrap();
     assert!(!meta_json.contains("s3cret"));
 
-    // reveal_entry: unseal the payload, then decrypt the per-field secrets.
+    // reveal_entry: unseal the stored payload with the session payload key.
     let rec = store.get("1").unwrap().unwrap();
-    let blob = String::from_utf8(rec.payload).unwrap();
-    let revealed = cryptor
-        .expose(&cryptor.decrypt_data::<Entry>(&blob).unwrap())
-        .unwrap();
+    let revealed = cipher.unseal(&rec.payload).unwrap();
     assert_eq!(revealed.password.as_deref(), Some("s3cret"));
     assert_eq!(revealed.username.as_deref(), Some("alice"));
 }
 
-// import_swftx re-keys a `.swftx` encrypted under a *different* master password
-// into the open store: expose under the source key, re-obscure under the current
-// key, upsert. Reveal with the current key must return the original plaintext,
-// and importing twice must merge by id (no duplicate rows).
+// Setup writes an Argon2id descriptor; unlock re-derives from that (serialized)
+// descriptor and opens the same DB. A wrong password derives a different key and
+// the open fails.
 #[test]
-fn import_swftx_rekeys_across_passwords_and_upserts_by_id() {
-    use super::migrate::rekey_record;
+fn argon2_descriptor_reproduces_key_and_opens() {
+    let path = tmp_db();
+    let params = argon2_params(b"salt-b-01234567890123456789012345");
+
+    // setup: derive, open, save a sealed entry.
+    let key = argon2_key("master-pw", &params);
+    {
+        let store = SqliteStore::open(&path, &key.sqlcipher_key()).unwrap();
+        let cipher = key.payload_cipher();
+        let payload = cipher.seal(&sample_entry()).unwrap();
+        store
+            .upsert(&migrate::build_record(&sample_entry(), payload).unwrap())
+            .unwrap();
+    }
+
+    // The persisted descriptor is Argon2id and round-trips through JSON (sidecar).
+    let sidecar = params.to_json().unwrap();
+    assert!(sidecar.contains("\"algo\":\"argon2id\""));
+    let reloaded = KdfParams::from_json(&sidecar).unwrap();
+
+    // unlock: re-derive from the reloaded descriptor and reopen.
+    let key2 = argon2_key("master-pw", &reloaded);
+    let store2 = SqliteStore::open(&path, &key2.sqlcipher_key()).unwrap();
+    let revealed = key2
+        .payload_cipher()
+        .unseal(&store2.get("1").unwrap().unwrap().payload)
+        .unwrap();
+    assert_eq!(revealed.password.as_deref(), Some("s3cret"));
+
+    // A wrong password derives a different SQLCipher key → open fails.
+    let wrong = argon2_key("wrong-pw", &reloaded);
+    assert!(SqliteStore::open(&path, &wrong.sqlcipher_key()).is_err());
+}
+
+// Back-compat: a DB created with the legacy deterministic key (no sidecar) still
+// opens via the legacy `VaultKey` fallback, and its payloads unseal.
+#[test]
+fn legacy_sidecarless_vault_opens() {
+    let path = tmp_db();
+    let key = VaultKey::legacy_from_password("master-pw");
+    {
+        let store = SqliteStore::open(&path, &key.sqlcipher_key()).unwrap();
+        let payload = key.payload_cipher().seal(&sample_entry()).unwrap();
+        store
+            .upsert(&migrate::build_record(&sample_entry(), payload).unwrap())
+            .unwrap();
+    }
+
+    let key2 = VaultKey::legacy_from_password("master-pw");
+    let store2 = SqliteStore::open(&path, &key2.sqlcipher_key()).unwrap();
+    let revealed = key2
+        .payload_cipher()
+        .unseal(&store2.get("1").unwrap().unwrap().payload)
+        .unwrap();
+    assert_eq!(revealed.password.as_deref(), Some("s3cret"));
+}
+
+// change_master_password: re-seal every payload under the new payload key, rekey
+// the DB to the new SQLCipher key, and write a fresh descriptor. The new
+// descriptor + new password opens and reveals; the old key no longer opens.
+#[test]
+fn change_password_reseals_rekeys_and_new_descriptor_opens() {
+    let path = tmp_db();
+    let old = argon2_key(
+        "old-pw",
+        &argon2_params(b"salt-c-01234567890123456789012345"),
+    );
+    let store = SqliteStore::open(&path, &old.sqlcipher_key()).unwrap();
+    let payload = old.payload_cipher().seal(&sample_entry()).unwrap();
+    store
+        .upsert(&migrate::build_record(&sample_entry(), payload).unwrap())
+        .unwrap();
+
+    // Fresh Argon2id params (new salt) → new key; re-seal old→new, import, rekey.
+    let new_params = argon2_params(b"salt-d-01234567890123456789012345");
+    let new = argon2_key("new-pw", &new_params);
+    let (old_cipher, new_cipher) = (old.payload_cipher(), new.payload_cipher());
+    let resealed: Vec<Record> = store
+        .export_for_sync()
+        .unwrap()
+        .into_iter()
+        .map(|mut r| {
+            let entry = old_cipher.unseal(&r.payload).unwrap();
+            r.payload = new_cipher.seal(&entry).unwrap();
+            r
+        })
+        .collect();
+    store.import(&resealed).unwrap();
+    store.rekey(&new.sqlcipher_key()).unwrap();
+    drop(store);
+
+    // The old key no longer opens; the new descriptor + password does.
+    assert!(SqliteStore::open(&path, &old.sqlcipher_key()).is_err());
+    let reopened = argon2_key(
+        "new-pw",
+        &KdfParams::from_json(&new_params.to_json().unwrap()).unwrap(),
+    );
+    let store2 = SqliteStore::open(&path, &reopened.sqlcipher_key()).unwrap();
+    let revealed = reopened
+        .payload_cipher()
+        .unseal(&store2.get("1").unwrap().unwrap().payload)
+        .unwrap();
+    assert_eq!(revealed.password.as_deref(), Some("s3cret"));
+}
+
+// import_swftx re-seals a `.swftx` encrypted under a *different* master password
+// into the open store: expose under the source key, re-seal under the current
+// payload key, upsert. Reveal with the current key must return the original
+// plaintext, and importing twice must merge by id (no duplicate rows).
+#[test]
+fn import_swftx_reseals_across_passwords_and_upserts_by_id() {
     use crate::crypto::{hash_secret, Cryptor};
-    use crate::models::{Entry, VaultData};
+    use crate::models::VaultData;
 
     let src = Cryptor::new(&hash_secret("source-pw"));
-    let cur = Cryptor::new(&hash_secret("current-pw"));
-
     let plain: Vec<Entry> = ["1", "2"]
         .iter()
         .map(|id| {
@@ -258,30 +375,27 @@ fn import_swftx_rekeys_across_passwords_and_upserts_by_id() {
         })
         .unwrap();
 
-    // Decrypt the file with the source cryptor (as the command does), then re-key
-    // each entry into a store opened for the *current* session.
+    // Decrypt with the source cryptor (as the command does), then re-seal each
+    // entry under the current session's Argon2id payload key.
     let file: VaultData = src.decrypt_data(&blob).unwrap();
-    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
-    for obscured in &file.entries {
-        store
-            .upsert(&rekey_record(&src, &cur, obscured).unwrap())
-            .unwrap();
+    let key = argon2_key(
+        "current-pw",
+        &argon2_params(b"salt-e-01234567890123456789012345"),
+    );
+    let cipher = key.payload_cipher();
+    let store = SqliteStore::open(&tmp_db(), &key.sqlcipher_key()).unwrap();
+    for r in migrate::reseal_swftx(&file.entries, &src, &cipher).unwrap() {
+        store.upsert(&r).unwrap();
     }
-
     // Re-importing the same file merges by id — the count stays at 2.
-    for obscured in &file.entries {
-        store
-            .upsert(&rekey_record(&src, &cur, obscured).unwrap())
-            .unwrap();
+    for r in migrate::reseal_swftx(&file.entries, &src, &cipher).unwrap() {
+        store.upsert(&r).unwrap();
     }
-    let list = store.list().unwrap();
-    assert_eq!(list.len(), 2);
+    assert_eq!(store.list().unwrap().len(), 2);
 
-    // Reveal with the *current* key returns the original plaintext secrets.
-    let rec = store.get("1").unwrap().unwrap();
-    let payload = String::from_utf8(rec.payload).unwrap();
-    let revealed = cur
-        .expose(&cur.decrypt_data::<Entry>(&payload).unwrap())
+    // Reveal with the current payload key returns the original plaintext secrets.
+    let revealed = cipher
+        .unseal(&store.get("1").unwrap().unwrap().payload)
         .unwrap();
     assert_eq!(revealed.password.as_deref(), Some("hunter2"));
     assert_eq!(revealed.username.as_deref(), Some("alice"));
@@ -291,7 +405,7 @@ fn import_swftx_rekeys_across_passwords_and_upserts_by_id() {
 #[test]
 fn import_swftx_wrong_source_password_errors() {
     use crate::crypto::{hash_secret, Cryptor};
-    use crate::models::{Entry, VaultData};
+    use crate::models::VaultData;
 
     let src = Cryptor::new(&hash_secret("source-pw"));
     let entry: Entry = serde_json::from_value(serde_json::json!({
@@ -306,60 +420,4 @@ fn import_swftx_wrong_source_password_errors() {
 
     let wrong = Cryptor::new(&hash_secret("not-the-password"));
     assert!(wrong.decrypt_data::<VaultData>(&blob).is_err());
-}
-
-#[test]
-fn migrate_from_json_round_trips_and_keeps_bak() {
-    use crate::crypto::Cryptor;
-    use crate::models::{Entry, VaultData};
-
-    let cryptor = Cryptor::new(&crate::crypto::hash_secret("master-pw"));
-    let entries: Vec<Entry> = ["1", "2"]
-        .iter()
-        .map(|id| {
-            serde_json::from_value(serde_json::json!({
-                "id": id, "type": "login", "title": format!("Site {id}"),
-                "website": "https://example.com/login", "password": "hunter2",
-                "tags": ["work"], "createdAt": "2024-01-02T03:04:05Z"
-            }))
-            .unwrap()
-        })
-        .collect();
-    let obscured: Vec<Entry> = entries
-        .iter()
-        .map(|e| cryptor.obscure(e).unwrap())
-        .collect();
-    let blob = cryptor
-        .encrypt_data(&VaultData {
-            entries: obscured.clone(),
-        })
-        .unwrap();
-
-    let json_path = tmp_db().with_file_name("vault.swftx");
-    std::fs::write(&json_path, &blob).unwrap();
-
-    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
-    let n = migrate_from_json(&json_path, &cryptor, &store).unwrap();
-    assert_eq!(n, 2);
-
-    // Metadata landed in columns.
-    let list = store.list().unwrap();
-    assert_eq!(list.len(), 2);
-    assert_eq!(list[0].url_host, "example.com");
-
-    // Payload decrypts back to the identical (obscured) entries.
-    for (want, meta) in obscured.iter().zip(&list) {
-        let record = store.get(&meta.id).unwrap().unwrap();
-        let payload = String::from_utf8(record.payload).unwrap();
-        let got: Entry = cryptor.decrypt_data(&payload).unwrap();
-        assert_eq!(
-            serde_json::to_value(&got).unwrap(),
-            serde_json::to_value(want).unwrap()
-        );
-    }
-
-    // The legacy JSON is retained as a .bak sidecar.
-    let mut bak = json_path.into_os_string();
-    bak.push(".bak");
-    assert!(PathBuf::from(bak).exists());
 }
