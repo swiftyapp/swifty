@@ -3,12 +3,12 @@ import { cx } from '@/utils/cx'
 
 // Shared token-styled building blocks for the settings panels.
 
-export const H1 = 'mb-5 text-xl font-semibold tracking-[-0.02em] text-text'
-export const LABEL = 'block text-[13px] font-medium text-text'
-export const DESC = 'mt-1 text-[13px] leading-relaxed text-text2'
-export const MUTED = 'text-[12px] leading-relaxed text-text3'
-export const DANGER = 'text-[13px] text-bad'
-export const SUCCESS = 'text-[13px] text-good'
+export const H1 = 'mb-5 text-xl font-semibold tracking-display text-text'
+export const LABEL = 'block text-base font-medium text-text'
+export const DESC = 'mt-1 text-base leading-relaxed text-text2'
+export const MUTED = 'text-base leading-relaxed text-text3'
+export const DANGER = 'text-base text-bad'
+export const SUCCESS = 'text-base text-good'
 
 export function Section({
   children,
@@ -37,7 +37,7 @@ export function Checkbox({
   children: ReactNode
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2.5 text-[13px] text-text2">
+    <label className="flex cursor-pointer items-center gap-2.5 text-base text-text2">
       <input
         type="checkbox"
         name={name}

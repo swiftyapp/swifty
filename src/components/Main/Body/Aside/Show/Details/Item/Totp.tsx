@@ -74,17 +74,17 @@ export default function Totp({ name, entry }: Props) {
             strokeDasharray={dash}
           />
         </svg>
-        <div className="font-mono text-[20px] tracking-[0.1em] text-text">
+        <div className="font-mono text-xl tracking-secret text-text">
           {`${code.slice(0, 3)} ${code.slice(3)}`}
         </div>
       </div>
-      <div className="font-mono text-[11px] text-text3">
+      <div className="font-mono text-xs text-text3">
         {t('refreshes in {n}s').replace('{n}', String(time))}
       </div>
       <button
         type="button"
         onClick={() => copy(code)}
-        className="mt-3 grid h-7 w-full cursor-pointer place-items-center rounded-sm border border-line2 text-[12px] text-text2 transition-colors hover:border-accent-line hover:text-text"
+        className="mt-3 grid h-7 w-full cursor-pointer place-items-center rounded-sm border border-line2 text-base text-text2 transition-colors hover:border-accent-line hover:text-text"
       >
         {t('Copy code')}
       </button>

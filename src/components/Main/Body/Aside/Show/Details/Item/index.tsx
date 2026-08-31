@@ -51,14 +51,12 @@ export default function Item({ entry, name, link, cc, secure, big, children }: P
 
   return (
     <div className="item flex items-center gap-3 px-3.5 py-3 shadow-[inset_0_-1px_0_var(--c-line)] last:shadow-none">
-      <span className={`w-[92px] flex-none ${MONO_LABEL} tracking-[0.1em]`}>
-        {t(name)}
-      </span>
+      <span className={`w-24 flex-none ${MONO_LABEL}`}>{t(name)}</span>
       <span
         className={
           big
-            ? 'min-w-0 flex-1 break-all font-mono text-[18px] tracking-[0.04em] text-text'
-            : 'min-w-0 flex-1 break-all font-mono text-[13px] text-text'
+            ? 'min-w-0 flex-1 break-all font-mono text-xl tracking-secret text-text'
+            : 'min-w-0 flex-1 break-all font-mono text-base text-text'
         }
         style={maskStyle}
         data-testid={`entry-value-${name.toLowerCase()}`}

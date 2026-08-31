@@ -9,11 +9,11 @@ interface Props {
 export default function Modal({ onClose, children }: Props) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-[var(--scrim)] p-4 pt-[10vh] backdrop-blur-sm"
+      className="animate-fade fixed inset-0 z-50 flex items-start justify-center bg-[var(--scrim)] p-4 pt-[10vh] backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-[80vh] w-full max-w-[720px] overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-[var(--shadow)]"
+        className="animate-pop relative flex max-h-[80vh] w-full max-w-[720px] overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-[var(--shadow)]"
         onClick={e => e.stopPropagation()}
       >
         <button

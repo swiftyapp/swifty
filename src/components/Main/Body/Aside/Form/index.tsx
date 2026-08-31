@@ -88,14 +88,14 @@ export default function Form({ entry }: Props) {
   return (
     <div className="mx-auto max-w-[560px]">
       <div className={MONO_LABEL}>{t(KIND_LABEL[type])}</div>
-      <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-text">
+      <h1 className="mt-2 text-2xl font-semibold tracking-display text-text">
         {entry ? t('Edit') : t('New Secret')}
       </h1>
 
       <div className="mt-6 flex flex-col gap-4">{fields()}</div>
 
       {saveError && (
-        <div className="mt-4 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3 text-[13px] text-bad">
+        <div className="mt-4 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3 text-base text-bad">
           {saveError}
         </div>
       )}
@@ -105,7 +105,7 @@ export default function Form({ entry }: Props) {
           type="button"
           data-testid="cancel-entry-button"
           onClick={onCancel}
-          className="h-9 cursor-pointer rounded-sm px-4 text-[13px] text-text2 transition-colors hover:text-text"
+          className="h-9 cursor-pointer rounded-sm px-4 text-base text-text2 transition-colors hover:text-text"
         >
           {t('Cancel')}
         </button>

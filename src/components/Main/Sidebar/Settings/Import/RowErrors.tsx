@@ -11,7 +11,7 @@ export default function RowErrors({ errors }: { errors: RowError[] }) {
   if (errors.length === 0) return null
 
   return (
-    <div className="mt-2 text-[13px]">
+    <div className="mt-2 text-base">
       <span
         className="cursor-pointer select-none text-bad"
         onClick={() => setOpen(!open)}

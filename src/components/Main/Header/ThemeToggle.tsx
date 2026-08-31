@@ -13,7 +13,6 @@ export default function ThemeToggle() {
     <IconButton
       onClick={() => toggleTheme()}
       title={isDark ? t('Light mode') : t('Dark mode')}
-      className="[-webkit-app-region:no-drag]"
     >
       {isDark ? <SunGlyph /> : <MoonGlyph />}
     </IconButton>

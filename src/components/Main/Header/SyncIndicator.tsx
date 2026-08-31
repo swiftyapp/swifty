@@ -28,7 +28,7 @@ export default function SyncIndicator() {
 
   return (
     <Tooltip content={message()}>
-      <div className="flex h-7 items-center gap-[7px] rounded-sm px-2.5 font-mono text-[11px] text-text3">
+      <div className="flex h-7 items-center gap-[7px] rounded-sm px-2.5 font-mono text-xs text-text3">
         <span className={cx('h-[5px] w-[5px] flex-none rounded-full', dot())} />
         {label()}
       </div>

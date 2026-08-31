@@ -11,7 +11,7 @@ export default function Note({ entry }: Props) {
     <div className="mt-3">
       <Panel>
         <div
-          className="whitespace-pre-wrap break-words px-4 py-4 text-[13px] leading-relaxed text-text2"
+          className="whitespace-pre-wrap break-words px-4 py-4 text-base leading-relaxed text-text2"
           data-testid="entry-value-note"
         >
           {entry.note}

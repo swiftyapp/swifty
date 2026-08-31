@@ -32,14 +32,14 @@ export default function TagsInput({ value, onChange }: Props) {
         <span
           key={tag}
           onClick={() => removeTag(tag)}
-          className="flex cursor-pointer items-center gap-1 rounded-sm bg-accent-soft px-2 py-1 font-mono text-[11px] text-accent hover:brightness-95"
+          className="flex cursor-pointer items-center gap-1 rounded-sm bg-accent-soft px-2 py-1 font-mono text-xs text-accent hover:brightness-95"
         >
           {tag}
           <span className="opacity-60">×</span>
         </span>
       ))}
       <input
-        className="min-w-[80px] flex-1 !border-0 !bg-transparent !p-1 !text-[13px] !text-text !outline-none"
+        className="min-w-[80px] flex-1 !border-0 !bg-transparent !p-1 !text-base !text-text !outline-none"
         value={input}
         onChange={e => setInput(e.target.value)}
         onKeyDown={handleKeyDown}

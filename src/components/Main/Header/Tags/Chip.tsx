@@ -15,14 +15,14 @@ export default function Chip({ label, count, selected, onClick }: Props) {
       type="button"
       onClick={onClick}
       className={cx(
-        'flex h-[25px] flex-none items-center gap-1.5 rounded-sm border px-[9px] text-[11px] whitespace-nowrap',
+        'flex h-6 flex-none items-center gap-1.5 rounded-sm border px-[9px] text-xs whitespace-nowrap',
         selected
           ? 'border-accent-line bg-accent-soft text-accent'
           : 'border-line bg-transparent text-text2 hover:border-line2'
       )}
     >
       <span>{label}</span>
-      <span className="font-mono text-[11px] opacity-60">{count}</span>
+      <span className="font-mono text-xs opacity-60">{count}</span>
     </button>
   )
 }

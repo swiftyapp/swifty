@@ -47,10 +47,12 @@ export default function Score({ audit }: Props) {
         />
       </svg>
       <div className="text-center">
-        <div className="text-[34px] font-semibold tracking-[-0.03em] text-text">
+        {/* 34px is a documented one-off: the dial numeral sits above the 24px
+            display tier so it fills the ring. */}
+        <div className="text-[34px] font-semibold tracking-display text-text">
           {score}
         </div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-text3">
+        <div className="font-mono text-xs uppercase tracking-label text-text3">
           {t('Overall Score')}
         </div>
       </div>

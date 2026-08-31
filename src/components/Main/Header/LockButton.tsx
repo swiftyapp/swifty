@@ -17,7 +17,6 @@ export default function LockButton() {
       testid="lock-vault-button"
       onClick={onLock}
       title={t('Lock')}
-      className="[-webkit-app-region:no-drag]"
     >
       <LockGlyph />
     </IconButton>

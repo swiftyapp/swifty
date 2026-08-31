@@ -9,7 +9,7 @@ export default function Search() {
   const query = useStore(state => state.filters.query)
 
   return (
-    <div className="flex-none [-webkit-app-region:no-drag]">
+    <div className="flex-none">
       <div className="flex h-7 w-[400px] items-center gap-2.5 rounded-sm border border-line2 bg-field pl-[11px] pr-2 text-text3 transition-colors focus-within:border-accent-line">
         <SearchGlyph className="flex-none" />
         <input

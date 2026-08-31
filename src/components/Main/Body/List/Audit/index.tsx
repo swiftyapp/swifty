@@ -17,7 +17,7 @@ export default function AuditList() {
 
   if (!audit)
     return (
-      <div className="px-4 py-6 font-mono text-[11px] uppercase tracking-[0.14em] text-text3">
+      <div className="px-4 py-6 font-mono text-xs uppercase tracking-label text-text3">
         {t('Loading Results..')}
       </div>
     )

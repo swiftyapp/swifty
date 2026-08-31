@@ -35,8 +35,8 @@ export default function Audit() {
               className="flex items-center gap-3 px-4 py-3 shadow-[inset_0_-1px_0_var(--c-line)] last:shadow-none"
             >
               <span className={`h-[7px] w-[7px] flex-none rounded-full ${s.dot}`} />
-              <span className="flex-1 text-[13px] text-text2">{s.label}</span>
-              <span className="font-mono text-[13px] text-text">{s.value}</span>
+              <span className="flex-1 text-base text-text2">{s.label}</span>
+              <span className="font-mono text-base text-text">{s.value}</span>
             </div>
           ))}
       </Panel>

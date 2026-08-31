@@ -36,7 +36,7 @@ export default function Password({ section }: Props) {
       <h1 className={H1}>{t('Password Settings')}</h1>
       <Row>
         <strong className={LABEL}>{t('Example')}</strong>
-        <div className="rounded-sm border border-line bg-field px-3 py-2.5 font-mono text-[14px] text-text">
+        <div className="rounded-sm border border-line bg-field px-3 py-2.5 font-mono text-base text-text">
           {example}
         </div>
       </Row>
@@ -52,7 +52,7 @@ export default function Password({ section }: Props) {
             value={options.length}
             onChange={onLength}
           />
-          <div className="grid h-6 min-w-[32px] place-items-center rounded-sm bg-accent-soft px-1.5 font-mono text-[12px] text-accent">
+          <div className="grid h-6 min-w-[32px] place-items-center rounded-sm bg-accent-soft px-1.5 font-mono text-base text-accent">
             {options.length}
           </div>
         </div>
