@@ -1,0 +1,136 @@
+/*
+ * Design system tokens for the v1 redesign (Tailwind v4, CSS-first).
+ *
+ * Preflight (Tailwind's reset) is intentionally NOT imported yet: during the
+ * incremental SASS -> Tailwind migration the legacy `application.sass` still
+ * owns the base/element styling, and layering Preflight on top would fight it.
+ * The final cleanup PR (once SASS is gone) switches to a plain
+ * `@import "tailwindcss"` so Preflight comes back. Until then we pull in only
+ * the theme (design tokens) and utilities layers.
+ */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/*
+ * The one piece of reset we need before Preflight returns: border-box sizing,
+ * which every redesign component (and the prototype) assumes. Scoped to the
+ * `base` layer so legacy SASS — unlayered, thus higher priority — keeps winning
+ * anywhere the two overlap during the migration.
+ */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+}
+
+/*
+ * Custom design tokens exposed as Tailwind utilities. `inline` makes each
+ * utility reference the runtime `var(--c-*)` directly instead of copying its
+ * value, so overriding those vars under `[data-theme="dark"]` re-themes every
+ * `bg-app`, `text-text2`, `border-line`, `bg-accent`, ... with no rebuild.
+ */
+@theme inline {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+
+  --color-app: var(--c-app);
+  --color-rail: var(--c-rail);
+  --color-list: var(--c-list);
+  --color-detail: var(--c-detail);
+  --color-field: var(--c-field);
+  --color-tile: var(--c-tile);
+  --color-line: var(--c-line);
+  --color-line2: var(--c-line2);
+  --color-hover: var(--c-hover);
+  --color-sel: var(--c-sel);
+  --color-text: var(--c-text);
+  --color-text2: var(--c-text2);
+  --color-text3: var(--c-text3);
+  --color-accent: var(--c-accent);
+  --color-accent-fg: var(--c-accent-fg);
+  --color-accent-soft: var(--c-accent-soft);
+  --color-accent-line: var(--c-accent-line);
+  --color-good: var(--c-good);
+  --color-warn: var(--c-warn);
+  --color-bad: var(--c-bad);
+}
+
+/*
+ * LIGHT is the default palette (bare `:root`), so the app is light with no
+ * `data-theme` set. DARK is opt-in via `[data-theme="dark"]`. Palettes come
+ * straight from the Keyring prototype (its light `[data-kr=light]` set here on
+ * :root, its default dark set under [data-theme="dark"]).
+ */
+:root {
+  color-scheme: light;
+
+  --c-app: #e7e8ea;
+  --c-rail: #e4e5e8;
+  --c-list: #f3f4f6;
+  --c-detail: #ffffff;
+  --c-field: #fafafb;
+  --c-tile: rgba(20, 22, 26, 0.065);
+  --c-line: rgba(20, 22, 26, 0.11);
+  --c-line2: rgba(20, 22, 26, 0.19);
+  --c-hover: rgba(20, 22, 26, 0.045);
+  --c-sel: rgba(59, 91, 219, 0.09);
+  --c-text: #15161a;
+  --c-text2: #585c64;
+  --c-text3: #84878e;
+  --c-accent: #3b5bdb;
+  --c-accent-fg: #ffffff;
+  --c-accent-soft: rgba(59, 91, 219, 0.1);
+  --c-accent-line: rgba(59, 91, 219, 0.45);
+  --c-good: #1e9c6e;
+  --c-warn: #b7761a;
+  --c-bad: #c9453a;
+
+  /* Design vars that aren't color utilities (gradients/shadows/scrims). */
+  --card: linear-gradient(180deg, #ffffff, #fbfbfc);
+  --chrome: rgba(246, 247, 248, 0.92);
+  --topglow: rgba(255, 255, 255, 0.7);
+  --shadow: 0 24px 60px rgba(24, 26, 30, 0.16), 0 1px 3px rgba(24, 26, 30, 0.1);
+  --scrim: rgba(40, 43, 48, 0.3);
+  --thumb: rgba(20, 22, 26, 0.22);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --c-app: #0f1011;
+  --c-rail: #131415;
+  --c-list: #171819;
+  --c-detail: #1b1c1e;
+  --c-field: rgba(255, 255, 255, 0.03);
+  --c-tile: rgba(255, 255, 255, 0.06);
+  --c-line: rgba(255, 255, 255, 0.07);
+  --c-line2: rgba(255, 255, 255, 0.12);
+  --c-hover: rgba(255, 255, 255, 0.045);
+  --c-sel: rgba(255, 255, 255, 0.06);
+  --c-text: #ebeced;
+  --c-text2: #9ea1a6;
+  --c-text3: #71747a;
+  --c-accent: #5b78e8;
+  --c-accent-fg: #ffffff;
+  --c-accent-soft: rgba(91, 120, 232, 0.16);
+  --c-accent-line: rgba(91, 120, 232, 0.55);
+  --c-good: #4cc08f;
+  --c-warn: #e0a94e;
+  --c-bad: #e4685d;
+
+  --card: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.045),
+    rgba(255, 255, 255, 0.012)
+  );
+  --chrome: rgba(15, 16, 17, 0.82);
+  --topglow: rgba(255, 255, 255, 0.06);
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  --scrim: rgba(8, 9, 10, 0.7);
+  --thumb: rgba(255, 255, 255, 0.14);
+}

@@ -3,12 +3,13 @@ import { defineConfig } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import svgr from 'vite-plugin-svgr'
+import tailwindcss from '@tailwindcss/vite'
 
 const host = process.env.TAURI_DEV_HOST
 
 // https://vitejs.dev/config/ — tuned for Tauri (fixed port, no clearScreen).
 export default defineConfig({
-  plugins: [react(), svgr()],
+  plugins: [react(), svgr(), tailwindcss()],
   clearScreen: false,
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) }

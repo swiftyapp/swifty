@@ -6,6 +6,7 @@ import { createEntriesSlice, type EntriesSlice } from './entriesSlice'
 import { createAuditSlice, type AuditSlice } from './auditSlice'
 import { createSyncSlice, type SyncSlice } from './syncSlice'
 import { createI18nSlice, type I18nSlice } from './i18nSlice'
+import { createThemeSlice, type ThemeSlice } from './themeSlice'
 import { createUpdateSlice, type UpdateSlice } from './updateSlice'
 import { createAsyncSlice, type AsyncSlice } from './thunks'
 
@@ -15,6 +16,7 @@ export type StoreState = FlowSlice &
   AuditSlice &
   SyncSlice &
   I18nSlice &
+  ThemeSlice &
   UpdateSlice &
   AsyncSlice
 
@@ -25,6 +27,7 @@ export const useStore = create<StoreState>()((...a) => ({
   ...createAuditSlice(...a),
   ...createSyncSlice(...a),
   ...createI18nSlice(...a),
+  ...createThemeSlice(...a),
   ...createUpdateSlice(...a),
   ...createAsyncSlice(...a)
 }))
@@ -74,6 +77,8 @@ export const {
   syncStart,
   syncStop,
   localeChanged,
+  changeTheme,
+  toggleTheme,
   setUpdateReady,
   dismissUpdate,
   runUpdateCheck,
