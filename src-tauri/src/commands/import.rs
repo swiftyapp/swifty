@@ -53,13 +53,18 @@ pub struct ImportReport {
 }
 
 // Open a file picker for a third-party export (JSON / CSV).
+// Async + spawn_blocking so the blocking picker never runs on the main thread
+// (which would deadlock the event loop and hang the window).
 #[tauri::command]
-pub fn pick_import_file(app: AppHandle) -> Result<Option<String>> {
-    let file = app
-        .dialog()
-        .file()
-        .add_filter("Password exports", &["json", "csv"])
-        .blocking_pick_file();
+pub async fn pick_import_file(app: AppHandle) -> Result<Option<String>> {
+    let file = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter("Password exports", &["json", "csv"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|e| Error::Other(e.to_string()))?;
     Ok(file
         .and_then(|f| f.into_path().ok())
         .map(|p| p.to_string_lossy().into_owned()))
@@ -150,7 +155,7 @@ pub async fn import_entries(
 // Export the open vault to a third-party format. `path` may be supplied directly;
 // when None, a save dialog is shown. `format` is "bitwarden" or "csv".
 #[tauri::command]
-pub fn export_entries(
+pub async fn export_entries(
     path: Option<String>,
     format: String,
     app: AppHandle,
@@ -183,12 +188,16 @@ pub fn export_entries(
     let dest = match path {
         Some(p) => Some(std::path::PathBuf::from(p)),
         None => {
-            let chosen = app
-                .dialog()
-                .file()
-                .set_file_name(format!("swifty-export.{ext}"))
-                .add_filter("Export", &[ext])
-                .blocking_save_file();
+            // Off-main-thread so the blocking save dialog can't hang the window.
+            let chosen = tauri::async_runtime::spawn_blocking(move || {
+                app.dialog()
+                    .file()
+                    .set_file_name(format!("swifty-export.{ext}"))
+                    .add_filter("Export", &[ext])
+                    .blocking_save_file()
+            })
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
             chosen.and_then(|f| f.into_path().ok())
         }
     };
