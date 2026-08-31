@@ -146,8 +146,9 @@ on Phase 1.
 ### T-AUTH-2 · Setup strength requirement  ✅ (PR) (S9, T12)
 **Evidence:** `Setup/Enter.tsx:21-24` only checks non-empty. **Steps:** add a zxcvbn meter + enforce ≥12 chars before `onEnter`. **Acceptance:** weak/short passwords are blocked with feedback.
 
-### T-AUTH-3 · Failed-unlock backoff  ❌ (S8, T12)
-**Evidence:** `commands/auth.rs:27-46` derives+tests immediately; no counter anywhere. **Steps:** persisted attempt counter (survives restart — store in the DB `meta` table) with exponential delay after 3 free attempts. **Acceptance:** repeated wrong attempts incur growing delay that survives a process kill.
+### T-AUTH-3 · Failed-unlock backoff  ✅ (S8, T12)
+**Evidence:** `commands/auth.rs:27-46` derives+tests immediately; no counter anywhere. **Steps:** persisted attempt counter (survives restart — plaintext sidecar next to the DB, since `meta` isn't readable before unlock) with exponential delay after 3 free attempts. **Acceptance:** repeated wrong attempts incur growing delay that survives a process kill.
+**Shipped:** `password unlock` now reads a plaintext `vault.lock.json` sidecar before deriving; 3 free attempts, then delay doubles (2s, 4s, 8s, ...) capped at 300s, persisted atomically and reset on success; wrong-password backoff only (biometric unlock unaffected); surfaced to the UI as `Error::TooManyAttempts { retry_after_secs }`.
 
 ### T-MEM-1 · Zeroize the key on lock/drop  ✅ (PR) (S4, T10)
 **Evidence:** auto-lock is real (`state.rs:38-42` `clear()` drops key+vault; `autolock.rs:41-50` 60s), but `master_key` is a plain `Vec<u8>` (`state.rs:13`) — drop doesn't scrub the heap; no `zeroize` dep.

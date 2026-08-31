@@ -19,6 +19,11 @@ pub const DB_REKEY_BACKUP_FILE: &str = "vault.db.rekey-backup";
 // salt (public by design) and is read *before* deriving the key — the salt/params
 // cannot live inside the encrypted DB, since deriving the key is what opens it.
 pub const KDF_SIDECAR_FILE: &str = "vault.kdf.json";
+// Plaintext failed-unlock backoff state (T-AUTH-3), stored next to the DB for the
+// same reason as the KDF sidecar: a wrong password never opens the encrypted DB,
+// so the attempt counter cannot live in the `meta` table. Public by design —
+// it only ever holds a counter and a timestamp, nothing secret.
+pub const LOCKOUT_SIDECAR_FILE: &str = "vault.lock.json";
 pub const GDRIVE_FILE: &str = "auth/gdrive.swftx";
 // Marker for "biometric unlock is enabled". The key itself lives in the OS
 // secure store; this flag lets us report availability without a biometric prompt.
@@ -83,6 +88,26 @@ pub fn read_kdf_sidecar(app: &AppHandle) -> Result<Option<String>> {
 // crash never leaves it truncated.
 pub fn write_kdf_sidecar(app: &AppHandle, json: &str) -> Result<()> {
     atomic_write_file(&kdf_sidecar_path(app)?, json)
+}
+
+fn lockout_sidecar_path(app: &AppHandle) -> Result<PathBuf> {
+    Ok(app_dir(app)?.join(LOCKOUT_SIDECAR_FILE))
+}
+
+// The failed-unlock backoff state JSON, or `None` when absent (no failed
+// attempts recorded yet, or a fresh vault).
+pub fn read_lockout_sidecar(app: &AppHandle) -> Result<Option<String>> {
+    let path = lockout_sidecar_path(app)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    Ok(Some(fs::read_to_string(path)?))
+}
+
+// Write (or overwrite) the backoff state sidecar, atomically (same durability
+// rationale as the KDF sidecar: never leave a torn/partial file behind).
+pub fn write_lockout_sidecar(app: &AppHandle, json: &str) -> Result<()> {
+    atomic_write_file(&lockout_sidecar_path(app)?, json)
 }
 
 // Durably overwrite `path`: write a temp sibling, fsync it, atomically rename it
@@ -262,6 +287,15 @@ mod tests {
 
         // A completed write leaves no temp file behind.
         assert!(!tmp_sibling(&path).exists());
+    }
+
+    #[test]
+    fn lockout_sidecar_round_trips_through_the_atomic_writer() {
+        // Same primitive as the KDF sidecar, exercised with the lockout shape.
+        let path = tmp_sidecar().with_file_name("vault.lock.json");
+        let json = "{\"failed_attempts\":4,\"locked_until_ms\":1700000002000}";
+        atomic_write_file(&path, json).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), json);
     }
 
     #[test]
