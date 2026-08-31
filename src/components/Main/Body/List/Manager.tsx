@@ -14,7 +14,7 @@ export default function Manager() {
   if (entries.length === 0) return <Empty />
 
   return (
-    <div className="list">
+    <div className="pb-6">
       {entries.map(entry => (
         <Item entry={entry} key={entry.id} />
       ))}

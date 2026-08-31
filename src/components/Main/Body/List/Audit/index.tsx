@@ -15,24 +15,19 @@ export default function AuditList() {
       .map(id => items.find(entry => entry.id === id))
       .filter((entry): entry is EntryMeta => entry !== undefined)
 
-  if (!audit) return <div>{t('Loading Results..')}</div>
+  if (!audit)
+    return (
+      <div className="px-4 py-6 font-mono text-[11px] uppercase tracking-[0.14em] text-text3">
+        {t('Loading Results..')}
+      </div>
+    )
   if (Object.keys(audit).length === 0) return <Empty />
 
   return (
-    <div className="list">
-      <Group title="Weak" level="level-one" entries={byProperty('isWeak')} />
-      <Group
-        title="Reused"
-        level="level-two"
-        entries={byProperty('isRepeating')}
-      />
-      {breachCheck && (
-        <Group
-          title="Breached"
-          level="level-three"
-          entries={byProperty('breached')}
-        />
-      )}
+    <div className="pb-6">
+      <Group title="Weak" entries={byProperty('isWeak')} />
+      <Group title="Reused" entries={byProperty('isRepeating')} />
+      {breachCheck && <Group title="Breached" entries={byProperty('breached')} />}
     </div>
   )
 }

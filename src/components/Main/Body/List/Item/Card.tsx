@@ -1,21 +1,15 @@
 import type { EntryMeta } from '@/lib/commands'
-import CardIcon from '@/assets/images/cards/card.svg?react'
+import { CardGlyph } from '@/components/Main/icons'
+import Row from './Row'
 
 interface Props {
   entry: EntryMeta
 }
 
-// The card number is a secret (in the payload), so the list can't brand by
-// issuer; a generic card icon is shown until the entry is revealed.
+// The card number is a secret (in the encrypted payload), so the list shows a
+// static masked pattern rather than any real digits until the entry is revealed.
 export default function Card({ entry }: Props) {
   return (
-    <>
-      <div className="icon">
-        <CardIcon width="30" />
-      </div>
-      <div className="description">
-        <div className="primary">{entry.title}</div>
-      </div>
-    </>
+    <Row glyph={<CardGlyph size={16} />} title={entry.title} sub="•••• •••• •••• ••••" />
   )
 }

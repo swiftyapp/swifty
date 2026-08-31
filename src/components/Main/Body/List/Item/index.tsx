@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function Item({ entry }: Props) {
-  const current = useStore(state => state.entries.current)
+  const selected = useStore(state => state.entries.current?.id === entry.id)
 
   const content = () => {
     switch (entry.type) {
@@ -25,7 +25,13 @@ export default function Item({ entry }: Props) {
 
   return (
     <div
-      className={cx('entry', { current: current?.id === entry.id })}
+      className={cx(
+        'flex cursor-pointer items-center gap-3 border-l-2 py-2.5 pl-[14px] pr-4',
+        'shadow-[inset_0_-1px_0_var(--c-line)]',
+        selected
+          ? 'border-accent bg-sel'
+          : 'border-transparent hover:bg-hover'
+      )}
       data-testid="entry-item"
       onClick={() => setCurrentEntry(entry.id)}
     >
