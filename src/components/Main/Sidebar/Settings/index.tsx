@@ -20,7 +20,11 @@ export default function Settings() {
   return (
     <div className="settings">
       <Tooltip content={t('Settings')}>
-        <div className="settings-button" onClick={() => setModal(!modal)}>
+        <div
+          className="settings-button"
+          data-testid="settings-button"
+          onClick={() => setModal(!modal)}
+        >
           <SettingsIcon />
         </div>
       </Tooltip>

@@ -34,13 +34,14 @@ export default function Enter({ display, onEnter, goBack }: Props) {
     <div className="bottom-lock">
       <Masterpass
         placeholder={t('Set Master Password')}
+        testid="setup-password-input"
         error={error}
         onEnter={onSend}
         onChange={onChange}
       />
       <PasswordStrength password={password} />
       <br />
-      <div className="button" onClick={onSend}>
+      <div className="button" data-testid="setup-continue-button" onClick={onSend}>
         {t('Continue')}
       </div>
       <span className="navigate-back" onClick={goBack}>

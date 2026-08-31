@@ -10,7 +10,7 @@ export default function Add() {
   }
 
   return (
-    <div className="add-button" onClick={onAddEntry}>
+    <div className="add-button" data-testid="add-entry-button" onClick={onAddEntry}>
       <Plus />
     </div>
   )

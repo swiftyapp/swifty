@@ -30,6 +30,11 @@ pub const GDRIVE_FILE: &str = "auth/gdrive.swftx";
 pub const BIOMETRIC_FILE: &str = "biometric.enabled";
 
 fn app_dir(app: &AppHandle) -> Result<PathBuf> {
+    // E2E test isolation: point the whole data dir at a fresh temp dir per run.
+    if let Ok(dir) = std::env::var("SWIFTY_DB_DIR") {
+        return Ok(PathBuf::from(dir));
+    }
+
     let dir = app
         .path()
         .app_data_dir()

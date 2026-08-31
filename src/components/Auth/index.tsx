@@ -71,6 +71,7 @@ export function Auth({ touchID }: Props) {
         <div className="bottom-lock">
           <Masterpass
             touchID={touchID}
+            testid="unlock-password-input"
             error={error}
             disabled={retryAfter > 0}
             onChange={() => retryAfter <= 0 && setError(null)}

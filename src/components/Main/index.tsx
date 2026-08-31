@@ -4,7 +4,7 @@ import Body from './Body'
 
 export function Main() {
   return (
-    <div className="layout">
+    <div className="layout" data-testid="main-view">
       <Sidebar />
       <div className="mainbar">
         <Header />

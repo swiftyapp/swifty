@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { cx } from '@/utils/cx'
-import { useStore } from '@/store'
-import { syncConnect, syncDisconnect, exportVault } from '@/lib/commands'
+import { useStore, flowAuth } from '@/store'
+import { syncConnect, syncDisconnect, exportVault, lock } from '@/lib/commands'
 import { SYNC_ENABLED } from '@/config'
 import { t } from '@/i18n'
 import type { Section } from './Navigation'
@@ -23,6 +23,10 @@ export default function Vault({ section }: Props) {
   const onConnect = () => {
     setConnecting(true)
     syncConnect()
+  }
+
+  const onLock = () => {
+    lock().finally(() => flowAuth(false))
   }
 
   const onExport = () => {
@@ -55,6 +59,11 @@ export default function Vault({ section }: Props) {
   return (
     <>
       <h1>{t('Vault Settings')}</h1>
+      <div className="section">
+        <div className="button pale" data-testid="lock-vault-button" onClick={onLock}>
+          {t('Lock Screen')}
+        </div>
+      </div>
       {SYNC_ENABLED && (
         <div className="section">
           <strong>{t('Synchronize')}</strong>
