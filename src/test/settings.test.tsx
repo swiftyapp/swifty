@@ -3,7 +3,13 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import { setLocale } from '@/i18n'
-import { changeMasterPassword, generatePassword } from '@/lib/commands'
+import {
+  changeMasterPassword,
+  generatePassword,
+  enableBiometric,
+  disableBiometric,
+  isBiometricAvailable
+} from '@/lib/commands'
 import { renderWithStore } from './utils'
 
 beforeEach(() => vi.clearAllMocks())
@@ -49,6 +55,30 @@ describe('Settings', () => {
 
     expect(changeMasterPassword).toHaveBeenCalledWith('old', 'newpass')
     expect(await screen.findByText('Successfully changed password')).toBeInTheDocument()
+  })
+
+  it('enables biometric unlock when currently disabled', async () => {
+    vi.mocked(isBiometricAvailable).mockResolvedValue(false)
+    vi.mocked(enableBiometric).mockResolvedValue(undefined)
+    await open()
+    await userEvent.click(screen.getByText('Biometric Unlock'))
+
+    await userEvent.click(await screen.findByText('Enable Biometric Unlock'))
+
+    expect(enableBiometric).toHaveBeenCalledOnce()
+    expect(await screen.findByText('Disable Biometric Unlock')).toBeInTheDocument()
+  })
+
+  it('disables biometric unlock when currently enabled', async () => {
+    vi.mocked(isBiometricAvailable).mockResolvedValue(true)
+    vi.mocked(disableBiometric).mockResolvedValue(undefined)
+    await open()
+    await userEvent.click(screen.getByText('Biometric Unlock'))
+
+    await userEvent.click(await screen.findByText('Disable Biometric Unlock'))
+
+    expect(disableBiometric).toHaveBeenCalledOnce()
+    expect(await screen.findByText('Enable Biometric Unlock')).toBeInTheDocument()
   })
 
   it('lists language options', async () => {

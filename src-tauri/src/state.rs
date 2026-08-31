@@ -1,4 +1,5 @@
 use std::sync::Mutex;
+use zeroize::Zeroizing;
 
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
@@ -10,7 +11,9 @@ use crate::models::VaultData;
 // without re-reading disk.
 #[derive(Default)]
 pub struct Session {
-    pub master_key: Option<Vec<u8>>,
+    // Wrapped in `Zeroizing` so the key is scrubbed from the heap on drop and
+    // whenever it's replaced or cleared (auto-lock / explicit lock).
+    pub master_key: Option<Zeroizing<Vec<u8>>>,
     pub vault: Option<VaultData>,
     pub sync_configured: bool,
 }
@@ -29,7 +32,7 @@ impl Session {
 
     // Store the derived key and exposed vault for this session.
     pub fn set(&mut self, secret: String, vault: VaultData, sync_configured: bool) {
-        self.master_key = Some(secret.into_bytes());
+        self.master_key = Some(Zeroizing::new(secret.into_bytes()));
         self.vault = Some(vault);
         self.sync_configured = sync_configured;
     }

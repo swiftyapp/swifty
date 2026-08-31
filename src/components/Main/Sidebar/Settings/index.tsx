@@ -5,6 +5,7 @@ import Tooltip from '@/components/elements/Tooltip'
 import Navigation, { type Section } from './Navigation'
 import Vault from './Vault'
 import MasterPassword from './MasterPassword'
+import Biometric from './Biometric'
 import Password from './Password'
 import Audit from './Audit'
 import Language from './Language'
@@ -28,6 +29,7 @@ export default function Settings() {
             <div className="body">
               <Vault section={section} />
               <MasterPassword section={section} />
+              <Biometric section={section} />
               <Password section={section} />
               <Audit section={section} />
               <Language section={section} />

@@ -11,6 +11,7 @@ use rand::RngCore;
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha512};
 use std::num::NonZeroU32;
+use zeroize::Zeroizing;
 
 use crate::error::{Error, Result};
 use crate::models::Entry;
@@ -38,23 +39,25 @@ fn err<E: std::fmt::Display>(e: E) -> Error {
 }
 
 pub struct Cryptor {
-    secret: Vec<u8>,
+    // Zeroized on drop so the master secret doesn't linger on the heap.
+    secret: Zeroizing<Vec<u8>>,
 }
 
 impl Cryptor {
     pub fn new(secret: &str) -> Self {
         Self {
-            secret: secret.as_bytes().to_vec(),
+            secret: Zeroizing::new(secret.as_bytes().to_vec()),
         }
     }
 
     fn cipher(&self, salt: &[u8]) -> Result<Aes256Gcm16> {
-        let mut key = [0u8; KEY_LEN];
+        // The derived AES key is scrubbed on drop too.
+        let mut key = Zeroizing::new([0u8; KEY_LEN]);
         // ring's PBKDF2 is assembly-optimized; the pure-Rust one is ~10-20x slower
         // and froze the UI while deriving a key per field. Output is identical.
         let iters = NonZeroU32::new(ITERATIONS).unwrap();
-        ring::pbkdf2::derive(ring::pbkdf2::PBKDF2_HMAC_SHA512, iters, salt, &self.secret, &mut key);
-        Aes256Gcm16::new_from_slice(&key).map_err(err)
+        ring::pbkdf2::derive(ring::pbkdf2::PBKDF2_HMAC_SHA512, iters, salt, &self.secret, &mut *key);
+        Aes256Gcm16::new_from_slice(&*key).map_err(err)
     }
 
     /// Encrypt to `hex( salt ‖ iv ‖ tag ‖ ciphertext )`.
