@@ -11,10 +11,10 @@ export default function Choice({ onSelect }: Props) {
   return (
     <AuthShell meta={`${t('offline')} · aes-256-gcm`}>
       <Eyebrow>{t('Welcome to Swifty')}</Eyebrow>
-      <h1 className="mt-8 text-center text-2xl font-medium tracking-tight text-text">
+      <h1 className="mt-8 text-center text-2xl font-medium tracking-display text-text">
         {t('Set up your vault')}
       </h1>
-      <p className="mx-auto mt-3 max-w-sm text-center text-sm leading-relaxed text-text2">
+      <p className="mx-auto mt-3 max-w-sm text-center text-base leading-relaxed text-text2">
         {t('Create a new vault or restore from an existing backup.')}
       </p>
       <div className="mx-auto mt-9 flex w-72 max-w-full flex-col gap-3">

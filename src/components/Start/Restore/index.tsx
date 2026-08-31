@@ -16,10 +16,10 @@ export default function Restore({ goBack }: Props) {
   return (
     <AuthShell meta={`${t('offline')} · aes-256-gcm`} onBack={goBack}>
       <Eyebrow tone="accent">{t('Restore')}</Eyebrow>
-      <h1 className="mt-8 text-center text-2xl font-medium tracking-tight text-text">
+      <h1 className="mt-8 text-center text-2xl font-medium tracking-display text-text">
         {t('Restore Backup')}
       </h1>
-      <p className="mx-auto mt-3 max-w-md text-center text-sm leading-relaxed text-text2">
+      <p className="mx-auto mt-3 max-w-md text-center text-base leading-relaxed text-text2">
         {chosen ? t('Enter the Master Password for this backup') : t('Restore Instructions')}
       </p>
 

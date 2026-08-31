@@ -21,7 +21,7 @@ export default function Settings() {
     <div className="settings">
       <Tooltip content={t('Settings')}>
         <div
-          className="settings-button grid h-9 w-9 cursor-pointer place-items-center rounded-[11px] text-text2 transition-colors hover:bg-hover hover:text-text"
+          className="settings-button grid h-9 w-9 cursor-pointer place-items-center rounded-lg text-text2 transition-colors hover:bg-hover hover:text-text"
           data-testid="settings-button"
           onClick={() => setModal(!modal)}
         >

@@ -1,6 +1,7 @@
 import { flowAuth } from '@/store'
 import { lock } from '@/lib/commands'
 import { t } from '@/i18n'
+import IconButton from '@/components/elements/IconButton'
 import { LockGlyph } from '../icons'
 
 // Locks the vault straight from the top chrome (previously only reachable via
@@ -12,14 +13,13 @@ export default function LockButton() {
   }
 
   return (
-    <button
-      type="button"
-      data-testid="lock-vault-button"
+    <IconButton
+      testid="lock-vault-button"
       onClick={onLock}
       title={t('Lock')}
-      className="grid h-7 w-7 place-items-center rounded-[7px] text-text2 transition-colors hover:bg-hover hover:text-text [-webkit-app-region:no-drag]"
+      className="[-webkit-app-region:no-drag]"
     >
       <LockGlyph />
-    </button>
+    </IconButton>
   )
 }

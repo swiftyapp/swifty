@@ -13,13 +13,13 @@ export default function Modal({ onClose, children }: Props) {
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-[80vh] w-full max-w-[720px] overflow-hidden rounded-2xl border border-line2 bg-detail text-text shadow-[var(--shadow)]"
+        className="relative flex max-h-[80vh] w-full max-w-[720px] overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-[var(--shadow)]"
         onClick={e => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-3 top-3 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-[7px] text-text3 transition-colors hover:bg-hover hover:text-text"
+          className="absolute right-3 top-3 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-sm text-text3 transition-colors hover:bg-hover hover:text-text"
         >
           <CloseGlyph />
         </button>

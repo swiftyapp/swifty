@@ -95,7 +95,7 @@ export default function Form({ entry }: Props) {
       <div className="mt-6 flex flex-col gap-4">{fields()}</div>
 
       {saveError && (
-        <div className="mt-4 rounded-xl border border-bad/40 bg-bad/5 px-4 py-3 text-[13px] text-bad">
+        <div className="mt-4 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3 text-[13px] text-bad">
           {saveError}
         </div>
       )}
@@ -105,7 +105,7 @@ export default function Form({ entry }: Props) {
           type="button"
           data-testid="cancel-entry-button"
           onClick={onCancel}
-          className="h-9 cursor-pointer rounded-lg px-4 text-[13px] text-text2 transition-colors hover:text-text"
+          className="h-9 cursor-pointer rounded-sm px-4 text-[13px] text-text2 transition-colors hover:text-text"
         >
           {t('Cancel')}
         </button>

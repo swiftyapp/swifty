@@ -71,11 +71,11 @@ export default function Show({ entry }: Props) {
           >
             <TrashGlyph />
           </IconButton>
-          <Button size="sm" onClick={() => editEntry()}>{t('Edit')}</Button>
+          <Button size="md" onClick={() => editEntry()}>{t('Edit')}</Button>
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-xl border border-line bg-[image:var(--card)]">
+      <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-lg border border-line bg-[image:var(--card)]">
         {ledger.map((cell, i) => (
           <div
             key={cell.k}
@@ -91,7 +91,7 @@ export default function Show({ entry }: Props) {
 
       {revealed && <Details entry={revealed} />}
       {deleteError && (
-        <div className="mt-3 rounded-xl border border-bad/40 bg-bad/5 px-4 py-3 text-[13px] text-bad">
+        <div className="mt-3 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3 text-[13px] text-bad">
           {deleteError}
         </div>
       )}

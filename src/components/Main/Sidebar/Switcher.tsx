@@ -24,7 +24,7 @@ export default function Switcher() {
           <Tooltip content={t(label)} key={current}>
             <div
               className={cx(
-                'item relative grid h-9 w-9 cursor-pointer place-items-center rounded-[11px] transition-colors',
+                'item relative grid h-9 w-9 cursor-pointer place-items-center rounded-lg transition-colors',
                 selected
                   ? 'current bg-accent-soft text-accent'
                   : 'text-text2 hover:bg-hover hover:text-text'

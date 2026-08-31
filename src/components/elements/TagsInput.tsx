@@ -27,12 +27,12 @@ export default function TagsInput({ value, onChange }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-[9px] border border-line2 bg-field px-2 py-1.5 transition-colors focus-within:border-accent-line">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-sm border border-line2 bg-field px-2 py-1.5 transition-colors focus-within:border-accent-line">
       {value.map(tag => (
         <span
           key={tag}
           onClick={() => removeTag(tag)}
-          className="flex cursor-pointer items-center gap-1 rounded-[6px] bg-accent-soft px-2 py-1 font-mono text-[11px] text-accent hover:brightness-95"
+          className="flex cursor-pointer items-center gap-1 rounded-sm bg-accent-soft px-2 py-1 font-mono text-[11px] text-accent hover:brightness-95"
         >
           {tag}
           <span className="opacity-60">×</span>

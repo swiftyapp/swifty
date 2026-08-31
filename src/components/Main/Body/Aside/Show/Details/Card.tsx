@@ -27,13 +27,13 @@ export default function Card({ entry }: Props) {
   return (
     <div className="mt-3">
       <div className="grid grid-cols-[340px_minmax(0,1fr)] items-start gap-3.5">
-        <div className="relative flex h-[208px] flex-col overflow-hidden rounded-2xl border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-[18px] text-[#EDEEF0] shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
+        <div className="relative flex h-[208px] flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-[18px] text-[#EDEEF0] shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
           <div className="absolute -right-10 -top-16 h-[200px] w-[200px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.07),transparent_70%)]" />
           <div className="flex items-start">
             <div className="flex-1 font-mono text-[11px] uppercase tracking-[0.18em] opacity-60">
               {entry.name || t('Card')}
             </div>
-            <div className="h-6 w-[34px] rounded border border-white/15 bg-white/10" />
+            <div className="h-6 w-[34px] rounded-[4px] border border-white/15 bg-white/10" />
           </div>
           <div className="flex-1" />
           <div className="font-mono text-[20px] tracking-[0.16em]">{number}</div>

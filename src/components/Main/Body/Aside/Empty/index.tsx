@@ -5,7 +5,7 @@ import { ShieldGlyph } from '../../../icons'
 export default function Empty() {
   return (
     <div className="flex min-h-full flex-col items-center justify-center text-center">
-      <div className="grid h-16 w-16 place-items-center rounded-[18px] bg-accent-soft text-accent">
+      <div className="grid h-16 w-16 place-items-center rounded-lg bg-accent-soft text-accent">
         <ShieldGlyph size={30} />
       </div>
       <h2 className="mt-5 text-2xl font-semibold tracking-[-0.025em] text-text">
