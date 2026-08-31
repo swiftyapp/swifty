@@ -60,13 +60,20 @@ pub fn delete_entry(id: String, state: State<'_, AppState>) -> Result<()> {
 }
 
 // Open a file picker for a `.swftx` backup. Returns the chosen path, or None if cancelled.
+// The blocking picker must run off the main thread: a sync command runs on the
+// main thread, and blocking there deadlocks the event loop (window hangs) while
+// the modal waits for it. spawn_blocking moves the wait off-main; the plugin
+// still presents the panel on the main thread internally.
 #[tauri::command]
-pub fn pick_backup(app: AppHandle) -> Result<Option<String>> {
-    let file = app
-        .dialog()
-        .file()
-        .add_filter("Swifty backup", &["swftx"])
-        .blocking_pick_file();
+pub async fn pick_backup(app: AppHandle) -> Result<Option<String>> {
+    let file = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter("Swifty backup", &["swftx"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|e| Error::Other(e.to_string()))?;
     Ok(file
         .and_then(|f| f.into_path().ok())
         .map(|p| p.to_string_lossy().into_owned()))
@@ -159,7 +166,7 @@ pub async fn import_swftx(
 // restorable via import_backup on any install. `password` must be the current
 // master password; a mismatch is rejected so a backup is never unrecoverable.
 #[tauri::command]
-pub fn export_vault(
+pub async fn export_vault(
     password: String,
     app: AppHandle,
     state: State<'_, AppState>,
@@ -181,12 +188,16 @@ pub fn export_vault(
         out.encrypt_data(&VaultData { entries })?
     };
 
-    let dest = app
-        .dialog()
-        .file()
-        .set_file_name("vault.swftx")
-        .add_filter("Swifty backup", &["swftx"])
-        .blocking_save_file();
+    // Off-main-thread so the blocking save dialog can't deadlock the event loop.
+    let dest = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .set_file_name("vault.swftx")
+            .add_filter("Swifty backup", &["swftx"])
+            .blocking_save_file()
+    })
+    .await
+    .map_err(|e| Error::Other(e.to_string()))?;
     let Some(dest) = dest.and_then(|f| f.into_path().ok()) else {
         return Ok(None);
     };
