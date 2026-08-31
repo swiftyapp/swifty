@@ -17,7 +17,11 @@ use crate::error::{Error, Result};
 use crate::models::VaultData;
 use zeroize::Zeroizing;
 
+// Used only by the macOS/Windows key-store impls; absent on the unsupported
+// fallback (Linux), so gate them to avoid a dead_code error there.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const SERVICE: &str = "pro.getswifty.app.vault";
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const ACCOUNT: &str = "master-key";
 
 /// Abstraction over the platform key store so the non-interactive unlock logic
