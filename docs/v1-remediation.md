@@ -105,7 +105,7 @@ entries(
 KDF descriptor + params live in the `meta` table (from T-STORE-1), so upgrading the KDF is a metadata
 change, not an on-disk-format break. **Never break legacy-vault decrypt** (golden harness).
 
-### T-KDF-1 · Argon2id with params in `meta`, drop the pre-hash  ❌ 🔴 (depends on T-STORE-1)
+### T-KDF-1 · Argon2id with params in `meta`, drop the pre-hash  ✅ 🔴 (wired — setup/unlock derive the master via Argon2id from a plaintext `vault.kdf.json` sidecar (salt+params, read before opening), HKDF-split into the SQLCipher key + a per-entry AES-256-GCM payload key; password fed directly to Argon2id (no `hash_secret`); descriptor mirrored into `meta`; sidecar-less dev DBs fall back to the legacy deterministic key; change-password rewrites the sidecar + re-seals + rekeys; `.swftx` reads keep the legacy PBKDF2 `Cryptor` + golden/crosscheck harness)
 **Evidence:** `crypto/mod.rs:28` PBKDF2-SHA512 @ 100k (below OWASP ~210k); `crypto/mod.rs:31-34` `hash_secret` = `base64(SHA512(pw))` adds no entropy and feeds the KDF at every call site.
 **Steps:**
 1. Add Argon2id (`argon2`, ~`m=64MiB, t=3, p=4`) as the default for new/migrated DBs; store `{ kdf, params, salt }` in `meta`. Keep PBKDF2-SHA512 as a configurable fallback.

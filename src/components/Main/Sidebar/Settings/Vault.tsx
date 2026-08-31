@@ -13,6 +13,9 @@ interface Props {
 
 export default function Vault({ section }: Props) {
   const [connecting, setConnecting] = useState(false)
+  const [password, setPassword] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const syncEnabled = useStore(state => state.sync.enabled)
 
   useEffect(() => setConnecting(false), [syncEnabled])
@@ -20,6 +23,16 @@ export default function Vault({ section }: Props) {
   const onConnect = () => {
     setConnecting(true)
     syncConnect()
+  }
+
+  const onExport = () => {
+    if (!password || exporting) return
+    setExporting(true)
+    setError(null)
+    exportVault(password)
+      .then(() => setPassword(''))
+      .catch(() => setError(t('Invalid master password')))
+      .finally(() => setExporting(false))
   }
 
   const syncAction = () => {
@@ -52,9 +65,26 @@ export default function Vault({ section }: Props) {
       <div className="section">
         <strong>{t('Backup')}</strong>
         <div>{t('Allows you to save a backup of your default vault file')}</div>
-        <div className="button pale iconed" onClick={() => exportVault()}>
+        <div className="threefour">
+          <input
+            type="password"
+            name="export_password"
+            placeholder={t('Master password')}
+            value={password}
+            disabled={exporting}
+            onChange={event => {
+              setError(null)
+              setPassword(event.target.value)
+            }}
+          />
+        </div>
+        <div
+          className={cx('button pale iconed', { disabled: !password || exporting })}
+          onClick={onExport}
+        >
           <DownloadIcon width="16" height="16" /> {t('Save Vault File')}
         </div>
+        {error && <span className="danger">{error}</span>}
       </div>
     </>
   )

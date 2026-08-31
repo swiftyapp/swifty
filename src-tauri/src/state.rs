@@ -1,19 +1,18 @@
 use std::sync::Mutex;
-use zeroize::Zeroizing;
 
-use crate::crypto::Cryptor;
+use crate::crypto::{Cryptor, PayloadCipher, VaultKey};
 use crate::error::{Error, Result};
 use crate::store::SqliteStore;
 
-// In-memory session. The master key never leaves Rust; the frontend only ever
+// In-memory session. The vault key never leaves Rust; the frontend only ever
 // receives non-secret entry metadata for the list and one decrypted entry at a
 // time (reveal). The open, encrypted store handle lives here — not a decrypted
 // vault — so plaintext secrets are never all held in memory.
 #[derive(Default)]
 pub struct Session {
-    // Wrapped in `Zeroizing` so the key is scrubbed from the heap on drop and
-    // whenever it's replaced or cleared (auto-lock / explicit lock).
-    pub master_key: Option<Zeroizing<Vec<u8>>>,
+    // The active vault key (Argon2id master or legacy secret). It owns its own
+    // zeroize-on-drop, so the material is scrubbed on lock/clear/replace.
+    pub key: Option<VaultKey>,
     // The open SQLCipher store. Dropped (connection closed) on lock.
     pub store: Option<SqliteStore>,
     pub sync_configured: bool,
@@ -21,14 +20,22 @@ pub struct Session {
 
 impl Session {
     pub fn is_unlocked(&self) -> bool {
-        self.master_key.is_some()
+        self.key.is_some()
     }
 
-    // Rebuild a Cryptor from the held key, or fail if locked.
+    // The held vault key, or fail if locked.
+    pub fn key(&self) -> Result<&VaultKey> {
+        self.key.as_ref().ok_or(Error::Locked)
+    }
+
+    // The per-entry payload cipher for this session, or fail if locked.
+    pub fn payload_cipher(&self) -> Result<PayloadCipher> {
+        Ok(self.key()?.payload_cipher())
+    }
+
+    // The legacy Cryptor for the (disabled) gdrive/sync token blob.
     pub fn cryptor(&self) -> Result<Cryptor> {
-        let key = self.master_key.as_ref().ok_or(Error::Locked)?;
-        let secret = std::str::from_utf8(key).map_err(|e| Error::Crypto(e.to_string()))?;
-        Ok(Cryptor::new(secret))
+        Ok(self.key()?.cryptor())
     }
 
     // Borrow the open store, or fail if locked.
@@ -37,15 +44,23 @@ impl Session {
     }
 
     // Adopt the derived key and open store for this session.
-    pub fn set(&mut self, secret: String, store: SqliteStore, sync_configured: bool) {
-        self.master_key = Some(Zeroizing::new(secret.into_bytes()));
+    pub fn set(&mut self, key: VaultKey, store: SqliteStore, sync_configured: bool) {
+        self.key = Some(key);
         self.store = Some(store);
         self.sync_configured = sync_configured;
     }
 
+    // Re-adopt a key + store, leaving sync_configured untouched. Used by
+    // change-master-password's success and rollback paths, where the store is
+    // taken out of the session and later put back (or replaced by a restore).
+    pub fn set_keyed(&mut self, key: VaultKey, store: SqliteStore) {
+        self.key = Some(key);
+        self.store = Some(store);
+    }
+
     // Drop the in-memory key and close the store. Used by the inactivity auto-lock.
     pub fn clear(&mut self) {
-        self.master_key = None;
+        self.key = None;
         self.store = None;
         self.sync_configured = false;
     }

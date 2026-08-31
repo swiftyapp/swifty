@@ -1,4 +1,6 @@
-use crate::commands::{list_metas, live_records, record_meta_dto, store_err};
+use crate::commands::{
+    create_vault, derive_key, list_metas, live_records, record_meta_dto, store_err,
+};
 use crate::error::{Error, Result};
 use crate::models::{Entry, EntryMetaDto, UnlockResult, VaultData};
 use crate::state::AppState;
@@ -17,35 +19,30 @@ pub fn read_vault(state: State<'_, AppState>) -> Result<Vec<EntryMetaDto>> {
     list_metas(session.store()?)
 }
 
-// Decrypt one entry on demand (view/edit): fetch its payload, unseal it, then
-// decrypt its per-field secrets. Nothing is cached in the session.
+// Decrypt one entry on demand (view/edit): fetch its payload and unseal it with
+// the session payload key. Nothing is cached in the session.
 #[tauri::command]
 pub fn reveal_entry(id: String, state: State<'_, AppState>) -> Result<Entry> {
     let session = state.session.lock().unwrap();
-    let cryptor = session.cryptor()?;
+    let cipher = session.payload_cipher()?;
     let record = session
         .store()?
         .get(&id)
         .map_err(store_err)?
         .ok_or(Error::NotFound)?;
-    let blob = String::from_utf8(record.payload).map_err(|e| Error::Crypto(e.to_string()))?;
-    let obscured: Entry = cryptor.decrypt_data(&blob)?;
-    cryptor.expose(&obscured)
+    cipher.unseal(&record.payload)
 }
 
-// Persist one entry: seal its secrets into a fresh payload and upsert a single
-// row (metadata + payload), stamping updated_at. No whole-vault rewrite.
+// Persist one entry: seal it into a fresh payload and upsert a single row
+// (metadata + payload), stamping updated_at. No whole-vault rewrite.
 #[tauri::command]
 pub fn save_entry(entry: Entry, state: State<'_, AppState>) -> Result<EntryMetaDto> {
     let session = state.session.lock().unwrap();
-    let cryptor = session.cryptor()?;
+    let cipher = session.payload_cipher()?;
     let store = session.store()?;
 
-    let obscured = cryptor.obscure(&entry)?;
-    let record = migrate::records_from_entries(&[obscured], &cryptor)?
-        .into_iter()
-        .next()
-        .ok_or_else(|| Error::Other("record build failed".into()))?;
+    let payload = cipher.seal(&entry)?;
+    let record = migrate::build_record(&entry, payload)?;
     store.upsert(&record).map_err(store_err)?;
 
     let saved = store
@@ -75,8 +72,9 @@ pub fn pick_backup(app: AppHandle) -> Result<Option<String>> {
         .map(|p| p.to_string_lossy().into_owned()))
 }
 
-// Restore a `.swftx` backup: decrypt it with `password`, import every entry into
-// the store, and adopt it as the unlocked session.
+// Restore a `.swftx` backup: decrypt it with `password` (legacy format), create a
+// fresh Argon2id vault under the same password, re-seal every entry under the new
+// payload key, and adopt it as the unlocked session.
 #[tauri::command]
 pub fn import_backup(
     path: String,
@@ -85,20 +83,14 @@ pub fn import_backup(
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
     let blob = storage::read_backup(&path)?;
-    let secret = crypto::hash_secret(&password);
-    let cryptor = crypto::Cryptor::new(&secret);
+    let src_cryptor = crypto::Cryptor::new(&crypto::hash_secret(&password));
     // Validate it decrypts before touching the store.
-    let vault: VaultData = cryptor
+    let vault: VaultData = src_cryptor
         .decrypt_data(&blob)
         .map_err(|_| Error::InvalidPassword)?;
 
-    let db_key = crypto::sqlcipher_key(&secret);
-    let store =
-        crate::store::SqliteStore::open(&storage::db_path(&app)?, &db_key).map_err(store_err)?;
-    store
-        .meta_set("kdf", crate::commands::KDF_DESCRIPTOR)
-        .map_err(store_err)?;
-    let records = migrate::records_from_entries(&vault.entries, &cryptor)?;
+    let (key, store) = create_vault(&app, &password)?;
+    let records = migrate::reseal_swftx(&vault.entries, &src_cryptor, &key.payload_cipher())?;
     store.import(&records).map_err(store_err)?;
 
     let metas = list_metas(&store)?;
@@ -107,7 +99,7 @@ pub fn import_backup(
         .session
         .lock()
         .unwrap()
-        .set(secret, store, sync_configured);
+        .set(key, store, sync_configured);
     Ok(UnlockResult {
         entries: metas,
         sync_configured,
@@ -117,8 +109,8 @@ pub fn import_backup(
 // Import a `.swftx` backup into the *currently unlocked* vault. The file is
 // independently encrypted and carries its own master password (which may differ
 // from the current vault's). Each entry is decrypted under the source key and
-// re-sealed under the current session key, then upserted (merge/add by id). The
-// CPU-bound re-encrypt loop runs off the UI thread and emits `import:progress`.
+// re-sealed under the current session payload key, then upserted (merge/add by
+// id). The CPU-bound re-seal loop runs off the UI thread and emits `import:progress`.
 #[tauri::command]
 pub async fn import_swftx(
     path: String,
@@ -132,16 +124,16 @@ pub async fn import_swftx(
     let src: VaultData = src_cryptor
         .decrypt_data(&blob)
         .map_err(|_| Error::InvalidPassword)?;
-    let cur_cryptor = state.session.lock().unwrap().cryptor()?;
+    let cur_cipher = state.session.lock().unwrap().payload_cipher()?;
 
-    // Re-key every entry off the UI thread: expose under the source key, re-obscure
-    // under the current key, seal one payload each — emitting progress as it goes.
+    // Re-seal every entry off the UI thread: expose under the source key, re-seal
+    // under the current payload key — emitting progress as it goes.
     let emitter = app.clone();
     let records = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<Record>> {
         let total = src.entries.len();
         let mut records = Vec::with_capacity(total);
         for (i, obscured) in src.entries.iter().enumerate() {
-            records.push(migrate::rekey_record(&src_cryptor, &cur_cryptor, obscured)?);
+            records.push(migrate::reseal_one(obscured, &src_cryptor, &cur_cipher)?);
             let _ = emitter.emit("import:progress", json!({ "done": i + 1, "total": total }));
         }
         Ok(records)
@@ -163,22 +155,30 @@ pub async fn import_swftx(
 }
 
 // Export the vault to a user-chosen file. Reconstructs the legacy `.swftx` blob
-// (obscured entries sealed under the master key) so backups stay restorable via
-// import_backup. Returns the path, or None if cancelled.
+// (entries obscured + sealed under `hash_secret(password)`) so backups stay
+// restorable via import_backup on any install. `password` must be the current
+// master password; a mismatch is rejected so a backup is never unrecoverable.
 #[tauri::command]
-pub fn export_vault(app: AppHandle, state: State<'_, AppState>) -> Result<Option<String>> {
+pub fn export_vault(
+    password: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Option<String>> {
     let blob = {
         let session = state.session.lock().unwrap();
-        let cryptor = session.cryptor()?;
-        // Each payload already holds the obscured entry; unseal to rebuild VaultData.
+        // Guard: the export key must match the unlocked vault.
+        if derive_key(&app, &password)?.sqlcipher_key() != session.key()?.sqlcipher_key() {
+            return Err(Error::InvalidPassword);
+        }
+        let cipher = session.payload_cipher()?;
+        // Rebuild each plaintext entry from its stored payload, then obscure + seal
+        // under the legacy password-derived cryptor for a portable `.swftx`.
+        let out = crypto::Cryptor::new(&crypto::hash_secret(&password));
         let entries = live_records(session.store()?)?
             .into_iter()
-            .map(|r| {
-                let s = String::from_utf8(r.payload).map_err(|e| Error::Crypto(e.to_string()))?;
-                cryptor.decrypt_data::<Entry>(&s)
-            })
+            .map(|r| out.obscure(&cipher.unseal(&r.payload)?))
             .collect::<Result<Vec<Entry>>>()?;
-        cryptor.encrypt_data(&VaultData { entries })?
+        out.encrypt_data(&VaultData { entries })?
     };
 
     let dest = app

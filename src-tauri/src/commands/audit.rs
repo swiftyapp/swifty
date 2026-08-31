@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crate::commands::live_records;
-use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::hibp;
 use crate::models::{Audit, AuditItem, Entry};
@@ -15,37 +14,35 @@ use zxcvbn::zxcvbn;
 const WEAK_SCORE: u8 = 3;
 
 // Audit every password in the unlocked vault: strength (zxcvbn), reuse, and —
-// when the user opts in — breach exposure (HIBP k-anonymity). Passwords are
-// stored encrypted, so decryption and the network call run off the UI thread.
+// when the user opts in — breach exposure (HIBP k-anonymity). Payloads are
+// encrypted, so unsealing and the network call run off the UI thread.
 #[tauri::command]
 pub async fn get_audit(state: State<'_, AppState>, check_breaches: bool) -> Result<Audit> {
-    // Collect the encrypted payloads under the lock, then unseal + score off the
-    // UI thread (payload unseal and each password decrypt run PBKDF2).
-    let (cryptor, payloads) = {
+    // Collect the sealed payloads under the lock, then unseal + score off the UI
+    // thread with the session payload cipher.
+    let (cipher, payloads) = {
         let s = state.session.lock().unwrap();
         let payloads: Vec<Vec<u8>> = live_records(s.store()?)?
             .into_iter()
             .map(|r| r.payload)
             .collect();
-        (s.cryptor()?, payloads)
+        (s.payload_cipher()?, payloads)
     };
     tauri::async_runtime::spawn_blocking(move || {
         let entries: Vec<Entry> = payloads
             .iter()
-            .map(|p| {
-                let blob = std::str::from_utf8(p).map_err(|e| Error::Crypto(e.to_string()))?;
-                cryptor.decrypt_data(blob)
-            })
+            .map(|p| cipher.unseal(p))
             .collect::<Result<_>>()?;
-        audit(&cryptor, &entries, check_breaches)
+        audit(&entries, check_breaches)
     })
     .await
     .map_err(|e| Error::Crypto(e.to_string()))?
 }
 
-// Decrypt each non-empty password once, then flag weak / reused / breached.
-fn audit(cryptor: &Cryptor, entries: &[Entry], check_breaches: bool) -> Result<Audit> {
-    let creds: Vec<(&Entry, String)> = entries
+// Flag each non-empty password as weak / reused / breached. Entries arrive
+// already decrypted (the payload cipher unseals to plaintext).
+fn audit(entries: &[Entry], check_breaches: bool) -> Result<Audit> {
+    let creds: Vec<(&Entry, &str)> = entries
         .iter()
         .filter_map(|e| {
             e.password
@@ -53,10 +50,9 @@ fn audit(cryptor: &Cryptor, entries: &[Entry], check_breaches: bool) -> Result<A
                 .filter(|p| !p.is_empty())
                 .map(|p| (e, p))
         })
-        .map(|(e, p)| Ok((e, cryptor.decrypt(p)?)))
-        .collect::<Result<_>>()?;
+        .collect();
 
-    let passwords: Vec<&str> = creds.iter().map(|(_, p)| p.as_str()).collect();
+    let passwords: Vec<&str> = creds.iter().map(|(_, p)| *p).collect();
     let breaches: HashMap<String, bool> = if check_breaches {
         hibp::check_all(&passwords)
     } else {
@@ -66,7 +62,7 @@ fn audit(cryptor: &Cryptor, entries: &[Entry], check_breaches: bool) -> Result<A
     Ok(creds
         .iter()
         .map(|(e, p)| {
-            let repeating = passwords.iter().filter(|&&x| x == p).count() > 1;
+            let repeating = passwords.iter().filter(|&&x| x == *p).count() > 1;
             let score = u8::from(zxcvbn(p, &[]).score());
             (
                 e.id.clone(),
@@ -74,7 +70,7 @@ fn audit(cryptor: &Cryptor, entries: &[Entry], check_breaches: bool) -> Result<A
                     score,
                     is_weak: score < WEAK_SCORE,
                     is_repeating: repeating,
-                    breached: breaches.get(p).copied().unwrap_or(false),
+                    breached: breaches.get(*p).copied().unwrap_or(false),
                 },
             )
         })
@@ -90,33 +86,23 @@ mod tests {
         serde_json::from_value(v).unwrap()
     }
 
-    fn cryptor() -> Cryptor {
-        Cryptor::new("audit-test-secret")
-    }
-
-    // Build a login with its password encrypted, as it is on disk.
-    fn login(c: &Cryptor, id: &str, password: &str) -> Entry {
-        c.obscure(&entry(json!({
-            "id": id, "type": "login", "title": "t",
-            "password": password,
-        })))
-        .unwrap()
+    // A plaintext login (payloads unseal to plaintext before audit runs).
+    fn login(id: &str, password: &str) -> Entry {
+        entry(json!({ "id": id, "type": "login", "title": "t", "password": password }))
     }
 
     #[test]
     fn skips_entries_without_password() {
-        let c = cryptor();
         let entries = vec![
             entry(json!({ "id": "n", "type": "note", "title": "t", "note": "x" })),
-            login(&c, "empty", ""),
+            login("empty", ""),
         ];
-        assert!(audit(&c, &entries, false).unwrap().is_empty());
+        assert!(audit(&entries, false).unwrap().is_empty());
     }
 
     #[test]
     fn flags_weak_by_score() {
-        let c = cryptor();
-        let a = audit(&c, &[login(&c, "1", "abc")], false).unwrap();
+        let a = audit(&[login("1", "abc")], false).unwrap();
         assert!(a["1"].is_weak);
         assert!(a["1"].score < WEAK_SCORE);
         assert!(!a["1"].is_repeating);
@@ -125,21 +111,18 @@ mod tests {
 
     #[test]
     fn strong_passphrase_is_not_weak() {
-        let c = cryptor();
-        let a = audit(&c, &[login(&c, "1", "correct horse battery staple")], false).unwrap();
+        let a = audit(&[login("1", "correct horse battery staple")], false).unwrap();
         assert!(!a["1"].is_weak);
         assert!(a["1"].score >= WEAK_SCORE);
     }
 
     #[test]
     fn detects_repeating_passwords() {
-        let c = cryptor();
         let a = audit(
-            &c,
             &[
-                login(&c, "1", "Repeated1!"),
-                login(&c, "2", "Repeated1!"),
-                login(&c, "3", "Unique2@ab"),
+                login("1", "Repeated1!"),
+                login("2", "Repeated1!"),
+                login("3", "Unique2@ab"),
             ],
             false,
         )
@@ -152,8 +135,7 @@ mod tests {
     // Opt-out (check_breaches = false) makes no network call and leaves breached false.
     #[test]
     fn breach_check_is_skipped_when_opted_out() {
-        let c = cryptor();
-        let a = audit(&c, &[login(&c, "1", "password")], false).unwrap();
+        let a = audit(&[login("1", "password")], false).unwrap();
         assert!(!a["1"].breached);
     }
 }
