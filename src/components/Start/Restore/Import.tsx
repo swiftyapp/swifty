@@ -1,14 +1,13 @@
 import { pickBackup } from '@/lib/commands'
 import { t } from '@/i18n'
-import Back from '@/assets/images/back.svg?react'
+import Button from '@/components/elements/Button'
 
 interface Props {
   display: boolean
   onImport: (path: string) => void
-  goBack: () => void
 }
 
-export default function Import({ display, onImport, goBack }: Props) {
+export default function Import({ display, onImport }: Props) {
   const chooseFile = () => {
     pickBackup().then(path => {
       if (path) onImport(path)
@@ -18,14 +17,10 @@ export default function Import({ display, onImport, goBack }: Props) {
   if (!display) return null
 
   return (
-    <>
-      <div className="button choose-file" onClick={chooseFile}>
+    <div className="mx-auto w-72 max-w-full">
+      <Button variant="ghost" onClick={chooseFile}>
         {t('Choose backup File')}
-      </div>
-      <br />
-      <span className="navigate-back" onClick={goBack}>
-        <Back width="15" /> {t('Go Back')}
-      </span>
-    </>
+      </Button>
+    </div>
   )
 }

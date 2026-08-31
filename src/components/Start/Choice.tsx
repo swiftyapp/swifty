@@ -1,6 +1,7 @@
 import { t } from '@/i18n'
-import NewUser from '@/assets/images/new_user.svg?react'
-import Backup from '@/assets/images/backup.svg?react'
+import AuthShell from '@/components/elements/AuthShell'
+import Eyebrow from '@/components/elements/Eyebrow'
+import Button from '@/components/elements/Button'
 
 interface Props {
   onSelect: (flow: 'setup' | 'restore') => void
@@ -8,25 +9,22 @@ interface Props {
 
 export default function Choice({ onSelect }: Props) {
   return (
-    <div className="lock-screen">
-      <div className="top-lock">
-        <NewUser width="48" />
-        <h2>{t('I am a new User')}</h2>
-        <div
-          className="button"
-          data-testid="start-setup-button"
-          onClick={() => onSelect('setup')}
-        >
+    <AuthShell meta={`${t('offline')} · aes-256-gcm`}>
+      <Eyebrow>{t('Welcome to Swifty')}</Eyebrow>
+      <h1 className="mt-8 text-center text-2xl font-medium tracking-tight text-text">
+        {t('Set up your vault')}
+      </h1>
+      <p className="mx-auto mt-3 max-w-sm text-center text-sm leading-relaxed text-text2">
+        {t('Create a new vault or restore from an existing backup.')}
+      </p>
+      <div className="mx-auto mt-9 flex w-72 max-w-full flex-col gap-3">
+        <Button testid="start-setup-button" onClick={() => onSelect('setup')}>
           {t('Setup Master Password')}
-        </div>
-      </div>
-      <div className="bottom-lock">
-        <Backup width="48" />
-        <h2>{t('I am existing User')}</h2>
-        <div className="button" onClick={() => onSelect('restore')}>
+        </Button>
+        <Button variant="ghost" onClick={() => onSelect('restore')}>
           {t('Restore from Backup')}
-        </div>
+        </Button>
       </div>
-    </div>
+    </AuthShell>
   )
 }

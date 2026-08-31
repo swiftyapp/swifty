@@ -1,8 +1,12 @@
 import { useMemo } from 'react'
+import { cx } from '@/utils/cx'
 import { t } from '@/i18n'
 import { evaluate, MIN_LENGTH } from '@/services/strength'
 
 const LABELS = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']
+
+// zxcvbn score 0..4 -> the token color of the lit segments.
+const SCORE_COLOR = ['bg-bad', 'bg-bad', 'bg-warn', 'bg-good', 'bg-good']
 
 interface Props {
   password: string
@@ -23,15 +27,21 @@ export default function PasswordStrength({ password }: Props) {
     : warning || suggestions[0] || ''
 
   return (
-    <div className="password-strength">
-      <div className={`bar score-${score}`}>
+    <div className="mx-auto mt-4 w-60">
+      <div className="flex gap-1">
         {[0, 1, 2, 3, 4].map(i => (
-          <span key={i} className={i <= score ? 'on' : ''} />
+          <span
+            key={i}
+            className={cx(
+              'h-1 flex-1 rounded-full transition-colors',
+              i <= score ? SCORE_COLOR[score] : 'bg-line2'
+            )}
+          />
         ))}
       </div>
-      <div className="label">
+      <div className="mt-1.5 flex justify-between gap-2 font-mono text-[11px] text-text3">
         <span>{t(LABELS[score])}</span>
-        {hint && <span className="hint">{hint}</span>}
+        {hint && <span className="text-right text-text3">{hint}</span>}
       </div>
     </div>
   )

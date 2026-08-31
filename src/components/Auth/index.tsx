@@ -4,7 +4,8 @@ import { enterMain } from '@/store'
 import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
 import Controls from '@/components/elements/Controls'
-import img from '@/assets/images/swifty.png'
+import AuthShell from '@/components/elements/AuthShell'
+import Eyebrow from '@/components/elements/Eyebrow'
 
 interface Props {
   touchID: boolean
@@ -64,22 +65,23 @@ export function Auth({ touchID }: Props) {
   return (
     <>
       <Controls />
-      <div className="lock-screen">
-        <div className="top-lock">
-          <img src={img} alt="" width={72} />
-        </div>
-        <div className="bottom-lock">
+      <AuthShell meta={`${t('offline')} · aes-256-gcm`}>
+        <Eyebrow tone={error ? 'bad' : 'muted'}>
+          {error ?? t('Vault sealed')}
+        </Eyebrow>
+        <div className="mt-8">
           <Masterpass
+            variant="lock"
             touchID={touchID}
             testid="unlock-password-input"
-            error={error}
+            invalid={!!error}
             disabled={retryAfter > 0}
             onChange={() => retryAfter <= 0 && setError(null)}
             onEnter={handleEnter}
             onTouchID={handleTouchId}
           />
         </div>
-      </div>
+      </AuthShell>
     </>
   )
 }

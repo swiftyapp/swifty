@@ -2,16 +2,15 @@ import { useState, type ChangeEvent } from 'react'
 import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
 import PasswordStrength from '@/components/elements/PasswordStrength'
+import Button from '@/components/elements/Button'
 import { evaluate, MIN_LENGTH } from '@/services/strength'
-import Back from '@/assets/images/back.svg?react'
 
 interface Props {
   display: boolean
   onEnter: (password: string) => void
-  goBack: () => void
 }
 
-export default function Enter({ display, onEnter, goBack }: Props) {
+export default function Enter({ display, onEnter }: Props) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -23,7 +22,8 @@ export default function Enter({ display, onEnter, goBack }: Props) {
   const onSend = () => {
     if (!password) return setError(t('Fill in the password'))
     const { tooShort, acceptable } = evaluate(password)
-    if (tooShort) return setError(`${t('Use at least')} ${MIN_LENGTH} ${t('characters')}`)
+    if (tooShort)
+      return setError(`${t('Use at least')} ${MIN_LENGTH} ${t('characters')}`)
     if (!acceptable) return setError(t('Choose a stronger master password'))
     onEnter(password)
   }
@@ -31,7 +31,7 @@ export default function Enter({ display, onEnter, goBack }: Props) {
   if (!display) return null
 
   return (
-    <div className="bottom-lock">
+    <div>
       <Masterpass
         placeholder={t('Set Master Password')}
         testid="setup-password-input"
@@ -40,13 +40,11 @@ export default function Enter({ display, onEnter, goBack }: Props) {
         onChange={onChange}
       />
       <PasswordStrength password={password} />
-      <br />
-      <div className="button" data-testid="setup-continue-button" onClick={onSend}>
-        {t('Continue')}
+      <div className="mx-auto mt-8 w-72 max-w-full">
+        <Button testid="setup-continue-button" onClick={onSend}>
+          {t('Continue')}
+        </Button>
       </div>
-      <span className="navigate-back" onClick={goBack}>
-        <Back width="15" /> {t('Go Back')}
-      </span>
     </div>
   )
 }
