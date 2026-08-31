@@ -157,13 +157,13 @@ on Phase 1.
 
 ## Phase 5 — Webview & shell hardening (parallelizable)
 
-### T-SEC-1 · Set a strict CSP  ❌ (S15, T14) — high priority
+### T-SEC-1 · Set a strict CSP  ✅ (PR) (S15, T14) — high priority
 **Evidence:** `tauri.conf.json:29` `security.csp: null` — **no CSP at all** (worse than legacy's late meta CSP). **Steps:** set an explicit main-process CSP, e.g. `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; frame-src 'none'` (add Google sync origins to `connect-src` **only** if/when sync is enabled). **Acceptance:** CSP present; app runs; no console CSP violations.
 
-### T-SEC-2 · Scope external-link opening to http/https  ❌ (S2, T8)
+### T-SEC-2 · Scope external-link opening to http/https  ✅ (PR) (S2, T8)
 **Evidence:** `Show/.../Item/index.tsx:26-29` calls `openUrl(raw)` on the raw vault `website` field; `capabilities/default.json:17` grants **unscoped** `opener:allow-open-url`. **Steps:** validate scheme (`http:`/`https:` only) before `openUrl`, and replace the unscoped permission with `opener:allow-default-urls` or a scoped custom permission. **Acceptance:** a `file://`/custom-scheme website value is refused; http/https still opens.
 
-### T-SEC-3 · Log-redaction discipline  🟡 (S17)
+### T-SEC-3 · Log-redaction discipline  ✅ (PR) (S17)
 **Evidence:** only 2 benign `log::` sites today; no structural redaction; unused frontend `plugin-log`. **Steps:** add a lint/review rule forbidding `log::*!` interpolating `Entry`/secret fields; drop the unused frontend log plugin or wire redaction. **Acceptance:** rule in place; no secret-bearing log call exists.
 
 ### T-SEC-4 · Prompt before auto-installing updates  🟡 (updater UX)
