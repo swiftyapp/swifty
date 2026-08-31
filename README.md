@@ -100,6 +100,13 @@ is provided to CI via the `TAURI_SIGNING_PRIVATE_KEY` (and
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) secrets. Generate a keypair with
 `npm run tauri signer generate -- -w ~/.swifty/updater.key`.
 
+## Security
+
+Swifty is offline-first: your vault is an encrypted file on your own device and
+there is no backend that holds your secrets. See [`SECURITY.md`](SECURITY.md) for
+how to report a vulnerability, and [`docs/threat-model.md`](docs/threat-model.md)
+for what Swifty does and does not defend against.
+
 ## Contributors
 
 ### Code Contributors
