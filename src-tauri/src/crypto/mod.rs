@@ -16,6 +16,9 @@ use zeroize::Zeroizing;
 use crate::error::{Error, Result};
 use crate::models::Entry;
 
+pub mod kdf;
+pub use kdf::{derive, KdfParams};
+
 #[cfg(test)]
 mod tests;
 

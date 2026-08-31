@@ -112,6 +112,7 @@ change, not an on-disk-format break. **Never break legacy-vault decrypt** (golde
 2. Feed the password directly to the KDF for new DBs — drop `hash_secret` (legacy JSON decrypt keeps it during T-STORE-2 migration only).
 3. Derive the app payload key and the SQLCipher key as separate subkeys of the Argon2id output (HKDF), so one KDF pass yields both.
 **Acceptance:** new DBs use Argon2id per `meta`; migrated legacy vaults still open; cross-impl/golden suites green; a KDF-params round-trip test exists.
+> **Progress (primitive done):** The self-contained KDF primitive lands in the `crypto: Argon2id KDF primitive` PR — `crypto/kdf.rs` with the versioned `KdfParams` descriptor (`argo`/`m_cost`/`t_cost`/`p_cost`/`iterations`/`salt`, JSON string for `meta`), `derive()` dispatch (Argon2id default `m=64MiB, t=3, p=4` / PBKDF2-SHA512 fallback), a fresh-salt generator, and in-module tests (determinism, serde round-trip, dispatch, Argon2id KAT). Legacy PBKDF2 `Cryptor` + golden/crosscheck harness untouched. **Wiring is pending** and is a follow-up after the storage rework (#246) lands: persist `KdfParams` in `meta` at setup, read it at unlock, feed the master password directly to `derive()`, and HKDF-split the output into the SQLCipher + payload subkeys. This task stays ❌ until that wiring ships.
 
 ---
 
