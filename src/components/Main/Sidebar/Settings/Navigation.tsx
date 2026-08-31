@@ -1,7 +1,12 @@
 import { cx } from '@/utils/cx'
 import { t } from '@/i18n'
 
-export type Section = 'vault' | 'masterpassword' | 'password' | 'language'
+export type Section =
+  | 'vault'
+  | 'masterpassword'
+  | 'password'
+  | 'audit'
+  | 'language'
 
 interface Props {
   section: Section
@@ -12,6 +17,7 @@ const items: { key: Section; label: string }[] = [
   { key: 'vault', label: 'Vault Settings' },
   { key: 'masterpassword', label: 'Master Password' },
   { key: 'password', label: 'Password Generation' },
+  { key: 'audit', label: 'Password Audit' },
   { key: 'language', label: 'Language' }
 ]
 

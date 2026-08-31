@@ -173,7 +173,7 @@ on Phase 1.
 
 ## Phase 6 — Audit quality & product correctness
 
-### T-AUDIT-1 · Modern password audit  ❌ (B8, T13)
+### T-AUDIT-1 · Modern password audit  ✅ (PR) (B8, T13)
 **Evidence:** `commands/audit.rs:8-9,47-53` uses composition rules (upper+lower+digit+symbol — NIST-discredited) + `FRESHNESS_DAYS = 90` rotation; no breach check. **Steps:** replace composition rules with a zxcvbn score; drop the rotation check; add **opt-in** HIBP Pwned-Passwords via k-anonymity (first 5 SHA-1 chars only, clearly explained in UI). Keep the boolean/score-only IPC contract. **Acceptance:** a strong passphrase is not "weak"; HIBP lookup is opt-in and never sends a full hash.
 
 ### T-PROD-1 · Small correctness batch  ✅ (PR) (B2, B5, B9)

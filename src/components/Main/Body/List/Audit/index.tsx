@@ -6,6 +6,7 @@ import Group from './Group'
 
 export default function AuditList() {
   const audit = useStore(state => state.audit)
+  const breachCheck = useStore(state => state.breachCheck)
   const items = useStore(state => state.entries.items)
 
   const byProperty = (property: keyof AuditItem): Entry[] =>
@@ -20,13 +21,18 @@ export default function AuditList() {
   return (
     <div className="list">
       <Group title="Weak" level="level-one" entries={byProperty('isWeak')} />
-      <Group title="Short" level="level-two" entries={byProperty('isShort')} />
       <Group
-        title="Duplicates"
-        level="level-three"
+        title="Reused"
+        level="level-two"
         entries={byProperty('isRepeating')}
       />
-      <Group title="Old" level="level-four" entries={byProperty('isOld')} />
+      {breachCheck && (
+        <Group
+          title="Breached"
+          level="level-three"
+          entries={byProperty('breached')}
+        />
+      )}
     </div>
   )
 }

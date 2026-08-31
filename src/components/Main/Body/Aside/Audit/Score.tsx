@@ -5,17 +5,19 @@ interface Props {
   audit: Audit
 }
 
-const scoreOf = (record: AuditItem) =>
-  (record.isWeak ? 0.5 : 0) +
-  (record.isShort ? 0.5 : 0) +
-  (record.isRepeating ? 0.25 : 0) +
-  (record.isOld ? 0.25 : 0)
+// Per-password health from the zxcvbn score (0-4 → 0-1), penalised for reuse
+// and known breaches. Averaged and scaled to a 0-10 overall score.
+const healthOf = (record: AuditItem) => {
+  let value = record.score / 4
+  if (record.isRepeating) value -= 0.25
+  if (record.breached) value -= 0.5
+  return Math.max(0, value)
+}
 
 export default function Score({ audit }: Props) {
   const records = Object.values(audit)
-  const penalty = records.reduce((total, record) => total + scoreOf(record), 0)
-  const score =
-    Math.round(((records.length - penalty) / records.length) * 100) / 10
+  const health = records.reduce((total, record) => total + healthOf(record), 0)
+  const score = Math.round((health / records.length) * 100) / 10
 
   return (
     <div className="score">

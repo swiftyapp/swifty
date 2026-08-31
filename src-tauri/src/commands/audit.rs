@@ -1,28 +1,34 @@
+use std::collections::HashMap;
+
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
+use crate::hibp;
 use crate::models::{Audit, AuditItem, Entry};
 use crate::state::AppState;
-use chrono::{DateTime, Utc};
 use tauri::State;
+use zxcvbn::zxcvbn;
 
-const MIN_LENGTH: usize = 8;
-const FRESHNESS_DAYS: i64 = 90;
+// zxcvbn scores 0-4; below 3 ("safely unguessable") is treated as weak. This
+// replaces NIST-discredited composition rules and already accounts for length,
+// dictionary words, keyboard walks and l33t substitutions.
+const WEAK_SCORE: u8 = 3;
 
-// Audit every password in the unlocked vault (weak / short / old / repeating).
-// Passwords are stored encrypted, so decryption runs off the UI thread.
+// Audit every password in the unlocked vault: strength (zxcvbn), reuse, and —
+// when the user opts in — breach exposure (HIBP k-anonymity). Passwords are
+// stored encrypted, so decryption and the network call run off the UI thread.
 #[tauri::command]
-pub async fn get_audit(state: State<'_, AppState>) -> Result<Audit> {
+pub async fn get_audit(state: State<'_, AppState>, check_breaches: bool) -> Result<Audit> {
     let (cryptor, vault) = {
         let s = state.session.lock().unwrap();
         (s.cryptor()?, s.vault.clone().ok_or(Error::Locked)?)
     };
-    tauri::async_runtime::spawn_blocking(move || audit(&cryptor, &vault.entries))
+    tauri::async_runtime::spawn_blocking(move || audit(&cryptor, &vault.entries, check_breaches))
         .await
         .map_err(|e| Error::Crypto(e.to_string()))?
 }
 
-// Decrypt each non-empty password once, then flag weak / short / old / repeating.
-fn audit(cryptor: &Cryptor, entries: &[Entry]) -> Result<Audit> {
+// Decrypt each non-empty password once, then flag weak / reused / breached.
+fn audit(cryptor: &Cryptor, entries: &[Entry], check_breaches: bool) -> Result<Audit> {
     let creds: Vec<(&Entry, String)> = entries
         .iter()
         .filter_map(|e| e.password.as_deref().filter(|p| !p.is_empty()).map(|p| (e, p)))
@@ -30,44 +36,28 @@ fn audit(cryptor: &Cryptor, entries: &[Entry]) -> Result<Audit> {
         .collect::<Result<_>>()?;
 
     let passwords: Vec<&str> = creds.iter().map(|(_, p)| p.as_str()).collect();
+    let breaches: HashMap<String, bool> = if check_breaches {
+        hibp::check_all(&passwords)
+    } else {
+        HashMap::new()
+    };
+
     Ok(creds
         .iter()
         .map(|(e, p)| {
             let repeating = passwords.iter().filter(|&&x| x == p).count() > 1;
+            let score = u8::from(zxcvbn(p, &[]).score());
             (
                 e.id.clone(),
                 AuditItem {
-                    is_short: p.chars().count() < MIN_LENGTH,
-                    is_weak: is_weak(p),
-                    is_old: is_old(e),
+                    score,
+                    is_weak: score < WEAK_SCORE,
                     is_repeating: repeating,
+                    breached: breaches.get(p).copied().unwrap_or(false),
                 },
             )
         })
         .collect())
-}
-
-// Weak if it lacks any of: uppercase, lowercase, digit, symbol.
-fn is_weak(pw: &str) -> bool {
-    let has_upper = pw.chars().any(|c| c.is_uppercase());
-    let has_lower = pw.chars().any(|c| c.is_lowercase());
-    let has_digit = pw.chars().any(|c| c.is_ascii_digit());
-    let has_symbol = pw.chars().any(|c| !c.is_alphanumeric() && !c.is_whitespace());
-    !(has_upper && has_lower && has_digit && has_symbol)
-}
-
-// Old if the last password update was over FRESHNESS_DAYS ago. Missing or
-// unparseable timestamps are treated as not old (legacy luxon NaN behavior).
-fn is_old(entry: &Entry) -> bool {
-    let ts = entry
-        .password_updated_at
-        .as_deref()
-        .or(entry.updated_at.as_deref());
-    let Some(ts) = ts else { return false };
-    match DateTime::parse_from_rfc3339(ts) {
-        Ok(dt) => (Utc::now() - dt.with_timezone(&Utc)).num_days().abs() > FRESHNESS_DAYS,
-        Err(_) => false,
-    }
 }
 
 #[cfg(test)]
@@ -84,11 +74,10 @@ mod tests {
     }
 
     // Build a login with its password encrypted, as it is on disk.
-    fn login(c: &Cryptor, id: &str, password: &str, updated: Option<&str>) -> Entry {
+    fn login(c: &Cryptor, id: &str, password: &str) -> Entry {
         c.obscure(&entry(json!({
             "id": id, "type": "login", "title": "t",
             "password": password,
-            "password_updated_at": updated,
         })))
         .unwrap()
     }
@@ -98,27 +87,27 @@ mod tests {
         let c = cryptor();
         let entries = vec![
             entry(json!({ "id": "n", "type": "note", "title": "t", "note": "x" })),
-            login(&c, "empty", "", None),
+            login(&c, "empty", ""),
         ];
-        assert!(audit(&c, &entries).unwrap().is_empty());
+        assert!(audit(&c, &entries, false).unwrap().is_empty());
     }
 
     #[test]
-    fn flags_short_and_weak() {
+    fn flags_weak_by_score() {
         let c = cryptor();
-        let a = audit(&c, &[login(&c, "1", "abc", None)]).unwrap();
-        let item = &a["1"];
-        assert!(item.is_short);
-        assert!(item.is_weak);
-        assert!(!item.is_repeating);
+        let a = audit(&c, &[login(&c, "1", "abc")], false).unwrap();
+        assert!(a["1"].is_weak);
+        assert!(a["1"].score < WEAK_SCORE);
+        assert!(!a["1"].is_repeating);
+        assert!(!a["1"].breached);
     }
 
     #[test]
-    fn strong_password_is_not_weak_or_short() {
+    fn strong_passphrase_is_not_weak() {
         let c = cryptor();
-        let a = audit(&c, &[login(&c, "1", "Abcdef1!ghij", None)]).unwrap();
-        assert!(!a["1"].is_short);
+        let a = audit(&c, &[login(&c, "1", "correct horse battery staple")], false).unwrap();
         assert!(!a["1"].is_weak);
+        assert!(a["1"].score >= WEAK_SCORE);
     }
 
     #[test]
@@ -127,10 +116,11 @@ mod tests {
         let a = audit(
             &c,
             &[
-                login(&c, "1", "Repeated1!", None),
-                login(&c, "2", "Repeated1!", None),
-                login(&c, "3", "Unique2@ab", None),
+                login(&c, "1", "Repeated1!"),
+                login(&c, "2", "Repeated1!"),
+                login(&c, "3", "Unique2@ab"),
             ],
+            false,
         )
         .unwrap();
         assert!(a["1"].is_repeating);
@@ -138,22 +128,11 @@ mod tests {
         assert!(!a["3"].is_repeating);
     }
 
+    // Opt-out (check_breaches = false) makes no network call and leaves breached false.
     #[test]
-    fn detects_old_passwords() {
+    fn breach_check_is_skipped_when_opted_out() {
         let c = cryptor();
-        let old = (Utc::now() - chrono::Duration::days(120)).to_rfc3339();
-        let fresh = (Utc::now() - chrono::Duration::days(10)).to_rfc3339();
-        let a = audit(
-            &c,
-            &[
-                login(&c, "old", "Str0ng!pass", Some(&old)),
-                login(&c, "fresh", "Str0ng!pass", Some(&fresh)),
-                login(&c, "missing", "Str0ng!pass", None),
-            ],
-        )
-        .unwrap();
-        assert!(a["old"].is_old);
-        assert!(!a["fresh"].is_old);
-        assert!(!a["missing"].is_old);
+        let a = audit(&c, &[login(&c, "1", "password")], false).unwrap();
+        assert!(!a["1"].breached);
     }
 }
