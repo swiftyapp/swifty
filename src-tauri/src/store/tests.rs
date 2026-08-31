@@ -137,6 +137,21 @@ fn file_mode_is_0600() {
 }
 
 #[test]
+fn snapshot_is_encrypted_and_reopens() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    store.upsert(&rec("1", b"durable")).unwrap();
+
+    let snap = tmp_db().with_file_name("snapshot.db");
+    store.snapshot_to(&snap, KEY).unwrap();
+
+    // The snapshot reopens with the same key and carries the committed row.
+    let restored = SqliteStore::open(&snap, KEY).unwrap();
+    assert_eq!(restored.get("1").unwrap().unwrap().payload, b"durable");
+    // It is genuinely encrypted: a wrong key cannot open it.
+    assert!(SqliteStore::open(&snap, &[0x22; 32]).is_err());
+}
+
+#[test]
 fn migrate_from_json_round_trips_and_keeps_bak() {
     use crate::crypto::Cryptor;
     use crate::models::{Entry, VaultData};

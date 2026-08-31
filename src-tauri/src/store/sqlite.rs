@@ -47,9 +47,20 @@ impl SqliteStore {
         }
 
         let conn = Connection::open(path)?;
-        // Raw-key pragma: the hex bytes are the key, not a passphrase.
+        // Raw-key pragma: the hex bytes are the key, not a passphrase. Must run
+        // before any other pragma that touches the (encrypted) file.
         conn.execute_batch(&format!("PRAGMA key = \"x'{}'\";", hex(key)))?;
-        conn.execute_batch("PRAGMA journal_mode = WAL;")?;
+        // Connection hygiene: WAL for crash-safe per-row writes; NORMAL is the
+        // durable/fast pairing for WAL; temp_store=MEMORY keeps sort/temp data
+        // (plaintext metadata) off disk; busy_timeout absorbs the brief lock a
+        // second connection (e.g. a snapshot) can hold. No foreign_keys pragma:
+        // the schema has no relations. SQLCipher has no such default pragmas.
+        conn.execute_batch(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = NORMAL;
+             PRAGMA temp_store = MEMORY;
+             PRAGMA busy_timeout = 5000;",
+        )?;
 
         // Force key verification on an existing DB (a wrong key errors only on read).
         if existed {
@@ -73,6 +84,24 @@ impl SqliteStore {
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Connection> {
         self.conn.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Write a consistent, still-encrypted snapshot of the live DB to `dest`
+    /// using SQLite's online-backup API. Unlike `fs::copy` of a WAL-mode file,
+    /// this reads *through* the connection, so it always captures committed WAL
+    /// frames a plain copy could miss (or tear). `dest` is keyed with the same
+    /// `key`, so the snapshot is as encrypted as the source — never a plaintext
+    /// leak — and reopens as a normal store.
+    pub fn snapshot_to(&self, dest: &Path, key: &[u8]) -> Result<()> {
+        let mut dst = Connection::open(dest)?;
+        dst.execute_batch(&format!("PRAGMA key = \"x'{}'\";", hex(key)))?;
+        let src = self.lock();
+        let backup = rusqlite::backup::Backup::new(&src, &mut dst)?;
+        backup.run_to_completion(100, std::time::Duration::from_millis(50), None)?;
+        drop(backup);
+        drop(dst);
+        set_mode(dest, 0o600);
+        Ok(())
     }
 }
 
