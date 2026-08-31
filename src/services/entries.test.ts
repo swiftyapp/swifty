@@ -8,6 +8,9 @@ const login = (title: string, tags?: string[]): Entry =>
 const card = (title: string): Entry =>
   ({ id: title, type: 'card', title, number: '4242' }) as Entry
 
+const richLogin = (fields: Partial<Entry> & { id: string; title: string }): Entry =>
+  ({ type: 'login', username: '', website: '', note: '', password: 'p', ...fields }) as Entry
+
 describe('filterEntries', () => {
   const entries = [login('Google', ['personal']), login('Airbnb'), login('Facebook', ['personal'])]
 
@@ -26,6 +29,25 @@ describe('filterEntries', () => {
 
   it('filters by query', () => {
     expect(filterEntries(entries, { scope: 'login', query: 'fa', tags: [] }).map(e => e.title)).toEqual(['Facebook'])
+  })
+
+  it('matches non-title fields (username, website, note, tags)', () => {
+    const items = [
+      richLogin({ id: '1', title: 'GitHub', username: 'octocat', website: 'github.com', note: 'work stuff' }),
+      richLogin({ id: '2', title: 'Bank', username: 'alice', website: 'bank.example', note: 'savings', tags: ['money'] })
+    ]
+    const q = (query: string) =>
+      filterEntries(items, { scope: 'login', query, tags: [] }).map(e => e.title)
+
+    expect(q('octocat')).toEqual(['GitHub']) // username
+    expect(q('github.com')).toEqual(['GitHub']) // website
+    expect(q('savings')).toEqual(['Bank']) // note
+    expect(q('money')).toEqual(['Bank']) // tag
+  })
+
+  it('is typo-tolerant (fuzzy)', () => {
+    const items = [richLogin({ id: '1', title: 'Facebook', username: 'me' })]
+    expect(filterEntries(items, { scope: 'login', query: 'facbook', tags: [] }).map(e => e.title)).toEqual(['Facebook'])
   })
 
   it('filters by tag', () => {
@@ -52,5 +74,9 @@ describe('isValid', () => {
       isValid({ type: 'card', title: 'T', number: '1', pin: '1', cvc: '1', month: '1', year: '1' })
     ).toBe(true)
     expect(isValid({ type: 'card', title: 'T', number: '1' })).toBe(false)
+  })
+
+  it('saves a card without a PIN', () => {
+    expect(isValid({ type: 'card', title: 'T', number: '1', cvc: '1', month: '1', year: '1' })).toBe(true)
   })
 })

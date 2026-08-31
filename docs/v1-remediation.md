@@ -139,10 +139,10 @@ on Phase 1.
 
 ## Phase 4 — Auth & memory hardening (parallelizable)
 
-### T-AUTH-1 · Remove the master-password length cap  ❌ (S5)
+### T-AUTH-1 · Remove the master-password length cap  ✅ (PR) (S5)
 **Evidence:** `Masterpass.tsx:35` `maxLength={24}` on both unlock and setup. **Steps:** remove it. **Acceptance:** a 40-char passphrase sets and unlocks.
 
-### T-AUTH-2 · Setup strength requirement  ❌ (S9, T12)
+### T-AUTH-2 · Setup strength requirement  ✅ (PR) (S9, T12)
 **Evidence:** `Setup/Enter.tsx:21-24` only checks non-empty. **Steps:** add a zxcvbn meter + enforce ≥12 chars before `onEnter`. **Acceptance:** weak/short passwords are blocked with feedback.
 
 ### T-AUTH-3 · Failed-unlock backoff  ❌ (S8, T12)
@@ -176,10 +176,10 @@ on Phase 1.
 ### T-AUDIT-1 · Modern password audit  ❌ (B8, T13)
 **Evidence:** `commands/audit.rs:8-9,47-53` uses composition rules (upper+lower+digit+symbol — NIST-discredited) + `FRESHNESS_DAYS = 90` rotation; no breach check. **Steps:** replace composition rules with a zxcvbn score; drop the rotation check; add **opt-in** HIBP Pwned-Passwords via k-anonymity (first 5 SHA-1 chars only, clearly explained in UI). Keep the boolean/score-only IPC contract. **Acceptance:** a strong passphrase is not "weak"; HIBP lookup is opt-in and never sends a full hash.
 
-### T-PROD-1 · Small correctness batch  ❌ (B2, B5, B9)
+### T-PROD-1 · Small correctness batch  ✅ (PR) (B2, B5, B9)
 **Evidence:** `services/entries.ts:43-44` search is title-only; `:13` card save requires `pin`; `defaults/generator.ts:4` length 12. **Steps:** extend search to username/website/tags/notes (query metadata columns + bounded decrypt-on-demand for secret fields; optional `fuse.js` ranker, T16); drop the `pin` requirement for cards; raise generator default to 20. **Acceptance:** search matches non-title fields; a card saves without a PIN; new generated passwords are 20 chars.
 
-### T-PROD-2 · Clipboard hygiene  ❌ (B10, T19)
+### T-PROD-2 · Clipboard hygiene  ✅ (PR) (B10, T19)
 **Evidence:** `clipboard.rs:12-17` clears unconditionally; no concealed-type marker; `services/copy.ts:3` 60s. **Steps:** clear **only if** the clipboard still holds the value written (compare-then-clear); set `org.nspasteboard.ConcealedType` (macOS) / `ExcludeClipboardContentFromMonitorProcessing` (Windows); drop default to 20s, make configurable. **Acceptance:** clearing never wipes an unrelated later copy; clipboard managers skip the secret.
 
 ---
