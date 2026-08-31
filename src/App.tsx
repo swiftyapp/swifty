@@ -5,6 +5,7 @@ import { subscribeToEvents } from './store/events'
 import Start from './components/Start'
 import Auth from './components/Auth'
 import Main from './components/Main'
+import UpdateToast from './components/elements/UpdateToast'
 
 function Shell() {
   const flow = useStore(state => state.flow)
@@ -32,5 +33,11 @@ export default function App() {
   }, [])
 
   // `locale` as key remounts the tree on language change so `t()` re-runs.
-  return <Shell key={locale} />
+  // The toast sits outside so a staged update stays visible across that remount.
+  return (
+    <>
+      <Shell key={locale} />
+      <UpdateToast />
+    </>
+  )
 }

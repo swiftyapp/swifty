@@ -105,5 +105,18 @@
   "or": "or",
   "Language": "Language",
   "Invalid link": "Invalid link",
-  "Only http and https links can be opened": "Only http and https links can be opened"
+  "Only http and https links can be opened": "Only http and https links can be opened",
+  "Update Ready": "Update Ready",
+  "Version {v} has been downloaded.": "Version {v} has been downloaded.",
+  "Later": "Later",
+  "Restart Now": "Restart Now",
+  "Restarting…": "Restarting…",
+  "Checking for updates…": "Checking for updates…",
+  "You're up to date.": "You're up to date.",
+  "Update check failed.": "Update check failed.",
+  "Updates": "Updates",
+  "Automatic Updates": "Automatic Updates",
+  "Updates download in the background and apply when you restart.": "Updates download in the background and apply when you restart.",
+  "Check for Updates": "Check for Updates",
+  "Checking…": "Checking…"
 }

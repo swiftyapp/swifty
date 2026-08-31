@@ -8,6 +8,7 @@ export type Section =
   | 'password'
   | 'audit'
   | 'language'
+  | 'updates'
 
 interface Props {
   section: Section
@@ -20,7 +21,8 @@ const items: { key: Section; label: string }[] = [
   { key: 'biometric', label: 'Biometric Unlock' },
   { key: 'password', label: 'Password Generation' },
   { key: 'audit', label: 'Password Audit' },
-  { key: 'language', label: 'Language' }
+  { key: 'language', label: 'Language' },
+  { key: 'updates', label: 'Updates' }
 ]
 
 export default function Navigation({ section, onClick }: Props) {

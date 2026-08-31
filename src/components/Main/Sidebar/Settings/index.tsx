@@ -9,6 +9,7 @@ import Biometric from './Biometric'
 import Password from './Password'
 import Audit from './Audit'
 import Language from './Language'
+import Updates from './Updates'
 import SettingsIcon from '@/assets/images/settings.svg?react'
 
 export default function Settings() {
@@ -33,6 +34,7 @@ export default function Settings() {
               <Password section={section} />
               <Audit section={section} />
               <Language section={section} />
+              <Updates section={section} />
             </div>
           </div>
         </Modal>
