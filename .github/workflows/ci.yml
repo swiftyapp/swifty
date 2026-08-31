@@ -11,14 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
-      - run: npm test
+          bun-version: 1.3.3
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run build
+      - run: bun run test
 
   rust:
     name: Rust (${{ matrix.os }})
@@ -44,14 +43,13 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: npm
+          bun-version: 1.3.3
 
       # generate_context! needs the built frontend (../dist) to exist.
-      - run: npm ci
-      - run: npm run build
+      - run: bun install --frozen-lockfile
+      - run: bun run build
 
       - name: Format check
         working-directory: src-tauri
@@ -82,14 +80,13 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: npm
+          bun-version: 1.3.3
 
       # generate_context! needs the built frontend (../dist) to exist.
-      - run: npm ci
-      - run: npm run build
+      - run: bun install --frozen-lockfile
+      - run: bun run build
 
       # Rust decrypts the Node-generated golden fixtures and asserts plaintext.
       - name: Fixture + round-trip tests
@@ -98,4 +95,4 @@ jobs:
 
       # Rust encrypts -> Node decrypts, and vice versa.
       - name: Cross-implementation round-trip
-        run: node scripts/crypto-crosscheck.mjs
+        run: bun scripts/crypto-crosscheck.mjs
