@@ -24,8 +24,10 @@
 - Time-based One Time Passwords support (TOTP)
 - Google Drive Sync (optional)
 - No data is leaving your computer:
-  - Everything is encrypted, stored and decrypted on your local file system
-  - Decryption happens once on entering Master Password
+  - Your vault is a locally stored, encrypted SQLite database (SQLCipher); each
+    entry's secrets are sealed in an extra application-level AEAD layer
+  - Secrets stay encrypted at rest and in memory, decrypted only when you reveal
+    or copy them
   - Ability to migrate from one computer to another using backup file or GDrive sync
 - There's more to come...
 
@@ -130,8 +132,10 @@ is provided to CI via the `TAURI_SIGNING_PRIVATE_KEY` (and
 
 ## Security
 
-Swifty is offline-first: your vault is an encrypted file on your own device and
-there is no backend that holds your secrets. See [`SECURITY.md`](SECURITY.md) for
+Swifty is offline-first: your vault is an encrypted SQLite database (SQLCipher)
+on your own device, with each entry's secrets sealed in an additional
+application-level AEAD layer, and there is no backend that holds your secrets.
+See [`SECURITY.md`](SECURITY.md) for
 how to report a vulnerability, and [`docs/threat-model.md`](docs/threat-model.md)
 for what Swifty does and does not defend against.
 
