@@ -1,6 +1,7 @@
 use crate::commands::{expose_all, obscure_all};
 use crate::error::{Error, Result};
 use crate::models::{UnlockResult, VaultData};
+use crate::secure_store::{self, KeyStore};
 use crate::state::AppState;
 use crate::{biometrics, crypto, storage};
 use tauri::{AppHandle, State};
@@ -52,22 +53,72 @@ pub fn lock(state: State<'_, AppState>) -> Result<()> {
     Ok(())
 }
 
-// Re-unlock within an active session, gated by a biometric prompt. The key is
-// already in memory (parity with legacy Touch ID), so no password is needed.
+// Unlock from a fresh/locked start using the biometric-gated key in the OS
+// secure store. Retrieving the key triggers the biometric prompt (Touch ID /
+// Windows Hello); the key then rebuilds the Cryptor and decrypts the on-disk
+// vault. Works even when nothing is in memory (app just launched).
 #[tauri::command]
-pub fn unlock_biometric(state: State<'_, AppState>) -> Result<UnlockResult> {
-    biometrics::authenticate()?;
-    let session = state.session.lock().unwrap();
-    let vault = session.vault.clone().ok_or(Error::Locked)?;
+pub fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<UnlockResult> {
+    storage::ensure_migrated(&app);
+    if !storage::biometric_enrolled(&app) {
+        return Err(Error::Other("biometric unlock is not enabled".into()));
+    }
+    let blob = storage::read_vault(&app)?;
+    let (key, vault) = match secure_store::open_vault(&secure_store::Platform, &blob) {
+        Ok(v) => v,
+        Err(Error::NotFound) => {
+            // The OS invalidated the item (e.g. enrolled fingerprints changed).
+            // Clear the stale marker so we stop offering a broken affordance.
+            let _ = storage::set_biometric_enrolled(&app, false);
+            return Err(Error::NotFound);
+        }
+        Err(e) => return Err(e),
+    };
+    // `open_vault` already validated the key as UTF-8 while decrypting.
+    let secret = String::from_utf8(key.to_vec()).map_err(|e| Error::Crypto(e.to_string()))?;
+    let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
+    state
+        .session
+        .lock()
+        .unwrap()
+        .set(secret, vault.clone(), sync_configured);
     Ok(UnlockResult {
         vault,
-        sync_configured: session.sync_configured,
+        sync_configured,
     })
 }
 
+// True only when the platform supports a biometric-gated store, the biometric
+// hardware is available, and a key has been enrolled (opt-in).
 #[tauri::command]
-pub fn is_biometric_available() -> Result<bool> {
-    Ok(biometrics::is_available())
+pub fn is_biometric_available(app: AppHandle) -> Result<bool> {
+    Ok(secure_store::is_supported()
+        && biometrics::is_available()
+        && storage::biometric_enrolled(&app))
+}
+
+// Opt in: store the current session's key material in the OS secure store,
+// biometry-gated. Requires an unlocked vault.
+#[tauri::command]
+pub fn enable_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    if !secure_store::is_supported() || !biometrics::is_available() {
+        return Err(Error::Other("biometrics not available".into()));
+    }
+    {
+        let session = state.session.lock().unwrap();
+        let key = session.master_key.as_ref().ok_or(Error::Locked)?;
+        secure_store::Platform.store(key)?;
+    }
+    storage::set_biometric_enrolled(&app, true)?;
+    Ok(())
+}
+
+// Opt out: delete the stored key and clear the marker.
+#[tauri::command]
+pub fn disable_biometric(app: AppHandle) -> Result<()> {
+    secure_store::Platform.delete()?;
+    storage::set_biometric_enrolled(&app, false)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -106,6 +157,16 @@ pub fn change_master_password(
     // legacy). Best-effort: a re-key must still succeed offline.
     if crate::sync::ENABLED && crate::sync::is_configured(&app, &new_cryptor) {
         let _ = crate::sync::push(&app, &new_cryptor, &new_blob);
+    }
+
+    // The biometric-stored key is now stale (it unlocks the old blob). Re-store
+    // the new material so biometric unlock keeps working; if that fails, clear it
+    // rather than leave a key that unlocks nothing.
+    if storage::biometric_enrolled(&app)
+        && secure_store::Platform.store(new_secret.as_bytes()).is_err()
+    {
+        let _ = secure_store::Platform.delete();
+        let _ = storage::set_biometric_enrolled(&app, false);
     }
 
     let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);

@@ -5,6 +5,7 @@ pub mod crypto;
 mod error;
 mod hibp;
 mod models;
+mod secure_store;
 mod state;
 mod storage;
 pub mod store;
@@ -61,6 +62,8 @@ pub fn run() {
             commands::auth::lock,
             commands::auth::unlock_biometric,
             commands::auth::is_biometric_available,
+            commands::auth::enable_biometric,
+            commands::auth::disable_biometric,
             commands::auth::change_master_password,
             commands::vault::read_vault,
             commands::vault::reveal_entry,

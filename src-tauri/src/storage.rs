@@ -11,6 +11,9 @@ use crate::error::{Error, Result};
 
 pub const VAULT_FILE: &str = "vault.swftx";
 pub const GDRIVE_FILE: &str = "auth/gdrive.swftx";
+// Marker for "biometric unlock is enabled". The key itself lives in the OS
+// secure store; this flag lets us report availability without a biometric prompt.
+pub const BIOMETRIC_FILE: &str = "biometric.enabled";
 
 fn app_dir(app: &AppHandle) -> Result<PathBuf> {
     let dir = app
@@ -89,6 +92,26 @@ pub fn vault_exists(app: &AppHandle) -> bool {
         .filter(|p| p.exists())
         .and_then(|p| fs::metadata(p).ok())
         .is_some_and(|m| m.len() > 0)
+}
+
+// Whether the user opted into biometric unlock (marker file present).
+pub fn biometric_enrolled(app: &AppHandle) -> bool {
+    app_dir(app)
+        .map(|d| d.join(BIOMETRIC_FILE).exists())
+        .unwrap_or(false)
+}
+
+// Set/clear the biometric-enabled marker. Idempotent.
+pub fn set_biometric_enrolled(app: &AppHandle, enrolled: bool) -> Result<()> {
+    let path = app_dir(app)?.join(BIOMETRIC_FILE);
+    if enrolled {
+        write_file(&path, "1")
+    } else if path.exists() {
+        fs::remove_file(&path)?;
+        Ok(())
+    } else {
+        Ok(())
+    }
 }
 
 pub fn sync_configured(app: &AppHandle) -> bool {

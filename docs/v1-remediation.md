@@ -148,7 +148,7 @@ on Phase 1.
 ### T-AUTH-3 · Failed-unlock backoff  ❌ (S8, T12)
 **Evidence:** `commands/auth.rs:27-46` derives+tests immediately; no counter anywhere. **Steps:** persisted attempt counter (survives restart — store in the DB `meta` table) with exponential delay after 3 free attempts. **Acceptance:** repeated wrong attempts incur growing delay that survives a process kill.
 
-### T-MEM-1 · Zeroize the key on lock/drop  🔴 🟡 (S4, T10)
+### T-MEM-1 · Zeroize the key on lock/drop  ✅ (PR) (S4, T10)
 **Evidence:** auto-lock is real (`state.rs:38-42` `clear()` drops key+vault; `autolock.rs:41-50` 60s), but `master_key` is a plain `Vec<u8>` (`state.rs:13`) — drop doesn't scrub the heap; no `zeroize` dep.
 **Steps:** wrap `master_key` and `Cryptor::secret` in `zeroize::Zeroizing` / `secrecy::SecretVec`; scrub on drop and on `clear()`. Keep the existing auto-lock + explicit-lock design (structurally correct). Optionally back biometric unlock with an OS-keychain-stored key (`kSecAccessControlBiometryCurrentSet`) rather than the in-session key.
 **Acceptance:** a test asserts no plaintext key remains reachable after lock; key type zeroizes on drop.

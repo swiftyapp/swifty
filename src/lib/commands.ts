@@ -112,6 +112,12 @@ export const unlockBiometric = (): Promise<UnlockResult> =>
 export const isBiometricAvailable = (): Promise<boolean> =>
   invoke('is_biometric_available')
 
+// Opt in/out of biometric unlock. `enable` stores the current session key in the
+// OS secure store (biometry-gated); `disable` deletes it. Requires an unlocked vault.
+export const enableBiometric = (): Promise<void> => invoke('enable_biometric')
+
+export const disableBiometric = (): Promise<void> => invoke('disable_biometric')
+
 export const changeMasterPassword = (
   current: string,
   next: string
