@@ -18,10 +18,10 @@ export default function Choice({ onSelect }: Props) {
         {t('Create a new vault or restore from an existing backup.')}
       </p>
       <div className="mx-auto mt-9 flex w-72 max-w-full flex-col gap-3">
-        <Button testid="start-setup-button" onClick={() => onSelect('setup')}>
+        <Button block testid="start-setup-button" onClick={() => onSelect('setup')}>
           {t('Setup Master Password')}
         </Button>
-        <Button variant="ghost" onClick={() => onSelect('restore')}>
+        <Button block variant="ghost" onClick={() => onSelect('restore')}>
           {t('Restore from Backup')}
         </Button>
       </div>

@@ -29,12 +29,17 @@ const items: { key: Section; label: string }[] = [
 
 export default function Navigation({ section, onClick }: Props) {
   return (
-    <ul className="navigation">
+    <ul className="navigation m-0 flex w-[200px] flex-none flex-col gap-1 overflow-y-auto border-r border-line bg-list p-3">
       {items.map(item => (
         <li
           key={item.key}
-          className={cx({ current: section === item.key })}
           onClick={() => onClick(item.key)}
+          className={cx(
+            'cursor-pointer rounded-lg px-3 py-2 text-[13px] transition-colors',
+            section === item.key
+              ? 'bg-accent-soft font-medium text-accent'
+              : 'text-text2 hover:bg-hover hover:text-text'
+          )}
         >
           {t(item.label)}
         </li>

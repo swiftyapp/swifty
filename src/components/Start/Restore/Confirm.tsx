@@ -35,7 +35,7 @@ export default function Confirm({ display, path }: Props) {
         onChange={onChange}
       />
       <div className="mx-auto mt-8 w-72 max-w-full">
-        <Button onClick={onSend}>{t('Finish')}</Button>
+        <Button block onClick={onSend}>{t('Finish')}</Button>
       </div>
     </div>
   )

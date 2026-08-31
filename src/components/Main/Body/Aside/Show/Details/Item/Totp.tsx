@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react'
 import { generateOtp, type LoginEntry } from '@/lib/commands'
 import { t } from '@/i18n'
 import { copy } from '@/services/copy'
-import Copy from '@/assets/images/copy.svg?react'
+import { Panel, MONO_LABEL } from '../../../ui'
 
 interface Props {
   name: string
   entry: LoginEntry
 }
+
+const PERIOD = 30
+const R = 48
+const CIRCUMFERENCE = 2 * Math.PI * R // ≈ 301
 
 export default function Totp({ name, entry }: Props) {
   const [time, setTime] = useState(0)
@@ -46,14 +50,44 @@ export default function Totp({ name, entry }: Props) {
 
   if (!secret) return null
 
+  const dash = `${(time / PERIOD) * CIRCUMFERENCE} ${CIRCUMFERENCE}`
+
   return (
-    <div className="item">
-      <div className="label">{t(name)}</div>
-      <div className="value">
-        <strong className="muted">{`${code.slice(0, 3)} ${code.slice(3)}`}</strong>
+    <Panel className="flex flex-col items-center p-3.5">
+      <div className={`self-stretch ${MONO_LABEL}`}>{t(name)}</div>
+      <div className="relative m-[10px_0_4px] grid h-[108px] w-[108px] place-items-center">
+        <svg
+          width="108"
+          height="108"
+          viewBox="0 0 108 108"
+          fill="none"
+          className="absolute inset-0 -rotate-90"
+        >
+          <circle cx="54" cy="54" r={R} stroke="var(--c-line)" strokeWidth="3" />
+          <circle
+            cx="54"
+            cy="54"
+            r={R}
+            stroke="var(--c-accent)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray={dash}
+          />
+        </svg>
+        <div className="font-mono text-[20px] tracking-[0.1em] text-text">
+          {`${code.slice(0, 3)} ${code.slice(3)}`}
+        </div>
       </div>
-      <div className="secondary">{time}</div>
-      <Copy width="16" height="16" onClick={() => copy(code)} />
-    </div>
+      <div className="font-mono text-[11px] text-text3">
+        {t('refreshes in {n}s').replace('{n}', String(time))}
+      </div>
+      <button
+        type="button"
+        onClick={() => copy(code)}
+        className="mt-3 grid h-7 w-full cursor-pointer place-items-center rounded-lg border border-line2 text-[12px] text-text2 transition-colors hover:border-accent-line hover:text-text"
+      >
+        {t('Copy code')}
+      </button>
+    </Panel>
   )
 }

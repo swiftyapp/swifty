@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { cx } from '@/utils/cx'
 import { useStore, newEntry } from '@/store'
 import { syncImport } from '@/lib/commands'
 import { SYNC_ENABLED } from '@/config'
 import { t } from '@/i18n'
+import Button from '@/components/elements/Button'
 
 export default function Actions() {
   const isPristine = useStore(state => state.entries.items.length === 0)
@@ -17,20 +17,14 @@ export default function Actions() {
   if (!isPristine) return null
 
   return (
-    <div className="actions">
-      <div>
-        <a href="#" onClick={() => newEntry()}>
-          {t('Create First Entry')}
-        </a>
-      </div>
+    <div className="mt-6 flex items-center gap-3">
+      <Button onClick={() => newEntry()}>{t('Create First Entry')}</Button>
       {SYNC_ENABLED && (
         <>
-          <div>{t('or')}</div>
-          <div>
-            <span className={cx('button', { loading })} onClick={onImport}>
-              {t('Import from Gdrive')}
-            </span>
-          </div>
+          <span className="text-[12px] text-text3">{t('or')}</span>
+          <Button variant="pale" loading={loading} onClick={onImport}>
+            {t('Import from Gdrive')}
+          </Button>
         </>
       )}
     </div>

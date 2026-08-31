@@ -1,6 +1,8 @@
 import { useStore, localeChanged } from '@/store'
 import { LANGUAGES, t } from '@/i18n'
 import type { Section } from './Navigation'
+import Select from '@/components/elements/Select'
+import { H1 } from './ui'
 
 interface Props {
   section: Section
@@ -13,20 +15,19 @@ export default function Language({ section }: Props) {
 
   return (
     <>
-      <h1>{t('Language')}</h1>
-      <div className="select">
-        <select
-          name="locale"
-          value={locale}
-          onChange={e => localeChanged(e.target.value)}
-        >
-          {Object.keys(LANGUAGES).map(key => (
-            <option key={key} value={key}>
-              {LANGUAGES[key]}
-            </option>
-          ))}
-        </select>
-      </div>
+      <h1 className={H1}>{t('Language')}</h1>
+      <Select
+        name="locale"
+        value={locale}
+        onChange={e => localeChanged(e.target.value)}
+        className="max-w-xs"
+      >
+        {Object.keys(LANGUAGES).map(key => (
+          <option key={key} value={key}>
+            {LANGUAGES[key]}
+          </option>
+        ))}
+      </Select>
     </>
   )
 }

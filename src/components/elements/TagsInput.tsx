@@ -27,21 +27,24 @@ export default function TagsInput({ value, onChange }: Props) {
   }
 
   return (
-    <div className="react-tagsinput">
-      <span>
-        {value.map(tag => (
-          <span key={tag} className="react-tagsinput-tag" onClick={() => removeTag(tag)}>
-            {tag}
-          </span>
-        ))}
-        <input
-          className="react-tagsinput-input"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={addTag}
-        />
-      </span>
+    <div className="flex flex-wrap items-center gap-1.5 rounded-[9px] border border-line2 bg-field px-2 py-1.5 transition-colors focus-within:border-accent-line">
+      {value.map(tag => (
+        <span
+          key={tag}
+          onClick={() => removeTag(tag)}
+          className="flex cursor-pointer items-center gap-1 rounded-[6px] bg-accent-soft px-2 py-1 font-mono text-[11px] text-accent hover:brightness-95"
+        >
+          {tag}
+          <span className="opacity-60">×</span>
+        </span>
+      ))}
+      <input
+        className="min-w-[80px] flex-1 !border-0 !bg-transparent !p-1 !text-[13px] !text-text !outline-none"
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={addTag}
+      />
     </div>
   )
 }
