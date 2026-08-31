@@ -2,8 +2,16 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Generator from '@/components/Main/Generator'
+import { useShortcuts } from '@/components/Main/useShortcuts'
 import { copyToClipboard, generatePassword } from '@/lib/commands'
 import { renderWithStore } from './utils'
+
+// ⌘G lives in the app-level shortcut surface now (Main/useShortcuts), so the
+// harness mounts it alongside the dialog the way Main does.
+const Harness = () => {
+  useShortcuts()
+  return <Generator />
+}
 
 const open = async () => {
   await userEvent.keyboard('{Meta>}g{/Meta}')
@@ -17,12 +25,12 @@ beforeEach(() => {
 
 describe('Generator', () => {
   it('stays closed until the shortcut is pressed', () => {
-    renderWithStore(<Generator />)
+    renderWithStore(<Harness />)
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 
   it('opens on the shortcut and copies on confirm', async () => {
-    renderWithStore(<Generator />)
+    renderWithStore(<Harness />)
     await open()
     expect(await screen.findByText('Generated123!')).toBeInTheDocument()
 
@@ -32,7 +40,7 @@ describe('Generator', () => {
   })
 
   it('closes on escape without copying', async () => {
-    renderWithStore(<Generator />)
+    renderWithStore(<Harness />)
     await open()
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
@@ -40,7 +48,7 @@ describe('Generator', () => {
   })
 
   it('switches to memorable words without calling the random engine', async () => {
-    renderWithStore(<Generator />)
+    renderWithStore(<Harness />)
     await open()
     vi.mocked(generatePassword).mockClear()
 

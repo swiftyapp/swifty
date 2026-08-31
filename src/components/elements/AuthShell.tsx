@@ -42,7 +42,7 @@ export default function AuthShell({ children, meta, onBack }: Props) {
         <button
           type="button"
           onClick={onBack}
-          className="absolute bottom-14 left-1/2 flex -translate-x-1/2 items-center gap-1.5 border-0 bg-transparent font-mono text-[11px] uppercase tracking-[0.14em] text-text3 transition-colors hover:text-text"
+          className="absolute bottom-14 left-1/2 flex -translate-x-1/2 items-center gap-1.5 border-0 bg-transparent font-mono text-xs uppercase tracking-label text-text3 transition-colors hover:text-text"
         >
           <Back width="13" className="[&_path]:fill-current" />
           {t('Go Back')}
@@ -50,7 +50,7 @@ export default function AuthShell({ children, meta, onBack }: Props) {
       )}
 
       {meta && (
-        <div className="absolute inset-x-0 bottom-0 flex h-13 items-center justify-center font-mono text-[11px] uppercase tracking-[0.16em] text-text3">
+        <div className="absolute inset-x-0 bottom-0 flex h-13 items-center justify-center font-mono text-xs uppercase tracking-label text-text3">
           {meta}
         </div>
       )}

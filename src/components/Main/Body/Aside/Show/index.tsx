@@ -24,13 +24,14 @@ export default function Show({ entry }: Props) {
   const revealed = useRevealed(entry)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
+  // Confirmation is inline in the more-menu (two-press pattern, like the
+  // editor sheet's discard guard) — no native confirm(), which sits outside
+  // the design language and blocks the webview.
   const onDelete = () => {
-    if (window.confirm(t('Are you sure you want to delete this item?'))) {
-      setDeleteError(null)
-      deleteEntry(entry.id).catch(() =>
-        setDeleteError(t('Could not delete. Please try again.'))
-      )
-    }
+    setDeleteError(null)
+    deleteEntry(entry.id).catch(() =>
+      setDeleteError(t('Could not delete. Please try again.'))
+    )
   }
 
   const ledger: { k: string; v: string }[] = [
@@ -41,14 +42,6 @@ export default function Show({ entry }: Props) {
 
   return (
     <div className="mx-auto max-w-[860px]">
-      {/* `copied-notification` + `hidden` are toggled by services/copy.ts; the
-          display flip is what replays `animate-pop`. Centering uses auto margins
-          instead of a translate so the pop's transform doesn't fight it. */}
-      <div
-        className="copied-notification hidden animate-pop fixed inset-x-0 top-4 z-50 mx-auto w-max rounded-full bg-text px-5 py-2 text-base text-detail shadow-[var(--shadow)]"
-      >
-        {t('Copied to Clipboard')}
-      </div>
 
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">

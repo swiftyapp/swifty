@@ -1,10 +1,11 @@
-import { useStore, setFilterQuery } from '@/store'
+import { useStore, setFilterQuery, openPalette } from '@/store'
 import { t } from '@/i18n'
 import Kbd from '@/components/elements/Kbd'
 import { CloseGlyph, SearchGlyph } from '../icons'
 
 // Command-bar style search entry: search glyph, input, and a mono ⌘K chip that
-// swaps to a clear button once there's a query.
+// swaps to a clear button once there's a query. Typing filters the list in
+// place; the ⌘K chip (or the shortcut) opens the command palette.
 export default function Search() {
   const query = useStore(state => state.filters.query)
 
@@ -21,7 +22,14 @@ export default function Search() {
           className="min-w-0 flex-1 border-0 bg-transparent text-base text-text outline-none placeholder:text-text3 [&::-webkit-search-cancel-button]:hidden"
         />
         {query === '' ? (
-          <Kbd>⌘K</Kbd>
+          <button
+            type="button"
+            onClick={() => openPalette()}
+            title={t('Open command palette')}
+            className="flex-none cursor-pointer transition-opacity hover:opacity-70"
+          >
+            <Kbd>⌘K</Kbd>
+          </button>
         ) : (
           <button
             type="button"
