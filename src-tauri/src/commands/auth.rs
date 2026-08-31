@@ -8,6 +8,8 @@ use crate::secure_store::{self, KeyStore};
 use crate::state::AppState;
 use crate::store::{Record, SqliteStore, VaultStore};
 use crate::{biometrics, storage};
+use std::fs;
+use std::path::Path;
 use tauri::{AppHandle, State};
 
 // True only when a SQLite vault DB exists. A legacy `vault.swftx` alone does NOT
@@ -156,8 +158,15 @@ pub fn disable_biometric(app: AppHandle) -> Result<()> {
 }
 
 // Re-derive a fresh Argon2id key (new salt), re-seal every payload under the new
-// payload key, then re-key the encrypted DB and rewrite the sidecar. Correct even
-// if slow: touches every row once. Requires an unlocked session.
+// payload key, re-key the encrypted DB and rewrite the sidecar. Correct even if
+// slow: touches every row once. Requires an unlocked session.
+//
+// Crash-consistency: the three destructive on-disk steps (import → rekey →
+// sidecar) are guarded by a recovery snapshot taken first. The sidecar (the
+// single source of truth for opening) is written last and atomically, so it only
+// ever names a DB already re-keyed to match. On any failure the pre-change,
+// old-keyed DB is restored from the snapshot and the OLD sidecar is left in place,
+// so the vault still opens under the unchanged current password.
 #[tauri::command]
 pub fn change_master_password(
     current: String,
@@ -165,51 +174,66 @@ pub fn change_master_password(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<()> {
+    // Hold the session lock throughout: no other command sees the half-open state
+    // while the store is out of the session.
     let mut session = state.session.lock().unwrap();
 
     // Verify the current password reproduces the unlocked session key.
-    let current_key = derive_key(&app, &current)?;
-    if current_key.sqlcipher_key() != session.key()?.sqlcipher_key() {
+    if derive_key(&app, &current)?.sqlcipher_key() != session.key()?.sqlcipher_key() {
         return Err(Error::InvalidPassword);
     }
 
-    // Old ciphers from the session; fresh Argon2id key (new salt) for the new one.
-    let old_cipher = session.key()?.payload_cipher();
-    let old_cryptor = session.key()?.cryptor();
-    let params = KdfParams::default_argon2id();
-    let new_key = VaultKey::Argon2 {
-        master: crypto::derive(new.as_bytes(), &params)?,
-    };
-    let new_cipher = new_key.payload_cipher();
-    let new_cryptor = new_key.cryptor();
-    let new_db_key = new_key.sqlcipher_key();
+    // Own the open store + key for the duration so we can drop and restore them.
+    let store = session.store.take().ok_or(Error::Locked)?;
+    let old_key = session.key.take().ok_or(Error::Locked)?;
 
-    let store = session.store()?;
-    // Re-seal every row's payload under the new payload key (timestamps + tombstones kept).
-    let resealed: Vec<Record> = store
-        .export_for_sync()
-        .map_err(store_err)?
-        .into_iter()
-        .map(|r| reseal_record(r, &old_cipher, &new_cipher))
-        .collect::<Result<_>>()?;
-    store.import(&resealed).map_err(store_err)?;
-    // Re-encrypt the DB file itself under the new SQLCipher key, then make the new
-    // descriptor authoritative. (Sidecar written after the rekey so it only ever
-    // describes a DB already re-keyed to match.)
-    store.rekey(&new_db_key).map_err(store_err)?;
-    record_kdf_meta(store, &params)?;
-    storage::write_kdf_sidecar(&app, &params.to_json()?)?;
+    // Fresh Argon2id key (new salt). Nothing on disk is touched yet, so on failure
+    // just put the untouched store/key back.
+    let params = KdfParams::default_argon2id();
+    let new_key = match crypto::derive(new.as_bytes(), &params) {
+        Ok(master) => VaultKey::Argon2 { master },
+        Err(e) => {
+            session.set_keyed(old_key, store);
+            return Err(e);
+        }
+    };
+
+    // Recovery point: snapshot the pre-change (old-keyed) DB to a sibling file.
+    let backup = storage::db_rekey_backup_path(&app)?;
+    if let Err(e) = store.snapshot_to(&backup, &old_key.sqlcipher_key()) {
+        let _ = fs::remove_file(&backup);
+        session.set_keyed(old_key, store);
+        return Err(store_err(e));
+    }
+
+    // Destructive sequence. On any error, roll back to the snapshot.
+    if let Err(e) = rekey_vault(&store, &old_key, &new_key, &params, &app) {
+        // Close the (possibly re-keyed) connection, copy the old-keyed snapshot
+        // back over the DB, and reopen under the OLD key (the current password is
+        // unchanged). The OLD sidecar is still on disk (it is rewritten only on a
+        // successful rekey), so the restored DB opens. Keep the snapshot as a
+        // last-resort artifact if the reopen itself fails.
+        drop(store);
+        match restore_db_from_backup(&app, &backup).and_then(|()| open_with_key(&app, &old_key)) {
+            Ok((restored, _)) => session.set_keyed(old_key, restored),
+            Err(_) => session.clear(),
+        }
+        return Err(e);
+    }
+
+    // Success: the change is committed on disk. Drop the recovery point.
+    let _ = fs::remove_file(&backup);
 
     // Re-encrypt the Drive token file under the new key if present (sync parity).
     let token = storage::read_gdrive(&app).unwrap_or_default();
     if !token.is_empty() {
-        if let Ok(plain) = old_cryptor.decrypt(&token) {
-            storage::write_gdrive(&app, &new_cryptor.encrypt(&plain)?)?;
+        if let Ok(plain) = old_key.cryptor().decrypt(&token) {
+            storage::write_gdrive(&app, &new_key.cryptor().encrypt(&plain)?)?;
         }
     }
 
-    // Swap in the new key for the live session.
-    session.key = Some(new_key);
+    // Adopt the new key + store for the live session.
+    session.set_keyed(new_key, store);
     drop(session);
 
     // The biometric-stored key is now stale; re-store the new material or clear it.
@@ -222,6 +246,45 @@ pub fn change_master_password(
             let _ = storage::set_biometric_enrolled(&app, false);
         }
     }
+    Ok(())
+}
+
+// The destructive on-disk sequence, isolated so a single `?` failure triggers the
+// snapshot rollback in the caller. Sidecar (atomic) written last, after the rekey.
+fn rekey_vault(
+    store: &SqliteStore,
+    old_key: &VaultKey,
+    new_key: &VaultKey,
+    params: &KdfParams,
+    app: &AppHandle,
+) -> Result<()> {
+    let old_cipher = old_key.payload_cipher();
+    let new_cipher = new_key.payload_cipher();
+    // Re-seal every row's payload under the new payload key (timestamps + tombstones kept).
+    let resealed: Vec<Record> = store
+        .export_for_sync()
+        .map_err(store_err)?
+        .into_iter()
+        .map(|r| reseal_record(r, &old_cipher, &new_cipher))
+        .collect::<Result<_>>()?;
+    store.import(&resealed).map_err(store_err)?;
+    store.rekey(&new_key.sqlcipher_key()).map_err(store_err)?;
+    record_kdf_meta(store, params)?;
+    storage::write_kdf_sidecar(app, &params.to_json()?)?;
+    Ok(())
+}
+
+// Roll the DB file back to the pre-change snapshot. The connection must already be
+// closed. Stale WAL/SHM sidecars are removed so they can't overlay the restored
+// (old-keyed) file with new-keyed frames.
+fn restore_db_from_backup(app: &AppHandle, backup: &Path) -> Result<()> {
+    let db = storage::db_path(app)?;
+    for suffix in ["-wal", "-shm"] {
+        let mut sidecar = db.clone().into_os_string();
+        sidecar.push(suffix);
+        let _ = fs::remove_file(std::path::PathBuf::from(sidecar));
+    }
+    fs::copy(backup, &db)?;
     Ok(())
 }
 

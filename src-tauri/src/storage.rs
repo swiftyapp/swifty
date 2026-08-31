@@ -3,7 +3,8 @@
 //! export copy. Also handles one-time migration from the Electron location.
 
 use std::fs;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use tauri::{AppHandle, Manager};
 
@@ -11,6 +12,9 @@ use crate::error::{Error, Result};
 
 pub const VAULT_FILE: &str = "vault.swftx";
 pub const DB_FILE: &str = "vault.db";
+// Pre-change recovery snapshot of the encrypted DB, written next to it before the
+// destructive change-master-password sequence (see `change_master_password`).
+pub const DB_REKEY_BACKUP_FILE: &str = "vault.db.rekey-backup";
 // Plaintext KDF descriptor stored next to the DB. It holds the Argon2id params +
 // salt (public by design) and is read *before* deriving the key — the salt/params
 // cannot live inside the encrypted DB, since deriving the key is what opens it.
@@ -43,6 +47,11 @@ pub fn db_path(app: &AppHandle) -> Result<PathBuf> {
     Ok(app_dir(app)?.join(DB_FILE))
 }
 
+// Sibling recovery snapshot of the DB (change-master-password rollback point).
+pub fn db_rekey_backup_path(app: &AppHandle) -> Result<PathBuf> {
+    Ok(app_dir(app)?.join(DB_REKEY_BACKUP_FILE))
+}
+
 // Whether the SQLite store has been created (non-empty file present).
 pub fn db_exists(app: &AppHandle) -> bool {
     db_path(app)
@@ -69,9 +78,41 @@ pub fn read_kdf_sidecar(app: &AppHandle) -> Result<Option<String>> {
     Ok(Some(fs::read_to_string(path)?))
 }
 
-// Write (or overwrite) the KDF descriptor sidecar. Authoritative for opening.
+// Write (or overwrite) the KDF descriptor sidecar. The sidecar is the single
+// source of truth for opening the vault, so the write is durable + atomic: a
+// crash never leaves it truncated.
 pub fn write_kdf_sidecar(app: &AppHandle, json: &str) -> Result<()> {
-    write_file(&kdf_sidecar_path(app)?, json)
+    atomic_write_file(&kdf_sidecar_path(app)?, json)
+}
+
+// Durably overwrite `path`: write a temp sibling, fsync it, atomically rename it
+// over the target, then fsync the directory. The target ends up as either the
+// complete old bytes or the complete new bytes — never a truncated/empty file.
+// A leftover `<path>.tmp` (from a crash before the rename) is ignored by readers,
+// which only ever open the target path.
+fn atomic_write_file(path: &Path, data: &str) -> Result<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| Error::Other("sidecar path has no parent directory".into()))?;
+    fs::create_dir_all(parent)?;
+
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = PathBuf::from(tmp);
+
+    let mut file = fs::File::create(&tmp)?;
+    file.write_all(data.as_bytes())?;
+    file.sync_all()?;
+    drop(file);
+
+    fs::rename(&tmp, path)?;
+
+    // Persist the directory entry for the rename where the platform supports it
+    // (opening a directory as a file fails on Windows — best-effort there).
+    if let Ok(dir) = fs::File::open(parent) {
+        let _ = dir.sync_all();
+    }
+    Ok(())
 }
 
 // Read a file as utf8, returning "" when it doesn't exist (legacy ensure-file).
@@ -180,4 +221,58 @@ pub fn ensure_migrated(app: &AppHandle) {
             log::warn!("legacy vault migration failed: {e}");
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::atomic_write_file;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    fn tmp_sidecar() -> PathBuf {
+        static N: AtomicU64 = AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "swifty-storage-{}-{}",
+            std::process::id(),
+            N.fetch_add(1, Ordering::SeqCst)
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        dir.join("vault.kdf.json")
+    }
+
+    fn tmp_sibling(path: &Path) -> PathBuf {
+        let mut tmp = path.to_path_buf().into_os_string();
+        tmp.push(".tmp");
+        PathBuf::from(tmp)
+    }
+
+    #[test]
+    fn atomic_write_round_trips_and_overwrites() {
+        let path = tmp_sidecar();
+        atomic_write_file(&path, "{\"algo\":\"argon2id\"}").unwrap();
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "{\"algo\":\"argon2id\"}"
+        );
+
+        // Overwrite in place with shorter content — the target is fully replaced.
+        atomic_write_file(&path, "{}").unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{}");
+
+        // A completed write leaves no temp file behind.
+        assert!(!tmp_sibling(&path).exists());
+    }
+
+    #[test]
+    fn leftover_temp_file_does_not_affect_the_target() {
+        let path = tmp_sidecar();
+        atomic_write_file(&path, "real").unwrap();
+
+        // Simulate a crash before a prior rename: a stale, partial temp sibling.
+        fs::write(tmp_sibling(&path), "garbage-partial").unwrap();
+
+        // Reading the sidecar (the target path) is unaffected by the temp file.
+        assert_eq!(fs::read_to_string(&path).unwrap(), "real");
+    }
 }

@@ -50,6 +50,14 @@ impl Session {
         self.sync_configured = sync_configured;
     }
 
+    // Re-adopt a key + store, leaving sync_configured untouched. Used by
+    // change-master-password's success and rollback paths, where the store is
+    // taken out of the session and later put back (or replaced by a restore).
+    pub fn set_keyed(&mut self, key: VaultKey, store: SqliteStore) {
+        self.key = Some(key);
+        self.store = Some(store);
+    }
+
     // Drop the in-memory key and close the store. Used by the inactivity auto-lock.
     pub fn clear(&mut self) {
         self.key = None;

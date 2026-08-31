@@ -346,6 +346,51 @@ fn change_password_reseals_rekeys_and_new_descriptor_opens() {
     assert_eq!(revealed.password.as_deref(), Some("s3cret"));
 }
 
+// Crash-recovery composition for change_master_password: snapshot the old-keyed
+// DB, then re-key it (simulating a change that then "crashes"), then restore the
+// snapshot back over the DB. The recovered DB must open under the OLD key with the
+// original payload intact — proving the snapshot is a valid rollback point.
+#[test]
+fn snapshot_then_rekey_then_restore_recovers_old_key() {
+    let path = tmp_db();
+    let backup = path.with_file_name("vault.db.rekey-backup");
+    let old = argon2_key(
+        "old-pw",
+        &argon2_params(b"salt-f-01234567890123456789012345"),
+    );
+
+    {
+        let store = SqliteStore::open(&path, &old.sqlcipher_key()).unwrap();
+        let payload = old.payload_cipher().seal(&sample_entry()).unwrap();
+        store
+            .upsert(&migrate::build_record(&sample_entry(), payload).unwrap())
+            .unwrap();
+        // Recovery point, then the destructive rekey.
+        store.snapshot_to(&backup, &old.sqlcipher_key()).unwrap();
+        let new = argon2_key(
+            "new-pw",
+            &argon2_params(b"salt-g-01234567890123456789012345"),
+        );
+        store.rekey(&new.sqlcipher_key()).unwrap();
+    } // connection closed
+
+    // "Crash" rollback: drop stale WAL/SHM, copy the snapshot back over the DB.
+    for suffix in ["-wal", "-shm"] {
+        let mut p = path.clone().into_os_string();
+        p.push(suffix);
+        let _ = std::fs::remove_file(PathBuf::from(p));
+    }
+    std::fs::copy(&backup, &path).unwrap();
+
+    // The restored DB opens with the OLD key and the payload is intact.
+    let store = SqliteStore::open(&path, &old.sqlcipher_key()).unwrap();
+    let revealed = old
+        .payload_cipher()
+        .unseal(&store.get("1").unwrap().unwrap().payload)
+        .unwrap();
+    assert_eq!(revealed.password.as_deref(), Some("s3cret"));
+}
+
 // import_swftx re-seals a `.swftx` encrypted under a *different* master password
 // into the open store: expose under the source key, re-seal under the current
 // payload key, upsert. Reveal with the current key must return the original
