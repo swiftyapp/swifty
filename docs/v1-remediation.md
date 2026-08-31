@@ -187,7 +187,7 @@ on Phase 1.
 
 ## Phase 7 — Import/export (real feature, independent)
 
-### T-IMPORT-1 · Import/export pipeline  ❌ (B3, T17)
+### T-IMPORT-1 · Import/export pipeline  ✅ (PR) (B3, T17)
 **Evidence:** only self-backup restore exists (`import_backup` decrypts a `.swftx`); zero third-party format support. **Steps:** add an import command that parses Bitwarden JSON, 1Password `.1pux`/CSV, LastPass CSV, KeePass CSV/XML, Chrome/Safari CSV, generic CSV with column mapping, and writes rows into the DB; preview-and-confirm, **per-row** error handling (no throw-on-first), dry-run count; matching export in the same formats. **Acceptance:** each format imports via a fixture; one malformed row doesn't abort the batch; round-trip export re-imports.
 
 > Highest adoption-impact item. No dependency on the security work — can run any time after Phase 1.
