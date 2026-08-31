@@ -1,49 +1,37 @@
-import { cx } from '@/utils/cx'
 import { useStore } from '@/store'
+import { cx } from '@/utils/cx'
 import Tooltip from '@/components/elements/Tooltip'
-import Gdrive from '@/assets/images/google-drive-color.svg?react'
-import HardDrive from '@/assets/images/hard-drive.svg?react'
-import Tick from '@/assets/images/success_tick@2x.png'
-import Exclamation from '@/assets/images/warning_exclamation@2x.png'
 
+// Sync pill: a small status dot + mono label. Local-only vaults read as
+// "Local"; connected vaults surface syncing / synced / error state.
 export default function SyncIndicator() {
   const sync = useStore(state => state.sync)
 
-  const icon = sync.enabled ? (
-    <Gdrive width="18" height="18" />
-  ) : (
-    <HardDrive width="16" height="16" className="monochrome" />
-  )
+  const dot = () => {
+    if (!sync.enabled) return 'bg-text3'
+    if (sync.inProgress) return 'bg-accent'
+    return sync.success ? 'bg-good' : 'bg-bad'
+  }
 
-  const statusIcon = () => {
-    if (sync.inProgress) return null
-    if (sync.success)
-      return <img src={Tick} width="11" height="10" className="success-icon" />
-    return (
-      <img src={Exclamation} width="4" height="10" className="error-icon" />
-    )
+  const label = () => {
+    if (!sync.enabled) return 'Local'
+    if (sync.inProgress) return 'Syncing…'
+    return sync.success ? 'Synced' : 'Sync error'
   }
 
   const message = () => {
+    if (!sync.enabled) return 'Local vault'
     if (sync.inProgress) return 'Syncing...'
     if (sync.success) return 'Sync Successful'
     return sync.error || 'Something went wrong'
   }
 
   return (
-    <div
-      className={cx('sync-indicator', {
-        static: !sync.enabled,
-        loading: sync.inProgress,
-        success: sync.enabled && sync.success,
-        failure: sync.enabled && !sync.success
-      })}
-    >
-      <Tooltip content={message()}>
-        <div className="spinner" />
-        {statusIcon()}
-        {icon}
-      </Tooltip>
-    </div>
+    <Tooltip content={message()}>
+      <div className="flex h-7 items-center gap-[7px] rounded-[7px] px-2.5 font-mono text-[11px] text-text3">
+        <span className={cx('h-[5px] w-[5px] flex-none rounded-full', dot())} />
+        {label()}
+      </div>
+    </Tooltip>
   )
 }

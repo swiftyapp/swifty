@@ -28,7 +28,7 @@ describe("Tauri app smoke test", () => {
     await expect($('[data-testid="main-view"]')).toBeDisplayed();
 
     // ── Lock ─────────────────────────────────────────────────────────────────
-    await $('[data-testid="settings-button"]').click();
+    // Lock now lives in the top chrome (not behind Settings), so click it directly.
     await waitFor("lock-vault-button");
     await $('[data-testid="lock-vault-button"]').click();
 
