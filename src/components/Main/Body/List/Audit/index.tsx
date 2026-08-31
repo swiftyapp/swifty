@@ -1,14 +1,12 @@
-import { useAppSelector } from '@/store'
+import { useStore } from '@/store'
 import type { Audit, AuditItem, Entry } from '@/lib/commands'
 import { t } from '@/i18n'
 import Empty from '../Empty'
 import Group from './Group'
 
 export default function AuditList() {
-  const { items, audit } = useAppSelector(state => ({
-    audit: state.audit,
-    items: state.entries.items
-  }))
+  const audit = useStore(state => state.audit)
+  const items = useStore(state => state.entries.items)
 
   const byProperty = (property: keyof AuditItem): Entry[] =>
     Object.keys(audit as Audit)

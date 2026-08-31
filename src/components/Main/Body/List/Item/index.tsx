@@ -1,6 +1,5 @@
 import { cx } from '@/utils/cx'
-import { useAppDispatch, useAppSelector } from '@/store'
-import { setCurrentEntry } from '@/store/entriesSlice'
+import { useStore, setCurrentEntry } from '@/store'
 import type { Entry } from '@/lib/commands'
 import Login from './Login'
 import Card from './Card'
@@ -11,8 +10,7 @@ interface Props {
 }
 
 export default function Item({ entry }: Props) {
-  const dispatch = useAppDispatch()
-  const current = useAppSelector(state => state.entries.current)
+  const current = useStore(state => state.entries.current)
 
   const content = () => {
     switch (entry.type) {
@@ -28,7 +26,7 @@ export default function Item({ entry }: Props) {
   return (
     <div
       className={cx('entry', { current: current?.id === entry.id })}
-      onClick={() => dispatch(setCurrentEntry(entry.id))}
+      onClick={() => setCurrentEntry(entry.id)}
     >
       {content()}
     </div>

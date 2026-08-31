@@ -1,4 +1,4 @@
-import { useAppSelector } from '@/store'
+import { useStore } from '@/store'
 import type { Audit, AuditItem } from '@/lib/commands'
 import { t } from '@/i18n'
 import Score from './Score'
@@ -7,10 +7,8 @@ const count = (audit: Audit, property: keyof AuditItem) =>
   Object.values(audit).filter(item => item[property]).length
 
 export default function Audit() {
-  const { isPristine, audit } = useAppSelector(state => ({
-    audit: state.audit,
-    isPristine: state.entries.items.length === 0
-  }))
+  const audit = useStore(state => state.audit)
+  const isPristine = useStore(state => state.entries.items.length === 0)
 
   if (isPristine || !audit) return null
 

@@ -1,77 +1,35 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+import type { StateCreator } from 'zustand'
 import type { Entry } from '@/lib/commands'
-import { setFilterScope } from './filtersSlice'
+import type { StoreState } from './index'
 
-interface EntriesState {
-  new: boolean
-  edit: boolean
-  current: Entry | null
-  items: Entry[]
-}
-
-const initialState: EntriesState = {
-  new: false,
-  edit: false,
-  current: null,
-  items: []
+export interface EntriesSlice {
+  entries: { new: boolean; edit: boolean; current: Entry | null; items: Entry[] }
+  newEntry: () => void
+  setNoEntry: () => void
+  editEntry: () => void
+  setEntries: (items: Entry[]) => void
+  setCurrentEntry: (id: string) => void
+  entrySaved: (id: string) => void
+  entryRemoved: (items: Entry[]) => void
 }
 
 const find = (items: Entry[], id?: string) =>
   items.find(item => item.id === id) ?? null
 
-const entriesSlice = createSlice({
-  name: 'entries',
-  initialState,
-  reducers: {
-    newEntry(state) {
-      state.new = true
-      state.edit = false
-      state.current = null
-    },
-    setNoEntry(state) {
-      state.new = false
-      state.edit = false
-      state.current = null
-    },
-    editEntry(state) {
-      state.edit = true
-      state.new = false
-    },
-    setEntries(state, action: PayloadAction<Entry[]>) {
-      state.items = action.payload
-    },
-    setCurrentEntry(state, action: PayloadAction<string>) {
-      state.current = find(state.items, action.payload)
-      state.new = false
-      state.edit = false
-    },
-    entrySaved(state, action: PayloadAction<string>) {
-      state.edit = false
-      state.new = false
-      state.current = find(state.items, action.payload)
-    },
-    entryRemoved(state, action: PayloadAction<Entry[]>) {
-      state.items = action.payload
-      state.new = false
-      state.edit = false
-      state.current = null
-    }
-  },
-  extraReducers: builder => {
-    builder.addCase(setFilterScope, state => {
-      state.new = false
-      state.current = null
-    })
-  }
+export const createEntriesSlice: StateCreator<StoreState, [], [], EntriesSlice> = (set, get) => ({
+  entries: { new: false, edit: false, current: null, items: [] },
+  newEntry: () => set(s => ({ entries: { ...s.entries, new: true, edit: false, current: null } })),
+  setNoEntry: () => set(s => ({ entries: { ...s.entries, new: false, edit: false, current: null } })),
+  editEntry: () => set(s => ({ entries: { ...s.entries, edit: true, new: false } })),
+  setEntries: items => set(s => ({ entries: { ...s.entries, items } })),
+  setCurrentEntry: id =>
+    set(s => ({
+      entries: { ...s.entries, current: find(get().entries.items, id), new: false, edit: false }
+    })),
+  entrySaved: id =>
+    set(s => ({
+      entries: { ...s.entries, edit: false, new: false, current: find(get().entries.items, id) }
+    })),
+  entryRemoved: items =>
+    set(s => ({ entries: { ...s.entries, items, new: false, edit: false, current: null } }))
 })
-
-export const {
-  newEntry,
-  setNoEntry,
-  editEntry,
-  setEntries,
-  setCurrentEntry,
-  entrySaved,
-  entryRemoved
-} = entriesSlice.actions
-export default entriesSlice.reducer

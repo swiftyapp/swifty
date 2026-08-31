@@ -1,16 +1,14 @@
-import { useAppDispatch, useAppSelector } from '@/store'
-import { unsetFilterTag } from '@/store/filtersSlice'
+import { useStore, unsetFilterTag } from '@/store'
 
 export default function Selected() {
-  const dispatch = useAppDispatch()
-  const tag = useAppSelector(state => state.filters.tags[0])
+  const tag = useStore(state => state.filters.tags[0])
 
   if (!tag) return null
 
   return (
     <span className="tag-selected">
       {tag}
-      <span className="tag-clear" onClick={() => dispatch(unsetFilterTag())}>
+      <span className="tag-clear" onClick={() => unsetFilterTag()}>
         x
       </span>
     </span>

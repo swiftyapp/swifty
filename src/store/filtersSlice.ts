@@ -1,34 +1,25 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+import type { StateCreator } from 'zustand'
+import type { StoreState } from './index'
 
 export type Scope = 'login' | 'note' | 'card' | 'audit'
 
-interface FiltersState {
-  scope: Scope
-  query: string
-  tags: string[]
+export interface FiltersSlice {
+  filters: { scope: Scope; query: string; tags: string[] }
+  setFilterQuery: (query: string) => void
+  setFilterScope: (scope: Scope) => void
+  setFilterTag: (tag: string) => void
+  unsetFilterTag: () => void
 }
 
-const initialState: FiltersState = { scope: 'login', query: '', tags: [] }
-
-const filtersSlice = createSlice({
-  name: 'filters',
-  initialState,
-  reducers: {
-    setFilterQuery(state, action: PayloadAction<string>) {
-      state.query = action.payload
-    },
-    setFilterScope(state, action: PayloadAction<Scope>) {
-      state.scope = action.payload
-    },
-    setFilterTag(state, action: PayloadAction<string>) {
-      state.tags = [action.payload]
-    },
-    unsetFilterTag(state) {
-      state.tags = []
-    }
-  }
+export const createFiltersSlice: StateCreator<StoreState, [], [], FiltersSlice> = set => ({
+  filters: { scope: 'login', query: '', tags: [] },
+  setFilterQuery: query => set(s => ({ filters: { ...s.filters, query } })),
+  // Switching scope also drops any in-progress new entry and selection.
+  setFilterScope: scope =>
+    set(s => ({
+      filters: { ...s.filters, scope },
+      entries: { ...s.entries, new: false, current: null }
+    })),
+  setFilterTag: tag => set(s => ({ filters: { ...s.filters, tags: [tag] } })),
+  unsetFilterTag: () => set(s => ({ filters: { ...s.filters, tags: [] } }))
 })
-
-export const { setFilterQuery, setFilterScope, setFilterTag, unsetFilterTag } =
-  filtersSlice.actions
-export default filtersSlice.reducer

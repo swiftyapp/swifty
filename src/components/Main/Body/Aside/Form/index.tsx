@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAppDispatch, useAppSelector } from '@/store'
-import { setCurrentEntry, setNoEntry } from '@/store/entriesSlice'
-import { saveEntry } from '@/store/thunks'
+import { useStore, setCurrentEntry, setNoEntry, saveEntry } from '@/store'
 import { useRevealed } from '@/hooks/useRevealed'
 import { isValid } from '@/services/entries'
 import defaults, { type EntryDraft } from '@/defaults/entries'
@@ -17,8 +15,7 @@ interface Props {
 }
 
 export default function Form({ entry }: Props) {
-  const dispatch = useAppDispatch()
-  const scope = useAppSelector(state => state.filters.scope)
+  const scope = useStore(state => state.filters.scope)
   const type: EntryType = scope === 'audit' ? 'login' : scope
 
   const [validate, setValidate] = useState(false)
@@ -46,12 +43,12 @@ export default function Form({ entry }: Props) {
   const onTagsChange = (tags: string[]) => patch('tags', tags)
 
   const onCancel = () => {
-    if (model.id) dispatch(setCurrentEntry(model.id))
-    else dispatch(setNoEntry())
+    if (model.id) setCurrentEntry(model.id)
+    else setNoEntry()
   }
 
   const onSave = () => {
-    if (isValid(model)) dispatch(saveEntry(model))
+    if (isValid(model)) saveEntry(model)
     else setValidate(true)
   }
 

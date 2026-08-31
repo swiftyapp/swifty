@@ -1,6 +1,5 @@
 import { useState, type ChangeEvent } from 'react'
-import { useAppDispatch } from '@/store'
-import { restoreBackup } from '@/store/thunks'
+import { restoreBackup } from '@/store'
 import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
 
@@ -10,7 +9,6 @@ interface Props {
 }
 
 export default function Confirm({ display, path }: Props) {
-  const dispatch = useAppDispatch()
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -20,7 +18,7 @@ export default function Confirm({ display, path }: Props) {
   }
 
   const onSend = () => {
-    dispatch(restoreBackup(path, password)).catch(() =>
+    restoreBackup(path, password).catch(() =>
       setError(t('Invalid password for backup'))
     )
   }

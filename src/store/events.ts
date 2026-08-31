@@ -1,30 +1,29 @@
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { on, EVENTS } from '@/lib/events'
-import type { AppDispatch } from './index'
-import { setEntries } from './entriesSlice'
-import { auditDone } from './auditSlice'
-import { flowAuth } from './flowSlice'
 import {
+  setEntries,
+  auditDone,
+  flowAuth,
   syncStart,
   syncStop,
   syncConnected,
   syncDisconnected
-} from './syncSlice'
+} from './index'
 
-// Wires backend events to store dispatches. Returns a cleanup function.
-export const subscribeToEvents = (dispatch: AppDispatch): (() => void) => {
+// Wires backend events to store actions. Returns a cleanup function.
+export const subscribeToEvents = (): (() => void) => {
   const pending: Promise<UnlistenFn>[] = [
-    on(EVENTS.syncStarted, () => dispatch(syncStart())),
-    on(EVENTS.syncStopped, payload => dispatch(syncStop(payload))),
-    on(EVENTS.syncConnected, () => dispatch(syncConnected())),
-    on(EVENTS.syncDisconnected, () => dispatch(syncDisconnected())),
-    on(EVENTS.pullStarted, () => dispatch(syncStart())),
+    on(EVENTS.syncStarted, () => syncStart()),
+    on(EVENTS.syncStopped, payload => syncStop(payload)),
+    on(EVENTS.syncConnected, () => syncConnected()),
+    on(EVENTS.syncDisconnected, () => syncDisconnected()),
+    on(EVENTS.pullStarted, () => syncStart()),
     on(EVENTS.pullStopped, payload => {
-      dispatch(syncStop(payload))
-      if (payload.data) dispatch(setEntries(payload.data.entries))
+      syncStop(payload)
+      if (payload.data) setEntries(payload.data.entries)
     }),
-    on(EVENTS.auditDone, payload => dispatch(auditDone(payload.data))),
-    on(EVENTS.vaultLocked, () => dispatch(flowAuth(false)))
+    on(EVENTS.auditDone, payload => auditDone(payload.data)),
+    on(EVENTS.vaultLocked, () => flowAuth(false))
   ]
 
   return () => {

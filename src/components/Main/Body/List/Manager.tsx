@@ -1,15 +1,13 @@
-import { useAppSelector } from '@/store'
+import { useStore } from '@/store'
 import { filterEntries } from '@/services/entries'
 import Item from './Item'
 import Empty from './Empty'
 
 export default function Manager() {
-  const { items, query, scope, tags } = useAppSelector(state => ({
-    tags: state.filters.tags,
-    scope: state.filters.scope,
-    query: state.filters.query,
-    items: state.entries.items
-  }))
+  const tags = useStore(state => state.filters.tags)
+  const scope = useStore(state => state.filters.scope)
+  const query = useStore(state => state.filters.query)
+  const items = useStore(state => state.entries.items)
 
   const entries = filterEntries(items, { scope, query, tags })
 

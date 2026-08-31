@@ -1,14 +1,12 @@
 import { useState } from 'react'
 import { cx } from '@/utils/cx'
-import { useAppDispatch, useAppSelector } from '@/store'
-import { newEntry } from '@/store/entriesSlice'
+import { useStore, newEntry } from '@/store'
 import { syncImport } from '@/lib/commands'
 import { SYNC_ENABLED } from '@/config'
 import { t } from '@/i18n'
 
 export default function Actions() {
-  const dispatch = useAppDispatch()
-  const isPristine = useAppSelector(state => state.entries.items.length === 0)
+  const isPristine = useStore(state => state.entries.items.length === 0)
   const [loading, setLoading] = useState(false)
 
   const onImport = () => {
@@ -21,7 +19,7 @@ export default function Actions() {
   return (
     <div className="actions">
       <div>
-        <a href="#" onClick={() => dispatch(newEntry())}>
+        <a href="#" onClick={() => newEntry()}>
           {t('Create First Entry')}
         </a>
       </div>

@@ -1,16 +1,16 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+import type { StateCreator } from 'zustand'
 import { getLocale, setLocale } from '@/i18n'
+import type { StoreState } from './index'
 
-const i18nSlice = createSlice({
-  name: 'i18n',
-  initialState: { locale: getLocale() },
-  reducers: {
-    localeChanged(state, action: PayloadAction<string>) {
-      setLocale(action.payload)
-      state.locale = action.payload
-    }
+export interface I18nSlice {
+  i18n: { locale: string }
+  localeChanged: (locale: string) => void
+}
+
+export const createI18nSlice: StateCreator<StoreState, [], [], I18nSlice> = set => ({
+  i18n: { locale: getLocale() },
+  localeChanged: locale => {
+    setLocale(locale)
+    set({ i18n: { locale } })
   }
 })
-
-export const { localeChanged } = i18nSlice.actions
-export default i18nSlice.reducer
