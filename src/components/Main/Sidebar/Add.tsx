@@ -1,5 +1,7 @@
 import { useStore, newEntry, setFilterScope } from '@/store'
-import Plus from '@/assets/images/plus.svg?react'
+import { t } from '@/i18n'
+import Tooltip from '@/components/elements/Tooltip'
+import { PlusGlyph } from '../icons'
 
 export default function Add() {
   const scope = useStore(state => state.filters.scope)
@@ -10,8 +12,14 @@ export default function Add() {
   }
 
   return (
-    <div className="add-button" data-testid="add-entry-button" onClick={onAddEntry}>
-      <Plus />
-    </div>
+    <Tooltip content={t('New Secret')}>
+      <div
+        data-testid="add-entry-button"
+        onClick={onAddEntry}
+        className="grid h-9 w-9 cursor-pointer place-items-center rounded-[11px] border border-dashed border-accent-line text-accent transition-colors hover:bg-accent-soft"
+      >
+        <PlusGlyph />
+      </div>
+    </Tooltip>
   )
 }

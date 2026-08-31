@@ -11,7 +11,7 @@ import Password from './Password'
 import Audit from './Audit'
 import Language from './Language'
 import Updates from './Updates'
-import SettingsIcon from '@/assets/images/settings.svg?react'
+import { GearGlyph } from '../../icons'
 
 export default function Settings() {
   const [modal, setModal] = useState(false)
@@ -21,11 +21,11 @@ export default function Settings() {
     <div className="settings">
       <Tooltip content={t('Settings')}>
         <div
-          className="settings-button"
+          className="settings-button grid h-9 w-9 cursor-pointer place-items-center rounded-[11px] text-text2 transition-colors hover:bg-hover hover:text-text"
           data-testid="settings-button"
           onClick={() => setModal(!modal)}
         >
-          <SettingsIcon />
+          <GearGlyph />
         </div>
       </Tooltip>
       {modal && (

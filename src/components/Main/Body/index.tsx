@@ -1,11 +1,12 @@
-import List from './List'
-import Aside from './Aside'
+import ListColumn from './ListColumn'
+import DetailPane from './DetailPane'
 
+// The two content panes to the right of the rail: list column + detail pane.
 export default function Body() {
   return (
-    <div className="body">
-      <List />
-      <Aside />
-    </div>
+    <>
+      <ListColumn />
+      <DetailPane />
+    </>
   )
 }

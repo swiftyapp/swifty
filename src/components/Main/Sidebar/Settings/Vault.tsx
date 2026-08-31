@@ -60,7 +60,7 @@ export default function Vault({ section }: Props) {
     <>
       <h1>{t('Vault Settings')}</h1>
       <div className="section">
-        <div className="button pale" data-testid="lock-vault-button" onClick={onLock}>
+        <div className="button pale" onClick={onLock}>
           {t('Lock Screen')}
         </div>
       </div>
