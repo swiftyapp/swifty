@@ -82,7 +82,11 @@ fn group(vault: &Value) -> Group {
         .unwrap_or_default()
         .into_iter()
         .map(|e| {
-            let id = e.get("id").and_then(Value::as_str).unwrap_or("").to_string();
+            let id = e
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
             (id, e)
         })
         .collect();
@@ -129,7 +133,9 @@ mod tests {
             json!([{ "id": "a", "title": "new" }]),
             "2024-06-01T00:00:00+00:00",
         );
-        let merged: Value = c.decrypt_data(&merge_data(&local, &remote, &c).unwrap()).unwrap();
+        let merged: Value = c
+            .decrypt_data(&merge_data(&local, &remote, &c).unwrap())
+            .unwrap();
         let e = &merged["entries"][0];
         assert_eq!(e["title"], "new"); // remote (newer) wins
         assert_eq!(e["note"], "keep"); // field only in local is preserved
@@ -149,7 +155,9 @@ mod tests {
             json!([{ "id": "a" }, { "id": "new_only" }]),
             "2024-06-01T00:00:00+00:00",
         );
-        let merged: Value = c.decrypt_data(&merge_data(&local, &remote, &c).unwrap()).unwrap();
+        let merged: Value = c
+            .decrypt_data(&merge_data(&local, &remote, &c).unwrap())
+            .unwrap();
         let got = ids(&merged);
         assert!(got.contains(&"a".to_string()));
         assert!(got.contains(&"new_only".to_string()));
@@ -169,7 +177,9 @@ mod tests {
             json!([{ "id": "a", "title": "remote" }, { "id": "remote_only" }]),
             "2024-01-01T00:00:00+00:00",
         );
-        let merged: Value = c.decrypt_data(&merge_data(&local, &remote, &c).unwrap()).unwrap();
+        let merged: Value = c
+            .decrypt_data(&merge_data(&local, &remote, &c).unwrap())
+            .unwrap();
         assert_eq!(merged["entries"][0]["title"], "local");
         let got = ids(&merged);
         assert!(got.contains(&"local_only".to_string()));

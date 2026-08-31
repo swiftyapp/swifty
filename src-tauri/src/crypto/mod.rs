@@ -56,7 +56,13 @@ impl Cryptor {
         // ring's PBKDF2 is assembly-optimized; the pure-Rust one is ~10-20x slower
         // and froze the UI while deriving a key per field. Output is identical.
         let iters = NonZeroU32::new(ITERATIONS).unwrap();
-        ring::pbkdf2::derive(ring::pbkdf2::PBKDF2_HMAC_SHA512, iters, salt, &self.secret, &mut *key);
+        ring::pbkdf2::derive(
+            ring::pbkdf2::PBKDF2_HMAC_SHA512,
+            iters,
+            salt,
+            &self.secret,
+            &mut *key,
+        );
         Aes256Gcm16::new_from_slice(&*key).map_err(err)
     }
 

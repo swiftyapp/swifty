@@ -1,0 +1,11 @@
+# Single source of truth for the Rust toolchain — used by CI, the release
+# build, and local dev. rustup auto-selects this in any cargo/clippy/rustc
+# invocation under the repo and installs it on demand.
+#
+# The CI clippy gate is `-D warnings` and CI runs `cargo fmt --check`, so a
+# floating toolchain would let a new release's lints or formatting break CI on
+# unchanged code. Pin deliberately: bump `channel` here and nowhere else.
+[toolchain]
+channel = "1.90.0"
+components = ["clippy", "rustfmt"]
+profile = "minimal"

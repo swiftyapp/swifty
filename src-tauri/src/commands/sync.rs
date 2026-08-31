@@ -42,7 +42,10 @@ pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     let result = perform(&app, &state);
     let _ = match &result {
         Ok(()) => app.emit("sync:stopped", json!({ "success": true })),
-        Err(e) => app.emit("sync:stopped", json!({ "success": false, "error": e.to_string() })),
+        Err(e) => app.emit(
+            "sync:stopped",
+            json!({ "success": false, "error": e.to_string() }),
+        ),
     };
     result
 }
@@ -85,8 +88,14 @@ pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     let _ = app.emit("vault:pull:started", ());
     let result = import_remote(&app, &state, &cryptor);
     let _ = match &result {
-        Ok(vault) => app.emit("vault:pull:stopped", json!({ "success": true, "data": vault })),
-        Err(e) => app.emit("vault:pull:stopped", json!({ "success": false, "error": e.to_string() })),
+        Ok(vault) => app.emit(
+            "vault:pull:stopped",
+            json!({ "success": true, "data": vault }),
+        ),
+        Err(e) => app.emit(
+            "vault:pull:stopped",
+            json!({ "success": false, "error": e.to_string() }),
+        ),
     };
     result.map(|_| ())
 }

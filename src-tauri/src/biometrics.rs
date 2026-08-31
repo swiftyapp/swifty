@@ -74,7 +74,9 @@ mod imp {
 
     #[allow(dead_code)]
     pub fn authenticate() -> Result<()> {
-        Err(Error::Other("biometrics not supported on this platform".into()))
+        Err(Error::Other(
+            "biometrics not supported on this platform".into(),
+        ))
     }
 }
 

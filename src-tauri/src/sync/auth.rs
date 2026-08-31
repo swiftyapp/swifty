@@ -123,7 +123,10 @@ pub fn authenticate(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
 pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -> Result<String> {
     let mut tokens = read_tokens(app, cryptor).ok_or(Error::SyncNotConfigured)?;
     if needs_refresh(&tokens) {
-        let refresh_token = tokens.refresh_token.clone().ok_or(Error::SyncNotConfigured)?;
+        let refresh_token = tokens
+            .refresh_token
+            .clone()
+            .ok_or(Error::SyncNotConfigured)?;
         let fresh = refresh(client, &refresh_token).await?;
         tokens.access_token = fresh.access_token;
         tokens.expires_at = fresh.expires_at;
@@ -184,7 +187,12 @@ async fn refresh(client: &Client, refresh_token: &str) -> Result<Tokens> {
 }
 
 async fn post_token(client: &Client, form: Vec<(&str, String)>) -> Result<Tokens> {
-    let resp = client.post(TOKEN_URL).form(&form).send().await.map_err(other)?;
+    let resp = client
+        .post(TOKEN_URL)
+        .form(&form)
+        .send()
+        .await
+        .map_err(other)?;
     let status = resp.status();
     let body = resp.text().await.map_err(other)?;
     if !status.is_success() {
@@ -271,7 +279,10 @@ mod tests {
     fn pkce_challenge_is_url_safe_sha256() {
         // Known RFC 7636 test vector.
         let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
-        assert_eq!(challenge(verifier), "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+        assert_eq!(
+            challenge(verifier),
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+        );
     }
 
     #[test]

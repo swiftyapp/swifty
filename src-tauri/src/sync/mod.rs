@@ -52,7 +52,9 @@ pub fn remote_vault_exists(app: &AppHandle, cryptor: &Cryptor) -> Result<bool> {
         let Some(folder) = drive::folder_id(&client, &token, FOLDER_NAME).await? else {
             return Ok(false);
         };
-        Ok(drive::file_id(&client, &token, FILE_NAME, &folder).await?.is_some())
+        Ok(drive::file_id(&client, &token, FILE_NAME, &folder)
+            .await?
+            .is_some())
     })
 }
 
