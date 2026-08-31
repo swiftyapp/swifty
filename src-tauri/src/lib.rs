@@ -11,8 +11,6 @@ mod storage;
 pub mod store;
 mod sync;
 mod tray;
-#[cfg(desktop)]
-mod updater;
 mod window;
 
 use state::AppState;
@@ -28,7 +26,8 @@ pub fn run() {
             .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
                 window::show(app); // focus existing window on a second launch
             }))
-            .plugin(tauri_plugin_updater::Builder::new().build());
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_process::init());
     }
 
     builder
@@ -51,8 +50,6 @@ pub fn run() {
             storage::ensure_migrated(app.handle()); // one-time copy from the legacy Electron vault
             window::create(app.handle())?;
             tray::create(app.handle())?;
-            #[cfg(desktop)]
-            updater::check(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

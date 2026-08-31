@@ -19,6 +19,7 @@
       "allow": [{ "url": "http://*" }, { "url": "https://*" }]
     },
     "log:default",
-    "updater:default"
+    "updater:default",
+    "process:default"
   ]
 }

@@ -166,7 +166,7 @@ on Phase 1.
 ### T-SEC-3 · Log-redaction discipline  ✅ (PR) (S17)
 **Evidence:** only 2 benign `log::` sites today; no structural redaction; unused frontend `plugin-log`. **Steps:** add a lint/review rule forbidding `log::*!` interpolating `Entry`/secret fields; drop the unused frontend log plugin or wire redaction. **Acceptance:** rule in place; no secret-bearing log call exists.
 
-### T-SEC-4 · Prompt before auto-installing updates  🟡 (updater UX)
+### T-SEC-4 · Prompt before auto-installing updates  ✅ (PR) (updater UX)
 **Evidence:** `updater.rs:15-20` silently downloads+installs on launch (`lib.rs:52`); signed via minisign (`tauri.conf.json:57`, public key — not a leak). **Steps:** surface an update prompt/notice before install (silent self-update is a trust concern even when signed). **Acceptance:** update requires user consent (or is clearly disclosed + opt-out).
 
 ---

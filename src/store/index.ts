@@ -6,6 +6,7 @@ import { createEntriesSlice, type EntriesSlice } from './entriesSlice'
 import { createAuditSlice, type AuditSlice } from './auditSlice'
 import { createSyncSlice, type SyncSlice } from './syncSlice'
 import { createI18nSlice, type I18nSlice } from './i18nSlice'
+import { createUpdateSlice, type UpdateSlice } from './updateSlice'
 import { createAsyncSlice, type AsyncSlice } from './thunks'
 
 export type StoreState = FlowSlice &
@@ -14,6 +15,7 @@ export type StoreState = FlowSlice &
   AuditSlice &
   SyncSlice &
   I18nSlice &
+  UpdateSlice &
   AsyncSlice
 
 export const useStore = create<StoreState>()((...a) => ({
@@ -23,6 +25,7 @@ export const useStore = create<StoreState>()((...a) => ({
   ...createAuditSlice(...a),
   ...createSyncSlice(...a),
   ...createI18nSlice(...a),
+  ...createUpdateSlice(...a),
   ...createAsyncSlice(...a)
 }))
 
@@ -33,7 +36,8 @@ const pickData = (s: StoreState) => ({
   audit: s.audit,
   breachCheck: s.breachCheck,
   sync: s.sync,
-  i18n: s.i18n
+  i18n: s.i18n,
+  update: s.update
 })
 
 const initialData = pickData(useStore.getState())
@@ -70,6 +74,9 @@ export const {
   syncStart,
   syncStop,
   localeChanged,
+  setUpdateReady,
+  dismissUpdate,
+  runUpdateCheck,
   saveEntry,
   deleteEntry,
   enterMain,
