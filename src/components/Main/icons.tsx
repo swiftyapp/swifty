@@ -10,6 +10,7 @@
 // Components keep the historical `*Glyph` names so this module stays the one
 // place an icon choice lives.
 import {
+  Check,
   ChevronDown,
   Copy,
   CreditCard,
@@ -21,6 +22,7 @@ import {
   Globe,
   Lock,
   Moon,
+  MoreHorizontal,
   Pencil,
   Plus,
   RefreshCw,
@@ -50,6 +52,8 @@ export const LockGlyph = glyph(Lock, 14)
 export const SunGlyph = glyph(Sun, 14)
 export const MoonGlyph = glyph(Moon, 14)
 export const CopyGlyph = glyph(Copy, 14)
+export const CheckGlyph = glyph(Check, 14)
+export const MoreGlyph = glyph(MoreHorizontal, 14)
 export const EyeGlyph = glyph(Eye, 14)
 export const EyeOffGlyph = glyph(EyeOff, 14)
 export const PencilGlyph = glyph(Pencil, 14)
