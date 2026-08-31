@@ -1,19 +1,14 @@
 import type { EntryMeta } from '@/lib/commands'
-import NoteIcon from '@/assets/images/notes/note.svg?react'
+import { NoteGlyph } from '@/components/Main/icons'
+import Row from './Row'
 
 interface Props {
   entry: EntryMeta
 }
 
+// The note body is a secret, so there is no snippet to preview in the list; the
+// tags (non-secret metadata) stand in as the secondary line when present.
 export default function Note({ entry }: Props) {
-  return (
-    <>
-      <div className="icon">
-        <NoteIcon width="26" height="26" />
-      </div>
-      <div className="description">
-        <div className="primary">{entry.title}</div>
-      </div>
-    </>
-  )
+  const sub = entry.tags.length > 0 ? entry.tags.join(' · ') : undefined
+  return <Row glyph={<NoteGlyph size={16} />} title={entry.title} sub={sub} />
 }

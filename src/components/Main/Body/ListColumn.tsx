@@ -4,8 +4,7 @@ import Tags from '../Header/Tags'
 import List from './List'
 
 // The middle pane: a scope header (mono eyebrow + large title) with the tag
-// filter, over the existing scrollable entry list. Full list-item styling and
-// the final tag-chip placement are PR 4 — this keeps it functional and legible.
+// filter chips, over the scrollable entry list.
 export default function ListColumn() {
   const scope = useStore(state => state.filters.scope)
 
@@ -18,9 +17,7 @@ export default function ListColumn() {
         <div className="mt-1.5 text-xl font-semibold tracking-[-0.025em] text-text">
           {scopeTitle(scope)}
         </div>
-        <div className="mt-3">
-          <Tags />
-        </div>
+        <Tags />
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <List />
