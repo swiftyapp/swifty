@@ -1,4 +1,4 @@
-import type { AppDispatch, RootState } from './index'
+import type { StateCreator } from 'zustand'
 import type { Entry, UnlockResult } from '@/lib/commands'
 import {
   saveVault,
@@ -10,24 +10,24 @@ import {
 } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
 import { enlarge } from '@/services/window'
-import { setEntries, entrySaved, entryRemoved } from './entriesSlice'
-import { auditDone } from './auditSlice'
-import { flowMain } from './flowSlice'
-import { syncInit } from './syncSlice'
 import { SYNC_ENABLED } from '@/config'
+import type { StoreState } from './index'
+
+export interface AsyncSlice {
+  saveEntry: (draft: EntryDraft) => Promise<void>
+  deleteEntry: (id: string) => Promise<void>
+  enterMain: (result: UnlockResult) => Promise<void>
+  completeSetup: (password: string) => Promise<void>
+  restoreBackup: (path: string, password: string) => Promise<void>
+}
 
 const trySync = () => {
   if (SYNC_ENABLED) syncNow().catch(() => {})
 }
 
-type Thunk = (dispatch: AppDispatch, getState: () => RootState) => Promise<void>
-
 const now = () => new Date().toISOString()
 
-const buildEntries = (
-  draft: EntryDraft,
-  items: Entry[]
-): [Entry[], Entry] => {
+const buildEntries = (draft: EntryDraft, items: Entry[]): [Entry[], Entry] => {
   const entries = items.slice()
   const index = entries.findIndex(e => e.id === draft.id)
   if (draft.id && index !== -1) {
@@ -45,53 +45,43 @@ const buildEntries = (
   return [entries, created]
 }
 
-const refreshAudit = (dispatch: AppDispatch) =>
-  getAudit()
-    .then(data => dispatch(auditDone(data)))
-    .catch(() => {})
+export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_set, get) => {
+  const refreshAudit = () =>
+    getAudit()
+      .then(data => get().auditDone(data))
+      .catch(() => {})
 
-export const saveEntry =
-  (draft: EntryDraft): Thunk =>
-  async (dispatch, getState) => {
-    const [entries, item] = buildEntries(draft, getState().entries.items)
-    const vault = await saveVault(entries)
-    dispatch(setEntries(vault.entries))
-    dispatch(entrySaved(item.id))
-    trySync()
-    refreshAudit(dispatch)
+  return {
+    saveEntry: async draft => {
+      const [entries, item] = buildEntries(draft, get().entries.items)
+      const vault = await saveVault(entries)
+      get().setEntries(vault.entries)
+      get().entrySaved(item.id)
+      trySync()
+      refreshAudit()
+    },
+    deleteEntry: async id => {
+      const remaining = get().entries.items.filter(e => e.id !== id)
+      const vault = await saveVault(remaining)
+      get().entryRemoved(vault.entries)
+      trySync()
+      refreshAudit()
+    },
+    enterMain: async result => {
+      await enlarge().catch(() => {})
+      get().setEntries(result.vault.entries)
+      get().flowMain()
+      get().syncInit(SYNC_ENABLED && result.syncConfigured)
+      if (SYNC_ENABLED && result.syncConfigured) syncNow().catch(() => {})
+    },
+    completeSetup: async password => {
+      await setup(password)
+      const vault = await readVault()
+      await get().enterMain({ vault, syncConfigured: false })
+    },
+    restoreBackup: async (path, password) => {
+      const result = await importBackup(path, password)
+      await get().enterMain(result)
+    }
   }
-
-export const deleteEntry =
-  (id: string): Thunk =>
-  async (dispatch, getState) => {
-    const remaining = getState().entries.items.filter(e => e.id !== id)
-    const vault = await saveVault(remaining)
-    dispatch(entryRemoved(vault.entries))
-    trySync()
-    refreshAudit(dispatch)
-  }
-
-export const enterMain =
-  (result: UnlockResult): Thunk =>
-  async dispatch => {
-    await enlarge().catch(() => {})
-    dispatch(setEntries(result.vault.entries))
-    dispatch(flowMain())
-    dispatch(syncInit(SYNC_ENABLED && result.syncConfigured))
-    if (SYNC_ENABLED && result.syncConfigured) syncNow().catch(() => {})
-  }
-
-export const completeSetup =
-  (password: string): Thunk =>
-  async dispatch => {
-    await setup(password)
-    const vault = await readVault()
-    await dispatch(enterMain({ vault, syncConfigured: false }))
-  }
-
-export const restoreBackup =
-  (path: string, password: string): Thunk =>
-  async dispatch => {
-    const result = await importBackup(path, password)
-    await dispatch(enterMain(result))
-  }
+}

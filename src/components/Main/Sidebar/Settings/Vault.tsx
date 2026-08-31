@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { cx } from '@/utils/cx'
-import { useAppSelector } from '@/store'
+import { useStore } from '@/store'
 import { syncConnect, syncDisconnect, exportVault } from '@/lib/commands'
 import { SYNC_ENABLED } from '@/config'
 import { t } from '@/i18n'
@@ -13,7 +13,7 @@ interface Props {
 
 export default function Vault({ section }: Props) {
   const [connecting, setConnecting] = useState(false)
-  const syncEnabled = useAppSelector(state => state.sync.enabled)
+  const syncEnabled = useStore(state => state.sync.enabled)
 
   useEffect(() => setConnecting(false), [syncEnabled])
 

@@ -1,6 +1,5 @@
 import { useState, type ChangeEvent } from 'react'
-import { useAppDispatch } from '@/store'
-import { completeSetup } from '@/store/thunks'
+import { completeSetup } from '@/store'
 import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
 
@@ -10,7 +9,6 @@ interface Props {
 }
 
 export default function Confirm({ display, password }: Props) {
-  const dispatch = useAppDispatch()
   const [confirmation, setConfirmation] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -20,7 +18,7 @@ export default function Confirm({ display, password }: Props) {
   }
 
   const onSend = () => {
-    if (password === confirmation) dispatch(completeSetup(password))
+    if (password === confirmation) completeSetup(password)
     else setError(t('Passwords do not match'))
   }
 

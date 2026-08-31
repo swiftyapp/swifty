@@ -1,29 +1,25 @@
 import type { ReactElement } from 'react'
 import { render } from '@testing-library/react'
-import { Provider } from 'react-redux'
-import { makeStore, type AppStore, type RootState } from '@/store'
-import { setEntries } from '@/store/entriesSlice'
-import { flowMain } from '@/store/flowSlice'
-import { auditDone } from '@/store/auditSlice'
+import { makeStore, setEntries, flowMain, auditDone } from '@/store'
 import type { Entry, Audit } from '@/lib/commands'
 
+type Store = ReturnType<typeof makeStore>
+
 interface Options {
-  store?: AppStore
+  store?: Store
 }
 
-// Renders a component inside a fresh store so tests never share state.
+// Renders a component against a freshly reset store so tests never share state.
 export const renderWithStore = (ui: ReactElement, { store = makeStore() }: Options = {}) => ({
   store,
-  ...render(<Provider store={store}>{ui}</Provider>)
+  ...render(ui)
 })
 
-export const state = (store: AppStore): RootState => store.getState()
-
 // Puts the store into the unlocked "main" flow with the given entries.
-export const withEntries = (store: AppStore, entries: Entry[], audit?: Audit) => {
-  store.dispatch(setEntries(entries))
-  store.dispatch(flowMain())
-  if (audit) store.dispatch(auditDone(audit))
+export const withEntries = (_store: Store, entries: Entry[], audit?: Audit) => {
+  setEntries(entries)
+  flowMain()
+  if (audit) auditDone(audit)
 }
 
 export const loginEntry = (overrides: Partial<Entry> = {}): Entry => ({

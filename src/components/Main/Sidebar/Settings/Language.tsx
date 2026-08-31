@@ -1,5 +1,4 @@
-import { useAppDispatch, useAppSelector } from '@/store'
-import { localeChanged } from '@/store/i18nSlice'
+import { useStore, localeChanged } from '@/store'
 import { LANGUAGES, t } from '@/i18n'
 import type { Section } from './Navigation'
 
@@ -8,8 +7,7 @@ interface Props {
 }
 
 export default function Language({ section }: Props) {
-  const dispatch = useAppDispatch()
-  const locale = useAppSelector(state => state.i18n.locale)
+  const locale = useStore(state => state.i18n.locale)
 
   if (section !== 'language') return null
 
@@ -20,7 +18,7 @@ export default function Language({ section }: Props) {
         <select
           name="locale"
           value={locale}
-          onChange={e => dispatch(localeChanged(e.target.value))}
+          onChange={e => localeChanged(e.target.value)}
         >
           {Object.keys(LANGUAGES).map(key => (
             <option key={key} value={key}>

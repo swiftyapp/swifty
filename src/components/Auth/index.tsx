@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { unlock, unlockBiometric } from '@/lib/commands'
-import { useAppDispatch } from '@/store'
-import { enterMain } from '@/store/thunks'
+import { enterMain } from '@/store'
 import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
 import Controls from '@/components/elements/Controls'
@@ -12,18 +11,17 @@ interface Props {
 }
 
 export function Auth({ touchID }: Props) {
-  const dispatch = useAppDispatch()
   const [error, setError] = useState<string | null>(null)
 
   const handleEnter = (value: string) => {
     unlock(value)
-      .then(result => dispatch(enterMain(result)))
+      .then(result => enterMain(result))
       .catch(() => setError(t('Incorrect Master Password')))
   }
 
   const handleTouchId = () => {
     unlockBiometric()
-      .then(result => dispatch(enterMain(result)))
+      .then(result => enterMain(result))
       .catch(() => setError(t('Incorrect Master Password')))
   }
 

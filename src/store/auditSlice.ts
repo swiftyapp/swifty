@@ -1,15 +1,13 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+import type { StateCreator } from 'zustand'
 import type { Audit } from '@/lib/commands'
+import type { StoreState } from './index'
 
-const auditSlice = createSlice({
-  name: 'audit',
-  initialState: null as Audit | null,
-  reducers: {
-    auditDone(_state, action: PayloadAction<Audit>) {
-      return action.payload
-    }
-  }
+export interface AuditSlice {
+  audit: Audit | null
+  auditDone: (audit: Audit) => void
+}
+
+export const createAuditSlice: StateCreator<StoreState, [], [], AuditSlice> = set => ({
+  audit: null,
+  auditDone: audit => set({ audit })
 })
-
-export const { auditDone } = auditSlice.actions
-export default auditSlice.reducer

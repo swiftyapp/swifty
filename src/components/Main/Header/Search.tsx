@@ -1,12 +1,10 @@
-import { useAppDispatch, useAppSelector } from '@/store'
-import { setFilterQuery } from '@/store/filtersSlice'
+import { useStore, setFilterQuery } from '@/store'
 import { t } from '@/i18n'
 import SearchIcon from '@/assets/images/search.svg?react'
 import ClearIcon from '@/assets/images/clear.svg?react'
 
 export default function Search() {
-  const dispatch = useAppDispatch()
-  const query = useAppSelector(state => state.filters.query)
+  const query = useStore(state => state.filters.query)
 
   return (
     <div className="search">
@@ -16,11 +14,11 @@ export default function Search() {
         name="search"
         placeholder={t('Search')}
         value={query}
-        onChange={e => dispatch(setFilterQuery(e.target.value))}
+        onChange={e => setFilterQuery(e.target.value)}
       />
       {query !== '' && (
         <ClearIcon
-          onClick={() => dispatch(setFilterQuery(''))}
+          onClick={() => setFilterQuery('')}
           width="10"
           height="10"
           className="clear-icon"
