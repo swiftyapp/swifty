@@ -52,7 +52,12 @@ async fn find_one(client: &Client, token: &str, q: &str) -> Result<Option<String
 }
 
 pub async fn folder_id(client: &Client, token: &str, name: &str) -> Result<Option<String>> {
-    find_one(client, token, &format!("name = '{}' and trashed = false", escape(name))).await
+    find_one(
+        client,
+        token,
+        &format!("name = '{}' and trashed = false", escape(name)),
+    )
+    .await
 }
 
 pub async fn file_id(

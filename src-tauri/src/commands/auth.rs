@@ -26,14 +26,20 @@ pub fn setup(password: String, app: AppHandle, state: State<'_, AppState>) -> Re
 // Unlock the vault with the master password. Returns decrypted data for display;
 // the derived key stays in Rust.
 #[tauri::command]
-pub fn unlock(password: String, app: AppHandle, state: State<'_, AppState>) -> Result<UnlockResult> {
+pub fn unlock(
+    password: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<UnlockResult> {
     storage::ensure_migrated(&app);
     let blob = storage::read_vault(&app)?;
     let secret = crypto::hash_secret(&password);
     let cryptor = crypto::Cryptor::new(&secret);
     // One derivation decrypts the outer blob. Sensitive fields stay encrypted and
     // are exposed lazily (reveal_entry) so plaintext secrets aren't all in memory.
-    let vault: VaultData = cryptor.decrypt_data(&blob).map_err(|_| Error::InvalidPassword)?;
+    let vault: VaultData = cryptor
+        .decrypt_data(&blob)
+        .map_err(|_| Error::InvalidPassword)?;
     let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
     state
         .session
@@ -170,10 +176,10 @@ pub fn change_master_password(
     }
 
     let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
-    state.session.lock().unwrap().set(
-        new_secret,
-        VaultData { entries: exposed },
-        sync_configured,
-    );
+    state
+        .session
+        .lock()
+        .unwrap()
+        .set(new_secret, VaultData { entries: exposed }, sync_configured);
     Ok(())
 }

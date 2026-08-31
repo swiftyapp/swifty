@@ -19,7 +19,10 @@ const PREFIX_LEN: usize = 5;
 // SHA-1 hex (uppercase, 40 chars) of the password. SHA-1 is required by the
 // HIBP range API and is not used here for any security property.
 fn sha1_hex(password: &str) -> String {
-    hex::encode_upper(digest::digest(&digest::SHA1_FOR_LEGACY_USE_ONLY, password.as_bytes()))
+    hex::encode_upper(digest::digest(
+        &digest::SHA1_FOR_LEGACY_USE_ONLY,
+        password.as_bytes(),
+    ))
 }
 
 // k-anonymity split: the 5-char prefix is all that is ever sent.

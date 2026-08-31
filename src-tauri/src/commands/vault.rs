@@ -9,7 +9,13 @@ use tauri_plugin_dialog::DialogExt;
 // frontend reveals individual entries on demand (reveal_entry).
 #[tauri::command]
 pub fn read_vault(state: State<'_, AppState>) -> Result<VaultData> {
-    state.session.lock().unwrap().vault.clone().ok_or(Error::Locked)
+    state
+        .session
+        .lock()
+        .unwrap()
+        .vault
+        .clone()
+        .ok_or(Error::Locked)
 }
 
 // Decrypt one entry's sensitive fields on demand (view/edit).
@@ -18,7 +24,11 @@ pub fn reveal_entry(id: String, state: State<'_, AppState>) -> Result<Entry> {
     let session = state.session.lock().unwrap();
     let cryptor = session.cryptor()?;
     let vault = session.vault.as_ref().ok_or(Error::Locked)?;
-    let entry = vault.entries.iter().find(|e| e.id == id).ok_or(Error::NotFound)?;
+    let entry = vault
+        .entries
+        .iter()
+        .find(|e| e.id == id)
+        .ok_or(Error::NotFound)?;
     cryptor.expose(entry)
 }
 
@@ -70,7 +80,9 @@ pub fn import_backup(
     let secret = crypto::hash_secret(&password);
     let cryptor = crypto::Cryptor::new(&secret);
     // Validate it decrypts, then adopt it; fields stay encrypted (revealed lazily).
-    let vault: VaultData = cryptor.decrypt_data(&blob).map_err(|_| Error::InvalidPassword)?;
+    let vault: VaultData = cryptor
+        .decrypt_data(&blob)
+        .map_err(|_| Error::InvalidPassword)?;
 
     storage::write_vault(&app, &blob)?;
     let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);

@@ -24,10 +24,20 @@ pub fn handle_event(app: &AppHandle, event: &WindowEvent) {
 }
 
 fn arm(app: &AppHandle) {
-    if !app.state::<AppState>().session.lock().unwrap().is_unlocked() {
+    if !app
+        .state::<AppState>()
+        .session
+        .lock()
+        .unwrap()
+        .is_unlocked()
+    {
         return;
     }
-    let generation = app.state::<AutoLock>().generation.fetch_add(1, Ordering::SeqCst) + 1;
+    let generation = app
+        .state::<AutoLock>()
+        .generation
+        .fetch_add(1, Ordering::SeqCst)
+        + 1;
     let app = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(INACTIVE_TIMEOUT);

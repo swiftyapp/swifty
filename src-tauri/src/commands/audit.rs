@@ -31,7 +31,12 @@ pub async fn get_audit(state: State<'_, AppState>, check_breaches: bool) -> Resu
 fn audit(cryptor: &Cryptor, entries: &[Entry], check_breaches: bool) -> Result<Audit> {
     let creds: Vec<(&Entry, String)> = entries
         .iter()
-        .filter_map(|e| e.password.as_deref().filter(|p| !p.is_empty()).map(|p| (e, p)))
+        .filter_map(|e| {
+            e.password
+                .as_deref()
+                .filter(|p| !p.is_empty())
+                .map(|p| (e, p))
+        })
         .map(|(e, p)| Ok((e, cryptor.decrypt(p)?)))
         .collect::<Result<_>>()?;
 
