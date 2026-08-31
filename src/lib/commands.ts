@@ -187,6 +187,49 @@ export const importSwftx = (
 
 export const exportVault = (): Promise<string | null> => invoke('export_vault')
 
+// --- Third-party import/export ---
+
+// Explicit format names understood by the backend (`import_entries`); 'auto'
+// detects by extension/content.
+export type ImportFormat =
+  | 'auto'
+  | 'bitwarden'
+  | 'csv'
+  | 'chrome'
+  | 'lastpass'
+  | 'keepass'
+
+export type ExportFormat = 'bitwarden' | 'csv'
+
+export interface RowError {
+  row: number
+  message: string
+}
+
+export interface ImportReport {
+  total: number // parsed entries (would-be import on a dry run)
+  imported: number // entries written (0 on a dry run)
+  skipped: number // rows that failed to parse
+  dryRun: boolean
+  errors: RowError[]
+}
+
+export const pickImportFile = (): Promise<string | null> =>
+  invoke('pick_import_file')
+
+export const importEntries = (
+  path: string,
+  format: ImportFormat,
+  dryRun: boolean
+): Promise<ImportReport> =>
+  invoke('import_entries', { path, format, dryRun })
+
+export const exportEntries = (
+  format: ExportFormat,
+  path?: string
+): Promise<string | null> =>
+  invoke('export_entries', { path: path ?? null, format })
+
 // ---------------------------------------------------------------------------
 // Generator & OTP
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ mod commands;
 pub mod crypto;
 mod error;
 mod hibp;
+mod import;
 mod models;
 mod secure_store;
 mod state;
@@ -70,6 +71,9 @@ pub fn run() {
             commands::vault::import_backup,
             commands::vault::import_swftx,
             commands::vault::export_vault,
+            commands::import::pick_import_file,
+            commands::import::import_entries,
+            commands::import::export_entries,
             commands::generator::generate_password,
             commands::generator::generate_otp,
             commands::generator::verify_otp,
