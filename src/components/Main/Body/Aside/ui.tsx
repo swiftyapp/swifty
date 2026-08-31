@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { cx } from '@/utils/cx'
 import { copy } from '@/services/copy'
-import { evaluate } from '@/services/strength'
+import { useStrength } from '@/hooks/useStrength'
 import { t } from '@/i18n'
 import { CopyGlyph } from '../../icons'
 
@@ -84,8 +84,11 @@ export function CopyButton({ value, title }: { value: string; title?: string }) 
 
 // Five-segment strength meter driven by the existing zxcvbn `evaluate`.
 export function StrengthBar({ password }: { password: string }) {
+  const strength = useStrength(password)
   if (!password) return null
-  const { score } = evaluate(password)
+  // Renders immediately as an empty bar and fills once the deferred score lands,
+  // so scoring never blocks the detail panel from painting on selection.
+  const score = strength?.score ?? null
   return (
     <div className="flex items-center gap-2.5">
       <span className="flex flex-none gap-[3px]">
@@ -94,13 +97,13 @@ export function StrengthBar({ password }: { password: string }) {
             key={i}
             className={cx(
               'h-[3px] w-[22px] rounded-full',
-              i <= score ? STRENGTH_COLOR[score] : 'bg-line2'
+              score !== null && i <= score ? STRENGTH_COLOR[score] : 'bg-line2'
             )}
           />
         ))}
       </span>
       <span className="font-mono text-[11px] text-text3">
-        {t(STRENGTH_LABELS[score])}
+        {score !== null ? t(STRENGTH_LABELS[score]) : ''}
       </span>
     </div>
   )
