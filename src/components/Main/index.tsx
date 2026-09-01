@@ -2,6 +2,7 @@ import Sidebar from './Sidebar'
 import Header from './Header'
 import Body from './Body'
 import Palette from './Palette'
+import Generator from './Generator'
 import { useShortcuts } from './useShortcuts'
 
 // Three-pane shell: a full-width top chrome bar over a row of
@@ -20,6 +21,7 @@ export function Main() {
         <Body />
       </div>
       <Palette />
+      <Generator />
     </div>
   )
 }
