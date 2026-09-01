@@ -4,20 +4,18 @@ import { useCopied } from '@/hooks/useCopied'
 import { useStrength } from '@/hooks/useStrength'
 import { t } from '@/i18n'
 import IconButton from '@/components/elements/IconButton'
+<<<<<<< HEAD
 import { CheckGlyph, CopyGlyph } from '../../icons'
+=======
+import Meter from '@/components/elements/Meter'
+import { CopyGlyph } from '../../icons'
+>>>>>>> feat/generator-dialog
 
 // Re-export so existing detail-pane imports keep working; the primitive itself
 // now lives in elements/ and is shared with the header and Masterpass.
 export { IconButton }
 
 const STRENGTH_LABELS = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']
-const STRENGTH_COLOR = [
-  'bg-bad',
-  'bg-bad',
-  'bg-warn',
-  'bg-good',
-  'bg-good'
-]
 
 // Shared presentation primitives for the detail pane. Every card, ledger cell,
 // mono label and copy affordance in Show / Form / Audit routes through these so
@@ -66,17 +64,7 @@ export function StrengthBar({ password }: { password: string }) {
   const score = strength?.score ?? null
   return (
     <div className="flex items-center gap-2.5">
-      <span className="flex flex-none gap-[3px]">
-        {[0, 1, 2, 3, 4].map(i => (
-          <span
-            key={i}
-            className={cx(
-              'h-[3px] w-[22px] rounded-full',
-              score !== null && i <= score ? STRENGTH_COLOR[score] : 'bg-line2'
-            )}
-          />
-        ))}
-      </span>
+      <Meter level={score} />
       <span className="font-mono text-xs text-text3">
         {score !== null ? t(STRENGTH_LABELS[score]) : ''}
       </span>

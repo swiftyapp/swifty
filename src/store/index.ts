@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { getLocale } from '@/i18n'
 import { createFlowSlice, type FlowSlice } from './flowSlice'
+import { createGeneratorSlice, type GeneratorSlice } from './generatorSlice'
 import { createFiltersSlice, type FiltersSlice } from './filtersSlice'
 import { createEntriesSlice, type EntriesSlice } from './entriesSlice'
 import { createAuditSlice, type AuditSlice } from './auditSlice'
@@ -13,6 +14,7 @@ import { createUiSlice, type UiSlice } from './uiSlice'
 import { createAsyncSlice, type AsyncSlice } from './thunks'
 
 export type StoreState = FlowSlice &
+  GeneratorSlice &
   FiltersSlice &
   EntriesSlice &
   AuditSlice &
@@ -26,6 +28,7 @@ export type StoreState = FlowSlice &
 
 export const useStore = create<StoreState>()((...a) => ({
   ...createFlowSlice(...a),
+  ...createGeneratorSlice(...a),
   ...createFiltersSlice(...a),
   ...createEntriesSlice(...a),
   ...createAuditSlice(...a),
@@ -40,6 +43,7 @@ export const useStore = create<StoreState>()((...a) => ({
 
 const pickData = (s: StoreState) => ({
   flow: s.flow,
+  generator: s.generator,
   filters: s.filters,
   entries: s.entries,
   audit: s.audit,
@@ -64,6 +68,8 @@ export const {
   flowSetup,
   flowAuth,
   flowMain,
+  openGenerator,
+  closeGenerator,
   setFilterQuery,
   setFilterScope,
   setFilterTag,
