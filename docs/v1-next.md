@@ -90,7 +90,10 @@ regressions in the core flows.
 
 ---
 
-## 3. E2E specs port from legacy ❌
+## 3. E2E specs port from legacy 🟡
+
+> Live coverage matrix (legacy floor, planned additions, and what is deliberately not
+> e2e-able): [`tests/e2e/COVERAGE.md`](../tests/e2e/COVERAGE.md).
 
 Port the legacy Electron E2E coverage onto the new `tauri-plugin-webdriver` harness landed in
 the remediation phase (`tests/e2e/`, mirrors the reticle app; one smoke spec today). The legacy
