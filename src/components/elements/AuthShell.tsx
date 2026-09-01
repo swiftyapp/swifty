@@ -41,6 +41,7 @@ export default function AuthShell({ children, meta, onBack }: Props) {
       {onBack && (
         <button
           type="button"
+          data-testid="go-back-button"
           onClick={onBack}
           className="absolute bottom-14 left-1/2 flex -translate-x-1/2 items-center gap-1.5 border-0 bg-transparent font-mono text-xs uppercase tracking-label text-text3 transition-colors hover:text-text"
         >
