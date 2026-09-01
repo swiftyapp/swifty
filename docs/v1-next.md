@@ -21,7 +21,18 @@ products solve it, don't patch symptoms.
 
 ---
 
-## 1. GDrive sync ❌ 🔴 OWNER-REVIEW
+## 1. GDrive sync ✅
+
+> **Done** — landed as PRs #284 (store merge primitives), #286 (`.swsync` pack format +
+> fresh-install restore), #287 (async Drive engine), #288 (post-landing cleanup). Design doc
+> with the full algorithm and adversarial review: the "Drive Sync v2" artifact. The 🔴 review
+> point was resolved as: sync the whole SQLCipher snapshot in a thin plaintext-KDF-header
+> container (Enpass/KeePass model), not per-entry envelopes.
+>
+> **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
+> on a fresh install); cross-device master-password-change flow (currently fails safe with a
+> foreign-vault error); OAuth scope audit (`drive.file`); **release gate: a production Google
+> OAuth client ID (owner task)**.
 
 Re-enable Google Drive sync on the new SQLite storage engine. Postponed during remediation;
 picking it back up now. **The storage groundwork already exists** — do not rebuild it:
@@ -51,7 +62,12 @@ _(Legacy audit refs: T-SYNC-1 / T-SYNC-2, D2–D4, S13.)_
 
 ---
 
-## 2. Frontend redesign ❌
+## 2. Frontend redesign ✅
+
+> **Done** — the Keyring-inspired redesign landed as the PR stack #268–#276 (+ rescues #277,
+> #282) with follow-up refinements through #283: ruled Tailwind v4 token system
+> (`src/styles/theme.css`), lucide icons, new brand mark, favicons in the list, card brand
+> marks + interactive card face. `data-testid` selectors were preserved throughout.
 
 A visual/UX refresh of the app. Tailwind was considered and deferred during the dependency
 modernization — revisit as part of this. The React stack is current (React 19 + zustand +
@@ -110,6 +126,6 @@ _(Legacy audit ref: T-CI-2 extended — the smoke spec is done; this is the brea
 
 ## Suggested order
 
-Sync (1) is independent and can proceed now. The redesign (2) and the E2E port (3) are
-coupled — do the redesign first (or alongside) so specs are written against the final UI,
-avoiding a double port.
+Sync (1) and the redesign (2) are done. Only the E2E port (3) remains — and its sequencing
+condition is now satisfied: the UI is final, so specs port once, against the shipped design.
+Sync assertions the legacy specs dropped can come back too, now that item 1 landed.
