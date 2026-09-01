@@ -6,6 +6,7 @@
 //! encrypts it (the caller applies its own AEAD). The only crypto here is
 //! SQLCipher at-rest, keyed by a byte key injected at [`SqliteStore::open`].
 
+mod hash;
 mod sqlite;
 
 // Migration glue lives in-module but deliberately references the app's crypto —
@@ -15,6 +16,7 @@ pub mod migrate;
 #[cfg(test)]
 mod tests;
 
+pub use hash::record_hash;
 pub use sqlite::SqliteStore;
 
 use std::time::{SystemTime, UNIX_EPOCH};
