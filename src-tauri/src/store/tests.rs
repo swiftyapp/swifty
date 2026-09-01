@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::{migrate, record_hash, Record, SqliteStore, VaultStore};
+use super::{migrate, record_hash, Record, SqliteStore, StoreError, VaultStore};
 use crate::crypto::{self, KdfParams, VaultKey};
 use crate::models::Entry;
 
@@ -222,6 +222,22 @@ fn rekey_reencrypts_db_in_place() {
     assert!(SqliteStore::open(&path, KEY).is_err());
     let store = SqliteStore::open(&path, KEY2).unwrap();
     assert_eq!(store.get("1").unwrap().unwrap().payload, b"durable");
+}
+
+// The one open failure that must NOT read as a wrong key: a vault stamped by
+// a newer build (user_version above this binary's migration list).
+#[test]
+fn future_schema_fails_as_schema_newer_not_wrong_key() {
+    let path = tmp_db();
+    {
+        let store = SqliteStore::open(&path, KEY).unwrap();
+        store.set_user_version(99).unwrap();
+    }
+    match SqliteStore::open(&path, KEY) {
+        Err(StoreError::SchemaNewer) => {}
+        Err(other) => panic!("expected SchemaNewer, got error: {other}"),
+        Ok(_) => panic!("expected SchemaNewer, but the open succeeded"),
+    }
 }
 
 #[test]

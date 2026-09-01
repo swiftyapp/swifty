@@ -16,7 +16,18 @@ use super::{now_ms, EntryMeta, Record, Result, StoreError, VaultStore};
 // change (Phase 2 KDF columns, Phase 3 sync columns). The `meta` k/v table holds
 // APP data (KDF descriptor, biometric flag, settings), not schema versioning.
 fn migrations() -> Migrations<'static> {
-    Migrations::new(vec![
+    Migrations::new(migration_list())
+}
+
+// After running all migrations, `user_version` equals the list length. A DB
+// above that was written by a newer build — refuse with a dedicated error
+// instead of letting the failure masquerade as a wrong key (see `open`).
+fn schema_version() -> i64 {
+    migration_list().len() as i64
+}
+
+fn migration_list() -> Vec<M<'static>> {
+    vec![
         M::up(
             "CREATE TABLE meta (
            key   TEXT PRIMARY KEY,
@@ -38,7 +49,7 @@ fn migrations() -> Migrations<'static> {
         // so listings show brand marks without touching the payload. NULL =
         // not yet derived (backfilled once on unlock).
         M::up("ALTER TABLE entries ADD COLUMN card_brand TEXT;"),
-    ])
+    ]
 }
 
 // card_brand is appended last so pre-existing column indexes stay put.
@@ -96,6 +107,14 @@ impl SqliteStore {
             .map_err(|_| StoreError::Other("cannot open database (wrong key?)".into()))?;
         }
 
+        // A vault stamped by a newer build must surface as "update the app",
+        // never as a key failure — for a password manager, a fake "wrong
+        // password" is the worst possible misdiagnosis.
+        let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if version > schema_version() {
+            return Err(StoreError::SchemaNewer);
+        }
+
         // Apply pending schema migrations on the decrypted DB (tracked via
         // `user_version`; idempotent — a no-op once the DB is at the latest).
         migrations()
@@ -137,6 +156,14 @@ impl SqliteStore {
     pub fn rekey(&self, new_key: &[u8]) -> Result<()> {
         self.lock()
             .execute_batch(&format!("PRAGMA rekey = \"x'{}'\";", hex(new_key)))?;
+        Ok(())
+    }
+
+    /// Test seam: stamp the DB as if a future build had migrated it further.
+    #[cfg(test)]
+    pub(crate) fn set_user_version(&self, version: i64) -> Result<()> {
+        self.lock()
+            .execute_batch(&format!("PRAGMA user_version = {version}"))?;
         Ok(())
     }
 

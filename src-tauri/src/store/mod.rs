@@ -28,6 +28,12 @@ pub enum StoreError {
     #[error("sqlite: {0}")]
     Sqlite(#[from] rusqlite::Error),
 
+    // The DB was stamped by a build with more migrations than this one knows.
+    // Kept distinct so the app boundary can say "update the app" instead of
+    // the catch-all "wrong password".
+    #[error("vault schema is newer than this app version")]
+    SchemaNewer,
+
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
 
