@@ -22,6 +22,16 @@ const isTooManyAttempts = (error: unknown): error is TooManyAttemptsError =>
   error !== null &&
   typeof (error as TooManyAttemptsError).retryAfterSecs === 'number'
 
+// Rust's `Error::VaultTooNew` (see error.rs) — the vault's schema is ahead of
+// this build. Shown as its own message: blaming the password would be wrong.
+const isVaultTooNew = (error: unknown): boolean =>
+  error === 'vault requires a newer version of the app'
+
+const unlockError = (error: unknown): string =>
+  isVaultTooNew(error)
+    ? t('Vault needs a newer version of Swifty')
+    : t('Incorrect Master Password')
+
 const lockedMessage = (seconds: number) =>
   `${t('Too many failed attempts')}. ${t('Try again in')} ${seconds}s`
 
@@ -49,7 +59,7 @@ export function Auth({ touchID }: Props) {
           setRetryAfter(err.retryAfterSecs)
           setError(lockedMessage(err.retryAfterSecs))
         } else {
-          setError(t('Incorrect Master Password'))
+          setError(unlockError(err))
         }
       })
   }
@@ -59,7 +69,7 @@ export function Auth({ touchID }: Props) {
     // already rate-limits it), so it stays available even while locked out.
     unlockBiometric()
       .then(result => enterMain(result))
-      .catch(() => setError(t('Incorrect Master Password')))
+      .catch((err: unknown) => setError(unlockError(err)))
   }
 
   return (

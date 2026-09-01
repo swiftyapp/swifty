@@ -7,6 +7,12 @@ pub enum Error {
     #[error("invalid master password")]
     InvalidPassword,
 
+    // The vault was written by a newer build (schema ahead of this binary).
+    // Distinct from InvalidPassword so the UI never blames the user's memory
+    // for a version mismatch. The message string is the frontend's match key.
+    #[error("vault requires a newer version of the app")]
+    VaultTooNew,
+
     // Failed-unlock backoff (T-AUTH-3): too many wrong attempts, wait it out.
     // `retry_after_secs` rides along in the serialized payload (see `Serialize`
     // below) so the frontend can render a countdown without parsing the message.
