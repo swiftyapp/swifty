@@ -17,6 +17,15 @@ const group = (value: string) => value.match(/.{1,4}/g)?.join(' ') ?? value
 // (the 1Password pattern — no per-field buttons, so the face stays a card,
 // not a toolbar), with inline "Copied" feedback at the pointer. Copy always
 // copies the true value, masked or not. No value renders an inert dash.
+// "Copied" is an overlay chip, never a value swap — the face never reflows.
+function CopiedOverlay() {
+  return (
+    <span className="absolute inset-0 grid place-items-center rounded-sm bg-[#101216]/90 text-[10px] uppercase tracking-[0.12em] text-white">
+      {t('Copied')}
+    </span>
+  )
+}
+
 function Face({
   label,
   value,
@@ -34,7 +43,7 @@ function Face({
     <>
       <div className="text-[11px] uppercase tracking-[0.12em] opacity-50">{label}</div>
       <div className="mt-1 text-[13px]" data-testid={testid}>
-        {copied ? t('Copied') : copyValue ? value : '—'}
+        {copyValue ? value : '—'}
       </div>
     </>
   )
@@ -45,9 +54,10 @@ function Face({
       type="button"
       onClick={() => copy(copyValue)}
       title={t('Copy')}
-      className="cursor-pointer rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-white/10"
+      className="relative cursor-pointer rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-white/10"
     >
       {body}
+      {copied && <CopiedOverlay />}
     </button>
   )
 }
@@ -58,6 +68,7 @@ function Face({
 export default function Card({ entry }: Props) {
   const [show, setShow] = useState(false)
   const { copied: numberCopied, copy: copyNumber } = useCopied()
+  const { copied: nameCopied, copy: copyName } = useCopied()
   // Derived live from the revealed number (the list's stored slug isn't in
   // scope here, and this also tracks unsaved-but-revealed data correctly).
   const brand = cardBrandOf(entry.number)
@@ -77,10 +88,25 @@ export default function Card({ entry }: Props) {
           real card, so they are exempt from the type/radius/tracking scales. */}
       <div className="relative flex h-[288px] w-[460px] flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 font-mono text-[#EDEEF0] shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
         <div className="absolute -right-10 -top-16 h-[240px] w-[240px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.07),transparent_70%)]" />
-        <div className="relative flex items-start">
-          <div className="flex-1 pt-1 text-[12px] uppercase tracking-[0.18em] opacity-60">
-            {entry.name || t('Card')}
-          </div>
+        <div className="relative flex items-start justify-between gap-4">
+          {entry.name ? (
+            <button
+              type="button"
+              onClick={() => copyName(entry.name)}
+              title={t('Copy')}
+              className="relative -mx-1.5 -my-1 min-w-0 cursor-pointer rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-white/10"
+              data-testid="entry-value-name"
+            >
+              <span className="block truncate pt-1 text-[12px] uppercase tracking-[0.18em] opacity-60">
+                {entry.name}
+              </span>
+              {nameCopied && <CopiedOverlay />}
+            </button>
+          ) : (
+            <div className="pt-1 text-[12px] uppercase tracking-[0.18em] opacity-60">
+              {t('Card')}
+            </div>
+          )}
           {hasBrandMark(brand) ? (
             <CardBrandMark brand={brand} size={22} tone="light" />
           ) : (
@@ -93,10 +119,11 @@ export default function Card({ entry }: Props) {
             type="button"
             onClick={() => copyNumber(entry.number)}
             title={t('Copy')}
-            className="-mx-2 cursor-pointer self-start rounded-sm px-2 py-1 text-left text-[24px] tracking-[0.14em] transition-colors hover:bg-white/10"
+            className="relative -mx-2 cursor-pointer self-start rounded-sm px-2 py-1 text-left text-[24px] tracking-[0.14em] transition-colors hover:bg-white/10"
             data-testid="entry-value-number"
           >
-            {numberCopied ? t('Copied') : number}
+            {number}
+            {numberCopied && <CopiedOverlay />}
           </button>
         ) : (
           <div className="px-0 py-1 text-[24px] tracking-[0.14em] opacity-50">
@@ -105,12 +132,6 @@ export default function Card({ entry }: Props) {
         )}
         <div className="relative mt-5 flex items-end gap-5">
           <div className="-mx-1.5 flex min-w-0 flex-1 gap-3.5">
-            <Face
-              label={t('Holder')}
-              value={entry.name}
-              copyValue={entry.name || undefined}
-              testid="entry-value-name"
-            />
             <Face
               label={t('Expires')}
               value={expires}
@@ -123,13 +144,13 @@ export default function Card({ entry }: Props) {
               copyValue={entry.cvc || undefined}
               testid="entry-value-cvc"
             />
-            <Face
-              label={t('Pin')}
-              value={show ? entry.pin : '••••'}
-              copyValue={entry.pin || undefined}
-              testid="entry-value-pin"
-            />
           </div>
+          <Face
+            label={t('Pin')}
+            value={show ? entry.pin : '••••'}
+            copyValue={entry.pin || undefined}
+            testid="entry-value-pin"
+          />
           <button
             type="button"
             onClick={() => setShow(!show)}
