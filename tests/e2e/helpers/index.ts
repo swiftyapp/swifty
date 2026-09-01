@@ -1,4 +1,5 @@
 export { waitFor, waitForAppReady } from "./app";
+export { chord, pressEnter } from "./keys";
 export { resetPristine, resetEmpty } from "./reset";
 export { setupVault, unlock, lockVault } from "./vault";
 export {
