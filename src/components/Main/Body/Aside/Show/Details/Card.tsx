@@ -5,7 +5,7 @@ import CardBrandMark from '@/components/elements/CardBrandMark'
 import { useCopied } from '@/hooks/useCopied'
 import { t } from '@/i18n'
 import Tags from './Item/Tags'
-import { EyeGlyph, EyeOffGlyph } from '../../../../icons'
+import { CheckGlyph, EyeGlyph, EyeOffGlyph } from '../../../../icons'
 
 interface Props {
   entry: CardEntry
@@ -15,13 +15,17 @@ const group = (value: string) => value.match(/.{1,4}/g)?.join(' ') ?? value
 
 // One data point on the card face. The whole field is a click-to-copy target
 // (the 1Password pattern — no per-field buttons, so the face stays a card,
-// not a toolbar), with inline "Copied" feedback at the pointer. Copy always
-// copies the true value, masked or not. No value renders an inert dash.
-// "Copied" is an overlay chip, never a value swap — the face never reflows.
-function CopiedOverlay() {
+// not a toolbar). Copy always copies the true value, masked or not. No value
+// renders an inert dash.
+//
+// Copy feedback is deliberately quiet here: a check over the value only —
+// the app-level "Copied to Clipboard" toast already says what happened, so
+// the face just confirms *which* value, without a second wordy label. The
+// overlay never swaps the text out, so nothing reflows.
+function CopiedMark() {
   return (
-    <span className="absolute inset-0 grid place-items-center rounded-sm bg-[#101216]/90 text-[10px] uppercase tracking-[0.12em] text-white">
-      {t('Copied')}
+    <span className="absolute -inset-x-1 inset-y-0 grid place-items-center rounded-[3px] bg-[#14161A]/70 text-white">
+      <CheckGlyph size={12} />
     </span>
   )
 }
@@ -42,8 +46,9 @@ function Face({
   const body = (
     <>
       <div className="text-[11px] uppercase tracking-[0.12em] opacity-50">{label}</div>
-      <div className="mt-1 text-[13px]" data-testid={testid}>
+      <div className="relative mt-1 text-[13px]" data-testid={testid}>
         {copyValue ? value : '—'}
+        {copied && <CopiedMark />}
       </div>
     </>
   )
@@ -54,10 +59,9 @@ function Face({
       type="button"
       onClick={() => copy(copyValue)}
       title={t('Copy')}
-      className="relative cursor-pointer rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-white/10"
+      className="cursor-pointer rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-white/10"
     >
       {body}
-      {copied && <CopiedOverlay />}
     </button>
   )
 }
@@ -94,13 +98,15 @@ export default function Card({ entry }: Props) {
               type="button"
               onClick={() => copyName(entry.name)}
               title={t('Copy')}
-              className="relative -mx-1.5 -my-1 min-w-0 cursor-pointer rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-white/10"
+              className="-mx-1.5 -my-1 min-w-0 cursor-pointer rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-white/10"
               data-testid="entry-value-name"
             >
-              <span className="block truncate pt-1 text-[12px] uppercase tracking-[0.18em] opacity-60">
-                {entry.name}
+              <span className="relative block pt-1">
+                <span className="block truncate text-[12px] uppercase tracking-[0.18em] opacity-60">
+                  {entry.name}
+                </span>
+                {nameCopied && <CopiedMark />}
               </span>
-              {nameCopied && <CopiedOverlay />}
             </button>
           ) : (
             <div className="pt-1 text-[12px] uppercase tracking-[0.18em] opacity-60">
@@ -119,11 +125,13 @@ export default function Card({ entry }: Props) {
             type="button"
             onClick={() => copyNumber(entry.number)}
             title={t('Copy')}
-            className="relative -mx-2 cursor-pointer self-start rounded-sm px-2 py-1 text-left text-[24px] tracking-[0.14em] transition-colors hover:bg-white/10"
+            className="-mx-2 cursor-pointer self-start rounded-sm px-2 py-1 text-left text-[24px] tracking-[0.14em] transition-colors hover:bg-white/10"
             data-testid="entry-value-number"
           >
-            {number}
-            {numberCopied && <CopiedOverlay />}
+            <span className="relative block">
+              {number}
+              {numberCopied && <CopiedMark />}
+            </span>
           </button>
         ) : (
           <div className="px-0 py-1 text-[24px] tracking-[0.14em] opacity-50">
