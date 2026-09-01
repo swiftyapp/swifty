@@ -1,0 +1,107 @@
+import { chord, resetEmpty, unlock, waitFor } from "../helpers";
+
+// The password generator dialog, opened both ways it can be reached: the
+// app-level chord (standalone — it copies) and the login editor's "generate"
+// link (it fills the field it was opened from).
+
+const MASTER_PASSWORD = "Nc8$jRt5vQz1mHf!";
+
+const output = () => $('[data-testid="generator-output"]');
+
+/** The slider reading — characters in random mode, words in memorable mode. */
+async function amount(): Promise<number> {
+  return Number(await $('[data-testid="generator-amount"]').getValue());
+}
+
+async function openGenerator(): Promise<void> {
+  await chord("g");
+  await waitFor("generator-dialog");
+  // The first value arrives from an async `generate` call.
+  await browser.waitUntil(async () => (await output().getText()) !== "", {
+    timeout: 10_000,
+    timeoutMsg: "the generator never produced a value",
+  });
+}
+
+/** Wait for the output to become something other than `previous`. */
+async function waitForNewValue(previous: string): Promise<string> {
+  await browser.waitUntil(
+    async () => {
+      const next = await output().getText();
+      return next !== "" && next !== previous;
+    },
+    { timeout: 10_000, timeoutMsg: `the generator output stayed at "${previous}"` },
+  );
+  return output().getText();
+}
+
+describe("password generator", () => {
+  before(async () => {
+    await resetEmpty(MASTER_PASSWORD);
+    await unlock(MASTER_PASSWORD);
+  });
+
+  it("regenerates, switches shape between the two modes, and copies", async () => {
+    await openGenerator();
+
+    // Random mode draws exactly as many characters as the slider asks for.
+    const random = await output().getText();
+    expect(random).toHaveLength(await amount());
+
+    await $('[data-testid="generator-regenerate"]').click();
+    const regenerated = await waitForNewValue(random);
+    expect(regenerated).toHaveLength(await amount());
+
+    // Memorable mode is words joined by hyphens (plus a two-digit suffix),
+    // which is a shape random mode never produces.
+    await $('[data-testid="generator-mode-memorable"]').click();
+    const memorable = await waitForNewValue(regenerated);
+    const words = memorable.split("-");
+    expect(words.length).toBeGreaterThanOrEqual(await amount());
+    for (const word of words) expect(word).toMatch(/^[a-z]+$|^\d{2}$/);
+
+    await $('[data-testid="generator-mode-random"]').click();
+    const backToRandom = await waitForNewValue(memorable);
+    expect(backToRandom).toHaveLength(await amount());
+
+    // Standalone, "Use & copy" has nothing to apply to, so the clipboard toast
+    // is the whole feedback (the clipboard itself is not readable from wdio).
+    await $('[data-testid="generator-use-button"]').click();
+    await waitFor("copy-toast");
+    await expect($('[data-testid="generator-dialog"]')).not.toBeDisplayed();
+  });
+
+  it("fills the login editor's password field when opened from it", async () => {
+    await waitFor("scope-login");
+    await $('[data-testid="scope-login"]').click();
+    await $('[data-testid="add-entry-button"]').click();
+    await waitFor("entry-sheet");
+
+    const field = $('input[name="password"]');
+    await field.waitForDisplayed({ timeout: 10_000 });
+    await expect(field).toHaveValue("");
+
+    // The link next to the Password label (`Form/Login.tsx`) — it opens the
+    // same dialog with a callback bound to this field.
+    await $('[data-testid="entry-sheet"]').$("span*=generate").click();
+    await waitFor("generator-dialog");
+    await browser.waitUntil(async () => (await output().getText()) !== "", {
+      timeout: 10_000,
+      timeoutMsg: "the generator never produced a value",
+    });
+    const generated = await output().getText();
+
+    await $('[data-testid="generator-use-button"]').click();
+    await expect($('[data-testid="generator-dialog"]')).not.toBeDisplayed();
+    await expect(field).toHaveValue(generated);
+
+    // Leave the vault as the next spec's reset expects: discard the draft
+    // (Cancel arms, the second press discards).
+    await $('[data-testid="cancel-entry-button"]').click();
+    await $('[data-testid="cancel-entry-button"]').click();
+    await $('[data-testid="entry-sheet"]').waitForDisplayed({
+      reverse: true,
+      timeout: 10_000,
+    });
+  });
+});
