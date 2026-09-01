@@ -22,9 +22,11 @@ const group = (value: string) => value.match(/.{1,4}/g)?.join(' ') ?? value
 // the app-level "Copied to Clipboard" toast already says what happened, so
 // the face just confirms *which* value, without a second wordy label. The
 // overlay never swaps the text out, so nothing reflows.
+// Same wash as the fields' hover state, so a click doesn't shift the ground —
+// only the check appears over the value.
 function CopiedMark() {
   return (
-    <span className="absolute -inset-x-1 inset-y-0 grid place-items-center rounded-[3px] bg-[#14161A]/70 text-white">
+    <span className="absolute -inset-x-1 inset-y-0 grid place-items-center rounded-[3px] bg-white/10 text-white">
       <CheckGlyph size={12} />
     </span>
   )
