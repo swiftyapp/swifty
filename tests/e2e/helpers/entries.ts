@@ -15,6 +15,7 @@ export interface LoginFields {
   username: string;
   password: string;
   website?: string;
+  tags?: string[];
 }
 
 export interface CardFields {
@@ -25,11 +26,13 @@ export interface CardFields {
   cvc: string;
   pin: string;
   name?: string;
+  tags?: string[];
 }
 
 export interface NoteFields {
   title: string;
   note: string;
+  tags?: string[];
 }
 
 async function openForm(scope: Scope): Promise<void> {
@@ -44,6 +47,20 @@ async function openForm(scope: Scope): Promise<void> {
 // textarea for note bodies), so there is no per-field testid to depend on.
 async function fill(name: string, value: string, tag = "input"): Promise<void> {
   await $(`${tag}[name="${name}"]`).setValue(value);
+}
+
+// Tags live in a chip input, not a plain field: each tag is committed with
+// Enter (the component also commits on blur, but Enter keeps the caret in the
+// input for the next one). Enter inside the sheet is inert — the sheet only
+// submits on ⌘/Ctrl+Enter — so this never saves early.
+async function fillTags(tags: string[] = []): Promise<void> {
+  if (tags.length === 0) return;
+  const input = $('[data-testid="tags-input"]');
+  await input.waitForDisplayed({ timeout: 5_000 });
+  for (const tag of tags) {
+    await input.setValue(tag);
+    await browser.keys("Enter");
+  }
 }
 
 // Save and wait for the sheet to close, which is the store's "write landed"
@@ -62,6 +79,7 @@ export async function createLogin(fields: LoginFields): Promise<void> {
   if (fields.website !== undefined) await fill("website", fields.website);
   await fill("username", fields.username);
   await fill("password", fields.password);
+  await fillTags(fields.tags);
   await save();
 }
 
@@ -74,6 +92,7 @@ export async function createCard(fields: CardFields): Promise<void> {
   await fill("cvc", fields.cvc);
   await fill("pin", fields.pin);
   if (fields.name !== undefined) await fill("name", fields.name);
+  await fillTags(fields.tags);
   await save();
 }
 
@@ -81,6 +100,7 @@ export async function createNote(fields: NoteFields): Promise<void> {
   await openForm("note");
   await fill("title", fields.title);
   await fill("note", fields.note, "textarea");
+  await fillTags(fields.tags);
   await save();
 }
 

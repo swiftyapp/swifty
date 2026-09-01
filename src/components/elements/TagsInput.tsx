@@ -39,6 +39,8 @@ export default function TagsInput({ value, onChange }: Props) {
         </span>
       ))}
       <input
+        // The one input in the entry form with no `name` — specs address it here.
+        data-testid="tags-input"
         className="min-w-[80px] flex-1 !border-0 !bg-transparent !p-1 !text-base !text-text !outline-none"
         value={input}
         onChange={e => setInput(e.target.value)}
