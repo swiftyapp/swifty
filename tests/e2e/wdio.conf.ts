@@ -16,7 +16,6 @@ import fs from "fs";
 import net from "net";
 import os from "os";
 import path from "path";
-import { waitFor } from "./helpers/app";
 
 const ROOT = path.resolve(__dirname, "../..");
 
@@ -101,10 +100,10 @@ export const config: WebdriverIO.Config = {
     },
   },
 
-  before: async () => {
-    // Fresh vault: the app boots straight into the setup/restore choice screen.
-    await waitFor("start-setup-button");
-  },
+  // No global `before` hook: waiting for the setup screen here would assume
+  // every spec inherits a pristine vault, which is exactly the run-order
+  // coupling this harness now avoids. Each spec opens with its own
+  // `resetPristine()` / `resetEmpty()` (see helpers/reset.ts).
 
   onPrepare: async () => {
     fs.mkdirSync(TEST_DB_DIR, { recursive: true });
@@ -143,7 +142,11 @@ export const config: WebdriverIO.Config = {
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
+        // Both are gates on the `e2e_reset` command: it refuses to run unless
+        // SWIFTY_E2E is 1, and it only ever wipes SWIFTY_DB_DIR — so it can
+        // never reach a developer's real app-data dir. See commands/e2e.rs.
         SWIFTY_DB_DIR: TEST_DB_DIR,
+        SWIFTY_E2E: "1",
         WEBKIT_DISABLE_COMPOSITING_MODE: "1",
       },
     });
