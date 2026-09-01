@@ -18,6 +18,12 @@ const LOGINS = ["Aurora Mail", "Basalt Bank", "Zephyr Cloud"];
 const NOTE = "Recovery Codes";
 const CARD = "Travel Card";
 
+// The default sort is "recent" (updatedAt descending — defaults/list.ts), so
+// with the seeds created in LOGINS order the list renders newest-first. The
+// suite clears localStorage on reset, so the default is guaranteed here; the
+// alpha mode has its own spec in the content-kinds batch.
+const LOGINS_BY_RECENCY = [...LOGINS].reverse();
+
 const searchInput = () => $('[data-testid="search-input"]');
 
 /** Titles of the rows currently rendered, in list order. */
@@ -73,7 +79,7 @@ describe("search and rail scopes", () => {
 
   it("filters the list by title and restores it on clear", async () => {
     await selectScope("login");
-    await expectTitles(LOGINS);
+    await expectTitles(LOGINS_BY_RECENCY);
 
     await searchInput().setValue("Basalt");
     await expectTitles(["Basalt Bank"]);
@@ -81,7 +87,7 @@ describe("search and rail scopes", () => {
 
     await $('[data-testid="search-clear-button"]').click();
     await expect(searchInput()).toHaveValue("");
-    await expectTitles(LOGINS);
+    await expectTitles(LOGINS_BY_RECENCY);
   });
 
   it("shows only the kind the rail scope selects", async () => {
@@ -93,6 +99,6 @@ describe("search and rail scopes", () => {
     await expectTitles([CARD]);
 
     await selectScope("login");
-    await expectTitles(LOGINS);
+    await expectTitles(LOGINS_BY_RECENCY);
   });
 });
