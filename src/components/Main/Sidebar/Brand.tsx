@@ -8,7 +8,7 @@ const ARM_ANGLES = [0, 60, 180, 240, 300]
 
 export default function Brand() {
   return (
-    <div className="grid h-10 w-10 flex-none place-items-center text-text" title="Swifty">
+    <div className="grid h-10 w-10 flex-none place-items-center text-text2" title="Swifty">
       <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-label="Swifty">
         {ARM_ANGLES.map(angle => (
           <rect
