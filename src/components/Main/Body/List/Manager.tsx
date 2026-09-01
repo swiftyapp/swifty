@@ -1,10 +1,11 @@
 import { useStore } from '@/store'
 import { filterEntries } from '@/services/entries'
 import Item from './Item'
-import Group from './Group'
 import Empty from './Empty'
-import { byTitle, groupByRecency } from './order'
+import { byTitle, byRecency } from './order'
 
+// A flat list in either order — retrieval here is by name or search, so date
+// buckets earn nothing (the audit list keeps its severity groups, which do).
 export default function Manager() {
   const tags = useStore(state => state.filters.tags)
   const scope = useStore(state => state.filters.scope)
@@ -16,20 +17,12 @@ export default function Manager() {
 
   if (entries.length === 0) return <Empty />
 
-  // A–Z is a flat index — grouping it by date would fight the ordering.
-  if (sort === 'alpha')
-    return (
-      <div className="pb-6">
-        {byTitle(entries).map(entry => (
-          <Item entry={entry} key={entry.id} />
-        ))}
-      </div>
-    )
+  const ordered = sort === 'alpha' ? byTitle(entries) : byRecency(entries)
 
   return (
     <div className="pb-6">
-      {groupByRecency(entries).map(group => (
-        <Group title={group.title} entries={group.entries} key={group.title} />
+      {ordered.map(entry => (
+        <Item entry={entry} key={entry.id} />
       ))}
     </div>
   )

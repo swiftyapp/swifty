@@ -41,7 +41,7 @@ export default function Show({ entry }: Props) {
   ]
 
   return (
-    <div className="mx-auto max-w-[860px]">
+    <div className="mx-auto w-full max-w-[860px]">
 
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
@@ -61,18 +61,20 @@ export default function Show({ entry }: Props) {
         <Actions type={entry.type} revealed={revealed} onDelete={onDelete} />
       </div>
 
-      <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-lg border border-line bg-[image:var(--card)]">
+      {/* Reference metadata, not content — no card fill, xs mono values, tight
+          padding, so the block recedes behind the title and details. */}
+      <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-lg border border-line">
         {ledger.map((cell, i) => (
           <div
             key={cell.k}
             className={
               i < ledger.length - 1
-                ? 'border-r border-line px-3.5 py-[11px]'
-                : 'px-3.5 py-[11px]'
+                ? 'border-r border-line px-3.5 py-2'
+                : 'px-3.5 py-2'
             }
           >
             <div className={MONO_LABEL}>{cell.k}</div>
-            <div className="mt-1.5 truncate font-mono text-base text-text2">
+            <div className="mt-1 truncate font-mono text-xs text-text2">
               {cell.v}
             </div>
           </div>

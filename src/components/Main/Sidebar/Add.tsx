@@ -16,9 +16,9 @@ export default function Add() {
       <div
         data-testid="add-entry-button"
         onClick={onAddEntry}
-        className="grid h-9 w-9 cursor-pointer place-items-center rounded-lg border border-dashed border-accent-line text-accent transition-colors hover:bg-accent-soft"
+        className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg border border-dashed border-accent-line text-accent transition-colors hover:bg-accent-soft"
       >
-        <PlusGlyph />
+        <PlusGlyph size={18} />
       </div>
     </Tooltip>
   )

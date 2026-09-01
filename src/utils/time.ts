@@ -36,26 +36,3 @@ const shortDate = (at: number, now: number): string => {
     ...(sameYear ? {} : { year: 'numeric' })
   })
 }
-
-export type Recency = 'Today' | 'Yesterday' | 'This week' | 'Earlier'
-
-export const RECENCY: Recency[] = ['Today', 'Yesterday', 'This week', 'Earlier']
-
-// Calendar-day buckets (not rolling 24h windows), so "Yesterday" means the
-// previous day on the clock. Anything undated falls to the bottom bucket.
-export const recencyBucket = (iso?: string, now: number = Date.now()): Recency => {
-  const at = toTime(iso)
-  if (at === null) return 'Earlier'
-
-  const days = Math.round((startOfDay(now) - startOfDay(at)) / DAY)
-  if (days <= 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return 'This week'
-  return 'Earlier'
-}
-
-const startOfDay = (ms: number): number => {
-  const date = new Date(ms)
-  date.setHours(0, 0, 0, 0)
-  return date.getTime()
-}

@@ -38,14 +38,12 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('Entry list', () => {
-  it('groups by recency, newest first, skipping empty buckets', () => {
+  it('lists newest first as a flat list, no date headers', () => {
     renderWithStore(<ListColumn />, { store: seed() })
 
-    expect(screen.getByText('Today')).toBeInTheDocument()
-    expect(screen.getByText('Yesterday')).toBeInTheDocument()
-    expect(screen.getByText('This week')).toBeInTheDocument()
-    expect(screen.getByText('Earlier')).toBeInTheDocument()
     expect(titles()).toEqual(['Zebra', 'Airbnb', 'Monzo', 'Basecamp'])
+    expect(screen.queryByText('Today')).not.toBeInTheDocument()
+    expect(screen.queryByText('Earlier')).not.toBeInTheDocument()
   })
 
   it('shows a relative time on every row', () => {
@@ -68,13 +66,12 @@ describe('Entry list', () => {
     expect(screen.getAllByTestId('entry-item')).toHaveLength(4)
   })
 
-  it('sorts alphabetically without group headers', async () => {
+  it('sorts alphabetically', async () => {
     renderWithStore(<ListColumn />, { store: seed() })
 
     await userEvent.click(screen.getByTestId('sort-menu'))
     await userEvent.click(screen.getByText('Alphabetical'))
 
     expect(titles()).toEqual(['Airbnb', 'Basecamp', 'Monzo', 'Zebra'])
-    expect(screen.queryByText('Today')).not.toBeInTheDocument()
   })
 })

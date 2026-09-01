@@ -1,8 +1,8 @@
 import { t } from '@/i18n'
 import type { Scope } from '@/store/filtersSlice'
 
-// The list-column header shows a mono eyebrow + large title per scope. Kept
-// here so the rail, list header, and any future scope-aware chrome stay in sync.
+// The list-column header shows a large title per scope. Kept here so the
+// rail, list header, and any future scope-aware chrome stay in sync.
 export const scopeTitle = (scope: Scope): string => {
   switch (scope) {
     case 'note':
@@ -15,6 +15,3 @@ export const scopeTitle = (scope: Scope): string => {
       return t('Logins')
   }
 }
-
-export const scopeEyebrow = (scope: Scope): string =>
-  scope === 'audit' ? t('Security') : t('Vault')

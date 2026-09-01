@@ -17,24 +17,24 @@ export default function Switcher() {
   const scope = useStore(state => state.filters.scope)
 
   return (
-    <div className="switcher flex flex-col items-center gap-[3px]">
+    <div className="switcher flex flex-col items-center gap-2">
       {scopes.map(({ scope: current, label, Icon }) => {
         const selected = scope === current
         return (
           <Tooltip content={t(label)} key={current}>
             <div
               className={cx(
-                'item relative grid h-9 w-9 cursor-pointer place-items-center rounded-lg transition-colors',
+                'item relative grid h-10 w-10 cursor-pointer place-items-center rounded-lg transition-colors',
                 selected
-                  ? 'current bg-accent-soft text-accent'
+                  ? 'current bg-tile text-text'
                   : 'text-text2 hover:bg-hover hover:text-text'
               )}
               onClick={() => setFilterScope(current)}
             >
               {selected && (
-                <span className="absolute -left-2.5 top-2.5 h-4 w-0.5 rounded-full bg-accent" />
+                <span className="absolute -left-3.5 top-3 h-4 w-0.5 rounded-full bg-accent" />
               )}
-              <Icon />
+              <Icon size={18} />
             </div>
           </Tooltip>
         )

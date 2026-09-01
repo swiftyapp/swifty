@@ -228,7 +228,7 @@
   --c-detail: #ffffff;
   --c-field: #fafafb;
   --c-tile: rgba(20, 22, 26, 0.065);
-  --c-line: rgba(20, 22, 26, 0.11);
+  --c-line: rgba(20, 22, 26, 0.075);
   --c-line2: rgba(20, 22, 26, 0.19);
   --c-hover: rgba(20, 22, 26, 0.045);
   --c-sel: rgba(59, 91, 219, 0.09);
@@ -264,7 +264,7 @@
   --c-detail: #1b1c1e;
   --c-field: rgba(255, 255, 255, 0.03);
   --c-tile: rgba(255, 255, 255, 0.06);
-  --c-line: rgba(255, 255, 255, 0.07);
+  --c-line: rgba(255, 255, 255, 0.05);
   --c-line2: rgba(255, 255, 255, 0.12);
   --c-hover: rgba(255, 255, 255, 0.045);
   --c-sel: rgba(255, 255, 255, 0.06);

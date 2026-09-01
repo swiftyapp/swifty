@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { relativeTime, recencyBucket, toTime } from './time'
+import { relativeTime, toTime } from './time'
 
 // A fixed "now" so every case is deterministic: 2024-03-14, midday local time.
 const now = new Date(2024, 2, 14, 12, 0, 0).getTime()
@@ -35,24 +35,6 @@ describe('relativeTime', () => {
 
   it('keeps the year on dates outside the current one', () => {
     expect(relativeTime(new Date(2023, 0, 12, 9).toISOString(), now)).toBe('Jan 12, 2023')
-  })
-})
-
-describe('recencyBucket', () => {
-  it('buckets by calendar day', () => {
-    expect(recencyBucket(new Date(2024, 2, 14, 1).toISOString(), now)).toBe('Today')
-    expect(recencyBucket(new Date(2024, 2, 13, 23).toISOString(), now)).toBe('Yesterday')
-    expect(recencyBucket(new Date(2024, 2, 10, 12).toISOString(), now)).toBe('This week')
-    expect(recencyBucket(new Date(2024, 1, 20, 12).toISOString(), now)).toBe('Earlier')
-  })
-
-  it('treats an hour-old entry from yesterday as Yesterday', () => {
-    // 13h ago is still the previous calendar day, not a rolling 24h window.
-    expect(recencyBucket(ago(13 * HOUR), now)).toBe('Yesterday')
-  })
-
-  it('sends undated entries to Earlier', () => {
-    expect(recencyBucket(undefined, now)).toBe('Earlier')
   })
 })
 
