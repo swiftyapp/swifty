@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { makeStore, setEntries, saveEntry, deleteEntry, enterMain } from './index'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { makeStore, setEntries, saveEntry, deleteEntry, enterMain, syncInit } from './index'
 import { saveEntry as saveEntryCmd, toEntryMeta, syncNow } from '@/lib/commands'
 import type { EntryMeta } from '@/lib/commands'
 
@@ -7,10 +7,13 @@ const meta = (id: string, title = id): EntryMeta => ({ id, type: 'login', title,
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.useFakeTimers({ shouldAdvanceTime: true })
   makeStore()
   // Echo back the saved entry's metadata, as the real backend does.
   vi.mocked(saveEntryCmd).mockImplementation(entry => Promise.resolve(toEntryMeta(entry)))
 })
+
+afterEach(() => vi.useRealTimers())
 
 describe('saveEntry', () => {
   it('creates a new entry and selects it', async () => {
@@ -22,7 +25,8 @@ describe('saveEntry', () => {
     expect(items[0].title).toBe('New')
     expect(current?.id).toBe(items[0].id)
     expect(saveEntryCmd).toHaveBeenCalledOnce()
-    // Sync is disabled for now, so saving must not trigger it.
+    // Nothing to sync to: this vault is local-only.
+    await vi.advanceTimersByTimeAsync(60_000)
     expect(syncNow).not.toHaveBeenCalled()
   })
 
@@ -34,6 +38,34 @@ describe('saveEntry', () => {
     const { items } = store.getState().entries
     expect(items).toHaveLength(1)
     expect(items[0].title).toBe('Updated')
+  })
+})
+
+describe('auto-sync', () => {
+  it('debounces a burst of writes into a single push', async () => {
+    makeStore()
+    syncInit(true)
+
+    await saveEntry({ type: 'login', title: 'One', username: 'u', password: 'p' })
+    await vi.advanceTimersByTimeAsync(20_000)
+    await saveEntry({ type: 'login', title: 'Two', username: 'u', password: 'p' })
+
+    // The second write reset the timer, so nothing has gone out yet.
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(syncNow).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(syncNow).toHaveBeenCalledOnce()
+  })
+
+  it('publishes a delete too', async () => {
+    makeStore()
+    syncInit(true)
+    setEntries([meta('a')])
+
+    await deleteEntry('a')
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(syncNow).toHaveBeenCalledOnce()
   })
 })
 
@@ -57,8 +89,16 @@ describe('enterMain', () => {
     const state = store.getState()
     expect(state.flow.name).toBe('main')
     expect(state.entries.items.map(e => e.id)).toEqual(['a'])
-    // Sync is disabled for now: never enabled, never triggered on unlock.
-    expect(state.sync.enabled).toBe(false)
+    // A configured vault syncs once on unlock, before any local write.
+    expect(state.sync.enabled).toBe(true)
+    expect(syncNow).toHaveBeenCalledOnce()
+  })
+
+  it('leaves sync off for a vault that has never been connected', async () => {
+    const store = makeStore()
+    await enterMain({ entries: [], syncConfigured: false })
+
+    expect(store.getState().sync.enabled).toBe(false)
     expect(syncNow).not.toHaveBeenCalled()
   })
 })

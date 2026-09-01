@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useStore, newEntry } from '@/store'
 import { syncImport } from '@/lib/commands'
-import { SYNC_ENABLED } from '@/config'
 import { t } from '@/i18n'
 import Button from '@/components/elements/Button'
 
@@ -11,7 +10,9 @@ export default function Actions() {
 
   const onImport = () => {
     setLoading(true)
-    syncImport()
+    // On success this screen is replaced by the imported entries; on failure
+    // the button has to come back, or it spins forever.
+    syncImport().catch(() => setLoading(false))
   }
 
   if (!isPristine) return null
@@ -19,14 +20,10 @@ export default function Actions() {
   return (
     <div className="mt-6 flex items-center gap-3">
       <Button onClick={() => newEntry()}>{t('Create First Entry')}</Button>
-      {SYNC_ENABLED && (
-        <>
-          <span className="text-base text-text3">{t('or')}</span>
-          <Button variant="pale" loading={loading} onClick={onImport}>
-            {t('Import from Gdrive')}
-          </Button>
-        </>
-      )}
+      <span className="text-base text-text3">{t('or')}</span>
+      <Button variant="pale" loading={loading} onClick={onImport}>
+        {t('Import from Gdrive')}
+      </Button>
     </div>
   )
 }

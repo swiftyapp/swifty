@@ -21,8 +21,8 @@
 //! types — so the Drive provider can reuse it and the tests can drive it
 //! directly.
 
-// The pack half of this module is consumed by the Drive provider in the next PR;
-// only the tests and the restore path call into it today.
+// `pack` itself is exercised only by the tests and the format's own callers;
+// the engine goes through `pack_store` and `unpack`.
 #![allow(dead_code)]
 
 use std::fs;

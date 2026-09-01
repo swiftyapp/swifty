@@ -139,7 +139,7 @@ pub async fn unlock(
                     log::warn!("failed to reset lockout sidecar: {e}");
                 }
             }
-            let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
+            let sync_configured = storage::sync_configured(&app);
             state
                 .session
                 .lock()
@@ -226,7 +226,7 @@ pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Res
         None => VaultKey::Legacy { secret: material },
     };
     let (key, store, entries) = open_off_thread(&app, key).await?;
-    let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
+    let sync_configured = storage::sync_configured(&app);
     state
         .session
         .lock()

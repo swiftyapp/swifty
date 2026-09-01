@@ -32,6 +32,7 @@
   "Synchronize": "Synchronize",
   "Backup": "Backup",
   "Remote vault file is invalid": "Remote vault file is invalid",
+  "Google Drive holds a vault from a different Swifty install": "Google Drive holds a vault from a different Swifty install",
   "Swifty folder was not found on GDrive": "Swifty folder was not found on GDrive",
   "Vault file was not found on GDrive": "Vault file was not found on GDrive",
   "Failed to create Swifty folder on GDrive": "Failed to create Swifty folder on GDrive",

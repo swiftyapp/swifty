@@ -10,7 +10,8 @@ import {
   disableBiometric,
   isBiometricAvailable,
   pickBackup,
-  importSwftx
+  importSwftx,
+  syncConnect
 } from '@/lib/commands'
 import { renderWithStore } from './utils'
 
@@ -30,9 +31,10 @@ describe('Settings', () => {
     expect(screen.getByText('Save Vault File')).toBeInTheDocument()
   })
 
-  it('hides Google Drive sync while it is disabled', async () => {
+  it('offers Google Drive sync on the vault section', async () => {
     await open()
-    expect(screen.queryByText('Connect your Google Drive')).toBeNull()
+    await userEvent.click(screen.getByText('Connect your Google Drive'))
+    expect(syncConnect).toHaveBeenCalledOnce()
   })
 
   it('shows a generated example on the password section', async () => {
