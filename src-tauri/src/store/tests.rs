@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::{migrate, Record, SqliteStore, StoreError, VaultStore};
+use super::{migrate, record_hash, Record, SqliteStore, StoreError, VaultStore};
 use crate::crypto::{self, KdfParams, VaultKey};
 use crate::models::Entry;
 
@@ -53,6 +53,41 @@ fn rec(id: &str, payload: &[u8]) -> Record {
         payload: payload.to_vec(),
         card_brand: None,
     }
+}
+
+// A record with the timestamps merge actually reasons about. `created_at` is
+// held constant so a differing `updated_at` is the only axis under test.
+fn stamped(id: &str, payload: &[u8], updated_at: i64) -> Record {
+    Record {
+        created_at: 100,
+        updated_at,
+        ..rec(id, payload)
+    }
+}
+
+fn tombstone(id: &str, at: i64) -> Record {
+    Record {
+        deleted_at: Some(at),
+        ..stamped(id, b"", at)
+    }
+}
+
+// Seed rows with their timestamps intact (import, unlike upsert, does not stamp)
+// and clear the dirty flag the seeding itself sets.
+fn seeded(recs: &[Record]) -> SqliteStore {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    store.import(recs).unwrap();
+    store.clear_dirty().unwrap();
+    store
+}
+
+fn row(store: &SqliteStore, id: &str) -> Record {
+    store
+        .export_for_sync()
+        .unwrap()
+        .into_iter()
+        .find(|r| r.id == id)
+        .unwrap()
 }
 
 #[test]
@@ -482,4 +517,244 @@ fn import_swftx_wrong_source_password_errors() {
 
     let wrong = Cryptor::new(&hash_secret("not-the-password"));
     assert!(wrong.decrypt_data::<VaultData>(&blob).is_err());
+}
+
+// ---- sync merge primitives ------------------------------------------------
+
+// The length prefixes exist so that shifting a byte across a field boundary is
+// a different preimage; without them ("ab","c") and ("a","bc") would collide,
+// and the merge tie-break would call two different records equal.
+#[test]
+fn record_hash_separates_adjacent_fields() {
+    let mut a = rec("1", b"x");
+    a.title = "ab".into();
+    a.tags = "c".into();
+    let mut b = a.clone();
+    b.title = "a".into();
+    b.tags = "bc".into();
+
+    assert_ne!(record_hash(&a), record_hash(&b));
+    // Same content, same hash — the id is deliberately not part of it.
+    assert_eq!(record_hash(&a), record_hash(&a.clone()));
+    assert_eq!(
+        record_hash(&a),
+        record_hash(&Record {
+            id: "2".into(),
+            ..a
+        })
+    );
+}
+
+#[test]
+fn merge_newer_incoming_wins() {
+    let store = seeded(&[stamped("1", b"old", 1000)]);
+    assert_eq!(
+        store.merge_records(&[stamped("1", b"new", 2000)]).unwrap(),
+        1
+    );
+
+    let got = row(&store, "1");
+    assert_eq!(got.payload, b"new");
+    assert_eq!(got.updated_at, 2000);
+}
+
+#[test]
+fn merge_older_incoming_is_a_no_op() {
+    let store = seeded(&[stamped("1", b"local", 2000)]);
+    let before = row(&store, "1");
+
+    assert_eq!(
+        store
+            .merge_records(&[stamped("1", b"stale", 1000)])
+            .unwrap(),
+        0
+    );
+    // Byte-identical, timestamps included: the loser must not touch the row.
+    assert_eq!(row(&store, "1"), before);
+}
+
+#[test]
+fn merge_inserts_unknown_record_verbatim() {
+    let store = seeded(&[]);
+    let mut incoming = stamped("1", b"fresh", 222);
+    incoming.created_at = 111;
+
+    assert_eq!(store.merge_records(&[incoming]).unwrap(), 1);
+
+    let got = row(&store, "1");
+    // created_at is carried over, not re-stamped to now as upsert would.
+    assert_eq!((got.created_at, got.updated_at), (111, 222));
+    assert_eq!(got.payload, b"fresh");
+}
+
+#[test]
+fn merge_newer_tombstone_beats_older_edit() {
+    let store = seeded(&[stamped("1", b"live", 1000)]);
+    assert_eq!(store.merge_records(&[tombstone("1", 2000)]).unwrap(), 1);
+
+    assert_eq!(store.get("1").unwrap(), None);
+    assert_eq!(row(&store, "1").deleted_at, Some(2000));
+}
+
+// The mirror case: an edit made after the delete resurrects the entry. That is
+// LWW working, not a bug — the user's later intent wins.
+#[test]
+fn merge_newer_edit_beats_older_tombstone() {
+    let store = seeded(&[tombstone("1", 1000)]);
+    assert_eq!(
+        store
+            .merge_records(&[stamped("1", b"revived", 2000)])
+            .unwrap(),
+        1
+    );
+
+    let got = store.get("1").unwrap().unwrap();
+    assert_eq!(got.payload, b"revived");
+    assert_eq!(got.deleted_at, None);
+}
+
+#[test]
+fn merge_tie_on_identical_content_writes_nothing() {
+    let store = seeded(&[stamped("1", b"same", 1000)]);
+    let mine = store.export_for_sync().unwrap();
+    assert_eq!(store.merge_records(&mine).unwrap(), 0);
+}
+
+// The convergence property. On an exact timestamp tie the two sides hold
+// different content, so *someone* must yield — and both must pick the same
+// side, or they diverge permanently and push at each other forever.
+#[test]
+fn merge_tie_picks_the_same_winner_on_both_sides() {
+    let a = seeded(&[stamped("1", b"aaa", 5000)]);
+    let b = seeded(&[stamped("1", b"bbb", 5000)]);
+    let (from_a, from_b) = (a.export_for_sync().unwrap(), b.export_for_sync().unwrap());
+
+    a.merge_records(&from_b).unwrap();
+    b.merge_records(&from_a).unwrap();
+
+    assert_eq!(a.state_digest().unwrap(), b.state_digest().unwrap());
+    // Exactly one of the two payloads survived on both sides.
+    let payload = row(&a, "1").payload;
+    assert_eq!(payload, row(&b, "1").payload);
+    assert!(payload == b"aaa" || payload == b"bbb");
+}
+
+#[test]
+fn merge_is_idempotent() {
+    let source = seeded(&[stamped("1", b"x", 1000), stamped("2", b"y", 2000)]);
+    let target = seeded(&[stamped("1", b"older", 500)]);
+    let export = source.export_for_sync().unwrap();
+
+    assert_eq!(target.merge_records(&export).unwrap(), 2);
+    let digest = target.state_digest().unwrap();
+
+    // Replaying the same batch is a no-op — every record now ties itself.
+    assert_eq!(target.merge_records(&export).unwrap(), 0);
+    assert_eq!(target.state_digest().unwrap(), digest);
+}
+
+#[test]
+fn merge_is_commutative_across_divergent_stores() {
+    let a = seeded(&[
+        stamped("1", b"a1", 100), // b wins
+        stamped("2", b"a2", 300), // a wins
+        stamped("3", b"a3", 100), // only in a
+    ]);
+    let b = seeded(&[
+        stamped("1", b"b1", 200),
+        stamped("2", b"b2", 200),
+        stamped("4", b"b4", 100), // only in b
+    ]);
+    let (from_a, from_b) = (a.export_for_sync().unwrap(), b.export_for_sync().unwrap());
+
+    a.merge_records(&from_b).unwrap();
+    b.merge_records(&from_a).unwrap();
+
+    assert_eq!(a.state_digest().unwrap(), b.state_digest().unwrap());
+    assert_eq!(row(&a, "1").payload, b"b1");
+    assert_eq!(row(&a, "2").payload, b"a2");
+    // Records held by only one side are additions, never conflicts.
+    assert_eq!(a.export_for_sync().unwrap().len(), 4);
+}
+
+#[test]
+fn merge_preserves_timestamps_end_to_end() {
+    let mut original = stamped("1", b"x", 222);
+    original.created_at = 111;
+    let a = seeded(&[original]);
+    let b = seeded(&[]);
+
+    b.merge_records(&a.export_for_sync().unwrap()).unwrap();
+
+    assert_eq!(row(&b, "1"), row(&a, "1"));
+}
+
+#[test]
+fn state_digest_matches_exactly_on_equal_state() {
+    let rows = [stamped("1", b"x", 100), stamped("2", b"y", 200)];
+    let a = seeded(&rows);
+    let b = seeded(&rows);
+    assert_eq!(a.state_digest().unwrap(), b.state_digest().unwrap());
+
+    // Any content change moves the digest.
+    b.merge_records(&[stamped("2", b"changed", 300)]).unwrap();
+    assert_ne!(a.state_digest().unwrap(), b.state_digest().unwrap());
+}
+
+// Tombstones are state: a vault that has seen a delete is not the same vault as
+// one that never held the row, and the digest has to say so or the delete never
+// propagates.
+#[test]
+fn state_digest_counts_tombstones() {
+    let a = seeded(&[stamped("1", b"x", 100)]);
+    let b = seeded(&[stamped("1", b"x", 100), tombstone("2", 100)]);
+    assert_ne!(a.state_digest().unwrap(), b.state_digest().unwrap());
+
+    b.purge_tombstones_before(200).unwrap();
+    assert_eq!(a.state_digest().unwrap(), b.state_digest().unwrap());
+}
+
+#[test]
+fn purge_tombstones_before_spares_live_and_recent_rows() {
+    let store = seeded(&[
+        stamped("live", b"x", 1000),
+        tombstone("old", 1000),
+        tombstone("recent", 9000),
+    ]);
+
+    assert_eq!(store.purge_tombstones_before(5000).unwrap(), 1);
+
+    let mut ids: Vec<String> = store
+        .export_for_sync()
+        .unwrap()
+        .into_iter()
+        .map(|r| r.id)
+        .collect();
+    ids.sort();
+    assert_eq!(ids, ["live", "recent"]);
+}
+
+#[test]
+fn dirty_flag_tracks_user_writes_only() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    assert!(!store.is_dirty().unwrap());
+
+    store.upsert(&rec("1", b"x")).unwrap();
+    assert!(store.is_dirty().unwrap());
+    store.clear_dirty().unwrap();
+    assert!(!store.is_dirty().unwrap());
+
+    store.delete("1").unwrap();
+    assert!(store.is_dirty().unwrap());
+    store.clear_dirty().unwrap();
+
+    store.import(&[stamped("2", b"y", 1000)]).unwrap();
+    assert!(store.is_dirty().unwrap());
+    store.clear_dirty().unwrap();
+
+    // A merge is a peer's write, and a brand backfill is derived metadata —
+    // neither is a local edit, so neither may re-trigger a push cycle.
+    assert_eq!(store.merge_records(&[stamped("2", b"z", 2000)]).unwrap(), 1);
+    store.set_card_brand("2", "visa").unwrap();
+    assert!(!store.is_dirty().unwrap());
 }
