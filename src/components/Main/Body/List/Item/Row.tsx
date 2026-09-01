@@ -22,7 +22,7 @@ interface Props {
 export default function Row({ glyph, title, sub, flag }: Props) {
   return (
     <>
-      <div className="grid h-[30px] w-[30px] flex-none place-items-center rounded-lg bg-tile text-text2">
+      <div className="grid h-[30px] w-[30px] flex-none place-items-center overflow-hidden rounded-lg bg-tile text-text2">
         {glyph}
       </div>
       <div className="min-w-0 flex-1">

@@ -10,7 +10,7 @@ export default function Login({ entry, flag }: ContentProps) {
 
   return (
     <Row
-      glyph={icon ? <img src={icon} alt="" className="h-4 w-4" /> : <LoginGlyph size={16} />}
+      glyph={icon ? <img src={icon} alt="" className="h-full w-full object-cover" /> : <LoginGlyph size={16} />}
       title={entry.title}
       sub={entry.urlHost}
       flag={flag}
