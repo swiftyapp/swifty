@@ -63,18 +63,24 @@ pub struct EntryMetaDto {
     pub title: String,
     pub tags: Vec<String>,
     pub url_host: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub card_brand: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
 }
 
 impl EntryMetaDto {
     // Build from the shared metadata columns (timestamps are ms → RFC3339).
+    // One positional arg per DB column, mirrored by both callers — grouping
+    // them into a struct would just restate the column list a third time.
+    #[allow(clippy::too_many_arguments)]
     pub fn from_parts(
         id: String,
         kind: String,
         title: String,
         tags: &str,
         url_host: String,
+        card_brand: Option<String>,
         created_at: i64,
         updated_at: i64,
     ) -> Self {
@@ -84,6 +90,8 @@ impl EntryMetaDto {
             title,
             tags: serde_json::from_str(tags).unwrap_or_default(),
             url_host,
+            // "none" marks a completed derivation with no match — internal only.
+            card_brand: card_brand.filter(|b| b != "none"),
             created_at: iso(created_at),
             updated_at: iso(updated_at),
         }

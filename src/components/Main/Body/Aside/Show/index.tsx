@@ -3,6 +3,8 @@ import { deleteEntry } from '@/store'
 import type { EntryMeta } from '@/lib/commands'
 import { useRevealed } from '@/hooks/useRevealed'
 import { useFavicon } from '@/hooks/useFavicon'
+import CardBrandMark from '@/components/elements/CardBrandMark'
+import { hasBrandMark } from '@/utils/cardBrand'
 import { t } from '@/i18n'
 import { LoginGlyph, NoteGlyph, CardGlyph } from '../../../icons'
 import Details from './Details'
@@ -69,6 +71,8 @@ export default function Show({ entry }: Props) {
             <div className="grid h-7 w-7 flex-none place-items-center overflow-hidden rounded-lg bg-tile text-text2">
               {icon ? (
                 <img src={icon} alt="" className="h-full w-full object-cover" />
+              ) : hasBrandMark(entry.cardBrand) ? (
+                <CardBrandMark brand={entry.cardBrand} size={12} />
               ) : (
                 <Glyph size={16} />
               )}

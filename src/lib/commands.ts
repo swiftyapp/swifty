@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { cardBrandOf } from '@/utils/cardBrand'
 
 /**
  * Frozen command contract for the Swifty backend.
@@ -65,6 +66,9 @@ export interface EntryMeta {
   title: string
   tags: string[]
   urlHost: string
+  // Card network slug ("visa", …) derived from the number at save time;
+  // absent for non-cards and unrecognized numbers.
+  cardBrand?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -76,6 +80,7 @@ export const toEntryMeta = (entry: Entry): EntryMeta => ({
   title: entry.title,
   tags: entry.tags ?? [],
   urlHost: entry.type === 'login' ? hostOf(entry.website) : '',
+  cardBrand: entry.type === 'card' ? cardBrandOf(entry.number) : undefined,
   createdAt: entry.createdAt ?? entry.created_at,
   updatedAt: entry.updatedAt ?? entry.updated_at
 })

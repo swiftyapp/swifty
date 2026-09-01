@@ -51,6 +51,7 @@ fn rec(id: &str, payload: &[u8]) -> Record {
         updated_at: 0,
         deleted_at: None,
         payload: payload.to_vec(),
+        card_brand: None,
     }
 }
 

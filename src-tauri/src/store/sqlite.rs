@@ -15,8 +15,9 @@ use super::{now_ms, EntryMeta, Record, Result, StoreError, VaultStore};
 // change (Phase 2 KDF columns, Phase 3 sync columns). The `meta` k/v table holds
 // APP data (KDF descriptor, biometric flag, settings), not schema versioning.
 fn migrations() -> Migrations<'static> {
-    Migrations::new(vec![M::up(
-        "CREATE TABLE meta (
+    Migrations::new(vec![
+        M::up(
+            "CREATE TABLE meta (
            key   TEXT PRIMARY KEY,
            value TEXT
          );
@@ -31,11 +32,19 @@ fn migrations() -> Migrations<'static> {
            deleted_at INTEGER,
            payload    BLOB
          );",
-    )])
+        ),
+        // Card network slug ("visa", …), derived from the number at save time
+        // so listings show brand marks without touching the payload. NULL =
+        // not yet derived (backfilled once on unlock).
+        M::up("ALTER TABLE entries ADD COLUMN card_brand TEXT;"),
+    ])
 }
 
-const COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, payload";
-const META_COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at";
+// card_brand is appended last so pre-existing column indexes stay put.
+const COLS: &str =
+    "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, payload, card_brand";
+const META_COLS: &str =
+    "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, card_brand";
 
 pub struct SqliteStore {
     conn: Mutex<Connection>,
@@ -119,6 +128,16 @@ impl SqliteStore {
             .execute_batch(&format!("PRAGMA rekey = \"x'{}'\";", hex(new_key)))?;
         Ok(())
     }
+
+    /// Set the derived card-network slug without stamping `updated_at` — it is
+    /// derived metadata, not a user edit (used by the one-time unlock backfill).
+    pub fn set_card_brand(&self, id: &str, brand: &str) -> Result<()> {
+        self.lock().execute(
+            "UPDATE entries SET card_brand = ?1 WHERE id = ?2",
+            params![brand, id],
+        )?;
+        Ok(())
+    }
 }
 
 impl VaultStore for SqliteStore {
@@ -161,11 +180,12 @@ impl VaultStore for SqliteStore {
         // created_at is set only on insert; updated_at is always stamped to now.
         self.lock().execute(
             &format!(
-                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)
+                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
                  ON CONFLICT(id) DO UPDATE SET
                    kind=excluded.kind, title=excluded.title, tags=excluded.tags,
                    url_host=excluded.url_host, updated_at=excluded.updated_at,
-                   deleted_at=excluded.deleted_at, payload=excluded.payload"
+                   deleted_at=excluded.deleted_at, payload=excluded.payload,
+                   card_brand=excluded.card_brand"
             ),
             params![
                 rec.id,
@@ -181,6 +201,7 @@ impl VaultStore for SqliteStore {
                 now,
                 rec.deleted_at,
                 rec.payload,
+                rec.card_brand,
             ],
         )?;
         Ok(())
@@ -209,12 +230,12 @@ impl VaultStore for SqliteStore {
         {
             // Bulk sync-in: timestamps are preserved verbatim (no stamping).
             let mut stmt = tx.prepare(&format!(
-                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)
+                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
                  ON CONFLICT(id) DO UPDATE SET
                    kind=excluded.kind, title=excluded.title, tags=excluded.tags,
                    url_host=excluded.url_host, created_at=excluded.created_at,
                    updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
-                   payload=excluded.payload"
+                   payload=excluded.payload, card_brand=excluded.card_brand"
             ))?;
             for r in recs {
                 stmt.execute(params![
@@ -227,6 +248,7 @@ impl VaultStore for SqliteStore {
                     r.updated_at,
                     r.deleted_at,
                     r.payload,
+                    r.card_brand,
                 ])?;
             }
         }
@@ -246,6 +268,7 @@ fn row_to_record(row: &Row) -> rusqlite::Result<Record> {
         updated_at: row.get(6)?,
         deleted_at: row.get(7)?,
         payload: row.get(8)?,
+        card_brand: row.get(9)?,
     })
 }
 
@@ -259,6 +282,7 @@ fn row_to_meta(row: &Row) -> rusqlite::Result<EntryMeta> {
         created_at: row.get(5)?,
         updated_at: row.get(6)?,
         deleted_at: row.get(7)?,
+        card_brand: row.get(8)?,
     })
 }
 
