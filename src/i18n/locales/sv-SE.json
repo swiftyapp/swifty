@@ -86,6 +86,7 @@
   "Confirm your identity": "Bekräfta din identitet",
   "or": "eller",
   "Language": "Språk",
+  "Biometric unlock failed": "Biometrisk upplåsning misslyckades",
   "Your vault key is protected by the Secure Enclave and invalidated if your fingerprints change.": "Ditt valvs nyckel skyddas av Secure Enclave och ogiltigförklaras om dina fingeravtryck ändras.",
   "Your vault key is stored in your OS credential store and released after a biometric check by Swifty.": "Ditt valvs nyckel lagras i systemets autentiseringslagring och frisläpps efter en biometrisk kontroll i Swifty."
 }

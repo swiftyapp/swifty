@@ -86,6 +86,7 @@
   "Confirm your identity": "Подтвердите свою личность",
   "or": "или",
   "Language": "Язык интерфейса",
+  "Biometric unlock failed": "Биометрическая разблокировка не удалась",
   "Your vault key is protected by the Secure Enclave and invalidated if your fingerprints change.": "Ключ вашего хранилища защищён Secure Enclave и аннулируется при изменении отпечатков пальцев.",
   "Your vault key is stored in your OS credential store and released after a biometric check by Swifty.": "Ключ вашего хранилища находится в системном хранилище учётных данных и выдаётся после биометрической проверки в Swifty."
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { on, EVENTS, type EventName, type EventPayloads } from '@/lib/events'
-import { getAudit } from '@/lib/commands'
+import { getAudit, isBiometricAvailable } from '@/lib/commands'
 import type { EntryMeta } from '@/lib/commands'
 import { subscribeToEvents } from './events'
 import { makeStore, setEntries } from './index'
@@ -59,5 +59,33 @@ describe('sync:stopped', () => {
     expect(inProgress).toBe(false)
     expect(success).toBe(false)
     expect(error).toBe('Drive API 403')
+  })
+})
+
+describe('vault:locked', () => {
+  it('shows the Touch ID button when a key is enrolled, not a hardcoded false', async () => {
+    vi.mocked(isBiometricAvailable).mockResolvedValue(true)
+    const store = makeStore()
+    subscribeToEvents()
+    store.getState().flowMain()
+
+    handlerFor(EVENTS.vaultLocked)()
+    await vi.waitFor(() => expect(store.getState().flow.name).toBe('auth'))
+
+    // The regression: this used to be `flowAuth(false)` unconditionally, so an
+    // in-session lock (autolock, tray) never offered Touch ID again until a
+    // full app restart.
+    expect(store.getState().flow.touchID).toBe(true)
+  })
+
+  it('lands on the plain lock screen when nothing is enrolled', async () => {
+    vi.mocked(isBiometricAvailable).mockRejectedValue(new Error('no backend'))
+    const store = makeStore()
+    subscribeToEvents()
+    store.getState().flowMain()
+
+    handlerFor(EVENTS.vaultLocked)()
+    await vi.waitFor(() => expect(store.getState().flow.name).toBe('auth'))
+    expect(store.getState().flow.touchID).toBe(false)
   })
 })

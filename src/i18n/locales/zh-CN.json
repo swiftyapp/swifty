@@ -86,6 +86,7 @@
     "Confirm your identity": "确认你的身份",
     "or": "或",
     "Language": "界面语言",
+    "Biometric unlock failed": "生物识别解锁失败",
     "Your vault key is protected by the Secure Enclave and invalidated if your fingerprints change.": "您的保险库密钥由安全隔区保护，指纹变更后将自动失效。",
     "Your vault key is stored in your OS credential store and released after a biometric check by Swifty.": "您的保险库密钥保存在系统凭据存储中，经 Swifty 生物识别校验后才会释放。"
   }

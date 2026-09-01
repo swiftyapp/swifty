@@ -1,5 +1,6 @@
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { on, EVENTS } from '@/lib/events'
+import { isBiometricAvailable } from '@/lib/commands'
 import {
   setEntries,
   runAudit,
@@ -30,7 +31,14 @@ export const subscribeToEvents = (): (() => void) => {
       runAudit()
     }),
     on(EVENTS.auditDone, payload => auditDone(payload.data)),
-    on(EVENTS.vaultLocked, () => flowAuth(false))
+    // Ask, don't assume: hardcoding `false` here meant the Touch ID button only
+    // ever appeared on a fresh boot (App.tsx runs the same check), never on an
+    // in-session lock — including the very first lock after enabling it.
+    on(EVENTS.vaultLocked, () =>
+      isBiometricAvailable()
+        .catch(() => false)
+        .then(flowAuth)
+    )
   ]
 
   return () => {

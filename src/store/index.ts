@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { getLocale } from '@/i18n'
+import { lock, isBiometricAvailable } from '@/lib/commands'
 import { createFlowSlice, type FlowSlice } from './flowSlice'
 import { createGeneratorSlice, type GeneratorSlice } from './generatorSlice'
 import { createFiltersSlice, type FiltersSlice } from './filtersSlice'
@@ -106,3 +107,15 @@ export const {
   completeSetup,
   restoreBackup
 } = useStore.getState()
+
+// Manual lock, from anywhere (top chrome, Settings, palette): clear the session,
+// then land on the lock screen with the Touch ID button when — and only when —
+// a key is enrolled. Hardcoding `false` here is how the button used to vanish
+// on every in-session lock. Autolock takes the same path via the vault:locked
+// event (events.ts).
+export const lockVault = () =>
+  lock().finally(() =>
+    isBiometricAvailable()
+      .catch(() => false)
+      .then(flowAuth)
+  )

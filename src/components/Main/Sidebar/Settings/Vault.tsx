@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useStore, flowAuth } from '@/store'
-import { syncConnect, syncDisconnect, exportVault, lock } from '@/lib/commands'
+import { useStore, lockVault } from '@/store'
+import { syncConnect, syncDisconnect, exportVault } from '@/lib/commands'
 import { t } from '@/i18n'
 import type { Section } from './Navigation'
 import Button from '@/components/elements/Button'
@@ -27,7 +27,7 @@ export default function Vault({ section }: Props) {
   }
 
   const onLock = () => {
-    lock().finally(() => flowAuth(false))
+    void lockVault()
   }
 
   const onExport = () => {

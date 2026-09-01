@@ -1,7 +1,6 @@
-import { lock } from '@/lib/commands'
 import {
   useStore,
-  flowAuth,
+  lockVault as lockVaultAction,
   newEntry,
   openSettings,
   setFilterScope,
@@ -24,7 +23,7 @@ export interface Command {
 // Locks the vault and drops back to the auth flow — the same path as the
 // header's lock button.
 export const lockVault = () => {
-  lock().finally(() => flowAuth(false))
+  void lockVaultAction()
 }
 
 // Starts a new entry, leaving the audit scope first (it has no editor) — the
