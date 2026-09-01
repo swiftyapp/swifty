@@ -56,6 +56,9 @@ const dialogOpen = () => !!document.querySelector('[role="dialog"], dialog[open]
 // primary copy action.
 export default function Actions({ type, revealed, onDelete }: Props) {
   const [menu, setMenu] = useState(false)
+  // Two-press delete: the first press arms the row ("Delete entry?"), the
+  // second executes. Closing or reopening the menu disarms.
+  const [armDelete, setArmDelete] = useState(false)
   const { copied, copy } = useCopied()
   const secret = revealed ? secretOf(revealed) : ''
 
@@ -72,7 +75,13 @@ export default function Actions({ type, revealed, onDelete }: Props) {
 
   const run = (action: () => void) => () => {
     setMenu(false)
+    setArmDelete(false)
     action()
+  }
+
+  const toggleMenu = () => {
+    setMenu(!menu)
+    setArmDelete(false)
   }
 
   return (
@@ -85,21 +94,25 @@ export default function Actions({ type, revealed, onDelete }: Props) {
         <IconButton
           title={t('More actions')}
           active={menu}
-          onClick={() => setMenu(!menu)}
+          onClick={toggleMenu}
           className="border border-line2 hover:border-accent-line"
           testid="more-actions-button"
         >
           <MoreGlyph />
         </IconButton>
         {menu && (
-          <Dropdown className="right-0 top-8" onBlur={() => setMenu(false)}>
+          <Dropdown className="right-0 top-8" onBlur={toggleMenu}>
             <DropdownItem onClick={run(editEntry)}>
               <PencilGlyph />
               {t('Edit')}
             </DropdownItem>
-            <DropdownItem separated danger onClick={run(onDelete)}>
+            <DropdownItem
+              separated
+              danger
+              onClick={armDelete ? run(onDelete) : () => setArmDelete(true)}
+            >
               <TrashGlyph />
-              {t('Delete')}
+              {armDelete ? t('Delete entry?') : t('Delete')}
             </DropdownItem>
           </Dropdown>
         )}

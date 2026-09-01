@@ -140,16 +140,18 @@ describe('Show', () => {
     expect(copyToClipboard).toHaveBeenCalledWith('hunter2', expect.any(Number))
   })
 
-  it('deletes from the more menu, keeping the confirmation', async () => {
+  it('deletes from the more menu behind a two-press inline confirm', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry())
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderWithStore(<Show entry={loginMeta()} />)
 
     await userEvent.click(screen.getByTestId('more-actions-button'))
-    await userEvent.click(screen.getByText('Delete'))
 
-    expect(confirm).toHaveBeenCalled()
+    // First press only arms the row.
+    await userEvent.click(screen.getByText('Delete'))
+    expect(deleteEntry).not.toHaveBeenCalled()
+
+    // Second press deletes.
+    await userEvent.click(screen.getByText('Delete entry?'))
     await waitFor(() => expect(deleteEntry).toHaveBeenCalledWith('l1'))
-    confirm.mockRestore()
   })
 })

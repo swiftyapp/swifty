@@ -1,15 +1,17 @@
 import { useEffect } from 'react'
-import { openPalette } from '@/store'
+import { useStore, openPalette, openGenerator } from '@/store'
 import { lockVault } from './Palette/commands'
 
-// App-wide chords for the unlocked vault. Mounted once from `Main`, so they are
-// live only while the vault is open and die with it.
-//
-// Deliberately one small effect with one `switch`: adding a chord is a case,
-// not a new listener, and two branches touching this file merge cleanly.
+// The app-level shortcut surface. One listener, one record — a new chord is
+// one line here. Mounted from Main, so chords are live only while unlocked.
 const BINDINGS: Record<string, () => void> = {
   k: openPalette,
-  l: lockVault
+  l: lockVault,
+  // Re-pressing ⌘G while the dialog is up must not drop the callback it was
+  // opened with, so an open dialog swallows the shortcut.
+  g: () => {
+    if (!useStore.getState().generator.open) openGenerator()
+  }
 }
 
 export const useShortcuts = () => {
