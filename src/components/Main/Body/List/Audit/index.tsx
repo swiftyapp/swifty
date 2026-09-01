@@ -2,7 +2,7 @@ import { useStore } from '@/store'
 import type { Audit, AuditItem, EntryMeta } from '@/lib/commands'
 import { t } from '@/i18n'
 import Empty from '../Empty'
-import Group from './Group'
+import Group from '../Group'
 
 export default function AuditList() {
   const audit = useStore(state => state.audit)

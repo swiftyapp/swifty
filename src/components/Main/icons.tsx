@@ -10,6 +10,7 @@
 // Components keep the historical `*Glyph` names so this module stays the one
 // place an icon choice lives.
 import {
+  ArrowDownWideNarrow,
   Check,
   ChevronDown,
   Copy,
@@ -63,6 +64,7 @@ export const DownloadGlyph = glyph(Download, 14)
 export const CloseGlyph = glyph(X, 14)
 export const ChevronDownGlyph = glyph(ChevronDown, 14)
 export const FingerprintGlyph = glyph(Fingerprint, 14)
+export const SortGlyph = glyph(ArrowDownWideNarrow, 14)
 
 // Row / tile / rail tier
 export const PlusGlyph = glyph(Plus, 16)

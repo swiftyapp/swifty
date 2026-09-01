@@ -5,6 +5,7 @@ import { createGeneratorSlice, type GeneratorSlice } from './generatorSlice'
 import { createFiltersSlice, type FiltersSlice } from './filtersSlice'
 import { createEntriesSlice, type EntriesSlice } from './entriesSlice'
 import { createAuditSlice, type AuditSlice } from './auditSlice'
+import { createListSlice, type ListSlice } from './listSlice'
 import { createSyncSlice, type SyncSlice } from './syncSlice'
 import { createI18nSlice, type I18nSlice } from './i18nSlice'
 import { createThemeSlice, type ThemeSlice } from './themeSlice'
@@ -17,6 +18,7 @@ export type StoreState = FlowSlice &
   FiltersSlice &
   EntriesSlice &
   AuditSlice &
+  ListSlice &
   SyncSlice &
   I18nSlice &
   ThemeSlice &
@@ -30,6 +32,7 @@ export const useStore = create<StoreState>()((...a) => ({
   ...createFiltersSlice(...a),
   ...createEntriesSlice(...a),
   ...createAuditSlice(...a),
+  ...createListSlice(...a),
   ...createSyncSlice(...a),
   ...createI18nSlice(...a),
   ...createThemeSlice(...a),
@@ -81,6 +84,7 @@ export const {
   auditDone,
   setBreachCheck,
   runAudit,
+  setSort,
   syncInit,
   syncConnected,
   syncDisconnected,
