@@ -57,6 +57,15 @@ pub fn db_path(app: &AppHandle) -> Result<PathBuf> {
     Ok(app_dir(app)?.join(DB_FILE))
 }
 
+// Working space for the sync engine: the snapshot it packs for upload and the
+// database it opens a pulled snapshot in. Inside the (dev-isolated) data dir so
+// a debug build never writes scratch beside the real vault, and so the files
+// inherit the 0700 directory mode. Everything written here is SQLCipher
+// ciphertext, and every writer removes its own files (see `pack::Scratch`).
+pub fn sync_scratch_dir(app: &AppHandle) -> Result<PathBuf> {
+    Ok(app_dir(app)?.join("sync-scratch"))
+}
+
 // Cached website favicons (list-row identity). Safe to wipe; refetched lazily.
 pub fn icons_dir(app: &AppHandle) -> Result<PathBuf> {
     Ok(app_dir(app)?.join("icons"))
@@ -180,14 +189,6 @@ fn write_file(path: &PathBuf, data: &str) -> Result<()> {
     }
     fs::write(path, data)?;
     Ok(())
-}
-
-pub fn read_vault(app: &AppHandle) -> Result<String> {
-    read_file(&vault_path(app)?)
-}
-
-pub fn write_vault(app: &AppHandle, data: &str) -> Result<()> {
-    write_file(&vault_path(app)?, data)
 }
 
 // Read an arbitrary backup file chosen by the user (absolute path).
