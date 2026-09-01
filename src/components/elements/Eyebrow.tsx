@@ -6,11 +6,12 @@ type Tone = 'muted' | 'bad' | 'accent'
 interface Props {
   children: ReactNode
   tone?: Tone
+  testid?: string
 }
 
 // Mono, uppercase, letter-spaced status line with a slow "breathing" dot.
 // Shared by every auth screen (lock / setup / restore) as its eyebrow.
-export default function Eyebrow({ children, tone = 'muted' }: Props) {
+export default function Eyebrow({ children, tone = 'muted', testid }: Props) {
   const dot =
     tone === 'bad' ? 'bg-bad' : tone === 'accent' ? 'bg-accent' : 'bg-text3'
   const text = tone === 'bad' ? 'text-bad' : 'text-text3'
@@ -23,7 +24,9 @@ export default function Eyebrow({ children, tone = 'muted' }: Props) {
           dot
         )}
       />
-      <span className={text}>{children}</span>
+      <span data-testid={testid} className={text}>
+        {children}
+      </span>
     </div>
   )
 }

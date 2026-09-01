@@ -27,6 +27,9 @@ export default function Row({ focused, onClick, onHover, className, children }: 
       ref={ref}
       role="option"
       aria-selected={focused}
+      // Every palette result (entry and command alike) flows through this
+      // shell, so one hook here covers the whole result list.
+      data-testid="palette-item"
       onClick={onClick}
       // mousemove, not mouseenter: a row sliding under a still cursor while the
       // list scrolls shouldn't steal focus from the arrow keys.

@@ -14,10 +14,30 @@ export default function Audit() {
 
   if (isPristine || !audit) return null
 
-  const stats: { label: string; value: number; dot: string; show: boolean }[] = [
-    { label: t('Weak'), value: count(audit, 'isWeak'), dot: 'bg-bad', show: true },
-    { label: t('Reused'), value: count(audit, 'isRepeating'), dot: 'bg-warn', show: true },
-    { label: t('Breached'), value: count(audit, 'breached'), dot: 'bg-bad', show: !!breachCheck }
+  // `key` is the untranslated slug — the label is localised, so e2e selectors
+  // and the React key both hang off the slug instead.
+  const stats: {
+    key: string
+    label: string
+    value: number
+    dot: string
+    show: boolean
+  }[] = [
+    { key: 'weak', label: t('Weak'), value: count(audit, 'isWeak'), dot: 'bg-bad', show: true },
+    {
+      key: 'reused',
+      label: t('Reused'),
+      value: count(audit, 'isRepeating'),
+      dot: 'bg-warn',
+      show: true
+    },
+    {
+      key: 'breached',
+      label: t('Breached'),
+      value: count(audit, 'breached'),
+      dot: 'bg-bad',
+      show: !!breachCheck
+    }
   ]
 
   return (
@@ -31,12 +51,15 @@ export default function Audit() {
           .filter(s => s.show)
           .map(s => (
             <div
-              key={s.label}
+              key={s.key}
+              data-testid={`audit-stat-${s.key}`}
               className="flex items-center gap-3 px-4 py-3 shadow-[inset_0_-1px_0_var(--c-line)] last:shadow-none"
             >
               <span className={`h-[7px] w-[7px] flex-none rounded-full ${s.dot}`} />
               <span className="flex-1 text-base text-text2">{s.label}</span>
-              <span className="font-mono text-base text-text">{s.value}</span>
+              <span data-testid="audit-stat-value" className="font-mono text-base text-text">
+                {s.value}
+              </span>
             </div>
           ))}
       </Panel>

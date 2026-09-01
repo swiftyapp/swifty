@@ -29,14 +29,23 @@ interface ItemProps {
   separated?: boolean
   // Destructive entry (delete, disconnect, ...): inked in the `bad` token.
   danger?: boolean
+  testid?: string
   onClick?: () => void
   children: ReactNode
 }
 
-export function DropdownItem({ id, separated, danger, onClick, children }: ItemProps) {
+export function DropdownItem({
+  id,
+  separated,
+  danger,
+  testid,
+  onClick,
+  children
+}: ItemProps) {
   return (
     <div
       id={id}
+      data-testid={testid}
       onClick={onClick}
       className={cx(
         'flex cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-base transition-colors hover:bg-hover',

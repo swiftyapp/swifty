@@ -49,7 +49,10 @@ export default function Score({ audit }: Props) {
       <div className="text-center">
         {/* 34px is a documented one-off: the dial numeral sits above the 24px
             display tier so it fills the ring. */}
-        <div className="text-[34px] font-semibold tracking-display text-text">
+        <div
+          data-testid="audit-score"
+          className="text-[34px] font-semibold tracking-display text-text"
+        >
           {score}
         </div>
         <div className="font-mono text-xs uppercase tracking-label text-text3">

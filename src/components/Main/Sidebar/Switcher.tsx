@@ -29,6 +29,7 @@ export default function Switcher() {
                   ? 'current bg-tile text-text'
                   : 'text-text2 hover:bg-hover hover:text-text'
               )}
+              data-testid={`scope-${current}`}
               onClick={() => setFilterScope(current)}
             >
               {selected && (

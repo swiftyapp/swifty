@@ -16,6 +16,7 @@ export default function Search() {
         <input
           type="search"
           name="search"
+          data-testid="search-input"
           placeholder={t('Search')}
           value={query}
           onChange={e => setFilterQuery(e.target.value)}
@@ -35,6 +36,7 @@ export default function Search() {
             type="button"
             onClick={() => setFilterQuery('')}
             aria-label={t('Clear')}
+            data-testid="search-clear-button"
             className="grid h-4 w-4 flex-none place-items-center rounded-full text-text3 hover:text-text"
           >
             <CloseGlyph size={12} />

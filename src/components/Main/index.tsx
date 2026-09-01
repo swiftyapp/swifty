@@ -27,7 +27,10 @@ export function Main() {
           display flip is what replays `animate-pop`. App-level so copies from
           the palette and standalone generator get feedback too. Centering uses
           auto margins so the pop's transform doesn't fight it. */}
-      <div className="copied-notification hidden animate-pop fixed inset-x-0 top-4 z-50 mx-auto w-max rounded-full bg-text px-5 py-2 text-base text-detail shadow-[var(--shadow)]">
+      <div
+        data-testid="copy-toast"
+        className="copied-notification hidden animate-pop fixed inset-x-0 top-4 z-50 mx-auto w-max rounded-full bg-text px-5 py-2 text-base text-detail shadow-[var(--shadow)]"
+      >
         {t('Copied to Clipboard')}
       </div>
     </div>

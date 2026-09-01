@@ -72,11 +72,24 @@ export default function MasterPassword({ section }: Props) {
         />
       </Row>
       <StatusRow>
-        <Button onClick={onSubmit} disabled={disabled} loading={processing}>
+        <Button
+          testid="change-password-submit"
+          onClick={onSubmit}
+          disabled={disabled}
+          loading={processing}
+        >
           {t('Update')}
         </Button>
-        {error && <span className={DANGER}>{error}</span>}
-        {success && <span className={SUCCESS}>{success}</span>}
+        {error && (
+          <span data-testid="change-password-error" className={DANGER}>
+            {error}
+          </span>
+        )}
+        {success && (
+          <span data-testid="change-password-success" className={SUCCESS}>
+            {success}
+          </span>
+        )}
       </StatusRow>
     </>
   )
