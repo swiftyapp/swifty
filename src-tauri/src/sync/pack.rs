@@ -21,10 +21,6 @@
 //! types — so the Drive provider can reuse it and the tests can drive it
 //! directly.
 
-// `pack` itself is exercised only by the tests and the format's own callers;
-// the engine goes through `pack_store` and `unpack`.
-#![allow(dead_code)]
-
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};

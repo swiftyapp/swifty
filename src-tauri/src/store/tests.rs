@@ -72,12 +72,10 @@ fn tombstone(id: &str, at: i64) -> Record {
     }
 }
 
-// Seed rows with their timestamps intact (import, unlike upsert, does not stamp)
-// and clear the dirty flag the seeding itself sets.
+// Seed rows with their timestamps intact (import, unlike upsert, does not stamp).
 fn seeded(recs: &[Record]) -> SqliteStore {
     let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
     store.import(recs).unwrap();
-    store.clear_dirty().unwrap();
     store
 }
 
@@ -736,48 +734,22 @@ fn purge_tombstones_before_spares_live_and_recent_rows() {
 
 // Restore scrubs the source device's sync bookkeeping by prefix. The match must
 // be a literal prefix — `_` is a LIKE wildcard, so a naive `LIKE 'sync_%'` would
-// also eat `syncopation`, and the dirty flag must fall inside the namespace or
-// the restored vault starts life believing it has unpushed work.
+// also eat `syncopation`.
 #[test]
 fn meta_delete_prefix_removes_only_the_namespace() {
     let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
-    store.upsert(&rec("1", b"x")).unwrap(); // sets sync_dirty
     store.meta_set("sync_last_digest", "deadbeef").unwrap();
+    store.meta_set("sync_remote_rev", "r1").unwrap();
     store.meta_set("syncopation", "keep").unwrap();
     store.meta_set("kdf", "argon2id").unwrap();
 
     assert_eq!(store.meta_delete_prefix(SYNC_META_PREFIX).unwrap(), 2);
 
-    assert!(!store.is_dirty().unwrap());
     assert_eq!(store.meta_get("sync_last_digest").unwrap(), None);
+    assert_eq!(store.meta_get("sync_remote_rev").unwrap(), None);
     assert_eq!(
         store.meta_get("syncopation").unwrap().as_deref(),
         Some("keep")
     );
     assert_eq!(store.meta_get("kdf").unwrap().as_deref(), Some("argon2id"));
-}
-
-#[test]
-fn dirty_flag_tracks_user_writes_only() {
-    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
-    assert!(!store.is_dirty().unwrap());
-
-    store.upsert(&rec("1", b"x")).unwrap();
-    assert!(store.is_dirty().unwrap());
-    store.clear_dirty().unwrap();
-    assert!(!store.is_dirty().unwrap());
-
-    store.delete("1").unwrap();
-    assert!(store.is_dirty().unwrap());
-    store.clear_dirty().unwrap();
-
-    store.import(&[stamped("2", b"y", 1000)]).unwrap();
-    assert!(store.is_dirty().unwrap());
-    store.clear_dirty().unwrap();
-
-    // A merge is a peer's write, and a brand backfill is derived metadata —
-    // neither is a local edit, so neither may re-trigger a push cycle.
-    assert_eq!(store.merge_records(&[stamped("2", b"z", 2000)]).unwrap(), 1);
-    store.set_card_brand("2", "visa").unwrap();
-    assert!(!store.is_dirty().unwrap());
 }

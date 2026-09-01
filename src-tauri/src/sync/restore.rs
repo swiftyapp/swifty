@@ -190,7 +190,7 @@ mod tests {
         let key = key_for(PASSWORD);
         let store = SqliteStore::open(&dir.join("vault.db"), &key.sqlcipher_key()).unwrap();
         store.import(&[record("1"), record("2")]).unwrap();
-        // Bookkeeping the restore must not inherit (`import` sets the dirty flag).
+        // Bookkeeping the restore must not inherit.
         store.meta_set("sync_last_digest", "deadbeef").unwrap();
         // …and app meta that it must keep.
         store.meta_set("kdf", "argon2id").unwrap();
@@ -243,7 +243,6 @@ mod tests {
 
         let (_, store) = restore_at(&db, &sidecar, &bytes, PASSWORD).unwrap();
 
-        assert!(!store.is_dirty().unwrap());
         assert_eq!(store.meta_get("sync_last_digest").unwrap(), None);
         // Scrubbing is scoped to the prefix: app meta is untouched.
         assert_eq!(store.meta_get("kdf").unwrap().as_deref(), Some("argon2id"));
