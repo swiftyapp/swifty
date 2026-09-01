@@ -37,6 +37,39 @@ describe('Form', () => {
     expect(saveEntry).not.toHaveBeenCalled()
   })
 
+  it('closes straight away when nothing was typed', async () => {
+    const { store } = renderWithStore(<Form />)
+    store.getState().newEntry()
+    await userEvent.click(screen.getByTestId('cancel-entry-button'))
+    expect(screen.queryByText('Discard changes?')).not.toBeInTheDocument()
+    expect(store.getState().entries.new).toBe(false)
+  })
+
+  it('guards unsaved changes with an inline confirm', async () => {
+    const { store } = renderWithStore(<Form />)
+    store.getState().newEntry()
+    await userEvent.type(document.querySelector('input[name="title"]')!, 'GitHub')
+
+    // First press only arms the confirm; the form stays open.
+    await userEvent.click(screen.getByTestId('cancel-entry-button'))
+    expect(screen.getByText('Discard changes?')).toBeInTheDocument()
+    expect(store.getState().entries.new).toBe(true)
+
+    // Second press discards.
+    await userEvent.click(screen.getByTestId('cancel-entry-button'))
+    expect(store.getState().entries.new).toBe(false)
+  })
+
+  it('saves on ⌘⏎ from anywhere in the sheet', async () => {
+    renderWithStore(<Form />)
+    await userEvent.type(document.querySelector('input[name="title"]')!, 'GitHub')
+    await userEvent.type(document.querySelector('input[name="username"]')!, 'octocat')
+    await userEvent.type(document.querySelector('input[name="password"]')!, 'pw')
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
+
+    expect(saveEntry).toHaveBeenCalledOnce()
+  })
+
   it('generates a password', async () => {
     vi.mocked(generatePassword).mockResolvedValue('Generated123!')
     renderWithStore(<Form />)
