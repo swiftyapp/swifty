@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS entitlements, applied only when the bundle is code-signed at package
+  time. `tauri dev` and unsigned/ad-hoc builds ignore this file entirely, so it
+  is inert until release signing is configured.
+
+  keychain-access-groups is what the data-protection keychain requires before it
+  will accept a biometry-protected item (see secure_store::GateMode::Protected).
+  Without it SecItemAdd returns errSecMissingEntitlement (-34018) and enrollment
+  falls back to the verify-then-read gate.
+
+  Release signing itself — bundle.macOS.signingIdentity, a Developer ID
+  certificate, and notarization credentials — is an owner task; this file only
+  pre-stages the entitlement so the protected gate starts working the moment a
+  real identity is wired up.
+-->
+<plist version="1.0">
+  <dict>
+    <key>keychain-access-groups</key>
+    <array>
+      <string>$(AppIdentifierPrefix)pro.getswifty.app</string>
+    </array>
+  </dict>
+</plist>

@@ -85,6 +85,9 @@
     "Are you sure you want to delete this item?": "Ви впевнені, що хочете видалити цей запис?",
     "Confirm your identity": "Підтвердіть свою особу",
     "or": "або",
-    "Language": "Мова інтерфейсу"
+    "Language": "Мова інтерфейсу",
+    "Biometric unlock failed": "Біометричне розблокування не вдалося",
+    "Your vault key is protected by the Secure Enclave and invalidated if your fingerprints change.": "Ключ вашого сховища захищений Secure Enclave і скасовується, якщо ваші відбитки пальців зміняться.",
+    "Your vault key is stored in your OS credential store and released after a biometric check by Swifty.": "Ключ вашого сховища зберігається в системному сховищі облікових даних і видається після біометричної перевірки у Swifty."
   }
 

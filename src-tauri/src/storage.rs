@@ -27,6 +27,8 @@ pub const LOCKOUT_SIDECAR_FILE: &str = "vault.lock.json";
 pub const GDRIVE_FILE: &str = "auth/gdrive.swftx";
 // Marker for "biometric unlock is enabled". The key itself lives in the OS
 // secure store; this flag lets us report availability without a biometric prompt.
+// Its contents name the gate the key was enrolled behind (`secure_store::GateMode`)
+// — not a secret: it says *how* the key is gated, never anything about the key.
 pub const BIOMETRIC_FILE: &str = "biometric.enabled";
 
 fn app_dir(app: &AppHandle) -> Result<PathBuf> {
@@ -204,6 +206,14 @@ pub fn write_gdrive(app: &AppHandle, data: &str) -> Result<()> {
     write_file(&gdrive_path(app)?, data)
 }
 
+// The recorded gate marker, or `None` when biometric unlock is not enabled.
+// Enrollment decides the gate once; every later retrieval reads it back from
+// here rather than re-probing what the platform would do today.
+pub fn biometric_marker(app: &AppHandle) -> Option<String> {
+    let path = app_dir(app).ok()?.join(BIOMETRIC_FILE);
+    fs::read_to_string(path).ok()
+}
+
 // Whether the user opted into biometric unlock (marker file present).
 pub fn biometric_enrolled(app: &AppHandle) -> bool {
     app_dir(app)
@@ -211,16 +221,16 @@ pub fn biometric_enrolled(app: &AppHandle) -> bool {
         .unwrap_or(false)
 }
 
-// Set/clear the biometric-enabled marker. Idempotent.
-pub fn set_biometric_enrolled(app: &AppHandle, enrolled: bool) -> Result<()> {
+// Record the enrolled gate, or clear the marker entirely with `None`. Idempotent.
+pub fn set_biometric_marker(app: &AppHandle, marker: Option<&str>) -> Result<()> {
     let path = app_dir(app)?.join(BIOMETRIC_FILE);
-    if enrolled {
-        write_file(&path, "1")
-    } else if path.exists() {
-        fs::remove_file(&path)?;
-        Ok(())
-    } else {
-        Ok(())
+    match marker {
+        Some(marker) => write_file(&path, marker),
+        None if path.exists() => {
+            fs::remove_file(&path)?;
+            Ok(())
+        }
+        None => Ok(()),
     }
 }
 
