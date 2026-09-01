@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { deleteEntry } from '@/store'
 import type { EntryMeta } from '@/lib/commands'
 import { useRevealed } from '@/hooks/useRevealed'
+import { useFavicon } from '@/hooks/useFavicon'
 import { t } from '@/i18n'
+import { LoginGlyph, NoteGlyph, CardGlyph } from '../../../icons'
 import Details from './Details'
 import Actions from './Actions'
 import { MONO_LABEL } from '../ui'
@@ -17,11 +19,19 @@ const KIND_LABEL: Record<EntryMeta['type'], string> = {
   note: 'Secure note'
 }
 
+const KIND_GLYPH: Record<EntryMeta['type'], typeof LoginGlyph> = {
+  login: LoginGlyph,
+  card: CardGlyph,
+  note: NoteGlyph
+}
+
 const formatDate = (value?: string) =>
   value ? new Date(value).toLocaleString() : '—'
 
 export default function Show({ entry }: Props) {
   const revealed = useRevealed(entry)
+  const icon = useFavicon(entry.urlHost)
+  const Glyph = KIND_GLYPH[entry.type]
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Confirmation is inline in the more-menu (two-press pattern, like the
@@ -44,6 +54,14 @@ export default function Show({ entry }: Props) {
     <div className="mx-auto w-full max-w-[860px]">
 
       <div className="flex items-start gap-4">
+        {/* Same identity tile as the list row, one size up. */}
+        <div className="grid h-11 w-11 flex-none place-items-center self-center overflow-hidden rounded-lg bg-tile text-text2">
+          {icon ? (
+            <img src={icon} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <Glyph size={20} />
+          )}
+        </div>
         <div className="min-w-0 flex-1">
           <div className={`flex items-center gap-2 whitespace-nowrap ${MONO_LABEL}`}>
             <span className="text-text2">{t(KIND_LABEL[entry.type])}</span>
