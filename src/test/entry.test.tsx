@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Form from '@/components/Main/Body/Aside/Form'
 import Show from '@/components/Main/Body/Aside/Show'
+import Generator from '@/components/Main/Generator'
 import { saveEntry, revealEntry, generatePassword, generateOtp, copyToClipboard, toEntryMeta } from '@/lib/commands'
 import type { LoginEntry } from '@/lib/commands'
 import { renderWithStore, loginEntry, loginMeta } from './utils'
@@ -37,13 +38,23 @@ describe('Form', () => {
     expect(saveEntry).not.toHaveBeenCalled()
   })
 
-  it('generates a password', async () => {
+  it('generates a password through the generator dialog', async () => {
     vi.mocked(generatePassword).mockResolvedValue('Generated123!')
-    renderWithStore(<Form />)
+    renderWithStore(
+      <>
+        <Form />
+        <Generator />
+      </>
+    )
     await userEvent.click(screen.getByText('generate'))
+    expect(await screen.findByTestId('generator-dialog')).toBeInTheDocument()
+    await screen.findByText('Generated123!')
+
+    await userEvent.click(screen.getByTestId('generator-use-button'))
     await waitFor(() =>
       expect(document.querySelector<HTMLInputElement>('input[name="password"]')!.value).toBe('Generated123!')
     )
+    expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 })
 
