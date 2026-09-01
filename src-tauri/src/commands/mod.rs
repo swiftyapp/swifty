@@ -8,9 +8,9 @@ pub mod vault;
 
 use tauri::AppHandle;
 
-use crate::crypto::{self, Cryptor, KdfParams, VaultKey};
+use crate::crypto::{self, KdfParams, VaultKey};
 use crate::error::{Error, Result};
-use crate::models::{Entry, EntryMetaDto};
+use crate::models::EntryMetaDto;
 use crate::storage;
 use crate::store::{EntryMeta, Record, SqliteStore, StoreError, VaultStore};
 
@@ -110,12 +110,6 @@ pub fn record_kdf_meta(store: &SqliteStore, params: &KdfParams) -> Result<()> {
         .meta_set("kdf_params", &params.to_json()?)
         .map_err(store_err)?;
     Ok(())
-}
-
-// Decrypt one entry's sensitive fields (legacy per-field ciphertext -> plaintext).
-// Used by the (disabled) sync path when adopting a merged remote vault.
-pub fn expose_all(cryptor: &Cryptor, entries: &[Entry]) -> Result<Vec<Entry>> {
-    entries.iter().map(|e| cryptor.expose(e)).collect()
 }
 
 // A store metadata row -> the frontend DTO (no secret fields).

@@ -73,7 +73,7 @@ export interface EntryMeta {
   updatedAt?: string
 }
 
-// Project a full entry down to its list metadata (used on the disabled sync path).
+// Project a full entry down to its list metadata.
 export const toEntryMeta = (entry: Entry): EntryMeta => ({
   id: entry.id,
   type: entry.type,

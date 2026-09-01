@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useStore, flowAuth } from '@/store'
 import { syncConnect, syncDisconnect, exportVault, lock } from '@/lib/commands'
-import { SYNC_ENABLED } from '@/config'
 import { t } from '@/i18n'
 import type { Section } from './Navigation'
 import Button from '@/components/elements/Button'
@@ -68,13 +67,11 @@ export default function Vault({ section }: Props) {
           </Button>
         </div>
       </Row>
-      {SYNC_ENABLED && (
-        <Row>
-          <strong className={LABEL}>{t('Synchronize')}</strong>
-          <p className={DESC}>{t('Synchronize your vault with Google Drive')}</p>
-          <div>{syncAction()}</div>
-        </Row>
-      )}
+      <Row>
+        <strong className={LABEL}>{t('Synchronize')}</strong>
+        <p className={DESC}>{t('Synchronize your vault with Google Drive')}</p>
+        <div>{syncAction()}</div>
+      </Row>
       <Row>
         <strong className={LABEL}>{t('Backup')}</strong>
         <p className={DESC}>

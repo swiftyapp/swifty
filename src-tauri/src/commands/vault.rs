@@ -101,7 +101,7 @@ pub fn import_backup(
     store.import(&records).map_err(store_err)?;
 
     let metas = list_metas(&store)?;
-    let sync_configured = crate::sync::ENABLED && storage::sync_configured(&app);
+    let sync_configured = storage::sync_configured(&app);
     state
         .session
         .lock()

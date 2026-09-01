@@ -1,5 +1,5 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { Audit, VaultData } from './commands'
+import type { Audit, EntryMeta } from './commands'
 
 /**
  * Frozen event catalog. The backend `emit`s these; the frontend `listen`s.
@@ -14,6 +14,7 @@ export const EVENTS = {
   syncDisconnected: 'sync:disconnected',
   pullStarted: 'vault:pull:started',
   pullStopped: 'vault:pull:stopped',
+  vaultMerged: 'vault:merged',
   auditDone: 'audit:done',
   vaultLocked: 'vault:locked',
   importProgress: 'import:progress',
@@ -27,8 +28,17 @@ export interface SyncStoppedPayload {
 
 export interface PullStoppedPayload {
   success: boolean
-  data?: VaultData
+  data?: { entries: EntryMeta[] }
   error?: string
+}
+
+/**
+ * A sync pulled entries this device did not have. Carries the whole refreshed
+ * list rather than a "reload" ping so the store updates in one render, and
+ * because the backend has already paid for the query.
+ */
+export interface VaultMergedPayload {
+  entries: EntryMeta[]
 }
 
 export interface AuditDonePayload {
@@ -52,6 +62,7 @@ export interface EventPayloads {
   'sync:disconnected': void
   'vault:pull:started': void
   'vault:pull:stopped': PullStoppedPayload
+  'vault:merged': VaultMergedPayload
   'audit:done': AuditDonePayload
   'vault:locked': void
   'import:progress': ImportProgressPayload

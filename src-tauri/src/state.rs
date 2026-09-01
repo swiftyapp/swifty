@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 
 use crate::crypto::{Cryptor, PayloadCipher, VaultKey};
@@ -69,4 +70,8 @@ impl Session {
 #[derive(Default)]
 pub struct AppState {
     pub session: Mutex<Session>,
+    // A sync run is in flight. Held outside `session` on purpose: the run takes
+    // and releases the session lock repeatedly (never across a network call),
+    // so the "one at a time" guard cannot live behind that same lock.
+    pub syncing: AtomicBool,
 }

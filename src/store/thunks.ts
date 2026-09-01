@@ -10,7 +10,6 @@ import {
   importBackup
 } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
-import { SYNC_ENABLED } from '@/config'
 import type { StoreState } from './index'
 
 export interface AsyncSlice {
@@ -22,9 +21,20 @@ export interface AsyncSlice {
   runAudit: () => Promise<void>
 }
 
-const trySync = () => {
-  if (SYNC_ENABLED) syncNow().catch(() => {})
-}
+/**
+ * How long a write waits before it is published.
+ *
+ * A push is the whole vault, so firing one per keystroke-sized edit would send
+ * the same snapshot over and over during a rename or a bulk import. The timer
+ * resets on every write, so a burst costs exactly one push once it settles. The
+ * debounce lives in the store rather than the backend because the backend has
+ * no write hook — this is where "the user changed something" is known. A quit
+ * inside the window loses nothing: the vault is still marked dirty, and the
+ * next unlock syncs it.
+ */
+const SYNC_DEBOUNCE_MS = 30_000
+
+let syncTimer: ReturnType<typeof setTimeout> | undefined
 
 const now = () => new Date().toISOString()
 
@@ -45,6 +55,15 @@ const upsertMeta = (items: EntryMeta[], meta: EntryMeta): EntryMeta[] => {
 }
 
 export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_set, get) => {
+  const scheduleSync = () => {
+    if (!get().sync.enabled) return
+    if (syncTimer) clearTimeout(syncTimer)
+    syncTimer = setTimeout(() => {
+      syncTimer = undefined
+      syncNow().catch(() => {})
+    }, SYNC_DEBOUNCE_MS)
+  }
+
   const refreshAudit = () =>
     getAudit(get().breachCheck)
       .then(data => get().auditDone(data))
@@ -57,20 +76,22 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       const meta = await saveEntryCmd(entry)
       get().setEntries(upsertMeta(get().entries.items, meta))
       get().entrySaved(meta.id)
-      trySync()
+      scheduleSync()
       refreshAudit()
     },
     deleteEntry: async id => {
       await deleteEntryCmd(id)
       get().entryRemoved(get().entries.items.filter(e => e.id !== id))
-      trySync()
+      scheduleSync()
       refreshAudit()
     },
     enterMain: async result => {
       get().setEntries(result.entries)
       get().flowMain()
-      get().syncInit(SYNC_ENABLED && result.syncConfigured)
-      if (SYNC_ENABLED && result.syncConfigured) syncNow().catch(() => {})
+      get().syncInit(result.syncConfigured)
+      // One run on unlock: this device may have been off while another pushed,
+      // and it may itself be holding writes a previous session never published.
+      if (result.syncConfigured) syncNow().catch(() => {})
       refreshAudit()
     },
     completeSetup: async password => {

@@ -1,28 +1,28 @@
-//! Google Drive sync provider (port of legacy `sync/gdrive/index.js` +
-//! `sync/index.js`). Finds/creates a "Swifty" folder and vault file, and
-//! reads/writes the remote vault. Async Drive/OAuth calls are driven on Tauri's
-//! runtime so the command layer stays synchronous.
+//! Google Drive sync provider. Finds (or creates) a "Swifty" folder and the
+//! `vault.swsync` pack inside it, and reads/writes that one file.
+//!
+//! This module is only the *transport*: the sync algorithm lives in [`engine`],
+//! behind the [`engine::Remote`] trait that [`DriveRemote`] implements. Drive's
+//! REST calls are async and are driven with `block_on` here, which is safe
+//! because a run always executes on its own thread (see `commands::sync`) —
+//! never on a command thread, and never on a runtime worker.
 
 mod auth;
 mod drive;
-pub mod merge;
+pub mod engine;
 pub mod pack;
 pub mod restore;
+
+use std::sync::Mutex;
 
 use reqwest::Client;
 use tauri::{async_runtime::block_on, AppHandle};
 
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
+use engine::{Remote, RemoteFile, SessionVault, SyncOutcome};
 
 const FOLDER_NAME: &str = "Swifty";
-const FILE_NAME: &str = "vault.swftx";
-
-// Temporarily disabled: Drive sync blocks the UI thread and needs an async
-// rework before it ships. Flip to true to re-enable. See commands/sync.rs.
-// When enabling: add the Google Drive/OAuth origins to `connect-src` in the
-// `security.csp` string in tauri.conf.json (currently `'self'` only).
-pub const ENABLED: bool = false;
 
 // Build an HTTPS client, installing the ring rustls provider once per process
 // (reqwest is built with `rustls-no-provider`).
@@ -47,48 +47,125 @@ pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
     auth::disconnect(app, cryptor)
 }
 
-pub fn remote_vault_exists(app: &AppHandle, cryptor: &Cryptor) -> Result<bool> {
-    block_on(async {
-        let client = http_client();
-        let token = auth::access_token(&client, app, cryptor).await?;
-        let Some(folder) = drive::folder_id(&client, &token, FOLDER_NAME).await? else {
-            return Ok(false);
-        };
-        Ok(drive::file_id(&client, &token, FILE_NAME, &folder)
-            .await?
-            .is_some())
-    })
+/// One full sync against Drive. Blocking: call it on a dedicated thread.
+pub fn run(app: &AppHandle, cryptor: Cryptor) -> Result<SyncOutcome> {
+    if !is_configured(app, &cryptor) {
+        return Err(Error::SyncNotConfigured);
+    }
+    let remote = DriveRemote::new(app.clone(), cryptor);
+    let local = SessionVault::capture(app)?;
+    engine::sync(&remote, &local, now_ms())
 }
 
-// Read the remote vault blob, erroring if the folder or file is missing.
-pub fn pull(app: &AppHandle, cryptor: &Cryptor) -> Result<String> {
-    block_on(async {
-        let client = http_client();
-        let token = auth::access_token(&client, app, cryptor).await?;
-        let folder = drive::folder_id(&client, &token, FOLDER_NAME)
-            .await?
-            .ok_or_else(|| Error::Other("Swifty folder was not found on GDrive".into()))?;
-        let file = drive::file_id(&client, &token, FILE_NAME, &folder)
-            .await?
-            .ok_or_else(|| Error::Other("Vault file was not found on GDrive".into()))?;
-        drive::read_file(&client, &token, &file).await
-    })
+fn now_ms() -> i64 {
+    chrono::Utc::now().timestamp_millis()
 }
 
-// Write the vault blob, creating the folder/file on first push (create-or-update).
-pub fn push(app: &AppHandle, cryptor: &Cryptor, data: &str) -> Result<()> {
-    block_on(async {
-        let client = http_client();
-        let token = auth::access_token(&client, app, cryptor).await?;
-        let folder = match drive::folder_id(&client, &token, FOLDER_NAME).await? {
-            Some(id) => id,
-            None => drive::create_folder(&client, &token, FOLDER_NAME).await?,
-        };
-        match drive::file_id(&client, &token, FILE_NAME, &folder).await? {
-            Some(id) => drive::update_file(&client, &token, &id, data).await,
-            None => drive::create_file(&client, &token, FILE_NAME, &folder, data)
-                .await
-                .map(|_| ()),
+/// [`Remote`] over one Drive folder + file pair.
+///
+/// The folder id is resolved once per instance (one instance per run) because
+/// the selection rule is deterministic and re-listing it would only cost round
+/// trips. The *file* is re-listed on every call: `head_revision` exists
+/// precisely to observe a change another device made, so it must never answer
+/// from a cache.
+struct DriveRemote {
+    app: AppHandle,
+    cryptor: Cryptor,
+    folder: Mutex<Option<String>>,
+}
+
+impl DriveRemote {
+    fn new(app: AppHandle, cryptor: Cryptor) -> Self {
+        Self {
+            app,
+            cryptor,
+            folder: Mutex::new(None),
         }
-    })
+    }
+
+    // Resolve the Swifty folder, remembering it for the rest of the run.
+    // `None` means it does not exist yet — which is also "no remote vault".
+    async fn folder(&self, client: &Client, token: &str) -> Result<Option<String>> {
+        if let Some(id) = self.folder.lock().unwrap().clone() {
+            return Ok(Some(id));
+        }
+        let found = drive::folder_id(client, token, FOLDER_NAME).await?;
+        if let Some(id) = &found {
+            *self.folder.lock().unwrap() = Some(id.clone());
+        }
+        Ok(found)
+    }
+
+    async fn locate(&self, client: &Client, token: &str) -> Result<Option<drive::DriveFile>> {
+        let Some(folder) = self.folder(client, token).await? else {
+            return Ok(None);
+        };
+        drive::find_file(client, token, pack::FILE_NAME, &folder).await
+    }
+
+    async fn token(&self, client: &Client) -> Result<String> {
+        auth::access_token(client, &self.app, &self.cryptor).await
+    }
+}
+
+impl Remote for DriveRemote {
+    fn fetch(&self) -> Result<Option<RemoteFile>> {
+        block_on(async {
+            let client = http_client();
+            let token = self.token(&client).await?;
+            let Some(file) = self.locate(&client, &token).await? else {
+                return Ok(None);
+            };
+            let bytes = drive::read_file(&client, &token, &file.id).await?;
+            Ok(Some(RemoteFile {
+                bytes,
+                revision: file.head_revision.unwrap_or_default(),
+            }))
+        })
+    }
+
+    fn head_revision(&self) -> Result<Option<String>> {
+        block_on(async {
+            let client = http_client();
+            let token = self.token(&client).await?;
+            let Some(file) = self.locate(&client, &token).await? else {
+                return Ok(None);
+            };
+            // The listing already carries it; only fall back to a `files.get`
+            // if Drive left it out of the list response.
+            match file.head_revision {
+                Some(revision) => Ok(Some(revision)),
+                None => Ok(Some(
+                    drive::head_revision(&client, &token, &file.id)
+                        .await?
+                        .unwrap_or_default(),
+                )),
+            }
+        })
+    }
+
+    fn upload(&self, bytes: &[u8]) -> Result<String> {
+        block_on(async {
+            let client = http_client();
+            let token = self.token(&client).await?;
+            let folder = match self.folder(&client, &token).await? {
+                Some(id) => id,
+                None => {
+                    let id = drive::create_folder(&client, &token, FOLDER_NAME).await?;
+                    *self.folder.lock().unwrap() = Some(id.clone());
+                    id
+                }
+            };
+            let revision = match drive::find_file(&client, &token, pack::FILE_NAME, &folder).await?
+            {
+                Some(file) => drive::update_file(&client, &token, &file.id, bytes).await?,
+                None => {
+                    drive::create_file(&client, &token, pack::FILE_NAME, &folder, bytes)
+                        .await?
+                        .head_revision
+                }
+            };
+            Ok(revision.unwrap_or_default())
+        })
+    }
 }
