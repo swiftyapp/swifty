@@ -5,6 +5,12 @@ on:
     branches: [master, v1-0-0]
   pull_request:
 
+# Cancel superseded PR runs (rapid pushes stack full matrices otherwise);
+# push runs on the protected branches are never cancelled.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   frontend:
     name: Frontend (build + lint)

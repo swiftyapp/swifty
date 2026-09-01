@@ -17,10 +17,47 @@ on:
     # Weekly re-scan so advisories added to the CodeQL packs after merge surface.
     - cron: '27 3 * * 1'
 
+# A superseded commit's analysis is worthless — cancel it. Push runs group per
+# ref; PR runs per PR.
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # The Rust leg costs ~8 minutes, so on PRs it only runs when Rust inputs
+  # changed. Pushes to the protected branches and the weekly cron always run
+  # everything, so Security-tab coverage never regresses.
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - 'src-tauri/**'
+              - '.github/codeql/**'
+              - '.github/workflows/codeql.yml'
+
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+    needs: changes
+    # `needs` never skips us: `always()` keeps this job alive on push/schedule,
+    # where `changes` itself is skipped. On PRs the Rust leg runs only when
+    # Rust inputs changed; a skipped leg satisfies branch protection.
+    if: >-
+      always() && (
+        matrix.language != 'rust' ||
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.rust == 'true'
+      )
     permissions:
       security-events: write
       actions: read
