@@ -13,6 +13,11 @@ export default function Chip({ label, count, selected, onClick }: Props) {
   return (
     <button
       type="button"
+      // One chip per tag, so specs disambiguate on `data-tag` (the raw tag —
+      // the visible label is the same string but sits beside a count span).
+      data-testid="tag-item"
+      data-tag={label}
+      aria-pressed={selected}
       onClick={onClick}
       className={cx(
         'flex h-6 flex-none items-center gap-1.5 rounded-sm border px-[9px] text-xs whitespace-nowrap',

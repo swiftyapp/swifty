@@ -27,7 +27,10 @@ export default function Tags() {
   if (tags.length === 0) return null
 
   return (
-    <div className="mt-3.5 flex gap-[5px] overflow-x-auto pb-0.5">
+    <div
+      data-testid="tags-list"
+      className="mt-3.5 flex gap-[5px] overflow-x-auto pb-0.5"
+    >
       {tags.map(([tag, count]) => (
         <Chip
           key={tag}

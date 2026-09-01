@@ -86,7 +86,12 @@ export default function Actions({ type, revealed, onDelete }: Props) {
 
   return (
     <div className="flex flex-none items-center gap-1.5">
-      <Button variant="pale" size="md" onClick={() => editEntry()}>
+      <Button
+        variant="pale"
+        size="md"
+        testid="edit-entry-button"
+        onClick={() => editEntry()}
+      >
         {t('Edit')}
       </Button>
 
@@ -106,9 +111,11 @@ export default function Actions({ type, revealed, onDelete }: Props) {
               <PencilGlyph />
               {t('Edit')}
             </DropdownItem>
+            {/* Same element for both presses: arm, then confirm. */}
             <DropdownItem
               separated
               danger
+              testid={armDelete ? 'delete-entry-confirm' : 'delete-entry-button'}
               onClick={armDelete ? run(onDelete) : () => setArmDelete(true)}
             >
               <TrashGlyph />

@@ -5,7 +5,10 @@ interface Props {
 export default function Error({ error }: Props) {
   if (!error) return null
   return (
-    <div className="mt-2.5 text-center font-mono text-xs tracking-label text-bad">
+    <div
+      data-testid="form-error"
+      className="mt-2.5 text-center font-mono text-xs tracking-label text-bad"
+    >
       {error}
     </div>
   )

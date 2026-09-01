@@ -1,0 +1,79 @@
+# E2E coverage matrix
+
+The live tracker for the E2E port (item 3 of [`docs/v1-next.md`](../../docs/v1-next.md)).
+Four PRs: **PR 1** is the foundation (per-spec isolation, helpers, `data-testid` hooks);
+**PRs 2–4** are spec batches that can land in parallel once PR 1 is in.
+
+Every spec opens with an explicit `resetPristine()` or `resetEmpty(password)` — the suite
+runs one app process against one data dir, so nothing may depend on file order.
+
+---
+
+## Legacy floor — the 18 Spectron specs on `master`
+
+| # | Legacy spec (`test/features/…`) | Lands in | New spec | Notes |
+|---|---|---|---|---|
+| 1 | `setup/launch.spec.js` | PR 2 | `setup.spec.ts` | Choice screen renders; Setup vs Restore. |
+| 2 | `setup/password.spec.js` | PR 2 | `setup.spec.ts` | Weak-password gate, mismatch error. Drop the old welcome copy assertion (rebrand). |
+| 3 | `authentication/password.spec.js` | PR 2 | `unlock.spec.ts` | Wrong password → `unlock-error`; correct password → `main-view`. |
+| 4 | `launch/scope.spec.js` | PR 2 | `unlock.spec.ts` | Boot lands on unlock when a vault exists (`resetEmpty`). |
+| 5 | `logins/create.spec.js` | PR 2 | `logins.spec.ts` | |
+| 6 | `logins/edit.spec.js` | PR 2 | `logins.spec.ts` | Includes the discard guard (see additions). |
+| 7 | `logins/delete.spec.js` | PR 2 | `logins.spec.ts` | Two-press confirm, not a dialog (see additions). |
+| 8 | `logins/password.spec.js` | PR 2 | `logins.spec.ts` | Reveal/hide + copy of the password field. |
+| 9 | `logins/search.spec.js` | PR 2 | `search.spec.ts` | |
+| 10 | `logins/empty.spec.js` | PR 3 | `empty.spec.ts` | `create-first-entry-button` state. |
+| 11 | `cards/create.spec.js` | PR 3 | `cards.spec.ts` | Plus brand mark + interactive face (see additions). |
+| 12 | `notes/create.spec.js` | PR 3 | `notes.spec.ts` | |
+| 13 | `tags/filter.spec.js` | PR 3 | `tags.spec.ts` | |
+| 14 | `tags/empty.spec.js` | PR 3 | `tags.spec.ts` | `tags-list` absent when no entry carries a tag. |
+| 15 | `audit/index.spec.js` | PR 4 | `audit.spec.ts` | Groups are **Weak / Reused / Breached** now, not the legacy buckets. |
+| 16 | `settings/change_password.spec.js` | PR 4 | `settings.spec.ts` | |
+| 17 | `settings/password.spec.js` | PR 4 | `generator.spec.ts` | Generator *defaults* panel in Settings. |
+| 18 | `settings/vault.spec.js` | PR 4 | `settings.spec.ts` | Minus the sync assertions the legacy spec made against the old Drive UI. |
+
+## Planned additions — flows the legacy suite never had
+
+| Flow | Lands in | Hook |
+|---|---|---|
+| Discard-changes guard on a dirty edit | PR 2 | `cancel-entry-button` pressed twice ("Discard changes?") |
+| Delete confirm | PR 2 | `delete-entry-button` → `delete-entry-confirm` inside `more-actions-button` |
+| Kind scopes in the rail | PR 2 | `scope-login` / `scope-note` / `scope-card` / `scope-audit` |
+| Sort control | PR 3 | `sort-menu` → `sort-option-recent` / `sort-option-alpha`, assert `entry-item-title` order |
+| Card face: reveal + copy | PR 3 | `card-reveal-button`, `entry-value-number` / `-expires` / `-cvc` / `-pin` |
+| Card brand mark | PR 3 | brand slug derived at save time; assert per-network glyph |
+| Empty states per scope | PR 3 | `create-first-entry-button` |
+| Command palette | PR 4 | `command-palette`, `command-palette-input`, `palette-item` |
+| Password generator | PR 4 | `generator-mode-random` / `-memorable`, `generator-amount`, `generator-regenerate`, `generator-output`, `generator-use-button` |
+| Change master password | PR 4 | `change-password-submit`, `change-password-error`, `change-password-success` |
+| Sync indicator reads "Local" | PR 4 | `sync-indicator` |
+| Copy toast | PR 4 | `copy-toast` — always in the DOM, toggled via the `hidden` class, so assert *visibility* |
+
+---
+
+## Deliberately not e2e-able
+
+These are not gaps in the suite; the coverage lives elsewhere and belongs there.
+
+| Area | Why not e2e | Where it is covered |
+|---|---|---|
+| Drive sync loop | Needs a live Google account + OAuth consent; a WebDriver run cannot hold credentials. | Rust tests around `sync::engine` against a fake `Remote`, plus the pack/restore round-trip tests. |
+| Biometric unlock | Gated by the OS (Touch ID prompt); no WebDriver surface, and the secure store is machine-bound. | `secure_store` / `biometrics` are behind a platform trait; unit-tested through it. |
+| `.swftx` import / export, backup restore | Opens a **native** file dialog outside the webview — the driver cannot reach it. | `import::` and `store::` Rust tests cover parse, reseal-on-import and the export round-trip. |
+| Updater | Talks to the release endpoint and stages a signed bundle. | `services/autoUpdate.test.ts` against a mocked plugin. |
+| HIBP breach check | Network call to the k-anonymity range API. | `hibp` Rust unit tests; the audit spec runs with the breach check off. |
+| Site favicons | Fetches from each entry's own host. | E2E asserts only the **glyph fallback**; fetching/caching is covered in `favicon` Rust tests. |
+
+---
+
+## Harness reference
+
+- `helpers/reset.ts` — `resetPristine()`, `resetEmpty(password)`
+- `helpers/vault.ts` — `setupVault(password)`, `unlock(password)`, `lockVault()`
+- `helpers/entries.ts` — `createLogin`, `createCard`, `createNote`, `entryItems()`
+- `helpers/app.ts` — `waitFor(testid)`, `waitForAppReady()`
+
+Reset goes through `window.__e2eReset` (installed only when `import.meta.env.DEV`) onto the
+`e2e_reset` Tauri command, which is compiled out of release builds and additionally refuses
+to run unless `SWIFTY_E2E=1` **and** `SWIFTY_DB_DIR` are set — so it can only ever erase the
+suite's own temp dir. See `src-tauri/src/commands/e2e.rs`.

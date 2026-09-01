@@ -28,7 +28,7 @@ export default function PasswordStrength({ password }: Props) {
     : strength?.warning || strength?.suggestions[0] || ''
 
   return (
-    <div className="mx-auto mt-4 w-60">
+    <div data-testid="password-strength" className="mx-auto mt-4 w-60">
       <div className="flex gap-1">
         {[0, 1, 2, 3, 4].map(i => (
           <span
@@ -41,7 +41,9 @@ export default function PasswordStrength({ password }: Props) {
         ))}
       </div>
       <div className="mt-1.5 flex justify-between gap-2 font-mono text-xs text-text3">
-        <span>{score !== null ? t(LABELS[score]) : ''}</span>
+        <span data-testid="password-strength-label">
+          {score !== null ? t(LABELS[score]) : ''}
+        </span>
         {hint && <span className="text-right text-text3">{hint}</span>}
       </div>
     </div>

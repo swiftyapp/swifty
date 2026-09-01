@@ -12,13 +12,21 @@ interface Props {
   onSubmit?: () => void
   // Pinned action row at the bottom of the panel.
   footer?: ReactNode
+  testid?: string
   children: ReactNode
 }
 
 // Full-height 520px panel sliding in from the right over a blurred scrim, with
 // a fixed header, a scrollable body and a pinned footer. Sibling of Modal:
 // same overlay language, different anchor.
-export default function Sheet({ title, onClose, onSubmit, footer, children }: Props) {
+export default function Sheet({
+  title,
+  onClose,
+  onSubmit,
+  footer,
+  testid,
+  children
+}: Props) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') return onClose()
@@ -37,6 +45,7 @@ export default function Sheet({ title, onClose, onSubmit, footer, children }: Pr
       onClick={onClose}
     >
       <div
+        data-testid={testid}
         className="animate-sheet flex h-full w-[520px] flex-col border-l border-line2 bg-detail text-text shadow-[var(--shadow)]"
         onClick={event => event.stopPropagation()}
       >

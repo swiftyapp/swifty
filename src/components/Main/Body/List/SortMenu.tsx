@@ -36,7 +36,11 @@ export default function SortMenu() {
         <div className="absolute right-0 top-full mt-1 w-[180px]">
           <Dropdown onBlur={() => setOpen(false)}>
             {OPTIONS.map(option => (
-              <DropdownItem key={option.mode} onClick={() => pick(option.mode)}>
+              <DropdownItem
+                key={option.mode}
+                testid={`sort-option-${option.mode}`}
+                onClick={() => pick(option.mode)}
+              >
                 <span className="grid w-3.5 flex-none place-items-center text-accent">
                   {sort === option.mode && <CheckGlyph />}
                 </span>

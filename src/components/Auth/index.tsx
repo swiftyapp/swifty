@@ -76,7 +76,18 @@ export function Auth({ touchID }: Props) {
     <>
       <Controls />
       <AuthShell meta={`${t('offline')} · aes-256-gcm`}>
-        <Eyebrow tone={error ? 'bad' : 'muted'}>
+        {/* One element carries all three states, so the testid names which one
+            is showing rather than forcing specs to parse the message. */}
+        <Eyebrow
+          tone={error ? 'bad' : 'muted'}
+          testid={
+            retryAfter > 0
+              ? 'unlock-lockout'
+              : error
+                ? 'unlock-error'
+                : 'unlock-status'
+          }
+        >
           {error ?? t('Vault sealed')}
         </Eyebrow>
         <div className="mt-8">

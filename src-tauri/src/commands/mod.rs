@@ -1,6 +1,10 @@
 pub mod audit;
 pub mod auth;
 pub mod clipboard;
+// E2E-only reset seam. Compiled out of release builds entirely (see e2e.rs for
+// the full gating rationale); the registration in lib.rs carries the same cfg.
+#[cfg(debug_assertions)]
+pub mod e2e;
 pub mod generator;
 pub mod import;
 pub mod sync;

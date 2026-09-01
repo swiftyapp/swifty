@@ -25,6 +25,7 @@ export default function Amount({ settings, onChange }: Props) {
       <input
         type="range"
         aria-label={t(byWords ? 'Words' : 'Length')}
+        data-testid="generator-amount"
         min={min}
         max={max}
         value={value}

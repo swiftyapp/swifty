@@ -27,7 +27,10 @@ export default function Row({ glyph, title, sub, flag }: Props) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-[7px]">
-          <span className="truncate text-base font-medium text-text">
+          <span
+            data-testid="entry-item-title"
+            className="truncate text-base font-medium text-text"
+          >
             {title}
           </span>
           {flag}

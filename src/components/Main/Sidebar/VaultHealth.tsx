@@ -40,6 +40,7 @@ export default function VaultHealth() {
   return (
     <Tooltip content={t('Vault Health')}>
       <div
+        data-testid="scope-audit"
         onClick={() => setFilterScope('audit')}
         className={cx(
           'grid h-10 w-10 cursor-pointer place-items-center rounded-lg transition-colors',
@@ -63,6 +64,7 @@ export default function VaultHealth() {
             />
           )}
           <text
+            data-testid="vault-health-score"
             x="18"
             y="21.5"
             textAnchor="middle"

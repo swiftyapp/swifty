@@ -20,6 +20,7 @@ export default function Tabs({ mode, onChange }: Props) {
         <button
           key={tab.mode}
           type="button"
+          data-testid={`generator-mode-${tab.mode}`}
           onClick={() => onChange(tab.mode)}
           className={cx(
             'cursor-pointer rounded-sm px-2.5 py-[3px] text-base transition-colors',

@@ -127,11 +127,15 @@ export default function Form({ entry }: Props) {
       onClose={onCancel}
       onSubmit={onSave}
       footer={footer}
+      testid="entry-sheet"
     >
       <div className="flex flex-col gap-4">{fields()}</div>
 
       {saveError && (
-        <div className="mt-4 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3 text-base text-bad">
+        <div
+          data-testid="entry-save-error"
+          className="mt-4 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3 text-base text-bad"
+        >
           {saveError}
         </div>
       )}
