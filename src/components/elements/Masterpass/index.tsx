@@ -88,6 +88,8 @@ export default function Masterpass({
           lock ? 'h-16' : 'h-14'
         )}
       >
+        {/* Deliberately off the type/tracking scales: the passphrase field is a
+            theatrical one-off (26/22px, .3em cuts) that no other surface reuses. */}
         <input
           type={reveal ? 'text' : 'password'}
           className="absolute inset-0 w-full border-0 bg-transparent text-center font-mono tracking-[0.3em] outline-none placeholder:text-[15px] placeholder:tracking-[0em] placeholder:text-text3"

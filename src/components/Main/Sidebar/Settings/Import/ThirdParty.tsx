@@ -107,7 +107,7 @@ export default function ThirdParty() {
       </div>
 
       {preview && (
-        <div className="text-[13px] text-text2">
+        <div className="text-base text-text2">
           {t('Ready to import')}: <strong className="text-text">{preview.total}</strong>
           {preview.skipped > 0 && (
             <span className={DANGER}>

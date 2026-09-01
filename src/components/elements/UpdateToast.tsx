@@ -17,7 +17,7 @@ export default function UpdateToast() {
 }
 
 const shell =
-  'fixed bottom-5 right-5 z-[1000] max-w-[340px] rounded-xl border border-line bg-detail text-text shadow-[var(--shadow)]'
+  'animate-pop fixed bottom-5 right-5 z-[1000] max-w-[340px] rounded-xl border border-line bg-detail text-text shadow-[var(--shadow)]'
 
 function ReadyToast({ version, notes }: { version: string; notes: string | null }) {
   const dismiss = useStore(state => state.dismissUpdate)
@@ -38,12 +38,12 @@ function ReadyToast({ version, notes }: { version: string; notes: string | null 
     <div className={`${shell} flex gap-3 p-4`} role="alert">
       <DownloadGlyph size={18} className="mt-0.5 flex-none text-accent" />
       <div className="flex flex-col gap-1">
-        <strong className="text-[14px]">{t('Update Ready')}</strong>
-        <span className="text-[13px] text-text2">
+        <strong className="text-base">{t('Update Ready')}</strong>
+        <span className="text-base text-text2">
           {t('Version {v} has been downloaded.').replace('{v}', version)}
         </span>
         {notes && (
-          <p className="mt-1 whitespace-pre-wrap text-[12px] text-text3">{notes}</p>
+          <p className="mt-1 whitespace-pre-wrap text-base text-text3">{notes}</p>
         )}
         <div className="mt-3 flex gap-2">
           <Button
@@ -75,7 +75,7 @@ const STATUS_COPY: Record<'checking' | 'uptodate' | 'error', string> = {
 function StatusToast({ status }: { status: 'checking' | 'uptodate' | 'error' }) {
   return (
     <div className={`${shell} px-4 py-3`} role="status">
-      <span className="text-[13px] text-text2">{t(STATUS_COPY[status])}</span>
+      <span className="text-base text-text2">{t(STATUS_COPY[status])}</span>
     </div>
   )
 }

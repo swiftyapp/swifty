@@ -17,11 +17,11 @@ export default function Row({ glyph, title, sub }: Props) {
         {glyph}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium tracking-[-0.01em] text-text">
+        <div className="truncate text-base font-medium text-text">
           {title}
         </div>
         {sub && (
-          <div className="mt-0.5 truncate font-mono text-[11px] text-text3">
+          <div className="mt-0.5 truncate font-mono text-xs text-text3">
             {sub}
           </div>
         )}

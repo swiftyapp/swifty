@@ -15,7 +15,7 @@ export default function Progress({ done, total }: Props) {
           style={{ width: `${pct(done, total)}%` }}
         />
       </div>
-      <span className="font-mono text-[12px] text-text3">
+      <span className="font-mono text-xs text-text3">
         {done} / {total}
       </span>
     </div>

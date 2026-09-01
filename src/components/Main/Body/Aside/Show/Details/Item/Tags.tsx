@@ -15,7 +15,7 @@ export default function Tags({ entry }: Props) {
       {entry.tags.map(tag => (
         <span
           key={tag}
-          className="grid h-6 place-items-center rounded-sm border border-line2 px-2.5 font-mono text-[11px] text-text2"
+          className="grid h-6 place-items-center rounded-sm border border-line2 px-2.5 font-mono text-xs text-text2"
         >
           {tag}
         </span>

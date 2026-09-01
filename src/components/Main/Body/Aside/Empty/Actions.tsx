@@ -21,7 +21,7 @@ export default function Actions() {
       <Button onClick={() => newEntry()}>{t('Create First Entry')}</Button>
       {SYNC_ENABLED && (
         <>
-          <span className="text-[12px] text-text3">{t('or')}</span>
+          <span className="text-base text-text3">{t('or')}</span>
           <Button variant="pale" loading={loading} onClick={onImport}>
             {t('Import from Gdrive')}
           </Button>

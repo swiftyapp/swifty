@@ -5,7 +5,7 @@ import Aside from './Aside'
 // the current content stays functional and readable in both themes.
 export default function DetailPane() {
   return (
-    <div className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-detail p-6 text-text">
+    <div className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-detail pt-[26px] px-[34px] pb-[60px] text-text">
       <Aside />
     </div>
   )

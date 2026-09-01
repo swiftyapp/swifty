@@ -35,7 +35,7 @@ export default function Login({
       <Field label={t('Username')} name="username" validate={validate} entry={entry} onChange={onChange} maxLength={40} />
       <SecureField label={t('Password')} name="password" validate={validate} entry={entry} onChange={onChange} maxLength={100}>
         <span
-          className="flex cursor-pointer items-center gap-1.5 text-[12px] text-accent hover:brightness-110"
+          className="flex cursor-pointer items-center gap-1.5 text-base text-accent hover:brightness-110"
           onClick={generate}
         >
           <RefreshGlyph size={13} />

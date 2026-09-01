@@ -42,15 +42,18 @@ export default function Show({ entry }: Props) {
 
   return (
     <div className="mx-auto max-w-[860px]">
+      {/* `copied-notification` + `hidden` are toggled by services/copy.ts; the
+          display flip is what replays `animate-pop`. Centering uses auto margins
+          instead of a translate so the pop's transform doesn't fight it. */}
       <div
-        className="copied-notification hidden fixed left-1/2 top-4 z-50 w-max -translate-x-1/2 rounded-full bg-text px-5 py-2 text-[13px] text-detail shadow-[var(--shadow)]"
+        className="copied-notification hidden animate-pop fixed inset-x-0 top-4 z-50 mx-auto w-max rounded-full bg-text px-5 py-2 text-base text-detail shadow-[var(--shadow)]"
       >
         {t('Copied to Clipboard')}
       </div>
 
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
-          <div className={`flex items-center gap-2 whitespace-nowrap ${MONO_LABEL} tracking-[0.14em]`}>
+          <div className={`flex items-center gap-2 whitespace-nowrap ${MONO_LABEL}`}>
             <span className="text-text2">{t(KIND_LABEL[entry.type])}</span>
             {entry.urlHost && (
               <>
@@ -59,7 +62,7 @@ export default function Show({ entry }: Props) {
               </>
             )}
           </div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-text">
+          <h1 className="mt-2 text-2xl font-semibold tracking-display text-text">
             {entry.title}
           </h1>
         </div>
@@ -79,10 +82,14 @@ export default function Show({ entry }: Props) {
         {ledger.map((cell, i) => (
           <div
             key={cell.k}
-            className={i < ledger.length - 1 ? 'border-r border-line px-3.5 py-3' : 'px-3.5 py-3'}
+            className={
+              i < ledger.length - 1
+                ? 'border-r border-line px-3.5 py-[11px]'
+                : 'px-3.5 py-[11px]'
+            }
           >
             <div className={MONO_LABEL}>{cell.k}</div>
-            <div className="mt-1.5 truncate font-mono text-[12px] text-text2">
+            <div className="mt-1.5 truncate font-mono text-base text-text2">
               {cell.v}
             </div>
           </div>
@@ -91,7 +98,7 @@ export default function Show({ entry }: Props) {
 
       {revealed && <Details entry={revealed} />}
       {deleteError && (
-        <div className="mt-3 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3 text-[13px] text-bad">
+        <div className="mt-3 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3 text-base text-bad">
           {deleteError}
         </div>
       )}

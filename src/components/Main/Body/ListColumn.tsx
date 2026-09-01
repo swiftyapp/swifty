@@ -11,10 +11,10 @@ export default function ListColumn() {
   return (
     <div className="flex w-[348px] min-h-0 flex-none flex-col border-r border-line bg-list">
       <div className="flex-none px-4 pt-4 pb-2.5">
-        <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-text3">
+        <div className="font-mono text-xs uppercase tracking-label text-text3">
           {scopeEyebrow(scope)}
         </div>
-        <div className="mt-1.5 text-xl font-semibold tracking-[-0.025em] text-text">
+        <div className="mt-1.5 text-xl font-semibold tracking-display text-text">
           {scopeTitle(scope)}
         </div>
         <Tags />

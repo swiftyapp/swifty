@@ -16,7 +16,7 @@ export default function Eyebrow({ children, tone = 'muted' }: Props) {
   const text = tone === 'bad' ? 'text-bad' : 'text-text3'
 
   return (
-    <div className="flex items-center justify-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.2em]">
+    <div className="flex items-center justify-center gap-2.5 font-mono text-xs uppercase tracking-label">
       <span
         className={cx(
           'h-1 w-1 rounded-full animate-[breathe_3.4s_ease-in-out_infinite]',

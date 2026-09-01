@@ -2,7 +2,11 @@ import { useState, type CSSProperties, type ReactNode } from 'react'
 import { cx } from '@/utils/cx'
 import type { EntryDraft } from '@/defaults/entries'
 import { valueOf, type FieldChange } from './helpers'
-import { inputClass, labelClass } from '@/components/elements/formStyles'
+import {
+  inputClass,
+  labelClass,
+  textareaClass
+} from '@/components/elements/formStyles'
 import { IconButton } from '../ui'
 import { EyeGlyph, EyeOffGlyph } from '../../../icons'
 
@@ -33,7 +37,7 @@ export default function SecureField({
   const mask: CSSProperties = {
     WebkitTextSecurity: show ? 'none' : 'disc'
   } as CSSProperties
-  const control = cx(inputClass, '!pr-10', error && '!border-bad')
+  const control = cx('!pr-10', error && '!border-bad')
 
   return (
     <div>
@@ -41,7 +45,7 @@ export default function SecureField({
       <div className="relative">
         {rows ? (
           <textarea
-            className={cx(control, 'resize-none')}
+            className={cx(textareaClass, control, 'resize-none')}
             name={name}
             rows={rows}
             value={value}
@@ -51,7 +55,7 @@ export default function SecureField({
           />
         ) : (
           <input
-            className={control}
+            className={cx(inputClass, control)}
             name={name}
             type="text"
             value={value}
@@ -61,7 +65,7 @@ export default function SecureField({
           />
         )}
         <IconButton
-          className="absolute right-1.5 top-1.5"
+          className="absolute top-1 right-1"
           active={show}
           onClick={() => setShow(!show)}
         >

@@ -1,7 +1,11 @@
 import { cx } from '@/utils/cx'
 import type { EntryDraft } from '@/defaults/entries'
 import { valueOf, type FieldChange } from './helpers'
-import { inputClass, labelClass } from '@/components/elements/formStyles'
+import {
+  inputClass,
+  labelClass,
+  textareaClass
+} from '@/components/elements/formStyles'
 
 interface Props {
   label: string
@@ -24,14 +28,14 @@ export default function Field({
 }: Props) {
   const value = valueOf(entry, name)
   const error = validate && value.trim() === ''
-  const control = cx(inputClass, error && '!border-bad')
+  const invalid = error && '!border-bad'
 
   return (
     <div>
       <label className={labelClass}>{label}</label>
       {rows ? (
         <textarea
-          className={cx(control, 'resize-none')}
+          className={cx(textareaClass, invalid, 'resize-none')}
           name={name}
           rows={rows}
           value={value}
@@ -40,7 +44,7 @@ export default function Field({
         />
       ) : (
         <input
-          className={control}
+          className={cx(inputClass, invalid)}
           name={name}
           type="text"
           value={value}

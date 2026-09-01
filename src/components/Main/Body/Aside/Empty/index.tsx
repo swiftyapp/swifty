@@ -8,10 +8,10 @@ export default function Empty() {
       <div className="grid h-16 w-16 place-items-center rounded-lg bg-accent-soft text-accent">
         <ShieldGlyph size={30} />
       </div>
-      <h2 className="mt-5 text-2xl font-semibold tracking-[-0.025em] text-text">
+      <h2 className="mt-5 text-2xl font-semibold tracking-display text-text">
         Swifty
       </h2>
-      <p className="mt-2 max-w-[320px] text-[13px] text-text2">
+      <p className="mt-2 max-w-[320px] text-base text-text2">
         {t('Keep your passwords safe and organized')}
       </p>
       <Actions />

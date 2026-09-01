@@ -40,7 +40,7 @@ export default function PasswordStrength({ password }: Props) {
           />
         ))}
       </div>
-      <div className="mt-1.5 flex justify-between gap-2 font-mono text-[11px] text-text3">
+      <div className="mt-1.5 flex justify-between gap-2 font-mono text-xs text-text3">
         <span>{score !== null ? t(LABELS[score]) : ''}</span>
         {hint && <span className="text-right text-text3">{hint}</span>}
       </div>

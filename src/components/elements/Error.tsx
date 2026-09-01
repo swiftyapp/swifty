@@ -5,7 +5,7 @@ interface Props {
 export default function Error({ error }: Props) {
   if (!error) return null
   return (
-    <div className="mt-2.5 text-center font-mono text-[11px] tracking-[0.02em] text-bad">
+    <div className="mt-2.5 text-center font-mono text-xs tracking-label text-bad">
       {error}
     </div>
   )
