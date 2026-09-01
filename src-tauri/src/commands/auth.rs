@@ -4,7 +4,7 @@ use crate::commands::{
 use crate::crypto::{self, KdfParams, PayloadCipher, VaultKey};
 use crate::error::{Error, Result};
 use crate::models::{EntryMetaDto, UnlockResult};
-use crate::secure_store::{self, KeyStore};
+use crate::secure_store::{self, GateMode, KeyStore};
 use crate::state::AppState;
 use crate::store::{Record, SqliteStore, VaultStore};
 use crate::{biometrics, storage};
@@ -206,18 +206,20 @@ pub fn lock(state: State<'_, AppState>) -> Result<()> {
 #[tauri::command]
 pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<UnlockResult> {
     storage::ensure_migrated(&app);
-    if !storage::biometric_enrolled(&app) {
+    let Some(marker) = storage::biometric_marker(&app) else {
         return Err(Error::Other("biometric unlock is not enabled".into()));
-    }
-    let material = match secure_store::Platform.retrieve() {
+    };
+    // Read through the gate enrollment recorded, never a re-probed one: trying
+    // the other mode on failure would either downgrade an OS-enforced gate to an
+    // app-enforced one behind the user's back, or just miss.
+    let material = match secure_store::Platform.retrieve(GateMode::from_marker(&marker)) {
         Ok(k) => k,
-        Err(Error::NotFound) => {
-            // The OS invalidated the item (e.g. enrolled fingerprints changed).
-            // Clear the stale marker so we stop offering a broken affordance.
-            let _ = storage::set_biometric_enrolled(&app, false);
-            return Err(Error::NotFound);
+        Err(e) => {
+            if unenroll_on(&e) {
+                let _ = storage::set_biometric_marker(&app, None);
+            }
+            return Err(e);
         }
-        Err(e) => return Err(e),
     };
     // A sidecar means the stored bytes are an Argon2id master; without one they
     // are the legacy secret string (a pre-sidecar dev vault).
@@ -238,6 +240,20 @@ pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Res
     })
 }
 
+// Whether a failed biometric retrieve means the enrollment itself is gone and
+// the marker should be cleared.
+//
+// Only [`Error::NotFound`] qualifies: the keychain item is provably absent (the
+// OS invalidated it because the enrolled fingerprints changed, or the user
+// removed it), so keeping the marker would leave a Touch ID button that can
+// never work. Every other failure — a build that lost its code-signing
+// entitlement, a cancelled prompt, a transient keychain error — leaves the key
+// sitting in the keychain intact, so un-enrolling would turn a temporary
+// problem into a permanent one and force the user to re-enroll for nothing.
+fn unenroll_on(err: &Error) -> bool {
+    matches!(err, Error::NotFound)
+}
+
 // True only when the platform supports a biometric-gated store, the biometric
 // hardware is available, and a key has been enrolled (opt-in).
 #[tauri::command]
@@ -247,26 +263,45 @@ pub fn is_biometric_available(app: AppHandle) -> Result<bool> {
         && storage::biometric_enrolled(&app))
 }
 
-// Opt in: store the current session's key material in the OS secure store,
-// biometry-gated. Requires an unlocked vault.
+// Enrollment state for the settings UI: whether biometric unlock is on, and
+// which gate the key sits behind (so the copy can describe it honestly).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BiometricStatus {
+    enabled: bool,
+    mode: Option<String>,
+}
+
 #[tauri::command]
-pub fn enable_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+pub fn biometric_status(app: AppHandle) -> Result<BiometricStatus> {
+    let marker = storage::biometric_marker(&app);
+    Ok(BiometricStatus {
+        enabled: is_biometric_available(app.clone())?,
+        mode: marker.map(|m| GateMode::from_marker(&m).as_marker().to_string()),
+    })
+}
+
+// Opt in: store the current session's key material in the OS secure store,
+// biometry-gated. Requires an unlocked vault. Returns the gate that enrollment
+// settled on — recorded here and honoured verbatim by every later retrieval.
+#[tauri::command]
+pub fn enable_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<String> {
     if !secure_store::is_supported() || !biometrics::is_available() {
         return Err(Error::Other("biometrics not available".into()));
     }
-    {
+    let mode = {
         let session = state.session.lock().unwrap();
-        secure_store::Platform.store(session.key()?.biometric_material())?;
-    }
-    storage::set_biometric_enrolled(&app, true)?;
-    Ok(())
+        secure_store::Platform.store(session.key()?.biometric_material())?
+    };
+    storage::set_biometric_marker(&app, Some(mode.as_marker()))?;
+    Ok(mode.as_marker().to_string())
 }
 
-// Opt out: delete the stored key and clear the marker.
+// Opt out: delete the stored key (in every mode) and clear the marker.
 #[tauri::command]
 pub fn disable_biometric(app: AppHandle) -> Result<()> {
     secure_store::Platform.delete()?;
-    storage::set_biometric_enrolled(&app, false)?;
+    storage::set_biometric_marker(&app, None)?;
     Ok(())
 }
 
@@ -349,14 +384,22 @@ pub fn change_master_password(
     session.set_keyed(new_key, store);
     drop(session);
 
-    // The biometric-stored key is now stale; re-store the new material or clear it.
+    // The biometric-stored key is now stale; re-store the new material or clear
+    // it. Re-storing is a fresh enrollment, so the gate is decided again and the
+    // marker refreshed — a build that has since gained (or lost) its entitlement
+    // moves the key to the matching mode instead of leaving a mislabelled item.
     if storage::biometric_enrolled(&app) {
         let session = state.session.lock().unwrap();
         let stored = secure_store::Platform.store(session.key()?.biometric_material());
         drop(session);
-        if stored.is_err() {
-            let _ = secure_store::Platform.delete();
-            let _ = storage::set_biometric_enrolled(&app, false);
+        match stored {
+            Ok(mode) => {
+                let _ = storage::set_biometric_marker(&app, Some(mode.as_marker()));
+            }
+            Err(_) => {
+                let _ = secure_store::Platform.delete();
+                let _ = storage::set_biometric_marker(&app, None);
+            }
         }
     }
     Ok(())
@@ -493,6 +536,25 @@ mod lockout_tests {
         let json = serde_json::to_string(&state).unwrap();
         let back: LockoutState = serde_json::from_str(&json).unwrap();
         assert_eq!(state, back);
+    }
+
+    #[test]
+    fn a_missing_keychain_item_un_enrolls() {
+        assert!(unenroll_on(&Error::NotFound));
+    }
+
+    #[test]
+    fn an_unreadable_but_present_key_keeps_the_enrollment() {
+        // The entitlement error the protected gate raises in an unsigned build,
+        // plus the everyday failures. None of these mean the key is gone.
+        for err in [
+            Error::Other("this build is not entitled to read the protected keychain item".into()),
+            Error::Other("biometric authentication failed".into()),
+            Error::Cancelled,
+            Error::Locked,
+        ] {
+            assert!(!unenroll_on(&err), "{err} must not clear the marker");
+        }
     }
 
     #[test]
