@@ -237,7 +237,10 @@ mod tests {
             <LINK REL="apple-touch-icon" HREF="/touch.png">
             <link rel="shortcut icon" href=favicon.ico >
         </head>"#;
-        assert_eq!(icon_hrefs(html), vec!["/touch.png", "/Icon-32.png", "favicon.ico"]);
+        assert_eq!(
+            icon_hrefs(html),
+            vec!["/touch.png", "/Icon-32.png", "favicon.ico"]
+        );
     }
 
     #[test]
@@ -250,6 +253,9 @@ mod tests {
     fn attr_values_keep_their_case() {
         let tag = r#"<link rel="icon" href="/CaseSensitive.PNG""#;
         let lower = tag.to_ascii_lowercase();
-        assert_eq!(attr_value(tag, &lower, "href").as_deref(), Some("/CaseSensitive.PNG"));
+        assert_eq!(
+            attr_value(tag, &lower, "href").as_deref(),
+            Some("/CaseSensitive.PNG")
+        );
     }
 }
