@@ -1,10 +1,14 @@
 import Sidebar from './Sidebar'
 import Header from './Header'
 import Body from './Body'
+import Palette from './Palette'
+import { useShortcuts } from './useShortcuts'
 
 // Three-pane shell: a full-width top chrome bar over a row of
 // rail (68px) · list column (348px) · detail pane (flex).
 export function Main() {
+  useShortcuts()
+
   return (
     <div
       data-testid="main-view"
@@ -15,6 +19,7 @@ export function Main() {
         <Sidebar />
         <Body />
       </div>
+      <Palette />
     </div>
   )
 }

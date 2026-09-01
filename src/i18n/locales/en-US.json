@@ -130,5 +130,14 @@
   "New entry": "New entry",
   "Edit entry": "Edit entry",
   "Discard changes?": "Discard changes?",
-  "Close": "Close"
+  "Close": "Close",
+  "Search or run a command": "Search or run a command",
+  "Best match": "Best match",
+  "Entries": "Entries",
+  "Commands": "Commands",
+  "No results": "No results",
+  "Lock vault": "Lock vault",
+  "Toggle theme": "Toggle theme",
+  "open": "open",
+  "copy": "copy"
 }

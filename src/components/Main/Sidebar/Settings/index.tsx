@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useStore, openSettings, closeSettings } from '@/store'
 import { t } from '@/i18n'
 import Modal from '@/components/elements/Modal'
 import Tooltip from '@/components/elements/Tooltip'
@@ -14,7 +15,8 @@ import Updates from './Updates'
 import { GearGlyph } from '../../icons'
 
 export default function Settings() {
-  const [modal, setModal] = useState(false)
+  // Open state lives in the store so the ⌘K palette can open Settings too.
+  const modal = useStore(state => state.ui.settings)
   const [section, setSection] = useState<Section>('vault')
 
   return (
@@ -23,13 +25,13 @@ export default function Settings() {
         <div
           className="settings-button grid h-9 w-9 cursor-pointer place-items-center rounded-lg text-text2 transition-colors hover:bg-hover hover:text-text"
           data-testid="settings-button"
-          onClick={() => setModal(!modal)}
+          onClick={() => (modal ? closeSettings() : openSettings())}
         >
           <GearGlyph />
         </div>
       </Tooltip>
       {modal && (
-        <Modal onClose={() => setModal(false)}>
+        <Modal onClose={closeSettings}>
           <div className="preferences flex max-h-[80vh] min-h-[560px] w-full text-text">
             <Navigation section={section} onClick={setSection} />
             <div className="body flex-1 overflow-y-auto p-7">

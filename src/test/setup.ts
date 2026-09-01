@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest'
 import { vi } from 'vitest'
 
+// jsdom implements no layout, so it ships no scrollIntoView.
+Element.prototype.scrollIntoView = vi.fn()
+
 // The Rust backend is built in parallel; mock the whole command/event layer so
 // screens render without a live backend. Individual tests override as needed.
 vi.mock('@/lib/commands', () => ({

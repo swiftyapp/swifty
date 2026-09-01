@@ -10,7 +10,6 @@ import {
   importBackup
 } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
-import { enlarge } from '@/services/window'
 import { SYNC_ENABLED } from '@/config'
 import type { StoreState } from './index'
 
@@ -68,7 +67,6 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       refreshAudit()
     },
     enterMain: async result => {
-      await enlarge().catch(() => {})
       get().setEntries(result.entries)
       get().flowMain()
       get().syncInit(SYNC_ENABLED && result.syncConfigured)

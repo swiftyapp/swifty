@@ -8,6 +8,7 @@ import { createSyncSlice, type SyncSlice } from './syncSlice'
 import { createI18nSlice, type I18nSlice } from './i18nSlice'
 import { createThemeSlice, type ThemeSlice } from './themeSlice'
 import { createUpdateSlice, type UpdateSlice } from './updateSlice'
+import { createUiSlice, type UiSlice } from './uiSlice'
 import { createAsyncSlice, type AsyncSlice } from './thunks'
 
 export type StoreState = FlowSlice &
@@ -18,6 +19,7 @@ export type StoreState = FlowSlice &
   I18nSlice &
   ThemeSlice &
   UpdateSlice &
+  UiSlice &
   AsyncSlice
 
 export const useStore = create<StoreState>()((...a) => ({
@@ -29,6 +31,7 @@ export const useStore = create<StoreState>()((...a) => ({
   ...createI18nSlice(...a),
   ...createThemeSlice(...a),
   ...createUpdateSlice(...a),
+  ...createUiSlice(...a),
   ...createAsyncSlice(...a)
 }))
 
@@ -40,7 +43,8 @@ const pickData = (s: StoreState) => ({
   breachCheck: s.breachCheck,
   sync: s.sync,
   i18n: s.i18n,
-  update: s.update
+  update: s.update,
+  ui: s.ui
 })
 
 const initialData = pickData(useStore.getState())
@@ -81,6 +85,10 @@ export const {
   toggleTheme,
   setUpdateReady,
   dismissUpdate,
+  openPalette,
+  closePalette,
+  openSettings,
+  closeSettings,
   runUpdateCheck,
   saveEntry,
   deleteEntry,
