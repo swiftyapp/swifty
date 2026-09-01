@@ -24,7 +24,7 @@ export default function Switcher() {
           <Tooltip content={t(label)} key={current}>
             <div
               className={cx(
-                'item relative grid h-9 w-9 cursor-pointer place-items-center rounded-lg transition-colors',
+                'item relative grid h-10 w-10 cursor-pointer place-items-center rounded-lg transition-colors',
                 selected
                   ? 'current bg-accent-soft text-accent'
                   : 'text-text2 hover:bg-hover hover:text-text'
@@ -32,9 +32,9 @@ export default function Switcher() {
               onClick={() => setFilterScope(current)}
             >
               {selected && (
-                <span className="absolute -left-2.5 top-2.5 h-4 w-0.5 rounded-full bg-accent" />
+                <span className="absolute -left-3.5 top-3 h-4 w-0.5 rounded-full bg-accent" />
               )}
-              <Icon />
+              <Icon size={18} />
             </div>
           </Tooltip>
         )

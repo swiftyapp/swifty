@@ -42,13 +42,13 @@ export default function VaultHealth() {
       <div
         onClick={() => setFilterScope('audit')}
         className={cx(
-          'grid h-9 w-9 cursor-pointer place-items-center rounded-lg transition-colors',
+          'grid h-10 w-10 cursor-pointer place-items-center rounded-lg transition-colors',
           selected
             ? 'bg-accent-soft text-accent'
             : 'text-text2 hover:bg-hover hover:text-text'
         )}
       >
-        <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
+        <svg width="30" height="30" viewBox="0 0 36 36" fill="none">
           <circle cx="18" cy="18" r={RADIUS} stroke="var(--c-line2)" strokeWidth="2.5" />
           {score !== null && (
             <circle
