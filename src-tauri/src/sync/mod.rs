@@ -6,6 +6,8 @@
 mod auth;
 mod drive;
 pub mod merge;
+pub mod pack;
+pub mod restore;
 
 use reqwest::Client;
 use tauri::{async_runtime::block_on, AppHandle};

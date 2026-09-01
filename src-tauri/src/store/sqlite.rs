@@ -68,6 +68,12 @@ const META_UPSERT: &str = "INSERT INTO meta (key, value) VALUES (?1, ?2)
 // local write since the last clear.
 const DIRTY_KEY: &str = "sync_dirty";
 
+/// Namespace for every device-local sync bookkeeping key in `meta` (the dirty
+/// flag, and the last-sync state the engine records). Grouped under one prefix
+/// so a restore can scrub the lot without enumerating them — a snapshot carries
+/// the *source* device's bookkeeping, which is meaningless on the target.
+pub const SYNC_META_PREFIX: &str = "sync_";
+
 pub struct SqliteStore {
     conn: Mutex<Connection>,
 }
@@ -251,6 +257,18 @@ impl SqliteStore {
         self.lock()
             .execute("DELETE FROM meta WHERE key = ?1", params![DIRTY_KEY])?;
         Ok(())
+    }
+
+    /// Delete every `meta` row whose key starts with `prefix`, returning how
+    /// many were removed.
+    ///
+    /// Matched with `substr`, not `LIKE`: `_` is a LIKE wildcard, so the literal
+    /// prefix `sync_` would also match `syncX…` — a silent over-delete.
+    pub fn meta_delete_prefix(&self, prefix: &str) -> Result<usize> {
+        Ok(self.lock().execute(
+            "DELETE FROM meta WHERE substr(key, 1, length(?1)) = ?1",
+            params![prefix],
+        )?)
     }
 
     /// Hard-delete tombstones deleted before `cutoff_ms`, returning the number
