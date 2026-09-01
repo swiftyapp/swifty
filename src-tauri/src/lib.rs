@@ -94,6 +94,12 @@ pub fn run() {
             commands::sync::sync_now,
             commands::sync::sync_import,
             commands::sync::sync_status,
+            // E2E-only vault reset. `generate_handler!` honours per-command
+            // attributes, so in a release build the match arm — and with it the
+            // only reference to the (also cfg'd-out) module — simply is not
+            // generated. See `commands/e2e.rs` for the runtime gates.
+            #[cfg(debug_assertions)]
+            commands::e2e::e2e_reset,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

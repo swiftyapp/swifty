@@ -23,6 +23,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>
 )
 
+// E2E state-reset bridge. Dynamic import behind the DEV flag: Vite substitutes
+// a literal `false` here for production builds, so the branch — and the module
+// behind it — never reach a shipped bundle. E2E runs against the dev server.
+if (import.meta.env.DEV) {
+  void import('./lib/e2e').then(({ installE2EBridge }) => installE2EBridge())
+}
+
 // Stage any signed update in the background; the toast surfaces it when ready.
 void runStartupUpdateCheck((version, notes) =>
   useStore.getState().setUpdateReady(version, notes)
