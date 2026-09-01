@@ -17,7 +17,7 @@ export default function Switcher() {
   const scope = useStore(state => state.filters.scope)
 
   return (
-    <div className="switcher flex flex-col items-center gap-[3px]">
+    <div className="switcher flex flex-col items-center gap-2">
       {scopes.map(({ scope: current, label, Icon }) => {
         const selected = scope === current
         return (
@@ -26,7 +26,7 @@ export default function Switcher() {
               className={cx(
                 'item relative grid h-10 w-10 cursor-pointer place-items-center rounded-lg transition-colors',
                 selected
-                  ? 'current bg-accent-soft text-accent'
+                  ? 'current bg-tile text-text'
                   : 'text-text2 hover:bg-hover hover:text-text'
               )}
               onClick={() => setFilterScope(current)}

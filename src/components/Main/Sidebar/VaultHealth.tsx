@@ -44,7 +44,7 @@ export default function VaultHealth() {
         className={cx(
           'grid h-10 w-10 cursor-pointer place-items-center rounded-lg transition-colors',
           selected
-            ? 'bg-accent-soft text-accent'
+            ? 'bg-tile text-text'
             : 'text-text2 hover:bg-hover hover:text-text'
         )}
       >

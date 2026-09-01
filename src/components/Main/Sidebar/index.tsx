@@ -9,7 +9,7 @@ import Settings from './Settings'
 // from the in-pane tiers so the rail reads as primary navigation.
 export default function Sidebar() {
   return (
-    <nav className="flex w-[68px] flex-none flex-col items-center gap-[3px] border-r border-line bg-rail py-3">
+    <nav className="flex w-[68px] flex-none flex-col items-center gap-2 border-r border-line bg-rail py-3">
       <Brand />
       <div className="my-2 h-px w-6 bg-line2" />
       <Add />
