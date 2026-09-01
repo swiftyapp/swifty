@@ -57,6 +57,11 @@ pub fn db_path(app: &AppHandle) -> Result<PathBuf> {
     Ok(app_dir(app)?.join(DB_FILE))
 }
 
+// Cached website favicons (list-row identity). Safe to wipe; refetched lazily.
+pub fn icons_dir(app: &AppHandle) -> Result<PathBuf> {
+    Ok(app_dir(app)?.join("icons"))
+}
+
 // Sibling recovery snapshot of the DB (change-master-password rollback point).
 pub fn db_rekey_backup_path(app: &AppHandle) -> Result<PathBuf> {
     Ok(app_dir(app)?.join(DB_REKEY_BACKUP_FILE))

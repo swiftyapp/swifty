@@ -255,6 +255,16 @@ export const getAudit = (checkBreaches: boolean): Promise<Audit> =>
   invoke('get_audit', { checkBreaches })
 
 // ---------------------------------------------------------------------------
+// Favicons
+// ---------------------------------------------------------------------------
+
+// The site's favicon as a data: URI, or null when it has none. The backend
+// fetches straight from the entry's own host (never a third-party favicon
+// service) and caches on disk, so repeat calls are a file read.
+export const fetchFavicon = (host: string): Promise<string | null> =>
+  invoke('fetch_favicon', { host })
+
+// ---------------------------------------------------------------------------
 // Clipboard
 // ---------------------------------------------------------------------------
 
