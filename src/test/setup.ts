@@ -32,6 +32,7 @@ vi.mock('@/lib/commands', () => ({
   generateOtp: vi.fn().mockResolvedValue({ code: '123456', time: 30 }),
   verifyOtp: vi.fn().mockResolvedValue(true),
   getAudit: vi.fn().mockResolvedValue({}),
+  fetchFavicon: vi.fn().mockResolvedValue(null),
   copyToClipboard: vi.fn().mockResolvedValue(undefined),
   syncConnect: vi.fn().mockResolvedValue(undefined),
   syncDisconnect: vi.fn().mockResolvedValue(undefined),
