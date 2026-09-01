@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
 import { setEntries } from '@/store'
-import { pickBackup, importSwftx, readVault } from '@/lib/commands'
+import { pickBackup, importSwftx, readVault, syncNow } from '@/lib/commands'
 import { t } from '@/i18n'
 import { useProgress } from './useProgress'
 import Progress from './Progress'
@@ -43,6 +43,8 @@ export default function Swftx() {
       .then(async imported => {
         setEntries(await readVault())
         setCount(imported)
+        // Publish the imported entries; a no-op when sync is not configured.
+        syncNow().catch(() => {})
       })
       .catch(() => setError(t('Invalid password for backup')))
       .finally(() => setRunning(false))
