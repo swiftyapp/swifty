@@ -21,6 +21,17 @@ pub fn build_record(entry: &Entry, payload: Vec<u8>) -> Result<Record> {
         updated_at: to_ms(&entry.updated_at),
         deleted_at: None,
         payload,
+        card_brand: derived_card_brand(entry),
+    })
+}
+
+// The stored slug for a card entry: its detected network, or "none" so a
+// completed derivation is distinguishable from a pre-column NULL.
+pub fn derived_card_brand(entry: &Entry) -> Option<String> {
+    (entry.kind == "card").then(|| {
+        crate::cards::card_brand(entry.number.as_deref().unwrap_or_default())
+            .unwrap_or("none")
+            .to_string()
     })
 }
 

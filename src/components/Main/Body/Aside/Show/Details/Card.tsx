@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { CardEntry } from '@/lib/commands'
+import { cardBrandOf, hasBrandMark } from '@/utils/cardBrand'
+import CardBrandMark from '@/components/elements/CardBrandMark'
 import { t } from '@/i18n'
 import Item from './Item'
 import Tags from './Item/Tags'
@@ -14,6 +16,9 @@ const group = (value: string) => value.match(/.{1,4}/g)?.join(' ') ?? value
 
 export default function Card({ entry }: Props) {
   const [show, setShow] = useState(false)
+  // Derived live from the revealed number (the list's stored slug isn't in
+  // scope here, and this also tracks unsaved-but-revealed data correctly).
+  const brand = cardBrandOf(entry.number)
 
   const number = entry.number
     ? show
@@ -36,7 +41,11 @@ export default function Card({ entry }: Props) {
             <div className="flex-1 font-mono text-[11px] uppercase tracking-[0.18em] opacity-60">
               {entry.name || t('Card')}
             </div>
-            <div className="h-6 w-[34px] rounded-[4px] border border-white/15 bg-white/10" />
+            {hasBrandMark(brand) ? (
+              <CardBrandMark brand={brand} size={20} tone="light" />
+            ) : (
+              <div className="h-6 w-[34px] rounded-[4px] border border-white/15 bg-white/10" />
+            )}
           </div>
           <div className="flex-1" />
           <div className="font-mono text-[20px] tracking-[0.16em]">{number}</div>

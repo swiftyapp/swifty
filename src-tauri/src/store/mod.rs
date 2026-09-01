@@ -47,6 +47,9 @@ pub struct Record {
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
     pub payload: Vec<u8>,
+    /// Card network slug derived from the number at save time ("visa", …);
+    /// None for non-cards and for rows saved before the column existed.
+    pub card_brand: Option<String>,
 }
 
 /// A row's metadata without its payload (what listings need).
@@ -60,6 +63,7 @@ pub struct EntryMeta {
     pub created_at: i64,
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
+    pub card_brand: Option<String>,
 }
 
 /// The swappable storage contract. Any backend behind this interface is a drop-in.
