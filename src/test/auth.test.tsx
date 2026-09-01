@@ -32,6 +32,17 @@ describe('Auth', () => {
     expect(await screen.findByText('Incorrect Master Password')).toBeInTheDocument()
   })
 
+  it('names the real problem when the vault schema is newer than the app', async () => {
+    // Rust's Error::VaultTooNew serializes as this exact string (error.rs).
+    vi.mocked(unlock).mockRejectedValue('vault requires a newer version of the app')
+    renderWithStore(<Auth touchID={false} />)
+
+    await userEvent.type(screen.getByPlaceholderText('Master Password'), 'right{Enter}')
+
+    expect(await screen.findByText('Vault needs a newer version of Swifty')).toBeInTheDocument()
+    expect(screen.queryByText('Incorrect Master Password')).not.toBeInTheDocument()
+  })
+
   it('disables the input and shows a countdown on too many attempts', async () => {
     vi.mocked(unlock).mockRejectedValue({ retryAfterSecs: 2 })
     renderWithStore(<Auth touchID={false} />)
