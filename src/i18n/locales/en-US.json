@@ -45,6 +45,8 @@
   "Biometric Unlock": "Biometric Unlock",
   "Unlock with Touch ID or Windows Hello": "Unlock with Touch ID or Windows Hello",
   "Store your vault key in the OS secure store, released only after a biometric check.": "Store your vault key in the OS secure store, released only after a biometric check.",
+  "Your vault key is protected by the Secure Enclave and invalidated if your fingerprints change.": "Your vault key is protected by the Secure Enclave and invalidated if your fingerprints change.",
+  "Your vault key is stored in your OS credential store and released after a biometric check by Swifty.": "Your vault key is stored in your OS credential store and released after a biometric check by Swifty.",
   "Enable Biometric Unlock": "Enable Biometric Unlock",
   "Disable Biometric Unlock": "Disable Biometric Unlock",
   "Password Settings": "Password Settings",

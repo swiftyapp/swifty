@@ -85,5 +85,7 @@
 	"Are you sure you want to delete this item?": "Tem certeza que quer remover esse item?",
 	"Confirm your identity": "Confirme sua identidade",
 	"or": "ou",
-	"Language": "Idioma"
+	"Language": "Idioma",
+	"Your vault key is protected by the Secure Enclave and invalidated if your fingerprints change.": "A chave do seu cofre é protegida pelo Secure Enclave e invalidada se suas impressões digitais mudarem.",
+	"Your vault key is stored in your OS credential store and released after a biometric check by Swifty.": "A chave do seu cofre fica armazenada no repositório de credenciais do sistema e é liberada após uma verificação biométrica do Swifty."
 }

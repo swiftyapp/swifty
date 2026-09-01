@@ -146,9 +146,25 @@ export const unlockBiometric = (): Promise<UnlockResult> =>
 export const isBiometricAvailable = (): Promise<boolean> =>
   invoke('is_biometric_available')
 
+// How the enrolled vault key is gated. `protected` is OS-enforced (the macOS
+// data-protection keychain releases the key only to Touch ID); `prompt` is
+// app-enforced (we run the biometric check, then read a plain credential-store
+// item). Decided once at enrollment and recorded, so the copy can be honest.
+export type BiometricMode = 'protected' | 'prompt'
+
+export interface BiometricStatus {
+  enabled: boolean
+  mode: BiometricMode | null
+}
+
+export const biometricStatus = (): Promise<BiometricStatus> =>
+  invoke('biometric_status')
+
 // Opt in/out of biometric unlock. `enable` stores the current session key in the
-// OS secure store (biometry-gated); `disable` deletes it. Requires an unlocked vault.
-export const enableBiometric = (): Promise<void> => invoke('enable_biometric')
+// OS secure store (biometry-gated) and resolves with the mode enrollment settled
+// on; `disable` deletes it. Requires an unlocked vault.
+export const enableBiometric = (): Promise<BiometricMode> =>
+  invoke('enable_biometric')
 
 export const disableBiometric = (): Promise<void> => invoke('disable_biometric')
 

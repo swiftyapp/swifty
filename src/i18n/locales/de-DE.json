@@ -85,5 +85,7 @@
     "Are you sure you want to delete this item?": "Sind Sie sicher, dass sie diesen Eintrag löschen wollen?",
     "Confirm your identity": "Bestätigen Sie Ihre Identität",
     "or": "oder",
-    "Language": "Sprache"
+    "Language": "Sprache",
+    "Your vault key is protected by the Secure Enclave and invalidated if your fingerprints change.": "Ihr Tresorschlüssel wird von der Secure Enclave geschützt und ungültig, wenn sich Ihre Fingerabdrücke ändern.",
+    "Your vault key is stored in your OS credential store and released after a biometric check by Swifty.": "Ihr Tresorschlüssel wird im Anmeldedaten-Speicher des Betriebssystems abgelegt und nach einer biometrischen Prüfung durch Swifty freigegeben."
   }

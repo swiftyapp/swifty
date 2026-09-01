@@ -8,7 +8,7 @@ import {
   generatePassword,
   enableBiometric,
   disableBiometric,
-  isBiometricAvailable,
+  biometricStatus,
   pickBackup,
   importSwftx,
   syncConnect
@@ -62,8 +62,8 @@ describe('Settings', () => {
   })
 
   it('enables biometric unlock when currently disabled', async () => {
-    vi.mocked(isBiometricAvailable).mockResolvedValue(false)
-    vi.mocked(enableBiometric).mockResolvedValue(undefined)
+    vi.mocked(biometricStatus).mockResolvedValue({ enabled: false, mode: null })
+    vi.mocked(enableBiometric).mockResolvedValue('protected')
     await open()
     await userEvent.click(screen.getByText('Biometric Unlock'))
 
@@ -74,7 +74,7 @@ describe('Settings', () => {
   })
 
   it('disables biometric unlock when currently enabled', async () => {
-    vi.mocked(isBiometricAvailable).mockResolvedValue(true)
+    vi.mocked(biometricStatus).mockResolvedValue({ enabled: true, mode: 'prompt' })
     vi.mocked(disableBiometric).mockResolvedValue(undefined)
     await open()
     await userEvent.click(screen.getByText('Biometric Unlock'))
@@ -83,6 +83,46 @@ describe('Settings', () => {
 
     expect(disableBiometric).toHaveBeenCalledOnce()
     expect(await screen.findByText('Enable Biometric Unlock')).toBeInTheDocument()
+  })
+
+  // The copy must name the gate actually in force: an OS-enforced Secure Enclave
+  // item and an app-enforced verify-then-read item are different promises.
+  it('describes the OS-enforced gate when enrolled in protected mode', async () => {
+    vi.mocked(biometricStatus).mockResolvedValue({
+      enabled: true,
+      mode: 'protected'
+    })
+    await open()
+    await userEvent.click(screen.getByText('Biometric Unlock'))
+
+    expect(await screen.findByText(/Secure Enclave/)).toBeInTheDocument()
+  })
+
+  it('describes the app-enforced gate when enrolled in prompt mode', async () => {
+    vi.mocked(biometricStatus).mockResolvedValue({
+      enabled: true,
+      mode: 'prompt'
+    })
+    await open()
+    await userEvent.click(screen.getByText('Biometric Unlock'))
+
+    expect(
+      await screen.findByText(/released after a biometric check by Swifty/)
+    ).toBeInTheDocument()
+  })
+
+  it('switches the copy to the mode enrollment settled on', async () => {
+    // An unentitled build falls back to prompt mode; the description must follow
+    // the enable response rather than keep advertising the generic offer.
+    vi.mocked(biometricStatus).mockResolvedValue({ enabled: false, mode: null })
+    vi.mocked(enableBiometric).mockResolvedValue('prompt')
+    await open()
+    await userEvent.click(screen.getByText('Biometric Unlock'))
+    await userEvent.click(await screen.findByText('Enable Biometric Unlock'))
+
+    expect(
+      await screen.findByText(/released after a biometric check by Swifty/)
+    ).toBeInTheDocument()
   })
 
   it('imports a .swftx file into the current vault with the source password', async () => {
