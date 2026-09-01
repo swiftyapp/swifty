@@ -131,16 +131,12 @@ impl Remote for DriveRemote {
             let Some(file) = self.locate(&client, &token).await? else {
                 return Ok(None);
             };
-            // The listing already carries it; only fall back to a `files.get`
-            // if Drive left it out of the list response.
-            match file.head_revision {
-                Some(revision) => Ok(Some(revision)),
-                None => Ok(Some(
-                    drive::head_revision(&client, &token, &file.id)
-                        .await?
-                        .unwrap_or_default(),
-                )),
-            }
+            // Read from the listing, exactly like `fetch` — the pre-flight
+            // compares this against `fetch`'s value, so the two must degrade
+            // identically. A `files.get` fallback here once made a missing
+            // listing field compare `Some(real)` against `fetch`'s `Some("")`,
+            // which would burn every retry and fail the run.
+            Ok(Some(file.head_revision.unwrap_or_default()))
         })
     }
 

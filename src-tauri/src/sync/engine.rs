@@ -88,7 +88,7 @@ pub trait LocalVault {
     fn digest(&self) -> Result<[u8; 32]>;
     /// Reclaim tombstones older than `cutoff_ms`, then pack the vault for upload.
     fn pack(&self, cutoff_ms: i64) -> Result<Vec<u8>>;
-    /// Record a completed push and clear the dirty flag.
+    /// Record a completed push: the revision it landed at, and when.
     fn note_push(&self, revision: &str, at_ms: i64) -> Result<()>;
 }
 
@@ -312,8 +312,7 @@ fn note_push(store: &SqliteStore, revision: &str, at_ms: i64) -> Result<()> {
         .map_err(store_err)?;
     store
         .meta_set(META_LAST_MS, &at_ms.to_string())
-        .map_err(store_err)?;
-    store.clear_dirty().map_err(store_err)
+        .map_err(store_err)
 }
 
 // Unique per call: a scheduled run and a manual one must not share a path.
@@ -530,10 +529,6 @@ mod tests {
             }
         );
         assert_eq!(remote_records(&remote), a.store.export_for_sync().unwrap());
-        assert!(
-            !a.store.is_dirty().unwrap(),
-            "a completed push clears the trigger"
-        );
     }
 
     #[test]

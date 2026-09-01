@@ -119,22 +119,6 @@ pub async fn find_file(
     Ok(oldest(find_all(client, token, &q).await?))
 }
 
-/// The file's current head revision, read fresh (the engine's pre-flight check).
-pub async fn head_revision(client: &Client, token: &str, id: &str) -> Result<Option<String>> {
-    let resp = client
-        .get(format!("{FILES}/{id}"))
-        .bearer_auth(token)
-        .query(&[("fields", FILE_FIELDS)])
-        .send()
-        .await
-        .map_err(other)?;
-    Ok(check(resp)
-        .await?
-        .get("headRevisionId")
-        .and_then(Value::as_str)
-        .map(String::from))
-}
-
 pub async fn read_file(client: &Client, token: &str, id: &str) -> Result<Vec<u8>> {
     let resp = client
         .get(format!("{FILES}/{id}"))

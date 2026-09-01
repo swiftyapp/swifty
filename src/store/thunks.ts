@@ -29,8 +29,8 @@ export interface AsyncSlice {
  * resets on every write, so a burst costs exactly one push once it settles. The
  * debounce lives in the store rather than the backend because the backend has
  * no write hook — this is where "the user changed something" is known. A quit
- * inside the window loses nothing: the vault is still marked dirty, and the
- * next unlock syncs it.
+ * inside the window loses nothing: the next unlock runs a sync anyway, and the
+ * digests still differ until the change is published.
  */
 const SYNC_DEBOUNCE_MS = 30_000
 

@@ -61,13 +61,6 @@ const META_COLS: &str =
 const META_UPSERT: &str = "INSERT INTO meta (key, value) VALUES (?1, ?2)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value";
 
-// Set by user-initiated writes, consumed by the sync engine purely as a
-// *debounce trigger* ("something happened locally, consider syncing soon").
-// It is never the push decision — that is `state_digest` inequality, because a
-// flag cannot see the case where local is a strict superset of remote with no
-// local write since the last clear.
-const DIRTY_KEY: &str = "sync_dirty";
-
 /// Namespace for every device-local sync bookkeeping key in `meta` (the dirty
 /// flag, and the last-sync state the engine records). Grouped under one prefix
 /// so a restore can scrub the lot without enumerating them — a snapshot carries
@@ -175,7 +168,6 @@ impl SqliteStore {
 
     /// Set the derived card-network slug without stamping `updated_at` — it is
     /// derived metadata, not a user edit (used by the one-time unlock backfill).
-    /// Deliberately does not mark the vault dirty for the same reason.
     pub fn set_card_brand(&self, id: &str, brand: &str) -> Result<()> {
         self.lock().execute(
             "UPDATE entries SET card_brand = ?1 WHERE id = ?2",
@@ -203,8 +195,6 @@ impl SqliteStore {
     ///
     /// Winners are written verbatim: no timestamp is stamped here, or the
     /// merged row would immediately look newer than its source everywhere else.
-    /// This does not set the dirty flag — a merge is not a user edit, and the
-    /// engine decides pushes from `state_digest`, not from dirt.
     pub fn merge_records(&self, recs: &[Record]) -> Result<usize> {
         let mut conn = self.lock();
         let tx = conn.transaction()?;
@@ -244,19 +234,6 @@ impl SqliteStore {
     /// sync engine's push decision: push when the digests differ, full stop.
     pub fn state_digest(&self) -> Result<[u8; 32]> {
         Ok(state_digest(&self.export_for_sync()?))
-    }
-
-    /// Whether a user-initiated write has landed since the last
-    /// [`clear_dirty`](Self::clear_dirty). See [`DIRTY_KEY`]: a trigger, not the
-    /// push decision.
-    pub fn is_dirty(&self) -> Result<bool> {
-        Ok(self.meta_get(DIRTY_KEY)?.as_deref() == Some("1"))
-    }
-
-    pub fn clear_dirty(&self) -> Result<()> {
-        self.lock()
-            .execute("DELETE FROM meta WHERE key = ?1", params![DIRTY_KEY])?;
-        Ok(())
     }
 
     /// Delete every `meta` row whose key starts with `prefix`, returning how
@@ -351,7 +328,7 @@ impl VaultStore for SqliteStore {
                 rec.card_brand,
             ],
         )?;
-        mark_dirty(&conn)
+        Ok(())
     }
 
     fn delete(&self, id: &str) -> Result<()> {
@@ -361,7 +338,7 @@ impl VaultStore for SqliteStore {
             "UPDATE entries SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
             params![now, id],
         )?;
-        mark_dirty(&conn)
+        Ok(())
     }
 
     fn export_for_sync(&self) -> Result<Vec<Record>> {
@@ -384,8 +361,6 @@ impl VaultStore for SqliteStore {
                 exec_record(&mut stmt, r)?;
             }
         }
-        // In-transaction so a `.swftx` import and its trigger land together.
-        mark_dirty(&tx)?;
         tx.commit()?;
         Ok(())
     }
@@ -417,14 +392,6 @@ fn exec_record(stmt: &mut Statement, r: &Record) -> rusqlite::Result<usize> {
         r.payload,
         r.card_brand,
     ])
-}
-
-// Takes the connection rather than `&self` so callers already inside a
-// transaction (import) flag atomically, and callers holding the mutex guard
-// (upsert, delete) do not deadlock re-locking it.
-fn mark_dirty(conn: &Connection) -> Result<()> {
-    conn.execute(META_UPSERT, params![DIRTY_KEY, "1"])?;
-    Ok(())
 }
 
 fn row_to_record(row: &Row) -> rusqlite::Result<Record> {
