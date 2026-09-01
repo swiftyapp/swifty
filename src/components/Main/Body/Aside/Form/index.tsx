@@ -35,13 +35,19 @@ export default function Form({ entry }: Props) {
   // What the model looked like when it was last loaded — the dirty baseline.
   const [pristine, setPristine] = useState<EntryDraft>(initial)
 
-  // When editing, secret fields arrive encrypted; swap in the decrypted values.
+  // When editing, secret fields arrive encrypted; swap in the decrypted values —
+  // once. The hook refetches when the entry's `updatedAt` moves (e.g. a sync
+  // merge landing mid-edit), and adopting that refetch here would silently
+  // replace whatever the user has typed. The form's baseline is the state at
+  // open; a concurrent change resolves through last-writer-wins on save.
   const revealed = useRevealed(entry)
+  const [adopted, setAdopted] = useState(false)
   useEffect(() => {
-    if (!revealed) return
+    if (!revealed || adopted) return
+    setAdopted(true)
     setModel({ ...revealed })
     setPristine({ ...revealed })
-  }, [revealed])
+  }, [revealed, adopted])
 
   const dirty = JSON.stringify(model) !== JSON.stringify(pristine)
 
