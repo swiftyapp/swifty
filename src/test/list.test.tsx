@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ListColumn from '@/components/Main/Body/ListColumn'
 import { fetchFavicon, type Audit } from '@/lib/commands'
-import { makeStore, setSort } from '@/store'
+import { makeStore, setSort, setFilterScope } from '@/store'
 import { resetFavicons } from '@/hooks/useFavicon'
 import { renderWithStore, withEntries, loginMeta } from './utils'
 
@@ -87,6 +87,21 @@ describe('Entry list', () => {
 
     await waitFor(() => expect(fetchFavicon).toHaveBeenCalled())
     expect(document.querySelector('img')).not.toBeInTheDocument()
+  })
+
+  it('shows the network mark on card rows that carry a brand', () => {
+    const store = makeStore()
+    withEntries(store, [
+      loginMeta({ id: 'c1', type: 'card', title: 'Company Visa', cardBrand: 'visa', urlHost: '' }),
+      loginMeta({ id: 'c2', type: 'card', title: 'Mystery Card', urlHost: '' })
+    ])
+    setFilterScope('card')
+    renderWithStore(<ListColumn />, { store })
+
+    expect(document.querySelector('svg[aria-label="visa"]')).toBeInTheDocument()
+    // The brandless card falls back to the generic glyph, not an empty tile.
+    expect(document.querySelectorAll('svg[aria-label]')).toHaveLength(1)
+    setFilterScope('login')
   })
 
   it('sorts alphabetically', async () => {

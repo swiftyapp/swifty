@@ -1,5 +1,6 @@
 mod autolock;
 mod biometrics;
+mod cards;
 mod commands;
 pub mod crypto;
 mod error;

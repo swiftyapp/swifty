@@ -39,8 +39,32 @@ pub fn derive_key(app: &AppHandle, password: &str) -> Result<VaultKey> {
 pub fn open_with_key(app: &AppHandle, key: &VaultKey) -> Result<(SqliteStore, Vec<EntryMetaDto>)> {
     let store = SqliteStore::open(&storage::db_path(app)?, &key.sqlcipher_key())
         .map_err(|_| Error::InvalidPassword)?;
+    backfill_card_brands(&store, key);
     let metas = list_metas(&store)?;
     Ok((store, metas))
+}
+
+// One-time derivation for cards saved before the card_brand column existed
+// (NULL there): unseal each once, store the slug ("none" when unrecognized),
+// and it's plain metadata from then on. Best-effort — a failure just leaves
+// the row NULL for the next unlock.
+fn backfill_card_brands(store: &SqliteStore, key: &VaultKey) {
+    let Ok(metas) = store.list() else { return };
+    let cipher = key.payload_cipher();
+    for meta in metas {
+        if meta.kind != "card" || meta.card_brand.is_some() {
+            continue;
+        }
+        let Ok(Some(record)) = store.get(&meta.id) else {
+            continue;
+        };
+        let Ok(entry) = cipher.unseal(&record.payload) else {
+            continue;
+        };
+        if let Some(brand) = crate::store::migrate::derived_card_brand(&entry) {
+            let _ = store.set_card_brand(&meta.id, &brand);
+        }
+    }
 }
 
 // Password unlock (run inside spawn_blocking): derive the key, then open + list.
@@ -96,6 +120,7 @@ pub fn meta_dto(m: &EntryMeta) -> EntryMetaDto {
         m.title.clone(),
         &m.tags,
         m.url_host.clone(),
+        m.card_brand.clone(),
         m.created_at,
         m.updated_at,
     )
@@ -109,6 +134,7 @@ pub fn record_meta_dto(r: &Record) -> EntryMetaDto {
         r.title.clone(),
         &r.tags,
         r.url_host.clone(),
+        r.card_brand.clone(),
         r.created_at,
         r.updated_at,
     )
