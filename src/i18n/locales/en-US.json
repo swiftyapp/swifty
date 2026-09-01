@@ -142,15 +142,18 @@
   "Automatic Updates": "Automatic Updates",
   "Updates download in the background and apply when you restart.": "Updates download in the background and apply when you restart.",
   "Check for Updates": "Check for Updates",
+  "Checking…": "Checking…",
+  "New entry": "New entry",
+  "Edit entry": "Edit entry",
+  "Discard changes?": "Discard changes?",
+  "Close": "Close",
   "Search or run a command": "Search or run a command",
   "Best match": "Best match",
   "Entries": "Entries",
   "Commands": "Commands",
   "No results": "No results",
-  "New entry": "New entry",
   "Lock vault": "Lock vault",
   "Toggle theme": "Toggle theme",
   "open": "open",
-  "copy": "copy",
-  "Checking…": "Checking…"
+  "copy": "copy"
 }
