@@ -54,14 +54,6 @@ export default function Show({ entry }: Props) {
     <div className="mx-auto w-full max-w-[860px]">
 
       <div className="flex items-start gap-4">
-        {/* Same identity tile as the list row, one size up. */}
-        <div className="grid h-11 w-11 flex-none place-items-center self-center overflow-hidden rounded-lg bg-tile text-text2">
-          {icon ? (
-            <img src={icon} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <Glyph size={20} />
-          )}
-        </div>
         <div className="min-w-0 flex-1">
           <div className={`flex items-center gap-2 whitespace-nowrap ${MONO_LABEL}`}>
             <span className="text-text2">{t(KIND_LABEL[entry.type])}</span>
@@ -72,9 +64,19 @@ export default function Show({ entry }: Props) {
               </>
             )}
           </div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-display text-text">
-            {entry.title}
-          </h1>
+          <div className="mt-2 flex items-center gap-2.5">
+            {/* Same identity tile as the list row, sized to the title line. */}
+            <div className="grid h-7 w-7 flex-none place-items-center overflow-hidden rounded-lg bg-tile text-text2">
+              {icon ? (
+                <img src={icon} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <Glyph size={16} />
+              )}
+            </div>
+            <h1 className="truncate text-2xl font-semibold tracking-display text-text">
+              {entry.title}
+            </h1>
+          </div>
         </div>
         <Actions type={entry.type} revealed={revealed} onDelete={onDelete} />
       </div>
