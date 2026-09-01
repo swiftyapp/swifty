@@ -4,12 +4,8 @@ import { useCopied } from '@/hooks/useCopied'
 import { useStrength } from '@/hooks/useStrength'
 import { t } from '@/i18n'
 import IconButton from '@/components/elements/IconButton'
-<<<<<<< HEAD
-import { CheckGlyph, CopyGlyph } from '../../icons'
-=======
 import Meter from '@/components/elements/Meter'
-import { CopyGlyph } from '../../icons'
->>>>>>> feat/generator-dialog
+import { CheckGlyph, CopyGlyph } from '../../icons'
 
 // Re-export so existing detail-pane imports keep working; the primitive itself
 // now lives in elements/ and is shared with the header and Masterpass.
