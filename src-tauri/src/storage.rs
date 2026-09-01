@@ -80,7 +80,9 @@ fn gdrive_path(app: &AppHandle) -> Result<PathBuf> {
     Ok(app_dir(app)?.join(GDRIVE_FILE))
 }
 
-fn kdf_sidecar_path(app: &AppHandle) -> Result<PathBuf> {
+// Public because the sync restore path addresses the sidecar by path (its core
+// runs without an `AppHandle`) rather than duplicating the layout constants.
+pub fn kdf_sidecar_path(app: &AppHandle) -> Result<PathBuf> {
     Ok(app_dir(app)?.join(KDF_SIDECAR_FILE))
 }
 
@@ -98,6 +100,19 @@ pub fn read_kdf_sidecar(app: &AppHandle) -> Result<Option<String>> {
 // crash never leaves it truncated.
 pub fn write_kdf_sidecar(app: &AppHandle, json: &str) -> Result<()> {
     atomic_write_file(&kdf_sidecar_path(app)?, json)
+}
+
+// Remove a SQLite database and its WAL/SHM siblings, ignoring whatever is
+// already absent. Both callers (the pack scratch snapshot, the failed-restore
+// rollback) must leave no *half* a database behind: a stale `-wal` beside a
+// missing or recreated main file is its own corruption, not a clean slate.
+pub fn remove_db_files(path: &Path) {
+    let _ = fs::remove_file(path);
+    for suffix in ["-wal", "-shm"] {
+        let mut sibling = path.as_os_str().to_owned();
+        sibling.push(suffix);
+        let _ = fs::remove_file(PathBuf::from(sibling));
+    }
 }
 
 fn lockout_sidecar_path(app: &AppHandle) -> Result<PathBuf> {
@@ -125,7 +140,7 @@ pub fn write_lockout_sidecar(app: &AppHandle, json: &str) -> Result<()> {
 // complete old bytes or the complete new bytes — never a truncated/empty file.
 // A leftover `<path>.tmp` (from a crash before the rename) is ignored by readers,
 // which only ever open the target path.
-fn atomic_write_file(path: &Path, data: &str) -> Result<()> {
+pub fn atomic_write_file(path: &Path, data: &str) -> Result<()> {
     let parent = path
         .parent()
         .ok_or_else(|| Error::Other("sidecar path has no parent directory".into()))?;

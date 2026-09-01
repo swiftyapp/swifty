@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::{migrate, record_hash, Record, SqliteStore, StoreError, VaultStore};
+use super::{migrate, record_hash, Record, SqliteStore, StoreError, VaultStore, SYNC_META_PREFIX};
 use crate::crypto::{self, KdfParams, VaultKey};
 use crate::models::Entry;
 
@@ -732,6 +732,29 @@ fn purge_tombstones_before_spares_live_and_recent_rows() {
         .collect();
     ids.sort();
     assert_eq!(ids, ["live", "recent"]);
+}
+
+// Restore scrubs the source device's sync bookkeeping by prefix. The match must
+// be a literal prefix — `_` is a LIKE wildcard, so a naive `LIKE 'sync_%'` would
+// also eat `syncopation`, and the dirty flag must fall inside the namespace or
+// the restored vault starts life believing it has unpushed work.
+#[test]
+fn meta_delete_prefix_removes_only_the_namespace() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    store.upsert(&rec("1", b"x")).unwrap(); // sets sync_dirty
+    store.meta_set("sync_last_digest", "deadbeef").unwrap();
+    store.meta_set("syncopation", "keep").unwrap();
+    store.meta_set("kdf", "argon2id").unwrap();
+
+    assert_eq!(store.meta_delete_prefix(SYNC_META_PREFIX).unwrap(), 2);
+
+    assert!(!store.is_dirty().unwrap());
+    assert_eq!(store.meta_get("sync_last_digest").unwrap(), None);
+    assert_eq!(
+        store.meta_get("syncopation").unwrap().as_deref(),
+        Some("keep")
+    );
+    assert_eq!(store.meta_get("kdf").unwrap().as_deref(), Some("argon2id"));
 }
 
 #[test]
