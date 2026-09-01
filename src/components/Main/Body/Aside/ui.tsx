@@ -1,23 +1,17 @@
 import type { ReactNode } from 'react'
 import { cx } from '@/utils/cx'
-import { copy } from '@/services/copy'
+import { useCopied } from '@/hooks/useCopied'
 import { useStrength } from '@/hooks/useStrength'
 import { t } from '@/i18n'
 import IconButton from '@/components/elements/IconButton'
-import { CopyGlyph } from '../../icons'
+import Meter from '@/components/elements/Meter'
+import { CheckGlyph, CopyGlyph } from '../../icons'
 
 // Re-export so existing detail-pane imports keep working; the primitive itself
 // now lives in elements/ and is shared with the header and Masterpass.
 export { IconButton }
 
 const STRENGTH_LABELS = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']
-const STRENGTH_COLOR = [
-  'bg-bad',
-  'bg-bad',
-  'bg-warn',
-  'bg-good',
-  'bg-good'
-]
 
 // Shared presentation primitives for the detail pane. Every card, ledger cell,
 // mono label and copy affordance in Show / Form / Audit routes through these so
@@ -45,11 +39,14 @@ export function Panel({
   )
 }
 
-// Copy-to-clipboard affordance wired to the existing clipboard service.
+// Copy-to-clipboard affordance wired to the existing clipboard service. The
+// glyph flips to a check for a beat so the row confirms locally, alongside the
+// global "Copied to Clipboard" toast.
 export function CopyButton({ value, title }: { value: string; title?: string }) {
+  const { copied, copy } = useCopied()
   return (
-    <IconButton title={title} onClick={() => copy(value)}>
-      <CopyGlyph />
+    <IconButton title={copied ? t('Copied') : title} onClick={() => copy(value)}>
+      {copied ? <CheckGlyph className="text-good" /> : <CopyGlyph />}
     </IconButton>
   )
 }
@@ -63,17 +60,7 @@ export function StrengthBar({ password }: { password: string }) {
   const score = strength?.score ?? null
   return (
     <div className="flex items-center gap-2.5">
-      <span className="flex flex-none gap-[3px]">
-        {[0, 1, 2, 3, 4].map(i => (
-          <span
-            key={i}
-            className={cx(
-              'h-[3px] w-[22px] rounded-full',
-              score !== null && i <= score ? STRENGTH_COLOR[score] : 'bg-line2'
-            )}
-          />
-        ))}
-      </span>
+      <Meter level={score} />
       <span className="font-mono text-xs text-text3">
         {score !== null ? t(STRENGTH_LABELS[score]) : ''}
       </span>
