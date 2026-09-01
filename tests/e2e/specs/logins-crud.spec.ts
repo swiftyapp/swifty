@@ -85,13 +85,20 @@ describe("login entries", () => {
     await expect($('[data-testid="entry-value-username"]')).toHaveText(USERNAME);
     expect(await entryItems()).toHaveLength(1);
 
-    // The rotated secret is read back through a fresh decrypt (reopening the
-    // editor) rather than off the detail pane. `useRevealed` keys its decrypt
-    // on the entry id alone, so saving in place leaves the pane — and the
-    // header's "Copy password" — holding the values decrypted before the edit.
-    // That staleness is a bug, not a contract, so this spec deliberately does
-    // not assert `entry-value-password` here; once the decrypt re-runs on
-    // save, add that assertion back.
+    // The pane re-decrypts after an in-place save (`useRevealed` keys on
+    // updatedAt as well as the id), so the rotated secret shows up right here —
+    // this assertion is the regression test for the stale-reveal bug.
+    await browser.waitUntil(
+      async () =>
+        (await $('[data-testid="entry-value-password"]').getText()) ===
+        EDITED_PASSWORD,
+      {
+        timeout: 15_000,
+        timeoutMsg: "the detail pane kept the pre-edit password after a save",
+      },
+    );
+
+    // And the editor agrees on a fresh decrypt.
     await openEditor(EDITED_PASSWORD);
     await expect(field("title")).toHaveValue(EDITED_TITLE);
     await closeEditor();

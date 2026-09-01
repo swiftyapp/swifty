@@ -89,6 +89,27 @@ describe('Form', () => {
     )
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
+
+  it('keeps in-progress edits when the entry refreshes mid-edit', async () => {
+    // The revealed title differs from the metadata title so this wait proves
+    // the decrypted values were actually adopted, not just the initial meta.
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google (decrypted)' }))
+    const { rerender } = renderWithStore(<Form entry={loginMeta()} />)
+    const title = document.querySelector<HTMLInputElement>('input[name="title"]')!
+    await waitFor(() => expect(title.value).toBe('Google (decrypted)'))
+
+    await userEvent.clear(title)
+    await userEvent.type(title, 'Renamed by me')
+
+    // A sync merge landing mid-edit bumps updatedAt and re-runs the decrypt.
+    // The form adopts the reveal once, at open — a refetch must not clobber
+    // what the user has typed (their save wins by last-writer-wins anyway).
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Merged elsewhere' }))
+    rerender(<Form entry={loginMeta({ updatedAt: '2024-06-01T00:00:00.000Z' })} />)
+    await waitFor(() => expect(revealEntry).toHaveBeenCalledTimes(2))
+
+    expect(title.value).toBe('Renamed by me')
+  })
 })
 
 describe('Show', () => {
@@ -128,6 +149,26 @@ describe('Show', () => {
     expect(copyToClipboard).toHaveBeenCalledWith('hunter2', expect.any(Number))
     // The password row is still masked: nothing toggled its reveal.
     expect(screen.getByTitle('Reveal')).toBeInTheDocument()
+  })
+
+  it('re-decrypts after an in-place save, so copy never serves the old secret', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'old-secret' }))
+    const { rerender } = renderWithStore(<Show entry={loginMeta()} />)
+    const action = await screen.findByTestId('primary-action-button')
+    await waitFor(() => expect(action).toBeEnabled())
+
+    // A save keeps the id but stamps updatedAt. The pane stays mounted across
+    // saves, so a decrypt keyed on the id alone kept serving — and copying —
+    // the pre-edit password. The regression: rotate, then copy.
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'new-secret' }))
+    rerender(<Show entry={loginMeta({ updatedAt: '2024-06-01T00:00:00.000Z' })} />)
+    await waitFor(() => expect(revealEntry).toHaveBeenCalledTimes(2))
+
+    const refreshed = screen.getByTestId('primary-action-button')
+    await waitFor(() => expect(refreshed).toBeEnabled())
+    await userEvent.click(refreshed)
+
+    expect(copyToClipboard).toHaveBeenCalledWith('new-secret', expect.any(Number))
   })
 
   it('runs the primary action on a bare Enter', async () => {
