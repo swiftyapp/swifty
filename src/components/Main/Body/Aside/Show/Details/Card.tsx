@@ -22,12 +22,18 @@ const group = (value: string) => value.match(/.{1,4}/g)?.join(' ') ?? value
 // the app-level "Copied to Clipboard" toast already says what happened, so
 // the face just confirms *which* value, without a second wordy label. The
 // overlay never swaps the text out, so nothing reflows.
-// Opaque version of the hover wash (white/10 composited over the card's dark
+// Opaque version of the hover wash (white/10 composited over the card's
 // ground), so a click doesn't visibly shift the ground but the value is fully
-// hidden under the check — no text/icon overlap.
-function CopiedMark() {
+// hidden under the check — no text/icon overlap. The card face is a gradient,
+// so the composite differs per zone: 'top' matches the lighter head of the
+// card (the name), 'base' the dark body (number and bottom row).
+function CopiedMark({ zone = 'base' }: { zone?: 'top' | 'base' }) {
   return (
-    <span className="absolute -inset-x-1 inset-y-0 grid place-items-center rounded-[3px] bg-[#2B2D31] text-white">
+    <span
+      className={`absolute -inset-x-1 inset-y-0 grid place-items-center rounded-[3px] text-white ${
+        zone === 'top' ? 'bg-[#3F4247]' : 'bg-[#2B2D31]'
+      }`}
+    >
       <CheckGlyph size={12} />
     </span>
   )
@@ -108,7 +114,7 @@ export default function Card({ entry }: Props) {
                 <span className="block truncate text-[12px] uppercase tracking-[0.18em] opacity-60">
                   {entry.name}
                 </span>
-                {nameCopied && <CopiedMark />}
+                {nameCopied && <CopiedMark zone="top" />}
               </span>
             </button>
           ) : (
