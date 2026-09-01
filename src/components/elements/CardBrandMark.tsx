@@ -19,6 +19,8 @@ export default function CardBrandMark({ brand, size = 16, tone = 'color' }: Prop
     width: (size * 3) / 2,
     height: size,
     viewBox: '0 0 24 16',
+    // Never overflow a tight tile — scale down, keeping the aspect ratio.
+    style: { maxWidth: '100%', height: 'auto' },
     'aria-label': brand ?? undefined
   }
 
@@ -74,14 +76,15 @@ export default function CardBrandMark({ brand, size = 16, tone = 'color' }: Prop
         </svg>
       )
     case 'discover':
+      // The wordmark is wide; it gets its own 5:2 box so it never clips.
       return (
-        <svg {...shared}>
+        <svg {...shared} width={(size * 5) / 2} viewBox="0 0 40 16">
           <text
-            x="10.5"
-            y="11"
+            x="20"
+            y="10.6"
             textAnchor="middle"
             fontFamily={TEXT_FONT}
-            fontSize="5.6"
+            fontSize="7"
             fontWeight="800"
             fill={tone === 'light' ? '#fff' : '#231F20'}
           >
