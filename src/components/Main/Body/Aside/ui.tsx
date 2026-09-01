@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
 import { cx } from '@/utils/cx'
-import { copy } from '@/services/copy'
+import { useCopied } from '@/hooks/useCopied'
 import { useStrength } from '@/hooks/useStrength'
 import { t } from '@/i18n'
 import IconButton from '@/components/elements/IconButton'
-import { CopyGlyph } from '../../icons'
+import { CheckGlyph, CopyGlyph } from '../../icons'
 
 // Re-export so existing detail-pane imports keep working; the primitive itself
 // now lives in elements/ and is shared with the header and Masterpass.
@@ -45,11 +45,14 @@ export function Panel({
   )
 }
 
-// Copy-to-clipboard affordance wired to the existing clipboard service.
+// Copy-to-clipboard affordance wired to the existing clipboard service. The
+// glyph flips to a check for a beat so the row confirms locally, alongside the
+// global "Copied to Clipboard" toast.
 export function CopyButton({ value, title }: { value: string; title?: string }) {
+  const { copied, copy } = useCopied()
   return (
-    <IconButton title={title} onClick={() => copy(value)}>
-      <CopyGlyph />
+    <IconButton title={copied ? t('Copied') : title} onClick={() => copy(value)}>
+      {copied ? <CheckGlyph className="text-good" /> : <CopyGlyph />}
     </IconButton>
   )
 }

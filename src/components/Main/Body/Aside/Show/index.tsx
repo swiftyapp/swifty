@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { editEntry, deleteEntry } from '@/store'
+import { deleteEntry } from '@/store'
 import type { EntryMeta } from '@/lib/commands'
 import { useRevealed } from '@/hooks/useRevealed'
 import { t } from '@/i18n'
 import Details from './Details'
-import Button from '@/components/elements/Button'
-import { IconButton, MONO_LABEL } from '../ui'
-import { TrashGlyph } from '../../../icons'
+import Actions from './Actions'
+import { MONO_LABEL } from '../ui'
 
 interface Props {
   entry: EntryMeta
@@ -66,16 +65,7 @@ export default function Show({ entry }: Props) {
             {entry.title}
           </h1>
         </div>
-        <div className="flex flex-none items-center gap-1.5">
-          <IconButton
-            title={t('Delete')}
-            onClick={onDelete}
-            className="border border-line2 hover:border-accent-line hover:text-bad"
-          >
-            <TrashGlyph />
-          </IconButton>
-          <Button size="md" onClick={() => editEntry()}>{t('Edit')}</Button>
-        </div>
+        <Actions type={entry.type} revealed={revealed} onDelete={onDelete} />
       </div>
 
       <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-lg border border-line bg-[image:var(--card)]">

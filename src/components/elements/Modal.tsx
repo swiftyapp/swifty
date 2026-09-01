@@ -13,6 +13,8 @@ export default function Modal({ onClose, children }: Props) {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         className="animate-pop relative flex max-h-[80vh] w-full max-w-[720px] overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-[var(--shadow)]"
         onClick={e => e.stopPropagation()}
       >
