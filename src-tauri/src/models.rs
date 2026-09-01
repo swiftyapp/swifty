@@ -71,6 +71,9 @@ pub struct EntryMetaDto {
 
 impl EntryMetaDto {
     // Build from the shared metadata columns (timestamps are ms → RFC3339).
+    // One positional arg per DB column, mirrored by both callers — grouping
+    // them into a struct would just restate the column list a third time.
+    #[allow(clippy::too_many_arguments)]
     pub fn from_parts(
         id: String,
         kind: String,
