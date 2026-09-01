@@ -37,8 +37,14 @@ pub fn derive_key(app: &AppHandle, password: &str) -> Result<VaultKey> {
 // Open the existing store with `key` and return its handle + entry metadata. A
 // wrong key fails SQLCipher's open verification -> surfaced as invalid password.
 pub fn open_with_key(app: &AppHandle, key: &VaultKey) -> Result<(SqliteStore, Vec<EntryMetaDto>)> {
-    let store = SqliteStore::open(&storage::db_path(app)?, &key.sqlcipher_key())
-        .map_err(|_| Error::InvalidPassword)?;
+    // Everything else that fails an open IS a key problem (SQLCipher can't
+    // read a byte of a wrongly-keyed file) — but a schema from a newer build
+    // must say so, not send the user doubting their master password.
+    let store =
+        SqliteStore::open(&storage::db_path(app)?, &key.sqlcipher_key()).map_err(|e| match e {
+            StoreError::SchemaNewer => Error::VaultTooNew,
+            _ => Error::InvalidPassword,
+        })?;
     backfill_card_brands(&store, key);
     let metas = list_metas(&store)?;
     Ok((store, metas))
