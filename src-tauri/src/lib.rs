@@ -3,6 +3,7 @@ mod biometrics;
 mod commands;
 pub mod crypto;
 mod error;
+mod favicon;
 mod hibp;
 mod import;
 mod models;
@@ -85,6 +86,7 @@ pub fn run() {
             commands::generator::generate_otp,
             commands::generator::verify_otp,
             commands::audit::get_audit,
+            favicon::fetch_favicon,
             commands::clipboard::copy_to_clipboard,
             commands::sync::sync_connect,
             commands::sync::sync_disconnect,
