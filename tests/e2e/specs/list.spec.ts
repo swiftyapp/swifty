@@ -54,6 +54,25 @@ async function openEntry(title: string): Promise<void> {
   throw new Error(`[e2e] no list row titled "${title}"`);
 }
 
+/**
+ * Open an entry and save it unchanged — the cheapest way to make it "newest".
+ *
+ * The wait on the password is not decoration: `useRevealed` seeds the draft
+ * after the editor mounts, and saving before it lands would write blanks.
+ */
+async function resaveEntry(title: string): Promise<void> {
+  await openEntry(title);
+  await waitFor("edit-entry-button");
+  await $('[data-testid="edit-entry-button"]').click();
+  await waitFor("entry-sheet");
+  await expect($('input[name="password"]')).toHaveValue(PASSWORD);
+  await $('[data-testid="save-entry-button"]').click();
+  await $('[data-testid="entry-sheet"]').waitForDisplayed({
+    reverse: true,
+    timeout: 15_000,
+  });
+}
+
 describe("entry list states and ordering", () => {
   before(async () => {
     await resetEmpty(MASTER_PASSWORD);
@@ -114,19 +133,36 @@ describe("entry list states and ordering", () => {
 
     // Re-saving restamps `updatedAt`, which is what Recent orders on — so the
     // oldest entry should jump to the top.
-    await openEntry(ZEPHYR);
-    await waitFor("edit-entry-button");
-    await $('[data-testid="edit-entry-button"]').click();
-    await waitFor("entry-sheet");
-    // Saving before the decrypted values land would submit an invalid draft.
-    await expect($('input[name="password"]')).toHaveValue(PASSWORD);
-
-    await $('[data-testid="save-entry-button"]').click();
-    await $('[data-testid="entry-sheet"]').waitForDisplayed({
-      reverse: true,
-      timeout: 15_000,
-    });
-
+    await resaveEntry(ZEPHYR);
     await expectOrder([ZEPHYR, MERCURY, ACME]);
+  });
+
+  it("pins a starred entry above the rest under Recent", async () => {
+    await openEntry(ACME);
+    await waitFor("favorite-toggle");
+    await $('[data-testid="favorite-toggle"]').click();
+
+    // Touching MERCURY makes it the most recent entry, so recency alone would
+    // now put ACME last. Only the pin can keep it on top.
+    await resaveEntry(MERCURY);
+    await expectOrder([ACME, MERCURY, ZEPHYR]);
+  });
+
+  it("collects the starred entries under Favorites, and lets go of them", async () => {
+    await $('[data-testid="view-favorites"]').click();
+    await expect($('[data-testid="list-title"]')).toHaveText("Favorites");
+    await expectOrder([ACME]);
+
+    await openEntry(ACME);
+    await $('[data-testid="favorite-toggle"]').click();
+
+    await waitFor("empty-favorites");
+    expect(await entryItems()).toHaveLength(0);
+
+    await $('[data-testid="view-items"]').click();
+    await browser.waitUntil(async () => (await entryItems()).length === 3, {
+      timeout: 15_000,
+      timeoutMsg: "unstarring lost an entry from All Items",
+    });
   });
 });

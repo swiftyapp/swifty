@@ -10,7 +10,8 @@ const meta = (id: string): EntryMeta => ({
   type: 'login',
   title: id,
   tags: [],
-  urlHost: ''
+  urlHost: '',
+  favorite: false
 })
 
 // The handler `subscribeToEvents` registered for one event. `on` is mocked

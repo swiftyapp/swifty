@@ -12,7 +12,7 @@ const seed = () => {
   withEntries(store, [
     loginMeta({ id: 'l1', title: 'Google', urlHost: 'google.com' }),
     loginMeta({ id: 'l2', title: 'Airbnb', urlHost: 'airbnb.com' }),
-    { id: 'c1', type: 'card', title: 'Visa', tags: [], urlHost: '' }
+    { id: 'c1', type: 'card', title: 'Visa', tags: [], urlHost: '', favorite: false }
   ])
   return store
 }

@@ -22,6 +22,10 @@ export const withEntries = (_store: Store, entries: EntryMeta[], audit?: Audit) 
   if (audit) auditDone(audit)
 }
 
+// A tombstone, as `list_deleted` reports one.
+export const deletedMeta = (overrides: Partial<EntryMeta> = {}): EntryMeta =>
+  loginMeta({ id: 'd1', title: 'Old Account', deletedAt: '2024-01-05T00:00:00.000Z', ...overrides })
+
 // List metadata for a login, as the backend returns it (no secret fields).
 export const loginMeta = (overrides: Partial<EntryMeta> = {}): EntryMeta => ({
   id: 'l1',
@@ -29,6 +33,7 @@ export const loginMeta = (overrides: Partial<EntryMeta> = {}): EntryMeta => ({
   title: 'Google',
   tags: [],
   urlHost: 'google.com',
+  favorite: false,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
   ...overrides

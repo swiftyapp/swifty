@@ -22,9 +22,24 @@ vi.mock('@/lib/commands', () => ({
     Promise.resolve({ id, type: 'login', title: '' })
   ),
   saveEntry: vi.fn().mockImplementation((entry: { id: string; type: string; title: string }) =>
-    Promise.resolve({ id: entry.id, type: entry.type, title: entry.title, tags: [], urlHost: '' })
+    Promise.resolve({
+      id: entry.id,
+      type: entry.type,
+      title: entry.title,
+      tags: [],
+      urlHost: '',
+      favorite: false
+    })
   ),
   deleteEntry: vi.fn().mockResolvedValue(undefined),
+  listDeleted: vi.fn().mockResolvedValue([]),
+  restoreEntry: vi.fn().mockImplementation((id: string) =>
+    Promise.resolve({ id, type: 'login', title: '', tags: [], urlHost: '', favorite: false })
+  ),
+  purgeEntry: vi.fn().mockResolvedValue(undefined),
+  setFavorite: vi.fn().mockImplementation((id: string, favorite: boolean) =>
+    Promise.resolve({ id, type: 'login', title: '', tags: [], urlHost: '', favorite })
+  ),
   pickBackup: vi.fn().mockResolvedValue(null),
   pickImportFile: vi.fn().mockResolvedValue(null),
   importEntries: vi
@@ -53,7 +68,8 @@ vi.mock('@/lib/commands', () => ({
     type: entry.type,
     title: entry.title,
     tags: entry.tags ?? [],
-    urlHost: ''
+    urlHost: '',
+    favorite: false
   })
 }))
 

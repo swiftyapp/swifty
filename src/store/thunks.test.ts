@@ -11,7 +11,8 @@ import {
 import { saveEntry as saveEntryCmd, toEntryMeta, syncNow } from '@/lib/commands'
 import type { EntryMeta } from '@/lib/commands'
 
-const meta = (id: string, title = id): EntryMeta => ({ id, type: 'login', title, tags: [], urlHost: '' })
+const meta = (id: string, title = id): EntryMeta =>
+  ({ id, type: 'login', title, tags: [], urlHost: '', favorite: false })
 
 beforeEach(() => {
   vi.clearAllMocks()
