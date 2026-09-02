@@ -11,16 +11,16 @@ import {
 } from '@/store'
 import { kindOf } from '@/kinds'
 import { t } from '@/i18n'
-import AsteriskBody from '@/components/elements/Asterisk'
+import Logo from '@/assets/images/logo.svg?react'
 import EmptyState from '@/components/elements/EmptyState'
 import { ActivityGlyph, SearchGlyph } from '../../icons'
 
-// The brand asterisk at whatever size the surface asks for — the rail mark's
-// silhouette, so the empty vault and the open one read as one character.
+// The brand mark at whatever size the surface asks for — the same baked logo
+// the rail shows, so the empty vault and the open one read as one character.
+// `fill-current` overrides the file's baked ink so the mark takes the text
+// colour of whatever tile it sits in.
 const Mark = ({ size }: { size: number }) => (
-  <svg width={size} height={size} viewBox="0 0 64 64" fill="currentColor" aria-hidden="true">
-    <AsteriskBody dot={120} hub={11} />
-  </svg>
+  <Logo width={size} height={size} className="fill-current" aria-hidden="true" />
 )
 
 // "Add a login" / "Add a credit card": one string for every kind, so the list
