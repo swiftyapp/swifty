@@ -6,8 +6,9 @@ import AsteriskBody from '@/components/elements/Asterisk'
 // flared spikes, same softened silhouette, same ink, so the sealed vault and
 // the open one read as a single character. Its own twist is "Reveal": the
 // lower-right spike is set free as a dot, the one secret taken out of the mask
-// and into your hand. With no face to carry, the hub is trimmed a step so the
-// notches open and it still reads as an asterisk at rail size.
+// and into your hand. With no face to carry, the hub is trimmed a step and the
+// spikes slimmed a touch, so the notches open and it still reads as an
+// asterisk at rail size.
 export default function Brand() {
   return (
     <div
@@ -21,7 +22,7 @@ export default function Brand() {
         fill="currentColor"
         aria-label="Swifty"
       >
-        <AsteriskBody dot={120} hub={11} />
+        <AsteriskBody dot={120} hub={11} spike={0.85} />
       </svg>
     </div>
   )
