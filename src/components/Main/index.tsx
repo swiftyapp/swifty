@@ -3,6 +3,7 @@ import Header from './Header'
 import Body from './Body'
 import Generator from './Generator'
 import Palette from './Palette'
+import AddSecret from './AddSecret'
 import { t } from '@/i18n'
 import { useShortcuts } from './useShortcuts'
 
@@ -23,6 +24,7 @@ export function Main() {
       </div>
       <Generator />
       <Palette />
+      <AddSecret />
       {/* `copied-notification` + `hidden` are toggled by services/copy.ts; the
           display flip is what replays `animate-pop`. App-level so copies from
           the palette and standalone generator get feedback too. Centering uses

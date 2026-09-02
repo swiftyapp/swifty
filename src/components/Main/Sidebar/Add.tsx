@@ -1,22 +1,21 @@
-import { useStore, newEntry, setView } from '@/store'
+import { useStore, openAddPicker, setView } from '@/store'
 import { t } from '@/i18n'
 import Tooltip from '@/components/elements/Tooltip'
 import { PlusGlyph } from '../icons'
 
 export default function Add() {
-  const type = useStore(state => state.filters.type)
   const view = useStore(state => state.ui.view)
 
-  // Interim: the kind comes from whatever the list is filtered to, falling back
-  // to a login. A kind-picker modal replaces this — it will call
-  // `newEntry(type)` with an explicit choice.
+  // The kind is asked for, never inferred: this opens the picker
+  // (Main/AddSecret). Leaving the audit view first gives the form it starts a
+  // list to land in.
   const onAddEntry = () => {
     if (view === 'health') setView('items')
-    newEntry(type ?? 'login')
+    openAddPicker()
   }
 
   return (
-    <Tooltip content={t('New Secret')}>
+    <Tooltip content={t('Add a secret')}>
       <div
         data-testid="add-entry-button"
         onClick={onAddEntry}

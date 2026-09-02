@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useStore, newEntry } from '@/store'
+import { useStore, openAddPicker } from '@/store'
 import { syncImport } from '@/lib/commands'
 import { t } from '@/i18n'
 import Button from '@/components/elements/Button'
@@ -19,8 +19,8 @@ export default function Actions() {
 
   return (
     <div className="mt-6 flex items-center gap-3">
-      <Button testid="create-first-entry-button" onClick={() => newEntry('login')}>
-        {t('Create First Entry')}
+      <Button testid="create-first-entry-button" onClick={openAddPicker}>
+        {t('Add a secret')}
       </Button>
       <span className="text-base text-text3">{t('or')}</span>
       <Button variant="pale" loading={loading} onClick={onImport}>

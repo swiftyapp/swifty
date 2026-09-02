@@ -72,10 +72,11 @@ describe("password generator", () => {
   });
 
   it("fills the login editor's password field when opened from it", async () => {
-    // Add takes its kind from the active filter (no kind picker yet).
-    await waitFor("filter-login");
-    await $('[data-testid="filter-login"]').click();
+    // Add asks which kind first; pick Login to get the editor with a password.
+    await waitFor("add-entry-button");
     await $('[data-testid="add-entry-button"]').click();
+    await waitFor("add-secret-modal");
+    await $('[data-testid="add-kind-login"]').click();
     await waitFor("entry-sheet");
 
     const field = $('input[name="password"]');

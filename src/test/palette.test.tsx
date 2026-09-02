@@ -112,8 +112,9 @@ describe('command palette', () => {
   it('moves focus with the arrow keys and runs the focused command', async () => {
     renderWithStore(<Main />, { store: seed() })
     await open()
-    // Commands: new entry · lock vault · toggle theme · settings
-    await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}{Enter}')
+    // Commands: new login · new credit card · new secure note · add a secret ·
+    // lock vault · toggle theme · settings — six moves down from the first.
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{Enter}')
 
     expect(useStore.getState().ui.settings).toBe(true)
     expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument()

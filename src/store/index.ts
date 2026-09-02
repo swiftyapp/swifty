@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { getLocale } from '@/i18n'
-import { lock, isBiometricAvailable } from '@/lib/commands'
+import { lock, isBiometricAvailable, type EntryType } from '@/lib/commands'
 import { createFlowSlice, type FlowSlice } from './flowSlice'
 import { createGeneratorSlice, type GeneratorSlice } from './generatorSlice'
 import { createFiltersSlice, type FiltersSlice } from './filtersSlice'
@@ -98,6 +98,8 @@ export const {
   closePalette,
   openSettings,
   closeSettings,
+  openAddPicker,
+  closeAddPicker,
   setView,
   runUpdateCheck,
   saveEntry,
@@ -106,6 +108,14 @@ export const {
   completeSetup,
   restoreBackup
 } = useStore.getState()
+
+// Starts a new entry of `type` from anywhere (kind picker, palette command),
+// leaving the audit view first — it has no editor to land the form in.
+// `setView` clears any half-written draft, so it has to run before `newEntry`.
+export const startEntry = (type: EntryType) => {
+  if (useStore.getState().ui.view === 'health') setView('items')
+  newEntry(type)
+}
 
 // Manual lock, from anywhere (top chrome, Settings, palette): clear the session,
 // then land on the lock screen with the Touch ID button when — and only when —
