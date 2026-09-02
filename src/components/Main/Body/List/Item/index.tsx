@@ -29,6 +29,9 @@ export default function Item({ entry }: Props) {
   useEffect(() => {
     if (!selected) return
     ref.current?.scrollIntoView({ block: 'nearest' })
+    // Still an option at this point even when the arrows just moved off it:
+    // dropping a focused row to tabIndex -1 does not blur it, so the row being
+    // left keeps focus until this one takes it.
     if (document.activeElement?.getAttribute('role') === 'option') ref.current?.focus()
   }, [selected])
 

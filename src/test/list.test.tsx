@@ -244,6 +244,27 @@ describe('List keyboard navigation', () => {
     )
   })
 
+  it('leaves ⏎ on the column’s own controls to that control', async () => {
+    renderWithStore(<ListColumn />, { store: seed() })
+
+    // The sort button opens its menu on ⏎; selecting a row as well would be
+    // two actions on one press.
+    screen.getByTestId('sort-menu').focus()
+    await userEvent.keyboard('{Enter}')
+
+    expect(screen.getByTestId('sort-option-recent')).toBeInTheDocument()
+    expect(useStore.getState().entries.current).toBeNull()
+  })
+
+  it('leaves the arrows alone while the sort menu owns them', async () => {
+    renderWithStore(<ListColumn />, { store: seed() })
+
+    await userEvent.click(screen.getByTestId('sort-menu'))
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}')
+
+    expect(useStore.getState().entries.current).toBeNull()
+  })
+
   it('leaves the arrows alone in fields outside the column', async () => {
     renderWithStore(
       <>
