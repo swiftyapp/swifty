@@ -86,13 +86,13 @@ export default function Masterpass({
     <input
       type={reveal ? 'text' : 'password'}
       className={cx(
-        // The placeholder inherits the value's exact metrics (size, weight,
-        // tracking) and differs only in ink — nothing shifts on first keystroke.
-        'absolute inset-0 w-full border-0 bg-transparent text-center font-sans tracking-[0.3em] outline-none placeholder:text-text3',
+        // Quiet shared metrics: placeholder and revealed value are 15px on the
+        // secret tracking (the revealed-secret tier); only the ink differs.
+        // The theatrical size lives in the dot overlay, not the text.
+        'absolute inset-0 w-full border-0 bg-transparent text-center font-sans text-[15px] tracking-secret outline-none placeholder:text-text3',
         lock && 'rounded-xl px-10'
       )}
       style={{
-        fontSize: 22,
         color: reveal ? 'var(--c-text)' : 'transparent',
         caretColor: reveal ? 'var(--c-accent)' : 'transparent'
       }}
