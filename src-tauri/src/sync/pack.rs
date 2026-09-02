@@ -240,6 +240,7 @@ mod tests {
             deleted_at: None,
             payload: payload.to_vec(),
             card_brand: None,
+            favorite: false,
         }
     }
 

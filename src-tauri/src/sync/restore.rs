@@ -181,6 +181,7 @@ mod tests {
             deleted_at: None,
             payload: b"sealed".to_vec(),
             card_brand: None,
+            favorite: false,
         }
     }
 

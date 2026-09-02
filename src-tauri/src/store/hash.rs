@@ -64,6 +64,7 @@ pub fn record_hash(r: &Record) -> [u8; 32] {
     opt_i64(&mut h, r.deleted_at);
     field(&mut h, &r.payload);
     opt_field(&mut h, r.card_brand.as_deref());
+    h.update([r.favorite as u8]);
     h.finalize().into()
 }
 

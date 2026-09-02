@@ -22,6 +22,9 @@ pub fn build_record(entry: &Entry, payload: Vec<u8>) -> Result<Record> {
         deleted_at: None,
         payload,
         card_brand: derived_card_brand(entry),
+        // Only read on insert: `upsert` leaves an existing row's star alone, so
+        // saving an edit can never clear it (see `SqliteStore::upsert`).
+        favorite: false,
     })
 }
 

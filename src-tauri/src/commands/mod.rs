@@ -116,41 +116,28 @@ pub fn record_kdf_meta(store: &SqliteStore, params: &KdfParams) -> Result<()> {
     Ok(())
 }
 
-// A store metadata row -> the frontend DTO (no secret fields).
-pub fn meta_dto(m: &EntryMeta) -> EntryMetaDto {
-    EntryMetaDto::from_parts(
-        m.id.clone(),
-        m.kind.clone(),
-        m.title.clone(),
-        &m.tags,
-        m.url_host.clone(),
-        m.card_brand.clone(),
-        m.created_at,
-        m.updated_at,
-    )
-}
-
-// A full record -> the frontend metadata DTO (drops the payload).
-pub fn record_meta_dto(r: &Record) -> EntryMetaDto {
-    EntryMetaDto::from_parts(
-        r.id.clone(),
-        r.kind.clone(),
-        r.title.clone(),
-        &r.tags,
-        r.url_host.clone(),
-        r.card_brand.clone(),
-        r.created_at,
-        r.updated_at,
-    )
+// Look one row up by id and project it (used by the commands that must report
+// back the row they just wrote). Tombstones are visible here: restore and purge
+// both need to read a row the live `get` hides.
+pub fn meta_dto_of(store: &SqliteStore, id: &str) -> Result<EntryMetaDto> {
+    store
+        .row(id)
+        .map_err(store_err)?
+        .map(|r| EntryMetaDto::from(&r.meta()))
+        .ok_or(Error::NotFound)
 }
 
 pub fn list_metas(store: &SqliteStore) -> Result<Vec<EntryMetaDto>> {
-    Ok(store
-        .list()
-        .map_err(store_err)?
-        .iter()
-        .map(meta_dto)
-        .collect())
+    Ok(metas(store.list().map_err(store_err)?))
+}
+
+// Tombstoned entries' metadata — what the Trash lists.
+pub fn list_deleted_metas(store: &SqliteStore) -> Result<Vec<EntryMetaDto>> {
+    Ok(metas(store.list_deleted().map_err(store_err)?))
+}
+
+fn metas(rows: Vec<EntryMeta>) -> Vec<EntryMetaDto> {
+    rows.iter().map(EntryMetaDto::from).collect()
 }
 
 // All live records (payloads included, tombstones excluded).

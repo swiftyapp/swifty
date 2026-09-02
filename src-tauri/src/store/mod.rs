@@ -58,6 +58,28 @@ pub struct Record {
     /// Card network slug derived from the number at save time ("visa", …);
     /// None for non-cards and for rows saved before the column existed.
     pub card_brand: Option<String>,
+    /// Starred by the user. A column rather than a payload field so listings can
+    /// filter and pin on it without decrypting anything; [`VaultStore::set_favorite`]
+    /// is its only writer outside a sync merge.
+    pub favorite: bool,
+}
+
+impl Record {
+    /// This row's metadata, payload dropped — the projection every listing wants.
+    pub fn meta(&self) -> EntryMeta {
+        EntryMeta {
+            id: self.id.clone(),
+            kind: self.kind.clone(),
+            title: self.title.clone(),
+            tags: self.tags.clone(),
+            url_host: self.url_host.clone(),
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            deleted_at: self.deleted_at,
+            card_brand: self.card_brand.clone(),
+            favorite: self.favorite,
+        }
+    }
 }
 
 /// A row's metadata without its payload (what listings need).
@@ -72,6 +94,7 @@ pub struct EntryMeta {
     pub updated_at: i64,
     pub deleted_at: Option<i64>,
     pub card_brand: Option<String>,
+    pub favorite: bool,
 }
 
 /// The swappable storage contract. Any backend behind this interface is a drop-in.
@@ -82,12 +105,22 @@ pub trait VaultStore: Send {
     fn meta_set(&self, key: &str, value: &str) -> Result<()>;
     /// List live entries' metadata (excludes tombstones).
     fn list(&self) -> Result<Vec<EntryMeta>>;
+    /// List tombstoned entries' metadata — what the Trash shows. Excludes rows
+    /// already purged (see [`VaultStore::purge`]), newest deletion first.
+    fn list_deleted(&self) -> Result<Vec<EntryMeta>>;
     /// Fetch one live record with its payload (`None` if missing or tombstoned).
     fn get(&self, id: &str) -> Result<Option<Record>>;
     /// Insert or update a record, stamping `updated_at` to now.
     fn upsert(&self, rec: &Record) -> Result<()>;
     /// Tombstone a record (`deleted_at = now`); the row is kept for sync.
     fn delete(&self, id: &str) -> Result<()>;
+    /// Un-tombstone a record (`deleted_at = NULL`), stamping `updated_at` so the
+    /// restore wins the sync merge against the tombstone peers still hold.
+    fn restore(&self, id: &str) -> Result<()>;
+    /// Discard a tombstoned record's contents for good.
+    fn purge(&self, id: &str) -> Result<()>;
+    /// Star or unstar a record, stamping `updated_at`.
+    fn set_favorite(&self, id: &str, favorite: bool) -> Result<()>;
     /// Every record including tombstones, with timestamps intact (for sync).
     fn export_for_sync(&self) -> Result<Vec<Record>>;
     /// Bulk-write records in one transaction, preserving their timestamps (sync in).

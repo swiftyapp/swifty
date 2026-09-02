@@ -52,6 +52,7 @@ fn rec(id: &str, payload: &[u8]) -> Record {
         deleted_at: None,
         payload: payload.to_vec(),
         card_brand: None,
+        favorite: false,
     }
 }
 
@@ -121,6 +122,147 @@ fn delete_tombstones_and_hides_from_list() {
     let exported = store.export_for_sync().unwrap();
     assert_eq!(exported.len(), 1);
     assert!(exported[0].deleted_at.is_some());
+}
+
+#[test]
+fn list_deleted_lists_tombstones_newest_first() {
+    let store = seeded(&[
+        stamped("live", b"x", 100),
+        Record {
+            deleted_at: Some(200),
+            ..stamped("old", b"x", 200)
+        },
+        Record {
+            deleted_at: Some(300),
+            ..stamped("new", b"x", 300)
+        },
+    ]);
+
+    let ids: Vec<String> = store
+        .list_deleted()
+        .unwrap()
+        .into_iter()
+        .map(|m| m.id)
+        .collect();
+    assert_eq!(ids, ["new", "old"]);
+}
+
+#[test]
+fn restore_clears_the_tombstone_and_bumps_updated_at() {
+    let store = seeded(&[Record {
+        deleted_at: Some(1000),
+        ..stamped("1", b"x", 1000)
+    }]);
+
+    store.restore("1").unwrap();
+
+    assert_eq!(store.list().unwrap().len(), 1);
+    assert!(store.list_deleted().unwrap().is_empty());
+    // The bump is what lets the restore beat the tombstone peers still hold.
+    assert!(row(&store, "1").updated_at > 1000);
+}
+
+#[test]
+fn purge_empties_the_row_and_drops_it_from_the_trash() {
+    let store = seeded(&[Record {
+        deleted_at: Some(1000),
+        title: "Secret Thing".into(),
+        ..stamped("1", b"sealed-payload", 1000)
+    }]);
+
+    store.purge("1").unwrap();
+
+    // The tombstone stays (sync still needs to know the id is gone) but carries
+    // nothing, so the Trash no longer offers it.
+    assert!(store.list_deleted().unwrap().is_empty());
+    let purged = row(&store, "1");
+    assert!(purged.deleted_at.is_some());
+    assert!(purged.payload.is_empty());
+    assert_eq!(purged.title, "");
+    assert!(purged.updated_at > 1000);
+}
+
+#[test]
+fn purge_only_touches_tombstones() {
+    let store = seeded(&[stamped("1", b"sealed-payload", 1000)]);
+
+    store.purge("1").unwrap();
+
+    assert_eq!(store.get("1").unwrap().unwrap().payload, b"sealed-payload");
+}
+
+#[test]
+fn purge_beats_a_peer_that_still_holds_the_row() {
+    let store = seeded(&[Record {
+        deleted_at: Some(1000),
+        ..stamped("1", b"sealed-payload", 1000)
+    }]);
+    store.purge("1").unwrap();
+
+    // The peer never saw the purge and pushes the row back, payload included.
+    // A hard DELETE would take it; the stamped empty row must win instead.
+    store
+        .merge_records(&[Record {
+            deleted_at: Some(1000),
+            ..stamped("1", b"sealed-payload", 1000)
+        }])
+        .unwrap();
+
+    assert!(row(&store, "1").payload.is_empty());
+    assert!(store.list_deleted().unwrap().is_empty());
+}
+
+#[test]
+fn set_favorite_round_trips_and_bumps_updated_at() {
+    let store = seeded(&[stamped("1", b"x", 1000)]);
+    assert!(!store.list().unwrap()[0].favorite);
+
+    store.set_favorite("1", true).unwrap();
+
+    assert!(store.list().unwrap()[0].favorite);
+    // Last-writer-wins on updated_at is the only reason a star propagates.
+    assert!(row(&store, "1").updated_at > 1000);
+
+    store.set_favorite("1", false).unwrap();
+    assert!(!store.list().unwrap()[0].favorite);
+}
+
+#[test]
+fn saving_an_entry_leaves_the_star_alone() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    store.upsert(&rec("1", b"x")).unwrap();
+    store.set_favorite("1", true).unwrap();
+
+    // An ordinary save carries favorite: false (build_record never reads a star),
+    // so `upsert` must not write the column over the top of set_favorite.
+    store.upsert(&rec("1", b"edited")).unwrap();
+
+    assert!(store.list().unwrap()[0].favorite);
+    assert_eq!(store.get("1").unwrap().unwrap().payload, b"edited");
+}
+
+#[test]
+fn favorite_travels_through_a_sync_merge() {
+    let store = seeded(&[stamped("1", b"x", 1000)]);
+
+    store
+        .merge_records(&[Record {
+            favorite: true,
+            ..stamped("1", b"x", 2000)
+        }])
+        .unwrap();
+
+    assert!(store.list().unwrap()[0].favorite);
+}
+
+#[test]
+fn favorite_is_part_of_a_records_identity() {
+    let plain = stamped("1", b"x", 1000);
+    let starred = Record {
+        favorite: true,
+        ..plain.clone()
+    };
+    assert_ne!(record_hash(&plain), record_hash(&starred));
 }
 
 #[test]
