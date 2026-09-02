@@ -53,22 +53,32 @@ export default function Mascot({
       data-state={state}
       className={bodyAnim}
     >
-      {/* Same-color round-join stroke fillets every inner notch corner (and
-          softens the tips), matching the reference's rounded cuts. */}
+      <defs>
+        {/* Blur + alpha threshold rounds every corner of the body's combined
+            silhouette — including the concave notch bottoms, which per-shape
+            stroke joins cannot fillet. */}
+        <filter id="mascot-soften" x="-15%" y="-15%" width="130%" height="130%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="b" />
+          <feColorMatrix
+            in="b"
+            type="matrix"
+            values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 30 -13"
+          />
+        </filter>
+      </defs>
       <g
-        style={{ fill, stroke: fill, transition: 'fill 300ms ease, stroke 300ms ease' }}
-        strokeWidth="8"
-        strokeLinejoin="round"
+        filter="url(#mascot-soften)"
+        style={{ fill, transition: 'fill 300ms ease' }}
       >
         {/* One flared spike: narrow at the base, wide at the tip, soft
             outer corners. Rotated six times; the circle buries the bases. */}
-        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" />
-        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" transform="rotate(60 32 32)" />
-        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" transform="rotate(120 32 32)" />
-        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" transform="rotate(180 32 32)" />
-        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" transform="rotate(240 32 32)" />
-        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" transform="rotate(300 32 32)" />
-        <circle cx="32" cy="32" r="10.5" />
+        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" />
+        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" transform="rotate(60 32 32)" />
+        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" transform="rotate(120 32 32)" />
+        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" transform="rotate(180 32 32)" />
+        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" transform="rotate(240 32 32)" />
+        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" transform="rotate(300 32 32)" />
+        <circle cx="32" cy="32" r="14" />
       </g>
 
       <g
