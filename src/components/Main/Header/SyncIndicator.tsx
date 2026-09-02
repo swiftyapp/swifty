@@ -1,40 +1,37 @@
-import { useStore } from '@/store'
+import { useStore, openSettings } from '@/store'
 import { cx } from '@/utils/cx'
 import Tooltip from '@/components/elements/Tooltip'
 
-// Sync pill: a small status dot + mono label. Local-only vaults read as
-// "Local"; connected vaults surface syncing / synced / error state.
+// Sync pill: a status dot + mono label surfacing syncing / synced / error.
+//
+// It renders only once sync is configured. A vault that was never connected has
+// no sync state to report, so the pill would sit in the chrome reading "Local"
+// forever — a permanent slot spent on a fact the user cannot act on. Clicking
+// goes where the state is owned: Settings › Sync & devices.
 export default function SyncIndicator() {
   const sync = useStore(state => state.sync)
 
-  const dot = () => {
-    if (!sync.enabled) return 'bg-text3'
-    if (sync.inProgress) return 'bg-accent'
-    return sync.success ? 'bg-good' : 'bg-bad'
-  }
+  if (!sync.enabled) return null
 
-  const label = () => {
-    if (!sync.enabled) return 'Local'
-    if (sync.inProgress) return 'Syncing…'
-    return sync.success ? 'Synced' : 'Sync error'
-  }
-
-  const message = () => {
-    if (!sync.enabled) return 'Local vault'
-    if (sync.inProgress) return 'Syncing...'
-    if (sync.success) return 'Sync Successful'
-    return sync.error || 'Something went wrong'
-  }
+  const dot = sync.inProgress ? 'bg-accent' : sync.success ? 'bg-good' : 'bg-bad'
+  const label = sync.inProgress ? 'Syncing…' : sync.success ? 'Synced' : 'Sync error'
+  const message = sync.inProgress
+    ? 'Syncing...'
+    : sync.success
+      ? 'Sync Successful'
+      : sync.error || 'Something went wrong'
 
   return (
-    <Tooltip content={message()}>
-      <div
+    <Tooltip content={message}>
+      <button
+        type="button"
         data-testid="sync-indicator"
-        className="flex h-7 items-center gap-[7px] rounded-sm px-2.5 font-mono text-xs text-text3"
+        onClick={() => openSettings('sync')}
+        className="flex h-7 items-center gap-[7px] rounded-sm px-2.5 font-mono text-xs text-text3 hover:text-text2"
       >
-        <span className={cx('h-[5px] w-[5px] flex-none rounded-full', dot())} />
-        {label()}
-      </div>
+        <span className={cx('h-[5px] w-[5px] flex-none rounded-full', dot)} />
+        {label}
+      </button>
     </Tooltip>
   )
 }

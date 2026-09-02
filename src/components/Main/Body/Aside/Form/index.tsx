@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { setCurrentEntry, setNoEntry, saveEntry } from '@/store'
 import { useRevealed } from '@/hooks/useRevealed'
-import { kindOf } from '@/kinds'
+import { addLabel, kindOf } from '@/kinds'
 import type { EntryDraft } from '@/defaults/entries'
 import type { EntryMeta, EntryType } from '@/lib/commands'
 import { t } from '@/i18n'
@@ -104,7 +104,7 @@ export default function Form({ type, entry }: Props) {
 
   return (
     <Sheet
-      title={entry ? t('Edit entry') : t('New entry')}
+      title={entry ? t('Edit entry') : addLabel(type)}
       onClose={onCancel}
       onSubmit={onSave}
       footer={footer}

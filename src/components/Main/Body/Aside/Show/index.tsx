@@ -6,7 +6,7 @@ import { useFavicon } from '@/hooks/useFavicon'
 import CardBrandMark from '@/components/elements/CardBrandMark'
 import { hasBrandMark } from '@/utils/cardBrand'
 import { kindOf } from '@/kinds'
-import { dateTime } from '@/utils/time'
+import { relativeTime } from '@/utils/time'
 import { t } from '@/i18n'
 import Details from './Details'
 import Actions from './Actions'
@@ -33,11 +33,12 @@ export default function Show({ entry }: Props) {
     )
   }
 
-  const ledger: { k: string; v: string }[] = [
-    { k: t('Type'), v: t(kind.label) },
-    { k: t('Last Modified'), v: dateTime(entry.updatedAt) },
-    { k: t('Created'), v: dateTime(entry.createdAt) }
-  ]
+  // Timestamps are reference, not content. The kind is already the eyebrow
+  // above the title, so the ledger it used to head had nothing left to say.
+  const stamps = [
+    `${t('Modified')} ${relativeTime(entry.updatedAt)}`,
+    `${t('Created')} ${relativeTime(entry.createdAt)}`
+  ].join(' · ')
 
   return (
     <div className="mx-auto w-full max-w-[860px]">
@@ -72,27 +73,14 @@ export default function Show({ entry }: Props) {
         <Actions type={entry.type} revealed={revealed} onDelete={onDelete} />
       </div>
 
-      {/* Reference metadata, not content — no card fill, xs mono values, tight
-          padding, so the block recedes behind the title and details. */}
-      <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-lg border border-line">
-        {ledger.map((cell, i) => (
-          <div
-            key={cell.k}
-            className={
-              i < ledger.length - 1
-                ? 'border-r border-line px-3.5 py-2'
-                : 'px-3.5 py-2'
-            }
-          >
-            <div className={MONO_LABEL}>{cell.k}</div>
-            <div className="mt-1 truncate font-mono text-xs text-text2">
-              {cell.v}
-            </div>
-          </div>
-        ))}
+      {revealed && <Details entry={revealed} />}
+
+      {/* One quiet line at the foot of the pane, where a three-cell ledger used
+          to compete with the details it sat above. */}
+      <div data-testid="entry-stamps" className={`mt-5 ${MONO_LABEL}`}>
+        {stamps}
       </div>
 
-      {revealed && <Details entry={revealed} />}
       {deleteError && (
         <div className="mt-3 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3 text-base text-bad">
           {deleteError}

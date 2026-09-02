@@ -59,13 +59,13 @@ describe('rank', () => {
   const fieldsOf = (item: { label: string }) => [{ text: item.label }]
 
   it('drops non-matches and orders by score', () => {
-    const items = [{ label: 'Toggle theme' }, { label: 'Lock vault' }, { label: 'New entry' }]
+    const items = [{ label: 'Toggle theme' }, { label: 'Lock vault' }, { label: 'Add a secret' }]
     expect(labels(rank(items, 'lock', fieldsOf))).toEqual(['Lock vault'])
   })
 
   it('keeps the input order for equal scores', () => {
-    const items = [{ label: 'Lock vault' }, { label: 'Lock screen' }]
-    expect(labels(rank(items, 'lock', fieldsOf))).toEqual(['Lock vault', 'Lock screen'])
+    const items = [{ label: 'Lock vault' }, { label: 'Lock vault after' }]
+    expect(labels(rank(items, 'lock', fieldsOf))).toEqual(['Lock vault', 'Lock vault after'])
   })
 
   it('returns everything for an empty query', () => {

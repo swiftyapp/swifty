@@ -21,6 +21,13 @@ describe('Form', () => {
     expect(screen.getByText('Username')).toBeInTheDocument()
   })
 
+  it('titles the editor from the kind registry', () => {
+    // The sheet has one title, so this pins the create action's wording: it is
+    // named after the kind, in the same phrasing the empty panes use.
+    renderWithStore(<Form type="card" />)
+    expect(screen.getByText('Add a credit card')).toBeInTheDocument()
+  })
+
   it('saves a valid new login', async () => {
     const { store } = renderWithStore(<Form type="login" />)
     await userEvent.type(document.querySelector('input[name="title"]')!, 'GitHub')

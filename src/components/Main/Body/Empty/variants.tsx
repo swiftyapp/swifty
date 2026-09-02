@@ -9,7 +9,7 @@ import {
   setFilterQuery,
   setFilterType
 } from '@/store'
-import { kindOf } from '@/kinds'
+import { addLabel, kindOf } from '@/kinds'
 import { t } from '@/i18n'
 import Logo from '@/assets/images/logo.svg?react'
 import EmptyState from '@/components/elements/EmptyState'
@@ -22,11 +22,6 @@ import { ActivityGlyph, SearchGlyph } from '../../icons'
 const Mark = ({ size }: { size: number }) => (
   <Logo width={size} height={size} className="fill-current" aria-hidden="true" />
 )
-
-// "Add a login" / "Add a credit card": one string for every kind, so the list
-// column, the health pane and any future surface phrase it the same way.
-const addLabel = (type: EntryType) =>
-  t('Add a {kind}').replace('{kind}', t(kindOf(type).label).toLowerCase())
 
 // The accelerators an empty pane can advertise. The name doubles as the copy
 // key, and `hints()` resolves it at render so a locale switch retranslates.
