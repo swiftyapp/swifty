@@ -22,8 +22,8 @@ export default function Input({ value, onChange, onKeyDown }: Props) {
         value={value}
         onChange={e => onChange(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder={t('Search or run a command')}
-        aria-label={t('Search or run a command')}
+        placeholder={t('Run a command')}
+        aria-label={t('Run a command')}
         data-testid="command-palette-input"
         className="min-w-0 flex-1 border-0 bg-transparent text-lg text-text caret-accent outline-none placeholder:text-text3"
       />

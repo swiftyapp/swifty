@@ -1,10 +1,9 @@
-import Search from './Search'
 import SyncIndicator from './SyncIndicator'
 import LockButton from './LockButton'
 import Controls from '@/components/elements/Controls'
 
-// Top chrome bar (~46px): window controls · command search · sync pill +
-// theme toggle + lock.
+// Top chrome bar (~46px): window controls · sync pill + lock. Search is not
+// here — it filters the list column, so it lives in it.
 //
 // `data-tauri-drag-region="deep"` makes the whole bar and its subtree a native
 // window drag region: Tauri's injected handler starts a window drag on
@@ -14,9 +13,7 @@ import Controls from '@/components/elements/Controls'
 // landing on the element itself.
 //
 // The handler already treats button/input/a/label/[role]/[tabindex] as
-// non-drag, so ThemeToggle, LockButton and the search input opt out for free.
-// Search additionally gets an explicit "false" so the field's padding and
-// border read as a text field rather than as window chrome.
+// non-drag, so ThemeToggle and LockButton opt out for free.
 export default function Header() {
   return (
     <header
@@ -25,10 +22,7 @@ export default function Header() {
     >
       <Controls />
       <div className="flex-1" />
-      <div data-tauri-drag-region="false" className="flex-none">
-        <Search />
-      </div>
-      <div className="flex flex-1 items-center justify-end gap-1.5">
+      <div className="flex flex-none items-center gap-1.5">
         <SyncIndicator />
         <LockButton />
       </div>

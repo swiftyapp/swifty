@@ -1,11 +1,23 @@
 import Fuse from 'fuse.js'
-import type { EntryMeta, EntryType } from '@/lib/commands'
+import { revealEntry, type EntryMeta, type EntryType } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
 import { kindOf } from '@/kinds'
+import { copy } from './copy'
 
 // Validates a draft has the fields required for its kind before saving.
 // The rule itself lives with the kind (src/kinds/<kind>/meta.ts).
 export const isValid = (draft: EntryDraft): boolean => kindOf(draft.type).isValid(draft)
+
+// Decrypts just this entry (secrets never live in the list metadata) and puts
+// the one secret worth a shortcut for its kind on the clipboard, with the usual
+// auto-clear timeout. Backs the list search's ⌘⏎.
+export const copySecret = (entry: EntryMeta): Promise<void> =>
+  revealEntry(entry.id)
+    .then(revealed => {
+      const value = kindOf(revealed.type).primarySecret(revealed)
+      if (value) copy(value)
+    })
+    .catch(() => {})
 
 export interface FilterOptions {
   // null means every kind — the "All Items" view.

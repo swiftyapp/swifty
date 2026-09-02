@@ -1,14 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { scoreText, scoreFields, rank, searchEntries } from './search'
-import type { EntryMeta } from '@/lib/commands'
-
-const login = (title: string, urlHost = '', tags: string[] = []): EntryMeta => ({
-  id: title,
-  type: 'login',
-  title,
-  tags,
-  urlHost
-})
+import { scoreText, scoreFields, rank } from './search'
 
 describe('scoreText', () => {
   it('matches everything on an empty query', () => {
@@ -81,40 +72,10 @@ describe('rank', () => {
     const items = [{ label: 'b' }, { label: 'a' }]
     expect(labels(rank(items, '', fieldsOf))).toEqual(['b', 'a'])
   })
-})
-
-describe('searchEntries', () => {
-  const entries = [
-    login('Google', 'google.com'),
-    login('Airbnb', 'airbnb.com', ['travel']),
-    login('GitHub', 'github.com', ['work'])
-  ]
-
-  it('sorts alphabetically with no query', () => {
-    expect(searchEntries(entries, '').map(e => e.title)).toEqual(['Airbnb', 'GitHub', 'Google'])
-  })
-
-  it('matches the title', () => {
-    expect(searchEntries(entries, 'git').map(e => e.title)).toEqual(['GitHub'])
-  })
-
-  it('matches the site host and tags', () => {
-    expect(searchEntries(entries, 'airbnb.com').map(e => e.title)).toEqual(['Airbnb'])
-    expect(searchEntries(entries, 'travel').map(e => e.title)).toEqual(['Airbnb'])
-  })
-
-  it('ranks a title hit above a tag hit', () => {
-    const items = [login('Bank', 'bank.example', ['work']), login('Work log', '')]
-    expect(searchEntries(items, 'work').map(e => e.title)).toEqual(['Work log', 'Bank'])
-  })
-
-  it('tolerates gaps (subsequence)', () => {
-    expect(searchEntries(entries, 'ggl').map(e => e.title)).toEqual(['Google'])
-  })
 
   it('does not mutate the input', () => {
-    const items = [login('B'), login('A')]
-    searchEntries(items, '')
-    expect(items.map(e => e.title)).toEqual(['B', 'A'])
+    const items = [{ label: 'b' }, { label: 'a' }]
+    rank(items, 'a', fieldsOf)
+    expect(labels(items)).toEqual(['b', 'a'])
   })
 })

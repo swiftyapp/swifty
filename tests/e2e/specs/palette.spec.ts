@@ -7,8 +7,9 @@ import {
 } from "../helpers";
 
 // The command palette: its chord is the only way in (nothing else calls
-// `openPalette`), entries and commands share one result list, and running a
-// command has to actually reach the app — so both commands asserted here are
+// `openPalette`), it lists commands and nothing else — entries belong to the
+// list column's search field (`search-and-scopes.spec.ts`) — and running a
+// command has to actually reach the app, so both commands asserted here are
 // checked by their effect, not by the row disappearing.
 
 const MASTER_PASSWORD = "Fy2$dLw9kXn6bVc!";
@@ -60,16 +61,22 @@ describe("command palette", () => {
     });
   });
 
-  it("surfaces a vault entry by title", async () => {
+  it("does not surface vault entries", async () => {
     await openPalette();
 
-    // Empty query lists the commands only; entries need something to rank by.
-    await query("Palette Target", ENTRY_TITLE);
-    await runItem(ENTRY_TITLE);
+    // The seeded entry's title is in the vault and would match, but only the
+    // list column searches entries — here it scores nothing at all.
+    await $('[data-testid="command-palette-input"]').setValue("Palette Target");
+    await browser.waitUntil(
+      async () => (await $$('[data-testid="palette-item"]')).length === 0,
+      {
+        timeout: 10_000,
+        timeoutMsg: `"${ENTRY_TITLE}" still surfaces as a palette result`,
+      },
+    );
 
-    // Opening an entry selects it in the list column and closes the palette.
+    await browser.keys("Escape");
     await expect($('[data-testid="command-palette"]')).not.toBeDisplayed();
-    await waitFor("edit-entry-button");
   });
 
   it("runs Lock vault", async () => {
