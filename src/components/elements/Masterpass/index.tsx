@@ -28,7 +28,14 @@ interface Props {
 
 const EyeIcon = <EyeGlyph size={16} />
 const SmallEyeIcon = <EyeGlyph size={14} />
-const FingerprintIcon = <FingerprintGlyph size={16} />
+
+// The macOS Touch ID rose, so the fingerprint reads as the system affordance
+// rather than another monochrome glyph.
+const TouchIdIcon = (
+  <span className="text-[#ee5d6f]">
+    <FingerprintGlyph size={18} />
+  </span>
+)
 
 // Shared master-passphrase field. The real value lives in the (uncontrolled)
 // input; a mirrored copy drives the dot overlay. Masking is done with a
@@ -79,10 +86,10 @@ export default function Masterpass({
       type={reveal ? 'text' : 'password'}
       className={cx(
         'absolute inset-0 w-full border-0 bg-transparent text-center font-mono tracking-[0.3em] outline-none placeholder:text-[15px] placeholder:tracking-[0em] placeholder:text-text3',
-        lock && 'rounded-xl px-14'
+        lock && 'rounded-xl px-10'
       )}
       style={{
-        fontSize: lock ? 24 : 22,
+        fontSize: 22,
         color: reveal ? 'var(--c-text)' : 'transparent',
         caretColor: reveal ? 'var(--c-accent)' : 'transparent'
       }}
@@ -102,7 +109,7 @@ export default function Masterpass({
     return (
       <div
         className={cx(
-          'relative mx-auto h-[60px] max-w-[460px] rounded-xl border bg-detail shadow-[var(--lockfield-shadow)] transition-all duration-300',
+          'relative mx-auto flex h-12 max-w-[380px] items-stretch rounded-xl border bg-detail shadow-[var(--lockfield-shadow)] transition-all duration-300',
           bad
             ? 'border-bad/60 ring-4 ring-bad/10 animate-[nudge_420ms_ease_both]'
             : success
@@ -111,41 +118,39 @@ export default function Masterpass({
           disabled && !success && 'opacity-60'
         )}
       >
-        {input}
-        {!reveal && <Dots count={value.length} caret={focused && !disabled} />}
+        <div className="relative flex-1">
+          {input}
+          {!reveal && (
+            <Dots count={value.length} caret={focused && !disabled} />
+          )}
+          {/* Reveal is a secondary modifier of what you're typing, so it only
+              appears once there is something to reveal, small and dim. */}
+          {value.length > 0 && (
+            <IconButton
+              label={t('Reveal passphrase')}
+              className="animate-fade absolute right-1.5 top-1/2 -translate-y-1/2"
+              muted
+              active={reveal}
+              onClick={() => setReveal(r => !r)}
+            >
+              {SmallEyeIcon}
+            </IconButton>
+          )}
+        </div>
 
-        {/*
-          Both alternatives to typing live inside the card. Touch ID is the
-          primary one (always present, full weight); reveal is a secondary
-          modifier of what you're typing, so it only appears once there is
-          something to reveal, one tier smaller and dimmer.
-        */}
-        {(touchID || value.length > 0) && (
-          <div className="absolute inset-y-0 right-3 flex items-center gap-1">
-            {value.length > 0 && (
-              <IconButton
-                label={t('Reveal passphrase')}
-                className="animate-fade"
-                muted
-                active={reveal}
-                onClick={() => setReveal(r => !r)}
-              >
-                {SmallEyeIcon}
-              </IconButton>
-            )}
-            {value.length > 0 && touchID && (
-              <span aria-hidden className="h-4 w-px bg-line" />
-            )}
-            {touchID && (
-              <IconButton
-                label={t('Touch ID')}
-                className="touchid"
-                onClick={onTouchID}
-              >
-                {FingerprintIcon}
-              </IconButton>
-            )}
-          </div>
+        {/* Touch ID is the card's own end segment: a taller divider than the
+            reveal tier, and the fingerprint in the macOS Touch ID rose. */}
+        {touchID && (
+          <>
+            <span aria-hidden className="my-auto h-7 w-px bg-line2" />
+            <IconButton
+              label={t('Touch ID')}
+              className="touchid mx-1.5 my-auto"
+              onClick={onTouchID}
+            >
+              {TouchIdIcon}
+            </IconButton>
+          </>
         )}
       </div>
     )
