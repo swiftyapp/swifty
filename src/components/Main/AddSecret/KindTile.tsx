@@ -31,7 +31,9 @@ export default function KindTile({ kind, onSelect }: Props) {
       </span>
       <span className="min-w-0">
         <span className="block truncate text-base font-medium text-text">{t(kind.label)}</span>
-        <span className="block text-base text-text2">{t(kind.description)}</span>
+        {/* The card is sized so every description fits on one line; a longer
+            translation ellipsizes rather than reflowing the tile. */}
+        <span className="block truncate text-base text-text2">{t(kind.description)}</span>
       </span>
     </button>
   )

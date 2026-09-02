@@ -64,7 +64,7 @@ export default function AddSecret() {
   return (
     <Modal
       onClose={closeAddPicker}
-      className="w-[560px]"
+      className="w-[640px]"
       labelledBy={TITLE_ID}
       testid="add-secret-modal"
     >
