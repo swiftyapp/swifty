@@ -1,7 +1,7 @@
 import { useStore } from '@/store'
 import { kindOf } from '@/kinds'
 import { t } from '@/i18n'
-import KindChips from '../../Header/KindChips'
+import KindChips from './KindChips'
 import List from '../List'
 import SortMenu from '../List/SortMenu'
 import Search from './Search'
