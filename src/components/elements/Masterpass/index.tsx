@@ -136,7 +136,11 @@ export default function Masterpass({
               muted
               onClick={() => setReveal(r => !r)}
             >
-              {reveal ? SmallEyeOffIcon : SmallEyeIcon}
+              {/* Dial the ink down a step below the muted tier; the opacity
+                  wrapper keeps the hover ink-step ratio intact. */}
+              <span className="opacity-70">
+                {reveal ? SmallEyeOffIcon : SmallEyeIcon}
+              </span>
             </IconButton>
           )}
         </div>
