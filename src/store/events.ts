@@ -1,5 +1,6 @@
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { on, EVENTS } from '@/lib/events'
+import { isBiometricAvailable } from '@/lib/commands'
 import {
   setEntries,
   runAudit,
@@ -30,7 +31,14 @@ export const subscribeToEvents = (): (() => void) => {
       runAudit()
     }),
     on(EVENTS.auditDone, payload => auditDone(payload.data)),
-    on(EVENTS.vaultLocked, () => flowAuth(false))
+    // Re-check biometrics on every lock instead of hard-coding false — the
+    // lock screen reached by locking must offer Touch ID just like a cold
+    // start (this used to silently drop the Touch ID affordance).
+    on(EVENTS.vaultLocked, () =>
+      isBiometricAvailable()
+        .catch(() => false)
+        .then(flowAuth)
+    )
   ]
 
   return () => {
