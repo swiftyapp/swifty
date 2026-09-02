@@ -1,12 +1,28 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
+import { cx } from '@/utils/cx'
 import { CloseGlyph } from '../Main/icons'
 
 interface Props {
   onClose: () => void
+  // Replaces the card's default sizing (`w-full max-w-[720px]`) rather than
+  // adding to it, so a narrower dialog does not fight the default width.
+  className?: string
+  // id of the element that names the dialog, for `aria-labelledby`.
+  labelledBy?: string
+  testid?: string
   children: ReactNode
 }
 
-export default function Modal({ onClose, children }: Props) {
+export default function Modal({ onClose, className, labelledBy, testid, children }: Props) {
+  // Escape closes every modal — the scrim and the X are pointer-only exits.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
   return (
     <div
       className="animate-fade fixed inset-0 z-50 flex items-start justify-center bg-[var(--scrim)] p-4 pt-[10vh] backdrop-blur-sm"
@@ -15,7 +31,12 @@ export default function Modal({ onClose, children }: Props) {
       <div
         role="dialog"
         aria-modal="true"
-        className="animate-pop relative flex max-h-[80vh] w-full max-w-[720px] overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-[var(--shadow)]"
+        aria-labelledby={labelledBy}
+        data-testid={testid}
+        className={cx(
+          'animate-pop relative flex max-h-[80vh] overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-[var(--shadow)]',
+          className ?? 'w-full max-w-[720px]'
+        )}
         onClick={e => e.stopPropagation()}
       >
         <button

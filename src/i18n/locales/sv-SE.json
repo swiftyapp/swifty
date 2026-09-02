@@ -100,5 +100,10 @@
   "Copy note": "Copy note",
   "Passwords for apps & sites": "Passwords for apps & sites",
   "Cards & payment details": "Cards & payment details",
-  "Private text, sealed": "Private text, sealed"
+  "Private text, sealed": "Private text, sealed",
+  "Add a secret": "Add a secret",
+  "Everything is encrypted before it touches disk.": "Everything is encrypted before it touches disk.",
+  "New login": "New login",
+  "New credit card": "New credit card",
+  "New secure note": "New secure note"
 }

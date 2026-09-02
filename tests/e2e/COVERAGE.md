@@ -44,6 +44,7 @@ runs one app process against one data dir, so nothing may depend on file order.
 | Card face: reveal + copy | PR 3 | `card-reveal-button`, `entry-value-number` / `-expires` / `-cvc` / `-pin` |
 | Card brand mark | PR 3 | brand slug derived at save time; assert per-network glyph |
 | Empty states per kind filter | PR 3 | `create-first-entry-button` |
+| "Add a secret" kind picker | PR 3 | `add-entry-button` (or `create-first-entry-button`) → `add-secret-modal` → `add-kind-login` / `add-kind-card` / `add-kind-note`; `modal-close` or Escape dismisses. Every create flow goes through it, so `helpers/entries.ts` owns the two clicks. |
 | Command palette | PR 4 | `command-palette`, `command-palette-input`, `palette-item` |
 | Password generator | PR 4 | `generator-mode-random` / `-memorable`, `generator-amount`, `generator-regenerate`, `generator-output`, `generator-use-button` |
 | Change master password | PR 4 | `change-password-submit`, `change-password-error`, `change-password-success` |
@@ -72,6 +73,7 @@ These are not gaps in the suite; the coverage lives elsewhere and belongs there.
 - `helpers/reset.ts` — `resetPristine()`, `resetEmpty(password)`
 - `helpers/vault.ts` — `setupVault(password)`, `unlock(password)`, `lockVault()`
 - `helpers/entries.ts` — `createLogin`, `createCard`, `createNote`, `entryItems()`
+  (each `create*` opens the kind picker from `add-entry-button` and presses its `add-kind-<kind>` tile)
 - `helpers/app.ts` — `waitFor(testid)`, `waitForAppReady()`
 
 Reset goes through `window.__e2eReset` (installed only when `import.meta.env.DEV`) onto the

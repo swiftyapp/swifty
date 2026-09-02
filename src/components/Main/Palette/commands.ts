@@ -1,11 +1,12 @@
 import {
   useStore,
   lockVault as lockVaultAction,
-  newEntry,
+  openAddPicker,
   openSettings,
-  setView,
+  startEntry,
   toggleTheme
 } from '@/store'
+import { KINDS } from '@/kinds'
 import { t } from '@/i18n'
 import { GearGlyph, LockGlyph, MoonGlyph, PlusGlyph, SunGlyph } from '../icons'
 
@@ -26,25 +27,30 @@ export const lockVault = () => {
   void lockVaultAction()
 }
 
-// Starts a new entry, leaving the audit view first (it has no editor) — the
-// same path as the rail's add button, including its interim rule that the kind
-// comes from the active type filter until the kind picker lands.
-export const startNewEntry = () => {
-  const { filters, ui } = useStore.getState()
-  if (ui.view === 'health') setView('items')
-  newEntry(filters.type ?? 'login')
-}
-
 // The palette's fixed command list. Order here is the order shown for an empty
-// query, and the tie-break when several commands score the same.
-// Rebuilt on every render rather than memoized: four objects is cheaper than
-// the dependency bookkeeping, and `t` reads a module-level locale that a
+// query, and the tie-break when several commands score the same. The per-kind
+// "New …" commands come first and skip the picker: someone who already knows
+// what they are saving should not be asked.
+// Rebuilt on every render rather than memoized: a handful of objects is cheaper
+// than the dependency bookkeeping, and `t` reads a module-level locale that a
 // dependency array can't see.
 export const useCommands = (): Command[] => {
   const theme = useStore(state => state.theme)
 
   return [
-    { id: 'new-entry', label: t('New entry'), glyph: PlusGlyph, run: startNewEntry },
+    ...KINDS.map(kind => ({
+      id: `new-${kind.type}`,
+      label: t(`New ${kind.label.toLowerCase()}`),
+      glyph: kind.Glyph,
+      run: () => startEntry(kind.type)
+    })),
+    {
+      id: 'add-secret',
+      label: t('Add a secret'),
+      shortcut: '⌘N',
+      glyph: PlusGlyph,
+      run: openAddPicker
+    },
     {
       id: 'lock-vault',
       label: t('Lock vault'),

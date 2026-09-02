@@ -3,11 +3,9 @@ import { waitFor } from "./app";
 /**
  * Entry creation through the real UI.
  *
- * There is no kind picker in the add flow yet: Add takes the kind from the
- * active type filter, falling back to a login (`Sidebar/Add.tsx`), so every
- * helper here presses its kind's filter chip first and only then presses Add.
- * When the kind-picker modal lands this becomes a choice inside the modal and
- * the chip click can go.
+ * Add always asks which kind: the rail button opens the picker modal
+ * (`Main/AddSecret`) and the kind is chosen there, so the list filter no longer
+ * has any say in what gets created.
  */
 
 type Kind = "login" | "card" | "note";
@@ -38,9 +36,10 @@ export interface NoteFields {
 }
 
 async function openForm(kind: Kind): Promise<void> {
-  await waitFor(`filter-${kind}`);
-  await $(`[data-testid="filter-${kind}"]`).click();
+  await waitFor("add-entry-button");
   await $('[data-testid="add-entry-button"]').click();
+  await waitFor("add-secret-modal");
+  await $(`[data-testid="add-kind-${kind}"]`).click();
   await waitFor("entry-sheet");
   await $('input[name="title"]').waitForDisplayed({ timeout: 5_000 });
 }

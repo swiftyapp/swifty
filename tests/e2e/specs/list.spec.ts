@@ -67,7 +67,10 @@ describe("entry list states and ordering", () => {
     await waitFor("create-first-entry-button");
     expect(await entryItems()).toHaveLength(0);
 
+    // The first-entry action opens the kind picker; the sheet follows the choice.
     await $('[data-testid="create-first-entry-button"]').click();
+    await waitFor("add-secret-modal");
+    await $('[data-testid="add-kind-login"]').click();
     await waitFor("entry-sheet");
 
     await $('[data-testid="cancel-entry-button"]').click();

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { EntryMeta } from '@/lib/commands'
 import type { Kind } from '@/kinds/types'
+import { KIND_TINT } from '@/kinds/tint'
 import { cx } from '@/utils/cx'
 
 // What every kind's list row component is handed (see src/kinds/*/ListRow).
@@ -20,14 +21,6 @@ interface Props {
   tint?: Kind['tint']
 }
 
-// Tailwind resolves class names statically, so the kind tokens are spelled out
-// per kind rather than interpolated.
-const TINT: Record<Kind['tint'], string> = {
-  login: 'bg-kind-login-soft text-kind-login',
-  card: 'bg-kind-card-soft text-kind-card',
-  note: 'bg-kind-note-soft text-kind-note'
-}
-
 // Shared inner layout for every list item, whatever its kind: a rounded glyph
 // tile, the title (with an optional audit flag beside it), and an optional mono
 // secondary line. The kind-specific bits (which glyph, which secondary text)
@@ -39,7 +32,7 @@ export default function Row({ glyph, title, sub, flag, tint }: Props) {
       <div
         className={cx(
           'grid h-[30px] w-[30px] flex-none place-items-center overflow-hidden rounded-lg',
-          tint ? TINT[tint] : 'bg-tile text-text2'
+          tint ? KIND_TINT[tint] : 'bg-tile text-text2'
         )}
       >
         {glyph}

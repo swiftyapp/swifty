@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useStore, openPalette, openGenerator } from '@/store'
+import { useStore, openPalette, openGenerator, openAddPicker } from '@/store'
 import { lockVault } from './Palette/commands'
 
 // The app-level shortcut surface. One listener, one record — a new chord is
@@ -11,6 +11,12 @@ const BINDINGS: Record<string, () => void> = {
   // opened with, so an open dialog swallows the shortcut.
   g: () => {
     if (!useStore.getState().generator.open) openGenerator()
+  },
+  // A modal already asking a question owns the keyboard: re-opening the picker
+  // over itself would reset its focus, and over Settings it would stack.
+  n: () => {
+    const { addPicker, settings } = useStore.getState().ui
+    if (!addPicker && !settings) openAddPicker()
   }
 }
 
