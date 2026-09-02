@@ -63,6 +63,51 @@
 }
 
 /*
+ * Lock-screen mascot motion (from the Lock v3 prototype): a slow occasional
+ * blink while idle, a cheer bounce on unlock, and a deny shake on a bad
+ * passphrase. `blink` runs on the eye group; the other two on the body.
+ */
+@keyframes blink {
+  0%,
+  93%,
+  100% {
+    transform: scaleY(1);
+  }
+  96%,
+  97.5% {
+    transform: scaleY(0.06);
+  }
+}
+@keyframes cheer {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  32% {
+    transform: translateY(-12px) scale(1.05);
+  }
+  66% {
+    transform: translateY(2px) scale(0.98);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes deny {
+  18% {
+    transform: translateX(-6px) rotate(-4deg);
+  }
+  44% {
+    transform: translateX(6px) rotate(4deg);
+  }
+  72% {
+    transform: translateX(-3px) rotate(-2deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/*
  * App-wide base (replaces the old base.sass / typography.sass). Preflight
  * already handles the reset + border-box; this only sets the full-height shell,
  * the default type family/size, and the themed page ground.

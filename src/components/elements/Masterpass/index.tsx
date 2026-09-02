@@ -3,11 +3,7 @@ import { cx } from '@/utils/cx'
 import { t } from '@/i18n'
 import Error from '../Error'
 import IconButton from '../IconButton'
-import {
-  EyeGlyph,
-  FingerprintGlyph,
-  LockGlyph
-} from '@/components/Main/icons'
+import { EyeGlyph, FingerprintGlyph } from '@/components/Main/icons'
 import Dots from './Dots'
 import KeyCuts from './KeyCuts'
 
@@ -17,20 +13,22 @@ interface Props {
   disabled?: boolean
   placeholder?: string
   testid?: string
-  // `lock` is the full unlock presentation (key-cut rule + action row);
+  // `lock` is the full unlock presentation (in-field actions + key-cut rule);
   // `compact` (default) is the plain centered field used by setup / restore.
   variant?: 'compact' | 'lock'
   // Lock only: tint the rule/cuts as invalid without rendering an inline error
   // (the lock screen surfaces the message in its eyebrow instead).
   invalid?: boolean
+  // Lock only: hold the rule/cuts on accent while the unlock lands.
+  success?: boolean
   onEnter?: (value: string) => void
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void
   onTouchID?: () => void
 }
 
 const EyeIcon = <EyeGlyph size={16} />
+const SmallEyeIcon = <EyeGlyph size={14} />
 const FingerprintIcon = <FingerprintGlyph size={16} />
-const LockIcon = <LockGlyph size={16} />
 
 // Shared master-passphrase field. The real value lives in the (uncontrolled)
 // input; a mirrored copy drives the dot overlay and key-cut count. Masking is
@@ -44,6 +42,7 @@ export default function Masterpass({
   testid,
   variant = 'compact',
   invalid,
+  success,
   onEnter,
   onChange,
   onTouchID
@@ -74,11 +73,7 @@ export default function Masterpass({
     if (event.key === 'Enter') doSubmit(event.currentTarget.value)
   }
 
-  const cutsTone = flash ? 'accent' : bad ? 'bad' : 'idle'
-  const hint =
-    value.length === 0
-      ? t('Enter your passphrase')
-      : `${value.length} ${t('characters')}`
+  const cutsTone = success || flash ? 'accent' : bad ? 'bad' : 'idle'
 
   return (
     <div className="w-full">
@@ -120,47 +115,44 @@ export default function Masterpass({
             {EyeIcon}
           </IconButton>
         )}
-      </div>
 
-      {lock ? (
-        <>
-          <KeyCuts count={value.length} tone={cutsTone} />
-          <div className="mt-5 flex items-center justify-between gap-4">
-            <span
-              className={cx(
-                'font-mono text-xs uppercase tracking-label transition-colors',
-                bad ? 'text-bad' : 'text-text3'
-              )}
-            >
-              {hint}
-            </span>
-            <div className="flex items-center gap-1">
+        {/*
+          Lock: both alternatives to typing live inside the field. Touch ID is
+          the primary one (always present, full weight); reveal is a secondary
+          modifier of what you're typing, so it only appears once there is
+          something to reveal, one tier smaller and dimmer.
+        */}
+        {lock && (touchID || value.length > 0) && (
+          <div className="absolute right-0 flex items-center gap-1">
+            {value.length > 0 && (
               <IconButton
                 label={t('Reveal passphrase')}
+                className="animate-fade"
+                muted
                 active={reveal}
                 onClick={() => setReveal(r => !r)}
               >
-                {EyeIcon}
+                {SmallEyeIcon}
               </IconButton>
-              {touchID && (
-                <IconButton
-                  label={t('Touch ID')}
-                  className="touchid"
-                  onClick={onTouchID}
-                >
-                  {FingerprintIcon}
-                </IconButton>
-              )}
+            )}
+            {value.length > 0 && touchID && (
+              <span aria-hidden className="h-4 w-px bg-line" />
+            )}
+            {touchID && (
               <IconButton
-                label={t('Unseal')}
-                active={value.length > 0}
-                onClick={() => doSubmit(value)}
+                label={t('Touch ID')}
+                className="touchid"
+                onClick={onTouchID}
               >
-                {LockIcon}
+                {FingerprintIcon}
               </IconButton>
-            </div>
+            )}
           </div>
-        </>
+        )}
+      </div>
+
+      {lock ? (
+        <KeyCuts count={value.length} tone={cutsTone} />
       ) : (
         <>
           <KeyCuts count={value.length} tone={bad ? 'bad' : 'idle'} />

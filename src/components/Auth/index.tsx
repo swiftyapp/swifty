@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react'
-import { unlock, unlockBiometric } from '@/lib/commands'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { unlock, unlockBiometric, type UnlockResult } from '@/lib/commands'
 import { enterMain } from '@/store'
 import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
 import Controls from '@/components/elements/Controls'
 import AuthShell from '@/components/elements/AuthShell'
 import Eyebrow from '@/components/elements/Eyebrow'
+import Mascot from '@/components/elements/Mascot'
+
+// How long the mascot gets to celebrate before the vault fades in.
+const SUCCESS_HOLD_MS = 650
 
 interface Props {
   touchID: boolean
@@ -38,6 +42,9 @@ const lockedMessage = (seconds: number) =>
 export function Auth({ touchID }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [retryAfter, setRetryAfter] = useState(0)
+  const [count, setCount] = useState(0)
+  const [success, setSuccess] = useState(false)
+  const holdTimer = useRef(0)
 
   // Countdown ticks once a second while locked out; re-enables the input at 0.
   useEffect(() => {
@@ -50,10 +57,22 @@ export function Auth({ touchID }: Props) {
     return () => clearTimeout(id)
   }, [retryAfter])
 
+  useEffect(() => () => clearTimeout(holdTimer.current), [])
+
+  // Let the mascot celebrate before the vault takes over.
+  const holdThenEnter = (result: UnlockResult) => {
+    setError(null)
+    setSuccess(true)
+    holdTimer.current = window.setTimeout(
+      () => enterMain(result),
+      SUCCESS_HOLD_MS
+    )
+  }
+
   const handleEnter = (value: string) => {
-    if (retryAfter > 0) return
+    if (retryAfter > 0 || success) return
     unlock(value)
-      .then(result => enterMain(result))
+      .then(holdThenEnter)
       .catch((err: unknown) => {
         if (isTooManyAttempts(err)) {
           setRetryAfter(err.retryAfterSecs)
@@ -67,19 +86,39 @@ export function Auth({ touchID }: Props) {
   const handleTouchId = () => {
     // Biometric unlock is never subject to the password backoff (the OS gate
     // already rate-limits it), so it stays available even while locked out.
+    if (success) return
     unlockBiometric()
-      .then(result => enterMain(result))
+      .then(holdThenEnter)
       .catch((err: unknown) => setError(unlockError(err)))
   }
+
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setCount(event.currentTarget.value.length)
+    if (retryAfter <= 0) setError(null)
+  }
+
+  // The mascot reads along as you type: the gaze pans left-to-right with the
+  // caret (16 chars ≈ full sweep, like the prototype).
+  const gaze = count > 0 ? Math.min(1, count / 16) * 2 - 1 : 0
+  const mascotState = success
+    ? 'success'
+    : error
+      ? 'error'
+      : count > 0
+        ? 'typing'
+        : 'idle'
 
   return (
     <>
       <Controls />
       <AuthShell meta={`${t('offline')} · aes-256-gcm`}>
+        <div className="mb-7 flex justify-center">
+          <Mascot state={mascotState} gaze={gaze} />
+        </div>
         {/* One element carries all three states, so the testid names which one
             is showing rather than forcing specs to parse the message. */}
         <Eyebrow
-          tone={error ? 'bad' : 'muted'}
+          tone={error ? 'bad' : success ? 'accent' : 'muted'}
           testid={
             retryAfter > 0
               ? 'unlock-lockout'
@@ -88,7 +127,7 @@ export function Auth({ touchID }: Props) {
                 : 'unlock-status'
           }
         >
-          {error ?? t('Vault sealed')}
+          {error ?? (success ? t('Unsealing') : t('Vault sealed'))}
         </Eyebrow>
         <div className="mt-8">
           <Masterpass
@@ -96,8 +135,9 @@ export function Auth({ touchID }: Props) {
             touchID={touchID}
             testid="unlock-password-input"
             invalid={!!error}
-            disabled={retryAfter > 0}
-            onChange={() => retryAfter <= 0 && setError(null)}
+            success={success}
+            disabled={retryAfter > 0 || success}
+            onChange={handleChange}
             onEnter={handleEnter}
             onTouchID={handleTouchId}
           />
