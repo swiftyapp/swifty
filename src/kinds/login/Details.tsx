@@ -12,11 +12,14 @@ export default function Details({ entry }: Props) {
   const hasOtp = !!entry.otp
 
   return (
-    <div className="mt-3">
+    <div className="@container mt-3">
+      {/* The OTP dial only earns its own 208px column once the credentials
+          panel still has room to read beside it; under that it wraps below.
+          Measured against the pane, not the window — the pane is what shrinks. */}
       <div
         className={
           hasOtp
-            ? 'grid grid-cols-[minmax(0,1fr)_208px] items-start gap-3'
+            ? 'grid items-start gap-3 @min-[560px]:grid-cols-[minmax(0,1fr)_208px]'
             : 'grid gap-3'
         }
       >

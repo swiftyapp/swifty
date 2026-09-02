@@ -99,8 +99,11 @@ export default function Details({ entry }: Props) {
     <div className="mt-3">
       {/* Card art: an always-dark plastic-card visual, deliberately off-system.
           Its gradient, hex inks, 16/4px radii and face letter-spacings imitate a
-          real card, so they are exempt from the type/radius/tracking scales. */}
-      <div className="relative flex h-[288px] w-[460px] flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 font-mono text-[#EDEEF0] shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
+          real card, so they are exempt from the type/radius/tracking scales.
+          Sized like a real card too: it takes the pane's width up to 460 and
+          keeps its 1.6 aspect at any of them, rather than fixing a 460×288 box
+          the narrowest pane would clip. */}
+      <div className="relative flex aspect-[1.6] w-full max-w-[460px] flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 font-mono text-[#EDEEF0] shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
         <div className="absolute -right-10 -top-16 h-[240px] w-[240px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.07),transparent_70%)]" />
         <div className="relative flex items-start justify-between gap-4">
           {entry.name ? (
