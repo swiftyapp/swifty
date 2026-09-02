@@ -3,9 +3,8 @@ import SyncIndicator from './SyncIndicator'
 import LockButton from './LockButton'
 import Controls from '@/components/elements/Controls'
 
-// Top chrome bar (~46px): window controls · command search · sync pill + lock.
-// The right side carries only controls that change state the user cares about
-// now, so the sync pill is absent until sync is configured.
+// Top chrome bar (~46px): window controls · command search · sync pill +
+// theme toggle + lock.
 //
 // `data-tauri-drag-region="deep"` makes the whole bar and its subtree a native
 // window drag region: Tauri's injected handler starts a window drag on
@@ -15,7 +14,7 @@ import Controls from '@/components/elements/Controls'
 // landing on the element itself.
 //
 // The handler already treats button/input/a/label/[role]/[tabindex] as
-// non-drag, so the sync pill, LockButton and the search input opt out for free.
+// non-drag, so ThemeToggle, LockButton and the search input opt out for free.
 // Search additionally gets an explicit "false" so the field's padding and
 // border read as a text field rather than as window chrome.
 export default function Header() {
