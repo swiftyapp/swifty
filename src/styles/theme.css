@@ -105,6 +105,16 @@
     background-position: -50% 0;
   }
 }
+/* The verifying card's halo breathes (opacity pulse on a ring overlay). */
+@keyframes halo {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
 /* While the key derives, the mask dots ripple in sequence (per-cell delay). */
 @keyframes dotwave {
   0%,

@@ -134,11 +134,18 @@ export default function Masterpass({
             : success
               ? 'border-good/50 ring-4 ring-good/15'
               : pending
-                ? 'border-accent-line ring-4 ring-accent-soft'
+                ? 'border-accent-line'
                 : 'border-text/12 focus-within:border-accent-line focus-within:ring-4 focus-within:ring-accent-soft',
           disabled && !success && !pending && 'opacity-60'
         )}
       >
+        {/* While verifying, the halo breathes instead of holding static. */}
+        {pending && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-xl ring-4 ring-accent-soft animate-[halo_1.8s_ease-in-out_infinite]"
+          />
+        )}
         <div className="relative flex-1">
           {input}
           <Dots
