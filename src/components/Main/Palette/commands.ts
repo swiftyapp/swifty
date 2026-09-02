@@ -6,7 +6,7 @@ import {
   startEntry,
   toggleTheme
 } from '@/store'
-import { KINDS } from '@/kinds'
+import { KINDS, addLabel } from '@/kinds'
 import { t } from '@/i18n'
 import { GearGlyph, LockGlyph, MoonGlyph, PlusGlyph, SunGlyph } from '../icons'
 
@@ -29,8 +29,8 @@ export const lockVault = () => {
 
 // The palette's fixed command list. Order here is the order shown for an empty
 // query, and the tie-break when several commands score the same. The per-kind
-// "New …" commands come first and skip the picker: someone who already knows
-// what they are saving should not be asked.
+// commands come first and skip the picker: someone who already knows what they
+// are saving should not be asked.
 // Rebuilt on every render rather than memoized: a handful of objects is cheaper
 // than the dependency bookkeeping, and `t` reads a module-level locale that a
 // dependency array can't see.
@@ -40,7 +40,7 @@ export const useCommands = (): Command[] => {
   return [
     ...KINDS.map(kind => ({
       id: `new-${kind.type}`,
-      label: t(`New ${kind.label.toLowerCase()}`),
+      label: addLabel(kind.type),
       glyph: kind.Glyph,
       run: () => startEntry(kind.type)
     })),
