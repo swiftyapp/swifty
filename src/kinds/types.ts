@@ -1,0 +1,53 @@
+import type { ComponentType } from 'react'
+import type { Entry, EntryMeta, EntryType } from '@/lib/commands'
+import type { EntryDraft } from '@/defaults/entries'
+import type { LoginGlyph } from '@/components/Main/icons'
+import type { ContentProps } from '@/components/Main/Body/List/Item/Row'
+import type { FieldChange } from '@/components/Main/Body/Aside/Form/helpers'
+
+// Every icon in the set shares this signature (see Main/icons.tsx).
+export type Glyph = typeof LoginGlyph
+
+// One prop shape for all three field sets, so the registry can hold them behind
+// a single component type. `setField` is only used by Login (the generator
+// writes the password back through it); the others simply ignore it.
+export interface FormProps {
+  entry: EntryDraft
+  validate: boolean
+  onChange: (event: FieldChange) => void
+  onTagsChange: (tags: string[]) => void
+  setField: (name: string, value: string) => void
+}
+
+/**
+ * Everything the app needs to know about one kind of secret, in one object.
+ *
+ * Adding a kind means writing one of these and listing it in `KINDS` — no
+ * switch statement, glyph map or label record anywhere else has to learn
+ * about it.
+ */
+export interface Kind {
+  type: EntryType
+  /** Singular, untranslated — call sites wrap it in `t()`. */
+  label: string
+  /** Plural, untranslated (list-column title, filter chip). */
+  pluralLabel: string
+  /** One line for pickers and empty states. */
+  description: string
+  Glyph: Glyph
+  /** Key into the `--color-kind-*` tokens (see styles/theme.css). */
+  tint: 'login' | 'card' | 'note'
+  /** The empty draft a new entry of this kind starts from. */
+  defaults: EntryDraft
+  /** Whether a draft carries the fields this kind requires to be saved. */
+  isValid: (draft: EntryDraft) => boolean
+  /** The one secret worth a shortcut — what ⏎ and ⌘⏎ copy. */
+  primarySecret: (entry: Entry) => string
+  /** Untranslated label for the detail header's primary button. */
+  primaryActionLabel: string
+  /** The row's secondary line, from non-secret metadata only. */
+  listSubtitle: (entry: EntryMeta) => string
+  ListRow: ComponentType<ContentProps>
+  Form: ComponentType<FormProps>
+  Details: ComponentType<{ entry: Entry }>
+}

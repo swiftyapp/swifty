@@ -8,12 +8,12 @@ import { byTitle, byRecency } from './order'
 // buckets earn nothing (the audit list keeps its severity groups, which do).
 export default function Manager() {
   const tags = useStore(state => state.filters.tags)
-  const scope = useStore(state => state.filters.scope)
+  const type = useStore(state => state.filters.type)
   const query = useStore(state => state.filters.query)
   const items = useStore(state => state.entries.items)
   const sort = useStore(state => state.sort)
 
-  const entries = filterEntries(items, { scope, query, tags })
+  const entries = filterEntries(items, { type, query, tags })
 
   if (entries.length === 0) return <Empty />
 

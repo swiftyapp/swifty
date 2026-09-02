@@ -5,8 +5,8 @@ import { useRevealed } from '@/hooks/useRevealed'
 import { useFavicon } from '@/hooks/useFavicon'
 import CardBrandMark from '@/components/elements/CardBrandMark'
 import { hasBrandMark } from '@/utils/cardBrand'
+import { kindOf } from '@/kinds'
 import { t } from '@/i18n'
-import { LoginGlyph, NoteGlyph, CardGlyph } from '../../../icons'
 import Details from './Details'
 import Actions from './Actions'
 import { MONO_LABEL } from '../ui'
@@ -15,25 +15,14 @@ interface Props {
   entry: EntryMeta
 }
 
-const KIND_LABEL: Record<EntryMeta['type'], string> = {
-  login: 'Login',
-  card: 'Card',
-  note: 'Secure note'
-}
-
-const KIND_GLYPH: Record<EntryMeta['type'], typeof LoginGlyph> = {
-  login: LoginGlyph,
-  card: CardGlyph,
-  note: NoteGlyph
-}
-
 const formatDate = (value?: string) =>
   value ? new Date(value).toLocaleString() : '—'
 
 export default function Show({ entry }: Props) {
   const revealed = useRevealed(entry)
   const icon = useFavicon(entry.urlHost)
-  const Glyph = KIND_GLYPH[entry.type]
+  const kind = kindOf(entry.type)
+  const Glyph = kind.Glyph
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Confirmation is inline in the more-menu (two-press pattern, like the
@@ -47,7 +36,7 @@ export default function Show({ entry }: Props) {
   }
 
   const ledger: { k: string; v: string }[] = [
-    { k: t('Type'), v: t(KIND_LABEL[entry.type]) },
+    { k: t('Type'), v: t(kind.label) },
     { k: t('Last Modified'), v: formatDate(entry.updatedAt) },
     { k: t('Created'), v: formatDate(entry.createdAt) }
   ]
@@ -58,7 +47,7 @@ export default function Show({ entry }: Props) {
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
           <div className={`flex items-center gap-2 whitespace-nowrap ${MONO_LABEL}`}>
-            <span className="text-text2">{t(KIND_LABEL[entry.type])}</span>
+            <span className="text-text2">{t(kind.label)}</span>
             {entry.urlHost && (
               <>
                 <span>/</span>

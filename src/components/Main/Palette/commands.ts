@@ -3,7 +3,7 @@ import {
   lockVault as lockVaultAction,
   newEntry,
   openSettings,
-  setFilterScope,
+  setView,
   toggleTheme
 } from '@/store'
 import { t } from '@/i18n'
@@ -26,11 +26,13 @@ export const lockVault = () => {
   void lockVaultAction()
 }
 
-// Starts a new entry, leaving the audit scope first (it has no editor) — the
-// same path as the rail's add button.
+// Starts a new entry, leaving the audit view first (it has no editor) — the
+// same path as the rail's add button, including its interim rule that the kind
+// comes from the active type filter until the kind picker lands.
 export const startNewEntry = () => {
-  if (useStore.getState().filters.scope === 'audit') setFilterScope('login')
-  newEntry()
+  const { filters, ui } = useStore.getState()
+  if (ui.view === 'health') setView('items')
+  newEntry(filters.type ?? 'login')
 }
 
 // The palette's fixed command list. Order here is the order shown for an empty

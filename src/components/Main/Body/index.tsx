@@ -7,7 +7,8 @@ import Form from './Aside/Form'
 // Creating or editing an entry floats the Form over both in a right slide-in
 // sheet, so the detail pane keeps showing the entry underneath.
 export default function Body() {
-  const isNew = useStore(state => state.entries.new)
+  // The kind being created, or null. An edit takes its kind from the entry.
+  const newType = useStore(state => state.entries.new)
   const isEditing = useStore(state => state.entries.edit)
   const entry = useStore(state => state.entries.current)
   const editing = isEditing ? entry : null
@@ -16,8 +17,8 @@ export default function Body() {
     <>
       <ListColumn />
       <DetailPane />
-      {isNew && <Form />}
-      {editing && <Form entry={editing} />}
+      {newType && <Form type={newType} />}
+      {editing && <Form type={editing.type} entry={editing} />}
     </>
   )
 }

@@ -1,33 +1,27 @@
 import { useState, useEffect } from 'react'
-import { useStore, setCurrentEntry, setNoEntry, saveEntry } from '@/store'
+import { setCurrentEntry, setNoEntry, saveEntry } from '@/store'
 import { useRevealed } from '@/hooks/useRevealed'
-import { isValid } from '@/services/entries'
-import defaults, { type EntryDraft } from '@/defaults/entries'
+import { kindOf } from '@/kinds'
+import type { EntryDraft } from '@/defaults/entries'
 import type { EntryMeta, EntryType } from '@/lib/commands'
 import { t } from '@/i18n'
-import Login from './Login'
-import Card from './Card'
-import Note from './Note'
 import Button from '@/components/elements/Button'
 import Sheet from '@/components/elements/Sheet'
 import { cx } from '@/utils/cx'
 import type { FieldChange } from './helpers'
 
 interface Props {
+  // The kind being written. New entries are told which kind to be; an edit
+  // passes the entry's own type.
+  type: EntryType
   entry?: EntryMeta
 }
 
-const KIND_LABEL: Record<EntryType, string> = {
-  login: 'Login',
-  card: 'Card',
-  note: 'Secure note'
-}
+export default function Form({ type, entry }: Props) {
+  const kind = kindOf(type)
+  const Fields = kind.Form
 
-export default function Form({ entry }: Props) {
-  const scope = useStore(state => state.filters.scope)
-  const type: EntryType = scope === 'audit' ? 'login' : scope
-
-  const initial = (): EntryDraft => (entry ? { ...entry } : defaults[type])
+  const initial = (): EntryDraft => (entry ? { ...entry } : { ...kind.defaults })
   const [validate, setValidate] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
@@ -79,7 +73,7 @@ export default function Form({ entry }: Props) {
   }
 
   const onSave = () => {
-    if (!isValid(model)) {
+    if (!kind.isValid(model)) {
       setValidate(true)
       return
     }
@@ -88,28 +82,9 @@ export default function Form({ entry }: Props) {
     saveEntry(model).catch(() => setSaveError(t('Could not save. Please try again.')))
   }
 
-  const fields = () => {
-    switch (type) {
-      case 'card':
-        return <Card entry={model} onChange={onChange} onTagsChange={onTagsChange} validate={validate} />
-      case 'note':
-        return <Note entry={model} onChange={onChange} onTagsChange={onTagsChange} validate={validate} />
-      default:
-        return (
-          <Login
-            entry={model}
-            onChange={onChange}
-            onTagsChange={onTagsChange}
-            validate={validate}
-            setField={patch}
-          />
-        )
-    }
-  }
-
   const footer = (
     <>
-      <span className="flex-1 font-mono text-xs text-text3">{t(KIND_LABEL[type])}</span>
+      <span className="flex-1 font-mono text-xs text-text3">{t(kind.label)}</span>
       <button
         type="button"
         data-testid="cancel-entry-button"
@@ -135,7 +110,15 @@ export default function Form({ entry }: Props) {
       footer={footer}
       testid="entry-sheet"
     >
-      <div className="flex flex-col gap-4">{fields()}</div>
+      <div className="flex flex-col gap-4">
+        <Fields
+          entry={model}
+          onChange={onChange}
+          onTagsChange={onTagsChange}
+          validate={validate}
+          setField={patch}
+        />
+      </div>
 
       {saveError && (
         <div

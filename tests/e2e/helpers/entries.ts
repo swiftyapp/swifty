@@ -3,12 +3,14 @@ import { waitFor } from "./app";
 /**
  * Entry creation through the real UI.
  *
- * There is no kind picker in the add flow: the new entry inherits the sidebar
- * scope (`Form/index.tsx` reads `filters.scope`), so every helper here selects
- * its rail item first and only then presses Add.
+ * There is no kind picker in the add flow yet: Add takes the kind from the
+ * active type filter, falling back to a login (`Sidebar/Add.tsx`), so every
+ * helper here presses its kind's filter chip first and only then presses Add.
+ * When the kind-picker modal lands this becomes a choice inside the modal and
+ * the chip click can go.
  */
 
-type Scope = "login" | "card" | "note";
+type Kind = "login" | "card" | "note";
 
 export interface LoginFields {
   title: string;
@@ -35,9 +37,9 @@ export interface NoteFields {
   tags?: string[];
 }
 
-async function openForm(scope: Scope): Promise<void> {
-  await waitFor(`scope-${scope}`);
-  await $(`[data-testid="scope-${scope}"]`).click();
+async function openForm(kind: Kind): Promise<void> {
+  await waitFor(`filter-${kind}`);
+  await $(`[data-testid="filter-${kind}"]`).click();
   await $('[data-testid="add-entry-button"]').click();
   await waitFor("entry-sheet");
   await $('input[name="title"]').waitForDisplayed({ timeout: 5_000 });

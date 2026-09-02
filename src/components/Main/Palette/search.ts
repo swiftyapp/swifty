@@ -4,8 +4,8 @@ import type { EntryMeta } from '@/lib/commands'
  * Matching for the ⌘K palette.
  *
  * The list column already has its own search (`services/entries.filterEntries`,
- * Fuse over one scope). The palette needs something different: it ranks across
- * every scope *and* across non-entry items (commands) in one pass, so it scores
+ * Fuse over one kind). The palette needs something different: it ranks across
+ * every kind *and* across non-entry items (commands) in one pass, so it scores
  * plain weighted fields instead. Deliberately dependency-free and synchronous —
  * it re-runs on every keystroke.
  *

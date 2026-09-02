@@ -1,27 +1,18 @@
 import { openGenerator } from '@/store'
-import type { EntryDraft } from '@/defaults/entries'
 import { t } from '@/i18n'
-import Field from './Field'
-import SecureField from './SecureField'
-import type { FieldChange } from './helpers'
-import TagField from './TagField'
-import { RefreshGlyph } from '../../../icons'
+import Field from '@/components/Main/Body/Aside/Form/Field'
+import SecureField from '@/components/Main/Body/Aside/Form/SecureField'
+import TagField from '@/components/Main/Body/Aside/Form/TagField'
+import { RefreshGlyph } from '@/components/Main/icons'
+import type { FormProps } from '../types'
 
-interface Props {
-  entry: EntryDraft
-  validate: boolean
-  onChange: (event: FieldChange) => void
-  onTagsChange: (tags: string[]) => void
-  setField: (name: string, value: string) => void
-}
-
-export default function Login({
+export default function Form({
   entry,
   validate,
   onChange,
   onTagsChange,
   setField
-}: Props) {
+}: FormProps) {
   const generate = () =>
     openGenerator(password => setField('password', password))
 

@@ -40,8 +40,8 @@ async function expectStat(key: string, expected: number): Promise<void> {
 }
 
 async function openAudit(): Promise<void> {
-  await waitFor("scope-audit");
-  await $('[data-testid="scope-audit"]').click();
+  await waitFor("view-health");
+  await $('[data-testid="view-health"]').click();
   await waitFor("audit-score");
 }
 
@@ -58,10 +58,10 @@ async function railScore(): Promise<string> {
   return String((await dial.getProperty("textContent")) ?? "").trim();
 }
 
-/** Select a login by its title in the list column. */
+/** Leave the audit for the entry list, then select a login by its title. */
 async function selectLogin(title: string): Promise<void> {
-  await waitFor("scope-login");
-  await $('[data-testid="scope-login"]').click();
+  await waitFor("view-items");
+  await $('[data-testid="view-items"]').click();
   await waitFor("entry-item");
 
   const rows = await $$('[data-testid="entry-item"]');

@@ -8,9 +8,10 @@ import {
   waitFor,
 } from "../helpers";
 
-// What the list column shows: the rail scope decides the kind, the search box
-// narrows within it. Seeded once (`before`) because every assertion below is a
-// read — nothing here mutates the vault.
+// What the list column shows: it lands on every kind at once ("All Items"), the
+// kind chips narrow it to one kind, and the search box narrows within whatever
+// is showing. Seeded once (`before`) because every assertion below is a read —
+// nothing here mutates the vault.
 
 const MASTER_PASSWORD = "Ws3%bTn7yFj4!kMc";
 
@@ -46,12 +47,20 @@ async function expectTitles(expected: string[]): Promise<void> {
   expect(await visibleTitles()).toEqual(expected);
 }
 
-async function selectScope(scope: "login" | "note" | "card"): Promise<void> {
-  await waitFor(`scope-${scope}`);
-  await $(`[data-testid="scope-${scope}"]`).click();
+/** Press one kind chip, or the "All" chip. */
+async function selectKind(kind: "all" | "login" | "note" | "card"): Promise<void> {
+  await waitFor(`filter-${kind}`);
+  await $(`[data-testid="filter-${kind}"]`).click();
 }
 
-describe("search and rail scopes", () => {
+/** The count rendered on one chip. */
+async function chipCount(kind: string): Promise<number> {
+  await waitFor(`filter-${kind}`);
+  const text = await $(`[data-testid="filter-${kind}"]`).$(".font-mono").getText();
+  return Number(text);
+}
+
+describe("search and kind filters", () => {
   before(async function () {
     // Five entries through the real create flow, on top of an Argon2id unlock.
     this.timeout(180_000);
@@ -78,7 +87,7 @@ describe("search and rail scopes", () => {
   });
 
   it("filters the list by title and restores it on clear", async () => {
-    await selectScope("login");
+    await selectKind("login");
     await expectTitles(LOGINS_BY_RECENCY);
 
     await searchInput().setValue("Basalt");
@@ -90,15 +99,56 @@ describe("search and rail scopes", () => {
     await expectTitles(LOGINS_BY_RECENCY);
   });
 
-  it("shows only the kind the rail scope selects", async () => {
-    // The query is global state, so leave it empty for the scope assertions.
-    await selectScope("note");
+  it("lists every kind together under All Items", async () => {
+    await selectKind("all");
+
+    // Newest write first, so the reverse of the seed order across all kinds.
+    await expectTitles([CARD, NOTE, ...LOGINS_BY_RECENCY]);
+    await expect($('[data-testid="list-title"]')).toHaveText("All Items");
+    await expect($('[data-testid="filter-all"]')).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("counts each kind on its chip", async () => {
+    await selectKind("all");
+
+    expect(await chipCount("all")).toBe(5);
+    expect(await chipCount("login")).toBe(3);
+    expect(await chipCount("note")).toBe(1);
+    expect(await chipCount("card")).toBe(1);
+  });
+
+  it("shows only the kind the chip selects", async () => {
+    // The query is global state, so leave it empty for the filter assertions.
+    await selectKind("note");
+    await expectTitles([NOTE]);
+    await expect($('[data-testid="list-title"]')).toHaveText("Secure notes");
+    await expect($('[data-testid="filter-note"]')).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await selectKind("card");
+    await expectTitles([CARD]);
+    await expect($('[data-testid="list-title"]')).toHaveText("Credit cards");
+
+    await selectKind("login");
+    await expectTitles(LOGINS_BY_RECENCY);
+    await expect($('[data-testid="list-title"]')).toHaveText("Logins");
+  });
+
+  it("searches across every kind under All Items", async () => {
+    await selectKind("all");
+    await searchInput().setValue("Recovery");
     await expectTitles([NOTE]);
 
-    await selectScope("card");
-    await expectTitles([CARD]);
+    // The same query under a kind that cannot match it comes back empty.
+    await selectKind("login");
+    await expectTitles([]);
 
-    await selectScope("login");
-    await expectTitles(LOGINS_BY_RECENCY);
+    await $('[data-testid="search-clear-button"]').click();
+    await expect(searchInput()).toHaveValue("");
   });
 });

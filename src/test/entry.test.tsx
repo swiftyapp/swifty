@@ -15,14 +15,14 @@ beforeEach(() => {
 
 describe('Form', () => {
   it('renders login fields for a new entry', () => {
-    renderWithStore(<Form />)
+    renderWithStore(<Form type="login" />)
     // en-US maps "Website" -> "URL"
     expect(screen.getByText('URL')).toBeInTheDocument()
     expect(screen.getByText('Username')).toBeInTheDocument()
   })
 
   it('saves a valid new login', async () => {
-    const { store } = renderWithStore(<Form />)
+    const { store } = renderWithStore(<Form type="login" />)
     await userEvent.type(document.querySelector('input[name="title"]')!, 'GitHub')
     await userEvent.type(document.querySelector('input[name="username"]')!, 'octocat')
     await userEvent.type(document.querySelector('input[name="password"]')!, 'pw')
@@ -33,36 +33,36 @@ describe('Form', () => {
   })
 
   it('blocks saving an invalid entry', async () => {
-    renderWithStore(<Form />)
+    renderWithStore(<Form type="login" />)
     await userEvent.click(screen.getByText('Save'))
     expect(saveEntry).not.toHaveBeenCalled()
   })
 
   it('closes straight away when nothing was typed', async () => {
-    const { store } = renderWithStore(<Form />)
-    store.getState().newEntry()
+    const { store } = renderWithStore(<Form type="login" />)
+    store.getState().newEntry('login')
     await userEvent.click(screen.getByTestId('cancel-entry-button'))
     expect(screen.queryByText('Discard changes?')).not.toBeInTheDocument()
-    expect(store.getState().entries.new).toBe(false)
+    expect(store.getState().entries.new).toBeNull()
   })
 
   it('guards unsaved changes with an inline confirm', async () => {
-    const { store } = renderWithStore(<Form />)
-    store.getState().newEntry()
+    const { store } = renderWithStore(<Form type="login" />)
+    store.getState().newEntry('login')
     await userEvent.type(document.querySelector('input[name="title"]')!, 'GitHub')
 
     // First press only arms the confirm; the form stays open.
     await userEvent.click(screen.getByTestId('cancel-entry-button'))
     expect(screen.getByText('Discard changes?')).toBeInTheDocument()
-    expect(store.getState().entries.new).toBe(true)
+    expect(store.getState().entries.new).toBe('login')
 
     // Second press discards.
     await userEvent.click(screen.getByTestId('cancel-entry-button'))
-    expect(store.getState().entries.new).toBe(false)
+    expect(store.getState().entries.new).toBeNull()
   })
 
   it('saves on ⌘⏎ from anywhere in the sheet', async () => {
-    renderWithStore(<Form />)
+    renderWithStore(<Form type="login" />)
     await userEvent.type(document.querySelector('input[name="title"]')!, 'GitHub')
     await userEvent.type(document.querySelector('input[name="username"]')!, 'octocat')
     await userEvent.type(document.querySelector('input[name="password"]')!, 'pw')
@@ -75,7 +75,7 @@ describe('Form', () => {
     vi.mocked(generatePassword).mockResolvedValue('Generated123!')
     renderWithStore(
       <>
-        <Form />
+        <Form type="login" />
         <Generator />
       </>
     )
@@ -94,7 +94,7 @@ describe('Form', () => {
     // The revealed title differs from the metadata title so this wait proves
     // the decrypted values were actually adopted, not just the initial meta.
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google (decrypted)' }))
-    const { rerender } = renderWithStore(<Form entry={loginMeta()} />)
+    const { rerender } = renderWithStore(<Form type="login" entry={loginMeta()} />)
     const title = document.querySelector<HTMLInputElement>('input[name="title"]')!
     await waitFor(() => expect(title.value).toBe('Google (decrypted)'))
 
@@ -105,7 +105,7 @@ describe('Form', () => {
     // The form adopts the reveal once, at open — a refetch must not clobber
     // what the user has typed (their save wins by last-writer-wins anyway).
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Merged elsewhere' }))
-    rerender(<Form entry={loginMeta({ updatedAt: '2024-06-01T00:00:00.000Z' })} />)
+    rerender(<Form type="login" entry={loginMeta({ updatedAt: '2024-06-01T00:00:00.000Z' })} />)
     await waitFor(() => expect(revealEntry).toHaveBeenCalledTimes(2))
 
     expect(title.value).toBe('Renamed by me')

@@ -1,5 +1,5 @@
 import { cx } from '@/utils/cx'
-import { useStore, setFilterScope } from '@/store'
+import { useStore, setView } from '@/store'
 import { t } from '@/i18n'
 import type { Audit, AuditItem } from '@/lib/commands'
 import Tooltip from '@/components/elements/Tooltip'
@@ -24,10 +24,9 @@ const RADIUS = 13
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS // ~82
 
 export default function VaultHealth() {
-  const scope = useStore(state => state.filters.scope)
   const audit = useStore(state => state.audit)
   const score = audit ? vaultScore(audit) : null
-  const selected = scope === 'audit'
+  const selected = useStore(state => state.ui.view === 'health')
 
   const ringColor =
     score === null || score >= 70
@@ -40,8 +39,8 @@ export default function VaultHealth() {
   return (
     <Tooltip content={t('Vault Health')}>
       <div
-        data-testid="scope-audit"
-        onClick={() => setFilterScope('audit')}
+        data-testid="view-health"
+        onClick={() => setView('health')}
         className={cx(
           'grid h-10 w-10 cursor-pointer place-items-center rounded-lg transition-colors',
           selected

@@ -3,8 +3,9 @@ import { useStore, setFilterTag, unsetFilterTag } from '@/store'
 import Chip from './Chip'
 
 // The list-column tag filter: a horizontal, scrollable row of chips, one per
-// tag used by entries in the current scope, each with a live count. Selecting a
-// chip filters the list to that tag; selecting it again clears the filter.
+// tag used by the entries the kind filter currently admits, each with a live
+// count. Selecting a chip filters the list to that tag; selecting it again
+// clears the filter.
 export default function Tags() {
   const selected = useStore(state => state.filters.tags[0])
   // Select stable store references and derive the tag list in a memo — a
@@ -12,17 +13,18 @@ export default function Tags() {
   // forever (its snapshot is never referentially equal, even under useShallow,
   // because the [tag, count] tuples are new references each pass).
   const items = useStore(state => state.entries.items)
-  const scope = useStore(state => state.filters.scope)
+  const type = useStore(state => state.filters.type)
   const tags = useMemo(() => {
     const counts = new Map<string, number>()
     for (const item of items) {
-      if (item.type !== scope) continue
+      // No kind filter means every kind's tags are on offer.
+      if (type && item.type !== type) continue
       for (const tag of item.tags ?? []) {
         counts.set(tag, (counts.get(tag) ?? 0) + 1)
       }
     }
     return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  }, [items, scope])
+  }, [items, type])
 
   if (tags.length === 0) return null
 
