@@ -86,7 +86,7 @@ export default function Masterpass({
     <input
       type={reveal ? 'text' : 'password'}
       className={cx(
-        'absolute inset-0 w-full border-0 bg-transparent text-center font-mono tracking-[0.3em] outline-none placeholder:text-[15px] placeholder:tracking-[0em] placeholder:text-text3',
+        'absolute inset-0 w-full border-0 bg-transparent text-center font-sans tracking-[0.3em] outline-none placeholder:text-[15px] placeholder:tracking-[0em] placeholder:text-text3',
         lock && 'rounded-xl px-10'
       )}
       style={{
