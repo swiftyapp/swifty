@@ -11,7 +11,7 @@ export default function Dots({ count, caret }: Props) {
       {Array.from({ length: count }).map((_, i) => (
         <span
           key={i}
-          className="mx-[5px] h-2 w-2 rounded-full bg-text/75"
+          className="animate-fade mx-[5px] h-2 w-2 rounded-full bg-text/75"
         />
       ))}
       {caret && (
