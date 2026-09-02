@@ -145,6 +145,8 @@ describe("login entries", () => {
       timeout: 15_000,
     });
     expect(await entryItems()).toHaveLength(0);
+    // Deleting the last entry lands back on the first-run hero.
+    await expect($('[data-testid="empty-vault"]')).toBeDisplayed();
     await expect($('[data-testid="create-first-entry-button"]')).toBeDisplayed();
   });
 });
