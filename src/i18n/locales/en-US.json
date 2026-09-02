@@ -242,5 +242,17 @@
   "more": "more",
   "Security": "Security",
   "Import": "Import",
-  "Filter by tag": "Filter by tag"
+  "Filter by tag": "Filter by tag",
+  "Favorites": "Favorites",
+  "Add to Favorites": "Add to Favorites",
+  "Remove from Favorites": "Remove from Favorites",
+  "No favorites yet": "No favorites yet",
+  "Star an entry to keep it here.": "Star an entry to keep it here.",
+  "Trash": "Trash",
+  "Nothing in the trash": "Nothing in the trash",
+  "Deleted entries wait here until you restore them or delete them for good.": "Deleted entries wait here until you restore them or delete them for good.",
+  "Deleted": "Deleted",
+  "Restore": "Restore",
+  "Delete permanently": "Delete permanently",
+  "Delete forever?": "Delete forever?"
 }

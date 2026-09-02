@@ -1,7 +1,15 @@
 import type { ReactElement } from 'react'
 import { useStore } from '@/store'
 import { useVariant, type Variant } from './variant'
-import { KindEmpty, SearchEmpty, SelectEmpty, VaultEmpty, HealthEmpty } from './variants'
+import {
+  KindEmpty,
+  SearchEmpty,
+  SelectEmpty,
+  VaultEmpty,
+  HealthEmpty,
+  FavoritesEmpty,
+  TrashEmpty
+} from './variants'
 
 // The list column's share: only the filter states, and only ever as one line.
 // On `vault` and `health` it renders nothing at all — the detail pane is
@@ -22,6 +30,8 @@ export default function ListEmpty() {
 const DETAIL: Record<Variant, () => ReactElement> = {
   vault: VaultEmpty,
   health: HealthEmpty,
+  favorites: FavoritesEmpty,
+  trash: TrashEmpty,
   kind: SelectEmpty,
   search: SelectEmpty,
   select: SelectEmpty

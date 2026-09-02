@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Entry, EntryType } from '@/lib/commands'
+import type { Entry, EntryMeta } from '@/lib/commands'
 import { editEntry } from '@/store'
 import { kindOf } from '@/kinds'
 import { t } from '@/i18n'
@@ -8,9 +8,10 @@ import Button from '@/components/elements/Button'
 import IconButton from '@/components/elements/IconButton'
 import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
 import { CheckGlyph, MoreGlyph, PencilGlyph, TrashGlyph } from '../../../icons'
+import Trashed from './Trashed'
 
 interface Props {
-  type: EntryType
+  entry: EntryMeta
   // The decrypted entry, or null while `revealEntry` is still in flight.
   revealed: Entry | null
   onDelete: () => void
@@ -39,14 +40,14 @@ const inInteractive = (target: EventTarget | null) =>
 const dialogOpen = () => !!document.querySelector('[role="dialog"], dialog[open]')
 
 // The detail header's action cluster: Edit, an overflow menu and the per-type
-// primary copy action.
-export default function Actions({ type, revealed, onDelete }: Props) {
+// primary copy action — or, for a tombstone, Restore and the last delete.
+export default function Actions({ entry, revealed, onDelete }: Props) {
   const [menu, setMenu] = useState(false)
   // Two-press delete: the first press arms the row ("Delete entry?"), the
   // second executes. Closing or reopening the menu disarms.
   const [armDelete, setArmDelete] = useState(false)
   const { copied, copy } = useCopied()
-  const kind = kindOf(type)
+  const kind = kindOf(entry.type)
   // The kind's headline secret — the one value the header offers in a single
   // press. Read straight off the already-decrypted entry, so copying never
   // touches a row's on-screen reveal state.
@@ -73,6 +74,10 @@ export default function Actions({ type, revealed, onDelete }: Props) {
     setMenu(!menu)
     setArmDelete(false)
   }
+
+  // A tombstone is read-only, so it swaps the whole cluster rather than greying
+  // parts of it out: nothing here applies to a row that has already been deleted.
+  if (entry.deletedAt) return <Trashed entry={entry} />
 
   return (
     <div className="flex flex-none items-center gap-1.5">

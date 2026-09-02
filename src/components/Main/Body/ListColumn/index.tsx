@@ -1,4 +1,5 @@
 import { useStore } from '@/store'
+import type { View } from '@/store/uiSlice'
 import { kindOf } from '@/kinds'
 import { t } from '@/i18n'
 import KindChips from '../../Header/KindChips'
@@ -8,16 +9,22 @@ import Search from './Search'
 
 // The middle pane: a title with the sort control, the search field and the kind
 // filter chips, over the scrollable entry list.
+// The column is titled after the view, except in All Items, where a kind chip
+// renames it to what it is now showing ("Logins"). The other views keep their
+// own name: "Logins" would lose the fact that you are looking at the Trash.
+const TITLES: Record<View, string> = {
+  items: 'All Items',
+  favorites: 'Favorites',
+  health: 'Vault Health',
+  trash: 'Trash'
+}
+
 export default function ListColumn() {
   const view = useStore(state => state.ui.view)
   const type = useStore(state => state.filters.type)
   const health = view === 'health'
 
-  const title = health
-    ? t('Vault Health')
-    : type
-      ? t(kindOf(type).pluralLabel)
-      : t('All Items')
+  const title = view === 'items' && type ? t(kindOf(type).pluralLabel) : t(TITLES[view])
 
   return (
     <div className="flex w-[348px] min-h-0 flex-none flex-col border-r border-line bg-list">

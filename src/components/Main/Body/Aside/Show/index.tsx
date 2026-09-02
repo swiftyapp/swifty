@@ -15,7 +15,9 @@ interface Props {
 // either mode, so entering and leaving edit doesn't re-fetch the secrets and
 // blank the rows on the way through.
 export default function Show({ entry, type, editing }: Props) {
-  const revealed = useRevealed(entry)
+  // A tombstone has nothing to reveal: `reveal_entry` does not serve deleted
+  // rows, so asking would only buy a rejected invoke per selection in the Trash.
+  const revealed = useRevealed(entry?.deletedAt ? null : entry)
   const kindType = type ?? entry?.type
 
   if (!kindType) return null

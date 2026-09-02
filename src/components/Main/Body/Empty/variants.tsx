@@ -13,7 +13,7 @@ import { addLabel, kindOf } from '@/kinds'
 import { t } from '@/i18n'
 import Logo from '@/assets/images/logo.svg?react'
 import EmptyState from '@/components/elements/EmptyState'
-import { ActivityGlyph, SearchGlyph } from '../../icons'
+import { ActivityGlyph, SearchGlyph, StarGlyph, TrashGlyph } from '../../icons'
 
 // The brand mark at whatever size the surface asks for — the same baked logo
 // the rail shows, so the empty vault and the open one read as one character.
@@ -101,6 +101,28 @@ export function HealthEmpty() {
 
 // One kind filtered down to nothing. Compact: the list column keeps its own
 // header and rows above, so this is a line of text, not a scene.
+export function FavoritesEmpty() {
+  return (
+    <EmptyState
+      testid="empty-favorites"
+      mark={<StarGlyph size={28} />}
+      title={t('No favorites yet')}
+      body={t('Star an entry to keep it here.')}
+    />
+  )
+}
+
+export function TrashEmpty() {
+  return (
+    <EmptyState
+      testid="empty-trash"
+      mark={<TrashGlyph size={28} />}
+      title={t('Nothing in the trash')}
+      body={t('Deleted entries wait here until you restore them or delete them for good.')}
+    />
+  )
+}
+
 export function KindEmpty({ type }: { type: EntryType }) {
   const { Glyph, pluralLabel } = kindOf(type)
 
