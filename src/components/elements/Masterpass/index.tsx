@@ -30,10 +30,11 @@ const EyeIcon = <EyeGlyph size={16} />
 const SmallEyeIcon = <EyeGlyph size={14} />
 
 // The macOS Touch ID rose, so the fingerprint reads as the system affordance
-// rather than another monochrome glyph.
+// rather than another monochrome glyph. Sized to nearly fill the 28px button:
+// the fingerprint should read large while the hover target stays on the grid.
 const TouchIdIcon = (
   <span className="text-[#ee5d6f]">
-    <FingerprintGlyph size={18} />
+    <FingerprintGlyph size={22} />
   </span>
 )
 
