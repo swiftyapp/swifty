@@ -40,6 +40,10 @@ export function Dropdown({ onBlur, className, children }: DropdownProps) {
         move(-1)
         break
       case 'Escape':
+        // An open menu owns Escape. Modal and Generator listen on `window`
+        // and Sheet on `document` — all ancestors of the React root — so
+        // without this the one press would dismiss the overlay underneath too.
+        event.stopPropagation()
         onBlur()
         trigger.current?.focus()
         break
@@ -97,8 +101,10 @@ export function DropdownItem({
       data-testid={testid}
       onClick={onClick}
       className={cx(
-        'flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-left text-base transition-colors hover:bg-hover',
-        danger ? 'text-bad' : 'text-text2 hover:text-text',
+        // The panel clips the global focus outline, so keyboard focus borrows
+        // the hover treatment instead of inventing a ring of its own.
+        'flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-left text-base transition-colors hover:bg-hover focus-visible:bg-hover',
+        danger ? 'text-bad' : 'text-text2 hover:text-text focus-visible:text-text',
         separated && 'mt-1 border-t border-line pt-2.5'
       )}
     >

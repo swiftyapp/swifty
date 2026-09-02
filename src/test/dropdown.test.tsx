@@ -65,6 +65,23 @@ describe('Dropdown', () => {
     expect(screen.getByTestId('trigger')).toHaveFocus()
   })
 
+  it('keeps Escape from reaching the overlay listeners underneath', async () => {
+    // Modal and Generator bind Escape on `window`, Sheet on `document`. A menu
+    // can be open beneath any of them (⌘G and ⌘N do not close it), and one
+    // press must dismiss only the menu.
+    const outer = vi.fn()
+    window.addEventListener('keydown', outer)
+    try {
+      await open()
+      await userEvent.keyboard('{Escape}')
+
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+      expect(outer).not.toHaveBeenCalled()
+    } finally {
+      window.removeEventListener('keydown', outer)
+    }
+  })
+
   it('activates the focused item with Enter and with Space', async () => {
     const onPick = vi.fn()
     render(<Harness onPick={onPick} />)
