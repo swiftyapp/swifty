@@ -107,6 +107,7 @@ describe("password generator", () => {
 
   it("fills the login editor's password field when opened from it", async () => {
     // Add asks which kind first; pick Login to get the editor with a password.
+    // The editor takes over the detail pane — there is no sheet to dismiss.
     await waitFor("add-entry-button");
     await $('[data-testid="add-entry-button"]').click();
     await waitFor("add-secret-modal");
@@ -117,8 +118,8 @@ describe("password generator", () => {
     await field.waitForDisplayed({ timeout: 10_000 });
     await expect(field).toHaveValue("");
 
-    // The link next to the Password label (`src/kinds/login/Form.tsx`) — it opens the
-    // same dialog with a callback bound to this field.
+    // The link on the password row (`src/components/elements/fields/PasswordField.tsx`)
+    // — it opens the same dialog with a callback bound to this field.
     await $('[data-testid="entry-sheet"]').$("span*=generate").click();
     await waitFor("generator-dialog");
     await browser.waitUntil(async () => (await output().getText()) !== "", {

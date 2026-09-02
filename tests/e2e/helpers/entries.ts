@@ -35,6 +35,9 @@ export interface NoteFields {
   tags?: string[];
 }
 
+// `entry-sheet` is now the editing container inside the detail pane rather
+// than a sliding sheet — the testid is kept so every wait below still reads as
+// "the editor is up".
 async function openForm(kind: Kind): Promise<void> {
   await waitFor("add-entry-button");
   await $('[data-testid="add-entry-button"]').click();
@@ -44,16 +47,17 @@ async function openForm(kind: Kind): Promise<void> {
   await $('input[name="title"]').waitForDisplayed({ timeout: 5_000 });
 }
 
-// Fields are addressed by `name` — the form renders plain inputs (and one
-// textarea for note bodies), so there is no per-field testid to depend on.
+// Fields are addressed by `name` — the editor renders one borderless input per
+// row (and one textarea for note bodies), so there is no per-field testid to
+// depend on. The title is the pane's own heading input, still `name="title"`.
 async function fill(name: string, value: string, tag = "input"): Promise<void> {
   await $(`${tag}[name="${name}"]`).setValue(value);
 }
 
 // Tags live in a chip input, not a plain field: each tag is committed with
 // Enter (the component also commits on blur, but Enter keeps the caret in the
-// input for the next one). Enter inside the sheet is inert — the sheet only
-// submits on ⌘/Ctrl+Enter — so this never saves early.
+// input for the next one). Enter inside the editor is inert — it only submits
+// on ⌘/Ctrl+Enter — so this never saves early.
 async function fillTags(tags: string[] = []): Promise<void> {
   if (tags.length === 0) return;
   const input = $('[data-testid="tags-input"]');
@@ -64,8 +68,9 @@ async function fillTags(tags: string[] = []): Promise<void> {
   }
 }
 
-// Save and wait for the sheet to close, which is the store's "write landed"
-// signal (a failed write leaves the sheet open with `entry-save-error`).
+// Save and wait for the editor to give the pane back to the read view, which is
+// the store's "write landed" signal (a failed write stays in edit mode with
+// `entry-save-error`).
 async function save(): Promise<void> {
   await $('[data-testid="save-entry-button"]').click();
   await $('[data-testid="entry-sheet"]').waitForDisplayed({
@@ -87,9 +92,12 @@ export async function createLogin(fields: LoginFields): Promise<void> {
 export async function createCard(fields: CardFields): Promise<void> {
   await openForm("card");
   await fill("title", fields.title);
+  // The card face IS the form: the number groups itself into 4-digit blocks as
+  // it is typed (so it reads back as "4111 1111 1111 1111"), and the two Month
+  // and Year boxes are now one MM/YY box that is split again on save. Callers
+  // still pass the pair — typing "0429" is what produces month 04, year 29.
   await fill("number", fields.number);
-  await fill("month", fields.month);
-  await fill("year", fields.year);
+  await fill("expiry", `${fields.month}${fields.year.slice(-2)}`);
   await fill("cvc", fields.cvc);
   await fill("pin", fields.pin);
   if (fields.name !== undefined) await fill("name", fields.name);

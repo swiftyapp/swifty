@@ -84,7 +84,7 @@ async function repassword(title: string, password: string): Promise<void> {
   await waitFor("entry-sheet");
 
   // Secrets arrive via `revealEntry`, so the field is empty for a beat after
-  // the sheet opens; typing before it lands would be overwritten. Only the
+  // the editor opens; typing before it lands would be overwritten. Only the
   // arrival is waited on, never the value: `useRevealed` caches by entry id, so
   // a re-opened entry can still hand back its pre-edit secret (known bug, out
   // of scope here — the audit itself recomputes from the saved vault).

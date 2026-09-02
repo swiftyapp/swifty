@@ -12,7 +12,10 @@ export default function Body() {
 
   return (
     <>
-      <div className={cx('flex min-h-0 flex-none', writing && 'pointer-events-none opacity-60')}>
+      <div
+        data-testid="list-column"
+        className={cx('flex min-h-0 flex-none', writing && 'pointer-events-none opacity-60')}
+      >
         <ListColumn />
       </div>
       <DetailPane />

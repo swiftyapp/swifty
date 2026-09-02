@@ -47,8 +47,9 @@ describe("secure notes", () => {
     await $('[data-testid="edit-entry-button"]').click();
     await waitFor("entry-sheet");
 
-    // The form opens on encrypted metadata and swaps in the decrypted values a
-    // tick later; typing before that lands would be overwritten.
+    // The editor opens on encrypted metadata and swaps in the decrypted values
+    // a tick later; typing before that lands would be overwritten. The body is
+    // the same panel the read view uses, now an autogrowing textarea.
     const body = $('textarea[name="note"]');
     await expect(body).toHaveValue(NOTE);
 

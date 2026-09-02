@@ -17,10 +17,10 @@ runs one app process against one data dir, so nothing may depend on file order.
 | 2 | `setup/password.spec.js` | PR 2 | `setup.spec.ts` | Weak-password gate, mismatch error. Drop the old welcome copy assertion (rebrand). |
 | 3 | `authentication/password.spec.js` | PR 2 | `unlock.spec.ts` | Wrong password → `unlock-error`; correct password → `main-view`. |
 | 4 | `launch/scope.spec.js` | PR 2 | `unlock.spec.ts` | Boot lands on unlock when a vault exists (`resetEmpty`). |
-| 5 | `logins/create.spec.js` | PR 2 | `logins.spec.ts` | |
-| 6 | `logins/edit.spec.js` | PR 2 | `logins.spec.ts` | Includes the discard guard (see additions). |
-| 7 | `logins/delete.spec.js` | PR 2 | `logins.spec.ts` | Two-press confirm, not a dialog (see additions). |
-| 8 | `logins/password.spec.js` | PR 2 | `logins.spec.ts` | Reveal/hide + copy of the password field. |
+| 5 | `logins/create.spec.js` | PR 2 | `logins-crud.spec.ts` | |
+| 6 | `logins/edit.spec.js` | PR 2 | `logins-crud.spec.ts` | Includes the discard guard (see additions). Editing happens in the detail pane. |
+| 7 | `logins/delete.spec.js` | PR 2 | `logins-crud.spec.ts` | Two-press confirm, not a dialog (see additions). |
+| 8 | `logins/password.spec.js` | PR 2 | `logins-crud.spec.ts` | Reveal/hide + copy of the password field. |
 | 9 | `logins/search.spec.js` | PR 2 | `search-and-scopes.spec.ts` | One search field for the whole app, in the list column: `search-input` / `search-clear-button`, focused by ⌘F, ⏎ selects the first row left standing. |
 | 10 | `logins/empty.spec.js` | PR 3 | `list.spec.ts` | Empty-vault hero: `empty-vault` in the detail pane, `create-first-entry-button` inside it, nothing in the list column. |
 | 11 | `cards/create.spec.js` | PR 3 | `cards.spec.ts` | Plus brand mark + interactive face (see additions). |
@@ -36,7 +36,10 @@ runs one app process against one data dir, so nothing may depend on file order.
 
 | Flow | Lands in | Hook |
 |---|---|---|
-| Discard-changes guard on a dirty edit | PR 2 | `cancel-entry-button` pressed twice ("Discard changes?") |
+| In-place editing, no form sheet | item 8 | `entry-sheet` is the editing container **inside the detail pane** (not a sliding sheet any more); it appears on `edit-entry-button` or a kind-picker choice and disappears on save/discard, which stays the "write landed" signal. The read cluster (`primary-action-button`, `more-actions-button`) is unmounted while it is up, and the list column is dimmed and `pointer-events-none` (`list-column`) — so nothing over there is clickable mid-draft. |
+| Discard-changes guard on a dirty edit | PR 2 | `cancel-entry-button` pressed twice ("Discard changes?"); Escape runs the same two-press guard. A clean draft closes on the first press. |
+| Card expiry as one MM/YY box | item 8 | `input[name="expiry"]` replaces `name="month"` + `name="year"`; typing `0429` saves month `04`, year `29` and reads back as `entry-value-expires` = `04/29`. `helpers/entries.ts` still takes the pair and composes the box. |
+| Type-aware editor fields | item 8 | Each row is one borderless input keyed by `name`, so the selectors are unchanged: `title` (the pane's heading input), `website`, `username`, `password`, `email`, `otp`, `number`, `cvc`, `pin`, `name`, plus `textarea[name="note"]`. The card number groups itself as it is typed, so it reads back as `4111 1111 1111 1111`. |
 | Delete confirm | PR 2 | `delete-entry-button` → `delete-entry-confirm` inside `more-actions-button` |
 | Kind filter chips over the list | PR 2 | `filter-all` / `filter-login` / `filter-card` / `filter-note`, `aria-pressed` on the active chip |
 | All Items / Vault Health views in the rail | PR 2 | `view-items` / `view-health`; the pane title is `list-title` |
@@ -79,7 +82,9 @@ These are not gaps in the suite; the coverage lives elsewhere and belongs there.
 - `helpers/reset.ts` — `resetPristine()`, `resetEmpty(password)`
 - `helpers/vault.ts` — `setupVault(password)`, `unlock(password)`, `lockVault()`
 - `helpers/entries.ts` — `createLogin`, `createCard`, `createNote`, `entryItems()`
-  (each `create*` opens the kind picker from `add-entry-button` and presses its `add-kind-<kind>` tile)
+  (each `create*` opens the kind picker from `add-entry-button`, presses its `add-kind-<kind>`
+  tile, fills the pane editor by field `name`, and saves — `createCard` composes the one
+  `expiry` box from the `month` / `year` pair its caller still passes)
 - `helpers/app.ts` — `waitFor(testid)`, `waitForAppReady()`
 
 Reset goes through `window.__e2eReset` (installed only when `import.meta.env.DEV`) onto the
