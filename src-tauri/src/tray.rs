@@ -10,7 +10,7 @@ const WEBSITE: &str = "https://getswifty.pro";
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let menu = MenuBuilder::new(app)
         .text("show", "Open Swifty")
-        .text("lock", "Lock Screen")
+        .text("lock", "Lock vault")
         .separator()
         .text("about", "About")
         .separator()

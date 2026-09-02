@@ -1,4 +1,5 @@
 import type { EntryType } from '@/lib/commands'
+import { t } from '@/i18n'
 import type { Kind } from './types'
 import login from './login'
 import card from './card'
@@ -16,3 +17,12 @@ export const KINDS: Kind[] = [login, card, note]
 const BY_TYPE: Record<EntryType, Kind> = { login, card, note }
 
 export const kindOf = (type: EntryType): Kind => BY_TYPE[type]
+
+/**
+ * "Add a login" / "Add a credit card": the create action, named after the kind
+ * it creates. The editor sheet, the empty panes and any future surface phrase
+ * it identically, so the wording lives with the registry it comes from instead
+ * of drifting into a different per-surface literal on every screen.
+ */
+export const addLabel = (type: EntryType): string =>
+  t('Add a {kind}').replace('{kind}', t(kindOf(type).label).toLowerCase())
