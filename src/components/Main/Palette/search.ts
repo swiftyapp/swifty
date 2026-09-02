@@ -1,13 +1,11 @@
-import type { EntryMeta } from '@/lib/commands'
-
 /**
  * Matching for the ⌘K palette.
  *
- * The list column already has its own search (`services/entries.filterEntries`,
- * Fuse over one kind). The palette needs something different: it ranks across
- * every kind *and* across non-entry items (commands) in one pass, so it scores
- * plain weighted fields instead. Deliberately dependency-free and synchronous —
- * it re-runs on every keystroke.
+ * Entries are searched by `services/entries.filterEntries` (Fuse, in the list
+ * column). The palette ranks commands, which are a fixed handful of short
+ * labels — Fuse's typo tolerance buys nothing there, so this scores plain
+ * weighted fields instead. Deliberately dependency-free and synchronous: it
+ * re-runs on every keystroke.
  *
  * Three tiers, best first: prefix > substring (earlier is better) > subsequence
  * (tighter span is better). A field's weight multiplies its score, so a title
@@ -82,15 +80,3 @@ export const rank = <T>(
     .filter((scored): scored is { item: T; score: number } => scored.score !== null)
     .sort((a, b) => b.score - a.score)
     .map(scored => scored.item)
-
-// Only non-secret list metadata is searchable — secrets live in the encrypted
-// payload and are never held in the entry list (see `lib/commands.EntryMeta`).
-export const entryFields = (entry: EntryMeta): Field[] => [
-  { text: entry.title, weight: 3 },
-  { text: entry.urlHost, weight: 2 },
-  ...entry.tags.map(tag => ({ text: tag, weight: 1 }))
-]
-
-// Entries matching `query`, best first, alphabetical within a tie.
-export const searchEntries = (entries: EntryMeta[], query: string): EntryMeta[] =>
-  rank([...entries].sort((a, b) => a.title.localeCompare(b.title)), query, entryFields)

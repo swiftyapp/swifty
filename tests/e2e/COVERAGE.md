@@ -21,7 +21,7 @@ runs one app process against one data dir, so nothing may depend on file order.
 | 6 | `logins/edit.spec.js` | PR 2 | `logins.spec.ts` | Includes the discard guard (see additions). |
 | 7 | `logins/delete.spec.js` | PR 2 | `logins.spec.ts` | Two-press confirm, not a dialog (see additions). |
 | 8 | `logins/password.spec.js` | PR 2 | `logins.spec.ts` | Reveal/hide + copy of the password field. |
-| 9 | `logins/search.spec.js` | PR 2 | `search.spec.ts` | |
+| 9 | `logins/search.spec.js` | PR 2 | `search-and-scopes.spec.ts` | One search field for the whole app, in the list column: `search-input` / `search-clear-button`, focused by ⌘F, ⏎ selects the first row left standing. |
 | 10 | `logins/empty.spec.js` | PR 3 | `list.spec.ts` | Empty-vault hero: `empty-vault` in the detail pane, `create-first-entry-button` inside it, nothing in the list column. |
 | 11 | `cards/create.spec.js` | PR 3 | `cards.spec.ts` | Plus brand mark + interactive face (see additions). |
 | 12 | `notes/create.spec.js` | PR 3 | `notes.spec.ts` | |
@@ -45,7 +45,7 @@ runs one app process against one data dir, so nothing may depend on file order.
 | Card brand mark | PR 3 | brand slug derived at save time; assert per-network glyph |
 | Empty states, one system for both panes | PR 3 | One variant at a time, each with its own hook: `empty-vault` (hero, detail pane, holds `create-first-entry-button`), `empty-kind` + `empty-kind-add` and `empty-search` + `empty-search-clear` / `empty-search-widen` (compact, list column), `empty-select` (quiet, detail pane), `empty-health`. The list column and the detail pane never both show a hero, so `empty-vault` and `empty-health` mean an empty column. |
 | "Add a secret" kind picker | PR 3 | `add-entry-button` (or `create-first-entry-button`) → `add-secret-modal` → `add-kind-login` / `add-kind-card` / `add-kind-note`; `modal-close` or Escape dismisses. Every create flow goes through it, so `helpers/entries.ts` owns the two clicks. |
-| Command palette | PR 4 | `command-palette`, `command-palette-input`, `palette-item` |
+| Command palette | PR 4 | `command-palette`, `command-palette-input`, `palette-item`. Commands only — a query matching a vault entry must leave `palette-item` empty; entries are `search-and-scopes.spec.ts`'s job. |
 | Password generator | PR 4 | `generator-mode-random` / `-memorable`, `generator-amount`, `generator-regenerate`, `generator-output`, `generator-use-button` |
 | Change master password | PR 4 | `change-password-submit`, `change-password-error`, `change-password-success` |
 | Settings shell: nav + section titles | PR 4 | `settings-modal`, `settings-nav-<sync\|security\|audit\|import\|language>` (`aria-current="page"` on the active item), `settings-version` / `settings-update-status` in the pinned footer, `modal-close` |

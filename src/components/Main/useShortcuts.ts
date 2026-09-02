@@ -1,6 +1,15 @@
 import { useEffect } from 'react'
 import { useStore, openPalette, openGenerator, openAddPicker } from '@/store'
+import { focusSearch } from './Body/ListColumn/focus'
 import { lockVault } from './Palette/commands'
+
+// True while a dialog owns the keyboard. A chord that would reach the shell
+// underneath it (opening a second modal, or pulling focus into the list column
+// behind the scrim) is swallowed instead.
+const dialogOpen = () => {
+  const { palette, settings, addPicker } = useStore.getState().ui
+  return palette || settings || addPicker
+}
 
 // The app-level shortcut surface. One listener, one record — a new chord is
 // one line here. Mounted from Main, so chords are live only while unlocked.
@@ -12,11 +21,11 @@ const BINDINGS: Record<string, () => void> = {
   g: () => {
     if (!useStore.getState().generator.open) openGenerator()
   },
-  // A modal already asking a question owns the keyboard: re-opening the picker
-  // over itself would reset its focus, and over Settings it would stack.
   n: () => {
-    const { addPicker, settings } = useStore.getState().ui
-    if (!addPicker && !settings) openAddPicker()
+    if (!dialogOpen()) openAddPicker()
+  },
+  f: () => {
+    if (!dialogOpen()) focusSearch()
   }
 }
 

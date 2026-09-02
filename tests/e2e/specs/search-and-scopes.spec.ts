@@ -1,17 +1,22 @@
 import {
+  chord,
   createCard,
   createLogin,
   createNote,
   entryItems,
+  pressEnter,
   resetEmpty,
   unlock,
   waitFor,
 } from "../helpers";
 
 // What the list column shows: it lands on every kind at once ("All Items"), the
-// kind chips narrow it to one kind, and the search box narrows within whatever
-// is showing. Seeded once (`before`) because every assertion below is a read —
-// nothing here mutates the vault.
+// kind chips narrow it to one kind, and the search field — the app's only one,
+// living in this column under the title — narrows within whatever is showing.
+// ⌘F puts the caret in it and ⏎ selects the first row left standing.
+//
+// Seeded once (`before`) because every assertion below is a read — nothing here
+// mutates the vault.
 
 const MASTER_PASSWORD = "Ws3%bTn7yFj4!kMc";
 
@@ -155,5 +160,28 @@ describe("search and kind filters", () => {
     await $('[data-testid="search-clear-button"]').click();
     await expect(searchInput()).toHaveValue("");
     await expect($('[data-testid="empty-search"]')).not.toBeExisting();
+  });
+
+  it("takes ⌘F, and ⏎ selects the first row left standing", async () => {
+    await selectKind("all");
+
+    // Nothing is focused on entry, so a caret in the field can only have come
+    // from the chord.
+    await chord("f");
+    await browser.waitUntil(async () => await searchInput().isFocused(), {
+      timeout: 10_000,
+      timeoutMsg: "⌘F never focused the list-column search field",
+    });
+
+    // Typed blind into whatever ⌘F focused.
+    await browser.keys("Basalt");
+    await expectTitles(["Basalt Bank"]);
+
+    // ⏎ opens the single match in the detail pane.
+    await pressEnter();
+    await waitFor("edit-entry-button");
+
+    await $('[data-testid="search-clear-button"]').click();
+    await expect(searchInput()).toHaveValue("");
   });
 });

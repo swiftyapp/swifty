@@ -51,6 +51,14 @@ describe('Main', () => {
     expect(screen.queryByText('Google')).not.toBeInTheDocument()
   })
 
+  it('focuses the one search field on ⌘F', async () => {
+    renderWithStore(<Main />, { store: seed() })
+    expect(screen.getAllByTestId('search-input')).toHaveLength(1)
+
+    await userEvent.keyboard('{Meta>}f{/Meta}')
+    expect(screen.getByTestId('search-input')).toHaveFocus()
+  })
+
   it('narrows the list to one kind through the filter chips', async () => {
     renderWithStore(<Main />, { store: seed() })
 

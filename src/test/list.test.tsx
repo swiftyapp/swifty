@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ListColumn from '@/components/Main/Body/ListColumn'
-import { fetchFavicon, type Audit } from '@/lib/commands'
-import { makeStore, setSort, setFilterType } from '@/store'
+import { copyToClipboard, fetchFavicon, revealEntry, type Audit } from '@/lib/commands'
+import { makeStore, useStore, setSort, setFilterType } from '@/store'
 import { resetFavicons } from '@/hooks/useFavicon'
-import { renderWithStore, withEntries, loginMeta } from './utils'
+import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 
 // A fixed clock (Date only, so userEvent's real timers keep working) makes the
 // recency buckets and the relative times deterministic.
@@ -111,5 +111,63 @@ describe('Entry list', () => {
     await userEvent.click(screen.getByText('Alphabetical'))
 
     expect(titles()).toEqual(['Airbnb', 'Basecamp', 'Monzo', 'Zebra'])
+  })
+})
+
+// The app's only search field lives in this column, so its accelerators are
+// asserted against the same rows they act on.
+describe('List search', () => {
+  const field = () => screen.getByTestId('search-input')
+
+  beforeEach(() => vi.clearAllMocks())
+
+  it('narrows the list as you type and restores it on clear', async () => {
+    renderWithStore(<ListColumn />, { store: seed() })
+
+    await userEvent.type(field(), 'air')
+    expect(screen.getByText('Airbnb')).toBeInTheDocument()
+    expect(screen.queryByText('Zebra')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('search-clear-button'))
+    expect(titles()).toEqual(['Zebra', 'Airbnb', 'Monzo', 'Basecamp'])
+  })
+
+  it('selects the first visible row on ⏎', async () => {
+    renderWithStore(<ListColumn />, { store: seed() })
+
+    // No query: the first row of the list as sorted (newest first).
+    await userEvent.type(field(), '{Enter}')
+    expect(useStore.getState().entries.current?.id).toBe('fresh')
+
+    // With one: the first row the query leaves standing.
+    await userEvent.type(field(), 'air{Enter}')
+    expect(useStore.getState().entries.current?.id).toBe('yday')
+  })
+
+  it('copies the first visible row’s primary secret on ⌘⏎', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'fresh', password: 's3cret' }))
+    renderWithStore(<ListColumn />, { store: seed() })
+
+    await userEvent.click(field())
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
+
+    expect(revealEntry).toHaveBeenCalledWith('fresh')
+    await vi.waitFor(() =>
+      expect(copyToClipboard).toHaveBeenCalledWith('s3cret', expect.anything())
+    )
+    // Copying is not selecting.
+    expect(useStore.getState().entries.current).toBeNull()
+  })
+
+  it('clears the query on Esc, then blurs', async () => {
+    renderWithStore(<ListColumn />, { store: seed() })
+
+    await userEvent.type(field(), 'air')
+    await userEvent.keyboard('{Escape}')
+    expect(field()).toHaveValue('')
+    expect(field()).toHaveFocus()
+
+    await userEvent.keyboard('{Escape}')
+    expect(field()).not.toHaveFocus()
   })
 })
