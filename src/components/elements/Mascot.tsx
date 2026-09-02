@@ -1,4 +1,4 @@
-export type MascotState = 'idle' | 'typing' | 'success' | 'error'
+export type MascotState = 'idle' | 'typing' | 'checking' | 'success' | 'error'
 
 interface Props {
   state?: MascotState
@@ -25,6 +25,8 @@ export default function Mascot({
   const ok = state === 'success'
   const bad = state === 'error'
   const typing = state === 'typing'
+  // Verifying the passphrase: eyes narrow in concentration, gaze straight.
+  const checking = state === 'checking'
 
   // Graphite (or the configured color) while idle and typing; the body only
   // tints for the verdict, then the eye shapes carry the expression.
@@ -36,9 +38,10 @@ export default function Mascot({
       : undefined
 
   // Eyes track the caret while typing, dip slightly toward the field, and
-  // snap back to center for a reaction.
-  const gazeX = ok || bad ? 0 : Math.max(-1, Math.min(1, gaze)) * 3
-  const gazeY = typing ? 2.5 : 0
+  // snap back to center for a reaction or while concentrating.
+  const gazeX = ok || bad || checking ? 0 : Math.max(-1, Math.min(1, gaze)) * 3
+  const gazeY = checking ? 1.5 : typing ? 2.5 : 0
+  const eyeRy = checking ? 3 : typing ? 4.3 : 5
 
   return (
     <svg
@@ -115,7 +118,7 @@ export default function Mascot({
               cx="27.6"
               cy="27.4"
               rx="3.5"
-              ry={typing ? 4.3 : 5}
+              ry={eyeRy}
               fill="#fff"
               style={{ transition: 'ry 300ms ease' }}
             />
@@ -123,7 +126,7 @@ export default function Mascot({
               cx="37.2"
               cy="26.8"
               rx="3.5"
-              ry={typing ? 4.3 : 5}
+              ry={eyeRy}
               fill="#fff"
               style={{ transition: 'ry 300ms ease' }}
             />

@@ -29,6 +29,18 @@ describe('Auth', () => {
     expect(screen.getByLabelText('Reveal passphrase')).toBeInTheDocument()
   })
 
+  it('acknowledges Enter immediately with a verifying state', async () => {
+    // Never resolves: we're asserting the in-flight presentation.
+    vi.mocked(unlock).mockReturnValue(new Promise(() => {}))
+    renderWithStore(<Auth touchID={false} />)
+
+    await userEvent.type(screen.getByPlaceholderText('Master Password'), 'pw{Enter}')
+
+    expect(screen.getByTestId('unlock-status')).toHaveTextContent('Verifying')
+    expect(screen.getByTestId('lock-mascot')).toHaveAttribute('data-state', 'checking')
+    expect(screen.getByPlaceholderText('Master Password')).toBeDisabled()
+  })
+
   it('walks the mascot through idle → typing → error → success', async () => {
     vi.mocked(unlock)
       .mockRejectedValueOnce(new Error('nope'))

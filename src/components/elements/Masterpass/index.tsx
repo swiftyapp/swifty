@@ -1,4 +1,10 @@
-import { useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent
+} from 'react'
 import { cx } from '@/utils/cx'
 import { t } from '@/i18n'
 import Error from '../Error'
@@ -21,6 +27,9 @@ interface Props {
   invalid?: boolean
   // Lock only: hold the card on the success tint while the unlock lands.
   success?: boolean
+  // Lock only: the submitted passphrase is being verified (key derivation is
+  // deliberately slow) — ripple the dots and hold the accent halo.
+  pending?: boolean
   onEnter?: (value: string) => void
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void
   onTouchID?: () => void
@@ -59,6 +68,7 @@ export default function Masterpass({
   variant = 'compact',
   invalid,
   success,
+  pending,
   onEnter,
   onChange,
   onTouchID
@@ -66,9 +76,16 @@ export default function Masterpass({
   const [value, setValue] = useState('')
   const [reveal, setReveal] = useState(false)
   const [focused, setFocused] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const lock = variant === 'lock'
   const bad = !!error || !!invalid
+
+  // Disabling the input (verifying / lockout) blurs it; hand focus back the
+  // moment it re-enables so a failed attempt can be retyped immediately.
+  useEffect(() => {
+    if (lock && !disabled) inputRef.current?.focus()
+  }, [lock, disabled])
 
   const doSubmit = (val: string) => {
     if (disabled || val === '') return
@@ -86,6 +103,7 @@ export default function Masterpass({
 
   const input = (
     <input
+      ref={inputRef}
       type={reveal ? 'text' : 'password'}
       className={cx(
         // The input's own text never shows: masked dots and the revealed value
@@ -115,8 +133,10 @@ export default function Masterpass({
             ? 'border-bad/60 ring-4 ring-bad/10 animate-[nudge_420ms_ease_both]'
             : success
               ? 'border-good/50 ring-4 ring-good/15'
-              : 'border-text/12 focus-within:border-accent-line focus-within:ring-4 focus-within:ring-accent-soft',
-          disabled && !success && 'opacity-60'
+              : pending
+                ? 'border-accent-line ring-4 ring-accent-soft'
+                : 'border-text/12 focus-within:border-accent-line focus-within:ring-4 focus-within:ring-accent-soft',
+          disabled && !success && !pending && 'opacity-60'
         )}
       >
         <div className="relative flex-1">
@@ -125,6 +145,7 @@ export default function Masterpass({
             count={value.length}
             caret={focused && !disabled}
             text={reveal ? value : undefined}
+            busy={pending}
           />
           {/* Reveal is a secondary modifier of what you're typing, so it only
               appears once there is something to reveal, small and dim. The

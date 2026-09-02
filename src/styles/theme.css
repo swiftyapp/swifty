@@ -96,6 +96,18 @@
     transform: none;
   }
 }
+/* While the key derives, the mask dots ripple in sequence (per-cell delay). */
+@keyframes dotwave {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
 /* The wide lock card gets a straight sideways nudge; rotation is the mascot's. */
 @keyframes nudge {
   18% {

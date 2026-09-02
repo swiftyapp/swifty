@@ -51,6 +51,7 @@ export function Auth({ touchID }: Props) {
   const [retryAfter, setRetryAfter] = useState(0)
   const [count, setCount] = useState(0)
   const [success, setSuccess] = useState(false)
+  const [pending, setPending] = useState(false)
   const holdTimer = useRef(0)
 
   // Countdown ticks once a second while locked out; re-enables the input at 0.
@@ -77,10 +78,16 @@ export function Auth({ touchID }: Props) {
   }
 
   const handleEnter = (value: string) => {
-    if (retryAfter > 0 || success) return
+    if (retryAfter > 0 || success || pending) return
+    // Key derivation is deliberately slow; acknowledge the Enter immediately.
+    setPending(true)
     unlock(value)
-      .then(holdThenEnter)
+      .then(result => {
+        setPending(false)
+        holdThenEnter(result)
+      })
       .catch((err: unknown) => {
+        setPending(false)
         if (isTooManyAttempts(err)) {
           setRetryAfter(err.retryAfterSecs)
           setError(lockedMessage(err.retryAfterSecs))
@@ -93,10 +100,17 @@ export function Auth({ touchID }: Props) {
   const handleTouchId = () => {
     // Biometric unlock is never subject to the password backoff (the OS gate
     // already rate-limits it), so it stays available even while locked out.
-    if (success) return
+    if (success || pending) return
+    setPending(true)
     unlockBiometric()
-      .then(holdThenEnter)
-      .catch((err: unknown) => setError(biometricError(err)))
+      .then(result => {
+        setPending(false)
+        holdThenEnter(result)
+      })
+      .catch((err: unknown) => {
+        setPending(false)
+        setError(biometricError(err))
+      })
   }
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -111,9 +125,11 @@ export function Auth({ touchID }: Props) {
     ? 'success'
     : error
       ? 'error'
-      : count > 0
-        ? 'typing'
-        : 'idle'
+      : pending
+        ? 'checking'
+        : count > 0
+          ? 'typing'
+          : 'idle'
 
   return (
     <>
@@ -134,7 +150,12 @@ export function Auth({ touchID }: Props) {
                 : 'unlock-status'
           }
         >
-          {error ?? (success ? t('Unsealing') : t('Vault sealed'))}
+          {error ??
+            (success
+              ? t('Unsealing')
+              : pending
+                ? t('Verifying')
+                : t('Vault sealed'))}
         </Eyebrow>
         <div className="mt-8">
           <Masterpass
@@ -143,7 +164,8 @@ export function Auth({ touchID }: Props) {
             testid="unlock-password-input"
             invalid={!!error}
             success={success}
-            disabled={retryAfter > 0 || success}
+            pending={pending}
+            disabled={retryAfter > 0 || success || pending}
             onChange={handleChange}
             onEnter={handleEnter}
             onTouchID={handleTouchId}
