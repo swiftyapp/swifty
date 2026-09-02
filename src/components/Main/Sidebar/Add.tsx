@@ -1,7 +1,7 @@
 import { useStore, openAddPicker, setView } from '@/store'
 import { t } from '@/i18n'
-import Tooltip from '@/components/elements/Tooltip'
-import { PlusGlyph } from '../icons'
+import RailButton from '@/components/elements/RailButton'
+import { PlusRailGlyph } from '../icons'
 
 export default function Add() {
   const view = useStore(state => state.ui.view)
@@ -14,15 +14,16 @@ export default function Add() {
     openAddPicker()
   }
 
+  // The rail's only action tile: a filled accent wash rather than the
+  // navigation inks, so it reads as "do" and not "go".
   return (
-    <Tooltip content={t('Add a secret')}>
-      <div
-        data-testid="add-entry-button"
-        onClick={onAddEntry}
-        className="grid h-10 w-10 cursor-pointer place-items-center rounded-lg border border-dashed border-accent-line text-accent transition-colors hover:bg-accent-soft"
-      >
-        <PlusGlyph size={18} />
-      </div>
-    </Tooltip>
+    <RailButton
+      label={t('Add a secret')}
+      onClick={onAddEntry}
+      testid="add-entry-button"
+      action
+    >
+      <PlusRailGlyph />
+    </RailButton>
   )
 }

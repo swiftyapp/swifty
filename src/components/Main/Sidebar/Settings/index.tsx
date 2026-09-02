@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore, openSettings, closeSettings } from '@/store'
 import { t } from '@/i18n'
 import Modal from '@/components/elements/Modal'
-import Tooltip from '@/components/elements/Tooltip'
+import RailButton from '@/components/elements/RailButton'
 import Navigation, { type Section } from './Navigation'
 import Vault from './Vault'
 import Import from './Import'
@@ -12,7 +12,7 @@ import Password from './Password'
 import Audit from './Audit'
 import Language from './Language'
 import Updates from './Updates'
-import { GearGlyph } from '../../icons'
+import { GearRailGlyph } from '../../icons'
 
 export default function Settings() {
   // Open state lives in the store so the ⌘K palette can open Settings too.
@@ -21,15 +21,14 @@ export default function Settings() {
 
   return (
     <div className="settings">
-      <Tooltip content={t('Settings')}>
-        <div
-          className="settings-button grid h-10 w-10 cursor-pointer place-items-center rounded-lg text-text2 transition-colors hover:bg-hover hover:text-text"
-          data-testid="settings-button"
-          onClick={() => (modal ? closeSettings() : openSettings())}
-        >
-          <GearGlyph size={18} />
-        </div>
-      </Tooltip>
+      <RailButton
+        label={t('Settings')}
+        testid="settings-button"
+        className="settings-button"
+        onClick={() => (modal ? closeSettings() : openSettings())}
+      >
+        <GearRailGlyph />
+      </RailButton>
       {modal && (
         <Modal onClose={closeSettings}>
           <div className="preferences flex max-h-[80vh] min-h-[560px] w-full text-text">
