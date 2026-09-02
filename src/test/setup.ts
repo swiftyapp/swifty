@@ -56,6 +56,10 @@ vi.mock('@/lib/events', async orig => ({
   on: vi.fn().mockResolvedValue(() => {})
 }))
 
+vi.mock('@tauri-apps/api/app', () => ({
+  getVersion: vi.fn().mockResolvedValue('1.0.0')
+}))
+
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({ setSize: vi.fn().mockResolvedValue(undefined) })
 }))

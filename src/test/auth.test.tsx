@@ -13,6 +13,13 @@ describe('Auth', () => {
     expect(screen.getByPlaceholderText('Master Password')).toBeInTheDocument()
   })
 
+  it('footers the version and where the vault lives', async () => {
+    renderWithStore(<Auth touchID={false} />)
+    expect(
+      await screen.findByText('Swifty 1.0.0 · Vault on this device')
+    ).toBeInTheDocument()
+  })
+
   it('has no unlock button — Enter is the only way to submit', () => {
     renderWithStore(<Auth touchID />)
     expect(screen.queryByLabelText('Unseal')).not.toBeInTheDocument()

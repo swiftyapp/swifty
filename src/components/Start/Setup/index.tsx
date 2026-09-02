@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { t } from '@/i18n'
 import AuthShell from '@/components/elements/AuthShell'
+import { useAuthMeta } from '@/components/elements/useAuthMeta'
 import Eyebrow from '@/components/elements/Eyebrow'
 import Enter from './Enter'
 import Confirm from './Confirm'
@@ -10,11 +11,12 @@ interface Props {
 }
 
 export default function Setup({ goBack }: Props) {
+  const meta = useAuthMeta()
   const [password, setPassword] = useState<string | null>(null)
   const confirming = password !== null
 
   return (
-    <AuthShell meta={`${t('offline')} · aes-256-gcm`} onBack={goBack}>
+    <AuthShell meta={meta} onBack={goBack}>
       <Eyebrow tone="accent">{t('New vault')}</Eyebrow>
       <h1 className="mt-8 text-center text-2xl font-medium tracking-display text-text">
         {t('Account Setup')}

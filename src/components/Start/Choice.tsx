@@ -1,5 +1,6 @@
 import { t } from '@/i18n'
 import AuthShell from '@/components/elements/AuthShell'
+import { useAuthMeta } from '@/components/elements/useAuthMeta'
 import Eyebrow from '@/components/elements/Eyebrow'
 import Button from '@/components/elements/Button'
 
@@ -8,8 +9,9 @@ interface Props {
 }
 
 export default function Choice({ onSelect }: Props) {
+  const meta = useAuthMeta()
   return (
-    <AuthShell meta={`${t('offline')} · aes-256-gcm`}>
+    <AuthShell meta={meta}>
       <Eyebrow>{t('Welcome to Swifty')}</Eyebrow>
       <h1 className="mt-8 text-center text-2xl font-medium tracking-display text-text">
         {t('Set up your vault')}

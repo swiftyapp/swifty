@@ -5,6 +5,7 @@ import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
 import Controls from '@/components/elements/Controls'
 import AuthShell from '@/components/elements/AuthShell'
+import { useAuthMeta } from '@/components/elements/useAuthMeta'
 import Eyebrow from '@/components/elements/Eyebrow'
 import Mascot from '@/components/elements/Mascot'
 
@@ -53,6 +54,7 @@ export function Auth({ touchID }: Props) {
   const [success, setSuccess] = useState(false)
   const [pending, setPending] = useState(false)
   const holdTimer = useRef(0)
+  const meta = useAuthMeta()
 
   // Countdown ticks once a second while locked out; re-enables the input at 0.
   useEffect(() => {
@@ -137,7 +139,7 @@ export function Auth({ touchID }: Props) {
   return (
     <>
       <Controls />
-      <AuthShell meta={`${t('offline')} · aes-256-gcm`}>
+      <AuthShell meta={meta}>
         <div className="mb-7 flex justify-center">
           <Mascot state={mascotState} gaze={gaze} />
         </div>
