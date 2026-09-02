@@ -9,10 +9,9 @@
 @import 'tailwindcss';
 
 /*
- * Shared motion primitives for the redesign: a blinking text caret and a
- * slow "breathing" status dot (both from the Keyring lock prototype). Kept as
- * top-level @keyframes so any component can reference them via an arbitrary
- * `animate-[...]` utility regardless of theme.
+ * Shared motion primitives for the redesign (from the Keyring lock prototype).
+ * Kept as top-level @keyframes so any component can reference them via an
+ * arbitrary `animate-[...]` utility regardless of theme.
  */
 @keyframes caret {
   0%,
@@ -22,15 +21,6 @@
   55%,
   100% {
     opacity: 0;
-  }
-}
-@keyframes breathe {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 0.9;
   }
 }
 @keyframes fade {
