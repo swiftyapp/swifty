@@ -115,7 +115,7 @@ export default function Masterpass({
             ? 'border-bad/60 ring-4 ring-bad/10 animate-[nudge_420ms_ease_both]'
             : success
               ? 'border-good/50 ring-4 ring-good/15'
-              : 'border-line focus-within:border-accent-line focus-within:ring-4 focus-within:ring-accent-soft',
+              : 'border-line2 focus-within:border-accent-line focus-within:ring-4 focus-within:ring-accent-soft',
           disabled && !success && 'opacity-60'
         )}
       >
