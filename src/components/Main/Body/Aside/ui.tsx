@@ -5,19 +5,18 @@ import { useStrength } from '@/hooks/useStrength'
 import { t } from '@/i18n'
 import IconButton from '@/components/elements/IconButton'
 import Meter from '@/components/elements/Meter'
+import { CARD, MONO_LABEL } from '@/components/elements/tokens'
 import { CheckGlyph, CopyGlyph } from '../../icons'
 
 // Re-export so existing detail-pane imports keep working; the primitive itself
 // now lives in elements/ and is shared with the header and Masterpass.
-export { IconButton }
+export { IconButton, MONO_LABEL }
 
 const STRENGTH_LABELS = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']
 
 // Shared presentation primitives for the detail pane. Every card, ledger cell,
 // mono label and copy affordance in Show / Form / Audit routes through these so
 // the token styling lives in one place.
-
-export const MONO_LABEL = 'font-mono text-xs uppercase tracking-label text-text3'
 
 // A bordered card surface on the gradient `--card` background.
 export function Panel({
@@ -28,12 +27,7 @@ export function Panel({
   className?: string
 }) {
   return (
-    <div
-      className={cx(
-        'overflow-hidden rounded-lg border border-line bg-[image:var(--card)]',
-        className
-      )}
-    >
+    <div className={cx(CARD, className)}>
       {children}
     </div>
   )
