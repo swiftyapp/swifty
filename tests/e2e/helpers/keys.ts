@@ -11,6 +11,7 @@
 const META = "\uE03D";
 const CONTROL = "\uE009";
 const ENTER = "\uE007";
+const ARROW_DOWN = "\uE015";
 
 const MODIFIER = process.platform === "darwin" ? META : CONTROL;
 
@@ -22,4 +23,9 @@ export async function chord(key: string): Promise<void> {
 /** Press Enter (submits the lock screen and the generator dialog). */
 export async function pressEnter(): Promise<void> {
   await browser.keys(ENTER);
+}
+
+/** Press ↓ (walks the list column's rows — `Body/ListColumn/useListKeys.ts`). */
+export async function pressArrowDown(): Promise<void> {
+  await browser.keys(ARROW_DOWN);
 }

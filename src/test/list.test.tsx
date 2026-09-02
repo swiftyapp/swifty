@@ -171,3 +171,112 @@ describe('List search', () => {
     expect(field()).not.toHaveFocus()
   })
 })
+
+// The arrows belong to the whole column, so they are asserted from both ends of
+// it: with the caret in the search field, and with a row itself focused.
+describe('List keyboard navigation', () => {
+  const field = () => screen.getByTestId('search-input')
+  const currentId = () => useStore.getState().entries.current?.id
+
+  beforeEach(() => vi.clearAllMocks())
+
+  it('walks the visible rows with ↓/↑ without taking the caret out of the field', async () => {
+    renderWithStore(<ListColumn />, { store: seed() })
+    await userEvent.click(field())
+
+    // Nothing selected yet: ↓ opens the list at its top row.
+    await userEvent.keyboard('{ArrowDown}')
+    expect(currentId()).toBe('fresh')
+
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}')
+    expect(currentId()).toBe('week')
+    await userEvent.keyboard('{ArrowUp}')
+    expect(currentId()).toBe('yday')
+
+    expect(field()).toHaveFocus()
+  })
+
+  it('clamps at both ends rather than wrapping', async () => {
+    renderWithStore(<ListColumn />, { store: seed() })
+    await userEvent.click(field())
+
+    // One press more than there are rows, at each end.
+    await userEvent.keyboard('{ArrowDown>5/}')
+    expect(currentId()).toBe('old')
+    await userEvent.keyboard('{ArrowUp>5/}')
+    expect(currentId()).toBe('fresh')
+  })
+
+  it('moves on from the selected row, carrying focus when the row has it', async () => {
+    renderWithStore(<ListColumn />, { store: seed() })
+
+    await userEvent.click(screen.getByText('Monzo'))
+    expect(currentId()).toBe('week')
+
+    await userEvent.keyboard('{ArrowDown}')
+    expect(currentId()).toBe('old')
+    // A focused row hands focus to the row the arrows land on.
+    expect(screen.getAllByTestId('entry-item')[3]).toHaveFocus()
+  })
+
+  it('re-aims at the first row left standing when a query hides the selection', async () => {
+    renderWithStore(<ListColumn />, { store: seed() })
+
+    await userEvent.click(screen.getByText('Monzo'))
+    await userEvent.type(field(), 'air')
+    await userEvent.keyboard('{ArrowDown}')
+
+    expect(currentId()).toBe('yday')
+  })
+
+  it('points ⌘⏎ at the row the arrows landed on', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'yday', password: 'airbnb' }))
+    renderWithStore(<ListColumn />, { store: seed() })
+
+    await userEvent.click(field())
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}')
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
+
+    // The second row, not the first the empty query would have offered.
+    expect(revealEntry).toHaveBeenCalledWith('yday')
+    await vi.waitFor(() =>
+      expect(copyToClipboard).toHaveBeenCalledWith('airbnb', expect.anything())
+    )
+  })
+
+  it('leaves ⏎ on the column’s own controls to that control', async () => {
+    renderWithStore(<ListColumn />, { store: seed() })
+
+    // The sort button opens its menu on ⏎; selecting a row as well would be
+    // two actions on one press.
+    screen.getByTestId('sort-menu').focus()
+    await userEvent.keyboard('{Enter}')
+
+    expect(screen.getByTestId('sort-option-recent')).toBeInTheDocument()
+    expect(useStore.getState().entries.current).toBeNull()
+  })
+
+  it('leaves the arrows alone while the sort menu owns them', async () => {
+    renderWithStore(<ListColumn />, { store: seed() })
+
+    await userEvent.click(screen.getByTestId('sort-menu'))
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}')
+
+    expect(useStore.getState().entries.current).toBeNull()
+  })
+
+  it('leaves the arrows alone in fields outside the column', async () => {
+    renderWithStore(
+      <>
+        <input data-testid="outside-field" />
+        <ListColumn />
+      </>,
+      { store: seed() }
+    )
+
+    await userEvent.click(screen.getByTestId('outside-field'))
+    await userEvent.keyboard('{ArrowDown}{ArrowUp}')
+
+    expect(useStore.getState().entries.current).toBeNull()
+  })
+})

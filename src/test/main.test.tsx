@@ -59,6 +59,19 @@ describe('Main', () => {
     expect(screen.getByTestId('search-input')).toHaveFocus()
   })
 
+  it('edits the selected entry on ⌘E, and needs a selection to do it', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    renderWithStore(<Main />, { store: seed() })
+
+    // Nothing selected: the chord has nothing to edit.
+    await userEvent.keyboard('{Meta>}e{/Meta}')
+    expect(useStore.getState().entries.edit).toBe(false)
+
+    await userEvent.click(screen.getByText('Google'))
+    await userEvent.keyboard('{Meta>}e{/Meta}')
+    expect(useStore.getState().entries.edit).toBe(true)
+  })
+
   it('narrows the list to one kind through the filter chips', async () => {
     renderWithStore(<Main />, { store: seed() })
 

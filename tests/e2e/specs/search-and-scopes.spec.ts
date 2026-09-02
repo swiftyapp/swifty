@@ -4,6 +4,7 @@ import {
   createLogin,
   createNote,
   entryItems,
+  pressArrowDown,
   pressEnter,
   resetEmpty,
   unlock,
@@ -50,6 +51,23 @@ async function expectTitles(expected: string[]): Promise<void> {
     },
   );
   expect(await visibleTitles()).toEqual(expected);
+}
+
+/** Wait for the row with this title to be the list's selected option. */
+async function expectSelected(title: string): Promise<void> {
+  await browser.waitUntil(
+    async () => {
+      for (const row of await $$('[data-testid="entry-item"]')) {
+        const rowTitle = await row.$('[data-testid="entry-item-title"]').getText();
+        if (rowTitle === title) return (await row.getAttribute("aria-selected")) === "true";
+      }
+      return false;
+    },
+    {
+      timeout: 15_000,
+      timeoutMsg: `"${title}" never became the selected row`,
+    },
+  );
 }
 
 /** Press one kind chip, or the "All" chip. */
@@ -180,6 +198,57 @@ describe("search and kind filters", () => {
     // ⏎ opens the single match in the detail pane.
     await pressEnter();
     await waitFor("edit-entry-button");
+
+    await $('[data-testid="search-clear-button"]').click();
+    await expect(searchInput()).toHaveValue("");
+  });
+
+  // The whole keyboard path, driven end to end: ⌘F, type, ↓↓, ⏎, ⌘E — never
+  // touching the pointer.
+  it("walks the results with ↓ and edits the row it lands on", async () => {
+    await selectKind("all");
+
+    await chord("f");
+    await browser.waitUntil(async () => await searchInput().isFocused(), {
+      timeout: 10_000,
+      timeoutMsg: "⌘F never focused the list-column search field",
+    });
+
+    // Two seeds carry "ra" ("Aurora Mail", "Travel Card"); the fuzzy ranking
+    // owns their order, so the row ↓↓ should land on is read back off the list.
+    await browser.keys("ra");
+    await browser.waitUntil(async () => (await visibleTitles()).length === 2, {
+      timeout: 15_000,
+      timeoutMsg: 'the query never settled on the two rows carrying "ra"',
+    });
+    const second = (await visibleTitles())[1];
+
+    // Nothing was selected, so the first ↓ opens the list at its top row and
+    // the second steps onto the row below it — with the caret still in the
+    // field the arrows came from.
+    await pressArrowDown();
+    await pressArrowDown();
+    await expectSelected(second);
+    await expect(searchInput()).toBeFocused();
+
+    // ⏎ stays on the row the arrows landed on instead of snapping back to the
+    // first, and the detail pane is showing it.
+    await pressEnter();
+    await waitFor("edit-entry-button");
+    await expectSelected(second);
+
+    // ⌘E takes that selection into the editor.
+    await chord("e");
+    await waitFor("entry-sheet");
+    // Cancelling before the decrypted values land would read as a dirty draft
+    // and arm the discard guard; every kind's sheet opens with its title.
+    await expect($('input[name="title"]')).toHaveValue(second);
+
+    await $('[data-testid="cancel-entry-button"]').click();
+    await $('[data-testid="entry-sheet"]').waitForDisplayed({
+      reverse: true,
+      timeout: 15_000,
+    });
 
     await $('[data-testid="search-clear-button"]').click();
     await expect(searchInput()).toHaveValue("");
