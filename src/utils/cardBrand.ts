@@ -20,6 +20,13 @@ const MARKED = new Set(['mastercard', 'maestro', 'visa', 'amex', 'discover'])
 export const hasBrandMark = (brand?: string | null): boolean =>
   !!brand && MARKED.has(brand)
 
+/** Digits only: what the vault stores and what the brand test reads. */
+export const cardDigits = (value: string): string => value.replace(/\D/g, '').slice(0, 19)
+
+/** The 4-4-4-4 grouping a card number is printed in. */
+export const groupCardNumber = (value: string): string =>
+  cardDigits(value).match(/.{1,4}/g)?.join(' ') ?? ''
+
 export const cardBrandOf = (number?: string): CardBrand | undefined => {
   const digits = (number ?? '').replace(/\D/g, '')
   if (digits.length < 4) return undefined

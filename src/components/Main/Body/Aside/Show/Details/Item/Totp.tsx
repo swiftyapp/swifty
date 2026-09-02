@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { generateOtp, type LoginEntry } from '@/lib/commands'
 import { t } from '@/i18n'
 import { copy } from '@/services/copy'
-import { Panel, MONO_LABEL } from '../../../ui'
+import Panel from '@/components/elements/Panel'
+import { MONO_LABEL } from '@/components/elements/tokens'
 
 interface Props {
   name: string

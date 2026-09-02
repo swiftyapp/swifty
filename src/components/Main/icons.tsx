@@ -12,11 +12,13 @@
 import {
   Activity,
   ArrowDownWideNarrow,
+  AtSign,
   Check,
   ChevronDown,
   Copy,
   CreditCard,
   Download,
+  ExternalLink,
   Eye,
   EyeOff,
   FileText,
@@ -35,6 +37,7 @@ import {
   Star,
   Sun,
   Trash2,
+  User,
   X,
   type LucideIcon
 } from 'lucide-react'
@@ -68,6 +71,9 @@ export const CloseGlyph = glyph(X, 14)
 export const ChevronDownGlyph = glyph(ChevronDown, 14)
 export const FingerprintGlyph = glyph(Fingerprint, 14)
 export const SortGlyph = glyph(ArrowDownWideNarrow, 14)
+export const ExternalGlyph = glyph(ExternalLink, 14)
+export const AtGlyph = glyph(AtSign, 14)
+export const UserGlyph = glyph(User, 14)
 
 // Row / tile / rail tier
 export const PlusGlyph = glyph(Plus, 16)

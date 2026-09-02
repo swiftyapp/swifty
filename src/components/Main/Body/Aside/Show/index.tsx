@@ -10,7 +10,7 @@ import { relativeTime } from '@/utils/time'
 import { t } from '@/i18n'
 import Details from './Details'
 import Actions from './Actions'
-import { MONO_LABEL } from '../ui'
+import { MONO_LABEL } from '@/components/elements/tokens'
 
 interface Props {
   entry: EntryMeta

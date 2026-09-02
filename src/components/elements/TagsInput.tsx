@@ -1,11 +1,13 @@
 import { useState, type KeyboardEvent } from 'react'
+import { TAG_CHIP } from './fields/chip'
 
 interface Props {
   value: string[]
   onChange: (tags: string[]) => void
 }
 
-// Minimal tags input: type + Enter to add, click a tag to remove it.
+// Minimal tags input: type + Enter to add, click a tag to remove it. The chips
+// are the read view's chips, so committing a tag doesn't restyle it.
 export default function TagsInput({ value, onChange }: Props) {
   const [input, setInput] = useState('')
 
@@ -27,21 +29,22 @@ export default function TagsInput({ value, onChange }: Props) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-sm border border-line2 bg-field px-2 py-1.5 transition-colors focus-within:border-accent-line">
+    <div className="flex flex-wrap items-center gap-2">
       {value.map(tag => (
-        <span
+        <button
           key={tag}
+          type="button"
           onClick={() => removeTag(tag)}
-          className="flex cursor-pointer items-center gap-1 rounded-sm bg-accent-soft px-2 py-1 font-mono text-xs text-accent hover:brightness-95"
+          className={`${TAG_CHIP} gap-1 hover:border-bad hover:text-bad`}
         >
           {tag}
           <span className="opacity-60">×</span>
-        </span>
+        </button>
       ))}
       <input
-        // The one input in the entry form with no `name` — specs address it here.
+        // The one input in the entry editor with no `name` — specs address it here.
         data-testid="tags-input"
-        className="min-w-[80px] flex-1 !border-0 !bg-transparent !p-1 !text-base !text-text !outline-none"
+        className="h-6 min-w-[110px] flex-1 border-b border-line2 bg-transparent font-mono text-xs text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line"
         value={input}
         onChange={e => setInput(e.target.value)}
         onKeyDown={handleKeyDown}

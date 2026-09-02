@@ -2,7 +2,9 @@ import { useState, type CSSProperties } from 'react'
 import type { Entry } from '@/lib/commands'
 import { t } from '@/i18n'
 import { openLink } from '@/services/openLink'
-import { CopyButton, IconButton, MONO_LABEL } from '../../../ui'
+import CopyButton from '@/components/elements/CopyButton'
+import IconButton from '@/components/elements/IconButton'
+import { MONO_LABEL } from '@/components/elements/tokens'
 import { EyeGlyph, EyeOffGlyph } from '../../../../../icons'
 
 interface Props {

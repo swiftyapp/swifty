@@ -2,7 +2,8 @@ import type { LoginEntry } from '@/lib/commands'
 import Item from '@/components/Main/Body/Aside/Show/Details/Item'
 import Totp from '@/components/Main/Body/Aside/Show/Details/Item/Totp'
 import Tags from '@/components/Main/Body/Aside/Show/Details/Item/Tags'
-import { Panel, StrengthBar } from '@/components/Main/Body/Aside/ui'
+import Panel from '@/components/elements/Panel'
+import StrengthBar from '@/components/elements/StrengthBar'
 
 interface Props {
   entry: LoginEntry

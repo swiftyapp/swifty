@@ -2,7 +2,8 @@ import { useStore } from '@/store'
 import type { Audit, AuditItem } from '@/lib/commands'
 import { t } from '@/i18n'
 import Score from './Score'
-import { Panel, MONO_LABEL } from '../ui'
+import Panel from '@/components/elements/Panel'
+import { MONO_LABEL } from '@/components/elements/tokens'
 
 const count = (audit: Audit, property: keyof AuditItem) =>
   Object.values(audit).filter(item => item[property]).length

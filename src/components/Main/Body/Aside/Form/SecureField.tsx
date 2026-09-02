@@ -7,7 +7,7 @@ import {
   labelClass,
   textareaClass
 } from '@/components/elements/formStyles'
-import { IconButton } from '../ui'
+import IconButton from '@/components/elements/IconButton'
 import { EyeGlyph, EyeOffGlyph } from '../../../icons'
 
 interface Props {

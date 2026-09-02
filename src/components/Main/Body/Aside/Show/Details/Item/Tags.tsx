@@ -1,7 +1,7 @@
 import type { Entry } from '@/lib/commands'
 import { setFilterQuery } from '@/store'
 import { t } from '@/i18n'
-import { MONO_LABEL } from '../../../ui'
+import { MONO_LABEL } from '@/components/elements/tokens'
 
 interface Props {
   entry: Entry

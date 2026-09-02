@@ -1,6 +1,6 @@
 import type { NoteEntry } from '@/lib/commands'
 import Tags from '@/components/Main/Body/Aside/Show/Details/Item/Tags'
-import { Panel } from '@/components/Main/Body/Aside/ui'
+import Panel from '@/components/elements/Panel'
 
 interface Props {
   entry: NoteEntry
