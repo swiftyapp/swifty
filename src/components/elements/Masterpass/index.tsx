@@ -150,8 +150,10 @@ export default function Masterpass({
             <span
               className="absolute left-1/2 top-1/2 h-[480px] w-[480px] animate-[orbit-spin_2.2s_linear_infinite]"
               style={{
+                // Peak at ~half the outline's own ink so the comet reads as a
+                // glint on the border, not a saturated streak over it.
                 background:
-                  'conic-gradient(transparent 0turn 0.62turn, var(--c-accent-line) 0.9turn, transparent 0.99turn)'
+                  'conic-gradient(transparent 0turn 0.62turn, color-mix(in srgb, var(--c-accent-line) 55%, transparent) 0.9turn, transparent 0.99turn)'
               }}
             />
           </span>
