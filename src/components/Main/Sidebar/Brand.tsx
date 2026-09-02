@@ -1,27 +1,27 @@
+import AsteriskBody from '@/components/elements/Asterisk'
+
 // Single-vault app: the rail top is just a brand mark (no vault switcher).
 //
-// The mark is "Reveal": a masked-password asterisk with one arm detached as a
-// dot — the one secret in your hand. Five stadium arms at 60° plus the dot
-// where the sixth would be; arms overlap the center so the union fills solid.
-// Drawn plain in the graphite ink, no tile behind it — the mark is the brand.
-const ARM_ANGLES = [0, 60, 180, 240, 300]
-
+// The mark is the lock-screen mascot with the face taken off: same hub, same
+// flared spikes, same softened silhouette, same ink, so the sealed vault and
+// the open one read as a single character. Its own twist is "Reveal": the
+// lower-right spike is set free as a dot, the one secret taken out of the mask
+// and into your hand. With no face to carry, the hub is trimmed a step so the
+// notches open and it still reads as an asterisk at rail size.
 export default function Brand() {
   return (
-    <div className="grid h-10 w-10 flex-none place-items-center text-text2" title="Swifty">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-label="Swifty">
-        {ARM_ANGLES.map(angle => (
-          <rect
-            key={angle}
-            x="10.4"
-            y="3.4"
-            width="3.2"
-            height="9.6"
-            rx="1.6"
-            transform={`rotate(${angle} 12 12)`}
-          />
-        ))}
-        <circle cx="18.06" cy="15.5" r="2.1" />
+    <div
+      className="grid h-10 w-10 flex-none place-items-center text-brand"
+      title="Swifty"
+    >
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 64 64"
+        fill="currentColor"
+        aria-label="Swifty"
+      >
+        <AsteriskBody dot={120} hub={11} />
       </svg>
     </div>
   )
