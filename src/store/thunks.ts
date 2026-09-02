@@ -3,6 +3,10 @@ import type { Entry, EntryMeta, UnlockResult } from '@/lib/commands'
 import {
   saveEntry as saveEntryCmd,
   deleteEntry as deleteEntryCmd,
+  listDeleted,
+  restoreEntry as restoreEntryCmd,
+  purgeEntry as purgeEntryCmd,
+  setFavorite,
   getAudit,
   syncNow,
   setup,
@@ -17,6 +21,10 @@ import type { StoreState } from './index'
 export interface AsyncSlice {
   saveEntry: (draft: EntryDraft) => Promise<void>
   deleteEntry: (id: string) => Promise<void>
+  loadTrash: () => Promise<void>
+  restoreEntry: (id: string) => Promise<void>
+  purgeEntry: (id: string) => Promise<void>
+  toggleFavorite: (id: string) => Promise<void>
   enterMain: (result: UnlockResult) => Promise<void>
   completeSetup: (password: string) => Promise<void>
   restoreBackup: (path: string, password: string) => Promise<void>
@@ -66,6 +74,13 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
     }, SYNC_DEBOUNCE_MS)
   }
 
+  // Restore and purge both take the row out of the Trash and leave nothing
+  // selected: the detail pane must not keep showing a row this view no longer has.
+  const dropFromTrash = (id: string) => {
+    get().setTrash(get().entries.trash.filter(e => e.id !== id))
+    get().setNoEntry()
+  }
+
   const refreshAudit = () =>
     getAudit(get().breachCheck)
       .then(data => get().auditDone(data))
@@ -92,6 +107,29 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       get().entryRemoved(get().entries.items.filter(e => e.id !== id))
       scheduleSync()
       refreshAudit()
+    },
+    loadTrash: async () => {
+      get().setTrash(await listDeleted())
+    },
+    restoreEntry: async id => {
+      const meta = await restoreEntryCmd(id)
+      get().setEntries(upsertMeta(get().entries.items, meta))
+      dropFromTrash(id)
+      scheduleSync()
+      refreshAudit()
+    },
+    purgeEntry: async id => {
+      await purgeEntryCmd(id)
+      dropFromTrash(id)
+      scheduleSync()
+    },
+    toggleFavorite: async id => {
+      const entry = get().entries.items.find(e => e.id === id)
+      if (!entry) return
+      const meta = await setFavorite(id, !entry.favorite)
+      get().setEntries(upsertMeta(get().entries.items, meta))
+      get().entrySaved(meta.id)
+      scheduleSync()
     },
     enterMain: async result => {
       get().setEntries(result.entries)

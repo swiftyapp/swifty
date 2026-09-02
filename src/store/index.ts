@@ -77,6 +77,7 @@ export const {
   setNoEntry,
   editEntry,
   setEntries,
+  setTrash,
   setCurrentEntry,
   entrySaved,
   entryRemoved,
@@ -105,6 +106,10 @@ export const {
   runUpdateCheck,
   saveEntry,
   deleteEntry,
+  loadTrash,
+  restoreEntry,
+  purgeEntry,
+  toggleFavorite,
   enterMain,
   completeSetup,
   restoreBackup
@@ -114,7 +119,9 @@ export const {
 // leaving the audit view first — it has no editor to land the form in.
 // `setView` clears any half-written draft, so it has to run before `newEntry`.
 export const startEntry = (type: EntryType) => {
-  if (useStore.getState().ui.view === 'health') setView('items')
+  // Only All Items can hold a draft: every other view is a filtered or
+  // read-only surface the new entry would immediately fall out of.
+  if (useStore.getState().ui.view !== 'items') setView('items')
   newEntry(type)
 }
 

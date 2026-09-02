@@ -7,10 +7,11 @@ export default function Add() {
   const view = useStore(state => state.ui.view)
 
   // The kind is asked for, never inferred: this opens the picker
-  // (Main/AddSecret). Leaving the audit view first gives the form it starts a
-  // list to land in.
+  // (Main/AddSecret). Any view but All Items is filtered or read-only, so the
+  // new entry would fall straight out of it — switch first and it has a list to
+  // land in.
   const onAddEntry = () => {
-    if (view === 'health') setView('items')
+    if (view !== 'items') setView('items')
     openAddPicker()
   }
 
