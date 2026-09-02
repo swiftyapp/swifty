@@ -17,8 +17,8 @@ interface Props {
 }
 
 // Enter is the detail pane's accelerator for the primary action, but only as a
-// bare press outside any text field or open dialog — anywhere else the key
-// belongs to whatever the user is typing in.
+// bare press outside any interactive control or open dialog — anywhere else
+// the key already belongs to whatever holds focus.
 const isPlainEnter = (e: KeyboardEvent) =>
   e.key === 'Enter' &&
   !e.metaKey &&
@@ -27,9 +27,14 @@ const isPlainEnter = (e: KeyboardEvent) =>
   !e.shiftKey &&
   !e.defaultPrevented
 
-const inTextField = (target: EventTarget | null) =>
+// Anything that owns Enter itself: a field the user is typing in, or a control
+// Enter already activates (a chip, the sort button, a menu item). Copying on
+// top of those would fire two actions from one press.
+const inInteractive = (target: EventTarget | null) =>
   target instanceof Element &&
-  !!target.closest('input, textarea, select, [contenteditable="true"]')
+  !!target.closest(
+    'input, textarea, select, [contenteditable="true"], button, a, [role="button"], [role="menuitem"]'
+  )
 
 const dialogOpen = () => !!document.querySelector('[role="dialog"], dialog[open]')
 
@@ -50,7 +55,7 @@ export default function Actions({ type, revealed, onDelete }: Props) {
   useEffect(() => {
     if (!secret) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!isPlainEnter(e) || inTextField(e.target) || dialogOpen()) return
+      if (!isPlainEnter(e) || inInteractive(e.target) || dialogOpen()) return
       e.preventDefault()
       copy(secret)
     }
@@ -84,6 +89,7 @@ export default function Actions({ type, revealed, onDelete }: Props) {
         <IconButton
           title={t('More actions')}
           active={menu}
+          expanded={menu}
           onClick={toggleMenu}
           className="border border-line2 hover:border-accent-line"
           testid="more-actions-button"
