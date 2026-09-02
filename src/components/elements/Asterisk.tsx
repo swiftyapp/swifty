@@ -29,6 +29,9 @@ interface Props {
   dot?: number
   // Hub radius; defaults to the mascot's.
   hub?: number
+  // Spike width as a factor of the mascot's; scaled about each spike's axis
+  // so the flare, tip rounding and reach stay the same.
+  spike?: number
   style?: CSSProperties
 }
 
@@ -39,12 +42,17 @@ interface Props {
 export default function AsteriskBody({
   dot,
   hub = HUB_RADIUS,
+  spike = 1,
   style
 }: Props) {
   const filterId = `asterisk-soften-${useId().replace(/\W/g, '')}`
   const rad = ((dot ?? 0) * Math.PI) / 180
   const dotX = CENTER + Math.sin(rad) * DOT_DISTANCE
   const dotY = CENTER - Math.cos(rad) * DOT_DISTANCE
+  const narrow =
+    spike !== 1
+      ? ` translate(${CENTER} 0) scale(${spike} 1) translate(${-CENTER} 0)`
+      : ''
 
   return (
     <>
@@ -63,7 +71,11 @@ export default function AsteriskBody({
           <path
             key={angle}
             d={SPIKE}
-            transform={angle ? `rotate(${angle} ${CENTER} ${CENTER})` : undefined}
+            transform={
+              angle || narrow
+                ? `rotate(${angle} ${CENTER} ${CENTER})${narrow}`
+                : undefined
+            }
           />
         ))}
         <circle cx={CENTER} cy={CENTER} r={hub} />
