@@ -1,9 +1,10 @@
 import { t } from '@/i18n'
 import { useField } from './context'
+import { requiredError } from './formats'
 import FieldRow from './Row'
 
-// Set to its own content height, so the body is never a two-line window onto a
-// twenty-line note.
+// Set to its own content height, so a twenty-line note is never read through a
+// two-line window.
 const grow = (el: HTMLTextAreaElement | null) => {
   if (!el) return
   el.style.height = 'auto'
@@ -12,18 +13,20 @@ const grow = (el: HTMLTextAreaElement | null) => {
 
 export default function NoteField({
   name = 'note',
-  label
+  label,
+  required
 }: {
   name?: string
   /** Omitted for a note entry, whose body owns the whole panel. */
   label?: string
+  required?: boolean
 }) {
-  const { value, set, editing } = useField(name)
+  const { value, set, editing, attempted } = useField(name)
 
   if (!editing && value === '') return null
 
   return (
-    <FieldRow label={label}>
+    <FieldRow label={label} error={requiredError(value, required, attempted)}>
       {editing ? (
         <textarea
           name={name}

@@ -5,6 +5,7 @@ import { EyeGlyph, EyeOffGlyph } from '../../Main/icons'
 import CopyButton from '../CopyButton'
 import IconButton from '../IconButton'
 import { useField } from './context'
+import { requiredError } from './formats'
 import FieldRow from './Row'
 
 export interface FieldProps {
@@ -67,11 +68,12 @@ export default function Field({
   // Reading, an empty field is not a field.
   if (!editing && value === '') return null
 
-  const error = !value.trim()
-    ? attempted && required
-      ? t('Required')
-      : ''
-    : (check?.(value) ?? '')
+  // Reading is error-free by construction: `attempted` is only ever true in an
+  // editing session, and a format complaint is an editor's business.
+  const error =
+    editing && value.trim()
+      ? (check?.(value) ?? '')
+      : requiredError(value, required, attempted)
 
   const masked = secure && !show
   const mask = masked ? MASK : undefined

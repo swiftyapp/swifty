@@ -7,13 +7,7 @@ const controlBase =
 // 36px — the ruled tier for inputs, CTAs and rail tiles.
 export const inputClass = `${controlBase} h-9`
 
-// Textareas grow with their content, so they swap the fixed height for padding.
-export const textareaClass = `${controlBase} py-2.5`
-
 export const selectClass = `${controlBase} h-9 appearance-none pr-9`
-
-export const labelClass =
-  'mb-[7px] block font-mono text-xs uppercase tracking-label text-text3'
 
 export const checkboxClass =
   'h-4 w-4 flex-none accent-accent'

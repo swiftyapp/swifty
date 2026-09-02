@@ -3,21 +3,9 @@ import type { Entry, EntryMeta, EntryType } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
 import type { LoginGlyph } from '@/components/Main/icons'
 import type { ContentProps } from '@/components/Main/Body/List/Item/Row'
-import type { FieldChange } from '@/components/Main/Body/Aside/Form/helpers'
 
 // Every icon in the set shares this signature (see Main/icons.tsx).
 export type Glyph = typeof LoginGlyph
-
-// One prop shape for all three field sets, so the registry can hold them behind
-// a single component type. `setField` is only used by Login (the generator
-// writes the password back through it); the others simply ignore it.
-export interface FormProps {
-  entry: EntryDraft
-  validate: boolean
-  onChange: (event: FieldChange) => void
-  onTagsChange: (tags: string[]) => void
-  setField: (name: string, value: string) => void
-}
 
 /**
  * Everything the app needs to know about one kind of secret, in one object.
@@ -48,6 +36,10 @@ export interface Kind {
   /** The row's secondary line, from non-secret metadata only. */
   listSubtitle: (entry: EntryMeta) => string
   ListRow: ComponentType<ContentProps>
-  Form: ComponentType<FormProps>
-  Details: ComponentType<{ entry: Entry }>
+  /**
+   * The kind's field set — the read view AND the editor. It takes no props:
+   * the draft, the writer and the save-attempt flag all arrive through the
+   * `FieldsProvider` its rows read (see components/elements/fields).
+   */
+  Fields: ComponentType
 }

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import Form from '@/components/Main/Body/Aside/Form'
 import Show from '@/components/Main/Body/Aside/Show'
 import Generator from '@/components/Main/Generator'
 import { saveEntry, revealEntry, generatePassword, generateOtp, copyToClipboard, deleteEntry, toEntryMeta } from '@/lib/commands'
@@ -13,40 +12,45 @@ beforeEach(() => {
   vi.mocked(saveEntry).mockImplementation(entry => Promise.resolve(toEntryMeta(entry)))
 })
 
-describe('Form', () => {
+const titleInput = () => document.querySelector<HTMLInputElement>('input[name="title"]')!
+const field = (name: string) => document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
+
+describe('Editing in the pane', () => {
   it('renders login fields for a new entry', () => {
-    renderWithStore(<Form type="login" />)
+    renderWithStore(<Show type="login" editing />)
     // en-US maps "Website" -> "URL"
     expect(screen.getByText('URL')).toBeInTheDocument()
     expect(screen.getByText('Username')).toBeInTheDocument()
   })
 
-  it('titles the editor from the kind registry', () => {
-    // The sheet has one title, so this pins the create action's wording: it is
-    // named after the kind, in the same phrasing the empty panes use.
-    renderWithStore(<Form type="card" />)
-    expect(screen.getByText('Add a credit card')).toBeInTheDocument()
+  it('says which kind is being edited, and names the empty title after it', () => {
+    renderWithStore(<Show type="card" editing />)
+    expect(screen.getByText('Editing')).toBeInTheDocument()
+    expect(titleInput()).toHaveAttribute('placeholder', 'Untitled credit card')
   })
 
   it('saves a valid new login', async () => {
-    const { store } = renderWithStore(<Form type="login" />)
-    await userEvent.type(document.querySelector('input[name="title"]')!, 'GitHub')
-    await userEvent.type(document.querySelector('input[name="username"]')!, 'octocat')
-    await userEvent.type(document.querySelector('input[name="password"]')!, 'pw')
+    const { store } = renderWithStore(<Show type="login" editing />)
+    await userEvent.type(titleInput(), 'GitHub')
+    await userEvent.type(field('username'), 'octocat')
+    await userEvent.type(field('password'), 'pw')
     await userEvent.click(screen.getByText('Save'))
 
     expect(saveEntry).toHaveBeenCalledOnce()
     await waitFor(() => expect(store.getState().entries.items[0].title).toBe('GitHub'))
   })
 
-  it('blocks saving an invalid entry', async () => {
-    renderWithStore(<Form type="login" />)
+  it('blocks an invalid save and says which rows are missing', async () => {
+    renderWithStore(<Show type="login" editing />)
     await userEvent.click(screen.getByText('Save'))
+
     expect(saveEntry).not.toHaveBeenCalled()
+    // Title, username and password: the three fields login's isValid requires.
+    expect(screen.getAllByText('Required')).toHaveLength(3)
   })
 
   it('closes straight away when nothing was typed', async () => {
-    const { store } = renderWithStore(<Form type="login" />)
+    const { store } = renderWithStore(<Show type="login" editing />)
     store.getState().newEntry('login')
     await userEvent.click(screen.getByTestId('cancel-entry-button'))
     expect(screen.queryByText('Discard changes?')).not.toBeInTheDocument()
@@ -54,11 +58,11 @@ describe('Form', () => {
   })
 
   it('guards unsaved changes with an inline confirm', async () => {
-    const { store } = renderWithStore(<Form type="login" />)
+    const { store } = renderWithStore(<Show type="login" editing />)
     store.getState().newEntry('login')
-    await userEvent.type(document.querySelector('input[name="title"]')!, 'GitHub')
+    await userEvent.type(titleInput(), 'GitHub')
 
-    // First press only arms the confirm; the form stays open.
+    // First press only arms the confirm; the editor stays open.
     await userEvent.click(screen.getByTestId('cancel-entry-button'))
     expect(screen.getByText('Discard changes?')).toBeInTheDocument()
     expect(store.getState().entries.new).toBe('login')
@@ -68,11 +72,24 @@ describe('Form', () => {
     expect(store.getState().entries.new).toBeNull()
   })
 
-  it('saves on ⌘⏎ from anywhere in the sheet', async () => {
-    renderWithStore(<Form type="login" />)
-    await userEvent.type(document.querySelector('input[name="title"]')!, 'GitHub')
-    await userEvent.type(document.querySelector('input[name="username"]')!, 'octocat')
-    await userEvent.type(document.querySelector('input[name="password"]')!, 'pw')
+  it('runs the same discard guard on Escape', async () => {
+    const { store } = renderWithStore(<Show type="login" editing />)
+    store.getState().newEntry('login')
+    await userEvent.type(titleInput(), 'GitHub')
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByText('Discard changes?')).toBeInTheDocument()
+    expect(store.getState().entries.new).toBe('login')
+
+    await userEvent.keyboard('{Escape}')
+    expect(store.getState().entries.new).toBeNull()
+  })
+
+  it('saves on ⌘⏎ from anywhere in the pane', async () => {
+    renderWithStore(<Show type="login" editing />)
+    await userEvent.type(titleInput(), 'GitHub')
+    await userEvent.type(field('username'), 'octocat')
+    await userEvent.type(field('password'), 'pw')
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
 
     expect(saveEntry).toHaveBeenCalledOnce()
@@ -82,7 +99,7 @@ describe('Form', () => {
     vi.mocked(generatePassword).mockResolvedValue('Generated123!')
     renderWithStore(
       <>
-        <Form type="login" />
+        <Show type="login" editing />
         <Generator />
       </>
     )
@@ -91,9 +108,7 @@ describe('Form', () => {
     await screen.findByText('Generated123!')
 
     await userEvent.click(screen.getByTestId('generator-use-button'))
-    await waitFor(() =>
-      expect(document.querySelector<HTMLInputElement>('input[name="password"]')!.value).toBe('Generated123!')
-    )
+    await waitFor(() => expect(field('password').value).toBe('Generated123!'))
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 
@@ -101,21 +116,20 @@ describe('Form', () => {
     // The revealed title differs from the metadata title so this wait proves
     // the decrypted values were actually adopted, not just the initial meta.
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google (decrypted)' }))
-    const { rerender } = renderWithStore(<Form type="login" entry={loginMeta()} />)
-    const title = document.querySelector<HTMLInputElement>('input[name="title"]')!
-    await waitFor(() => expect(title.value).toBe('Google (decrypted)'))
+    const { rerender } = renderWithStore(<Show entry={loginMeta()} editing />)
+    await waitFor(() => expect(titleInput().value).toBe('Google (decrypted)'))
 
-    await userEvent.clear(title)
-    await userEvent.type(title, 'Renamed by me')
+    await userEvent.clear(titleInput())
+    await userEvent.type(titleInput(), 'Renamed by me')
 
     // A sync merge landing mid-edit bumps updatedAt and re-runs the decrypt.
-    // The form adopts the reveal once, at open — a refetch must not clobber
+    // The draft adopts the reveal once, at open — a refetch must not clobber
     // what the user has typed (their save wins by last-writer-wins anyway).
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Merged elsewhere' }))
-    rerender(<Form type="login" entry={loginMeta({ updatedAt: '2024-06-01T00:00:00.000Z' })} />)
+    rerender(<Show entry={loginMeta({ updatedAt: '2024-06-01T00:00:00.000Z' })} editing />)
     await waitFor(() => expect(revealEntry).toHaveBeenCalledTimes(2))
 
-    expect(title.value).toBe('Renamed by me')
+    expect(titleInput().value).toBe('Renamed by me')
   })
 })
 
@@ -139,9 +153,10 @@ describe('Show', () => {
   it('copies a field value', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ username: 'copyme' }))
     renderWithStore(<Show entry={loginMeta()} />)
-    await userEvent.click(await screen.findByText('copyme'))
-    await userEvent.click(document.querySelector('.item svg')!)
-    expect(copyToClipboard).toHaveBeenCalled()
+    await screen.findByText('copyme')
+    // One copy button per rendered row, in row order: URL, then username.
+    await userEvent.click(screen.getAllByTitle('Copy')[1])
+    expect(copyToClipboard).toHaveBeenCalledWith('copyme', expect.any(Number))
   })
 
   it('copies the password from the header without revealing it', async () => {

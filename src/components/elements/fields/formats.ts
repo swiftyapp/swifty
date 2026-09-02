@@ -18,3 +18,13 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /** Deliberately shallow: enough to catch a typo, never enough to reject a real address. */
 export const emailError = (value: string): string =>
   EMAIL.test(value.trim()) ? '' : t('Not an email address')
+
+/**
+ * The one rule behind every "Required" message: a field the kind's `isValid`
+ * needs only complains once the user has actually tried to save.
+ */
+export const requiredError = (
+  value: string,
+  required?: boolean,
+  attempted?: boolean
+): string => (attempted && required && !value.trim() ? t('Required') : '')

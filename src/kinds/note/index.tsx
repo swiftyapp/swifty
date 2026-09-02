@@ -1,10 +1,8 @@
-import type { Entry } from '@/lib/commands'
 import { NoteGlyph } from '@/components/Main/icons'
 import type { Kind } from '../types'
 import { defaults, isValid, listSubtitle, primarySecret } from './meta'
 import ListRow from './ListRow'
-import Form from './Form'
-import Details from './Details'
+import Fields from './Fields'
 
 const note: Kind = {
   type: 'note',
@@ -19,9 +17,7 @@ const note: Kind = {
   primaryActionLabel: 'Copy note',
   listSubtitle,
   ListRow,
-  Form,
-  Details: ({ entry }: { entry: Entry }) =>
-    entry.type === 'note' ? <Details entry={entry} /> : null
+  Fields
 }
 
 export default note
