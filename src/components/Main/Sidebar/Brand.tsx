@@ -11,12 +11,12 @@ import AsteriskBody from '@/components/elements/Asterisk'
 export default function Brand() {
   return (
     <div
-      className="grid h-10 w-10 flex-none place-items-center text-brand"
+      className="grid h-9 w-9 flex-none place-items-center text-brand"
       title="Swifty"
     >
       <svg
-        width="28"
-        height="28"
+        width="24"
+        height="24"
         viewBox="0 0 64 64"
         fill="currentColor"
         aria-label="Swifty"
