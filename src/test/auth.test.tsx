@@ -116,9 +116,9 @@ describe('Auth', () => {
 
   it('unlocks with biometrics', async () => {
     vi.mocked(unlockBiometric).mockResolvedValue({ entries: [], syncConfigured: false })
-    const { container, store } = renderWithStore(<Auth touchID />)
+    const { store } = renderWithStore(<Auth touchID />)
 
-    await userEvent.click(container.querySelector('.touchid')!)
+    await userEvent.click(screen.getByLabelText('Touch ID'))
 
     expect(unlockBiometric).toHaveBeenCalledOnce()
     await waitFor(() => expect(store.getState().flow.name).toBe('main'))

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-type Tone = 'muted' | 'bad' | 'accent'
+type Tone = 'muted' | 'bad'
 
 interface Props {
   children: ReactNode

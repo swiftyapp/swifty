@@ -1,3 +1,5 @@
+import { memo } from 'react'
+
 export type MascotState = 'idle' | 'typing' | 'checking' | 'success' | 'error'
 
 interface Props {
@@ -13,10 +15,17 @@ interface Props {
 
 const GRAPHITE = '#34373e'
 
+// One flared spike: narrow at the base, wide at the tip, soft outer corners.
+// Rotated around the hub; the circle buries the bases.
+const SPIKE = 'M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z'
+const SPIKE_ANGLES = [0, 60, 120, 180, 240, 300]
+
 // The Swifty mascot: the brand asterisk (a secret value, redacted) with eyes.
 // It sits still and blinks every once in a while, follows typing with its
 // gaze, cheers when the vault opens and shakes its head at a bad passphrase.
-export default function Mascot({
+// Memoized: the filtered SVG is the priciest thing on the lock screen, and
+// most parent re-renders (keystrokes past the gaze sweep) don't change it.
+function Mascot({
   state = 'idle',
   gaze = 0,
   color = GRAPHITE,
@@ -70,14 +79,13 @@ export default function Mascot({
         filter="url(#mascot-soften)"
         style={{ fill, transition: 'fill 300ms ease' }}
       >
-        {/* One flared spike: narrow at the base, wide at the tip, soft
-            outer corners. Rotated six times; the circle buries the bases. */}
-        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" />
-        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" transform="rotate(60 32 32)" />
-        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" transform="rotate(120 32 32)" />
-        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" transform="rotate(180 32 32)" />
-        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" transform="rotate(240 32 32)" />
-        <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" transform="rotate(300 32 32)" />
+        {SPIKE_ANGLES.map(angle => (
+          <path
+            key={angle}
+            d={SPIKE}
+            transform={angle ? `rotate(${angle} 32 32)` : undefined}
+          />
+        ))}
         <circle cx="32" cy="32" r="14" />
       </g>
 
@@ -141,3 +149,5 @@ export default function Mascot({
     </svg>
   )
 }
+
+export default memo(Mascot)

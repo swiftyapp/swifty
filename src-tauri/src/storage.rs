@@ -235,9 +235,9 @@ pub fn set_biometric_marker(app: &AppHandle, marker: Option<&str>) -> Result<()>
 }
 
 pub fn sync_configured(app: &AppHandle) -> bool {
+    // A single metadata call answers both "exists" and "non-empty".
     gdrive_path(app)
         .ok()
-        .filter(|p| p.exists())
         .and_then(|p| fs::metadata(p).ok())
         .is_some_and(|m| m.len() > 0)
 }

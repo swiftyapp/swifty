@@ -1,5 +1,11 @@
 import { cx } from '@/utils/cx'
 
+// Stagger offsets for the busy ripple, precomputed so renders allocate no
+// style objects. 40 covers any plausible passphrase; longer ones wrap.
+const WAVE_DELAYS = Array.from({ length: 40 }, (_, i) => ({
+  animationDelay: `${i * 70}ms`
+}))
+
 interface Props {
   count: number
   caret: boolean
@@ -31,7 +37,7 @@ export default function Dots({ count, caret, text, busy }: Props) {
                 ? 'h-[7px] w-[7px] rounded-full bg-text/75'
                 : 'text-[15px] text-text'
             )}
-            style={busy ? { animationDelay: `${i * 70}ms` } : undefined}
+            style={busy ? WAVE_DELAYS[i % WAVE_DELAYS.length] : undefined}
           >
             {text?.[i]}
           </span>

@@ -37,7 +37,7 @@ export default function IconButton({
         active
           ? 'bg-accent-soft text-accent'
           : muted
-            ? 'text-text3 hover:bg-hover hover:text-text2'
+            ? 'text-text3/70 hover:bg-hover hover:text-text2'
             : 'text-text2 hover:bg-hover hover:text-text',
         className
       )}

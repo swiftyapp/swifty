@@ -5,7 +5,6 @@ import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
 import Controls from '@/components/elements/Controls'
 import AuthShell from '@/components/elements/AuthShell'
-import { useAuthMeta } from '@/components/elements/useAuthMeta'
 import Eyebrow from '@/components/elements/Eyebrow'
 import Mascot from '@/components/elements/Mascot'
 
@@ -47,14 +46,17 @@ const biometricError = (error: unknown): string =>
 const lockedMessage = (seconds: number) =>
   `${t('Too many failed attempts')}. ${t('Try again in')} ${seconds}s`
 
+// One attempt-lifecycle slot instead of separate success/pending booleans:
+// only one of these can be true at a time, and everything below derives from
+// the same precedence.
+type Phase = 'idle' | 'verifying' | 'success'
+
 export function Auth({ touchID }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [retryAfter, setRetryAfter] = useState(0)
   const [count, setCount] = useState(0)
-  const [success, setSuccess] = useState(false)
-  const [pending, setPending] = useState(false)
+  const [phase, setPhase] = useState<Phase>('idle')
   const holdTimer = useRef(0)
-  const meta = useAuthMeta()
 
   // Countdown ticks once a second while locked out; re-enables the input at 0.
   useEffect(() => {
@@ -71,8 +73,7 @@ export function Auth({ touchID }: Props) {
 
   // Let the mascot celebrate before the vault takes over.
   const holdThenEnter = (result: UnlockResult) => {
-    setError(null)
-    setSuccess(true)
+    setPhase('success')
     holdTimer.current = window.setTimeout(
       () => enterMain(result),
       SUCCESS_HOLD_MS
@@ -80,18 +81,15 @@ export function Auth({ touchID }: Props) {
   }
 
   const handleEnter = (value: string) => {
-    if (retryAfter > 0 || success || pending) return
+    if (retryAfter > 0 || phase !== 'idle') return
     // Key derivation is deliberately slow; acknowledge the Enter immediately
     // (and drop any stale error — this attempt owns the eyebrow now).
     setError(null)
-    setPending(true)
+    setPhase('verifying')
     unlock(value)
-      .then(result => {
-        setPending(false)
-        holdThenEnter(result)
-      })
+      .then(holdThenEnter)
       .catch((err: unknown) => {
-        setPending(false)
+        setPhase('idle')
         if (isTooManyAttempts(err)) {
           setRetryAfter(err.retryAfterSecs)
           setError(lockedMessage(err.retryAfterSecs))
@@ -104,16 +102,13 @@ export function Auth({ touchID }: Props) {
   const handleTouchId = () => {
     // Biometric unlock is never subject to the password backoff (the OS gate
     // already rate-limits it), so it stays available even while locked out.
-    if (success || pending) return
+    if (phase !== 'idle') return
     setError(null)
-    setPending(true)
+    setPhase('verifying')
     unlockBiometric()
-      .then(result => {
-        setPending(false)
-        holdThenEnter(result)
-      })
+      .then(holdThenEnter)
       .catch((err: unknown) => {
-        setPending(false)
+        setPhase('idle')
         setError(biometricError(err))
       })
   }
@@ -124,14 +119,15 @@ export function Auth({ touchID }: Props) {
   }
 
   // The mascot reads along as you type: the gaze pans left-to-right with the
-  // caret (16 chars ≈ full sweep, like the prototype).
-  const gaze = count > 0 ? Math.min(1, count / 16) * 2 - 1 : 0
-  const mascotState = success
-    ? 'success'
-    : error
-      ? 'error'
-      : pending
-        ? 'checking'
+  // caret (16 chars ≈ full sweep, like the prototype; Mascot clamps to ±1).
+  const gaze = count > 0 ? (count / 16) * 2 - 1 : 0
+  const mascotState =
+    phase !== 'idle'
+      ? phase === 'success'
+        ? 'success'
+        : 'checking'
+      : error
+        ? 'error'
         : count > 0
           ? 'typing'
           : 'idle'
@@ -139,15 +135,15 @@ export function Auth({ touchID }: Props) {
   return (
     <>
       <Controls />
-      <AuthShell meta={meta}>
+      <AuthShell>
         <div className="mb-7 flex justify-center">
           <Mascot state={mascotState} gaze={gaze} />
         </div>
         {/* One element carries all three states, so the testid names which one
             is showing rather than forcing specs to parse the message. */}
         <Eyebrow
-          tone={error ? 'bad' : success ? 'accent' : 'muted'}
-          busy={pending}
+          tone={error ? 'bad' : 'muted'}
+          busy={phase === 'verifying'}
           testid={
             retryAfter > 0
               ? 'unlock-lockout'
@@ -157,9 +153,9 @@ export function Auth({ touchID }: Props) {
           }
         >
           {error ??
-            (success
+            (phase === 'success'
               ? t('Unsealing')
-              : pending
+              : phase === 'verifying'
                 ? t('Verifying')
                 : t('Vault sealed'))}
         </Eyebrow>
@@ -169,9 +165,9 @@ export function Auth({ touchID }: Props) {
             touchID={touchID}
             testid="unlock-password-input"
             invalid={!!error}
-            success={success}
-            pending={pending}
-            disabled={retryAfter > 0 || success || pending}
+            success={phase === 'success'}
+            pending={phase === 'verifying'}
+            disabled={retryAfter > 0}
             onChange={handleChange}
             onEnter={handleEnter}
             onTouchID={handleTouchId}

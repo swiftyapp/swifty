@@ -16,6 +16,7 @@ import KeyCuts from './KeyCuts'
 interface Props {
   error?: string | null
   touchID?: boolean
+  // The field genuinely must not accept input (lockout countdown); dims it.
   disabled?: boolean
   placeholder?: string
   testid?: string
@@ -28,26 +29,12 @@ interface Props {
   // Lock only: hold the card on the success tint while the unlock lands.
   success?: boolean
   // Lock only: the submitted passphrase is being verified (key derivation is
-  // deliberately slow) — ripple the dots and hold the accent halo.
+  // deliberately slow) — ripple the dots and orbit the halo.
   pending?: boolean
   onEnter?: (value: string) => void
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void
   onTouchID?: () => void
 }
-
-const EyeIcon = <EyeGlyph size={16} />
-const EyeOffIcon = <EyeOffGlyph size={16} />
-const SmallEyeIcon = <EyeGlyph size={15} />
-const SmallEyeOffIcon = <EyeOffGlyph size={15} />
-
-// The macOS Touch ID rose, so the fingerprint reads as the system affordance
-// rather than another monochrome glyph. Sized to nearly fill the 28px button:
-// the fingerprint should read large while the hover target stays on the grid.
-const TouchIdIcon = (
-  <span className="text-[#ee5d6f]">
-    <FingerprintGlyph size={22} />
-  </span>
-)
 
 // Shared master-passphrase field. The real value lives in the (uncontrolled)
 // input; a mirrored copy drives the dot overlay. Masking is done with a
@@ -80,15 +67,19 @@ export default function Masterpass({
 
   const lock = variant === 'lock'
   const bad = !!error || !!invalid
+  // The input can't accept keystrokes while locked out, verifying, or during
+  // the success hold; only the lockout also dims the card.
+  const inert = !!disabled || !!success || !!pending
 
   // Disabling the input (verifying / lockout) blurs it; hand focus back the
   // moment it re-enables so a failed attempt can be retyped immediately.
   useEffect(() => {
-    if (lock && !disabled) inputRef.current?.focus()
-  }, [lock, disabled])
+    if (lock && !inert && document.activeElement !== inputRef.current)
+      inputRef.current?.focus()
+  }, [lock, inert])
 
   const doSubmit = (val: string) => {
-    if (disabled || val === '') return
+    if (inert || val === '') return
     onEnter?.(val)
   }
 
@@ -113,7 +104,7 @@ export default function Masterpass({
         lock && 'rounded-xl px-10'
       )}
       placeholder={placeholder || t('Master Password')}
-      disabled={disabled}
+      disabled={inert}
       data-testid={testid}
       autoFocus
       value={value}
@@ -124,11 +115,43 @@ export default function Masterpass({
     />
   )
 
+  const dots = (
+    <Dots
+      count={value.length}
+      caret={focused && !inert}
+      text={reveal ? value : undefined}
+      busy={pending}
+    />
+  )
+
+  // The crossed eye alone carries the on state — no persistent wash.
+  const revealButton = (
+    <IconButton
+      label={t(reveal ? 'Hide passphrase' : 'Reveal passphrase')}
+      className={
+        lock
+          ? 'animate-fade absolute right-1.5 top-1/2 -translate-y-1/2'
+          : 'absolute right-0'
+      }
+      muted={lock}
+      onClick={() => setReveal(r => !r)}
+    >
+      {reveal ? (
+        <EyeOffGlyph size={lock ? 15 : 16} />
+      ) : (
+        <EyeGlyph size={lock ? 15 : 16} />
+      )}
+    </IconButton>
+  )
+
   if (lock) {
     return (
       <div
         className={cx(
-          'relative mx-auto flex h-12 max-w-[380px] items-stretch rounded-xl border bg-detail shadow-[var(--lockfield-shadow)] transition-all duration-300',
+          // In-card icon buttons (reveal, Touch ID) share a softened hover
+          // wash; the ! outranks IconButton's own hover:bg-hover, in this one
+          // place instead of at every button.
+          'relative mx-auto flex h-12 max-w-[380px] items-stretch rounded-xl border bg-detail shadow-[var(--lockfield-shadow)] transition-all duration-300 [&_button:hover]:bg-hover/60!',
           bad
             ? 'border-bad/60 ring-4 ring-bad/10 animate-[nudge_420ms_ease_both]'
             : success
@@ -136,66 +159,40 @@ export default function Masterpass({
               : pending
                 ? 'border-accent-line'
                 : 'border-text/12 focus-within:border-accent-line focus-within:ring-4 focus-within:ring-accent-soft',
-          disabled && !success && !pending && 'opacity-60'
+          disabled && 'opacity-60'
         )}
       >
-        {/* While verifying, a soft comet of light orbits the border: the
-            oversized gradient square rotates (compositor transform), the
-            orbit-ring mask trims it to the border. */}
+        {/* While verifying, a soft comet of light orbits the border (the
+            orbit-ring utility owns the whole effect). */}
         {pending && (
           <span
             aria-hidden
             className="orbit-ring pointer-events-none absolute -inset-px rounded-xl"
-          >
-            <span
-              className="absolute left-1/2 top-1/2 h-[480px] w-[480px] animate-[orbit-spin_2.2s_linear_infinite]"
-              style={{
-                // Peak at ~half the outline's own ink so the comet reads as a
-                // glint on the border, not a saturated streak over it.
-                background:
-                  'conic-gradient(transparent 0turn 0.62turn, color-mix(in srgb, var(--c-accent-line) 55%, transparent) 0.9turn, transparent 0.99turn)'
-              }}
-            />
-          </span>
+          />
         )}
         <div className="relative flex-1">
           {input}
-          <Dots
-            count={value.length}
-            caret={focused && !disabled}
-            text={reveal ? value : undefined}
-            busy={pending}
-          />
+          {dots}
           {/* Reveal is a secondary modifier of what you're typing, so it only
-              appears once there is something to reveal, small and dim. The
-              crossed eye alone carries the on state — no persistent wash. */}
-          {value.length > 0 && (
-            <IconButton
-              label={t(reveal ? 'Hide passphrase' : 'Reveal passphrase')}
-              className="animate-fade absolute right-1.5 top-1/2 -translate-y-1/2 hover:bg-hover/60!"
-              muted
-              onClick={() => setReveal(r => !r)}
-            >
-              {/* Dial the ink down a step below the muted tier; the opacity
-                  wrapper keeps the hover ink-step ratio intact. */}
-              <span className="opacity-70">
-                {reveal ? SmallEyeOffIcon : SmallEyeIcon}
-              </span>
-            </IconButton>
-          )}
+              appears once there is something to reveal, small and dim. */}
+          {value.length > 0 && revealButton}
         </div>
 
         {/* Touch ID is the card's own end segment: a taller divider than the
-            reveal tier, and the fingerprint in the macOS Touch ID rose. */}
+            reveal tier, and the fingerprint in the macOS Touch ID rose, sized
+            to nearly fill the 28px button. */}
         {touchID && (
           <>
             <span aria-hidden className="my-auto h-7 w-px bg-line" />
             <IconButton
               label={t('Touch ID')}
-              className="touchid mx-1.5 my-auto hover:bg-hover/60!"
+              className="mx-1.5 my-auto"
               onClick={onTouchID}
             >
-              {TouchIdIcon}
+              {/* Child span so the rose survives IconButton's hover ink. */}
+              <span className="text-touchid">
+                <FingerprintGlyph size={22} />
+              </span>
             </IconButton>
           </>
         )}
@@ -207,18 +204,8 @@ export default function Masterpass({
     <div className="w-full">
       <div className="relative flex h-14 items-center justify-center">
         {input}
-        <Dots
-          count={value.length}
-          caret={focused && !disabled}
-          text={reveal ? value : undefined}
-        />
-        <IconButton
-          label={t(reveal ? 'Hide passphrase' : 'Reveal passphrase')}
-          className="absolute right-0"
-          onClick={() => setReveal(r => !r)}
-        >
-          {reveal ? EyeOffIcon : EyeIcon}
-        </IconButton>
+        {dots}
+        {revealButton}
       </div>
       <KeyCuts count={value.length} tone={bad ? 'bad' : 'idle'} />
       <Error error={error} />

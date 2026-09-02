@@ -256,6 +256,7 @@
   --color-warn: var(--c-warn);
   --color-bad: var(--c-bad);
   --color-accent-deep: var(--c-accent-deep);
+  --color-touchid: var(--c-touchid);
 }
 
 /*
@@ -304,9 +305,12 @@
 }
 
 /*
- * The orbiting border light's container: clips its rotating gradient child
- * down to the card's 2px border ring (two-layer mask keeps the interior
- * clear).
+ * The orbiting border light, whole: the container clips down to the card's
+ * 2px border ring (two-layer mask keeps the interior clear) and its ::before
+ * is the rotating comet — an oversized conic square (covers the card's
+ * diagonal at any angle) spun by a compositor transform. The comet peaks at
+ * ~half the outline's own ink so it reads as a glint on the border, not a
+ * saturated streak over it.
  */
 @utility orbit-ring {
   padding: 2px;
@@ -319,6 +323,22 @@
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 400px;
+    height: 400px;
+    background: conic-gradient(
+      transparent 0turn 0.62turn,
+      color-mix(in srgb, var(--c-accent-line) 55%, transparent) 0.9turn,
+      transparent 0.99turn
+    );
+    animation: orbit-spin 2.2s linear infinite;
+    will-change: transform;
+  }
 }
 
 /*
@@ -368,6 +388,8 @@
   --c-good: #1e9c6e;
   --c-warn: #b7761a;
   --c-bad: #c9453a;
+  /* The macOS Touch ID fingerprint rose (biometric affordances). */
+  --c-touchid: #ee5d6f;
   /* Deep end of the brand gradient; same in both themes (it sits under the
    * accent, which does adapt). */
   --c-accent-deep: #2b3a8f;
@@ -407,6 +429,7 @@
   --c-good: #4cc08f;
   --c-warn: #e0a94e;
   --c-bad: #e4685d;
+  --c-touchid: #ee5d6f;
 
   --card: linear-gradient(
     180deg,
