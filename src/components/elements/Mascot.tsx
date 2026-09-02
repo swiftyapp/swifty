@@ -11,7 +11,7 @@ interface Props {
   size?: number
 }
 
-const GRAPHITE = '#686c75'
+const GRAPHITE = '#34373e'
 
 // The Swifty mascot: the brand asterisk (a secret value, redacted) with eyes.
 // It sits still and blinks every once in a while, follows typing with its
