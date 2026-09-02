@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, v1-0-0]
+    branches: [master, main, v1-0-0]
   pull_request:
 
 # Cancel superseded PR runs (rapid pushes stack full matrices otherwise);
@@ -47,6 +47,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          # Restore everywhere, save only on push. A PR run that also saved
+          # wrote a second ~1 GB copy of every cache under refs/pull/N/merge;
+          # with five cached jobs that doubled storage past the 10 GB repo
+          # limit, GitHub evicted by LRU, and PRs then restored nothing at all
+          # ("No cache found." -> ~14 min of cold compile, worst on Windows).
+          # Push runs on the trunk keep one authoritative copy per job+OS that
+          # every PR, from any branch, restores.
+          save-if: ${{ github.event_name == 'push' }}
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -120,6 +128,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          # Restore everywhere, save only on push. A PR run that also saved
+          # wrote a second ~1 GB copy of every cache under refs/pull/N/merge;
+          # with five cached jobs that doubled storage past the 10 GB repo
+          # limit, GitHub evicted by LRU, and PRs then restored nothing at all
+          # ("No cache found." -> ~14 min of cold compile, worst on Windows).
+          # Push runs on the trunk keep one authoritative copy per job+OS that
+          # every PR, from any branch, restores.
+          save-if: ${{ github.event_name == 'push' }}
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -171,6 +187,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          # Restore everywhere, save only on push. A PR run that also saved
+          # wrote a second ~1 GB copy of every cache under refs/pull/N/merge;
+          # with five cached jobs that doubled storage past the 10 GB repo
+          # limit, GitHub evicted by LRU, and PRs then restored nothing at all
+          # ("No cache found." -> ~14 min of cold compile, worst on Windows).
+          # Push runs on the trunk keep one authoritative copy per job+OS that
+          # every PR, from any branch, restores.
+          save-if: ${{ github.event_name == 'push' }}
 
       - run: bun install --frozen-lockfile
 
