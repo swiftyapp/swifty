@@ -53,48 +53,21 @@ export default function Mascot({
       data-state={state}
       className={bodyAnim}
     >
-      <g style={{ fill, transition: 'fill 300ms ease' }}>
-        <rect x="24" y="3" width="16" height="34" rx="8" />
-        <rect
-          x="24"
-          y="3"
-          width="16"
-          height="34"
-          rx="8"
-          transform="rotate(60 32 32)"
-        />
-        <rect
-          x="24"
-          y="3"
-          width="16"
-          height="34"
-          rx="8"
-          transform="rotate(120 32 32)"
-        />
-        <rect
-          x="24"
-          y="3"
-          width="16"
-          height="34"
-          rx="8"
-          transform="rotate(180 32 32)"
-        />
-        <rect
-          x="24"
-          y="3"
-          width="16"
-          height="34"
-          rx="8"
-          transform="rotate(240 32 32)"
-        />
-        <rect
-          x="24"
-          y="3"
-          width="16"
-          height="34"
-          rx="8"
-          transform="rotate(300 32 32)"
-        />
+      {/* Same-color round-join stroke fillets every inner notch corner (and
+          softens the tips), matching the reference's rounded cuts. */}
+      <g
+        style={{ fill, stroke: fill, transition: 'fill 300ms ease, stroke 300ms ease' }}
+        strokeWidth="5"
+        strokeLinejoin="round"
+      >
+        {/* One flared spike: narrow at the base, wide at the tip, soft
+            outer corners. Rotated six times; the circle buries the bases. */}
+        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" />
+        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" transform="rotate(60 32 32)" />
+        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" transform="rotate(120 32 32)" />
+        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" transform="rotate(180 32 32)" />
+        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" transform="rotate(240 32 32)" />
+        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" transform="rotate(300 32 32)" />
         <circle cx="32" cy="32" r="12" />
       </g>
 
