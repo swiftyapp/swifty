@@ -9,7 +9,7 @@ interface Props {
 
 export default function Choice({ onSelect }: Props) {
   return (
-    <AuthShell meta={`${t('offline')} · aes-256-gcm`}>
+    <AuthShell>
       <Eyebrow>{t('Welcome to Swifty')}</Eyebrow>
       <h1 className="mt-8 text-center text-2xl font-medium tracking-display text-text">
         {t('Set up your vault')}

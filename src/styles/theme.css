@@ -9,10 +9,9 @@
 @import 'tailwindcss';
 
 /*
- * Shared motion primitives for the redesign: a blinking text caret and a
- * slow "breathing" status dot (both from the Keyring lock prototype). Kept as
- * top-level @keyframes so any component can reference them via an arbitrary
- * `animate-[...]` utility regardless of theme.
+ * Shared motion primitives for the redesign (from the Keyring lock prototype).
+ * Kept as top-level @keyframes so any component can reference them via an
+ * arbitrary `animate-[...]` utility regardless of theme.
  */
 @keyframes caret {
   0%,
@@ -22,15 +21,6 @@
   55%,
   100% {
     opacity: 0;
-  }
-}
-@keyframes breathe {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 0.9;
   }
 }
 @keyframes fade {
@@ -58,6 +48,100 @@
   }
   to {
     opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Lock-screen mascot motion (from the Lock v3 prototype): a slow occasional
+ * blink while idle, a cheer bounce on unlock, and a deny shake on a bad
+ * passphrase. `blink` runs on the eye group; the other two on the body.
+ */
+@keyframes blink {
+  0%,
+  93%,
+  100% {
+    transform: scaleY(1);
+  }
+  96%,
+  97.5% {
+    transform: scaleY(0.06);
+  }
+}
+@keyframes cheer {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  32% {
+    transform: translateY(-12px) scale(1.05);
+  }
+  66% {
+    transform: translateY(2px) scale(0.98);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes deny {
+  18% {
+    transform: translateX(-6px) rotate(-4deg);
+  }
+  44% {
+    transform: translateX(6px) rotate(4deg);
+  }
+  72% {
+    transform: translateX(-3px) rotate(-2deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* A light band sweeping through text (see the `shimmer-text` utility). */
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+/*
+ * The verifying card: a soft comet of light orbits the border. The gradient
+ * layer itself rotates (compositor-driven transform, so it stays smooth);
+ * the `orbit-ring` container masks it down to the border ring.
+ */
+@keyframes orbit-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+/* While the key derives, the mask dots ripple in sequence (per-cell delay). */
+@keyframes dotwave {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+/* The wide lock card gets a straight sideways nudge; rotation is the mascot's. */
+@keyframes nudge {
+  18% {
+    transform: translateX(-7px);
+  }
+  44% {
+    transform: translateX(6px);
+  }
+  72% {
+    transform: translateX(-3px);
+  }
+  100% {
     transform: none;
   }
 }
@@ -140,10 +224,16 @@
  * `bg-app`, `text-text2`, `border-line`, `bg-accent`, ... with no rebuild.
  */
 @theme inline {
-  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system,
-    'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
-    monospace;
+  /*
+   * Native system stacks — no bundled webfonts. On macOS (Tauri/WebKit) these
+   * resolve to SF Pro and SF Mono; on Windows to Segoe UI and Consolas; on
+   * Linux to the desktop's configured fonts. The mono tier stays monospaced
+   * on purpose: labels, counts and revealed secrets rely on it.
+   */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas,
+    'Roboto Mono', 'Liberation Mono', monospace;
 
   --color-app: var(--c-app);
   --color-rail: var(--c-rail);
@@ -166,6 +256,7 @@
   --color-warn: var(--c-warn);
   --color-bad: var(--c-bad);
   --color-accent-deep: var(--c-accent-deep);
+  --color-touchid: var(--c-touchid);
 }
 
 /*
@@ -214,6 +305,61 @@
 }
 
 /*
+ * The orbiting border light, whole: the container clips down to the card's
+ * 2px border ring (two-layer mask keeps the interior clear) and its ::before
+ * is the rotating comet — an oversized conic square (covers the card's
+ * diagonal at any angle) spun by a compositor transform. The comet peaks at
+ * ~half the outline's own ink so it reads as a glint on the border, not a
+ * saturated streak over it.
+ */
+@utility orbit-ring {
+  padding: 2px;
+  overflow: hidden;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 400px;
+    height: 400px;
+    background: conic-gradient(
+      transparent 0turn 0.62turn,
+      color-mix(in srgb, var(--c-accent-line) 55%, transparent) 0.9turn,
+      transparent 0.99turn
+    );
+    animation: orbit-spin 2.2s linear infinite;
+    will-change: transform;
+  }
+}
+
+/*
+ * Busy text: the muted ink with a brighter band sweeping through the glyphs.
+ * Gradient is clipped to the text, so it re-themes via the ink tokens.
+ */
+@utility shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--c-text3) 40%,
+    var(--c-text) 50%,
+    var(--c-text3) 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2s linear infinite;
+}
+
+/*
  * LIGHT is the default palette (bare `:root`), so the app is light with no
  * `data-theme` set. DARK is opt-in via `[data-theme="dark"]`. Palettes come
  * straight from the Keyring prototype (its light `[data-kr=light]` set here on
@@ -242,6 +388,8 @@
   --c-good: #1e9c6e;
   --c-warn: #b7761a;
   --c-bad: #c9453a;
+  /* The macOS Touch ID fingerprint rose (biometric affordances). */
+  --c-touchid: #ee5d6f;
   /* Deep end of the brand gradient; same in both themes (it sits under the
    * accent, which does adapt). */
   --c-accent-deep: #2b3a8f;
@@ -253,6 +401,9 @@
   --shadow: 0 24px 60px rgba(24, 26, 30, 0.16), 0 1px 3px rgba(24, 26, 30, 0.1);
   --scrim: rgba(40, 43, 48, 0.3);
   --thumb: rgba(20, 22, 26, 0.22);
+  /* The lock screen's signature field: soft, layered float (see Masterpass). */
+  --lockfield-shadow: 0 1px 2px rgba(20, 22, 26, 0.05),
+    0 14px 36px rgba(20, 22, 26, 0.1);
 }
 
 :root[data-theme='dark'] {
@@ -278,6 +429,7 @@
   --c-good: #4cc08f;
   --c-warn: #e0a94e;
   --c-bad: #e4685d;
+  --c-touchid: #ee5d6f;
 
   --card: linear-gradient(
     180deg,
@@ -289,4 +441,6 @@
   --shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
   --scrim: rgba(8, 9, 10, 0.7);
   --thumb: rgba(255, 255, 255, 0.14);
+  --lockfield-shadow: 0 1px 2px rgba(0, 0, 0, 0.45),
+    0 18px 44px rgba(0, 0, 0, 0.5);
 }

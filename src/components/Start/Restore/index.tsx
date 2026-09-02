@@ -14,8 +14,8 @@ export default function Restore({ goBack }: Props) {
   const chosen = path !== null
 
   return (
-    <AuthShell meta={`${t('offline')} · aes-256-gcm`} onBack={goBack}>
-      <Eyebrow tone="accent">{t('Restore')}</Eyebrow>
+    <AuthShell onBack={goBack}>
+      <Eyebrow>{t('Restore')}</Eyebrow>
       <h1 className="mt-8 text-center text-2xl font-medium tracking-display text-text">
         {t('Restore Backup')}
       </h1>

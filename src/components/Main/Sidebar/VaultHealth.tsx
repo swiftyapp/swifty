@@ -68,7 +68,7 @@ export default function VaultHealth() {
             x="18"
             y="21.5"
             textAnchor="middle"
-            fontFamily="IBM Plex Mono, monospace"
+            fontFamily="var(--font-mono)"
             fontSize="10"
             fill="currentColor"
           >

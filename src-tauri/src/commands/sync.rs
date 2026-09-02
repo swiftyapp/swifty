@@ -90,10 +90,17 @@ pub async fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<(
 }
 
 #[tauri::command]
-pub fn sync_status(state: State<'_, AppState>) -> Result<SyncStatus> {
-    Ok(SyncStatus {
-        configured: state.session.lock().unwrap().sync_configured,
-    })
+pub fn sync_status(app: AppHandle, state: State<'_, AppState>) -> Result<SyncStatus> {
+    // The session flag only exists after an unlock; while locked, answer from
+    // the persisted (non-secret) settings so e.g. the lock screen can say
+    // where the vault lives.
+    let session = state.session.lock().unwrap();
+    let configured = if session.is_unlocked() {
+        session.sync_configured
+    } else {
+        crate::storage::sync_configured(&app)
+    };
+    Ok(SyncStatus { configured })
 }
 
 // Run the OAuth consent flow off the main thread and mark the session connected.

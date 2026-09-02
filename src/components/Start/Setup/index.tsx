@@ -14,8 +14,8 @@ export default function Setup({ goBack }: Props) {
   const confirming = password !== null
 
   return (
-    <AuthShell meta={`${t('offline')} · aes-256-gcm`} onBack={goBack}>
-      <Eyebrow tone="accent">{t('New vault')}</Eyebrow>
+    <AuthShell onBack={goBack}>
+      <Eyebrow>{t('New vault')}</Eyebrow>
       <h1 className="mt-8 text-center text-2xl font-medium tracking-display text-text">
         {t('Account Setup')}
       </h1>

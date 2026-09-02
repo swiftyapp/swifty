@@ -6,12 +6,9 @@ import { runStartupUpdateCheck } from './services/autoUpdate'
 import { applyPlatform } from './utils/platform'
 import { applyTheme, getTheme } from './theme'
 import './shortcuts'
-// Self-hosted fonts (bundled, no runtime CDN — the app stays fully offline).
-import '@fontsource-variable/geist/wght.css'
-import '@fontsource/ibm-plex-mono/400.css'
-import '@fontsource/ibm-plex-mono/500.css'
-import '@fontsource/ibm-plex-mono/600.css'
 // Design tokens + base (Tailwind v4). Sole stylesheet now the SASS is gone.
+// Type comes from the OS system stacks (see --font-sans/--font-mono) — no
+// bundled webfonts.
 import './styles/theme.css'
 
 applyPlatform()

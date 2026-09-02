@@ -1,18 +1,20 @@
 import type { ReactNode } from 'react'
 import { t } from '@/i18n'
+import { useAuthMeta } from '@/hooks/useAuthMeta'
 import Back from '@/assets/images/back.svg?react'
 
 interface Props {
   children: ReactNode
-  meta?: ReactNode
   onBack?: () => void
 }
 
 // The shared full-height, centered auth ground: a neutral background (via the
 // `bg-app` token, so it reads in both light and dark) with a soft radial glow
-// behind a max-560px centered column, an optional bottom "Go Back" link and an
-// optional mono meta strip. Reused by the lock, setup and restore screens.
-export default function AuthShell({ children, meta, onBack }: Props) {
+// behind a max-560px centered column, an optional bottom "Go Back" link and
+// the mono footer strip (version + vault home, from useAuthMeta). Reused by
+// the lock, setup and restore screens.
+export default function AuthShell({ children, onBack }: Props) {
+  const meta = useAuthMeta()
   return (
     <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-app px-10 text-text select-none">
       <div
@@ -51,7 +53,8 @@ export default function AuthShell({ children, meta, onBack }: Props) {
       )}
 
       {meta && (
-        <div className="absolute inset-x-0 bottom-0 flex h-13 items-center justify-center font-mono text-xs uppercase tracking-label text-text3">
+        // A tier below text-xs on purpose: footer chrome, not content.
+        <div className="absolute inset-x-0 bottom-0 flex h-13 items-center justify-center font-mono text-[10px] uppercase tracking-label text-text3">
           {meta}
         </div>
       )}
