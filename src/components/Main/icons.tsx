@@ -4,12 +4,13 @@
 // System rules (from the Keyring design system):
 //   · stroke 1.75 — tracks the prototype's 1.7 hairline look (lucide's
 //     default 2 reads too heavy at our sizes)
-//   · two sizes — 14 inside 24–28px controls, 16 everywhere else
-//     (rows, tiles, rail); call sites may override for hero surfaces
+//   · three sizes — 14 inside 24–28px controls, 16 for rows and tiles, 20 for
+//     the rail; call sites may override for hero surfaces
 //
 // Components keep the historical `*Glyph` names so this module stays the one
 // place an icon choice lives.
 import {
+  Activity,
   ArrowDownWideNarrow,
   Check,
   ChevronDown,
@@ -21,6 +22,7 @@ import {
   FileText,
   Fingerprint,
   Globe,
+  LayoutGrid,
   Lock,
   Moon,
   MoreHorizontal,
@@ -30,6 +32,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Star,
   Sun,
   Trash2,
   X,
@@ -42,7 +45,7 @@ interface IconProps {
 }
 
 const glyph =
-  (Icon: LucideIcon, defaultSize: 14 | 16) =>
+  (Icon: LucideIcon, defaultSize: 14 | 16 | 20) =>
   ({ size = defaultSize, className }: IconProps) => (
     <Icon size={size} strokeWidth={1.75} className={className} />
   )
@@ -73,3 +76,13 @@ export const LoginGlyph = glyph(Globe, 16)
 export const NoteGlyph = glyph(FileText, 16)
 export const CardGlyph = glyph(CreditCard, 16)
 export const ShieldGlyph = glyph(ShieldCheck, 16)
+export const GlobeGlyph = glyph(Globe, 16)
+export const ActivityGlyph = glyph(Activity, 16)
+
+// Rail tier (20px, for the 40px+ rail hit areas and Settings nav headers)
+export const PlusRailGlyph = glyph(Plus, 20)
+export const GearRailGlyph = glyph(Settings, 20)
+export const GridRailGlyph = glyph(LayoutGrid, 20)
+export const StarRailGlyph = glyph(Star, 20)
+export const TrashRailGlyph = glyph(Trash2, 20)
+export const ActivityRailGlyph = glyph(Activity, 20)
