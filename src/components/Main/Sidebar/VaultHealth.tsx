@@ -1,8 +1,7 @@
-import { cx } from '@/utils/cx'
 import { useStore, setView } from '@/store'
 import { t } from '@/i18n'
 import type { Audit, AuditItem } from '@/lib/commands'
-import Tooltip from '@/components/elements/Tooltip'
+import RailButton from '@/components/elements/RailButton'
 
 // Per-password health from the zxcvbn score, penalised for reuse/breach —
 // mirrors the audit Score card, scaled here to a 0-100 vault score.
@@ -37,44 +36,44 @@ export default function VaultHealth() {
   const dash = score === null ? 0 : (score / 100) * CIRCUMFERENCE
 
   return (
-    <Tooltip content={t('Vault Health')}>
-      <div
-        data-testid="view-health"
-        onClick={() => setView('health')}
-        className={cx(
-          'grid h-10 w-10 cursor-pointer place-items-center rounded-lg transition-colors',
-          selected
-            ? 'bg-tile text-text'
-            : 'text-text2 hover:bg-hover hover:text-text'
+    <RailButton
+      label={t('Vault Health')}
+      selected={selected}
+      onClick={() => setView('health')}
+      testid="view-health"
+    >
+      <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
+        <circle
+          cx="18"
+          cy="18"
+          r={RADIUS}
+          stroke="var(--c-line2)"
+          strokeWidth="2"
+        />
+        {score !== null && (
+          <circle
+            cx="18"
+            cy="18"
+            r={RADIUS}
+            stroke={ringColor}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${CIRCUMFERENCE}`}
+            transform="rotate(-90 18 18)"
+          />
         )}
-      >
-        <svg width="30" height="30" viewBox="0 0 36 36" fill="none">
-          <circle cx="18" cy="18" r={RADIUS} stroke="var(--c-line2)" strokeWidth="2.5" />
-          {score !== null && (
-            <circle
-              cx="18"
-              cy="18"
-              r={RADIUS}
-              stroke={ringColor}
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeDasharray={`${dash} ${CIRCUMFERENCE}`}
-              transform="rotate(-90 18 18)"
-            />
-          )}
-          <text
-            data-testid="vault-health-score"
-            x="18"
-            y="21.5"
-            textAnchor="middle"
-            fontFamily="var(--font-mono)"
-            fontSize="10"
-            fill="currentColor"
-          >
-            {score === null ? '—' : score}
-          </text>
-        </svg>
-      </div>
-    </Tooltip>
+        <text
+          data-testid="vault-health-score"
+          x="18"
+          y="21.5"
+          textAnchor="middle"
+          fontFamily="var(--font-mono)"
+          fontSize="9"
+          fill="currentColor"
+        >
+          {score === null ? '—' : score}
+        </text>
+      </svg>
+    </RailButton>
   )
 }

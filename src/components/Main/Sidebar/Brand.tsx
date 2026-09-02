@@ -12,10 +12,10 @@ import Logo from '@/assets/images/logo.svg?react'
 export default function Brand() {
   return (
     <div
-      className="grid h-10 w-10 flex-none place-items-center"
+      className="grid h-9 w-9 flex-none place-items-center"
       title="Swifty"
     >
-      <Logo width={28} height={28} className="fill-brand" />
+      <Logo width={24} height={24} className="fill-brand" />
     </div>
   )
 }
