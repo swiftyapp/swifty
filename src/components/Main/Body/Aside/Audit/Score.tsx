@@ -1,17 +1,9 @@
-import type { Audit, AuditItem } from '@/lib/commands'
+import type { Audit } from '@/lib/commands'
 import { t } from '@/i18n'
+import { vaultScore } from '@/utils/vaultScore'
 
 interface Props {
   audit: Audit
-}
-
-// Per-password health from the zxcvbn score (0-4 → 0-1), penalised for reuse
-// and known breaches. Averaged and scaled to a 0-10 overall score.
-const healthOf = (record: AuditItem) => {
-  let value = record.score / 4
-  if (record.isRepeating) value -= 0.25
-  if (record.breached) value -= 0.5
-  return Math.max(0, value)
 }
 
 const R = 40
@@ -21,9 +13,8 @@ const toneOf = (score: number) =>
   score >= 7 ? 'var(--c-good)' : score >= 4 ? 'var(--c-warn)' : 'var(--c-bad)'
 
 export default function Score({ audit }: Props) {
-  const records = Object.values(audit)
-  const health = records.reduce((total, record) => total + healthOf(record), 0)
-  const score = Math.round((health / records.length) * 100) / 10
+  // The shared 0-100 vault score, shown here on a 0-10 scale with one decimal.
+  const score = (vaultScore(audit) ?? 0) / 10
   const dash = `${(score / 10) * CIRCUMFERENCE} ${CIRCUMFERENCE}`
 
   return (

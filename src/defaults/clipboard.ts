@@ -1,7 +1,9 @@
 const KEY = 'swifty:clipboardTimeout'
 
 // How long a copied secret lingers before the clipboard is cleared (ms).
-export const DEFAULT_CLIPBOARD_TIMEOUT = 20000
+// One of the choices offered in Settings › Security, so the segmented control
+// always has something selected on a fresh install.
+export const DEFAULT_CLIPBOARD_TIMEOUT = 30000
 
 export const getTimeout = (): number => {
   const stored = localStorage.getItem(KEY)

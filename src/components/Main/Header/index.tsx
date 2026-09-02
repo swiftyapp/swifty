@@ -1,6 +1,5 @@
 import Search from './Search'
 import SyncIndicator from './SyncIndicator'
-import ThemeToggle from './ThemeToggle'
 import LockButton from './LockButton'
 import Controls from '@/components/elements/Controls'
 
@@ -31,7 +30,6 @@ export default function Header() {
       </div>
       <div className="flex flex-1 items-center justify-end gap-1.5">
         <SyncIndicator />
-        <ThemeToggle />
         <LockButton />
       </div>
     </header>

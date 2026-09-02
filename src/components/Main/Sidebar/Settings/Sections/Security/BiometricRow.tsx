@@ -6,13 +6,9 @@ import {
   type BiometricMode
 } from '@/lib/commands'
 import { t } from '@/i18n'
-import type { Section } from './Navigation'
-import Button from '@/components/elements/Button'
-import { H1, Section as Row, LABEL, DESC, DANGER } from './ui'
-
-interface Props {
-  section: Section
-}
+import SettingsGroup from '@/components/elements/SettingsGroup'
+import SettingsRow from '@/components/elements/SettingsRow'
+import Toggle from '@/components/elements/Toggle'
 
 // What the gate actually is, once we know it. Before enrollment we can only
 // describe the offer; afterwards the recorded mode says which guarantee holds.
@@ -30,7 +26,7 @@ const description = (mode: BiometricMode | null) => {
   )
 }
 
-export default function Biometric({ section }: Props) {
+export default function BiometricRow() {
   const [enabled, setEnabled] = useState(false)
   const [mode, setMode] = useState<BiometricMode | null>(null)
   const [busy, setBusy] = useState(false)
@@ -48,6 +44,7 @@ export default function Biometric({ section }: Props) {
   const toggle = () => {
     setBusy(true)
     setError(null)
+    const done = () => setBusy(false)
     if (enabled) {
       disableBiometric()
         .then(() => {
@@ -55,41 +52,41 @@ export default function Biometric({ section }: Props) {
           setMode(null)
         })
         .catch(err => setError(String(err?.message ?? err)))
-        .finally(() => setBusy(false))
+        .finally(done)
       return
     }
     enableBiometric()
-      .then(mode => {
+      .then(next => {
         setEnabled(true)
-        setMode(mode)
+        setMode(next)
       })
       .catch(err => setError(String(err?.message ?? err)))
-      .finally(() => setBusy(false))
+      .finally(done)
   }
 
-  if (section !== 'biometric') return null
-
   return (
-    <>
-      <h1 className={H1}>{t('Biometric Unlock')}</h1>
-      <Row>
-        <strong className={LABEL}>
-          {t('Unlock with Touch ID or Windows Hello')}
-        </strong>
-        <p className={DESC}>{description(enabled ? mode : null)}</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            variant={enabled ? 'danger' : 'primary'}
-            loading={busy}
-            onClick={toggle}
-          >
-            {enabled
-              ? t('Disable Biometric Unlock')
-              : t('Enable Biometric Unlock')}
-          </Button>
-          {error && <span className={DANGER}>{error}</span>}
-        </div>
-      </Row>
-    </>
+    <SettingsGroup label={t('Biometrics')}>
+      <SettingsRow
+        label={t('Unlock with Touch ID or Windows Hello')}
+        description={description(enabled ? mode : null)}
+        testid="settings-biometric-row"
+        control={
+          <Toggle
+            name="biometric"
+            checked={enabled}
+            disabled={busy}
+            onChange={toggle}
+            aria-label={t('Unlock with Touch ID or Windows Hello')}
+            testid="settings-biometric-toggle"
+          />
+        }
+      >
+        {error && (
+          <span data-testid="settings-biometric-error" className="text-base text-bad">
+            {error}
+          </span>
+        )}
+      </SettingsRow>
+    </SettingsGroup>
   )
 }

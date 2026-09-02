@@ -9,7 +9,7 @@ export interface UpdateSlice {
     // Version + release notes of a staged update awaiting restart (null = none).
     readyVersion: string | null
     readyNotes: string | null
-    // Transient status of a manual "Check for Updates" run (null = idle).
+    // Transient status of a manual update check (null = idle).
     status: UpdateCheckStatus
   }
   // Records a staged update (drives the restart toast).

@@ -1,13 +1,10 @@
 import { getLocale } from '@/i18n'
-
-// Compact timestamps for list rows, in the prototype's shape: "3m", "1h", "2d",
-// then a short localized date ("Mar 4") once something is more than a week old.
+import { getFormat } from '@/defaults/dateFormat'
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 
-// An ISO timestamp -> epoch ms, or null when it is missing or unparseable.
 export const toTime = (iso?: string): number | null => {
   if (!iso) return null
   const at = Date.parse(iso)
@@ -23,16 +20,35 @@ export const relativeTime = (iso?: string, now: number = Date.now()): string => 
   if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m`
   if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`
   if (elapsed < 7 * DAY) return `${Math.floor(elapsed / DAY)}d`
-  return shortDate(at, now)
+  return shortDate(at)
 }
 
-// "Mar 4" within the current year, "Mar 4, 2023" before it.
-const shortDate = (at: number, now: number): string => {
+const pad = (value: number) => String(value).padStart(2, '0')
+
+// Anything older than a week — and every explicit timestamp in the UI — is
+// rendered in the pattern picked in Settings › Language & region.
+export const shortDate = (at: number | Date): string => {
   const date = new Date(at)
-  const sameYear = date.getFullYear() === new Date(now).getFullYear()
-  return date.toLocaleDateString(getLocale(), {
-    month: 'short',
-    day: 'numeric',
-    ...(sameYear ? {} : { year: 'numeric' })
+  const year = date.getFullYear()
+  const month = pad(date.getMonth() + 1)
+  const day = pad(date.getDate())
+
+  switch (getFormat()) {
+    case 'DD.MM.YYYY':
+      return `${day}.${month}.${year}`
+    case 'YYYY-MM-DD':
+      return `${year}-${month}-${day}`
+    default:
+      return `${month}/${day}/${year}`
+  }
+}
+
+export const dateTime = (iso?: string): string => {
+  const at = toTime(iso)
+  if (at === null) return '—'
+  const time = new Date(at).toLocaleTimeString(getLocale(), {
+    hour: '2-digit',
+    minute: '2-digit'
   })
+  return `${shortDate(at)} ${time}`
 }

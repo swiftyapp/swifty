@@ -95,6 +95,7 @@ pub fn run() {
             commands::audit::get_audit,
             favicon::fetch_favicon,
             commands::clipboard::copy_to_clipboard,
+            autolock::set_autolock_timeout,
             commands::sync::sync_connect,
             commands::sync::sync_disconnect,
             commands::sync::sync_now,

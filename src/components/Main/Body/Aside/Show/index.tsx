@@ -6,6 +6,7 @@ import { useFavicon } from '@/hooks/useFavicon'
 import CardBrandMark from '@/components/elements/CardBrandMark'
 import { hasBrandMark } from '@/utils/cardBrand'
 import { kindOf } from '@/kinds'
+import { dateTime } from '@/utils/time'
 import { t } from '@/i18n'
 import Details from './Details'
 import Actions from './Actions'
@@ -14,9 +15,6 @@ import { MONO_LABEL } from '../ui'
 interface Props {
   entry: EntryMeta
 }
-
-const formatDate = (value?: string) =>
-  value ? new Date(value).toLocaleString() : '—'
 
 export default function Show({ entry }: Props) {
   const revealed = useRevealed(entry)
@@ -37,8 +35,8 @@ export default function Show({ entry }: Props) {
 
   const ledger: { k: string; v: string }[] = [
     { k: t('Type'), v: t(kind.label) },
-    { k: t('Last Modified'), v: formatDate(entry.updatedAt) },
-    { k: t('Created'), v: formatDate(entry.createdAt) }
+    { k: t('Last Modified'), v: dateTime(entry.updatedAt) },
+    { k: t('Created'), v: dateTime(entry.createdAt) }
   ]
 
   return (

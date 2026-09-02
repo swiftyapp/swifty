@@ -98,6 +98,7 @@ export const {
   closePalette,
   openSettings,
   closeSettings,
+  setSettingsSection,
   openAddPicker,
   closeAddPicker,
   setView,

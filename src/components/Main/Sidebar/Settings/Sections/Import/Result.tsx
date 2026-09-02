@@ -1,0 +1,92 @@
+import { useState } from 'react'
+import { t } from '@/i18n'
+import Button from '@/components/elements/Button'
+import { inputClass } from '@/components/elements/formStyles'
+import { CARD } from '@/components/elements/tokens'
+import Progress from './Progress'
+import RowErrors from './RowErrors'
+import type { useImport } from './useImport'
+
+const fileName = (path: string) => path.replace(/^.*[\\/]/, '')
+
+// The one card under the grid: what was picked, what it holds, and the button
+// that commits it.
+export default function Result({ flow }: { flow: ReturnType<typeof useImport> }) {
+  const { picked, preview, result, count, running, error, progress } = flow
+  const [password, setPassword] = useState('')
+
+  if (!picked) return null
+
+  return (
+    <div className={`${CARD} flex flex-col gap-3 p-4`} data-testid="import-result">
+      <div className="font-mono text-xs text-text3">{fileName(picked.path)}</div>
+
+      {picked.kind === 'swftx' ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="password"
+            name="import_password"
+            placeholder={t('Vault File Password')}
+            className={`${inputClass} max-w-xs`}
+            value={password}
+            disabled={running}
+            onChange={event => setPassword(event.target.value)}
+          />
+          <Button
+            size="md"
+            loading={running}
+            onClick={() => flow.runBackup(password)}
+            testid="import-run-backup"
+          >
+            {t('Run import')}
+          </Button>
+        </div>
+      ) : (
+        preview && (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-base text-text2">
+              {t('Ready to import')}:{' '}
+              <strong className="text-text">{preview.total}</strong>
+              {preview.skipped > 0 && (
+                <span className="text-bad">
+                  {' '}
+                  · {preview.skipped} {t('rows skipped')}
+                </span>
+              )}
+            </span>
+            <Button
+              size="md"
+              loading={running}
+              onClick={flow.commit}
+              testid="import-commit"
+            >
+              {t('Import')} {preview.total}
+            </Button>
+          </div>
+        )
+      )}
+
+      {running && <Progress done={progress.done} total={progress.total} />}
+
+      {error && (
+        <span data-testid="import-error" className="text-base text-bad">
+          {error}
+        </span>
+      )}
+      {result && (
+        <span className="text-base text-good">
+          {t('Imported')} {result.imported}
+          {result.skipped > 0 && ` · ${result.skipped} ${t('skipped')}`}
+        </span>
+      )}
+      {count !== null && (
+        <span className="text-base text-good">
+          {t('Imported')} {count}
+        </span>
+      )}
+
+      {preview && <RowErrors errors={preview.errors} />}
+      {result && <RowErrors errors={result.errors} />}
+    </div>
+  )
+}

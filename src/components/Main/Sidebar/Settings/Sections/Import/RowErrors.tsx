@@ -11,7 +11,7 @@ export default function RowErrors({ errors }: { errors: RowError[] }) {
   if (errors.length === 0) return null
 
   return (
-    <div className="mt-2 text-base">
+    <div className="text-base">
       <span
         className="cursor-pointer select-none text-bad"
         onClick={() => setOpen(!open)}
@@ -26,7 +26,9 @@ export default function RowErrors({ errors }: { errors: RowError[] }) {
             </li>
           ))}
           {errors.length > MAX_SHOWN && (
-            <li>… {errors.length - MAX_SHOWN} {t('more')}</li>
+            <li>
+              … {errors.length - MAX_SHOWN} {t('more')}
+            </li>
           )}
         </ul>
       )}
