@@ -105,14 +105,20 @@
     background-position: -50% 0;
   }
 }
-/* The verifying card's halo breathes (opacity pulse on a ring overlay). */
-@keyframes halo {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 1;
+/*
+ * The verifying card: a comet of accent light orbits the border (see the
+ * `orbit-ring` utility). The angle is a registered property so the conic
+ * gradient itself animates; without @property support it degrades to a
+ * static arc.
+ */
+@property --orbit {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes orbit {
+  to {
+    --orbit: 360deg;
   }
 }
 /* While the key derives, the mask dots ripple in sequence (per-cell delay). */
@@ -298,6 +304,30 @@
   --animate-fade: fade 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-pop: pop 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-sheet: sheet 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/*
+ * The orbiting border light: a conic comet painted over the card's border
+ * ring only (two-layer mask keeps the interior clear). 2px thick, one lap
+ * every 1.4s.
+ */
+@utility orbit-ring {
+  padding: 2px;
+  background: conic-gradient(
+    from var(--orbit),
+    transparent 0turn 0.62turn,
+    var(--c-accent) 0.87turn,
+    transparent 1turn
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: orbit 1.4s linear infinite;
 }
 
 /*

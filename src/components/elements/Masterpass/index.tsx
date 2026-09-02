@@ -139,11 +139,11 @@ export default function Masterpass({
           disabled && !success && !pending && 'opacity-60'
         )}
       >
-        {/* While verifying, the halo breathes instead of holding static. */}
+        {/* While verifying, a comet of accent light orbits the border. */}
         {pending && (
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-0 rounded-xl ring-4 ring-accent-soft animate-[halo_1.8s_ease-in-out_infinite]"
+            className="orbit-ring pointer-events-none absolute -inset-px rounded-xl"
           />
         )}
         <div className="relative flex-1">
