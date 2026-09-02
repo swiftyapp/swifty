@@ -106,19 +106,16 @@
   }
 }
 /*
- * The verifying card: a comet of accent light orbits the border (see the
- * `orbit-ring` utility). The angle is a registered property so the conic
- * gradient itself animates; without @property support it degrades to a
- * static arc.
+ * The verifying card: a soft comet of light orbits the border. The gradient
+ * layer itself rotates (compositor-driven transform, so it stays smooth);
+ * the `orbit-ring` container masks it down to the border ring.
  */
-@property --orbit {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 0deg;
-}
-@keyframes orbit {
+@keyframes orbit-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
   to {
-    --orbit: 360deg;
+    transform: translate(-50%, -50%) rotate(360deg);
   }
 }
 /* While the key derives, the mask dots ripple in sequence (per-cell delay). */
@@ -307,18 +304,13 @@
 }
 
 /*
- * The orbiting border light: a conic comet painted over the card's border
- * ring only (two-layer mask keeps the interior clear). 2px thick, one lap
- * every 1.4s.
+ * The orbiting border light's container: clips its rotating gradient child
+ * down to the card's 2px border ring (two-layer mask keeps the interior
+ * clear).
  */
 @utility orbit-ring {
   padding: 2px;
-  background: conic-gradient(
-    from var(--orbit),
-    transparent 0turn 0.62turn,
-    var(--c-accent) 0.87turn,
-    transparent 1turn
-  );
+  overflow: hidden;
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -327,7 +319,6 @@
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  animation: orbit 1.4s linear infinite;
 }
 
 /*

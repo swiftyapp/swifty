@@ -139,12 +139,22 @@ export default function Masterpass({
           disabled && !success && !pending && 'opacity-60'
         )}
       >
-        {/* While verifying, a comet of accent light orbits the border. */}
+        {/* While verifying, a soft comet of light orbits the border: the
+            oversized gradient square rotates (compositor transform), the
+            orbit-ring mask trims it to the border. */}
         {pending && (
           <span
             aria-hidden
             className="orbit-ring pointer-events-none absolute -inset-px rounded-xl"
-          />
+          >
+            <span
+              className="absolute left-1/2 top-1/2 h-[480px] w-[480px] animate-[orbit-spin_2.2s_linear_infinite]"
+              style={{
+                background:
+                  'conic-gradient(transparent 0turn 0.62turn, var(--c-accent-line) 0.9turn, transparent 0.99turn)'
+              }}
+            />
+          </span>
         )}
         <div className="relative flex-1">
           {input}
