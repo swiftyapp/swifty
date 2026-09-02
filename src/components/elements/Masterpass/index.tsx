@@ -3,7 +3,7 @@ import { cx } from '@/utils/cx'
 import { t } from '@/i18n'
 import Error from '../Error'
 import IconButton from '../IconButton'
-import { EyeGlyph, FingerprintGlyph } from '@/components/Main/icons'
+import { EyeGlyph, EyeOffGlyph, FingerprintGlyph } from '@/components/Main/icons'
 import Dots from './Dots'
 import KeyCuts from './KeyCuts'
 
@@ -27,7 +27,9 @@ interface Props {
 }
 
 const EyeIcon = <EyeGlyph size={16} />
+const EyeOffIcon = <EyeOffGlyph size={16} />
 const SmallEyeIcon = <EyeGlyph size={14} />
+const SmallEyeOffIcon = <EyeOffGlyph size={14} />
 
 // The macOS Touch ID rose, so the fingerprint reads as the system affordance
 // rather than another monochrome glyph. Sized to nearly fill the 28px button:
@@ -125,16 +127,16 @@ export default function Masterpass({
             text={reveal ? value : undefined}
           />
           {/* Reveal is a secondary modifier of what you're typing, so it only
-              appears once there is something to reveal, small and dim. */}
+              appears once there is something to reveal, small and dim. The
+              crossed eye alone carries the on state — no persistent wash. */}
           {value.length > 0 && (
             <IconButton
-              label={t('Reveal passphrase')}
-              className="animate-fade absolute right-1.5 top-1/2 -translate-y-1/2"
+              label={t(reveal ? 'Hide passphrase' : 'Reveal passphrase')}
+              className="animate-fade absolute right-1.5 top-1/2 -translate-y-1/2 hover:bg-hover/60!"
               muted
-              active={reveal}
               onClick={() => setReveal(r => !r)}
             >
-              {SmallEyeIcon}
+              {reveal ? SmallEyeOffIcon : SmallEyeIcon}
             </IconButton>
           )}
         </div>
@@ -146,7 +148,7 @@ export default function Masterpass({
             <span aria-hidden className="my-auto h-7 w-px bg-line" />
             <IconButton
               label={t('Touch ID')}
-              className="touchid mx-1.5 my-auto"
+              className="touchid mx-1.5 my-auto hover:bg-hover/60!"
               onClick={onTouchID}
             >
               {TouchIdIcon}
@@ -167,12 +169,11 @@ export default function Masterpass({
           text={reveal ? value : undefined}
         />
         <IconButton
-          label={t('Reveal passphrase')}
+          label={t(reveal ? 'Hide passphrase' : 'Reveal passphrase')}
           className="absolute right-0"
-          active={reveal}
           onClick={() => setReveal(r => !r)}
         >
-          {EyeIcon}
+          {reveal ? EyeOffIcon : EyeIcon}
         </IconButton>
       </div>
       <KeyCuts count={value.length} tone={bad ? 'bad' : 'idle'} />
