@@ -2,7 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Body from '@/components/Main/Body'
-import { listDeleted, purgeEntry, restoreEntry, revealEntry } from '@/lib/commands'
+import { useShortcuts } from '@/components/Main/useShortcuts'
+import {
+  copyToClipboard,
+  listDeleted,
+  purgeEntry,
+  restoreEntry,
+  revealEntry
+} from '@/lib/commands'
 import { makeStore, useStore, setView } from '@/store'
 import { renderWithStore, withEntries, deletedMeta, loginMeta } from './utils'
 
@@ -11,12 +18,20 @@ const NOW = new Date('2024-01-08T00:00:00.000Z')
 const gone = deletedMeta({ id: 'gone', title: 'Old Account' })
 const live = loginMeta({ id: 'live', title: 'Google' })
 
+// ⌘E is an app-level accelerator (Main/useShortcuts), so the harness mounts it
+// alongside the panes the way Main does — otherwise the guard under test would
+// never be reached by a key press.
+const Harness = () => {
+  useShortcuts()
+  return <Body />
+}
+
 // Open the Trash the way the rail does, and wait for `list_deleted` to land.
 const openTrash = async (tombstones = [gone]) => {
   vi.mocked(listDeleted).mockResolvedValue(tombstones)
   const store = makeStore()
   withEntries(store, [live])
-  const rendered = renderWithStore(<Body />, { store })
+  const rendered = renderWithStore(<Harness />, { store })
   setView('trash')
   await vi.waitFor(() => expect(useStore.getState().entries.trash).toEqual(tombstones))
   return rendered
@@ -85,6 +100,44 @@ describe('the Trash view', () => {
     await vi.waitFor(() => expect(useStore.getState().entries.trash).toEqual([]))
     // It does not come back as a live entry either.
     expect(useStore.getState().entries.items.map(e => e.id)).toEqual(['live'])
+  })
+
+  // ⌘E and ⌘⏎ reach the entry without going through the detail header, so the
+  // pane's read-only-ness has to hold at the store and service level too.
+  it('refuses ⌘E on a tombstone, so no editor can open on an unreadable row', async () => {
+    await openTrash()
+    await userEvent.click(screen.getByTestId('entry-item'))
+
+    await userEvent.keyboard('{Meta>}e{/Meta}')
+
+    expect(useStore.getState().entries.edit).toBe(false)
+    expect(screen.queryByTestId('entry-sheet')).not.toBeInTheDocument()
+    // Still the read-only cluster, not an editor.
+    expect(screen.getByTestId('restore-entry-button')).toBeInTheDocument()
+  })
+
+  it('still edits a live entry — the guard is about tombstones, not ⌘E', async () => {
+    const store = makeStore()
+    withEntries(store, [live])
+    renderWithStore(<Harness />, { store })
+
+    await userEvent.click(screen.getByTestId('entry-item'))
+    await userEvent.keyboard('{Meta>}e{/Meta}')
+
+    expect(useStore.getState().entries.edit).toBe(true)
+  })
+
+  it('fails quietly when ⌘⏎ asks a tombstone for its secret', async () => {
+    vi.mocked(revealEntry).mockRejectedValue(new Error('entry not found'))
+    await openTrash()
+
+    await userEvent.click(screen.getByTestId('search-input'))
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
+
+    // `reveal_entry` refuses deleted rows; the rejection must not escape
+    // `copySecret`, and nothing may reach the clipboard.
+    await vi.waitFor(() => expect(revealEntry).toHaveBeenCalledWith('gone'))
+    expect(copyToClipboard).not.toHaveBeenCalled()
   })
 
   it('shows the trash empty state when there is nothing to restore', async () => {
