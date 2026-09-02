@@ -57,18 +57,18 @@ export default function Mascot({
           softens the tips), matching the reference's rounded cuts. */}
       <g
         style={{ fill, stroke: fill, transition: 'fill 300ms ease, stroke 300ms ease' }}
-        strokeWidth="5"
+        strokeWidth="8"
         strokeLinejoin="round"
       >
         {/* One flared spike: narrow at the base, wide at the tip, soft
             outer corners. Rotated six times; the circle buries the bases. */}
-        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" />
-        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" transform="rotate(60 32 32)" />
-        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" transform="rotate(120 32 32)" />
-        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" transform="rotate(180 32 32)" />
-        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" transform="rotate(240 32 32)" />
-        <path d="M28 24 L25.8 7.5 Q25.5 5 28 5 L36 5 Q38.5 5 38.2 7.5 L36 24 Z" transform="rotate(300 32 32)" />
-        <circle cx="32" cy="32" r="12" />
+        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" />
+        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" transform="rotate(60 32 32)" />
+        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" transform="rotate(120 32 32)" />
+        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" transform="rotate(180 32 32)" />
+        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" transform="rotate(240 32 32)" />
+        <path d="M29.5 24 L27.2 8 Q27 6.5 28.5 6.5 L35.5 6.5 Q37 6.5 36.8 8 L34.5 24 Z" transform="rotate(300 32 32)" />
+        <circle cx="32" cy="32" r="10.5" />
       </g>
 
       <g
