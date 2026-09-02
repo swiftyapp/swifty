@@ -45,7 +45,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(
+            // The plugin defaults to Trace, which pulls in every dependency's
+            // tracing -- tao logs entry and exit of each NSWindowDelegate
+            // callback, so ordinary focus changes flood stderr and the log file.
             tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .level_for("swifty_lib", log::LevelFilter::Debug)
                 .target(tauri_plugin_log::Target::new(
                     tauri_plugin_log::TargetKind::Stderr,
                 ))
