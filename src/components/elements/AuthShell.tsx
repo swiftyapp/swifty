@@ -51,7 +51,8 @@ export default function AuthShell({ children, meta, onBack }: Props) {
       )}
 
       {meta && (
-        <div className="absolute inset-x-0 bottom-0 flex h-13 items-center justify-center font-mono text-xs uppercase tracking-label text-text3">
+        // A tier below text-xs on purpose: footer chrome, not content.
+        <div className="absolute inset-x-0 bottom-0 flex h-13 items-center justify-center font-mono text-[10px] uppercase tracking-label text-text3">
           {meta}
         </div>
       )}
