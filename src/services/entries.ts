@@ -11,18 +11,16 @@ export interface FilterOptions {
   // null means every kind — the "All Items" view.
   type: EntryType | null
   query: string
-  tags: string[]
 }
 
 // Fields a query is matched against. Only non-secret list metadata is available
 // here (secret fields like username/notes live in the encrypted payload); the
-// site host stands in for the website. url_host covers most "which account" searches.
+// site host stands in for the website. url_host covers most "which account"
+// searches, and tags make the search field the way to pull up a tagged set.
 const SEARCH_KEYS = ['title', 'urlHost', 'tags']
 
 export const filterEntries = (entries: EntryMeta[], options: FilterOptions): EntryMeta[] => {
-  const scoped = entries.filter(
-    entry => matchType(entry, options.type) && matchTags(entry, options.tags)
-  )
+  const scoped = entries.filter(entry => matchType(entry, options.type))
 
   const query = options.query.trim()
   if (query === '') return scoped.sort((a, b) => a.title.localeCompare(b.title))
@@ -33,6 +31,3 @@ export const filterEntries = (entries: EntryMeta[], options: FilterOptions): Ent
 }
 
 const matchType = (entry: EntryMeta, type: EntryType | null) => !type || entry.type === type
-
-const matchTags = (entry: EntryMeta, tags: string[]) =>
-  !tags || tags.length === 0 || !!entry.tags?.some(tag => tags.includes(tag))

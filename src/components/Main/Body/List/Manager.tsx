@@ -7,13 +7,12 @@ import { byTitle, byRecency } from './order'
 // A flat list in either order — retrieval here is by name or search, so date
 // buckets earn nothing (the audit list keeps its severity groups, which do).
 export default function Manager() {
-  const tags = useStore(state => state.filters.tags)
   const type = useStore(state => state.filters.type)
   const query = useStore(state => state.filters.query)
   const items = useStore(state => state.entries.items)
   const sort = useStore(state => state.sort)
 
-  const entries = filterEntries(items, { type, query, tags })
+  const entries = filterEntries(items, { type, query })
 
   if (entries.length === 0) return <Empty />
 

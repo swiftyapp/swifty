@@ -25,8 +25,8 @@ runs one app process against one data dir, so nothing may depend on file order.
 | 10 | `logins/empty.spec.js` | PR 3 | `empty.spec.ts` | `create-first-entry-button` state. |
 | 11 | `cards/create.spec.js` | PR 3 | `cards.spec.ts` | Plus brand mark + interactive face (see additions). |
 | 12 | `notes/create.spec.js` | PR 3 | `notes.spec.ts` | |
-| 13 | `tags/filter.spec.js` | PR 3 | `tags.spec.ts` | |
-| 14 | `tags/empty.spec.js` | PR 3 | `tags.spec.ts` | `tags-list` absent when no entry carries a tag. |
+| 13 | `tags/filter.spec.js` | dropped | — | The tag chip row was removed with the All Items redesign; tags stay on entries and are matched by the search field (`search-and-scopes.spec.ts`). |
+| 14 | `tags/empty.spec.js` | dropped | — | No chip row to assert on any more. |
 | 15 | `audit/index.spec.js` | PR 4 | `audit.spec.ts` | Groups are **Weak / Reused / Breached** now, not the legacy buckets. |
 | 16 | `settings/change_password.spec.js` | PR 4 | `settings.spec.ts` | |
 | 17 | `settings/password.spec.js` | PR 4 | `generator.spec.ts` | Generator *defaults* panel in Settings. |

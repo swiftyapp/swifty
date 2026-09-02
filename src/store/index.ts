@@ -73,8 +73,6 @@ export const {
   closeGenerator,
   setFilterQuery,
   setFilterType,
-  setFilterTag,
-  unsetFilterTag,
   newEntry,
   setNoEntry,
   editEntry,

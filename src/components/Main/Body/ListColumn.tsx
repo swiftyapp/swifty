@@ -2,12 +2,11 @@ import { useStore } from '@/store'
 import { kindOf } from '@/kinds'
 import { t } from '@/i18n'
 import KindChips from '../Header/KindChips'
-import Tags from '../Header/Tags'
 import List from './List'
 import SortMenu from './List/SortMenu'
 
-// The middle pane: a title with the sort control and the two filter chip rows
-// (kinds, then tags), over the scrollable entry list.
+// The middle pane: a title with the sort control and the kind filter chips,
+// over the scrollable entry list.
 export default function ListColumn() {
   const view = useStore(state => state.ui.view)
   const type = useStore(state => state.filters.type)
@@ -34,14 +33,9 @@ export default function ListColumn() {
           {/* The audit list has its own severity order — nothing to sort. */}
           {!health && <SortMenu />}
         </div>
-        {/* The audit is not a filtered view of the vault, so neither chip row
-            applies to it. */}
-        {!health && (
-          <>
-            <KindChips />
-            <Tags />
-          </>
-        )}
+        {/* The audit is not a filtered view of the vault, so the chips don't
+            apply to it. */}
+        {!health && <KindChips />}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <List />
