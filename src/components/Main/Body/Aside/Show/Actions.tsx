@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Entry, EntryType } from '@/lib/commands'
 import { editEntry } from '@/store'
+import { kindOf } from '@/kinds'
 import { t } from '@/i18n'
 import { useCopied } from '@/hooks/useCopied'
 import Button from '@/components/elements/Button'
@@ -13,26 +14,6 @@ interface Props {
   // The decrypted entry, or null while `revealEntry` is still in flight.
   revealed: Entry | null
   onDelete: () => void
-}
-
-// Each type's headline secret — the one value the header offers in a single
-// press. Reads straight off the already-decrypted entry, so copying never
-// touches a row's on-screen reveal state.
-const secretOf = (entry: Entry): string => {
-  switch (entry.type) {
-    case 'login':
-      return entry.password
-    case 'card':
-      return entry.number
-    case 'note':
-      return entry.note
-  }
-}
-
-const PRIMARY_LABEL: Record<EntryType, string> = {
-  login: 'Copy password',
-  card: 'Copy number',
-  note: 'Copy note'
 }
 
 // Enter is the detail pane's accelerator for the primary action, but only as a
@@ -60,7 +41,11 @@ export default function Actions({ type, revealed, onDelete }: Props) {
   // second executes. Closing or reopening the menu disarms.
   const [armDelete, setArmDelete] = useState(false)
   const { copied, copy } = useCopied()
-  const secret = revealed ? secretOf(revealed) : ''
+  const kind = kindOf(type)
+  // The kind's headline secret — the one value the header offers in a single
+  // press. Read straight off the already-decrypted entry, so copying never
+  // touches a row's on-screen reveal state.
+  const secret = revealed ? kind.primarySecret(revealed) : ''
 
   useEffect(() => {
     if (!secret) return
@@ -138,7 +123,7 @@ export default function Actions({ type, revealed, onDelete }: Props) {
             {t('Copied')}
           </>
         ) : (
-          t(PRIMARY_LABEL[type])
+          t(kind.primaryActionLabel)
         )}
       </Button>
     </div>

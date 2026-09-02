@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { makeStore, setEntries, saveEntry, deleteEntry, enterMain, syncInit } from './index'
+import {
+  makeStore,
+  setEntries,
+  saveEntry,
+  deleteEntry,
+  enterMain,
+  syncInit,
+  setFilterType
+} from './index'
 import { saveEntry as saveEntryCmd, toEntryMeta, syncNow } from '@/lib/commands'
 import type { EntryMeta } from '@/lib/commands'
 
@@ -38,6 +46,34 @@ describe('saveEntry', () => {
     const { items } = store.getState().entries
     expect(items).toHaveLength(1)
     expect(items[0].title).toBe('Updated')
+  })
+
+  it('drops a kind filter that would hide the entry just saved', async () => {
+    const store = makeStore()
+    setFilterType('login')
+
+    await saveEntry({
+      type: 'card',
+      title: 'Travel Card',
+      number: '4111111111111111',
+      month: '12',
+      year: '30',
+      cvc: '123'
+    })
+
+    // The row has to be visible for the selection to mean anything.
+    expect(store.getState().filters.type).toBeNull()
+    expect(store.getState().entries.current?.title).toBe('Travel Card')
+  })
+
+  it('keeps a kind filter the saved entry still matches', async () => {
+    const store = makeStore()
+    setFilterType('login')
+
+    await saveEntry({ type: 'login', title: 'New', username: 'u', password: 'p' })
+
+    expect(store.getState().filters.type).toBe('login')
+    expect(store.getState().entries.current?.title).toBe('New')
   })
 })
 

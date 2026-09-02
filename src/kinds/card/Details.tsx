@@ -4,8 +4,9 @@ import { cardBrandOf, hasBrandMark } from '@/utils/cardBrand'
 import CardBrandMark from '@/components/elements/CardBrandMark'
 import { useCopied } from '@/hooks/useCopied'
 import { t } from '@/i18n'
-import Tags from './Item/Tags'
-import { CheckGlyph, EyeGlyph, EyeOffGlyph } from '../../../../icons'
+import Tags from '@/components/Main/Body/Aside/Show/Details/Item/Tags'
+import { CheckGlyph, EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
+import { CARD_MASK } from './meta'
 
 interface Props {
   entry: CardEntry
@@ -78,7 +79,7 @@ function Face({
 // The card IS the data surface: every value on it copies on click, and one
 // eye reveals number/CVC/PIN together (the Apple Card "show details" model) —
 // two interactions total, nothing else competing for attention.
-export default function Card({ entry }: Props) {
+export default function Details({ entry }: Props) {
   const [show, setShow] = useState(false)
   const { copied: numberCopied, copy: copyNumber } = useCopied()
   const { copied: nameCopied, copy: copyName } = useCopied()
@@ -144,7 +145,7 @@ export default function Card({ entry }: Props) {
           </button>
         ) : (
           <div className="px-0 py-1 text-[24px] tracking-[0.14em] opacity-50">
-            •••• •••• •••• ••••
+            {CARD_MASK}
           </div>
         )}
         <div className="relative mt-5 flex items-end gap-5">

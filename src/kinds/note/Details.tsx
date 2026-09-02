@@ -1,12 +1,12 @@
 import type { NoteEntry } from '@/lib/commands'
-import Tags from './Item/Tags'
-import { Panel } from '../../ui'
+import Tags from '@/components/Main/Body/Aside/Show/Details/Item/Tags'
+import { Panel } from '@/components/Main/Body/Aside/ui'
 
 interface Props {
   entry: NoteEntry
 }
 
-export default function Note({ entry }: Props) {
+export default function Details({ entry }: Props) {
   return (
     <div className="mt-3">
       <Panel>

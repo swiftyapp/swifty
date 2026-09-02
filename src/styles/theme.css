@@ -258,6 +258,19 @@
   --color-accent-deep: var(--c-accent-deep);
   --color-touchid: var(--c-touchid);
   --color-brand: var(--c-brand);
+
+  /*
+   * Per-kind identity inks (see src/kinds). A solid for the glyph and a soft
+   * wash for the tile behind it, so `text-kind-card` / `bg-kind-card-soft`
+   * compile. One pair per kind in `KINDS` — a new kind adds a new pair here
+   * and nowhere else.
+   */
+  --color-kind-login: var(--c-kind-login);
+  --color-kind-login-soft: var(--c-kind-login-soft);
+  --color-kind-card: var(--c-kind-card);
+  --color-kind-card-soft: var(--c-kind-card-soft);
+  --color-kind-note: var(--c-kind-note);
+  --color-kind-note-soft: var(--c-kind-note-soft);
 }
 
 /*
@@ -399,6 +412,14 @@
   --c-brand: #34373e;
   --c-brand-eye: #ffffff;
 
+  /* Kind identity: coral logins, indigo cards, amber notes. */
+  --c-kind-login: #d9574c;
+  --c-kind-login-soft: rgba(217, 87, 76, 0.12);
+  --c-kind-card: #6366f1;
+  --c-kind-card-soft: rgba(99, 102, 241, 0.12);
+  --c-kind-note: #c98a1c;
+  --c-kind-note-soft: rgba(201, 138, 28, 0.14);
+
   /* Design vars that aren't color utilities (gradients/shadows/scrims). */
   --card: linear-gradient(180deg, #ffffff, #fbfbfc);
   --chrome: rgba(246, 247, 248, 0.92);
@@ -448,6 +469,14 @@
   --c-touchid: #ee5d6f;
   --c-brand: #d6d8dc;
   --c-brand-eye: #15161a;
+
+  /* Each solid lifts a step on the dark ground; the washes carry more alpha. */
+  --c-kind-login: #e4685d;
+  --c-kind-login-soft: rgba(228, 104, 93, 0.18);
+  --c-kind-card: #7c7ff5;
+  --c-kind-card-soft: rgba(124, 127, 245, 0.18);
+  --c-kind-note: #e0a94e;
+  --c-kind-note-soft: rgba(224, 169, 78, 0.18);
 
   --card: linear-gradient(
     180deg,

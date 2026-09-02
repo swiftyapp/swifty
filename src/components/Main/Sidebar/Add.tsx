@@ -1,14 +1,18 @@
-import { useStore, newEntry, setFilterScope } from '@/store'
+import { useStore, newEntry, setView } from '@/store'
 import { t } from '@/i18n'
 import Tooltip from '@/components/elements/Tooltip'
 import { PlusGlyph } from '../icons'
 
 export default function Add() {
-  const scope = useStore(state => state.filters.scope)
+  const type = useStore(state => state.filters.type)
+  const view = useStore(state => state.ui.view)
 
+  // Interim: the kind comes from whatever the list is filtered to, falling back
+  // to a login. A kind-picker modal replaces this — it will call
+  // `newEntry(type)` with an explicit choice.
   const onAddEntry = () => {
-    if (scope === 'audit') setFilterScope('login')
-    newEntry()
+    if (view === 'health') setView('items')
+    newEntry(type ?? 'login')
   }
 
   return (

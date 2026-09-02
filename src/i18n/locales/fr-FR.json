@@ -88,5 +88,17 @@
   "Language": "Langue",
   "Biometric unlock failed": "Échec du déverrouillage biométrique",
   "Your vault key is protected by the Secure Enclave and invalidated if your fingerprints change.": "La clé de votre coffre est protégée par la Secure Enclave et invalidée si vos empreintes digitales changent.",
-  "Your vault key is stored in your OS credential store and released after a biometric check by Swifty.": "La clé de votre coffre est stockée dans le gestionnaire d'identifiants du système et libérée après une vérification biométrique par Swifty."
+  "Your vault key is stored in your OS credential store and released after a biometric check by Swifty.": "La clé de votre coffre est stockée dans le gestionnaire d'identifiants du système et libérée après une vérification biométrique par Swifty.",
+  "All Items": "All Items",
+  "Login": "Login",
+  "Credit card": "Credit card",
+  "Credit cards": "Cartes de crédit",
+  "Secure note": "Secure note",
+  "Secure notes": "Notes sécurisées",
+  "Vault Health": "Vault Health",
+  "Copy number": "Copy number",
+  "Copy note": "Copy note",
+  "Passwords for apps & sites": "Passwords for apps & sites",
+  "Cards & payment details": "Cards & payment details",
+  "Private text, sealed": "Private text, sealed"
 }

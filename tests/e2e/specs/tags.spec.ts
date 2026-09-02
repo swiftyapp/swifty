@@ -1,7 +1,7 @@
 import { createLogin, entryItems, resetEmpty, unlock, waitFor } from "../helpers";
 
-// Tags are typed into the entry form and surface as a filter chip row above
-// the list, scoped to the current rail selection.
+// Tags are typed into the entry form and surface as a filter chip row below the
+// kind chips, counted over whatever the kind filter currently admits.
 
 const MASTER_PASSWORD = "Ld5!gXm2vQr6tN@k";
 
@@ -30,7 +30,7 @@ describe("tag filtering", () => {
     await unlock(MASTER_PASSWORD);
   });
 
-  it("shows no chip row while nothing in scope is tagged", async () => {
+  it("shows no chip row while nothing in view is tagged", async () => {
     await waitFor("main-view");
     await expect($('[data-testid="tags-list"]')).not.toBeDisplayed();
 
@@ -40,7 +40,7 @@ describe("tag filtering", () => {
     await expect($('[data-testid="tags-list"]')).not.toBeDisplayed();
   });
 
-  it("surfaces one chip per tag used in the current scope", async () => {
+  it("surfaces one chip per tag used by the entries in view", async () => {
     await createLogin({ title: WORK_ENTRY, ...CREDENTIALS, tags: ["work"] });
     await createLogin({ title: HOME_ENTRY, ...CREDENTIALS, tags: ["home"] });
     await expectRowCount(3);
@@ -65,9 +65,9 @@ describe("tag filtering", () => {
     await expect(chip("work")).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("keeps the chip row out of a scope with no tagged entries", async () => {
-    await waitFor("scope-note");
-    await $('[data-testid="scope-note"]').click();
+  it("keeps the chip row out of a kind with no tagged entries", async () => {
+    await waitFor("filter-note");
+    await $('[data-testid="filter-note"]').click();
 
     await expectRowCount(0);
     await expect($('[data-testid="tags-list"]')).not.toBeDisplayed();

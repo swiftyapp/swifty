@@ -38,11 +38,12 @@ runs one app process against one data dir, so nothing may depend on file order.
 |---|---|---|
 | Discard-changes guard on a dirty edit | PR 2 | `cancel-entry-button` pressed twice ("Discard changes?") |
 | Delete confirm | PR 2 | `delete-entry-button` → `delete-entry-confirm` inside `more-actions-button` |
-| Kind scopes in the rail | PR 2 | `scope-login` / `scope-note` / `scope-card` / `scope-audit` |
+| Kind filter chips over the list | PR 2 | `filter-all` / `filter-login` / `filter-card` / `filter-note`, `aria-pressed` on the active chip |
+| All Items / Vault Health views in the rail | PR 2 | `view-items` / `view-health`; the pane title is `list-title` |
 | Sort control | PR 3 | `sort-menu` → `sort-option-recent` / `sort-option-alpha`, assert `entry-item-title` order |
 | Card face: reveal + copy | PR 3 | `card-reveal-button`, `entry-value-number` / `-expires` / `-cvc` / `-pin` |
 | Card brand mark | PR 3 | brand slug derived at save time; assert per-network glyph |
-| Empty states per scope | PR 3 | `create-first-entry-button` |
+| Empty states per kind filter | PR 3 | `create-first-entry-button` |
 | Command palette | PR 4 | `command-palette`, `command-palette-input`, `palette-item` |
 | Password generator | PR 4 | `generator-mode-random` / `-memorable`, `generator-amount`, `generator-regenerate`, `generator-output`, `generator-use-button` |
 | Change master password | PR 4 | `change-password-submit`, `change-password-error`, `change-password-success` |

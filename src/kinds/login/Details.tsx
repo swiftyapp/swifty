@@ -1,14 +1,14 @@
 import type { LoginEntry } from '@/lib/commands'
-import Item from './Item'
-import Totp from './Item/Totp'
-import Tags from './Item/Tags'
-import { Panel, StrengthBar } from '../../ui'
+import Item from '@/components/Main/Body/Aside/Show/Details/Item'
+import Totp from '@/components/Main/Body/Aside/Show/Details/Item/Totp'
+import Tags from '@/components/Main/Body/Aside/Show/Details/Item/Tags'
+import { Panel, StrengthBar } from '@/components/Main/Body/Aside/ui'
 
 interface Props {
   entry: LoginEntry
 }
 
-export default function Login({ entry }: Props) {
+export default function Details({ entry }: Props) {
   const hasOtp = !!entry.otp
 
   return (

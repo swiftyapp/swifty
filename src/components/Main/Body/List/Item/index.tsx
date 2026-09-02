@@ -1,11 +1,9 @@
 import { cx } from '@/utils/cx'
 import { useStore, setCurrentEntry } from '@/store'
 import type { EntryMeta } from '@/lib/commands'
+import { kindOf } from '@/kinds'
 import { relativeTime } from '@/utils/time'
 import { stampOf } from '../order'
-import Login from './Login'
-import Card from './Card'
-import Note from './Note'
 import Flag from './Flag'
 import { flagOf } from './audit'
 
@@ -21,17 +19,7 @@ export default function Item({ entry }: Props) {
 
   const flag = flagKind ? <Flag kind={flagKind} /> : undefined
   const meta = relativeTime(stampOf(entry))
-
-  const content = () => {
-    switch (entry.type) {
-      case 'login':
-        return <Login entry={entry} flag={flag} />
-      case 'card':
-        return <Card entry={entry} flag={flag} />
-      case 'note':
-        return <Note entry={entry} flag={flag} />
-    }
-  }
+  const Content = kindOf(entry.type).ListRow
 
   return (
     <div
@@ -45,7 +33,7 @@ export default function Item({ entry }: Props) {
       data-testid="entry-item"
       onClick={() => setCurrentEntry(entry.id)}
     >
-      {content()}
+      <Content entry={entry} flag={flag} />
       {meta && (
         <span className="flex-none font-mono text-xs text-text3">{meta}</span>
       )}

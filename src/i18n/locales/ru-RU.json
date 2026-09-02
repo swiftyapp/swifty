@@ -88,5 +88,17 @@
   "Language": "Язык интерфейса",
   "Biometric unlock failed": "Биометрическая разблокировка не удалась",
   "Your vault key is protected by the Secure Enclave and invalidated if your fingerprints change.": "Ключ вашего хранилища защищён Secure Enclave и аннулируется при изменении отпечатков пальцев.",
-  "Your vault key is stored in your OS credential store and released after a biometric check by Swifty.": "Ключ вашего хранилища находится в системном хранилище учётных данных и выдаётся после биометрической проверки в Swifty."
+  "Your vault key is stored in your OS credential store and released after a biometric check by Swifty.": "Ключ вашего хранилища находится в системном хранилище учётных данных и выдаётся после биометрической проверки в Swifty.",
+  "All Items": "All Items",
+  "Login": "Login",
+  "Credit card": "Credit card",
+  "Credit cards": "Платежные Карты",
+  "Secure note": "Secure note",
+  "Secure notes": "Безопасные Заметки",
+  "Vault Health": "Vault Health",
+  "Copy number": "Copy number",
+  "Copy note": "Copy note",
+  "Passwords for apps & sites": "Passwords for apps & sites",
+  "Cards & payment details": "Cards & payment details",
+  "Private text, sealed": "Private text, sealed"
 }
