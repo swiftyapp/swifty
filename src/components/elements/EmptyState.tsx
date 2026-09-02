@@ -7,6 +7,8 @@ interface Action {
   label: string
   onClick: () => void
   testid?: string
+  // For actions that go to the network (a Drive restore) and have to spin.
+  loading?: boolean
 }
 
 interface Props {
@@ -15,13 +17,18 @@ interface Props {
   title: string
   body?: string
   primary?: Action
-  secondary?: { label: string; onClick: () => void }
+  secondary?: Action
   hints?: { keys: string; label: string }[]
   // Tint override for the mark tile, e.g. a per-type wash.
   markClassName?: string
+  // Ink override for the title, e.g. a quieter tier for a non-hero state.
+  titleClassName?: string
   // Single-line variant for a list column: no tile, no title tier.
   compact?: boolean
   className?: string
+  // Hook for the surface as a whole — the copy is localised and quoted, so
+  // e2e needs something stabler to wait on.
+  testid?: string
 }
 
 // THE nothing-here surface: one mark, one title, one line, one action. Every
@@ -35,12 +42,17 @@ export default function EmptyState({
   secondary,
   hints,
   markClassName,
+  titleClassName,
   compact,
-  className
+  className,
+  testid
 }: Props) {
+  // A column-width line has no room for buttons, so both actions read as
+  // links; the text truncates around them and the line never wraps.
   if (compact)
     return (
       <div
+        data-testid={testid}
         className={cx(
           'flex items-center justify-center gap-2 px-3 py-6 text-base text-text3',
           className
@@ -48,20 +60,25 @@ export default function EmptyState({
       >
         <span className="flex-none">{mark}</span>
         <span className="min-w-0 truncate">{body ?? title}</span>
-        {secondary && (
-          <button
-            type="button"
-            onClick={secondary.onClick}
-            className="flex-none cursor-pointer text-accent hover:underline"
-          >
-            {secondary.label}
-          </button>
-        )}
+        {[primary, secondary]
+          .filter((action): action is Action => !!action)
+          .map(action => (
+            <button
+              key={action.label}
+              type="button"
+              onClick={action.onClick}
+              data-testid={action.testid}
+              className="flex-none cursor-pointer text-accent hover:underline"
+            >
+              {action.label}
+            </button>
+          ))}
       </div>
     )
 
   return (
     <div
+      data-testid={testid}
       className={cx(
         'flex max-w-[320px] flex-col items-center gap-5 text-center animate-pop',
         className
@@ -77,18 +94,34 @@ export default function EmptyState({
       </div>
 
       <div>
-        <div className="text-2xl font-semibold tracking-display text-text">{title}</div>
+        <div
+          className={cx(
+            'text-2xl font-semibold tracking-display',
+            titleClassName ?? 'text-text'
+          )}
+        >
+          {title}
+        </div>
         {body && <div className="mt-2 text-base text-text2">{body}</div>}
 
         {(primary || secondary) && (
           <div className="mt-6 flex items-center justify-center gap-3">
             {primary && (
-              <Button onClick={primary.onClick} testid={primary.testid}>
+              <Button
+                onClick={primary.onClick}
+                loading={primary.loading}
+                testid={primary.testid}
+              >
                 {primary.label}
               </Button>
             )}
             {secondary && (
-              <Button variant="pale" onClick={secondary.onClick}>
+              <Button
+                variant="pale"
+                onClick={secondary.onClick}
+                loading={secondary.loading}
+                testid={secondary.testid}
+              >
                 {secondary.label}
               </Button>
             )}

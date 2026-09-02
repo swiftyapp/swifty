@@ -144,11 +144,16 @@ describe("search and kind filters", () => {
     await searchInput().setValue("Recovery");
     await expectTitles([NOTE]);
 
-    // The same query under a kind that cannot match it comes back empty.
+    // The same query under a kind that cannot match it comes back empty — and
+    // says so in the list column, naming the query and the kind narrowing it.
     await selectKind("login");
     await expectTitles([]);
+    await waitFor("empty-search");
+    // The widen link is the tell that the kind filter is named in the line.
+    await expect($('[data-testid="empty-search-widen"]')).toBeDisplayed();
 
     await $('[data-testid="search-clear-button"]').click();
     await expect(searchInput()).toHaveValue("");
+    await expect($('[data-testid="empty-search"]')).not.toBeExisting();
   });
 });
