@@ -3,8 +3,9 @@ import { t } from '@/i18n'
 import IconButton from '@/components/elements/IconButton'
 import { LockGlyph } from '../icons'
 
-// Locks the vault straight from the top chrome (previously only reachable via
-// Settings → Vault).
+// Locks the vault straight from the top chrome. "Lock vault" is the one name
+// for this action everywhere it appears — here, the command palette and the
+// tray menu.
 export default function LockButton() {
   const onLock = () => {
     void lockVault()
@@ -14,7 +15,7 @@ export default function LockButton() {
     <IconButton
       testid="lock-vault-button"
       onClick={onLock}
-      title={t('Lock')}
+      title={t('Lock vault')}
     >
       <LockGlyph />
     </IconButton>

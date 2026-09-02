@@ -21,6 +21,13 @@ describe('Form', () => {
     expect(screen.getByText('Username')).toBeInTheDocument()
   })
 
+  it('titles the editor from the kind registry', () => {
+    // The sheet has one title, so this pins the create action's wording: it is
+    // named after the kind, in the same phrasing the empty panes use.
+    renderWithStore(<Form type="card" />)
+    expect(screen.getByText('Add a credit card')).toBeInTheDocument()
+  })
+
   it('saves a valid new login', async () => {
     const { store } = renderWithStore(<Form type="login" />)
     await userEvent.type(document.querySelector('input[name="title"]')!, 'GitHub')
@@ -179,6 +186,33 @@ describe('Show', () => {
     await userEvent.keyboard('{Enter}')
 
     expect(copyToClipboard).toHaveBeenCalledWith('hunter2', expect.any(Number))
+  })
+
+  it('announces the more menu trigger as a disclosure', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry())
+    renderWithStore(<Show entry={loginMeta()} />)
+
+    const trigger = screen.getByTestId('more-actions-button')
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+
+    await userEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('leaves Enter to whichever control holds focus', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'hunter2' }))
+    renderWithStore(<Show entry={loginMeta()} />)
+
+    await waitFor(() => expect(screen.getByTestId('primary-action-button')).toBeEnabled())
+
+    // Enter on a focused button activates that button and nothing else — it
+    // used to open the more menu *and* copy the password.
+    screen.getByTestId('more-actions-button').focus()
+    await userEvent.keyboard('{Enter}')
+
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    expect(copyToClipboard).not.toHaveBeenCalled()
   })
 
   it('deletes from the more menu behind a two-press inline confirm', async () => {

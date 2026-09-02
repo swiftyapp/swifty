@@ -125,9 +125,11 @@ describe('add a secret', () => {
       await openPalette()
 
       const palette = within(screen.getByTestId('command-palette'))
-      expect(palette.getByText('New login')).toBeInTheDocument()
-      expect(palette.getByText('New credit card')).toBeInTheDocument()
-      expect(palette.getByText('New secure note')).toBeInTheDocument()
+      // Each kind command is named the same way the editor sheet and the empty
+      // panes name it, from the kind registry.
+      expect(palette.getByText('Add a login')).toBeInTheDocument()
+      expect(palette.getByText('Add a credit card')).toBeInTheDocument()
+      expect(palette.getByText('Add a secure note')).toBeInTheDocument()
       expect(palette.getByText('Add a secret')).toBeInTheDocument()
     })
 
@@ -135,7 +137,9 @@ describe('add a secret', () => {
       renderWithStore(<Main />, { store: seed() })
       await openPalette()
 
-      await userEvent.click(screen.getByText('New secure note'))
+      // "Add a secure note" also names an empty-state action, so scope it.
+      const palette = within(screen.getByTestId('command-palette'))
+      await userEvent.click(palette.getByText('Add a secure note'))
 
       expect(useStore.getState().entries.new).toBe('note')
       expect(useStore.getState().ui.addPicker).toBe(false)
