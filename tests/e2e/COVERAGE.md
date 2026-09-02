@@ -22,7 +22,7 @@ runs one app process against one data dir, so nothing may depend on file order.
 | 7 | `logins/delete.spec.js` | PR 2 | `logins.spec.ts` | Two-press confirm, not a dialog (see additions). |
 | 8 | `logins/password.spec.js` | PR 2 | `logins.spec.ts` | Reveal/hide + copy of the password field. |
 | 9 | `logins/search.spec.js` | PR 2 | `search.spec.ts` | |
-| 10 | `logins/empty.spec.js` | PR 3 | `empty.spec.ts` | `create-first-entry-button` state. |
+| 10 | `logins/empty.spec.js` | PR 3 | `list.spec.ts` | Empty-vault hero: `empty-vault` in the detail pane, `create-first-entry-button` inside it, nothing in the list column. |
 | 11 | `cards/create.spec.js` | PR 3 | `cards.spec.ts` | Plus brand mark + interactive face (see additions). |
 | 12 | `notes/create.spec.js` | PR 3 | `notes.spec.ts` | |
 | 13 | `tags/filter.spec.js` | dropped | — | The tag chip row was removed with the All Items redesign; tags stay on entries and are matched by the search field (`search-and-scopes.spec.ts`). |
@@ -43,7 +43,7 @@ runs one app process against one data dir, so nothing may depend on file order.
 | Sort control | PR 3 | `sort-menu` → `sort-option-recent` / `sort-option-alpha`, assert `entry-item-title` order |
 | Card face: reveal + copy | PR 3 | `card-reveal-button`, `entry-value-number` / `-expires` / `-cvc` / `-pin` |
 | Card brand mark | PR 3 | brand slug derived at save time; assert per-network glyph |
-| Empty states per kind filter | PR 3 | `create-first-entry-button` |
+| Empty states, one system for both panes | PR 3 | One variant at a time, each with its own hook: `empty-vault` (hero, detail pane, holds `create-first-entry-button`), `empty-kind` + `empty-kind-add` and `empty-search` + `empty-search-clear` / `empty-search-widen` (compact, list column), `empty-select` (quiet, detail pane), `empty-health`. The list column and the detail pane never both show a hero, so `empty-vault` and `empty-health` mean an empty column. |
 | "Add a secret" kind picker | PR 3 | `add-entry-button` (or `create-first-entry-button`) → `add-secret-modal` → `add-kind-login` / `add-kind-card` / `add-kind-note`; `modal-close` or Escape dismisses. Every create flow goes through it, so `helpers/entries.ts` owns the two clicks. |
 | Command palette | PR 4 | `command-palette`, `command-palette-input`, `palette-item` |
 | Password generator | PR 4 | `generator-mode-random` / `-memorable`, `generator-amount`, `generator-regenerate`, `generator-output`, `generator-use-button` |

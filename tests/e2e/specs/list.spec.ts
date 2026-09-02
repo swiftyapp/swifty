@@ -64,8 +64,14 @@ describe("entry list states and ordering", () => {
   });
 
   it("offers the first-entry action on an empty vault and opens the create sheet", async () => {
+    await waitFor("empty-vault");
     await waitFor("create-first-entry-button");
     expect(await entryItems()).toHaveLength(0);
+
+    // One empty state at a time: the hero belongs to the detail pane, so the
+    // list column shows nothing at all on a vault with nothing in it.
+    await expect($('[data-testid="empty-kind"]')).not.toBeExisting();
+    await expect($('[data-testid="empty-search"]')).not.toBeExisting();
 
     // The first-entry action opens the kind picker; the sheet follows the choice.
     await $('[data-testid="create-first-entry-button"]').click();
@@ -78,6 +84,7 @@ describe("entry list states and ordering", () => {
       reverse: true,
       timeout: 15_000,
     });
+    await waitFor("empty-vault");
     await waitFor("create-first-entry-button");
   });
 

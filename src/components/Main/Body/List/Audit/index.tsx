@@ -1,7 +1,6 @@
 import { useStore } from '@/store'
 import type { Audit, AuditItem, EntryMeta } from '@/lib/commands'
 import { t } from '@/i18n'
-import Empty from '../Empty'
 import Group from '../Group'
 
 export default function AuditList() {
@@ -21,7 +20,9 @@ export default function AuditList() {
         {t('Loading Results..')}
       </div>
     )
-  if (Object.keys(audit).length === 0) return <Empty />
+  // Nothing to score: the detail pane says so on its own (Body/Empty), so the
+  // column stays blank rather than repeating it.
+  if (Object.keys(audit).length === 0) return null
 
   return (
     <div className="pb-6">

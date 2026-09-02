@@ -108,10 +108,11 @@ describe('Main', () => {
     expect(useStore.getState().entries.current).toBeNull()
   })
 
-  it('shows the empty placeholder when there are no entries', () => {
+  it('shows the empty-vault hero in the detail pane when there are no entries', () => {
     const store = makeStore()
     withEntries(store, [])
     renderWithStore(<Main />, { store })
-    expect(screen.getByText('No Items')).toBeInTheDocument()
+    expect(screen.getByText('Your vault is empty')).toBeInTheDocument()
+    expect(screen.getByTestId('create-first-entry-button')).toBeInTheDocument()
   })
 })
