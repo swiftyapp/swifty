@@ -143,7 +143,7 @@ export default function Masterpass({
             reveal tier, and the fingerprint in the macOS Touch ID rose. */}
         {touchID && (
           <>
-            <span aria-hidden className="my-auto h-7 w-px bg-line2" />
+            <span aria-hidden className="my-auto h-7 w-px bg-line" />
             <IconButton
               label={t('Touch ID')}
               className="touchid mx-1.5 my-auto"
