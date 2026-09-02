@@ -1,4 +1,4 @@
-import { chord, resetEmpty, unlock, waitFor } from "../helpers";
+import { chord, resetEmpty, setRange, unlock, waitFor } from "../helpers";
 
 // The password generator dialog, opened both ways it can be reached: the
 // app-level chord (standalone — it copies) and the login editor's "generate"
@@ -79,12 +79,9 @@ describe("password generator", () => {
     await openGenerator();
 
     const before = await amount();
-    // Focus rather than click: a click on a range input jumps to wherever the
-    // pointer landed, and this case is about a single step.
-    await browser.execute(() =>
-      document.querySelector<HTMLElement>('[data-testid="generator-amount"]')?.focus(),
-    );
-    await browser.keys(["ArrowRight"]);
+    // One step up, driven like a drag: WebKitGTK ignores synthesized arrow keys
+    // on a range input, and a click would jump to wherever the pointer landed.
+    await setRange("generator-amount", before + 1);
     await browser.waitUntil(async () => (await amount()) === before + 1, {
       timeout: 10_000,
       timeoutMsg: "the slider never moved",
