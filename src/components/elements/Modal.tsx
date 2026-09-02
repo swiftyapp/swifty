@@ -10,10 +10,19 @@ interface Props {
   // id of the element that names the dialog, for `aria-labelledby`.
   labelledBy?: string
   testid?: string
+  // For layouts that carry their own close control in a header row.
+  hideClose?: boolean
   children: ReactNode
 }
 
-export default function Modal({ onClose, className, labelledBy, testid, children }: Props) {
+export default function Modal({
+  onClose,
+  className,
+  labelledBy,
+  testid,
+  hideClose,
+  children
+}: Props) {
   // Escape closes every modal — the scrim and the X are pointer-only exits.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -39,14 +48,16 @@ export default function Modal({ onClose, className, labelledBy, testid, children
         )}
         onClick={e => e.stopPropagation()}
       >
-        <button
-          type="button"
-          data-testid="modal-close"
-          onClick={onClose}
-          className="absolute right-3 top-3 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-sm text-text3 transition-colors hover:bg-hover hover:text-text"
-        >
-          <CloseGlyph />
-        </button>
+        {!hideClose && (
+          <button
+            type="button"
+            data-testid="modal-close"
+            onClick={onClose}
+            className="absolute right-3 top-3 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-sm text-text3 transition-colors hover:bg-hover hover:text-text"
+          >
+            <CloseGlyph />
+          </button>
+        )}
         {children}
       </div>
     </div>

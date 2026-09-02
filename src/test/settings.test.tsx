@@ -3,19 +3,31 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import { setLocale } from '@/i18n'
+import { getTimeout } from '@/defaults/clipboard'
+import { getSecs } from '@/defaults/autolock'
+import { dateTime } from '@/utils/time'
 import {
   changeMasterPassword,
-  generatePassword,
+  biometricStatus,
   enableBiometric,
   disableBiometric,
-  biometricStatus,
   pickBackup,
   importSwftx,
-  syncConnect
+  syncConnect,
+  setAutolockTimeout,
+  getAudit
 } from '@/lib/commands'
 import { renderWithStore } from './utils'
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  // Every panel reads its initial value from localStorage, so leftovers from an
+  // earlier case would decide which segment starts selected.
+  localStorage.removeItem('swifty:clipboardTimeout')
+  localStorage.removeItem('swifty:autolockSecs')
+  localStorage.removeItem('swifty:dateFormat')
+})
+
 afterEach(() => setLocale('en-US'))
 
 const open = async () => {
@@ -24,91 +36,137 @@ const open = async () => {
   return { container, store }
 }
 
-describe('Settings', () => {
-  it('opens the preferences modal on the vault section', async () => {
+const go = (section: string) =>
+  userEvent.click(screen.getByTestId(`settings-nav-${section}`))
+
+describe('Settings shell', () => {
+  it('opens on the sync section', async () => {
     await open()
-    expect(screen.getByRole('heading', { name: 'Vault Settings' })).toBeInTheDocument()
-    expect(screen.getByText('Save Vault File')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-modal')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sync & devices' })).toBeInTheDocument()
+    expect(screen.getByTestId('settings-nav-sync')).toHaveAttribute('aria-current', 'page')
   })
 
-  it('offers Google Drive sync on the vault section', async () => {
+  it('switches sections from the nav and remembers the last one', async () => {
+    const { store } = await open()
+
+    await go('audit')
+    expect(screen.getByRole('heading', { name: 'Vault audit' })).toBeInTheDocument()
+    expect(store.getState().ui.settingsSection).toBe('audit')
+
+    await go('language')
+    expect(
+      screen.getByRole('heading', { name: 'Language & region' })
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('settings-nav-language')).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+  })
+
+  it('deep-links to a section through openSettings', async () => {
+    const { store } = renderWithStore(<Settings />)
+    store.getState().openSettings('security')
+    expect(await screen.findByRole('heading', { name: 'Security' })).toBeInTheDocument()
+  })
+
+  it('closes from the header X', async () => {
+    const { store } = await open()
+    await userEvent.click(screen.getByTestId('modal-close'))
+    expect(store.getState().ui.settings).toBe(false)
+  })
+})
+
+describe('Settings › sync', () => {
+  it('connects Google Drive', async () => {
     await open()
-    await userEvent.click(screen.getByText('Connect your Google Drive'))
+    await userEvent.click(screen.getByTestId('settings-drive-connect'))
     expect(syncConnect).toHaveBeenCalledOnce()
   })
 
-  it('shows a generated example on the password section', async () => {
-    vi.mocked(generatePassword).mockResolvedValue('Generated123!')
+  it('offers the encrypted backup behind its own control', async () => {
     await open()
-    await userEvent.click(screen.getByText('Password Generation'))
-    expect(await screen.findByText('Generated123!')).toBeInTheDocument()
+    expect(document.querySelector('input[name="export_password"]')).toBeNull()
+    await userEvent.click(screen.getByText('Save…'))
+    expect(document.querySelector('input[name="export_password"]')).toBeInTheDocument()
   })
+})
 
+describe('Settings › security', () => {
   it('changes the master password', async () => {
     vi.mocked(changeMasterPassword).mockResolvedValue(undefined)
     await open()
-    await userEvent.click(screen.getByText('Master Password'))
+    await go('security')
+    await userEvent.click(screen.getByText('Change…'))
 
-    const inputs = document.querySelectorAll<HTMLInputElement>(
-      '.preferences input[type="password"]'
+    await userEvent.type(document.querySelector('input[name="current_password"]')!, 'old')
+    await userEvent.type(document.querySelector('input[name="new_password"]')!, 'newpass')
+    await userEvent.type(
+      document.querySelector('input[name="new_password_repeat"]')!,
+      'newpass'
     )
-    await userEvent.type(inputs[0], 'old')
-    await userEvent.type(inputs[1], 'newpass')
-    await userEvent.type(inputs[2], 'newpass')
-    await userEvent.click(screen.getByText('Update'))
+    await userEvent.click(screen.getByTestId('change-password-submit'))
 
     expect(changeMasterPassword).toHaveBeenCalledWith('old', 'newpass')
-    expect(await screen.findByText('Successfully changed password')).toBeInTheDocument()
+    expect(await screen.findByTestId('change-password-success')).toBeInTheDocument()
   })
 
-  it('enables biometric unlock when currently disabled', async () => {
+  it('reports a rejected master password change', async () => {
+    vi.mocked(changeMasterPassword).mockRejectedValue(new Error('nope'))
+    await open()
+    await go('security')
+    await userEvent.click(screen.getByText('Change…'))
+
+    await userEvent.type(document.querySelector('input[name="current_password"]')!, 'bad')
+    await userEvent.type(document.querySelector('input[name="new_password"]')!, 'newpass')
+    await userEvent.type(
+      document.querySelector('input[name="new_password_repeat"]')!,
+      'newpass'
+    )
+    await userEvent.click(screen.getByTestId('change-password-submit'))
+
+    expect(await screen.findByTestId('change-password-error')).toBeInTheDocument()
+  })
+
+  it('enables biometric unlock from the toggle', async () => {
     vi.mocked(biometricStatus).mockResolvedValue({ enabled: false, mode: null })
     vi.mocked(enableBiometric).mockResolvedValue('protected')
     await open()
-    await userEvent.click(screen.getByText('Biometric Unlock'))
+    await go('security')
 
-    await userEvent.click(await screen.findByText('Enable Biometric Unlock'))
+    const toggle = await screen.findByTestId('settings-biometric-toggle')
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await userEvent.click(toggle)
 
     expect(enableBiometric).toHaveBeenCalledOnce()
-    expect(await screen.findByText('Disable Biometric Unlock')).toBeInTheDocument()
+    expect(await screen.findByTestId('settings-biometric-toggle')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
   })
 
-  it('disables biometric unlock when currently enabled', async () => {
+  it('disables biometric unlock from the toggle', async () => {
     vi.mocked(biometricStatus).mockResolvedValue({ enabled: true, mode: 'prompt' })
     vi.mocked(disableBiometric).mockResolvedValue(undefined)
     await open()
-    await userEvent.click(screen.getByText('Biometric Unlock'))
+    await go('security')
 
-    await userEvent.click(await screen.findByText('Disable Biometric Unlock'))
+    await userEvent.click(await screen.findByTestId('settings-biometric-toggle'))
 
     expect(disableBiometric).toHaveBeenCalledOnce()
-    expect(await screen.findByText('Enable Biometric Unlock')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-biometric-toggle')).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
   })
 
   // The copy must name the gate actually in force: an OS-enforced Secure Enclave
   // item and an app-enforced verify-then-read item are different promises.
   it('describes the OS-enforced gate when enrolled in protected mode', async () => {
-    vi.mocked(biometricStatus).mockResolvedValue({
-      enabled: true,
-      mode: 'protected'
-    })
+    vi.mocked(biometricStatus).mockResolvedValue({ enabled: true, mode: 'protected' })
     await open()
-    await userEvent.click(screen.getByText('Biometric Unlock'))
-
+    await go('security')
     expect(await screen.findByText(/Secure Enclave/)).toBeInTheDocument()
-  })
-
-  it('describes the app-enforced gate when enrolled in prompt mode', async () => {
-    vi.mocked(biometricStatus).mockResolvedValue({
-      enabled: true,
-      mode: 'prompt'
-    })
-    await open()
-    await userEvent.click(screen.getByText('Biometric Unlock'))
-
-    expect(
-      await screen.findByText(/released after a biometric check by Swifty/)
-    ).toBeInTheDocument()
   })
 
   it('switches the copy to the mode enrollment settled on', async () => {
@@ -117,50 +175,153 @@ describe('Settings', () => {
     vi.mocked(biometricStatus).mockResolvedValue({ enabled: false, mode: null })
     vi.mocked(enableBiometric).mockResolvedValue('prompt')
     await open()
-    await userEvent.click(screen.getByText('Biometric Unlock'))
-    await userEvent.click(await screen.findByText('Enable Biometric Unlock'))
+    await go('security')
+    await userEvent.click(await screen.findByTestId('settings-biometric-toggle'))
 
     expect(
       await screen.findByText(/released after a biometric check by Swifty/)
     ).toBeInTheDocument()
   })
 
-  it('imports a .swftx file into the current vault with the source password', async () => {
+  it('stores the auto-lock choice and pushes it to the backend', async () => {
+    await open()
+    await go('security')
+    await userEvent.click(screen.getByTestId('settings-autolock-300'))
+
+    expect(getSecs()).toBe(300)
+    expect(setAutolockTimeout).toHaveBeenCalledWith(300)
+  })
+
+  it('stores the clipboard delay, "Never" included', async () => {
+    await open()
+    await go('security')
+
+    await userEvent.click(screen.getByTestId('settings-clipboard-15000'))
+    expect(getTimeout()).toBe(15000)
+
+    await userEvent.click(screen.getByTestId('settings-clipboard-0'))
+    expect(getTimeout()).toBe(0)
+  })
+
+  it('writes the generator defaults the dialog reads', async () => {
+    await open()
+    await go('security')
+
+    await userEvent.click(screen.getByTestId('settings-generator-symbols'))
+
+    const stored = JSON.parse(localStorage.getItem('swifty:generatorDefaults')!)
+    expect(stored.symbols).toBe(false)
+  })
+})
+
+describe('Settings › vault audit', () => {
+  it('toggles breach monitoring and re-runs the audit', async () => {
+    const { store } = await open()
+    await go('audit')
+
+    expect(store.getState().breachCheck).toBe(false)
+    await userEvent.click(screen.getByTestId('settings-breach-toggle'))
+
+    expect(store.getState().breachCheck).toBe(true)
+    expect(getAudit).toHaveBeenCalledWith(true)
+  })
+
+  it('leaves the always-on monitors without a fake control', async () => {
+    await open()
+    await go('audit')
+    expect(screen.getByText('Weak passwords')).toBeInTheDocument()
+    expect(screen.getByText('Reused passwords')).toBeInTheDocument()
+    // Breach monitoring is the only switch on this section.
+    expect(screen.getAllByRole('switch')).toHaveLength(1)
+  })
+
+  it('jumps to the Vault Health view and closes', async () => {
+    const { store } = await open()
+    await go('audit')
+    await userEvent.click(screen.getByTestId('settings-open-health'))
+
+    expect(store.getState().ui.view).toBe('health')
+    expect(store.getState().ui.settings).toBe(false)
+  })
+})
+
+describe('Settings › import', () => {
+  it('imports a .swftx file with the source password', async () => {
     vi.mocked(pickBackup).mockResolvedValue('/tmp/other.swftx')
     vi.mocked(importSwftx).mockResolvedValue(3)
     await open()
-    await userEvent.click(screen.getByText('Import Vault'))
+    await go('import')
 
-    await userEvent.click(screen.getByText('Choose backup File'))
-    // The chosen file name replaces the picker label.
-    await screen.findByText('other.swftx')
+    await userEvent.click(screen.getByTestId('import-tile-swftx'))
+    expect(await screen.findByText('other.swftx')).toBeInTheDocument()
 
-    const input = document.querySelector<HTMLInputElement>('.preferences input[type="password"]')!
-    await userEvent.type(input, 'source-pw')
-    await userEvent.click(screen.getByText('Run import'))
+    await userEvent.type(
+      document.querySelector('input[name="import_password"]')!,
+      'source-pw'
+    )
+    await userEvent.click(screen.getByTestId('import-run-backup'))
 
     expect(importSwftx).toHaveBeenCalledWith('/tmp/other.swftx', 'source-pw')
     expect(await screen.findByText(/Imported/)).toBeInTheDocument()
   })
 
-  it('shows an error when the source password is wrong', async () => {
+  it('shows an error when the backup password is wrong', async () => {
     vi.mocked(pickBackup).mockResolvedValue('/tmp/other.swftx')
     vi.mocked(importSwftx).mockRejectedValue(new Error('invalid password'))
     await open()
-    await userEvent.click(screen.getByText('Import Vault'))
+    await go('import')
 
-    await userEvent.click(screen.getByText('Choose backup File'))
+    await userEvent.click(screen.getByTestId('import-tile-swftx'))
     await screen.findByText('other.swftx')
-    await userEvent.click(screen.getByText('Run import'))
+    await userEvent.click(screen.getByTestId('import-run-backup'))
 
     expect(await screen.findByText('Invalid password for backup')).toBeInTheDocument()
   })
 
-  it('lists language options', async () => {
+  it('offers a tile per source and no format select', async () => {
+    await open()
+    await go('import')
+    for (const key of ['bitwarden', 'chrome', 'lastpass', 'keepass', 'csv', 'swftx'])
+      expect(screen.getByTestId(`import-tile-${key}`)).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  })
+})
+
+describe('Settings › language & region', () => {
+  it('picks a language from the radio list', async () => {
     const { store } = await open()
-    await userEvent.click(screen.getByText('Language'))
-    const select = screen.getByRole('combobox') as HTMLSelectElement
-    await userEvent.selectOptions(select, 'de-DE')
+    await go('language')
+    await userEvent.click(screen.getByTestId('settings-locale-de-DE'))
     expect(store.getState().i18n.locale).toBe('de-DE')
+  })
+
+  it('sets the theme from the segmented control', async () => {
+    const { store } = await open()
+    await go('language')
+    await userEvent.click(screen.getByTestId('settings-theme-dark'))
+
+    expect(store.getState().theme).toBe('dark')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+  })
+
+  it('offers System as a theme', async () => {
+    const { store } = await open()
+    await go('language')
+    await userEvent.click(screen.getByTestId('settings-theme-system'))
+    expect(store.getState().theme).toBe('system')
+  })
+
+  it('applies the date format to rendered timestamps', async () => {
+    const iso = new Date(2024, 0, 2, 10, 30).toISOString()
+    await open()
+    await go('language')
+
+    expect(dateTime(iso)).toMatch(/^01\/02\/2024/)
+
+    await userEvent.click(screen.getByTestId('settings-date-format-DD.MM.YYYY'))
+    expect(dateTime(iso)).toMatch(/^02\.01\.2024/)
+
+    await userEvent.click(screen.getByTestId('settings-date-format-YYYY-MM-DD'))
+    expect(dateTime(iso)).toMatch(/^2024-01-02/)
   })
 })

@@ -53,7 +53,7 @@ describe('Entry list', () => {
     renderWithStore(<ListColumn />, { store: seed() })
     expect(screen.getByText('3h')).toBeInTheDocument()
     expect(screen.getByText('4d')).toBeInTheDocument()
-    expect(screen.getByText('Jan 12')).toBeInTheDocument()
+    expect(screen.getByText('01/12/2024')).toBeInTheDocument()
   })
 
   it('flags weak and reused entries from the audit already in the store', () => {

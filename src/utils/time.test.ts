@@ -29,12 +29,14 @@ describe('relativeTime', () => {
     expect(relativeTime(ago(6 * DAY), now)).toBe('6d')
   })
 
-  it('falls back to a short date past a week', () => {
-    expect(relativeTime(new Date(2024, 2, 4, 9).toISOString(), now)).toBe('Mar 4')
+  // Past a week the label becomes a real date, in the pattern chosen in
+  // Settings › Language & region (MM/DD/YYYY by default).
+  it('falls back to a formatted date past a week', () => {
+    expect(relativeTime(new Date(2024, 2, 4, 9).toISOString(), now)).toBe('03/04/2024')
   })
 
   it('keeps the year on dates outside the current one', () => {
-    expect(relativeTime(new Date(2023, 0, 12, 9).toISOString(), now)).toBe('Jan 12, 2023')
+    expect(relativeTime(new Date(2023, 0, 12, 9).toISOString(), now)).toBe('01/12/2023')
   })
 })
 

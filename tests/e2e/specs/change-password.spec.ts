@@ -16,8 +16,12 @@ async function fill(name: string, value: string): Promise<void> {
 async function openMasterPasswordSettings(): Promise<void> {
   await waitFor("settings-button");
   await $('[data-testid="settings-button"]').click();
-  await $("li=Master Password").waitForDisplayed({ timeout: 10_000 });
-  await $("li=Master Password").click();
+  await waitFor("settings-nav-security");
+  await $('[data-testid="settings-nav-security"]').click();
+
+  // The three fields live behind the row's "Change…" control.
+  await waitFor("settings-master-password-row");
+  await $('[data-testid="settings-master-password-row"]').$("button").click();
   await waitFor("change-password-submit");
 }
 

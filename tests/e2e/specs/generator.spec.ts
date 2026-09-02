@@ -3,6 +3,10 @@ import { chord, resetEmpty, unlock, waitFor } from "../helpers";
 // The password generator dialog, opened both ways it can be reached: the
 // app-level chord (standalone — it copies) and the login editor's "generate"
 // link (it fills the field it was opened from).
+//
+// The dialog and Settings › Security › Generator defaults share one stored
+// record (`swifty:generatorDefaults`): the dialog seeds from it and writes
+// back, so a change in either place is what the other one opens with.
 
 const MASTER_PASSWORD = "Nc8$jRt5vQz1mHf!";
 
@@ -69,6 +73,39 @@ describe("password generator", () => {
     await $('[data-testid="generator-use-button"]').click();
     await waitFor("copy-toast");
     await expect($('[data-testid="generator-dialog"]')).not.toBeDisplayed();
+  });
+
+  it("writes the length back to the shared generator defaults", async () => {
+    await openGenerator();
+
+    const before = await amount();
+    // Focus rather than click: a click on a range input jumps to wherever the
+    // pointer landed, and this case is about a single step.
+    await browser.execute(() =>
+      document.querySelector<HTMLElement>('[data-testid="generator-amount"]')?.focus(),
+    );
+    await browser.keys(["ArrowRight"]);
+    await browser.waitUntil(async () => (await amount()) === before + 1, {
+      timeout: 10_000,
+      timeoutMsg: "the slider never moved",
+    });
+
+    // Settings reads the very same record, so this is the whole handshake.
+    await browser.waitUntil(
+      async () =>
+        (await browser.execute(
+          () =>
+            JSON.parse(localStorage.getItem("swifty:generatorDefaults") ?? "{}")
+              .length,
+        )) === before + 1,
+      { timeout: 10_000, timeoutMsg: "the default length was not persisted" },
+    );
+
+    await browser.keys(["Escape"]);
+    await $('[data-testid="generator-dialog"]').waitForDisplayed({
+      reverse: true,
+      timeout: 10_000,
+    });
   });
 
   it("fills the login editor's password field when opened from it", async () => {

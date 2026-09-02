@@ -7,9 +7,11 @@ import {
   syncNow,
   setup,
   readVault,
-  importBackup
+  importBackup,
+  setAutolockTimeout
 } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
+import { getSecs } from '@/defaults/autolock'
 import type { StoreState } from './index'
 
 export interface AsyncSlice {
@@ -94,6 +96,9 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
     enterMain: async result => {
       get().setEntries(result.entries)
       get().flowMain()
+      // The backend resets to its built-in default on every launch; re-apply
+      // the stored preference as soon as there is a session to protect.
+      setAutolockTimeout(getSecs()).catch(() => {})
       get().syncInit(result.syncConfigured)
       // One run on unlock: this device may have been off while another pushed,
       // and it may itself be holding writes a previous session never published.

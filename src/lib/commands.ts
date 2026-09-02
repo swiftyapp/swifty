@@ -298,6 +298,9 @@ export const copyToClipboard = (
 // Sync
 // ---------------------------------------------------------------------------
 
+export const setAutolockTimeout = (secs: number): Promise<void> =>
+  invoke('set_autolock_timeout', { secs })
+
 export const syncConnect = (): Promise<void> => invoke('sync_connect')
 
 export const syncDisconnect = (): Promise<void> => invoke('sync_disconnect')

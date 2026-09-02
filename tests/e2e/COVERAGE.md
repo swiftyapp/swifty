@@ -28,8 +28,8 @@ runs one app process against one data dir, so nothing may depend on file order.
 | 13 | `tags/filter.spec.js` | dropped | — | The tag chip row was removed with the All Items redesign; tags stay on entries and are matched by the search field (`search-and-scopes.spec.ts`). |
 | 14 | `tags/empty.spec.js` | dropped | — | No chip row to assert on any more. |
 | 15 | `audit/index.spec.js` | PR 4 | `audit.spec.ts` | Groups are **Weak / Reused / Breached** now, not the legacy buckets. |
-| 16 | `settings/change_password.spec.js` | PR 4 | `settings.spec.ts` | |
-| 17 | `settings/password.spec.js` | PR 4 | `generator.spec.ts` | Generator *defaults* panel in Settings. |
+| 16 | `settings/change_password.spec.js` | PR 4 | `change-password.spec.ts` | Reached via `settings-nav-security` → the row's "Change…" control. |
+| 17 | `settings/password.spec.js` | PR 4 | `settings.spec.ts` | Generator *defaults* card in Settings › Security; `generator.spec.ts` covers the ⌘G dialog itself. |
 | 18 | `settings/vault.spec.js` | PR 4 | `settings.spec.ts` | Minus the sync assertions the legacy spec made against the old Drive UI. |
 
 ## Planned additions — flows the legacy suite never had
@@ -48,6 +48,12 @@ runs one app process against one data dir, so nothing may depend on file order.
 | Command palette | PR 4 | `command-palette`, `command-palette-input`, `palette-item` |
 | Password generator | PR 4 | `generator-mode-random` / `-memorable`, `generator-amount`, `generator-regenerate`, `generator-output`, `generator-use-button` |
 | Change master password | PR 4 | `change-password-submit`, `change-password-error`, `change-password-success` |
+| Settings shell: nav + section titles | PR 4 | `settings-modal`, `settings-nav-<sync\|security\|audit\|import\|language>` (`aria-current="page"` on the active item), `settings-version` / `settings-update-status` in the pinned footer, `modal-close` |
+| Session preferences | PR 4 | `settings-autolock-<secs>` and `settings-clipboard-<ms>` segments, asserted through `swifty:autolockSecs` / `swifty:clipboardTimeout` in localStorage. Auto-lock also pushes to the `set_autolock_timeout` command. |
+| Generator defaults | PR 4 | `settings-generator-length` / `-symbols` / `-numbers`, asserted through `swifty:generatorDefaults` |
+| Breach monitoring switch | PR 4 | `settings-breach-toggle`; weak/reused are informational rows with no control, so the section holds exactly one `role="switch"` |
+| Import tiles | PR 4 | `import-tile-<bitwarden\|chrome\|lastpass\|keepass\|csv\|swftx>`, `import-dropzone`; the format `<select>` is gone |
+| Theme and date format | PR 4 | `settings-theme-<light\|dark\|system>` (asserted on `<html data-theme>`), `settings-date-format-<pattern>` (asserted through `swifty:dateFormat`) |
 | Sync indicator reads "Local" | PR 4 | `sync-indicator` |
 | Copy toast | PR 4 | `copy-toast` — always in the DOM, toggled via the `hidden` class, so assert *visibility* |
 
@@ -61,7 +67,7 @@ These are not gaps in the suite; the coverage lives elsewhere and belongs there.
 |---|---|---|
 | Drive sync loop | Needs a live Google account + OAuth consent; a WebDriver run cannot hold credentials. | Rust tests around `sync::engine` against a fake `Remote`, plus the pack/restore round-trip tests. |
 | Biometric unlock | Gated by the OS (Touch ID prompt); no WebDriver surface, and the secure store is machine-bound. | `secure_store` / `biometrics` are behind a platform trait; unit-tested through it. |
-| `.swftx` import / export, backup restore | Opens a **native** file dialog outside the webview — the driver cannot reach it. | `import::` and `store::` Rust tests cover parse, reseal-on-import and the export round-trip. |
+| `.swftx` import / export, backup restore, third-party imports | Every import tile and the portable export open a **native** file dialog outside the webview — the driver cannot reach it. The drop zone needs a real OS drag. | `import::` and `store::` Rust tests cover parse, reseal-on-import and the export round-trip; `settings.test.tsx` drives the tile → password → import flow against mocked commands. |
 | Updater | Talks to the release endpoint and stages a signed bundle. | `services/autoUpdate.test.ts` against a mocked plugin. |
 | HIBP breach check | Network call to the k-anonymity range API. | `hibp` Rust unit tests; the audit spec runs with the breach check off. |
 | Site favicons | Fetches from each entry's own host. | E2E asserts only the **glyph fallback**; fetching/caching is covered in `favicon` Rust tests. |

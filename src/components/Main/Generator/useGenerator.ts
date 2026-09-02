@@ -3,6 +3,7 @@ import {
   defaultSettings,
   entropy,
   generate,
+  persistDefaults,
   type GeneratorSettings
 } from '@/services/generator'
 
@@ -24,6 +25,10 @@ export function useGenerator() {
       current = false
     }
   }, [settings, nonce])
+
+  // Whatever the dialog is set to becomes the default for next time. Idempotent,
+  // so the initial pass (which read those very values) is a no-op write.
+  useEffect(() => persistDefaults(settings), [settings])
 
   const update = useCallback(
     (patch: Partial<GeneratorSettings>) =>

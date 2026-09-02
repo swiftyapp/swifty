@@ -3,11 +3,12 @@ import { getVersion } from '@tauri-apps/api/app'
 import { syncStatus } from '@/lib/commands'
 import { t } from '@/i18n'
 
-// Both facts are constant for the app's lifetime (the sync flag can't change
-// while locked, and unlocking navigates away), so one pair of IPC calls
-// serves every auth-screen mount.
-let cached: Promise<{ version: string | null; configured: boolean }> | null =
-  null
+export interface VaultMeta {
+  version: string | null
+  configured: boolean
+}
+
+let cached: Promise<VaultMeta> | null = null
 
 const load = () =>
   (cached ??= Promise.all([
@@ -15,22 +16,18 @@ const load = () =>
     syncStatus().catch(() => ({ configured: false }))
   ]).then(([version, sync]) => ({ version, configured: sync.configured })))
 
-// The auth screens' footer: app version plus where the vault lives, in plain
-// words. Replaces "offline · aes-256-gcm" — jargon that told users nothing
-// and an "offline" that read as a (wrong) connectivity status. Both facts are
-// safe to show while locked: the version is public and the sync flag is
-// non-secret config.
-export function useAuthMeta(): string | null {
-  const [meta, setMeta] = useState<string | null>(null)
+// Where the vault lives, in one phrase.
+export const vaultHome = (configured: boolean): string =>
+  configured ? t('Syncs with Google Drive') : t('Vault on this device')
+
+// The raw parts, for callers that lay them out themselves (the Settings footer).
+export function useVaultMeta(): VaultMeta | null {
+  const [meta, setMeta] = useState<VaultMeta | null>(null)
 
   useEffect(() => {
     let alive = true
-    load().then(({ version, configured }) => {
-      if (!alive) return
-      const home = configured
-        ? t('Syncs with Google Drive')
-        : t('Vault on this device')
-      setMeta(version ? `Swifty ${version} · ${home}` : home)
+    load().then(next => {
+      if (alive) setMeta(next)
     })
     return () => {
       alive = false
@@ -38,4 +35,11 @@ export function useAuthMeta(): string | null {
   }, [])
 
   return meta
+}
+
+export function useAuthMeta(): string | null {
+  const meta = useVaultMeta()
+  if (!meta) return null
+  const home = vaultHome(meta.configured)
+  return meta.version ? `Swifty ${meta.version} · ${home}` : home
 }
