@@ -12,7 +12,7 @@ describe('EmptyState', () => {
         mark={<PlusGlyph />}
         title="No entries yet"
         body="Add your first login to get started."
-        primary={{ label: 'New entry', onClick, testid: 'empty-new' }}
+        primary={{ label: 'Add a secret', onClick, testid: 'empty-new' }}
         secondary={{ label: 'Import', onClick: vi.fn() }}
         hints={[{ keys: '⌘N', label: 'new' }]}
       />

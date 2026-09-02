@@ -60,8 +60,8 @@ pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     Ok(())
 }
 
-/// The "Import from Gdrive" flow: connect, then take on whatever the account
-/// already holds.
+/// The "Import from Google Drive" flow: connect, then take on whatever the
+/// account already holds.
 ///
 /// It is a **merge**, not a restore. The legacy version overwrote the local
 /// vault with the remote one, which silently discarded anything this device had
