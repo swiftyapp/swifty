@@ -141,6 +141,35 @@ describe('Editing in the pane', () => {
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 
+  it('dismisses the generator on Escape without ending the edit session', async () => {
+    // The reported reproducer: add a login, open the generator off the password
+    // row, press Escape. The editor's Esc listener is on `document`, so it sees
+    // the key first — and a draft with nothing typed yet closes with no confirm,
+    // silently taking the session down with the dialog.
+    vi.mocked(generatePassword).mockResolvedValue('Generated123!')
+    const { store } = renderWithStore(
+      <>
+        <Show type="login" editing />
+        <Generator />
+      </>
+    )
+    store.getState().newEntry('login')
+
+    await userEvent.click(screen.getByText('generate'))
+    expect(await screen.findByTestId('generator-dialog')).toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+
+    // Only the generator went.
+    expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
+    expect(store.getState().entries.new).toBe('login')
+    expect(screen.getByTestId('entry-sheet')).toBeInTheDocument()
+
+    // And the editor still owns Escape now that the dialog is gone.
+    await userEvent.keyboard('{Escape}')
+    expect(store.getState().entries.new).toBeNull()
+  })
+
   it('keeps in-progress edits when the entry refreshes mid-edit', async () => {
     // The revealed title differs from the metadata title so this wait proves
     // the decrypted values were actually adopted, not just the initial meta.
