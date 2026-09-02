@@ -48,6 +48,7 @@ runs one app process against one data dir, so nothing may depend on file order.
 | Card brand mark | PR 3 | brand slug derived at save time; assert per-network glyph |
 | Empty states, one system for both panes | PR 3 | One variant at a time, each with its own hook: `empty-vault` (hero, detail pane, holds `create-first-entry-button`), `empty-kind` + `empty-kind-add` and `empty-search` + `empty-search-clear` / `empty-search-widen` (compact, list column), `empty-select` (quiet, detail pane), `empty-health`. The list column and the detail pane never both show a hero, so `empty-vault` and `empty-health` mean an empty column. |
 | "Add a secret" kind picker | PR 3 | `add-entry-button` (or `create-first-entry-button`) → `add-secret-modal` → `add-kind-login` / `add-kind-card` / `add-kind-note`; `modal-close` or Escape dismisses. Every create flow goes through it, so `helpers/entries.ts` owns the two clicks. |
+| Keyboard path through the list | PR 2 | ⌘F → type → ↓↓ → ⏎ → ⌘E in `search-and-scopes.spec.ts`, no pointer. Rows are `role="option"` with `aria-selected` inside the column's `role="listbox"` scroller, so the selection is read off the row rather than a class; the arrows leave the caret in `search-input`. |
 | Command palette | PR 4 | `command-palette`, `command-palette-input`, `palette-item`. Commands only — a query matching a vault entry must leave `palette-item` empty; entries are `search-and-scopes.spec.ts`'s job. |
 | Password generator | PR 4 | `generator-mode-random` / `-memorable`, `generator-amount`, `generator-regenerate`, `generator-output`, `generator-use-button` |
 | Change master password | PR 4 | `change-password-submit`, `change-password-error`, `change-password-success` |
@@ -86,6 +87,7 @@ These are not gaps in the suite; the coverage lives elsewhere and belongs there.
   tile, fills the pane editor by field `name`, and saves — `createCard` composes the one
   `expiry` box from the `month` / `year` pair its caller still passes)
 - `helpers/app.ts` — `waitFor(testid)`, `waitForAppReady()`
+- `helpers/keys.ts` — `chord(key)` (Meta on macOS, Control on CI), `pressEnter()`, `pressArrowDown()`
 
 Reset goes through `window.__e2eReset` (installed only when `import.meta.env.DEV`) onto the
 `e2e_reset` Tauri command, which is compiled out of release builds and additionally refuses
