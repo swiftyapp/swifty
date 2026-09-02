@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { setCurrentEntry, setNoEntry, saveEntry } from '@/store'
 import { kindOf } from '@/kinds'
+import { dialogOpen } from '@/utils/dialogOpen'
 import type { EntryDraft } from '@/defaults/entries'
 import type { Entry, EntryType } from '@/lib/commands'
 import { t } from '@/i18n'
@@ -85,8 +86,15 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
   }
 
   // Bound fresh every render: both handlers close over the current draft.
+  //
+  // Both keys stand down while a dialog is up. The editor opens dialogs of its
+  // own (the generator, off the password row), and this listener is on
+  // `document` — so it sees Escape on the way *down* to the dialog's own
+  // handler. Without the guard, dismissing the generator would also end the
+  // edit session, and ⌘⏎ inside it would save the draft behind it.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (dialogOpen()) return
       if (event.key === 'Escape') return cancel()
       if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault()

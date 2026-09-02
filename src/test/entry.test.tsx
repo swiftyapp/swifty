@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Show from '@/components/Main/Body/Aside/Show'
 import Generator from '@/components/Main/Generator'
+import AddSecret from '@/components/Main/AddSecret'
+import { openAddPicker } from '@/store'
 import { saveEntry, revealEntry, generatePassword, generateOtp, copyToClipboard, deleteEntry, toEntryMeta } from '@/lib/commands'
 import type { LoginEntry } from '@/lib/commands'
 import { renderWithStore, loginEntry, loginMeta } from './utils'
@@ -83,6 +85,33 @@ describe('Editing in the pane', () => {
 
     await userEvent.keyboard('{Escape}')
     expect(store.getState().entries.new).toBeNull()
+  })
+
+  it('stands down on both keys while a dialog owns the keyboard', async () => {
+    const { store } = renderWithStore(
+      <>
+        <Show type="login" editing />
+        <AddSecret />
+      </>
+    )
+    store.getState().newEntry('login')
+    await userEvent.type(titleInput(), 'GitHub')
+    await userEvent.type(field('username'), 'octocat')
+    await userEvent.type(field('password'), 'pw')
+
+    // The editor's own listener is on `document`, so it sees these keys on the
+    // way down to the dialog's handler. Dismissing a dialog must not end the
+    // edit session, and saving behind one must not happen at all.
+    act(() => openAddPicker())
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByText('Discard changes?')).not.toBeInTheDocument()
+    expect(store.getState().entries.new).toBe('login')
+
+    act(() => openAddPicker())
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
+    expect(saveEntry).not.toHaveBeenCalled()
   })
 
   it('saves on ⌘⏎ from anywhere in the pane', async () => {
