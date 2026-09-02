@@ -5,18 +5,16 @@ interface Props {
   count: number
   selected: boolean
   onClick: () => void
+  testid: string
 }
 
 // A single filter chip: a token-bordered pill with a label and a mono count.
 // Selected chips switch to the accent palette.
-export default function Chip({ label, count, selected, onClick }: Props) {
+export default function Chip({ label, count, selected, onClick, testid }: Props) {
   return (
     <button
       type="button"
-      // One chip per tag, so specs disambiguate on `data-tag` (the raw tag —
-      // the visible label is the same string but sits beside a count span).
-      data-testid="tag-item"
-      data-tag={label}
+      data-testid={testid}
       aria-pressed={selected}
       onClick={onClick}
       className={cx(

@@ -1,37 +1,26 @@
 import Fuse from 'fuse.js'
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta, EntryType } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
+import { kindOf } from '@/kinds'
 
-// Validates a draft has the fields required for its type before saving.
-// Cards do not require a PIN — most cards have none.
-export const isValid = (entry: EntryDraft): boolean => {
-  switch (entry.type) {
-    case 'login':
-      return !!(entry.title && entry.username && entry.password)
-    case 'card':
-      return !!(entry.title && entry.number && entry.cvc && entry.month && entry.year)
-    case 'note':
-      return !!(entry.title && entry.note)
-    default:
-      return false
-  }
-}
+// Validates a draft has the fields required for its kind before saving.
+// The rule itself lives with the kind (src/kinds/<kind>/meta.ts).
+export const isValid = (draft: EntryDraft): boolean => kindOf(draft.type).isValid(draft)
 
 export interface FilterOptions {
-  scope: string
+  // null means every kind — the "All Items" view.
+  type: EntryType | null
   query: string
-  tags: string[]
 }
 
 // Fields a query is matched against. Only non-secret list metadata is available
 // here (secret fields like username/notes live in the encrypted payload); the
-// site host stands in for the website. url_host covers most "which account" searches.
+// site host stands in for the website. url_host covers most "which account"
+// searches, and tags make the search field the way to pull up a tagged set.
 const SEARCH_KEYS = ['title', 'urlHost', 'tags']
 
 export const filterEntries = (entries: EntryMeta[], options: FilterOptions): EntryMeta[] => {
-  const scoped = entries.filter(
-    entry => matchScope(entry, options.scope) && matchTags(entry, options.tags)
-  )
+  const scoped = entries.filter(entry => matchType(entry, options.type))
 
   const query = options.query.trim()
   if (query === '') return scoped.sort((a, b) => a.title.localeCompare(b.title))
@@ -41,7 +30,4 @@ export const filterEntries = (entries: EntryMeta[], options: FilterOptions): Ent
   return fuse.search(query).map(result => result.item)
 }
 
-const matchScope = (entry: EntryMeta, scope: string) => entry.type === scope
-
-const matchTags = (entry: EntryMeta, tags: string[]) =>
-  !tags || tags.length === 0 || !!entry.tags?.some(tag => tags.includes(tag))
+const matchType = (entry: EntryMeta, type: EntryType | null) => !type || entry.type === type

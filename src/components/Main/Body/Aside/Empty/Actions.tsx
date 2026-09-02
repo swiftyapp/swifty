@@ -19,7 +19,7 @@ export default function Actions() {
 
   return (
     <div className="mt-6 flex items-center gap-3">
-      <Button testid="create-first-entry-button" onClick={() => newEntry()}>
+      <Button testid="create-first-entry-button" onClick={() => newEntry('login')}>
         {t('Create First Entry')}
       </Button>
       <span className="text-base text-text3">{t('or')}</span>

@@ -11,20 +11,39 @@ describe('filterEntries', () => {
   const entries = [login('Google', ['personal']), login('Airbnb'), login('Facebook', ['personal'])]
 
   it('sorts by title', () => {
-    expect(filterEntries(entries, { scope: 'login', query: '', tags: [] }).map(e => e.title)).toEqual([
+    expect(filterEntries(entries, { type: 'login', query: '' }).map(e => e.title)).toEqual([
       'Airbnb',
       'Facebook',
       'Google'
     ])
   })
 
-  it('filters by scope', () => {
+  it('filters by kind', () => {
     const mixed = [...entries, card('Visa')]
-    expect(filterEntries(mixed, { scope: 'card', query: '', tags: [] }).map(e => e.title)).toEqual(['Visa'])
+    expect(filterEntries(mixed, { type: 'card', query: '' }).map(e => e.title)).toEqual(['Visa'])
+  })
+
+  it('keeps every kind when no kind filter is set', () => {
+    const mixed = [...entries, card('Visa')]
+    expect(filterEntries(mixed, { type: null, query: '' }).map(e => e.title)).toEqual([
+      'Airbnb',
+      'Facebook',
+      'Google',
+      'Visa'
+    ])
+  })
+
+  it('narrows a query to the filtered kind', () => {
+    // "Visa" matches a card by title; under the login filter it is not offered.
+    const mixed = [...entries, card('Visa')]
+    expect(filterEntries(mixed, { type: 'login', query: 'visa' })).toEqual([])
+    expect(filterEntries(mixed, { type: null, query: 'visa' }).map(e => e.title)).toEqual(
+      ['Visa']
+    )
   })
 
   it('filters by query', () => {
-    expect(filterEntries(entries, { scope: 'login', query: 'fa', tags: [] }).map(e => e.title)).toEqual(['Facebook'])
+    expect(filterEntries(entries, { type: 'login', query: 'fa' }).map(e => e.title)).toEqual(['Facebook'])
   })
 
   it('matches metadata fields (site host, tags)', () => {
@@ -35,7 +54,7 @@ describe('filterEntries', () => {
       login('Bank', ['money'], 'bank.example')
     ]
     const q = (query: string) =>
-      filterEntries(items, { scope: 'login', query, tags: [] }).map(e => e.title)
+      filterEntries(items, { type: 'login', query }).map(e => e.title)
 
     expect(q('github.com')).toEqual(['GitHub']) // url_host
     expect(q('money')).toEqual(['Bank']) // tag
@@ -43,14 +62,7 @@ describe('filterEntries', () => {
 
   it('is typo-tolerant (fuzzy)', () => {
     const items = [login('Facebook')]
-    expect(filterEntries(items, { scope: 'login', query: 'facbook', tags: [] }).map(e => e.title)).toEqual(['Facebook'])
-  })
-
-  it('filters by tag', () => {
-    expect(filterEntries(entries, { scope: 'login', query: '', tags: ['personal'] }).map(e => e.title)).toEqual([
-      'Facebook',
-      'Google'
-    ])
+    expect(filterEntries(items, { type: 'login', query: 'facbook' }).map(e => e.title)).toEqual(['Facebook'])
   })
 })
 

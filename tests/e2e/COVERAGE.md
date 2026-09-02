@@ -25,8 +25,8 @@ runs one app process against one data dir, so nothing may depend on file order.
 | 10 | `logins/empty.spec.js` | PR 3 | `empty.spec.ts` | `create-first-entry-button` state. |
 | 11 | `cards/create.spec.js` | PR 3 | `cards.spec.ts` | Plus brand mark + interactive face (see additions). |
 | 12 | `notes/create.spec.js` | PR 3 | `notes.spec.ts` | |
-| 13 | `tags/filter.spec.js` | PR 3 | `tags.spec.ts` | |
-| 14 | `tags/empty.spec.js` | PR 3 | `tags.spec.ts` | `tags-list` absent when no entry carries a tag. |
+| 13 | `tags/filter.spec.js` | dropped | — | The tag chip row was removed with the All Items redesign; tags stay on entries and are matched by the search field (`search-and-scopes.spec.ts`). |
+| 14 | `tags/empty.spec.js` | dropped | — | No chip row to assert on any more. |
 | 15 | `audit/index.spec.js` | PR 4 | `audit.spec.ts` | Groups are **Weak / Reused / Breached** now, not the legacy buckets. |
 | 16 | `settings/change_password.spec.js` | PR 4 | `settings.spec.ts` | |
 | 17 | `settings/password.spec.js` | PR 4 | `generator.spec.ts` | Generator *defaults* panel in Settings. |
@@ -38,11 +38,12 @@ runs one app process against one data dir, so nothing may depend on file order.
 |---|---|---|
 | Discard-changes guard on a dirty edit | PR 2 | `cancel-entry-button` pressed twice ("Discard changes?") |
 | Delete confirm | PR 2 | `delete-entry-button` → `delete-entry-confirm` inside `more-actions-button` |
-| Kind scopes in the rail | PR 2 | `scope-login` / `scope-note` / `scope-card` / `scope-audit` |
+| Kind filter chips over the list | PR 2 | `filter-all` / `filter-login` / `filter-card` / `filter-note`, `aria-pressed` on the active chip |
+| All Items / Vault Health views in the rail | PR 2 | `view-items` / `view-health`; the pane title is `list-title` |
 | Sort control | PR 3 | `sort-menu` → `sort-option-recent` / `sort-option-alpha`, assert `entry-item-title` order |
 | Card face: reveal + copy | PR 3 | `card-reveal-button`, `entry-value-number` / `-expires` / `-cvc` / `-pin` |
 | Card brand mark | PR 3 | brand slug derived at save time; assert per-network glyph |
-| Empty states per scope | PR 3 | `create-first-entry-button` |
+| Empty states per kind filter | PR 3 | `create-first-entry-button` |
 | Command palette | PR 4 | `command-palette`, `command-palette-input`, `palette-item` |
 | Password generator | PR 4 | `generator-mode-random` / `-memorable`, `generator-amount`, `generator-regenerate`, `generator-output`, `generator-use-button` |
 | Change master password | PR 4 | `change-password-submit`, `change-password-error`, `change-password-success` |

@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import type { EntryMeta } from '@/lib/commands'
+import type { Kind } from '@/kinds/types'
+import { cx } from '@/utils/cx'
 
-// What every type-specific row component (Login / Card / Note) is handed.
+// What every kind's list row component is handed (see src/kinds/*/ListRow).
 export interface ContentProps {
   entry: EntryMeta
   flag?: ReactNode
@@ -12,17 +14,34 @@ interface Props {
   title: string
   sub?: string
   flag?: ReactNode
+  // Set only when the tile shows the kind's generic glyph. A favicon or card
+  // brand mark is the entry's own identity and gets the neutral tile instead —
+  // tinting behind real artwork would just muddy it.
+  tint?: Kind['tint']
 }
 
-// Shared inner layout for every list item, whatever its type: a rounded
-// `bg-tile` glyph tile, the title (with an optional audit flag beside it), and
-// an optional mono secondary line. The type-specific bits (which glyph, which
-// secondary text) live in Login / Card / Note so this stays a single source of
-// truth for spacing and typography.
-export default function Row({ glyph, title, sub, flag }: Props) {
+// Tailwind resolves class names statically, so the kind tokens are spelled out
+// per kind rather than interpolated.
+const TINT: Record<Kind['tint'], string> = {
+  login: 'bg-kind-login-soft text-kind-login',
+  card: 'bg-kind-card-soft text-kind-card',
+  note: 'bg-kind-note-soft text-kind-note'
+}
+
+// Shared inner layout for every list item, whatever its kind: a rounded glyph
+// tile, the title (with an optional audit flag beside it), and an optional mono
+// secondary line. The kind-specific bits (which glyph, which secondary text)
+// live in src/kinds so this stays a single source of truth for spacing and
+// typography.
+export default function Row({ glyph, title, sub, flag, tint }: Props) {
   return (
     <>
-      <div className="grid h-[30px] w-[30px] flex-none place-items-center overflow-hidden rounded-lg bg-tile text-text2">
+      <div
+        className={cx(
+          'grid h-[30px] w-[30px] flex-none place-items-center overflow-hidden rounded-lg',
+          tint ? TINT[tint] : 'bg-tile text-text2'
+        )}
+      >
         {glyph}
       </div>
       <div className="min-w-0 flex-1">

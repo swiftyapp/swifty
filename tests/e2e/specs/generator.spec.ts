@@ -72,8 +72,9 @@ describe("password generator", () => {
   });
 
   it("fills the login editor's password field when opened from it", async () => {
-    await waitFor("scope-login");
-    await $('[data-testid="scope-login"]').click();
+    // Add takes its kind from the active filter (no kind picker yet).
+    await waitFor("filter-login");
+    await $('[data-testid="filter-login"]').click();
     await $('[data-testid="add-entry-button"]').click();
     await waitFor("entry-sheet");
 
@@ -81,7 +82,7 @@ describe("password generator", () => {
     await field.waitForDisplayed({ timeout: 10_000 });
     await expect(field).toHaveValue("");
 
-    // The link next to the Password label (`Form/Login.tsx`) — it opens the
+    // The link next to the Password label (`src/kinds/login/Form.tsx`) — it opens the
     // same dialog with a callback bound to this field.
     await $('[data-testid="entry-sheet"]').$("span*=generate").click();
     await waitFor("generator-dialog");

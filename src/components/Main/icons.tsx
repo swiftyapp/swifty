@@ -76,6 +76,7 @@ export const LoginGlyph = glyph(Globe, 16)
 export const NoteGlyph = glyph(FileText, 16)
 export const CardGlyph = glyph(CreditCard, 16)
 export const ShieldGlyph = glyph(ShieldCheck, 16)
+export const AllItemsGlyph = glyph(LayoutGrid, 16)
 export const GlobeGlyph = glyph(Globe, 16)
 export const ActivityGlyph = glyph(Activity, 16)
 

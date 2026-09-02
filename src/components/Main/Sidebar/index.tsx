@@ -1,10 +1,10 @@
 import Brand from './Brand'
 import Add from './Add'
-import Switcher from './Switcher'
+import AllItems from './AllItems'
 import VaultHealth from './VaultHealth'
 import Settings from './Settings'
 
-// The 68px icon rail: brand mark · new-secret · scope filters · spacer ·
+// The 68px icon rail: brand mark · new-secret · all-items · spacer ·
 // vault-health · settings. Rail tiles are 40px with 18px glyphs — one step up
 // from the in-pane tiers so the rail reads as primary navigation.
 export default function Sidebar() {
@@ -14,7 +14,7 @@ export default function Sidebar() {
       <div className="my-2 h-px w-6 bg-line2" />
       <Add />
       <div className="h-1.5" />
-      <Switcher />
+      <AllItems />
       <div className="flex-1" />
       <VaultHealth />
       <Settings />

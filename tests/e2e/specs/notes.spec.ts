@@ -4,11 +4,14 @@ import { createNote, resetEmpty, unlock, waitFor } from "../helpers";
 // id alone, so after an in-place save the detail pane keeps serving the
 // pre-edit plaintext. Clearing the selection unmounts the pane, so re-opening
 // the entry forces a fresh reveal — which is what this asserts against.
+// Filtering to a kind the selection is not clears it (`setFilterType`), so the
+// login→note round trip is what unmounts the pane; the "All" chip would keep
+// the note selected and the stale reveal with it.
 async function reopenFirstEntry(): Promise<void> {
-  await waitFor("scope-login");
-  await $('[data-testid="scope-login"]').click();
-  await waitFor("scope-note");
-  await $('[data-testid="scope-note"]').click();
+  await waitFor("filter-login");
+  await $('[data-testid="filter-login"]').click();
+  await waitFor("filter-note");
+  await $('[data-testid="filter-note"]').click();
   await waitFor("entry-item");
   await $('[data-testid="entry-item"]').click();
   await waitFor("entry-value-note");

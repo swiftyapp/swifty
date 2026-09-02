@@ -75,6 +75,12 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       const entry = buildEntry(draft)
       const meta = await saveEntryCmd(entry)
       get().setEntries(upsertMeta(get().entries.items, meta))
+      // A save always lands somewhere the user can see it: a type filter that
+      // would hide the row just written is dropped rather than silently
+      // swallowing it (the editor no longer takes its kind from the filter, so
+      // the two can legitimately disagree).
+      const { type } = get().filters
+      if (type && type !== meta.type) get().setFilterType(null)
       get().entrySaved(meta.id)
       scheduleSync()
       refreshAudit()
