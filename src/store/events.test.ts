@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { on, EVENTS, type EventName, type EventPayloads } from '@/lib/events'
-import { getAudit, isBiometricAvailable } from '@/lib/commands'
+import { getAudit, isBiometricAvailable, listDeleted } from '@/lib/commands'
 import type { EntryMeta } from '@/lib/commands'
 import { subscribeToEvents } from './events'
-import { makeStore, setEntries } from './index'
+import { makeStore, setEntries, setView } from './index'
 
 const meta = (id: string): EntryMeta => ({
   id,
@@ -43,6 +43,27 @@ describe('vault:merged', () => {
   it('re-runs the audit, since the new rows have no strength result yet', () => {
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
     expect(getAudit).toHaveBeenCalled()
+  })
+
+  // A merge can add or drop tombstones too, and the Trash only loads on entry —
+  // so an open one has to be told, while a closed one refetches on its own.
+  it('re-reads the tombstones when the Trash is the open view', () => {
+    setView('trash')
+    vi.mocked(listDeleted).mockClear()
+
+    handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
+
+    expect(listDeleted).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves the tombstones alone when the Trash is not open', () => {
+    setView('items')
+    vi.mocked(listDeleted).mockClear()
+
+    handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
+    handlerFor(EVENTS.pullStopped)({ success: true })
+
+    expect(listDeleted).not.toHaveBeenCalled()
   })
 })
 
