@@ -36,6 +36,13 @@ const unlockError = (error: unknown): string =>
     ? t('Vault needs a newer version of Swifty')
     : t('Incorrect Master Password')
 
+// A biometric failure is never a password problem: the backend's errors here
+// are a cancelled/failed prompt, a missing enrollment, or a keychain issue.
+// Claiming "Incorrect Master Password" for any of them would send the user
+// retyping a password that was never checked.
+const biometricError = (error: unknown): string =>
+  isVaultTooNew(error) ? t('Vault needs a newer version of Swifty') : t('Biometric unlock failed')
+
 const lockedMessage = (seconds: number) =>
   `${t('Too many failed attempts')}. ${t('Try again in')} ${seconds}s`
 
@@ -89,7 +96,7 @@ export function Auth({ touchID }: Props) {
     if (success) return
     unlockBiometric()
       .then(holdThenEnter)
-      .catch((err: unknown) => setError(unlockError(err)))
+      .catch((err: unknown) => setError(biometricError(err)))
   }
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {

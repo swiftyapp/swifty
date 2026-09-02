@@ -18,7 +18,6 @@ mod imp {
         unsafe { LAContext::new().canEvaluatePolicy_error(POLICY).is_ok() }
     }
 
-    #[allow(dead_code)] // verify-then-read path; unused on macOS (OS-enforced-on-read)
     pub fn authenticate() -> Result<()> {
         let ctx = unsafe { LAContext::new() };
         let reason = NSString::from_str("Confirm your identity");
@@ -84,9 +83,10 @@ pub fn is_available() -> bool {
     imp::is_available()
 }
 
-// Used only where the biometric gate is verify-then-read (Windows). On macOS the
-// OS enforces biometry on Keychain read, so no explicit prompt call is needed.
-#[allow(dead_code)]
+// The verify-then-read gate: Windows always, and macOS in `GateMode::Prompt`
+// (unentitled builds, where the OS cannot enforce biometry on keychain read).
+// Nothing calls it on Linux, where the secure store is unsupported outright.
+#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
 pub fn authenticate() -> Result<()> {
     imp::authenticate()
 }

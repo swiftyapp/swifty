@@ -31,9 +31,9 @@ export const subscribeToEvents = (): (() => void) => {
       runAudit()
     }),
     on(EVENTS.auditDone, payload => auditDone(payload.data)),
-    // Re-check biometrics on every lock instead of hard-coding false — the
-    // lock screen reached by locking must offer Touch ID just like a cold
-    // start (this used to silently drop the Touch ID affordance).
+    // Ask, don't assume: hardcoding `false` here meant the Touch ID button only
+    // ever appeared on a fresh boot (App.tsx runs the same check), never on an
+    // in-session lock — including the very first lock after enabling it.
     on(EVENTS.vaultLocked, () =>
       isBiometricAvailable()
         .catch(() => false)

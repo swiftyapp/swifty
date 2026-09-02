@@ -1,15 +1,13 @@
-import { flowAuth } from '@/store'
-import { lock } from '@/lib/commands'
+import { lockVault } from '@/store'
 import { t } from '@/i18n'
 import IconButton from '@/components/elements/IconButton'
 import { LockGlyph } from '../icons'
 
 // Locks the vault straight from the top chrome (previously only reachable via
-// Settings → Vault). Same action path as before: lock the vault, then drop the
-// UI back to the auth flow.
+// Settings → Vault).
 export default function LockButton() {
   const onLock = () => {
-    lock().finally(() => flowAuth(false))
+    void lockVault()
   }
 
   return (

@@ -5,9 +5,15 @@ import { revealEntry, type Entry } from '@/lib/commands'
 // whole vault is never decrypted at once, only the entry currently in view/edit.
 // Takes anything carrying an id (list metadata or a full entry). Returns null
 // until the reveal resolves (and for missing entries).
-export function useRevealed(entry?: { id: string } | null): Entry | null {
+//
+// Keyed on `updatedAt` as well as `id`: the id survives an in-place save, and a
+// decrypt keyed on it alone kept serving the PRE-edit secrets to a detail pane
+// that stays mounted across saves — including its "Copy password" action, which
+// then copied the rotated-away password.
+export function useRevealed(entry?: { id: string; updatedAt?: string } | null): Entry | null {
   const [revealed, setRevealed] = useState<Entry | null>(null)
   const id = entry?.id
+  const stamp = entry?.updatedAt
 
   useEffect(() => {
     setRevealed(null)
@@ -19,7 +25,7 @@ export function useRevealed(entry?: { id: string } | null): Entry | null {
     return () => {
       active = false
     }
-  }, [id])
+  }, [id, stamp])
 
   return revealed
 }
