@@ -181,6 +181,18 @@ describe('Show', () => {
     expect(copyToClipboard).toHaveBeenCalledWith('hunter2', expect.any(Number))
   })
 
+  it('announces the more menu trigger as a disclosure', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry())
+    renderWithStore(<Show entry={loginMeta()} />)
+
+    const trigger = screen.getByTestId('more-actions-button')
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+
+    await userEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('leaves Enter to whichever control holds focus', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'hunter2' }))
     renderWithStore(<Show entry={loginMeta()} />)

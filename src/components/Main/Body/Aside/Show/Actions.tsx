@@ -89,6 +89,7 @@ export default function Actions({ type, revealed, onDelete }: Props) {
         <IconButton
           title={t('More actions')}
           active={menu}
+          expanded={menu}
           onClick={toggleMenu}
           className="border border-line2 hover:border-accent-line"
           testid="more-actions-button"

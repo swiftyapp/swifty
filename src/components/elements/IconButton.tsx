@@ -11,6 +11,7 @@ export default function IconButton({
   label,
   active,
   muted,
+  expanded,
   className,
   testid,
   children
@@ -21,6 +22,9 @@ export default function IconButton({
   label?: string
   active?: boolean
   muted?: boolean
+  // Set only on a button that owns a popup menu: renders the disclosure pair
+  // (`aria-haspopup` + `aria-expanded`). Left undefined, neither appears.
+  expanded?: boolean
   className?: string
   testid?: string
   children: ReactNode
@@ -30,6 +34,8 @@ export default function IconButton({
       type="button"
       title={title}
       aria-label={label ?? title}
+      aria-haspopup={expanded === undefined ? undefined : 'menu'}
+      aria-expanded={expanded}
       data-testid={testid}
       onClick={onClick}
       className={cx(
