@@ -47,13 +47,20 @@ export default function Dialog({ apply, onClose }: Props) {
       className="fixed inset-0 z-50 grid animate-fade place-items-center bg-[var(--scrim)] p-4 backdrop-blur-sm"
       onClick={onClose}
     >
+      {/* Announces itself as modal like `elements/Modal` does. Beyond the
+          a11y, this is what tells the window-level accelerators to stand down:
+          `utils/dialogOpen` asks the DOM, so without the role the editor's Esc
+          would close the edit session underneath this dialog. */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="generator-title"
         data-testid="generator-dialog"
         className="w-[470px] animate-pop overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-[var(--shadow)]"
         onClick={event => event.stopPropagation()}
       >
         <div className="flex items-center gap-2.5 px-[18px] py-[15px] shadow-[inset_0_-1px_0_var(--c-line)]">
-          <div className="flex-1 text-lg font-semibold tracking-display">
+          <div id="generator-title" className="flex-1 text-lg font-semibold tracking-display">
             {t('Generate')}
           </div>
           <Tabs mode={settings.mode} onChange={mode => update({ mode })} />

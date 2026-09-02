@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Show from '@/components/Main/Body/Aside/Show'
 import Generator from '@/components/Main/Generator'
+import AddSecret from '@/components/Main/AddSecret'
+import { openAddPicker } from '@/store'
 import { saveEntry, revealEntry, generatePassword, generateOtp, copyToClipboard, deleteEntry, toEntryMeta } from '@/lib/commands'
 import type { LoginEntry } from '@/lib/commands'
 import { renderWithStore, loginEntry, loginMeta } from './utils'
@@ -85,6 +87,33 @@ describe('Editing in the pane', () => {
     expect(store.getState().entries.new).toBeNull()
   })
 
+  it('stands down on both keys while a dialog owns the keyboard', async () => {
+    const { store } = renderWithStore(
+      <>
+        <Show type="login" editing />
+        <AddSecret />
+      </>
+    )
+    store.getState().newEntry('login')
+    await userEvent.type(titleInput(), 'GitHub')
+    await userEvent.type(field('username'), 'octocat')
+    await userEvent.type(field('password'), 'pw')
+
+    // The editor's own listener is on `document`, so it sees these keys on the
+    // way down to the dialog's handler. Dismissing a dialog must not end the
+    // edit session, and saving behind one must not happen at all.
+    act(() => openAddPicker())
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByText('Discard changes?')).not.toBeInTheDocument()
+    expect(store.getState().entries.new).toBe('login')
+
+    act(() => openAddPicker())
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
+    expect(saveEntry).not.toHaveBeenCalled()
+  })
+
   it('saves on ⌘⏎ from anywhere in the pane', async () => {
     renderWithStore(<Show type="login" editing />)
     await userEvent.type(titleInput(), 'GitHub')
@@ -110,6 +139,35 @@ describe('Editing in the pane', () => {
     await userEvent.click(screen.getByTestId('generator-use-button'))
     await waitFor(() => expect(field('password').value).toBe('Generated123!'))
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
+  })
+
+  it('dismisses the generator on Escape without ending the edit session', async () => {
+    // The reported reproducer: add a login, open the generator off the password
+    // row, press Escape. The editor's Esc listener is on `document`, so it sees
+    // the key first — and a draft with nothing typed yet closes with no confirm,
+    // silently taking the session down with the dialog.
+    vi.mocked(generatePassword).mockResolvedValue('Generated123!')
+    const { store } = renderWithStore(
+      <>
+        <Show type="login" editing />
+        <Generator />
+      </>
+    )
+    store.getState().newEntry('login')
+
+    await userEvent.click(screen.getByText('generate'))
+    expect(await screen.findByTestId('generator-dialog')).toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+
+    // Only the generator went.
+    expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
+    expect(store.getState().entries.new).toBe('login')
+    expect(screen.getByTestId('entry-sheet')).toBeInTheDocument()
+
+    // And the editor still owns Escape now that the dialog is gone.
+    await userEvent.keyboard('{Escape}')
+    expect(store.getState().entries.new).toBeNull()
   })
 
   it('keeps in-progress edits when the entry refreshes mid-edit', async () => {

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useStore, openPalette, openGenerator, openAddPicker } from '@/store'
+import { useStore, openPalette, openGenerator, openAddPicker, editEntry } from '@/store'
 import { focusSearch } from './Body/ListColumn/focus'
 import { lockVault } from './Palette/commands'
 
@@ -26,6 +26,10 @@ const BINDINGS: Record<string, () => void> = {
   },
   f: () => {
     if (!dialogOpen()) focusSearch()
+  },
+  // Edit whatever the list has selected — nothing to edit without a selection.
+  e: () => {
+    if (!dialogOpen() && useStore.getState().entries.current) editEntry()
   }
 }
 
