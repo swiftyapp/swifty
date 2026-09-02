@@ -86,16 +86,12 @@ export default function Masterpass({
     <input
       type={reveal ? 'text' : 'password'}
       className={cx(
-        // Quiet shared metrics: placeholder and revealed value are 15px on the
-        // secret tracking (the revealed-secret tier); only the ink differs.
-        // The theatrical size lives in the dot overlay, not the text.
-        'absolute inset-0 w-full border-0 bg-transparent text-center font-sans text-[15px] tracking-secret outline-none placeholder:text-text3',
+        // The input's own text never shows: masked dots and the revealed value
+        // are both drawn by the cell overlay (see Dots) so they share one
+        // geometry. Only the placeholder renders from here (15px, muted ink).
+        'absolute inset-0 w-full border-0 bg-transparent text-center font-sans text-[15px] tracking-secret text-transparent caret-transparent outline-none placeholder:text-text3',
         lock && 'rounded-xl px-10'
       )}
-      style={{
-        color: reveal ? 'var(--c-text)' : 'transparent',
-        caretColor: reveal ? 'var(--c-accent)' : 'transparent'
-      }}
       placeholder={placeholder || t('Master Password')}
       disabled={disabled}
       data-testid={testid}
@@ -123,9 +119,11 @@ export default function Masterpass({
       >
         <div className="relative flex-1">
           {input}
-          {!reveal && (
-            <Dots count={value.length} caret={focused && !disabled} />
-          )}
+          <Dots
+            count={value.length}
+            caret={focused && !disabled}
+            text={reveal ? value : undefined}
+          />
           {/* Reveal is a secondary modifier of what you're typing, so it only
               appears once there is something to reveal, small and dim. */}
           {value.length > 0 && (
@@ -163,7 +161,11 @@ export default function Masterpass({
     <div className="w-full">
       <div className="relative flex h-14 items-center justify-center">
         {input}
-        {!reveal && <Dots count={value.length} caret={focused && !disabled} />}
+        <Dots
+          count={value.length}
+          caret={focused && !disabled}
+          text={reveal ? value : undefined}
+        />
         <IconButton
           label={t('Reveal passphrase')}
           className="absolute right-0"
