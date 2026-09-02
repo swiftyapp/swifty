@@ -401,9 +401,20 @@
   --shadow: 0 24px 60px rgba(24, 26, 30, 0.16), 0 1px 3px rgba(24, 26, 30, 0.1);
   --scrim: rgba(40, 43, 48, 0.3);
   --thumb: rgba(20, 22, 26, 0.22);
-  /* The lock screen's signature field: soft, layered float (see Masterpass). */
-  --lockfield-shadow: 0 1px 2px rgba(20, 22, 26, 0.05),
-    0 14px 36px rgba(20, 22, 26, 0.1);
+  /*
+   * The lock screen's signature field (see Masterpass): a white surface set
+   * gently *into* the ground rather than floating on it. A faint shadow along
+   * the inside top (light from above) and a 1px highlight just under the
+   * bottom edge — the lip catching the light. `deep` is the focused cut, a
+   * touch deeper. The edge itself is the card's border; the state halo is a
+   * Tailwind ring, and all three compose as one box-shadow.
+   */
+  --lockfield-shadow:
+    inset 0 1.5px 3px rgba(20, 22, 26, 0.09),
+    0 1px 0 rgba(255, 255, 255, 0.7);
+  --lockfield-shadow-deep:
+    inset 0 2px 5px rgba(20, 22, 26, 0.13),
+    0 1px 0 rgba(255, 255, 255, 0.75);
 }
 
 :root[data-theme='dark'] {
@@ -441,6 +452,10 @@
   --shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
   --scrim: rgba(8, 9, 10, 0.7);
   --thumb: rgba(255, 255, 255, 0.14);
-  --lockfield-shadow: 0 1px 2px rgba(0, 0, 0, 0.45),
-    0 18px 44px rgba(0, 0, 0, 0.5);
+  --lockfield-shadow:
+    inset 0 1.5px 3px rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+  --lockfield-shadow-deep:
+    inset 0 2px 5px rgba(0, 0, 0, 0.65),
+    0 1px 0 rgba(255, 255, 255, 0.05);
 }

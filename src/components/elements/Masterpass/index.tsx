@@ -42,10 +42,12 @@ interface Props {
 // the design in both themes.
 //
 // The lock variant is deliberately unlike every other field in the app: a
-// floating white card with big centered dots, whose halo carries the state —
-// accent on focus, red (plus a shake) on a bad passphrase, green while a
-// successful unlock lands. Its only chrome is Touch ID (primary) and reveal
-// (secondary, only once there is something to reveal) on the right edge.
+// white card set gently into the window ground (see --lockfield-shadow) with
+// big centered dots, whose border + halo carry the state — accent on focus,
+// red (plus a shake) on a bad passphrase, green while a successful unlock
+// lands — while focus also cuts a touch deeper. Its only chrome is Touch ID
+// (primary) and reveal (secondary, only once there is something to reveal) on
+// the right edge.
 export default function Masterpass({
   error,
   touchID,
@@ -151,7 +153,10 @@ export default function Masterpass({
           // In-card icon buttons (reveal, Touch ID) share a softened hover
           // wash; the ! outranks IconButton's own hover:bg-hover, in this one
           // place instead of at every button.
-          'relative mx-auto flex h-12 max-w-[380px] items-stretch rounded-xl border bg-detail shadow-[var(--lockfield-shadow)] transition-all duration-300 [&_button:hover]:bg-hover/60!',
+          'relative mx-auto flex h-12 max-w-[380px] items-stretch rounded-xl border bg-detail transition-all duration-300 [&_button:hover]:bg-hover/60!',
+          // The inset shadow is the cut; focus goes a touch deeper. It and the
+          // state halo (ring) are both box-shadow, so Tailwind composes them.
+          'shadow-[var(--lockfield-shadow)] focus-within:shadow-[var(--lockfield-shadow-deep)]',
           bad
             ? 'border-bad/60 ring-4 ring-bad/10 animate-[nudge_420ms_ease_both]'
             : success
