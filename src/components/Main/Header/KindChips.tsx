@@ -2,15 +2,15 @@ import { useMemo } from 'react'
 import { useStore, setFilterType } from '@/store'
 import { KINDS } from '@/kinds'
 import { t } from '@/i18n'
-import Chip from './Tags/Chip'
+import Chip from './Chip'
 
 // The list-column kind filter: an "All" chip plus one per registered kind, each
 // with a live count. This is what replaced the rail's type tabs — narrowing the
 // list, not navigating away from it.
 export default function KindChips() {
   const type = useStore(state => state.filters.type)
-  // Same rule as the tag row: select stable store references and derive in a
-  // memo, never return a fresh object from the selector.
+  // Select stable store references and derive in a memo, never return a fresh
+  // object from the selector (useSyncExternalStore would re-render forever).
   const items = useStore(state => state.entries.items)
   const counts = useMemo(() => {
     const totals = new Map<string, number>()
