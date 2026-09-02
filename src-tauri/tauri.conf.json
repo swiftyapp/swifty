@@ -18,6 +18,8 @@
         "create": false,
         "width": 900,
         "height": 700,
+        "minWidth": 820,
+        "minHeight": 640,
         "center": true,
         "resizable": true,
         "transparent": true,
