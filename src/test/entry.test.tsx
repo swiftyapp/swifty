@@ -181,6 +181,33 @@ describe('Show', () => {
     expect(copyToClipboard).toHaveBeenCalledWith('hunter2', expect.any(Number))
   })
 
+  it('announces the more menu trigger as a disclosure', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry())
+    renderWithStore(<Show entry={loginMeta()} />)
+
+    const trigger = screen.getByTestId('more-actions-button')
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+
+    await userEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('leaves Enter to whichever control holds focus', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'hunter2' }))
+    renderWithStore(<Show entry={loginMeta()} />)
+
+    await waitFor(() => expect(screen.getByTestId('primary-action-button')).toBeEnabled())
+
+    // Enter on a focused button activates that button and nothing else — it
+    // used to open the more menu *and* copy the password.
+    screen.getByTestId('more-actions-button').focus()
+    await userEvent.keyboard('{Enter}')
+
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    expect(copyToClipboard).not.toHaveBeenCalled()
+  })
+
   it('deletes from the more menu behind a two-press inline confirm', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry())
     renderWithStore(<Show entry={loginMeta()} />)

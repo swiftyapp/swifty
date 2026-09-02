@@ -27,6 +27,7 @@ export default function SortMenu() {
       <IconButton
         title={t('Sort')}
         active={open}
+        expanded={open}
         testid="sort-menu"
         onClick={() => setOpen(value => !value)}
       >
