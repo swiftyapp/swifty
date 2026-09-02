@@ -28,8 +28,8 @@ interface Props {
 
 const EyeIcon = <EyeGlyph size={16} />
 const EyeOffIcon = <EyeOffGlyph size={16} />
-const SmallEyeIcon = <EyeGlyph size={14} />
-const SmallEyeOffIcon = <EyeOffGlyph size={14} />
+const SmallEyeIcon = <EyeGlyph size={15} />
+const SmallEyeOffIcon = <EyeOffGlyph size={15} />
 
 // The macOS Touch ID rose, so the fingerprint reads as the system affordance
 // rather than another monochrome glyph. Sized to nearly fill the 28px button:
