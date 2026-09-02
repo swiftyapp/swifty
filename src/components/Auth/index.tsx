@@ -79,7 +79,9 @@ export function Auth({ touchID }: Props) {
 
   const handleEnter = (value: string) => {
     if (retryAfter > 0 || success || pending) return
-    // Key derivation is deliberately slow; acknowledge the Enter immediately.
+    // Key derivation is deliberately slow; acknowledge the Enter immediately
+    // (and drop any stale error — this attempt owns the eyebrow now).
+    setError(null)
     setPending(true)
     unlock(value)
       .then(result => {
@@ -101,6 +103,7 @@ export function Auth({ touchID }: Props) {
     // Biometric unlock is never subject to the password backoff (the OS gate
     // already rate-limits it), so it stays available even while locked out.
     if (success || pending) return
+    setError(null)
     setPending(true)
     unlockBiometric()
       .then(result => {
@@ -142,6 +145,7 @@ export function Auth({ touchID }: Props) {
             is showing rather than forcing specs to parse the message. */}
         <Eyebrow
           tone={error ? 'bad' : success ? 'accent' : 'muted'}
+          busy={pending}
           testid={
             retryAfter > 0
               ? 'unlock-lockout'

@@ -96,6 +96,15 @@
     transform: none;
   }
 }
+/* A light band sweeping through text (see the `shimmer-text` utility). */
+@keyframes shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
 /* While the key derives, the mask dots ripple in sequence (per-cell delay). */
 @keyframes dotwave {
   0%,
@@ -279,6 +288,24 @@
   --animate-fade: fade 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-pop: pop 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-sheet: sheet 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/*
+ * Busy text: the muted ink with a brighter band sweeping through the glyphs.
+ * Gradient is clipped to the text, so it re-themes via the ink tokens.
+ */
+@utility shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--c-text3) 40%,
+    var(--c-text) 50%,
+    var(--c-text3) 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2s linear infinite;
 }
 
 /*
