@@ -257,6 +257,7 @@
   --color-bad: var(--c-bad);
   --color-accent-deep: var(--c-accent-deep);
   --color-touchid: var(--c-touchid);
+  --color-brand: var(--c-brand);
 }
 
 /*
@@ -393,6 +394,10 @@
   /* Deep end of the brand gradient; same in both themes (it sits under the
    * accent, which does adapt). */
   --c-accent-deep: #2b3a8f;
+  /* The brand asterisk's ink (mascot body + rail mark) and the paper its eyes
+   * are cut from. Graphite on light ground; flips to chalk on dark. */
+  --c-brand: #34373e;
+  --c-brand-eye: #ffffff;
 
   /* Design vars that aren't color utilities (gradients/shadows/scrims). */
   --card: linear-gradient(180deg, #ffffff, #fbfbfc);
@@ -430,6 +435,8 @@
   --c-warn: #e0a94e;
   --c-bad: #e4685d;
   --c-touchid: #ee5d6f;
+  --c-brand: #d6d8dc;
+  --c-brand-eye: #15161a;
 
   --card: linear-gradient(
     180deg,

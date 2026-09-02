@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import AsteriskBody from './Asterisk'
 
 export type MascotState = 'idle' | 'typing' | 'checking' | 'success' | 'error'
 
@@ -7,18 +8,15 @@ interface Props {
   // Where the eyes look horizontally, -1 (left) .. 1 (right). The lock screen
   // maps the passphrase caret position onto this so the mascot reads along.
   gaze?: number
-  // Body color. Graphite by default; a vault-personalization setting will feed
-  // this eventually.
+  // Body color. The brand ink by default (shared with the rail mark, themed in
+  // theme.css); a vault-personalization setting will feed this eventually.
   color?: string
   size?: number
 }
 
-const GRAPHITE = '#34373e'
-
-// One flared spike: narrow at the base, wide at the tip, soft outer corners.
-// Rotated around the hub; the circle buries the bases.
-const SPIKE = 'M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z'
-const SPIKE_ANGLES = [0, 60, 120, 180, 240, 300]
+const BRAND_INK = 'var(--c-brand)'
+// Eyes and expression strokes: paper on ink, so they flip with the theme too.
+const EYE = 'var(--c-brand-eye)'
 
 // The Swifty mascot: the brand asterisk (a secret value, redacted) with eyes.
 // It sits still and blinks every once in a while, follows typing with its
@@ -28,7 +26,7 @@ const SPIKE_ANGLES = [0, 60, 120, 180, 240, 300]
 function Mascot({
   state = 'idle',
   gaze = 0,
-  color = GRAPHITE,
+  color = BRAND_INK,
   size = 96
 }: Props) {
   const ok = state === 'success'
@@ -62,32 +60,7 @@ function Mascot({
       data-state={state}
       className={bodyAnim}
     >
-      <defs>
-        {/* Blur + alpha threshold rounds every corner of the body's combined
-            silhouette — including the concave notch bottoms, which per-shape
-            stroke joins cannot fillet. */}
-        <filter id="mascot-soften" x="-15%" y="-15%" width="130%" height="130%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="b" />
-          <feColorMatrix
-            in="b"
-            type="matrix"
-            values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 30 -13"
-          />
-        </filter>
-      </defs>
-      <g
-        filter="url(#mascot-soften)"
-        style={{ fill, transition: 'fill 300ms ease' }}
-      >
-        {SPIKE_ANGLES.map(angle => (
-          <path
-            key={angle}
-            d={SPIKE}
-            transform={angle ? `rotate(${angle} 32 32)` : undefined}
-          />
-        ))}
-        <circle cx="32" cy="32" r="14" />
-      </g>
+      <AsteriskBody style={{ fill, transition: 'fill 300ms ease' }} />
 
       <g
         style={{
@@ -110,7 +83,7 @@ function Mascot({
               cy="27.4"
               rx="3.5"
               ry={eyeRy}
-              fill="#fff"
+              fill={EYE}
               style={{ transition: 'ry 300ms ease' }}
             />
             <ellipse
@@ -118,14 +91,14 @@ function Mascot({
               cy="26.8"
               rx="3.5"
               ry={eyeRy}
-              fill="#fff"
+              fill={EYE}
               style={{ transition: 'ry 300ms ease' }}
             />
           </g>
           {/* Happy arcs (success) */}
           <g
             style={{ opacity: ok ? 1 : 0, transition: 'opacity 190ms ease' }}
-            stroke="#fff"
+            stroke={EYE}
             strokeWidth="2.6"
             strokeLinecap="round"
             fill="none"
@@ -136,7 +109,7 @@ function Mascot({
           {/* Sad arcs (error) */}
           <g
             style={{ opacity: bad ? 1 : 0, transition: 'opacity 190ms ease' }}
-            stroke="#fff"
+            stroke={EYE}
             strokeWidth="2.6"
             strokeLinecap="round"
             fill="none"
