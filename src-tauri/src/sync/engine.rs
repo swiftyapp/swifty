@@ -22,6 +22,7 @@ use tauri::{AppHandle, Manager};
 use zeroize::Zeroizing;
 
 use super::pack::{self, PackError};
+use crate::app::APP_NAME;
 use crate::commands::store_err;
 use crate::error::{Error, Result};
 use crate::state::AppState;
@@ -45,7 +46,9 @@ const META_REMOTE_REV: &str = "sync_remote_rev";
 const META_LAST_MS: &str = "sync_last_ms";
 
 // Surfaced verbatim by the sync indicator, so it has to read as a sentence.
-const FOREIGN_VAULT: &str = "Google Drive holds a vault from a different Swifty install";
+fn foreign_vault_error() -> String {
+    format!("Google Drive holds a vault from a different {APP_NAME} install")
+}
 
 /// The remote snapshot together with the revision it was read at.
 pub struct RemoteFile {
@@ -258,7 +261,7 @@ fn decode_pack(
 ) -> Result<Vec<Record>> {
     let unpacked = pack::unpack(bytes).map_err(remote_pack_error)?;
     if unpacked.kdf_params_json != expected_kdf_params_json {
-        return Err(Error::Other(FOREIGN_VAULT.into()));
+        return Err(Error::Other(foreign_vault_error()));
     }
     records_from_snapshot(&unpacked.snapshot, key, scratch_dir)
 }
@@ -691,7 +694,7 @@ mod tests {
         let remote = FakeRemote::with(pack::pack(&foreign, &[0u8; 4096]));
 
         match sync(&remote, &a, NOW) {
-            Err(Error::Other(msg)) => assert_eq!(msg, FOREIGN_VAULT),
+            Err(Error::Other(msg)) => assert_eq!(msg, foreign_vault_error()),
             other => panic!("expected the foreign-vault error, got {other:?}"),
         }
         assert_eq!(remote.uploads(), 0);

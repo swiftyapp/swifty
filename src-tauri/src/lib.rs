@@ -1,3 +1,4 @@
+mod app;
 mod autolock;
 mod biometrics;
 mod cards;
