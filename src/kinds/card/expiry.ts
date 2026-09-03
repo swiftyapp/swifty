@@ -8,7 +8,11 @@
 export const formatExpiry = (month: string, year: string): string => {
   const mm = month.replace(/\D/g, '').slice(0, 2)
   const yy = year.replace(/\D/g, '').slice(-2)
-  return yy ? `${mm}/${yy}` : mm
+  // Pre-redesign cards stored an unpadded month ("3"), which `splitExpiry`
+  // would re-read positionally as month "32" on the first keystroke. Padding
+  // the complete form makes the round-trip lossless. A month still being typed
+  // has no year yet, so this never fights the caret.
+  return yy ? `${mm.padStart(2, '0')}/${yy}` : mm
 }
 
 /** Splits whatever is in the box back into the pair, digit by typed digit. */
