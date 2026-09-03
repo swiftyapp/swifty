@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react'
 import { setCurrentEntry, setNoEntry, saveEntry } from '@/store'
 import { kindOf } from '@/kinds'
+import { pruneExtra } from '@/components/elements/fields'
 import { dialogOpen } from '@/utils/dialogOpen'
-import type { EntryDraft } from '@/defaults/entries'
-import type { Entry, EntryType, Passkey } from '@/lib/commands'
+import type { DraftValue, EntryDraft } from '@/defaults/entries'
+import type { Entry, EntryType } from '@/lib/commands'
 import { t } from '@/i18n'
 
 export interface Draft {
   model: EntryDraft
-  /** Writes one draft key. `Passkey[]` is how the passkeys block drops one. */
-  set: (name: string, value: string | string[] | Passkey[]) => void
+  /** Writes one draft key; the list shapes are the whole-collection blocks. */
+  set: (name: string, value: DraftValue) => void
   /** Something has been typed since the draft was loaded. */
   dirty: boolean
   /** Save has been attempted, so required fields may now complain. */
@@ -45,7 +46,7 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
 
   const dirty = JSON.stringify(model) !== JSON.stringify(pristine)
 
-  const set = (name: string, value: string | string[] | Passkey[]) => {
+  const set = (name: string, value: DraftValue) => {
     setConfirmDiscard(false)
     setModel(current => ({ ...current, [name]: value }))
   }
@@ -80,7 +81,7 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
         : model
     setModel(stamped)
     // Never imply success on a failed write: surface the error, stay in edit.
-    saveEntry(stamped).catch(() => setSaveError(t('Could not save. Please try again.')))
+    saveEntry(pruneExtra(stamped)).catch(() => setSaveError(t('Could not save. Please try again.')))
   }
 
   // Bound fresh every render: both handlers close over the current draft.

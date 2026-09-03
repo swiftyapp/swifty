@@ -9,7 +9,7 @@ use rand::RngCore;
 use serde::Serialize;
 use serde_json::{json, Value};
 
-use super::bitwarden::{KEY_ALGORITHM, KEY_CURVE, KEY_TYPE};
+use super::bitwarden::{FIELD_TEXT, KEY_ALGORITHM, KEY_CURVE, KEY_TYPE};
 use super::{EntryKind, ImportedEntry, ImportedPasskey};
 use crate::app::APP_NAME;
 
@@ -36,6 +36,20 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
                 "name": e.title,
                 "notes": e.notes,
             });
+            // Extras go in Bitwarden's own custom fields, for every kind — and
+            // only when there are some, so an export of a vault without any is
+            // byte-identical to before.
+            if !e.extra.is_empty() {
+                item["fields"] = json!(e
+                    .extra
+                    .iter()
+                    .map(|(label, value)| json!({
+                        "name": label,
+                        "value": value,
+                        "type": FIELD_TEXT,
+                    }))
+                    .collect::<Vec<_>>());
+            }
             match e.kind {
                 EntryKind::Login => {
                     item["login"] = json!({

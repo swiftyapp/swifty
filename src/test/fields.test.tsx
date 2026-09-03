@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Show from '@/components/Main/Body/Aside/Show'
 import { saveEntry, revealEntry, generateOtp, toEntryMeta } from '@/lib/commands'
-import type { LoginEntry, Passkey } from '@/lib/commands'
+import type { Entry, ExtraField, LoginEntry, Passkey } from '@/lib/commands'
 import { renderWithStore, loginEntry, loginMeta } from './utils'
 
 const input = (name: string) =>
@@ -405,5 +405,175 @@ describe('Passkeys on a login', () => {
 
     expect(screen.queryByText('Required')).not.toBeInTheDocument()
     expect(saveEntry).toHaveBeenCalledWith(expect.objectContaining({ password: '' }))
+  })
+})
+
+// Free-form label/value pairs. Wired into the identity form for now, but the
+// block itself knows nothing about the kind it renders for.
+const identityMeta = () =>
+  loginMeta({ id: 'i1', type: 'identity', title: 'UK Passport', urlHost: '' })
+
+const identityEntry = (extra?: ExtraField[]): Entry =>
+  ({
+    id: 'i1',
+    type: 'identity',
+    title: 'UK Passport',
+    doc_type: 'passport',
+    name: 'ADA LOVELACE',
+    number: 'X1234567',
+    country: 'GBR',
+    nationality: '',
+    birth_date: '',
+    sex: '',
+    issue_date: '',
+    expiry_date: '2035-06-01',
+    authority: '',
+    personal_number: '',
+    note: '',
+    tags: [],
+    ...(extra ? { extra } : {})
+  }) as Entry
+
+const savedDraft = () => vi.mocked(saveEntry).mock.calls[0][0]
+
+describe('Custom fields', () => {
+  it('reads one row per pair, with the label the user wrote', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(
+      identityEntry([
+        { label: 'Categories', value: 'B, BE' },
+        { label: 'Blood type', value: 'O+' }
+      ])
+    )
+    renderWithStore(<Show entry={identityMeta()} />)
+
+    expect(await screen.findByText('Custom fields')).toBeInTheDocument()
+    expect(screen.getByTestId('entry-extra-label-0')).toHaveTextContent('Categories')
+    expect(screen.getByTestId('entry-extra-value-0')).toHaveTextContent('B, BE')
+    expect(screen.getByTestId('entry-extra-label-1')).toHaveTextContent('Blood type')
+    // A value is copyable, like any other row's.
+    expect(screen.getAllByTitle('Copy').length).toBeGreaterThan(0)
+  })
+
+  it('shows nothing at all when the entry has no extra fields', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    renderWithStore(<Show entry={identityMeta()} />)
+
+    await screen.findByTestId('entry-value-name')
+    expect(screen.queryByText('Custom fields')).not.toBeInTheDocument()
+  })
+
+  // A blank row is the editor's own scaffolding, so reading skips it — an empty
+  // row on a read view explains nothing.
+  it('skips a blank row while reading', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(
+      identityEntry([
+        { label: '', value: '' },
+        { label: 'Blood type', value: 'O+' }
+      ])
+    )
+    renderWithStore(<Show entry={identityMeta()} />)
+
+    await screen.findByText('Custom fields')
+    expect(screen.getByTestId('entry-extra-label-0')).toHaveTextContent('Blood type')
+    expect(screen.queryByTestId('entry-extra-label-1')).not.toBeInTheDocument()
+  })
+
+  it('appends a row, takes a label and a value, and saves the pair', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    renderWithStore(<Show entry={identityMeta()} editing />)
+
+    await waitFor(() => expect(input('name').value).toBe('ADA LOVELACE'))
+    await userEvent.click(screen.getByTestId('add-extra-field'))
+    await userEvent.type(input('extra-label-0'), 'Categories')
+    await userEvent.type(input('extra-value-0'), 'B, BE')
+
+    await userEvent.click(screen.getByText('Save'))
+    expect(savedDraft()).toEqual(
+      expect.objectContaining({ extra: [{ label: 'Categories', value: 'B, BE' }] })
+    )
+  })
+
+  it('drops the row whose remove button is pressed', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(
+      identityEntry([
+        { label: 'Categories', value: 'B, BE' },
+        { label: 'Blood type', value: 'O+' }
+      ])
+    )
+    renderWithStore(<Show entry={identityMeta()} editing />)
+
+    await waitFor(() => expect(input('extra-value-0').value).toBe('B, BE'))
+    await userEvent.click(screen.getByTestId('remove-extra-0'))
+
+    expect(input('extra-value-0').value).toBe('O+')
+    expect(document.querySelector('input[name="extra-value-1"]')).toBeNull()
+
+    await userEvent.click(screen.getByText('Save'))
+    expect(savedDraft()).toEqual(
+      expect.objectContaining({ extra: [{ label: 'Blood type', value: 'O+' }] })
+    )
+  })
+
+  it('edits a stored value in place', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(
+      identityEntry([{ label: 'Blood type', value: 'O+' }])
+    )
+    renderWithStore(<Show entry={identityMeta()} editing />)
+
+    await waitFor(() => expect(input('extra-value-0').value).toBe('O+'))
+    await userEvent.clear(input('extra-value-0'))
+    await userEvent.type(input('extra-value-0'), 'A-')
+
+    await userEvent.click(screen.getByText('Save'))
+    expect(savedDraft()).toEqual(
+      expect.objectContaining({ extra: [{ label: 'Blood type', value: 'A-' }] })
+    )
+  })
+
+  // Enter is inert in the editor (only ⌘⏎ saves), so the last row spends it on
+  // the next one — a list of fields is filled without reaching for the mouse.
+  it('adds a row on Enter in the last value box', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(
+      identityEntry([{ label: 'Categories', value: 'B, BE' }])
+    )
+    renderWithStore(<Show entry={identityMeta()} editing />)
+
+    await waitFor(() => expect(input('extra-value-0').value).toBe('B, BE'))
+    await userEvent.type(input('extra-value-0'), '{Enter}')
+
+    expect(input('extra-value-1')).toBeInTheDocument()
+    // Only the last row appends, and that is now the new one.
+    await userEvent.type(input('extra-value-0'), '{Enter}')
+    expect(document.querySelector('input[name="extra-value-2"]')).toBeNull()
+  })
+
+  // An entry the user never gave an extra field has to stay without one, so a
+  // row that was added and left alone is not something the vault ever sees.
+  it('sends no extra key when every row is blank', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    renderWithStore(<Show entry={identityMeta()} editing />)
+
+    await waitFor(() => expect(input('name').value).toBe('ADA LOVELACE'))
+    await userEvent.click(screen.getByTestId('add-extra-field'))
+    await userEvent.click(screen.getByTestId('add-extra-field'))
+
+    await userEvent.click(screen.getByText('Save'))
+    expect('extra' in savedDraft()).toBe(false)
+  })
+
+  it('keeps the rows that say something and drops the blank ones', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    renderWithStore(<Show entry={identityMeta()} editing />)
+
+    await waitFor(() => expect(input('name').value).toBe('ADA LOVELACE'))
+    await userEvent.click(screen.getByTestId('add-extra-field'))
+    await userEvent.type(input('extra-label-0'), 'Categories')
+    // Enter leaves a second row behind, untouched.
+    await userEvent.type(input('extra-value-0'), '{Enter}')
+
+    await userEvent.click(screen.getByText('Save'))
+    expect(savedDraft()).toEqual(
+      expect.objectContaining({ extra: [{ label: 'Categories', value: '' }] })
+    )
   })
 })

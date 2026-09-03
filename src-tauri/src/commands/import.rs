@@ -15,7 +15,7 @@ use tauri_plugin_dialog::DialogExt;
 use crate::commands::store_err;
 use crate::error::{Error, Result};
 use crate::import::{self, EntryKind, Format, ImportedEntry, ImportedPasskey, RowError};
-use crate::models::{Entry, Passkey};
+use crate::models::{Entry, ExtraField, Passkey};
 use crate::state::AppState;
 use crate::store::{migrate, Record, VaultStore};
 
@@ -244,6 +244,17 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
         // Set below for logins only; stays None so a passkey-less entry
         // serializes exactly as it did before passkeys existed.
         passkeys: None,
+        // Extras belong to no kind, so they are mapped here rather than in the
+        // match below. None when there are none, for the same reason.
+        extra: (!imp.extra.is_empty()).then(|| {
+            imp.extra
+                .iter()
+                .map(|(label, value)| ExtraField {
+                    label: label.clone(),
+                    value: value.clone(),
+                })
+                .collect()
+        }),
         // No third-party format carries a star.
         favorite: false,
         created_at: Some(now.clone()),
@@ -312,6 +323,13 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
             .unwrap_or_default()
             .iter()
             .map(to_imported_passkey)
+            .collect(),
+        extra: e
+            .extra
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|f| (f.label.clone(), f.value.clone()))
             .collect(),
     }
 }

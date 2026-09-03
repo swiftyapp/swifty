@@ -64,6 +64,14 @@ pub struct Entry {
     /// serializes byte-identically to before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub passkeys: Option<Vec<Passkey>>,
+    /// Free-form label/value pairs, in the order the user put them in — what a
+    /// document carries that the fixed rows have no room for ("Categories: B,
+    /// BE"). Kind-agnostic: any entry may hold them. `None` when there are none,
+    /// so every pre-extras vault JSON, `.swftx` backup and fixture serializes
+    /// byte-identically to before. Not obscured per field: the payload is sealed
+    /// as a whole, and per-field secrecy for extras is deferred.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra: Option<Vec<ExtraField>>,
     /// The user's star. Stored as a column rather than in the payload, so it
     /// rides along here only to survive a `.swftx` export/import round-trip —
     /// the editor never sends it, which is what keeps an ordinary save from
@@ -109,6 +117,13 @@ pub struct Passkey {
     /// RFC3339.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub created_at: Option<String>,
+}
+
+/// One free-form field on an entry: a label the user wrote and its value.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExtraField {
+    pub label: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -286,6 +301,31 @@ mod tests {
             out,
             r#"{"id":"1","type":"login","title":"Site","password":"pw"}"#
         );
+    }
+
+    // Extras are ordered and kind-agnostic, and an entry without them carries
+    // no `extra` key at all — the whole point of the `Option`.
+    #[test]
+    fn extra_fields_round_trip_in_order_and_stay_absent_when_unset() {
+        let entry: Entry = serde_json::from_str(
+            r#"{"id":"1","type":"identity","title":"Licence","extra":[
+                 {"label":"Categories","value":"B, BE"},
+                 {"label":"Blood type","value":"O+"}]}"#,
+        )
+        .unwrap();
+        let extra = entry.extra.clone().unwrap();
+        assert_eq!(extra[0].label, "Categories");
+        assert_eq!(extra[1].value, "O+");
+
+        let out = serde_json::to_value(&entry).unwrap();
+        assert_eq!(out["extra"][0]["label"], "Categories");
+        assert_eq!(out["extra"][1]["label"], "Blood type");
+
+        let bare: Entry =
+            serde_json::from_str(r#"{"id":"1","type":"note","title":"Wifi"}"#).unwrap();
+        assert!(bare.extra.is_none());
+        let out = serde_json::to_string(&bare).unwrap();
+        assert!(!out.contains("extra"), "{out}");
     }
 
     fn meta(has_passkey: bool) -> crate::store::EntryMeta {

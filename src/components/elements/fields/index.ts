@@ -1,4 +1,6 @@
 export { FieldsProvider, useField, useFields, type FieldsState } from './context'
+export { default as CustomFieldsField } from './CustomFields'
+export { pruneExtra } from './CustomFields/extras'
 export { default as Field } from './Field'
 export { default as FieldRow } from './Row'
 export { default as DateField } from './DateField'
