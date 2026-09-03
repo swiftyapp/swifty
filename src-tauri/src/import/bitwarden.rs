@@ -32,6 +32,35 @@ struct Item {
     card: Option<Card>,
     #[serde(default)]
     identity: Option<Identity>,
+    #[serde(default)]
+    fields: Vec<Field>,
+}
+
+/// A Bitwarden custom field. `type` is 0 = text, 1 = hidden, 2 = boolean,
+/// 3 = linked; the first two are values a person typed and become extra fields,
+/// the other two are Bitwarden's own machinery and are dropped. An absent type
+/// reads as text, which is what an unset one means there.
+#[derive(Deserialize)]
+struct Field {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    value: Option<String>,
+    #[serde(default, rename = "type")]
+    kind: u8,
+}
+
+pub const FIELD_TEXT: u8 = 0;
+pub const FIELD_HIDDEN: u8 = 1;
+
+// A row with neither a name nor a value says nothing, so it is not carried.
+fn extras(fields: Vec<Field>) -> Vec<(String, String)> {
+    fields
+        .into_iter()
+        .filter(|f| matches!(f.kind, FIELD_TEXT | FIELD_HIDDEN))
+        .map(|f| (f.name.unwrap_or_default(), f.value.unwrap_or_default()))
+        .filter(|(name, value)| !name.is_empty() || !value.is_empty())
+        .collect()
 }
 
 #[derive(Deserialize)]
@@ -191,6 +220,9 @@ impl Importer for Bitwarden {
         for (i, item) in export.items.into_iter().enumerate() {
             let row = i + 1;
             let title = item.name.clone().unwrap_or_default();
+            // Custom fields are not a kind's business: every item type may
+            // carry them, so they are read once, before the kind is decided.
+            let extra = extras(item.fields);
             match item.kind {
                 1 => {
                     let login = item.login.unwrap_or(Login {
@@ -219,6 +251,7 @@ impl Importer for Bitwarden {
                         notes: opt(item.notes),
                         otp: opt(login.totp),
                         passkeys,
+                        extra,
                         ..Default::default()
                     });
                 }
@@ -226,6 +259,7 @@ impl Importer for Bitwarden {
                     kind: EntryKind::Note,
                     title,
                     notes: opt(item.notes),
+                    extra,
                     ..Default::default()
                 }),
                 3 => {
@@ -245,6 +279,7 @@ impl Importer for Bitwarden {
                         card_year: opt(card.exp_year),
                         card_cvc: opt(card.code),
                         cardholder: opt(card.cardholder_name),
+                        extra,
                         ..Default::default()
                     });
                 }
@@ -267,6 +302,7 @@ impl Importer for Bitwarden {
                         doc_number: licence.or_else(|| opt(identity.passport_number.clone())),
                         doc_country: opt(identity.country.clone()),
                         holder_name: identity.full_name(),
+                        extra,
                         ..Default::default()
                     });
                 }
