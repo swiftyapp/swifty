@@ -1,15 +1,13 @@
 import type { ReactNode } from 'react'
-import { cx } from '@/utils/cx'
 
 interface Props {
   content: ReactNode
-  className?: string
   children: ReactNode
 }
 
-export default function Tooltip({ content, className, children }: Props) {
+export default function Tooltip({ content, children }: Props) {
   return (
-    <div className={cx('group/tt relative', className)}>
+    <div className="group/tt relative">
       {/* The panel stays mounted, so `animate-pop` is scoped to the shown state
           (its `both` fill would otherwise pin opacity to 1 and never hide), and
           centering uses auto margins rather than a transform the pop would eat.
