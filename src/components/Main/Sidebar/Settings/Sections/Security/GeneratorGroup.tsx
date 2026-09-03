@@ -23,7 +23,6 @@ export default function GeneratorGroup() {
     <SettingsGroup label={t('Generator defaults')}>
       <SettingsRow
         label={t('Length')}
-        testid="settings-generator-length-row"
         control={
           <div className="flex w-[280px] items-center gap-3">
             <input
@@ -44,7 +43,6 @@ export default function GeneratorGroup() {
       />
       <SettingsRow
         label={t('Include symbols')}
-        testid="settings-generator-symbols-row"
         control={
           <Toggle
             name="symbols"
@@ -57,7 +55,6 @@ export default function GeneratorGroup() {
       />
       <SettingsRow
         label={t('Include numbers')}
-        testid="settings-generator-numbers-row"
         control={
           <Toggle
             name="numbers"
