@@ -31,15 +31,22 @@ export function useOtp(secret: string): { code: string; time: number } {
     }
   }, [secret])
 
-  // The window rolled over while we were watching: ask for the next code.
+  // The window rolled over while we were watching: ask for the next code. Same
+  // guard as the first fetch — without it a rollover left in flight when the
+  // field switches secrets lands on top of the new secret's code.
   useEffect(() => {
     if (!secret || time !== 0 || code === '') return
+    let cancelled = false
     generateOtp(secret)
       .then(otp => {
+        if (cancelled) return
         setCode(otp.code)
         setTime(otp.time)
       })
       .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [secret, time, code])
 
   return { code, time }
