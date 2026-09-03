@@ -53,11 +53,7 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
 
   const set = (name: string, value: string | string[]) => {
     setConfirmDiscard(false)
-    setModel(current => ({
-      ...current,
-      [name]: value,
-      ...(name === 'password' ? { password_updated_at: new Date().toISOString() } : {})
-    }))
+    setModel(current => ({ ...current, [name]: value }))
   }
 
   const close = () => {
@@ -81,8 +77,16 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
       return
     }
     setSaveError(null)
+    // The rotation stamp records a password *change*, not typing: stamping it
+    // per keystroke made "changed just now" true of a password that was typed
+    // back to what it already was.
+    const stamped =
+      model.password !== pristine.password
+        ? { ...model, password_updated_at: new Date().toISOString() }
+        : model
+    setModel(stamped)
     // Never imply success on a failed write: surface the error, stay in edit.
-    saveEntry(model).catch(() => setSaveError(t('Could not save. Please try again.')))
+    saveEntry(stamped).catch(() => setSaveError(t('Could not save. Please try again.')))
   }
 
   // Bound fresh every render: both handlers close over the current draft.
