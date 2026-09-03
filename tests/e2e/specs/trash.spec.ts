@@ -1,4 +1,11 @@
-import { createLogin, entryItems, resetEmpty, unlock, waitFor } from "../helpers";
+import {
+  createLogin,
+  entryItems,
+  expectTitles,
+  resetEmpty,
+  unlock,
+  waitFor,
+} from "../helpers";
 
 const MASTER_PASSWORD = "Tq4$mZr7bKv2!xNd";
 
@@ -38,10 +45,9 @@ describe("trash", () => {
     await waitFor("entry-item");
 
     await expect($('[data-testid="list-title"]')).toHaveText("Trash");
-    await expect($('[data-testid="entry-item-title"]')).toHaveText(TITLE);
+    await expectTitles([TITLE]);
     // Tombstone rows are stamped with when they went, not when they changed.
     await expect($('[data-testid="entry-item"]')).toHaveTextContaining("Deleted");
-    expect(await entryItems()).toHaveLength(1);
   });
 
   it("makes a trashed entry read-only: Restore or delete forever, nothing else", async () => {
@@ -62,8 +68,7 @@ describe("trash", () => {
     expect(await entryItems()).toHaveLength(0);
 
     await view("items");
-    await waitFor("entry-item");
-    await expect($('[data-testid="entry-item-title"]')).toHaveText(TITLE);
+    await expectTitles([TITLE]);
 
     // The restored entry is a normal, editable entry again.
     await $('[data-testid="entry-item"]').click();
