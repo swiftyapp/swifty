@@ -132,10 +132,46 @@ describe('Type-aware fields', () => {
 
   it('rates the password being typed and stamps when it changed', async () => {
     renderWithStore(<Show type="login" editing />)
+    await userEvent.type(input('title'), 'Acme')
+    await userEvent.type(input('username'), 'octocat')
     await userEvent.type(input('password'), 'correct horse battery staple')
 
     // The strength meter is debounced through a timeout.
     expect(await screen.findByText('Very strong')).toBeInTheDocument()
+    // The stamp belongs to the saved password, so it lands on Save.
+    expect(screen.queryByText('changed just now')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByText('Save'))
     expect(screen.getByText('changed just now')).toBeInTheDocument()
+  })
+
+  it('leaves the rotation stamp alone when the password ends up unchanged', async () => {
+    const stamp = '2024-01-01T00:00:00.000Z'
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password_updated_at: stamp }))
+    renderWithStore(<Show entry={loginMeta()} editing />)
+
+    await waitFor(() => expect(input('password').value).toBe('secret'))
+    // Typed and taken back: the password never moved.
+    await userEvent.type(input('password'), 'x')
+    await userEvent.type(input('password'), '{backspace}')
+
+    await userEvent.click(screen.getByText('Save'))
+    expect(saveEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ password: 'secret', password_updated_at: stamp })
+    )
+  })
+
+  it('moves the rotation stamp when the password really changed', async () => {
+    const stamp = '2024-01-01T00:00:00.000Z'
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password_updated_at: stamp }))
+    renderWithStore(<Show entry={loginMeta()} editing />)
+
+    await waitFor(() => expect(input('password').value).toBe('secret'))
+    await userEvent.type(input('password'), '2')
+
+    await userEvent.click(screen.getByText('Save'))
+    const saved = vi.mocked(saveEntry).mock.calls[0][0]
+    expect(saved.password).toBe('secret2')
+    expect(saved.password_updated_at).not.toBe(stamp)
   })
 })
