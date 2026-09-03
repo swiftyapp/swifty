@@ -26,7 +26,7 @@ const titles = () =>
 
 const seed = (audit?: Audit) => {
   const store = makeStore()
-  withEntries(store, entries, audit)
+  withEntries(entries, audit)
   return store
 }
 
@@ -90,7 +90,7 @@ describe('Entry list', () => {
 
   it('shows the network mark on card rows that carry a brand', () => {
     const store = makeStore()
-    withEntries(store, [
+    withEntries([
       loginMeta({ id: 'c1', type: 'card', title: 'Company Visa', cardBrand: 'visa', urlHost: '' }),
       loginMeta({ id: 'c2', type: 'card', title: 'Mystery Card', urlHost: '' })
     ])
@@ -135,7 +135,7 @@ describe('List search', () => {
   // ranked results buried the closest match under whatever was newest.
   it('keeps the search ranking, so the best match leads', async () => {
     const store = makeStore()
-    withEntries(store, [
+    withEntries([
       loginMeta({ id: 'loose', title: 'Monzo Business Account', updatedAt: at(2024, 2, 14, 9) }),
       loginMeta({ id: 'exact', title: 'Monzo', updatedAt: at(2024, 0, 12, 12) })
     ])

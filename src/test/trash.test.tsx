@@ -30,7 +30,7 @@ const Harness = () => {
 const openTrash = async (tombstones = [gone]) => {
   vi.mocked(listDeleted).mockResolvedValue(tombstones)
   const store = makeStore()
-  withEntries(store, [live])
+  withEntries([live])
   const rendered = renderWithStore(<Harness />, { store })
   setView('trash')
   await vi.waitFor(() => expect(useStore.getState().entries.trash).toEqual(tombstones))
@@ -118,7 +118,7 @@ describe('the Trash view', () => {
 
   it('still edits a live entry — the guard is about tombstones, not ⌘E', async () => {
     const store = makeStore()
-    withEntries(store, [live])
+    withEntries([live])
     renderWithStore(<Harness />, { store })
 
     await userEvent.click(screen.getByTestId('entry-item'))
@@ -151,7 +151,7 @@ describe('the Trash view', () => {
   it('survives a failed read of the tombstones', async () => {
     vi.mocked(listDeleted).mockRejectedValue(new Error('vault busy'))
     const store = makeStore()
-    withEntries(store, [live])
+    withEntries([live])
     renderWithStore(<Harness />, { store })
 
     setView('trash')
