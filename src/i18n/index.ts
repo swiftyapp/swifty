@@ -34,7 +34,7 @@ export const LANGUAGES: Record<string, string> = {
   'sv-SE': 'Svenska',
   'tr-TR': 'Türkçe',
   'uk-UA': 'Українська',
-  'zh-CN': 'Chinese'
+  'zh-CN': '中文'
 }
 
 const DEFAULT_LOCALE = 'en-US'
