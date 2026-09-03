@@ -1,4 +1,13 @@
-import { createLogin, entryItems, resetEmpty, unlock, waitFor } from "../helpers";
+import {
+  createLogin,
+  entryItems,
+  expectTitles,
+  openEntry,
+  resetEmpty,
+  toggleFavorite,
+  unlock,
+  waitFor,
+} from "../helpers";
 
 // The list column itself: what a vault with nothing in it offers, and the two
 // orders the sort menu can put entries in.
@@ -22,36 +31,6 @@ async function pickSort(mode: SortMode): Promise<void> {
     reverse: true,
     timeout: 5_000,
   });
-}
-
-async function titles(): Promise<string[]> {
-  const rows = await $$('[data-testid="entry-item-title"]');
-  const out: string[] = [];
-  for (const row of rows) out.push(await row.getText());
-  return out;
-}
-
-async function expectOrder(expected: string[]): Promise<void> {
-  await browser.waitUntil(
-    async () => (await titles()).join(" | ") === expected.join(" | "),
-    {
-      timeout: 15_000,
-      timeoutMsg: `list never settled on ${expected.join(" | ")}`,
-    },
-  );
-}
-
-// Click the row with this title. Rows carry no per-entry testid, so they are
-// matched on their title text.
-async function openEntry(title: string): Promise<void> {
-  const rows = await $$('[data-testid="entry-item"]');
-  for (const row of rows) {
-    if ((await row.$('[data-testid="entry-item-title"]').getText()) === title) {
-      await row.click();
-      return;
-    }
-  }
-  throw new Error(`[e2e] no list row titled "${title}"`);
 }
 
 /**
@@ -123,38 +102,37 @@ describe("entry list states and ordering", () => {
     });
 
     await pickSort("alpha");
-    await expectOrder([ACME, MERCURY, ZEPHYR]);
+    await expectTitles([ACME, MERCURY, ZEPHYR]);
   });
 
   it("puts the most recently edited entry first under Recent", async () => {
     await pickSort("recent");
     // Newest write first: the seed order reversed.
-    await expectOrder([MERCURY, ACME, ZEPHYR]);
+    await expectTitles([MERCURY, ACME, ZEPHYR]);
 
     // Re-saving restamps `updatedAt`, which is what Recent orders on — so the
     // oldest entry should jump to the top.
     await resaveEntry(ZEPHYR);
-    await expectOrder([ZEPHYR, MERCURY, ACME]);
+    await expectTitles([ZEPHYR, MERCURY, ACME]);
   });
 
   it("pins a starred entry above the rest under Recent", async () => {
     await openEntry(ACME);
-    await waitFor("favorite-toggle");
-    await $('[data-testid="favorite-toggle"]').click();
+    await toggleFavorite();
 
     // Touching MERCURY makes it the most recent entry, so recency alone would
     // now put ACME last. Only the pin can keep it on top.
     await resaveEntry(MERCURY);
-    await expectOrder([ACME, MERCURY, ZEPHYR]);
+    await expectTitles([ACME, MERCURY, ZEPHYR]);
   });
 
   it("collects the starred entries under Favorites, and lets go of them", async () => {
     await $('[data-testid="view-favorites"]').click();
     await expect($('[data-testid="list-title"]')).toHaveText("Favorites");
-    await expectOrder([ACME]);
+    await expectTitles([ACME]);
 
     await openEntry(ACME);
-    await $('[data-testid="favorite-toggle"]').click();
+    await toggleFavorite();
 
     await waitFor("empty-favorites");
     expect(await entryItems()).toHaveLength(0);

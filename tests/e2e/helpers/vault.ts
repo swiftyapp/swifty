@@ -1,4 +1,5 @@
 import { waitFor, waitForAppReady } from "./app";
+import { pressEnter } from "./keys";
 
 /** Drive the real first-run setup UI from the choice screen to an unlocked vault. */
 export async function setupVault(password: string): Promise<void> {
@@ -20,7 +21,7 @@ export async function setupVault(password: string): Promise<void> {
 export async function unlock(password: string): Promise<void> {
   await waitFor("unlock-password-input");
   await $('[data-testid="unlock-password-input"]').setValue(password);
-  await browser.keys([""]); // Enter
+  await pressEnter();
   await waitForAppReady();
 }
 

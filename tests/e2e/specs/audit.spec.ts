@@ -1,13 +1,13 @@
-import { createLogin, resetEmpty, unlock, waitFor } from "../helpers";
+import { createLogin, openEntry, resetEmpty, unlock, waitFor } from "../helpers";
 
 // The Password Audit pane behind the rail's vault-health dial.
 //
 // Everything asserted here is seeded, never sampled: two logins share a
 // password (reused), one carries a trivially guessable one (weak). The
 // Breached group is deliberately excluded — it is gated on the opt-in HIBP
-// lookup, which is a network call (`hibp::check_all`), so the spec pins the
-// preference off and asserts the group is *absent* rather than depending on
-// what a live range query would answer.
+// lookup, which is a network call (`hibp::check_all`), so the spec asserts the
+// group is *absent* rather than depending on what a live range query would
+// answer.
 
 const MASTER_PASSWORD = "Pd3$wKn7yBq2xMt!";
 
@@ -62,17 +62,7 @@ async function railScore(): Promise<string> {
 async function selectLogin(title: string): Promise<void> {
   await waitFor("view-items");
   await $('[data-testid="view-items"]').click();
-  await waitFor("entry-item");
-
-  const rows = await $$('[data-testid="entry-item"]');
-  for (const row of rows) {
-    const rowTitle = await row.$('[data-testid="entry-item-title"]').getText();
-    if (rowTitle === title) {
-      await row.click();
-      return;
-    }
-  }
-  throw new Error(`[e2e] no entry row titled "${title}"`);
+  await openEntry(title);
 }
 
 /** Open a login in the editor and replace just its password. */
