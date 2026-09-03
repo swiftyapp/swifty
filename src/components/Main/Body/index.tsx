@@ -1,24 +1,24 @@
 import { useStore } from '@/store'
+import { cx } from '@/utils/cx'
 import ListColumn from './ListColumn'
 import DetailPane from './DetailPane'
-import Form from './Aside/Form'
 
 // The two content panes to the right of the rail: list column + detail pane.
-// Creating or editing an entry floats the Form over both in a right slide-in
-// sheet, so the detail pane keeps showing the entry underneath.
+// Creating or editing an entry happens inside the detail pane, so the list
+// stays visible for context but goes quiet and inert — nothing over there can
+// compete with, or navigate away from, an unsaved draft.
 export default function Body() {
-  // The kind being created, or null. An edit takes its kind from the entry.
-  const newType = useStore(state => state.entries.new)
-  const isEditing = useStore(state => state.entries.edit)
-  const entry = useStore(state => state.entries.current)
-  const editing = isEditing ? entry : null
+  const writing = useStore(state => state.entries.edit || !!state.entries.new)
 
   return (
     <>
-      <ListColumn />
+      <div
+        data-testid="list-column"
+        className={cx('flex min-h-0 flex-none', writing && 'pointer-events-none opacity-60')}
+      >
+        <ListColumn />
+      </div>
       <DetailPane />
-      {newType && <Form type={newType} />}
-      {editing && <Form type={editing.type} entry={editing} />}
     </>
   )
 }

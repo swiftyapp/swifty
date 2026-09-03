@@ -5,7 +5,7 @@ import login from './login'
 import card from './card'
 import note from './note'
 
-export type { Kind, FormProps, Glyph } from './types'
+export type { Kind, Glyph } from './types'
 
 /**
  * Every kind of secret the vault holds, in display order (pickers, filter

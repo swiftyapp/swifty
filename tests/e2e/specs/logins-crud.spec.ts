@@ -24,13 +24,16 @@ const EDITED_TITLE = "Vault Console (renamed)";
 const EDITED_PASSWORD = "Rotated-Passphrase-9!";
 const DISCARDED_TITLE = "Never Saved Title";
 
+// Editing happens in the detail pane, in the read view's own layout;
+// `entry-sheet` is that editing container. Every field is scoped to it, so
+// these selectors can never match the read view by accident.
 const sheet = () => $('[data-testid="entry-sheet"]');
 const field = (name: string) => sheet().$(`input[name="${name}"]`);
 
 /**
- * Open the edit sheet and wait until the decrypted values have landed.
+ * Enter edit mode and wait until the decrypted values have landed.
  *
- * `useRevealed` resolves after the sheet mounts and then replaces the whole
+ * `useRevealed` resolves after the editor mounts and then seeds the whole
  * draft, so anything typed before that arrives is silently overwritten.
  */
 async function openEditor(currentPassword: string): Promise<void> {
@@ -40,12 +43,12 @@ async function openEditor(currentPassword: string): Promise<void> {
     async () => (await field("password").getValue()) === currentPassword,
     {
       timeout: 15_000,
-      timeoutMsg: "the edit sheet never showed the stored password",
+      timeoutMsg: "the editor never showed the stored password",
     },
   );
 }
 
-/** Close a sheet that has no unsaved edits — one press, no discard guard. */
+/** Leave an editor with no unsaved edits — one press, no discard guard. */
 async function closeEditor(): Promise<void> {
   await $('[data-testid="cancel-entry-button"]').click();
   await sheet().waitForDisplayed({ reverse: true, timeout: 15_000 });

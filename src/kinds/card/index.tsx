@@ -1,10 +1,8 @@
-import type { Entry } from '@/lib/commands'
 import { CardGlyph } from '@/components/Main/icons'
 import type { Kind } from '../types'
 import { defaults, isValid, listSubtitle, primarySecret } from './meta'
 import ListRow from './ListRow'
-import Form from './Form'
-import Details from './Details'
+import Fields from './Fields'
 
 const card: Kind = {
   type: 'card',
@@ -19,9 +17,7 @@ const card: Kind = {
   primaryActionLabel: 'Copy number',
   listSubtitle,
   ListRow,
-  Form,
-  Details: ({ entry }: { entry: Entry }) =>
-    entry.type === 'card' ? <Details entry={entry} /> : null
+  Fields
 }
 
 export default card

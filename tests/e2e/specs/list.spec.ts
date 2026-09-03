@@ -63,7 +63,7 @@ describe("entry list states and ordering", () => {
     await pickSort("recent");
   });
 
-  it("offers the first-entry action on an empty vault and opens the create sheet", async () => {
+  it("offers the first-entry action on an empty vault and opens the editor", async () => {
     await waitFor("empty-vault");
     await waitFor("create-first-entry-button");
     expect(await entryItems()).toHaveLength(0);
@@ -73,7 +73,8 @@ describe("entry list states and ordering", () => {
     await expect($('[data-testid="empty-kind"]')).not.toBeExisting();
     await expect($('[data-testid="empty-search"]')).not.toBeExisting();
 
-    // The first-entry action opens the kind picker; the sheet follows the choice.
+    // The first-entry action opens the kind picker; the pane editor follows the
+    // choice, and one Cancel is enough because nothing has been typed.
     await $('[data-testid="create-first-entry-button"]').click();
     await waitFor("add-secret-modal");
     await $('[data-testid="add-kind-login"]').click();

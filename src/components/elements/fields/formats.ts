@@ -1,0 +1,30 @@
+import { t } from '@/i18n'
+
+// The pure text rules behind the type-aware fields: what a value becomes when
+// the user leaves it, and what the row says when it can't be one.
+
+/**
+ * People type "example.com". Give it the scheme the opener and the favicon
+ * lookup both need, and leave anything that already has one alone.
+ */
+export const normalizeUrl = (value: string): string => {
+  const url = value.trim()
+  if (!url || /^[a-z][a-z\d+.-]*:/i.test(url)) return url
+  return `https://${url}`
+}
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** Deliberately shallow: enough to catch a typo, never enough to reject a real address. */
+export const emailError = (value: string): string =>
+  EMAIL.test(value.trim()) ? '' : t('Not an email address')
+
+/**
+ * The one rule behind every "Required" message: a field the kind's `isValid`
+ * needs only complains once the user has actually tried to save.
+ */
+export const requiredError = (
+  value: string,
+  required?: boolean,
+  attempted?: boolean
+): string => (attempted && required && !value.trim() ? t('Required') : '')

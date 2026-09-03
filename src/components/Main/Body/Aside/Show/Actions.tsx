@@ -4,6 +4,7 @@ import { editEntry } from '@/store'
 import { kindOf } from '@/kinds'
 import { t } from '@/i18n'
 import { useCopied } from '@/hooks/useCopied'
+import { dialogOpen } from '@/utils/dialogOpen'
 import Button from '@/components/elements/Button'
 import IconButton from '@/components/elements/IconButton'
 import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
@@ -35,8 +36,6 @@ const inInteractive = (target: EventTarget | null) =>
   !!target.closest(
     'input, textarea, select, [contenteditable="true"], button, a, [role="button"], [role="menuitem"]'
   )
-
-const dialogOpen = () => !!document.querySelector('[role="dialog"], dialog[open]')
 
 // The detail header's action cluster: Edit, an overflow menu and the per-type
 // primary copy action.
