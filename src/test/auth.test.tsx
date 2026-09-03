@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Auth from '@/components/Auth'
 import { unlock, unlockBiometric } from '@/lib/commands'
@@ -34,6 +34,24 @@ describe('Auth', () => {
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'a')
 
     expect(screen.getByLabelText('Reveal passphrase')).toBeInTheDocument()
+  })
+
+  it('puts the caret where you click so backspace edits mid-passphrase', async () => {
+    renderWithStore(<Auth touchID={false} />)
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Master Password')
+
+    await userEvent.type(input, 'abcd')
+    expect(input.selectionStart).toBe(4)
+
+    // jsdom lays the cell row out at x=0, so 30px (two 15px cells) is the
+    // boundary between 'b' and 'c'.
+    fireEvent.mouseDown(input, { clientX: 30, button: 0 })
+    expect(input.selectionStart).toBe(2)
+    expect(input.selectionEnd).toBe(2)
+
+    await userEvent.keyboard('{Backspace}')
+    expect(input.value).toBe('acd')
+    expect(input.selectionStart).toBe(1)
   })
 
   it('acknowledges Enter immediately with a verifying state', async () => {
