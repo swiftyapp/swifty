@@ -1,5 +1,6 @@
 import type { Entry, EntryMeta } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
+import { emailError, filled } from '@/components/elements/fields/formats'
 
 export const defaults: EntryDraft = {
   type: 'login',
@@ -13,7 +14,12 @@ export const defaults: EntryDraft = {
 }
 
 export const isValid = (draft: EntryDraft): boolean =>
-  !!(draft.title && draft.username && draft.password)
+  filled(draft.title) &&
+  filled(draft.username) &&
+  filled(draft.password) &&
+  // The email is optional, but the row's "Not an email address" complaint is
+  // binding: showing it in red and saving anyway is not a check.
+  (!filled(draft.email) || !emailError(draft.email))
 
 export const primarySecret = (entry: Entry): string =>
   entry.type === 'login' ? entry.password : ''
