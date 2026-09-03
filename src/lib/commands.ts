@@ -12,7 +12,7 @@ import { cardBrandOf } from '@/utils/cardBrand'
 // Shared types
 // ---------------------------------------------------------------------------
 
-export type EntryType = 'login' | 'note' | 'card'
+export type EntryType = 'login' | 'note' | 'card' | 'identity'
 
 interface BaseEntry {
   id: string
@@ -70,7 +70,29 @@ export interface CardEntry extends BaseEntry {
   name: string
 }
 
-export type Entry = LoginEntry | NoteEntry | CardEntry
+// An ID document. `number` (the document number) and `personal_number` are the
+// secrets; `name` is the holder's full name, kept whole rather than split. The
+// three dates are ISO `YYYY-MM-DD` — the display pattern is a preference, never
+// what is stored.
+export interface IdentityEntry extends BaseEntry {
+  type: 'identity'
+  /** One of `passport`, `id_card`, `driver_license`, `residence_permit`, `other`. */
+  doc_type: string
+  name: string
+  number: string
+  /** Issuing country, ISO 3166-1 alpha-3 by preference but free text. */
+  country: string
+  nationality: string
+  birth_date: string
+  sex: string
+  issue_date: string
+  expiry_date: string
+  authority: string
+  personal_number: string
+  note: string
+}
+
+export type Entry = LoginEntry | NoteEntry | CardEntry | IdentityEntry
 
 export interface VaultData {
   entries: Entry[]
