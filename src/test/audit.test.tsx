@@ -64,7 +64,7 @@ describe('Audit aside', () => {
     expect(screen.getByTestId('audit-score')).toHaveTextContent('0.0')
 
     const store = makeStore()
-    withEntries(store, [loginMeta()], {
+    withEntries([loginMeta()], {
       l1: { score: 4, isWeak: false, isRepeating: false, breached: false }
     })
     renderWithStore(<AuditAside />, { store })
