@@ -20,6 +20,13 @@ export const emailError = (value: string): string =>
   EMAIL.test(value.trim()) ? '' : t('Not an email address')
 
 /**
+ * What every kind's `isValid` counts as a value: present, and not just spaces.
+ * A type guard, so the same test narrows a draft key for the format checks.
+ */
+export const filled = (value?: string | string[]): value is string =>
+  typeof value === 'string' && value.trim() !== ''
+
+/**
  * The one rule behind every "Required" message: a field the kind's `isValid`
  * needs only complains once the user has actually tried to save.
  */
