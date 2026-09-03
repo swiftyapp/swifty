@@ -46,11 +46,11 @@ export default function PasswordField({
         editing ? (
           <button
             type="button"
+            data-testid="generate-password-link"
             onClick={() => openGenerator(set)}
             className="flex cursor-pointer items-center gap-1.5 text-base text-accent hover:brightness-110"
           >
             <RefreshGlyph size={13} />
-            {/* The word is its own element: the generator spec clicks it by text. */}
             <span>generate</span>
           </button>
         ) : undefined
