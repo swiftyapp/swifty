@@ -62,6 +62,16 @@ const PLURAL_SUFFIXES = ['_zero', '_one', '_two', '_few', '_many', '_other']
 const inCatalogue = (key: string) =>
   key in catalogue || PLURAL_SUFFIXES.some(suffix => `${key}${suffix}` in catalogue)
 
+// A locale legitimately carries plural categories English does not have:
+// English needs `_one`/`_other`, Russian and Polish need `_few` and `_many`
+// too. Such a key is recognised by its base having a plural entry in en-US.
+const PLURAL_SUFFIX = new RegExp(`(${PLURAL_SUFFIXES.join('|')})$`)
+const knownKey = (key: string) => {
+  if (key in catalogue) return true
+  const base = key.replace(PLURAL_SUFFIX, '')
+  return base !== key && PLURAL_SUFFIXES.some(suffix => `${base}${suffix}` in catalogue)
+}
+
 const translated = Object.entries(locales).filter(([path]) => !path.endsWith('en-US.json'))
 
 describe('i18n', () => {
@@ -74,12 +84,22 @@ describe('i18n', () => {
   })
 
   it('keeps en-US placeholders in every locale that carries the key', () => {
+    // A plural form English does not have (`_few`, `_many`) is compared against
+    // whichever form en-US does define — it needs the same placeholders.
+    const counterpart = (key: string): string | undefined => {
+      if (key in catalogue) return catalogue[key]
+      const base = key.replace(PLURAL_SUFFIX, '')
+      if (base === key) return undefined
+      const match = PLURAL_SUFFIXES.map(s => `${base}${s}`).find(k => k in catalogue)
+      return match && catalogue[match]
+    }
+
     const mismatched = translated.flatMap(([path, locale]) =>
       Object.entries(locale)
-        .filter(
-          ([key, value]) =>
-            key in catalogue && placeholders(catalogue[key]) !== placeholders(value)
-        )
+        .filter(([key, value]) => {
+          const source = counterpart(key)
+          return source !== undefined && placeholders(source) !== placeholders(value)
+        })
         .map(([key, value]) => `${path}: ${JSON.stringify(key)} -> ${JSON.stringify(value)}`)
     )
 
@@ -89,7 +109,7 @@ describe('i18n', () => {
   it('carries no keys en-US has dropped', () => {
     const orphans = translated.flatMap(([path, locale]) =>
       Object.keys(locale)
-        .filter(key => !(key in catalogue))
+        .filter(key => !knownKey(key))
         .map(key => `${path}: ${JSON.stringify(key)}`)
     )
 

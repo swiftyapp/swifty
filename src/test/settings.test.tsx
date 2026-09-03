@@ -305,6 +305,16 @@ describe('Settings › language & region', () => {
     await waitFor(() => expect(i18n.resolvedLanguage).toBe('de-DE'))
   })
 
+  // The mono labels are uppercased by CSS, and `text-transform` follows the
+  // document language: under `lang="en"` Turkish "i" becomes "I" rather than
+  // "İ", misspelling every label in the Turkish UI.
+  it('tells the document what language it is in', async () => {
+    await open()
+    await go('language')
+    await userEvent.click(screen.getByTestId('settings-locale-tr-TR'))
+    await waitFor(() => expect(document.documentElement.lang).toBe('tr-TR'))
+  })
+
   it('sets the theme from the segmented control', async () => {
     const { store } = await open()
     await go('language')

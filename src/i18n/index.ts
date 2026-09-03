@@ -84,11 +84,25 @@ export const i18nReady = resolveInitial().then(lng =>
         defaultVariables: { appName: APP_NAME }
       }
     })
+    .then(translate => {
+      // The listener below covers every later change; this covers the first
+      // paint, which it does not fire for.
+      document.documentElement.lang = i18n.resolvedLanguage ?? DEFAULT_LOCALE
+      return translate
+    })
 )
 
-// Persist the choice so the next launch skips the OS lookup. Registered once,
-// rather than wrapping `changeLanguage`, so a change from anywhere is stored.
+// Persist the choice so the next launch skips the OS lookup, and tell the
+// document what language it is in. Registered once, rather than wrapping
+// `changeLanguage`, so a change from anywhere is picked up.
+//
+// `lang` is not decoration: the mono labels are uppercased by CSS
+// (`text-transform`, see MONO_TYPE), and casing is language-dependent. Under
+// `lang="en"` Turkish "i" uppercases to "I" instead of "İ", so every mono label
+// in the Turkish UI is misspelled. It also drives screen-reader pronunciation
+// and line breaking.
 i18n.on('languageChanged', locale => {
+  document.documentElement.lang = locale
   try {
     localStorage.setItem(STORAGE_KEY, locale)
   } catch {
