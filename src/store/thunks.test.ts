@@ -6,7 +6,8 @@ import {
   deleteEntry,
   enterMain,
   syncInit,
-  setFilterType
+  setFilterType,
+  lockVault
 } from './index'
 import { saveEntry as saveEntryCmd, toEntryMeta, syncNow } from '@/lib/commands'
 import type { EntryMeta } from '@/lib/commands'
@@ -93,6 +94,19 @@ describe('auto-sync', () => {
 
     await vi.advanceTimersByTimeAsync(20_000)
     expect(syncNow).toHaveBeenCalledOnce()
+  })
+
+  it('drops a write still waiting when the vault locks', async () => {
+    makeStore()
+    syncInit(true)
+
+    await saveEntry({ type: 'login', title: 'One', username: 'u', password: 'p' })
+    await lockVault()
+
+    // The key is gone: a push fired now could only fail, and the next unlock
+    // syncs anyway.
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(syncNow).not.toHaveBeenCalled()
   })
 
   it('publishes a delete too', async () => {
