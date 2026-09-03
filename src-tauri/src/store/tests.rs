@@ -66,10 +66,13 @@ fn stamped(id: &str, payload: &[u8], updated_at: i64) -> Record {
     }
 }
 
+// An ordinary tombstone: `delete` only stamps `deleted_at`, so the payload is
+// still there. Keeping it non-empty here is what separates this from the
+// content-free shell `purge` leaves behind, which the merge treats as absorbing.
 fn tombstone(id: &str, at: i64) -> Record {
     Record {
         deleted_at: Some(at),
-        ..stamped(id, b"", at)
+        ..stamped(id, b"sealed-payload", at)
     }
 }
 
@@ -210,6 +213,56 @@ fn purge_beats_a_peer_that_still_holds_the_row() {
 
     assert!(row(&store, "1").payload.is_empty());
     assert!(store.list_deleted().unwrap().is_empty());
+}
+
+// The sibling case, and the one last-writer-wins gets wrong: the peer did not
+// just re-push the row, it *edited* it after the purge, so its copy is newer.
+// LWW would hand the sealed payload back live — "Delete forever" has to beat a
+// newer stamp, not merely an equal one.
+#[test]
+fn purge_beats_a_peer_that_edited_the_row_afterwards() {
+    let store = seeded(&[Record {
+        deleted_at: Some(1000),
+        ..stamped("1", b"sealed-payload", 1000)
+    }]);
+    store.purge("1").unwrap();
+
+    store
+        .merge_records(&[stamped("1", b"edited-after-the-purge", i64::MAX)])
+        .unwrap();
+
+    assert!(row(&store, "1").payload.is_empty());
+    assert!(row(&store, "1").deleted_at.is_some());
+    assert!(store.list().unwrap().is_empty());
+    assert!(store.list_deleted().unwrap().is_empty());
+}
+
+// The other direction, and the reason the guard is symmetric: the purge has to
+// *travel*. Were the shell only absorbing locally, the peer that holds a newer
+// edit would keep its payload, the two digests would never match, and the pair
+// would push at each other forever.
+#[test]
+fn a_purged_shell_destroys_the_payload_on_the_peer_too() {
+    let purged = seeded(&[Record {
+        deleted_at: Some(1000),
+        ..stamped("1", b"sealed-payload", 1000)
+    }]);
+    purged.purge("1").unwrap();
+    let peer = seeded(&[stamped("1", b"edited-after-the-purge", i64::MAX)]);
+
+    peer.merge_records(&purged.export_for_sync().unwrap())
+        .unwrap();
+
+    assert!(row(&peer, "1").payload.is_empty());
+    assert!(peer.list().unwrap().is_empty());
+    // Both sides converged on the shell, so nothing is left to push.
+    assert_eq!(peer.state_digest().unwrap(), purged.state_digest().unwrap());
+    // And replaying it changes nothing.
+    assert_eq!(
+        peer.merge_records(&purged.export_for_sync().unwrap())
+            .unwrap(),
+        0
+    );
 }
 
 #[test]
