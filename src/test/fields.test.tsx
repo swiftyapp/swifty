@@ -109,6 +109,27 @@ describe('Type-aware fields', () => {
     expect(screen.getByText('refreshes in 25s')).toBeInTheDocument()
   })
 
+  it('counts a recent rotation as a duration', async () => {
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+    vi.mocked(revealEntry).mockResolvedValue(
+      loginEntry({ password_updated_at: threeHoursAgo })
+    )
+    renderWithStore(<Show entry={loginMeta()} editing />)
+
+    expect(await screen.findByText('changed 3h ago')).toBeInTheDocument()
+  })
+
+  // Past a week the duration runs out; a date belongs in its own sentence and
+  // not inside "changed ... ago".
+  it('names the date once the rotation is older than a week', async () => {
+    const longAgo = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString()
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password_updated_at: longAgo }))
+    renderWithStore(<Show entry={loginMeta()} editing />)
+
+    const stamp = await screen.findByText(/^changed /)
+    expect(stamp.textContent).toMatch(/^changed on /)
+  })
+
   it('rates the password being typed and stamps when it changed', async () => {
     renderWithStore(<Show type="login" editing />)
     await userEvent.type(input('password'), 'correct horse battery staple')
