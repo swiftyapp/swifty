@@ -117,7 +117,12 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       refreshAudit()
     },
     loadTrash: async () => {
-      get().setTrash(await listDeleted())
+      try {
+        get().setTrash(await listDeleted())
+      } catch {
+        // Keep the last known list: a failed read is not an empty Trash, and
+        // there is nothing the user can do about it from here.
+      }
     },
     restoreEntry: async id => {
       const meta = await restoreEntryCmd(id)
