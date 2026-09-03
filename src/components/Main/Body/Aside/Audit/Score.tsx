@@ -44,7 +44,7 @@ export default function Score({ audit }: Props) {
           data-testid="audit-score"
           className="text-[34px] font-semibold tracking-display text-text"
         >
-          {score}
+          {score.toFixed(1)}
         </div>
         <div className="font-mono text-xs uppercase tracking-label text-text3">
           {t('Overall Score')}
