@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { t } from '@/i18n'
 import { copy } from '@/services/copy'
 import Button from '@/components/elements/Button'
@@ -20,6 +20,7 @@ interface Props {
 // entropy, the shaping controls, then the action row. ⏎ confirms, Esc closes.
 export default function Dialog({ apply, onClose }: Props) {
   const { settings, value, update, regenerate, bits, level } = useGenerator()
+  const cardRef = useRef<HTMLDivElement>(null)
 
   const confirm = useCallback(() => {
     if (!value) return
@@ -30,6 +31,14 @@ export default function Dialog({ apply, onClose }: Props) {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // Something nearer the key already handled it (a field's own Esc, the
+      // palette's ⏎) — acting again would fire two things off one press.
+      if (event.defaultPrevented) return
+      // Only the topmost dialog answers: the generator can sit under a palette
+      // opened over it, and ⏎ there belongs to the palette's command.
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      if (dialogs[dialogs.length - 1] !== cardRef.current) return
+
       if (event.key === 'Escape') {
         event.preventDefault()
         onClose()
@@ -52,6 +61,7 @@ export default function Dialog({ apply, onClose }: Props) {
           `utils/dialogOpen` asks the DOM, so without the role the editor's Esc
           would close the edit session underneath this dialog. */}
       <div
+        ref={cardRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="generator-title"

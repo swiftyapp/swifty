@@ -11,7 +11,8 @@ import {
   syncStart,
   syncStop,
   syncConnected,
-  syncDisconnected
+  syncDisconnected,
+  resetVaultData
 } from './index'
 
 // A merge can add or drop tombstones as readily as live entries, but the Trash
@@ -46,11 +47,14 @@ export const subscribeToEvents = (): (() => void) => {
     // Ask, don't assume: hardcoding `false` here meant the Touch ID button only
     // ever appeared on a fresh boot (App.tsx runs the same check), never on an
     // in-session lock — including the very first lock after enabling it.
-    on(EVENTS.vaultLocked, () =>
-      isBiometricAvailable()
+    on(EVENTS.vaultLocked, () => {
+      // Autolock takes this path instead of `lockVault`, so the session data
+      // has to be dropped here too.
+      resetVaultData()
+      return isBiometricAvailable()
         .catch(() => false)
         .then(flowAuth)
-    )
+    })
   ]
 
   return () => {

@@ -6,7 +6,7 @@ import ListColumn from '@/components/Main/Body/ListColumn'
 import Body from '@/components/Main/Body'
 import Show from '@/components/Main/Body/Aside/Show'
 import { revealEntry, setFavorite } from '@/lib/commands'
-import { makeStore, useStore, setView, setSort } from '@/store'
+import { makeStore, useStore, setView, setCurrentEntry } from '@/store'
 import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 
 const starred = loginMeta({ id: 'star', title: 'Monzo', favorite: true })
@@ -16,14 +16,11 @@ const titles = () => screen.getAllByTestId('entry-item-title').map(el => el.text
 
 const seed = () => {
   const store = makeStore()
-  withEntries(store, [plain, starred])
+  withEntries([plain, starred])
   return store
 }
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  setSort('recent')
-})
+beforeEach(() => vi.clearAllMocks())
 
 describe('the favorite toggle', () => {
   it('stars an unstarred entry and keeps the new value in the list', async () => {
@@ -87,7 +84,7 @@ describe('the Favorites view', () => {
     // `plain` is the more recently touched of the two, so recency alone would
     // put it first: only the pin can float the starred row over it.
     const store = makeStore()
-    withEntries(store, [
+    withEntries([
       loginMeta({ id: 'plain', title: 'Airbnb', updatedAt: '2024-03-01T00:00:00.000Z' }),
       loginMeta({ id: 'star', title: 'Monzo', favorite: true, updatedAt: '2024-01-01T00:00:00.000Z' })
     ])
@@ -102,12 +99,26 @@ describe('the Favorites view', () => {
 
   it('says how to fill itself when nothing is starred', () => {
     const store = makeStore()
-    withEntries(store, [plain])
+    withEntries([plain])
     setView('favorites')
     renderWithStore(<Body />, { store })
 
     expect(screen.getByTestId('empty-favorites')).toBeInTheDocument()
     expect(screen.getByText('Star an entry to keep it here.')).toBeInTheDocument()
     expect(screen.queryByTestId('entry-item')).not.toBeInTheDocument()
+  })
+
+  it('drops the selection when the shown entry is unstarred from inside it', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'star' }))
+    const store = makeStore()
+    withEntries([starred])
+    setView('favorites')
+    setCurrentEntry('star')
+    renderWithStore(<Body />, { store })
+
+    await userEvent.click(screen.getByTestId('favorite-toggle'))
+
+    await vi.waitFor(() => expect(useStore.getState().entries.current).toBeNull())
+    expect(screen.getByTestId('empty-favorites')).toBeInTheDocument()
   })
 })

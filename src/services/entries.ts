@@ -1,12 +1,7 @@
 import Fuse from 'fuse.js'
 import { revealEntry, type EntryMeta, type EntryType } from '@/lib/commands'
-import type { EntryDraft } from '@/defaults/entries'
 import { kindOf } from '@/kinds'
 import { copy } from './copy'
-
-// Validates a draft has the fields required for its kind before saving.
-// The rule itself lives with the kind (src/kinds/<kind>/meta.ts).
-export const isValid = (draft: EntryDraft): boolean => kindOf(draft.type).isValid(draft)
 
 // Decrypts just this entry (secrets never live in the list metadata) and puts
 // the one secret worth a shortcut for its kind on the clipboard, with the usual
@@ -19,7 +14,7 @@ export const copySecret = (entry: EntryMeta): Promise<void> =>
     })
     .catch(() => {})
 
-export interface FilterOptions {
+interface FilterOptions {
   // null means every kind — the "All Items" view.
   type: EntryType | null
   query: string
@@ -34,8 +29,10 @@ const SEARCH_KEYS = ['title', 'urlHost', 'tags']
 export const filterEntries = (entries: EntryMeta[], options: FilterOptions): EntryMeta[] => {
   const scoped = entries.filter(entry => matchType(entry, options.type))
 
+  // Unordered without a query: the list's own sort (recency or A–Z) is applied
+  // downstream, so ordering here would only be thrown away.
   const query = options.query.trim()
-  if (query === '') return scoped.sort((a, b) => a.title.localeCompare(b.title))
+  if (query === '') return scoped
 
   // Fuzzy rank across the searchable metadata (typo-tolerant, relevance-ordered).
   const fuse = new Fuse(scoped, { keys: SEARCH_KEYS, threshold: 0.4, ignoreLocation: true })

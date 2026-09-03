@@ -12,7 +12,7 @@ import { createI18nSlice, type I18nSlice } from './i18nSlice'
 import { createThemeSlice, type ThemeSlice } from './themeSlice'
 import { createUpdateSlice, type UpdateSlice } from './updateSlice'
 import { createUiSlice, type UiSlice } from './uiSlice'
-import { createAsyncSlice, type AsyncSlice } from './thunks'
+import { createAsyncSlice, cancelScheduledSync, type AsyncSlice } from './thunks'
 
 export type StoreState = FlowSlice &
   GeneratorSlice &
@@ -52,7 +52,11 @@ const pickData = (s: StoreState) => ({
   sync: s.sync,
   i18n: s.i18n,
   update: s.update,
-  ui: s.ui
+  ui: s.ui,
+  // Both read a persisted preference at slice creation, so a test that changes
+  // one has to have it put back like everything else.
+  sort: s.sort,
+  theme: s.theme
 })
 
 const initialData = pickData(useStore.getState())
@@ -62,6 +66,17 @@ const initialData = pickData(useStore.getState())
 export const makeStore = () => {
   useStore.setState({ ...structuredClone(initialData), i18n: { locale: getLocale() } }, false)
   return useStore
+}
+
+// Everything the unlocked session put in the store: the entry list and what is
+// selected in it, the surfaces open over it, and the audit of it. A lock has to
+// drop all of it — it outlives the session otherwise, and the next unlock (of
+// this or any other vault) opens onto the previous one's rows. Session-shaped
+// state (flow, sync, theme, locale, update) is deliberately kept.
+export const resetVaultData = () => {
+  const { entries, ui, filters, audit } = structuredClone(initialData)
+  useStore.setState({ entries, ui, filters, audit })
+  cancelScheduledSync()
 }
 
 // Actions never change reference, so we expose them bound for non-reactive use.
@@ -77,10 +92,7 @@ export const {
   setNoEntry,
   editEntry,
   setEntries,
-  setTrash,
   setCurrentEntry,
-  entrySaved,
-  entryRemoved,
   auditDone,
   setBreachCheck,
   runAudit,
@@ -131,8 +143,9 @@ export const startEntry = (type: EntryType) => {
 // on every in-session lock. Autolock takes the same path via the vault:locked
 // event (events.ts).
 export const lockVault = () =>
-  lock().finally(() =>
-    isBiometricAvailable()
+  lock().finally(() => {
+    resetVaultData()
+    return isBiometricAvailable()
       .catch(() => false)
       .then(flowAuth)
-  )
+  })

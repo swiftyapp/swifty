@@ -3,10 +3,8 @@ import { render } from '@testing-library/react'
 import { makeStore, setEntries, flowMain, auditDone } from '@/store'
 import type { Entry, EntryMeta, Audit } from '@/lib/commands'
 
-type Store = ReturnType<typeof makeStore>
-
 interface Options {
-  store?: Store
+  store?: ReturnType<typeof makeStore>
 }
 
 // Renders a component against a freshly reset store so tests never share state.
@@ -15,8 +13,10 @@ export const renderWithStore = (ui: ReactElement, { store = makeStore() }: Optio
   ...render(ui)
 })
 
-// Puts the store into the unlocked "main" flow with the given entry metadata.
-export const withEntries = (_store: Store, entries: EntryMeta[], audit?: Audit) => {
+// Puts the (singleton) store into the unlocked "main" flow with the given entry
+// metadata. Acts on the store the bound actions already point at, so there is
+// nothing to hand it.
+export const withEntries = (entries: EntryMeta[], audit?: Audit) => {
   setEntries(entries)
   flowMain()
   if (audit) auditDone(audit)

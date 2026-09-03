@@ -17,7 +17,7 @@ beforeEach(() => vi.clearAllMocks())
 describe('Main', () => {
   const seed = () => {
     const store = makeStore()
-    withEntries(store, [loginMeta({ id: 'l1', title: 'Google' }), note('n1', 'Journal'), card('c1', 'Visa')])
+    withEntries([loginMeta({ id: 'l1', title: 'Google' }), note('n1', 'Journal'), card('c1', 'Visa')])
     return store
   }
 
@@ -43,7 +43,7 @@ describe('Main', () => {
 
   it('filters entries by search query', async () => {
     const store = makeStore()
-    withEntries(store, [loginMeta({ id: 'a', title: 'Airbnb' }), loginMeta({ id: 'g', title: 'Google' })])
+    withEntries([loginMeta({ id: 'a', title: 'Airbnb' }), loginMeta({ id: 'g', title: 'Google' })])
     renderWithStore(<Main />, { store })
 
     await userEvent.type(screen.getByPlaceholderText('Search'), 'air')
@@ -70,6 +70,25 @@ describe('Main', () => {
     await userEvent.click(screen.getByText('Google'))
     await userEvent.keyboard('{Meta>}e{/Meta}')
     expect(useStore.getState().entries.edit).toBe(true)
+  })
+
+  // jsdom implements no `inert` semantics, so the attribute itself is the
+  // assertion: it is what takes the column's rows, chips and arrows out of the
+  // browser's keyboard and pointer reach while a draft is open.
+  it('takes the list column out of the keyboard while a draft is open', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    renderWithStore(<Main />, { store: seed() })
+
+    const column = screen.getByTestId('list-column')
+    expect(column).not.toHaveAttribute('inert')
+
+    await userEvent.click(screen.getByText('Google'))
+    await userEvent.keyboard('{Meta>}e{/Meta}')
+    expect(useStore.getState().entries.edit).toBe(true)
+
+    expect(column).toHaveAttribute('inert')
+    // `pointer-events-none` only ever stopped the mouse.
+    expect(column.className).not.toContain('pointer-events-none')
   })
 
   it('narrows the list to one kind through the filter chips', async () => {
@@ -131,7 +150,7 @@ describe('Main', () => {
 
   it('shows the empty-vault hero in the detail pane when there are no entries', () => {
     const store = makeStore()
-    withEntries(store, [])
+    withEntries([])
     renderWithStore(<Main />, { store })
     expect(screen.getByText('Your vault is empty')).toBeInTheDocument()
     expect(screen.getByTestId('create-first-entry-button')).toBeInTheDocument()

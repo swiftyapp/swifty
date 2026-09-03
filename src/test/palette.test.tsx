@@ -9,7 +9,7 @@ const open = () => userEvent.keyboard('{Meta>}k{/Meta}')
 
 const seed = () => {
   const store = makeStore()
-  withEntries(store, [
+  withEntries([
     loginMeta({ id: 'l1', title: 'Google', urlHost: 'google.com' }),
     loginMeta({ id: 'l2', title: 'Airbnb', urlHost: 'airbnb.com' }),
     { id: 'c1', type: 'card', title: 'Visa', tags: [], urlHost: '', favorite: false }
@@ -83,6 +83,24 @@ describe('command palette', () => {
 
     expect(useStore.getState().ui.settings).toBe(true)
     expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument()
+  })
+
+  // Focus never leaves the field, so the row the arrows land on is only
+  // announced through aria-activedescendant.
+  it('points the field at the focused row for a screen reader', async () => {
+    renderWithStore(<Main />, { store: seed() })
+    await open()
+
+    const palette = within(screen.getByTestId('command-palette'))
+    const field = screen.getByTestId('command-palette-input')
+    const rows = screen.getAllByTestId('palette-item')
+    expect(field).toHaveAttribute('aria-controls', palette.getByRole('listbox').id)
+    expect(field).toHaveAttribute('aria-activedescendant', rows[0].id)
+
+    await userEvent.keyboard('{ArrowDown}')
+
+    expect(field).toHaveAttribute('aria-activedescendant', rows[1].id)
+    expect(rows[1].id).not.toBe('')
   })
 
   it('runs a command on click', async () => {
