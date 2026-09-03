@@ -42,7 +42,12 @@ const literalKeys = (): Map<string, string> => {
   return found
 }
 
-const placeholders = (value: string) => [...value.matchAll(/\{[^}]*\}/g)].map(m => m[0]).join()
+// `%{appName}` is exempt: it is the app's name (a constant, see `@/lib/app`),
+// not per-call data, so nothing is lost when a locale names the app where
+// en-US does not — or says nothing about it where en-US does. Every other
+// placeholder stands for a value the sentence needs, so it stays symmetric.
+const placeholders = (value: string) =>
+  [...value.replace(/%\{appName\}/g, '').matchAll(/\{[^}]*\}/g)].map(m => m[0]).join()
 
 const catalogue: Record<string, string> = enUS
 

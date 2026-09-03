@@ -17,6 +17,7 @@ use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 use url::Url;
 
+use crate::app::APP_NAME;
 use crate::error::{Error, Result};
 use crate::{crypto::Cryptor, storage};
 
@@ -254,7 +255,9 @@ fn response_html(ok: bool, error: Option<&str>) -> String {
     let (status, body) = if ok {
         (
             "200 OK",
-            "<h2>You've successfully connected!</h2><p>You may now close this window and return to Swifty.</p>".to_string(),
+            format!(
+                "<h2>You've successfully connected!</h2><p>You may now close this window and return to {APP_NAME}.</p>"
+            ),
         )
     } else {
         (

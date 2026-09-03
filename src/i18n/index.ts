@@ -8,6 +8,7 @@ import svSE from './locales/sv-SE.json'
 import trTR from './locales/tr-TR.json'
 import ukUA from './locales/uk-UA.json'
 import zhCN from './locales/zh-CN.json'
+import { APP_NAME } from '@/lib/app'
 
 type Translations = Record<string, string>
 
@@ -48,6 +49,14 @@ export const setLocale = (next: string) => {
   localStorage.setItem('locale', next)
 }
 
+// Values may name the app as `%{appName}` so no locale file hardcodes it.
+// Keys never carry the placeholder: they stay plain English, which is what
+// callers pass and what the fallback below renders.
+const VARIABLES: Record<string, string> = { appName: APP_NAME }
+
+const interpolate = (value: string): string =>
+  value.replace(/%\{(\w+)\}/g, (match, name: string) => VARIABLES[name] ?? match)
+
 // Returns the translation for the key, falling back to the key itself.
 export const t = (key: string): string =>
-  translations[locale]?.[key] ?? translations[DEFAULT_LOCALE][key] ?? key
+  interpolate(translations[locale]?.[key] ?? translations[DEFAULT_LOCALE][key] ?? key)
