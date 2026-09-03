@@ -25,7 +25,12 @@ export default function Chip({ label, count, selected, onClick, testid }: Props)
       )}
     >
       <span>{label}</span>
-      <span className="font-mono text-xs opacity-60">{count}</span>
+      <span
+        data-testid={testid ? `${testid}-count` : undefined}
+        className="font-mono text-xs opacity-60"
+      >
+        {count}
+      </span>
     </button>
   )
 }

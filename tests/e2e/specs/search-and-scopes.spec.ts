@@ -78,9 +78,8 @@ async function selectKind(kind: "all" | "login" | "note" | "card"): Promise<void
 
 /** The count rendered on one chip. */
 async function chipCount(kind: string): Promise<number> {
-  await waitFor(`filter-${kind}`);
-  const text = await $(`[data-testid="filter-${kind}"]`).$(".font-mono").getText();
-  return Number(text);
+  await waitFor(`filter-${kind}-count`);
+  return Number(await $(`[data-testid="filter-${kind}-count"]`).getText());
 }
 
 describe("search and kind filters", () => {
