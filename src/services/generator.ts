@@ -80,14 +80,15 @@ export const defaultSettings = (): GeneratorSettings => {
 
 // The dialog always keeps both letter cases and asks for `strict`, so toggling
 // Symbols or Numbers on guarantees the class shows up in the result.
-// Write the three shared knobs back so the dialog and Settings › Security agree.
+// Write the shared knobs back so the dialog and Settings › Security agree.
 // Everything else in the stored props (uppercase, exclude) is left untouched.
 export const persistDefaults = (settings: GeneratorSettings) =>
   setProps({
     ...getProps(),
     length: settings.length,
     symbols: settings.symbols,
-    numbers: settings.numbers
+    numbers: settings.numbers,
+    excludeSimilarCharacters: settings.excludeSimilar
   })
 
 export const toOptions = (settings: GeneratorSettings): GeneratorOptions => ({
