@@ -29,6 +29,12 @@ export interface FieldProps {
   below?: ReactNode
   /** Stored → stored, on blur (a URL gains its missing scheme). */
   normalize?: (value: string) => string
+  /**
+   * Stored → shown, in both modes — an ISO date read in the user's pattern.
+   * Paired with `normalize`, which takes what was typed back to storage, so the
+   * editor shows and accepts the same form the read view does.
+   */
+  format?: (value: string) => string
   /** A format complaint about a non-empty value, or ''. */
   check?: (value: string) => string
 }
@@ -52,11 +58,14 @@ export default function Field({
   actions,
   below,
   normalize,
+  format,
   check
 }: FieldProps) {
   const { t } = useTranslation()
   const { value, set, editing, attempted } = useField(name)
   const [show, setShow] = useState(false)
+  // What the row puts on screen and on the clipboard; the draft keeps `value`.
+  const shown = format ? format(value) : value
 
   // Reading, an empty field is not a field.
   if (!editing && value === '') return null
@@ -88,12 +97,13 @@ export default function Field({
             <IconButton
               title={show ? t('Hide') : t('Reveal')}
               active={show}
+              testid={`reveal-${name}`}
               onClick={() => setShow(!show)}
             >
               {show ? <EyeOffGlyph /> : <EyeGlyph />}
             </IconButton>
           )}
-          {!editing && <CopyButton value={value} title={t('Copy')} />}
+          {!editing && <CopyButton value={shown} title={t('Copy')} />}
         </>
       }
     >
@@ -103,7 +113,7 @@ export default function Field({
           id={id}
           name={name}
           type={type}
-          value={value}
+          value={shown}
           placeholder={placeholder}
           maxLength={maxLength}
           autoComplete="off"
@@ -119,7 +129,7 @@ export default function Field({
         />
         ) : (
           <span className={ink} style={mask} data-testid={`entry-value-${name}`}>
-            {value}
+            {shown}
           </span>
         )
       }
