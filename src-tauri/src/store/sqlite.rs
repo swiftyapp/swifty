@@ -168,15 +168,16 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Fetch one row by id **including tombstones**, unlike [`VaultStore::get`]
-    /// which hides them. Restore and purge both act on rows the live read cannot
-    /// see, and both report back the row they wrote.
-    pub fn row(&self, id: &str) -> Result<Option<Record>> {
+    /// Fetch one row's metadata by id **including tombstones**, unlike
+    /// [`VaultStore::list`] which hides them. Save, restore, favorite and purge
+    /// all report back the row they just wrote, and restore and purge act on
+    /// rows the live read cannot see. None of them wants the payload, so this
+    /// does not read it: the whole point of a metadata projection is that
+    /// reporting a write never decrypts anything.
+    pub fn row_meta(&self, id: &str) -> Result<Option<EntryMeta>> {
         let conn = self.lock();
-        let sql = format!("SELECT {COLS} FROM entries WHERE id = ?1");
-        Ok(conn
-            .query_row(&sql, params![id], row_to_record)
-            .optional()?)
+        let sql = format!("SELECT {META_COLS} FROM entries WHERE id = ?1");
+        Ok(conn.query_row(&sql, params![id], row_to_meta).optional()?)
     }
 
     /// Set the derived card-network slug without stamping `updated_at` — it is
@@ -425,8 +426,12 @@ impl VaultStore for SqliteStore {
         // star that left the clock alone would lose to (or coin-flip against, via
         // the hash tie-break) every peer's copy and silently revert.
         let now = now_ms();
+        // Tombstones are excluded like they are in `purge`: a trashed entry has
+        // no star to set, and the `updated_at` bump would hand a deleted row a
+        // fresh stamp for the sync merge to carry around.
         self.lock().execute(
-            "UPDATE entries SET favorite = ?1, updated_at = ?2 WHERE id = ?3",
+            "UPDATE entries SET favorite = ?1, updated_at = ?2
+             WHERE id = ?3 AND deleted_at IS NULL",
             params![favorite, now, id],
         )?;
         Ok(())
