@@ -14,12 +14,13 @@ import { otpSecret } from './secret'
 export default function OtpField({ name = 'otp', label = 'OTP' }) {
   const { value, set, editing } = useField(name)
   const parsed = otpSecret(value)
-  // Reading, trust whatever the vault holds: the generator is the final judge,
-  // and refusing a legacy secret here would silently drop a working code.
-  const secret = editing ? parsed : parsed || value.trim()
-  const { code, time } = useOtp(secret)
+  const { code, time } = useOtp(parsed)
 
-  if (!editing && !secret) return null
+  // Reading, the panel is worth its column only once a code has arrived.
+  // Passing the raw value through when it failed to parse bought nothing but a
+  // dead dial and a "Copy code" button that copied '' — the backend rejects
+  // exactly what `otpSecret` rejects.
+  if (!editing && !code) return null
 
   return (
     <Panel className="flex flex-col items-center p-3.5">
@@ -28,6 +29,9 @@ export default function OtpField({ name = 'otp', label = 'OTP' }) {
       {editing && (
         <input
           name={name}
+          // The panel's heading is not a label element, so the input names
+          // itself rather than borrowing the row geometry it does not use.
+          aria-label={t(label)}
           value={value}
           placeholder={t('base32 secret or otpauth:// link')}
           autoComplete="off"
@@ -42,7 +46,7 @@ export default function OtpField({ name = 'otp', label = 'OTP' }) {
         />
       )}
 
-      {secret && <Dial code={code} time={time} />}
+      {parsed && <Dial code={code} time={time} />}
 
       {editing && value !== '' && !parsed && (
         <div className="mt-3 text-base text-bad">{t('Not a one-time-password secret')}</div>

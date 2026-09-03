@@ -19,8 +19,6 @@ export interface FieldProps {
   secure?: boolean
   /** The row's headline secret: 2xl, letter-spaced for reading aloud. */
   big?: boolean
-  /** Character-by-character tracking without the size bump. */
-  secret?: boolean
   type?: string
   maxLength?: number
   placeholder?: string
@@ -28,10 +26,6 @@ export interface FieldProps {
   /** Trailing controls shown in both modes. */
   actions?: ReactNode
   below?: ReactNode
-  /** Stored → displayed, live (card-number grouping). */
-  format?: (value: string) => string
-  /** Typed → stored, live (a card number keeps only digits). */
-  parse?: (value: string) => string
   /** Stored → stored, on blur (a URL gains its missing scheme). */
   normalize?: (value: string) => string
   /** A format complaint about a non-empty value, or ''. */
@@ -50,15 +44,12 @@ export default function Field({
   required,
   secure,
   big,
-  secret,
   type = 'text',
   maxLength,
   placeholder,
   prefix,
   actions,
   below,
-  format,
-  parse,
   normalize,
   check
 }: FieldProps) {
@@ -79,7 +70,7 @@ export default function Field({
   const mask = masked ? MASK : undefined
   const ink = cx(
     'block h-6 w-full min-w-0 truncate font-mono leading-6 text-text',
-    big ? 'text-xl tracking-secret' : secret ? 'text-base tracking-secret' : 'text-base'
+    big ? 'text-xl tracking-secret' : 'text-base'
   )
 
   return (
@@ -104,17 +95,19 @@ export default function Field({
         </>
       }
     >
-      {editing ? (
+      {id =>
+        editing ? (
         <input
+          id={id}
           name={name}
           type={type}
-          value={format ? format(value) : value}
+          value={value}
           placeholder={placeholder}
           maxLength={maxLength}
           autoComplete="off"
           spellCheck={false}
           style={mask}
-          onChange={event => set(parse ? parse(event.target.value) : event.target.value)}
+          onChange={event => set(event.target.value)}
           onBlur={normalize ? () => set(normalize(value)) : undefined}
           className={cx(
             ink,
@@ -122,11 +115,12 @@ export default function Field({
             error ? 'border-bad' : 'border-line2 focus:border-accent-line'
           )}
         />
-      ) : (
-        <span className={ink} style={mask} data-testid={`entry-value-${name}`}>
-          {format ? format(value) : value}
-        </span>
-      )}
+        ) : (
+          <span className={ink} style={mask} data-testid={`entry-value-${name}`}>
+            {value}
+          </span>
+        )
+      }
     </FieldRow>
   )
 }

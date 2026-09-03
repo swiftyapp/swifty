@@ -1,5 +1,6 @@
 import type { Entry } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
+import { filled } from '@/components/elements/fields/formats'
 
 export const defaults: EntryDraft = {
   type: 'card',
@@ -14,7 +15,11 @@ export const defaults: EntryDraft = {
 
 // Cards do not require a PIN — most cards have none.
 export const isValid = (draft: EntryDraft): boolean =>
-  !!(draft.title && draft.number && draft.cvc && draft.month && draft.year)
+  filled(draft.title) &&
+  filled(draft.number) &&
+  filled(draft.cvc) &&
+  filled(draft.month) &&
+  filled(draft.year)
 
 export const primarySecret = (entry: Entry): string =>
   entry.type === 'card' ? entry.number : ''

@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { EntryMeta, EntryType } from '@/lib/commands'
 import { useRevealed } from '@/hooks/useRevealed'
 import Read from './Read'
@@ -23,10 +24,24 @@ export default function Show({ entry, type, editing }: Props) {
   // change still carries the previous entry's secrets. Match it to the entry in
   // hand before passing it down — a draft (no entry) never gets one at all.
   const current = revealed && entry && revealed.id === entry.id ? revealed : null
+  // Once an entry's secrets have been served, the editor owns the draft: a
+  // later reveal (the refetch an `updatedAt` change triggers, e.g. a sync merge
+  // landing mid-edit) must not take the editor away and the draft with it.
+  const served = useRef<string | undefined>(undefined)
+  if (current) served.current = current.id
 
   if (!kindType) return null
-  // Keyed per entry: each editing session starts from a fresh draft.
-  if (editing) return <Edit key={entry?.id ?? 'new'} type={kindType} revealed={current} />
+  if (editing) {
+    // The draft is seeded from the reveal, so an editor mounted before it lands
+    // would discard whatever was typed in the meantime. Hold the pane's frame
+    // until the secrets are in hand — a tombstone never gets here, so this
+    // always resolves. (`reveal_entry` refuses deleted rows; `editEntry` does
+    // too.)
+    if (entry && !current && served.current !== entry.id)
+      return <div className="mx-auto min-h-[320px] w-full max-w-[860px]" />
+    // Keyed per entry: each editing session starts from a fresh draft.
+    return <Edit key={entry?.id ?? 'new'} type={kindType} revealed={current} />
+  }
   if (!entry) return null
   return <Read entry={entry} revealed={current} />
 }
