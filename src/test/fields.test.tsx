@@ -133,6 +133,17 @@ describe('Type-aware fields', () => {
     expect(generateOtp).not.toHaveBeenCalled()
   })
 
+  // A pre-redesign vault can hold something `otpSecret` cannot read. The
+  // backend would reject it too, so there is no code to offer and no panel.
+  it('shows no dial for a stored secret it cannot read', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ otp: 'legacy-garbage' }))
+    renderWithStore(<Show entry={loginMeta()} />)
+
+    await waitFor(() => expect(screen.getByTestId('entry-value-username')).toBeInTheDocument())
+    expect(screen.queryByText('Copy code')).not.toBeInTheDocument()
+    expect(generateOtp).not.toHaveBeenCalled()
+  })
+
   it('previews the live code for a secret that is already saved', async () => {
     vi.mocked(generateOtp).mockResolvedValue({ code: '123456', time: 25 })
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ otp: 'JBSWY3DPEHPK3PXP' }))
