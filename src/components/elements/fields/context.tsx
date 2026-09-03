@@ -1,6 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { EntryDraft } from '@/defaults/entries'
-import type { Passkey } from '@/lib/commands'
+import type { DraftValue, EntryDraft } from '@/defaults/entries'
 
 export interface FieldsState {
   /** The live draft while editing, the decrypted entry while reading. */
@@ -9,10 +8,11 @@ export interface FieldsState {
    * Writes one draft key. `null` is the whole mode switch: with no writer
    * every field renders its read face, so no component takes a `mode` prop.
    *
-   * `Passkey[]` is in the union because the passkeys block removes one by
-   * writing back the survivors; no other field writes a non-string value.
+   * The list shapes in `DraftValue` are there for the blocks that write a whole
+   * collection back at once: tags, the passkeys a login keeps, and the extra
+   * fields. Every ordinary field writes a string.
    */
-  set: ((name: string, value: string | string[] | Passkey[]) => void) | null
+  set: ((name: string, value: DraftValue) => void) | null
   /** Save has been attempted, so required fields may now complain. */
   attempted: boolean
 }
