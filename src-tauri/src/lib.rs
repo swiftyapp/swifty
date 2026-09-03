@@ -13,6 +13,9 @@ mod models;
 // The WebAuthn authenticator core. Declared only: its caller is the browser
 // extension host a later PR adds, so no command is registered below yet.
 mod passkey;
+// Local image scanning (card / identity document). `pub` so `examples/scan.rs`
+// can drive the OCR backend without the app around it.
+pub mod scan;
 mod secure_store;
 mod state;
 mod storage;
@@ -103,6 +106,8 @@ pub fn run() {
             commands::generator::generate_otp,
             commands::generator::verify_otp,
             commands::audit::get_audit,
+            scan::scan_image,
+            scan::scan_supported,
             favicon::fetch_favicon,
             commands::clipboard::copy_to_clipboard,
             autolock::set_autolock_timeout,

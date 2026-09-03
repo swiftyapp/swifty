@@ -70,12 +70,27 @@ objc2-foundation = "0.3"
 objc2-app-kit = { version = "0.3", features = ["NSPasteboard"] }
 objc2-local-authentication = { version = "0.3", features = ["LAContext", "block2"] }
 block2 = "0.6"
+# On-device text recognition (VNRecognizeTextRequest) for the image scanner.
+# Only the headers the scanner touches are enabled; `objc2-core-foundation`
+# gates the observation's bounding box, which is what puts lines in reading
+# order.
+objc2-vision = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "VNRequest",
+  "VNRequestHandler",
+  "VNRecognizeTextRequest",
+  "VNObservation",
+  "VNTypes",
+  "objc2-core-foundation",
+] }
 # Biometric-gated Keychain (SecAccessControl / kSecAccessControlBiometryCurrentSet).
 # OSX_10_15 enables the data-protection keychain required for biometric ACLs.
 security-framework = { version = "3.6.0", features = ["OSX_10_15"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.61", features = ["Security_Credentials_UI", "Win32_Foundation", "Win32_System_DataExchange", "Win32_System_Memory"] }
+# `Media_Ocr` + the imaging/storage stack it needs are for the image scanner:
+# a file path -> SoftwareBitmap -> recognized lines.
+windows = { version = "0.61", features = ["Security_Credentials_UI", "Win32_Foundation", "Win32_System_DataExchange", "Win32_System_Memory", "Media_Ocr", "Graphics_Imaging", "Storage", "Storage_Streams"] }
 # Credential Manager storage; retrieval is gated behind Windows Hello (verify-then-read).
 keyring = { version = "3", features = ["windows-native"] }
 
