@@ -51,7 +51,7 @@ export default function PasswordField({
             className="flex cursor-pointer items-center gap-1.5 text-base text-accent hover:brightness-110"
           >
             <RefreshGlyph size={13} />
-            <span>generate</span>
+            <span>{t('generate')}</span>
           </button>
         ) : undefined
       }

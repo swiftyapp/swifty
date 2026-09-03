@@ -88,7 +88,7 @@ export default function Value({
         <input
           name={name}
           value={value}
-          placeholder={placeholder}
+          placeholder={placeholder === undefined ? undefined : t(placeholder)}
           maxLength={maxLength}
           autoComplete="off"
           spellCheck={false}

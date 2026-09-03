@@ -1,5 +1,6 @@
 import { useStore, openSettings } from '@/store'
 import { cx } from '@/utils/cx'
+import { t } from '@/i18n'
 import Tooltip from '@/components/elements/Tooltip'
 
 // Sync pill: a status dot + mono label surfacing syncing / synced / error.
@@ -14,12 +15,17 @@ export default function SyncIndicator() {
   if (!sync.enabled) return null
 
   const dot = sync.inProgress ? 'bg-accent' : sync.success ? 'bg-good' : 'bg-bad'
-  const label = sync.inProgress ? 'Syncing…' : sync.success ? 'Synced' : 'Sync error'
-  const message = sync.inProgress
-    ? 'Syncing...'
+  const label = sync.inProgress
+    ? t('Syncing…')
     : sync.success
-      ? 'Sync Successful'
-      : sync.error || 'Something went wrong'
+      ? t('Synced')
+      : t('Sync error')
+  const message = sync.inProgress
+    ? t('Syncing…')
+    : sync.success
+      ? t('Sync Successful')
+      : // The backend hands back an English message; it is a locale key too.
+        t(sync.error || 'Something went wrong')
 
   return (
     <Tooltip content={message}>

@@ -48,7 +48,7 @@ export default function Tiles({ active, disabled, onFormat, onBackup }: Props) {
             {tile.badge}
           </div>
           <div className="mt-3 truncate text-base text-text">{t(tile.name)}</div>
-          <div className="mt-0.5 font-mono text-xs text-text3">{tile.hint}</div>
+          <div className="mt-0.5 font-mono text-xs text-text3">{t(tile.hint)}</div>
         </button>
       ))}
     </div>
