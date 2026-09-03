@@ -70,9 +70,16 @@ async function reset(mode: ResetMode, password?: string): Promise<void> {
   // spec (or a human) set in some other run leaks into this one. That is not
   // hypothetical: a sort-mode leak made a suite green locally and red on CI.
   // Clear it here so a reset means what it says: the app boots with defaults.
+  //
+  // The locale goes straight back in: every spec selects on English labels, and
+  // here is the only place a pin can survive — one set by a spec before its own
+  // reset() is simply wiped again. `en-US` is also the app's fallback
+  // (`src/i18n`), so this states the suite's requirement rather than leaning on
+  // that default staying put.
   await browser.execute(() => {
     localStorage.clear();
     sessionStorage.clear();
+    localStorage.setItem("locale", "en-US");
   });
 
   await browser.refresh();

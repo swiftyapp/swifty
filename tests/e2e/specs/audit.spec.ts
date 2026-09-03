@@ -107,13 +107,9 @@ async function repassword(title: string, password: string): Promise<void> {
 
 describe("password audit", () => {
   before(async () => {
-    // The Breached group is opt-in (`defaults/audit.ts`, off by default). Pin it
-    // so the spec is independent of whatever a previous spec left in
-    // localStorage — the reset below wipes the vault, not the webview storage.
-    await browser.execute(() =>
-      localStorage.setItem("swifty:breachCheck", "false"),
-    );
-
+    // The Breached group is opt-in (`defaults/audit.ts`, off by default) and
+    // `reset()` clears the webview storage a previous spec could have left it
+    // on in, so the reset is the pin.
     await resetEmpty(MASTER_PASSWORD);
     await unlock(MASTER_PASSWORD);
 
