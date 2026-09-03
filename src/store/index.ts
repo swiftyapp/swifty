@@ -84,6 +84,8 @@ export const {
   setFilterQuery,
   setFilterType,
   newEntry,
+  setPrefill,
+  clearPrefill,
   setNoEntry,
   editEntry,
   setEntries,
@@ -109,6 +111,10 @@ export const {
   openAddPicker,
   closeAddPicker,
   setView,
+  setScanSupported,
+  scanStarted,
+  scanFinished,
+  dismissScan,
   runUpdateCheck,
   saveEntry,
   deleteEntry,
@@ -121,14 +127,15 @@ export const {
   restoreBackup
 } = useStore.getState()
 
-// Starts a new entry of `type` from anywhere (kind picker, palette command),
-// leaving the audit view first — it has no editor to land the form in.
+// Starts a new entry of `type` from anywhere (kind picker, palette command,
+// a scan), leaving the audit view first — it has no editor to land the form in.
 // `setView` clears any half-written draft, so it has to run before `newEntry`.
-export const startEntry = (type: EntryType) => {
+// `prefill` seeds the fields a scan already read (see `Scan/run`).
+export const startEntry = (type: EntryType, prefill?: Record<string, string>) => {
   // Only All Items can hold a draft: every other view is a filtered or
   // read-only surface the new entry would immediately fall out of.
   if (useStore.getState().ui.view !== 'items') setView('items')
-  newEntry(type)
+  newEntry(type, prefill)
 }
 
 // Manual lock, from anywhere (top chrome, Settings, palette): clear the session,

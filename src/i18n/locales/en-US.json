@@ -345,5 +345,15 @@
   "Untitled {kind}": "Untitled {kind}",
   "changed on {d}": "changed on {d}",
   "changed {t} ago": "changed {t} ago",
-  "refreshes in {n}s": "refreshes in {n}s"
+  "refreshes in {n}s": "refreshes in {n}s",
+  "Drop to scan the card or document": "Drop to scan the card or document",
+  "Read on this device. The image is never copied or uploaded.": "Read on this device. The image is never copied or uploaded.",
+  "Reading the image…": "Reading the image…",
+  "Nothing recognized in that image.": "Nothing recognized in that image.",
+  "Scanning is not available on this device.": "Scanning is not available on this device.",
+  "That image could not be read.": "That image could not be read.",
+  "Good, even light helps — with the whole card, or the two or three machine-readable lines, inside the frame.": "Good, even light helps — with the whole card, or the two or three machine-readable lines, inside the frame.",
+  "Scan a card or document…": "Scan a card or document…",
+  "A photo or screenshot, read on this device.": "A photo or screenshot, read on this device.",
+  "Images": "Images"
 }

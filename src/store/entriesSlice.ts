@@ -12,11 +12,17 @@ interface Entries {
   // Tombstones, as the Trash view lists them. Not part of the unlock payload,
   // so this stays empty until the Trash is opened.
   trash: EntryMeta[]
+  // Field values waiting for an editor to take them (what a scan read out of an
+  // image). Consumed once — `useDraft` folds them into the draft and clears
+  // them, so nothing is left to seed the next entry with.
+  prefill: Record<string, string> | null
 }
 
 export interface EntriesSlice {
   entries: Entries
-  newEntry: (type: EntryType) => void
+  newEntry: (type: EntryType, prefill?: Record<string, string>) => void
+  setPrefill: (prefill: Record<string, string>) => void
+  clearPrefill: () => void
   setNoEntry: () => void
   editEntry: () => void
   setEntries: (items: EntryMeta[]) => void
@@ -30,10 +36,17 @@ const find = (entries: Entries, id?: string) =>
   [...entries.items, ...entries.trash].find(item => item.id === id) ?? null
 
 export const createEntriesSlice: StateCreator<StoreState, [], [], EntriesSlice> = (set, get) => ({
-  entries: { new: null, edit: false, current: null, items: [], trash: [] },
-  newEntry: type =>
-    set(s => ({ entries: { ...s.entries, new: type, edit: false, current: null } })),
-  setNoEntry: () => set(s => ({ entries: { ...s.entries, new: null, edit: false, current: null } })),
+  entries: { new: null, edit: false, current: null, items: [], trash: [], prefill: null },
+  newEntry: (type, prefill) =>
+    set(s => ({
+      entries: { ...s.entries, new: type, edit: false, current: null, prefill: prefill ?? null }
+    })),
+  setPrefill: prefill => set(s => ({ entries: { ...s.entries, prefill } })),
+  clearPrefill: () => set(s => ({ entries: { ...s.entries, prefill: null } })),
+  setNoEntry: () =>
+    set(s => ({
+      entries: { ...s.entries, new: null, edit: false, current: null, prefill: null }
+    })),
   // A tombstone has no editable form: `reveal_entry` refuses deleted rows, so an
   // edit would open a pane that can never load its own values and whose save
   // would resurrect the entry behind the user's back. Refusing here rather than

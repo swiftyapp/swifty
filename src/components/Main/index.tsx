@@ -5,6 +5,7 @@ import Body from './Body'
 import Generator from './Generator'
 import Palette from './Palette'
 import AddSecret from './AddSecret'
+import Scan from './Scan'
 import { useShortcuts } from './useShortcuts'
 
 // Three-pane shell: a full-width top chrome bar over a row of
@@ -26,6 +27,7 @@ export function Main() {
       <Generator />
       <Palette />
       <AddSecret />
+      <Scan />
       {/* `copied-notification` + `hidden` are toggled by services/copy.ts; the
           display flip is what replays `animate-pop`. App-level so copies from
           the palette and standalone generator get feedback too. Centering uses

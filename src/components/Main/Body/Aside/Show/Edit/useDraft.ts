@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { setCurrentEntry, setNoEntry, saveEntry } from '@/store'
+import { useStore, setCurrentEntry, setNoEntry, saveEntry, clearPrefill } from '@/store'
 import { kindOf } from '@/kinds'
 import { pruneExtra } from '@/components/elements/fields'
+import { mergeFields } from '@/components/Main/Scan/fields'
 import { dialogOpen } from '@/utils/dialogOpen'
 import type { DraftValue, EntryDraft } from '@/defaults/entries'
 import type { Entry, EntryType } from '@/lib/commands'
@@ -35,7 +36,12 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
   // means a later reveal (a sync merge moving `updatedAt`) cannot replace the
   // draft. The baseline is the state at open; a concurrent change resolves
   // through last-writer-wins on save.
-  const initial = (): EntryDraft => ({ ...(revealed ?? kind.defaults) })
+  // Fields a scan read out of an image, waiting for a form to land in. A new
+  // entry's are in the store before this mounts, so they are part of the
+  // initial draft — the editor opens already filled in, and nothing about it
+  // reads as unsaved typing.
+  const [seed] = useState(() => useStore.getState().entries.prefill)
+  const initial = (): EntryDraft => mergeFields({ ...(revealed ?? kind.defaults) }, seed ?? {})
 
   const [attempted, setAttempted] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -50,6 +56,16 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
     setConfirmDiscard(false)
     setModel(current => ({ ...current, [name]: value }))
   }
+
+  // A scan of what is already being edited arrives after the mount: it fills
+  // this draft's blanks in place rather than opening a second one. Consumed
+  // either way, so the prefill can never seed a later entry.
+  const prefill = useStore(state => state.entries.prefill)
+  useEffect(() => {
+    if (!prefill) return
+    if (prefill !== seed) setModel(current => mergeFields(current, prefill))
+    clearPrefill()
+  }, [prefill, seed])
 
   const close = () => {
     if (model.id) setCurrentEntry(model.id)
