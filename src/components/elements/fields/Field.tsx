@@ -95,8 +95,10 @@ export default function Field({
         </>
       }
     >
-      {editing ? (
+      {id =>
+        editing ? (
         <input
+          id={id}
           name={name}
           type={type}
           value={value}
@@ -113,11 +115,12 @@ export default function Field({
             error ? 'border-bad' : 'border-line2 focus:border-accent-line'
           )}
         />
-      ) : (
-        <span className={ink} style={mask} data-testid={`entry-value-${name}`}>
-          {value}
-        </span>
-      )}
+        ) : (
+          <span className={ink} style={mask} data-testid={`entry-value-${name}`}>
+            {value}
+          </span>
+        )
+      }
     </FieldRow>
   )
 }
