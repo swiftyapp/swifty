@@ -174,6 +174,13 @@ describe('Type-aware fields', () => {
     expect(input('title').value).toBe('Google!')
   })
 
+  // The e2e suite opens the generator through this link; a testid survives a
+  // rewording of the label, which matching on its text did not.
+  it('marks the generator link with a testid', () => {
+    renderWithStore(<Show type="login" editing />)
+    expect(screen.getByTestId('generate-password-link')).toBeInTheDocument()
+  })
+
   it('counts a recent rotation as a duration', async () => {
     const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
     vi.mocked(revealEntry).mockResolvedValue(

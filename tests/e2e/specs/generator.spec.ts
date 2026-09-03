@@ -120,7 +120,7 @@ describe("password generator", () => {
 
     // The link on the password row (`src/components/elements/fields/PasswordField.tsx`)
     // — it opens the same dialog with a callback bound to this field.
-    await $('[data-testid="entry-sheet"]').$("span*=generate").click();
+    await $('[data-testid="generate-password-link"]').click();
     await waitFor("generator-dialog");
     await browser.waitUntil(async () => (await output().getText()) !== "", {
       timeout: 10_000,
