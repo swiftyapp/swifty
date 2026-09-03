@@ -11,7 +11,12 @@ export const toTime = (iso?: string): number | null => {
   return Number.isNaN(at) ? null : at
 }
 
-export const relativeTime = (iso?: string, now: number = Date.now()): string => {
+/**
+ * How long ago, as a duration and nothing else — '' past a week, where a
+ * duration stops being worth counting. For callers that put the value in a
+ * sentence ("changed {t} ago") and need to pick another phrasing instead.
+ */
+export const relativeDuration = (iso?: string, now: number = Date.now()): string => {
   const at = toTime(iso)
   if (at === null) return ''
 
@@ -20,7 +25,13 @@ export const relativeTime = (iso?: string, now: number = Date.now()): string => 
   if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m`
   if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`
   if (elapsed < 7 * DAY) return `${Math.floor(elapsed / DAY)}d`
-  return shortDate(at)
+  return ''
+}
+
+export const relativeTime = (iso?: string, now: number = Date.now()): string => {
+  const at = toTime(iso)
+  if (at === null) return ''
+  return relativeDuration(iso, now) || shortDate(at)
 }
 
 const pad = (value: number) => String(value).padStart(2, '0')
