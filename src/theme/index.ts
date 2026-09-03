@@ -52,3 +52,14 @@ export const setTheme = (next: ThemePreference): void => {
   }
   applyTheme(next)
 }
+
+// "System" has to keep following the OS, not just read it once at startup. Same
+// guard as `prefersDark`: no matchMedia (jsdom) or a locked-down webview simply
+// means the preference stops tracking, which is what it did before anyway.
+try {
+  window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (preference === 'system') applyTheme('system')
+  })
+} catch {
+  // No subscription; "system" stays on whatever it resolved to at load.
+}
