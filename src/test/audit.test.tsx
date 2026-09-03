@@ -14,7 +14,6 @@ const audit: Audit = {
 const seed = () => {
   const store = makeStore()
   withEntries(
-    store,
     [loginMeta({ id: 'l1', title: 'Weakling' }), loginMeta({ id: 'l2', title: 'Reuser' })],
     audit
   )
@@ -45,7 +44,7 @@ describe('Audit list', () => {
 
   it('shows a loading state before results arrive', () => {
     const store = makeStore()
-    withEntries(store, [loginMeta()])
+    withEntries([loginMeta()])
     renderWithStore(<AuditList />, { store })
     expect(screen.getByText('Loading Results..')).toBeInTheDocument()
   })

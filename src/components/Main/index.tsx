@@ -8,7 +8,7 @@ import { t } from '@/i18n'
 import { useShortcuts } from './useShortcuts'
 
 // Three-pane shell: a full-width top chrome bar over a row of
-// rail (68px) · list column (348px) · detail pane (flex).
+// rail (56px) · list column (348px) · detail pane (flex).
 export function Main() {
   useShortcuts()
 

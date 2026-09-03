@@ -42,7 +42,7 @@ describe('Show chrome', () => {
 describe('Edit mode in the pane', () => {
   const seed = () => {
     const store = makeStore()
-    withEntries(store, [loginMeta()])
+    withEntries([loginMeta()])
     setCurrentEntry('l1')
     return store
   }

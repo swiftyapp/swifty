@@ -95,8 +95,8 @@ export function HealthEmpty() {
   )
 }
 
-// One kind filtered down to nothing. Compact: the list column keeps its own
-// header and rows above, so this is a line of text, not a scene.
+// The Favorites view with nothing starred yet — a whole-view state, so it gets
+// the pane's full hero and says how to fill itself.
 export function FavoritesEmpty() {
   return (
     <EmptyState
