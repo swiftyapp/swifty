@@ -14,8 +14,11 @@ describe('RailButton', () => {
     const button = screen.getByRole('button', { name: 'All Items' })
     expect(button).toHaveAttribute('type', 'button')
     expect(button).not.toHaveAttribute('aria-pressed')
-    // The tooltip panel carries the same copy, next to the button.
+    // The tooltip panel carries the same copy, next to the button — visible,
+    // but kept out of the AT tree so it does not double the button's own name.
     expect(screen.getAllByText('All Items')).toHaveLength(1)
+    expect(screen.getByText('All Items')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByText('All Items')).toHaveAttribute('role', 'tooltip')
     expect(screen.getByTestId('rail')).toBe(button)
   })
 
