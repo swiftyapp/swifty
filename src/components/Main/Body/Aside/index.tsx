@@ -13,8 +13,10 @@ export default function Aside() {
   const entry = useStore(state => state.entries.current)
   const variant = useVariant()
 
-  if (draftType) return <Show type={draftType} editing />
-  if (entry) return <Show entry={entry} editing={editing} />
+  // Distinct keys: a draft and an entry must never share a `Show` instance, or
+  // the draft inherits the entry's in-flight reveal (and with it, its id).
+  if (draftType) return <Show key="draft" type={draftType} editing />
+  if (entry) return <Show key={entry.id} entry={entry} editing={editing} />
   // No variant means the health view has a score to show; everything else the
   // pane can be showing is one kind of empty or another.
   if (!variant) return <Audit />

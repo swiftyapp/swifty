@@ -19,11 +19,14 @@ export default function Show({ entry, type, editing }: Props) {
   // rows, so asking would only buy a rejected invoke per selection in the Trash.
   const revealed = useRevealed(entry?.deletedAt ? null : entry)
   const kindType = type ?? entry?.type
+  // The reveal is cleared in an effect, so the first render after the props
+  // change still carries the previous entry's secrets. Match it to the entry in
+  // hand before passing it down — a draft (no entry) never gets one at all.
+  const current = revealed && entry && revealed.id === entry.id ? revealed : null
 
   if (!kindType) return null
   // Keyed per entry: each editing session starts from a fresh draft.
-  if (editing)
-    return <Edit key={entry?.id ?? 'new'} type={kindType} revealed={revealed} />
+  if (editing) return <Edit key={entry?.id ?? 'new'} type={kindType} revealed={current} />
   if (!entry) return null
-  return <Read entry={entry} revealed={revealed} />
+  return <Read entry={entry} revealed={current} />
 }
