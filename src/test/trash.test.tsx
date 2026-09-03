@@ -148,6 +148,19 @@ describe('the Trash view', () => {
     expect(screen.queryByTestId('entry-item')).not.toBeInTheDocument()
   })
 
+  it('survives a failed read of the tombstones', async () => {
+    vi.mocked(listDeleted).mockRejectedValue(new Error('vault busy'))
+    const store = makeStore()
+    withEntries(store, [live])
+    renderWithStore(<Harness />, { store })
+
+    setView('trash')
+    await vi.waitFor(() => expect(listDeleted).toHaveBeenCalled())
+
+    // No unhandled rejection, and the view still renders its own empty state.
+    expect(screen.getByTestId('empty-trash')).toBeInTheDocument()
+  })
+
   it('re-reads the tombstones on every visit, so a peer’s deletes show up', async () => {
     await openTrash()
 
