@@ -20,6 +20,7 @@
     "test:e2e": "wdio run tests/e2e/wdio.conf.ts",
     "test:e2e:build": "bun run build && cargo build --manifest-path src-tauri/Cargo.toml && bun run test:e2e",
     "logo": "bun run scripts/logo.tsx",
+    "icons": "tauri icon src-tauri/icons/asterisq.svg -o src-tauri/icons && tauri icon src-tauri/icons/tray.svg -o src-tauri/icons/tray -p 72",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

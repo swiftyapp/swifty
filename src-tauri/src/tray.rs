@@ -1,10 +1,16 @@
 use crate::{autolock, window};
+use tauri::image::Image;
 use tauri::menu::MenuBuilder;
 use tauri::tray::TrayIconBuilder;
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
 const WEBSITE: &str = "https://getswifty.pro";
+
+// Monochrome asterisk glyph, generated from icons/tray.svg by `bun run icons`.
+// Rendered as a template image on macOS so the menu bar tints it for
+// light/dark appearance; other platforms show the PNG as-is.
+const TRAY_ICON: &[u8] = include_bytes!("../icons/tray/72x72.png");
 
 // Tray menu mirrors legacy tray/index.js.
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
@@ -18,7 +24,8 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .build()?;
 
     TrayIconBuilder::new()
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(Image::from_bytes(TRAY_ICON)?)
+        .icon_as_template(true)
         .tooltip("Swifty")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
