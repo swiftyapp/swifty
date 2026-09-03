@@ -65,7 +65,6 @@ export default function Sync() {
           <SettingsRow
             label={t('Last synced')}
             description={lastSynced}
-            testid="settings-sync-row"
             control={
               <Button
                 variant="pale"

@@ -35,7 +35,6 @@ export default function ExportRow() {
     <SettingsRow
       label={t('Portable export')}
       description={t('Bitwarden JSON or generic CSV, unencrypted')}
-      testid="settings-export-row"
       control={
         <div className="flex items-center gap-2">
           <Select

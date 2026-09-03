@@ -69,7 +69,6 @@ export default function BiometricRow() {
       <SettingsRow
         label={t('Unlock with Touch ID or Windows Hello')}
         description={description(enabled ? mode : null)}
-        testid="settings-biometric-row"
         control={
           <Toggle
             name="biometric"
