@@ -153,7 +153,7 @@ pub async fn import_entries(
 }
 
 // Export the open vault to a third-party format. `path` may be supplied directly;
-// when None, a save dialog is shown. `format` is "bitwarden" or "csv".
+// when None, a save dialog is shown. `format` is "bitwarden", "cxf" or "csv".
 #[tauri::command]
 pub async fn export_entries(
     path: Option<String>,
@@ -178,6 +178,7 @@ pub async fn export_entries(
 
     let (bytes, ext) = match format.to_lowercase().as_str() {
         "bitwarden" => (import::export::to_bitwarden_json(&entries)?, "json"),
+        "cxf" | "fido" => (import::export::to_cxf_json(&entries)?, "json"),
         "csv" => (
             import::export::to_generic_csv(&entries).map_err(|e| Error::Other(e.to_string()))?,
             "csv",

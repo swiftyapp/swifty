@@ -14,6 +14,13 @@ const TILES: {
   format?: ImportFormat
 }[] = [
   { key: 'bitwarden', badge: 'BW', name: 'Bitwarden', hint: '.json export', format: 'bitwarden' },
+  {
+    key: 'cxf',
+    badge: 'CXF',
+    name: 'FIDO Credential Exchange (CXF)',
+    hint: '.json export',
+    format: 'cxf'
+  },
   { key: 'chrome', badge: 'CH', name: 'Chrome / Safari', hint: '.csv export', format: 'chrome' },
   { key: 'lastpass', badge: 'LP', name: 'LastPass', hint: '.csv export', format: 'lastpass' },
   { key: 'keepass', badge: 'KP', name: 'KeePass', hint: '.csv export', format: 'keepass' },

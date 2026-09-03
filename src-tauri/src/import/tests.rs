@@ -1,4 +1,4 @@
-use super::export::{sanitize_cell, to_bitwarden_json, to_generic_csv};
+use super::export::{sanitize_cell, to_bitwarden_json, to_cxf_json, to_generic_csv};
 use super::{detect, EntryKind, Format, ImportedEntry, ImportedPasskey, Importer};
 
 fn parse(fmt: Format, bytes: &[u8]) -> super::ImportResult {
@@ -332,6 +332,266 @@ fn round_trip_bitwarden_passkeys() {
     let back = super::bitwarden::Bitwarden.parse(&bytes);
     assert!(back.errors.is_empty());
     assert_eq!(back.entries[0].passkeys, entries[0].passkeys);
+}
+
+// A CXF item carries a list of credentials, so all five types can share one
+// item. `creationAt` (Unix seconds) dates the passkeys on it.
+#[test]
+fn cxf_maps_every_credential_type_on_one_item() {
+    let json = br#"{
+      "version": {"major": 1, "minor": 0},
+      "exporterRpId": "example.com", "exporterDisplayName": "Example", "timestamp": 1700000000,
+      "accounts": [{"id": "YWNjdA", "username": "", "email": "", "collections": [], "items": [
+        {"id": "aXRlbTE", "creationAt": 1700000000, "modifiedAt": 1700000000,
+         "title": "GitHub", "favorite": false, "tags": ["Work"],
+         "scope": {"urls": ["https://github.com"], "androidApps": []},
+         "credentials": [
+           {"type": "basic-auth",
+            "username": {"fieldType": "string", "value": "octo"},
+            "password": {"fieldType": "concealed-string", "value": "pw"}},
+           {"type": "passkey", "credentialId": "Y3JlZDE", "rpId": "github.com",
+            "username": "octo", "userDisplayName": "Octo", "userHandle": "dWgx",
+            "key": "cGsx", "fido2Extensions": {}},
+           {"type": "totp", "secret": "SEED", "period": 30, "digits": 6,
+            "algorithm": "sha1", "issuer": "GitHub", "username": "octo"},
+           {"type": "note", "content": {"fieldType": "string", "value": "body"}},
+           {"type": "future-thing", "whatever": 1}
+         ]},
+        {"id": "aXRlbTI", "title": "Visa", "credentials": [
+           {"type": "credit-card",
+            "number": {"fieldType": "concealed-string", "value": "4111111111111111"},
+            "fullName": {"fieldType": "string", "value": "A B"},
+            "cardType": {"fieldType": "string", "value": "Visa"},
+            "verificationNumber": {"fieldType": "concealed-string", "value": "123"},
+            "expiryDate": {"fieldType": "year-month", "value": "2030-01"},
+            "pin": {"fieldType": "concealed-string", "value": "1234"}}
+         ]}
+      ]}]
+    }"#;
+    let r = parse(Format::Cxf, json);
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.entries.len(), 2);
+
+    let login = &r.entries[0];
+    assert_eq!(login.kind, EntryKind::Login);
+    assert_eq!(login.title, "GitHub");
+    assert_eq!(login.username.as_deref(), Some("octo"));
+    assert_eq!(login.password.as_deref(), Some("pw"));
+    assert_eq!(login.url.as_deref(), Some("https://github.com"));
+    assert_eq!(login.otp.as_deref(), Some("SEED"));
+    assert_eq!(login.notes.as_deref(), Some("body"));
+    assert_eq!(login.tags, vec!["Work".to_string()]);
+    assert_eq!(
+        login.passkeys,
+        vec![ImportedPasskey {
+            credential_id: "Y3JlZDE".into(),
+            rp_id: "github.com".into(),
+            rp_name: None,
+            user_handle: "dWgx".into(),
+            user_name: "octo".into(),
+            user_display_name: "Octo".into(),
+            private_key: "cGsx".into(),
+            counter: 0,
+            // 1700000000 seconds, as the item dates it.
+            created_at: Some("2023-11-14T22:13:20+00:00".into()),
+        }]
+    );
+
+    let card = &r.entries[1];
+    assert_eq!(card.kind, EntryKind::Card);
+    assert_eq!(card.card_number.as_deref(), Some("4111111111111111"));
+    assert_eq!(card.cardholder.as_deref(), Some("A B"));
+    assert_eq!(card.card_month.as_deref(), Some("01"));
+    assert_eq!(card.card_year.as_deref(), Some("2030"));
+    assert_eq!(card.card_cvc.as_deref(), Some("123"));
+}
+
+// Nothing but passkeys: still a login, named after the credential since there
+// is no basic-auth to name it.
+#[test]
+fn cxf_passkey_only_item_becomes_a_passkey_only_login() {
+    let json = br#"{"version":{"major":1,"minor":0},"accounts":[{"items":[
+      {"id":"aQ","title":"Acme","credentials":[
+        {"type":"passkey","credentialId":"Y3JlZDE","rpId":"acme.test","username":"alice",
+         "userDisplayName":"Alice","userHandle":"dWgx","key":"cGsx"}
+      ]}
+    ]}]}"#;
+    let r = parse(Format::Cxf, json);
+    assert!(r.errors.is_empty());
+    let e = &r.entries[0];
+    assert_eq!(e.kind, EntryKind::Login);
+    assert_eq!(e.username.as_deref(), Some("alice"));
+    assert_eq!(e.password, None);
+    assert_eq!(e.passkeys.len(), 1);
+    assert_eq!(e.passkeys[0].created_at, None); // no creationAt on the item
+}
+
+// An item whose only credential is a note is a note; an item with nothing we
+// can map is a row error, numbered across accounts.
+#[test]
+fn cxf_maps_note_only_items_and_flags_unmappable_ones() {
+    let json = br#"{"version":{"major":1,"minor":0},"accounts":[
+      {"items":[{"id":"aQ","title":"Secret","credentials":[
+        {"type":"note","content":{"fieldType":"string","value":"body"}}]}]},
+      {"items":[{"id":"aQ","title":"Mystery","credentials":[{"type":"ssh-key"}]}]}
+    ]}"#;
+    let r = parse(Format::Cxf, json);
+    assert_eq!(r.entries.len(), 1);
+    assert_eq!(r.entries[0].kind, EntryKind::Note);
+    assert_eq!(r.entries[0].notes.as_deref(), Some("body"));
+    assert_eq!(r.errors.len(), 1);
+    assert_eq!(r.errors[0].row, 2); // second item overall
+}
+
+// A passkey without an id, relying party or key cannot sign; it is dropped on
+// its own and the item still imports.
+#[test]
+fn cxf_skips_a_bad_passkey_but_imports_the_item() {
+    let json = br#"{"version":{"major":1,"minor":0},"accounts":[{"items":[
+      {"id":"aQ","title":"Acme","credentials":[
+        {"type":"basic-auth","username":{"fieldType":"string","value":"alice"}},
+        {"type":"passkey","rpId":"acme.test","username":"alice","key":"cGsx"},
+        {"type":"passkey","credentialId":"Y3JlZDI","rpId":"acme.test","key":"cGsy"}
+      ]}
+    ]}]}"#;
+    let r = parse(Format::Cxf, json);
+    assert_eq!(r.entries.len(), 1);
+    assert_eq!(r.entries[0].username.as_deref(), Some("alice"));
+    assert_eq!(r.entries[0].passkeys.len(), 1);
+    assert_eq!(r.entries[0].passkeys[0].credential_id, "Y3JlZDI");
+    assert_eq!(r.errors.len(), 1);
+    assert_eq!(r.errors[0].row, 1);
+    assert!(r.errors[0].message.contains("passkey"));
+}
+
+// Older drafts wrote bare strings where 1.0 wraps values in an EditableField,
+// and kept `urls` on the item rather than under `scope`.
+#[test]
+fn cxf_accepts_bare_field_values_and_item_level_urls() {
+    let json = br#"{"version":{"major":1,"minor":0},"accounts":[{"items":[
+      {"id":"aQ","title":"Acme","urls":["https://acme.test"],"credentials":[
+        {"type":"basic-auth","username":"alice","password":"pw"}
+      ]}
+    ]}]}"#;
+    let r = parse(Format::Cxf, json);
+    assert!(r.errors.is_empty());
+    assert_eq!(r.entries[0].username.as_deref(), Some("alice"));
+    assert_eq!(r.entries[0].password.as_deref(), Some("pw"));
+    assert_eq!(r.entries[0].url.as_deref(), Some("https://acme.test"));
+}
+
+#[test]
+fn cxf_export_writes_a_version_1_0_document() {
+    let bytes = to_cxf_json(&login_with_passkeys()).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(out["version"]["major"], 1);
+    assert_eq!(out["version"]["minor"], 0);
+    assert_eq!(out["exporterDisplayName"], crate::app::APP_NAME);
+    assert_eq!(out["exporterRpId"], super::export::EXPORTER_RP_ID);
+    assert!(out["timestamp"].is_i64());
+
+    let creds = &out["accounts"][0]["items"][0]["credentials"];
+    assert_eq!(creds[0]["type"], "basic-auth");
+    // An absent value is an absent member, not an empty one.
+    assert!(creds[0].get("password").is_none());
+    assert_eq!(creds[1]["type"], "passkey");
+    assert_eq!(creds[1]["credentialId"], "Y3JlZDE");
+    assert_eq!(creds[1]["key"], "cGsx");
+    assert_eq!(creds[1]["userHandle"], "dWgx");
+}
+
+// Export -> import round-trips everything CXF can carry. `counter` and
+// `rp_name` have no home in the format, so they come back at their defaults.
+#[test]
+fn round_trip_cxf() {
+    let entries = vec![
+        ImportedEntry {
+            kind: EntryKind::Login,
+            title: "Acme".into(),
+            username: Some("neo".into()),
+            password: Some("trinity".into()),
+            url: Some("https://acme.test".into()),
+            notes: Some("hi".into()),
+            otp: Some("SEED".into()),
+            tags: vec!["Work".into()],
+            passkeys: vec![passkey()],
+            ..Default::default()
+        },
+        ImportedEntry {
+            kind: EntryKind::Card,
+            title: "Visa".into(),
+            notes: Some("spare".into()),
+            card_number: Some("4111".into()),
+            card_month: Some("01".into()),
+            card_year: Some("2030".into()),
+            card_cvc: Some("123".into()),
+            cardholder: Some("Neo".into()),
+            ..Default::default()
+        },
+        ImportedEntry {
+            kind: EntryKind::Note,
+            title: "Secret".into(),
+            notes: Some("body".into()),
+            ..Default::default()
+        },
+    ];
+    let bytes = to_cxf_json(&entries).unwrap();
+    let back = parse(Format::Cxf, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries.len(), 3);
+
+    let expected: Vec<ImportedEntry> = entries
+        .iter()
+        .cloned()
+        .map(|mut e| {
+            for p in &mut e.passkeys {
+                p.rp_name = None;
+                p.counter = 0;
+                // The item is dated at export time, and its passkeys with it.
+                p.created_at = None;
+            }
+            e
+        })
+        .collect();
+    let actual: Vec<ImportedEntry> = back
+        .entries
+        .into_iter()
+        .map(|mut e| {
+            for p in &mut e.passkeys {
+                assert!(p.created_at.is_some());
+                p.created_at = None;
+            }
+            e
+        })
+        .collect();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn from_name_resolves_cxf() {
+    assert_eq!(Format::from_name("cxf"), Some(Format::Cxf));
+    assert_eq!(Format::from_name("CXF"), Some(Format::Cxf));
+    assert_eq!(Format::from_name("fido"), Some(Format::Cxf));
+    assert_eq!(Format::from_name("nope"), None);
+}
+
+// Both formats are JSON objects, so the sniff has to look inside: CXF declares
+// a `version` object and an `accounts` array, Bitwarden neither.
+#[test]
+fn detect_tells_cxf_from_bitwarden_json() {
+    let cxf = br#"{"version":{"major":1,"minor":0},"accounts":[]}"#;
+    assert_eq!(detect("export.json", cxf), Some(Format::Cxf));
+    assert_eq!(detect("noext", cxf), Some(Format::Cxf));
+    assert_eq!(
+        detect("bw.json", br#"{"encrypted":false,"items":[]}"#),
+        Some(Format::Bitwarden)
+    );
+    // `accounts` alone (or an unparseable file) is not enough.
+    assert_eq!(
+        detect("x.json", br#"{"accounts":[]}"#),
+        Some(Format::Bitwarden)
+    );
+    assert_eq!(detect("broken.json", b"{not json"), Some(Format::Bitwarden));
 }
 
 #[test]

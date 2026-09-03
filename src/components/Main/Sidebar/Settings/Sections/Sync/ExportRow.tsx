@@ -8,13 +8,14 @@ import SettingsRow from '@/components/elements/SettingsRow'
 
 const FORMATS: { value: ExportFormat; label: TKey }[] = [
   { value: 'bitwarden', label: 'Bitwarden (JSON)' },
+  { value: 'cxf', label: 'FIDO Credential Exchange (CXF)' },
   { value: 'csv', label: 'Generic CSV' }
 ]
 
 const fileName = (path: string) => path.replace(/^.*[\\/]/, '')
 
-// A portable, unencrypted dump. CSV cells are sanitized against formula
-// injection in the backend.
+// A portable, unencrypted dump — the one warning covers every format offered
+// here. CSV cells are sanitized against formula injection in the backend.
 export default function ExportRow() {
   const { t } = useTranslation()
   const [format, setFormat] = useState<ExportFormat>('bitwarden')
@@ -36,7 +37,7 @@ export default function ExportRow() {
   return (
     <SettingsRow
       label={t('Portable export')}
-      description={t('Bitwarden JSON or generic CSV, unencrypted')}
+      description={t('Bitwarden JSON, FIDO CXF or generic CSV, unencrypted')}
       control={
         <div className="flex items-center gap-2">
           <Select
@@ -44,7 +45,7 @@ export default function ExportRow() {
             value={format}
             disabled={running}
             onChange={e => setFormat(e.target.value as ExportFormat)}
-            className="w-[172px]"
+            className="w-[228px]"
           >
             {FORMATS.map(f => (
               <option key={f.value} value={f.value}>

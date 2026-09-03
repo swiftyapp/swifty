@@ -10,6 +10,7 @@
 
 mod bitwarden;
 mod csv;
+mod cxf;
 pub mod export;
 
 #[cfg(test)]
@@ -107,6 +108,7 @@ pub trait Importer {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
     Bitwarden,
+    Cxf, // FIDO Credential Exchange Format — the other JSON shape we read
     GenericCsv,
     BrowserCsv, // Chrome / Safari share a header-aliased shape
     LastpassCsv,
@@ -118,6 +120,7 @@ impl Format {
     pub fn from_name(name: &str) -> Option<Format> {
         match name.trim().to_lowercase().as_str() {
             "bitwarden" => Some(Format::Bitwarden),
+            "cxf" | "fido" => Some(Format::Cxf),
             "csv" | "generic" | "generic_csv" => Some(Format::GenericCsv),
             "chrome" | "safari" | "browser" | "browser_csv" => Some(Format::BrowserCsv),
             "lastpass" | "lastpass_csv" => Some(Format::LastpassCsv),
@@ -130,6 +133,7 @@ impl Format {
     pub fn importer(self) -> Box<dyn Importer> {
         match self {
             Format::Bitwarden => Box::new(bitwarden::Bitwarden),
+            Format::Cxf => Box::new(cxf::Cxf),
             Format::GenericCsv => Box::new(csv::GenericCsv),
             Format::BrowserCsv => Box::new(csv::BrowserCsv),
             Format::LastpassCsv => Box::new(csv::LastpassCsv),
@@ -143,19 +147,35 @@ impl Format {
 pub fn detect(name: &str, bytes: &[u8]) -> Option<Format> {
     let lower = name.to_lowercase();
     if lower.ends_with(".json") {
-        return Some(Format::Bitwarden);
+        return Some(detect_json(bytes));
     }
     if lower.ends_with(".csv") {
         return Some(detect_csv(bytes));
     }
     // Fall back to content sniffing when the extension is unhelpful.
     if bytes.iter().find(|b| !b.is_ascii_whitespace()) == Some(&b'{') {
-        return Some(Format::Bitwarden);
+        return Some(detect_json(bytes));
     }
     if !bytes.is_empty() {
         return Some(detect_csv(bytes));
     }
     None
+}
+
+// Both JSON formats we read are top-level objects; CXF is the one that declares
+// a `version` object and an `accounts` array. Parsed once, then thrown away —
+// an explicit choice from the UI skips this entirely.
+fn detect_json(bytes: &[u8]) -> Format {
+    let Ok(doc) = serde_json::from_slice::<serde_json::Value>(bytes) else {
+        return Format::Bitwarden;
+    };
+    let cxf = doc.get("accounts").is_some_and(serde_json::Value::is_array)
+        && doc.get("version").is_some_and(serde_json::Value::is_object);
+    if cxf {
+        Format::Cxf
+    } else {
+        Format::Bitwarden
+    }
 }
 
 // Pick a CSV dialect from the header row's column names.
