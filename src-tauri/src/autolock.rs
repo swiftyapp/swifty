@@ -1,13 +1,21 @@
 use crate::error::Result;
 use crate::state::AppState;
+use crate::timer::Timer;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
+// A day. The row offers far less, but the command is reachable from the
+// frontend, and a timeout measured in years is indistinguishable from "never" —
+// which is not a setting a password manager should be talked into.
+const MAX_TIMEOUT_SECS: u64 = 24 * 60 * 60;
 
 pub struct AutoLock {
-    generation: AtomicU64,
+    /// The pending lock. One timer for the whole process: a blur re-arms it and
+    /// a focus disarms it, so alt-tabbing cannot pile up pending locks.
+    timer: Arc<Timer>,
     /// Idle seconds before an unfocused, unlocked vault seals itself. Set from
     /// the frontend on unlock and whenever the Settings row changes, so the
     /// value the user picked survives a focus cycle without a restart.
@@ -17,7 +25,7 @@ pub struct AutoLock {
 impl Default for AutoLock {
     fn default() -> Self {
         Self {
-            generation: AtomicU64::new(0),
+            timer: Timer::spawn(),
             timeout_secs: AtomicU64::new(DEFAULT_TIMEOUT_SECS),
         }
     }
@@ -25,17 +33,20 @@ impl Default for AutoLock {
 
 #[tauri::command]
 pub fn set_autolock_timeout(app: AppHandle, secs: u64) -> Result<()> {
-    app.state::<AutoLock>()
+    let autolock = app.state::<AutoLock>();
+    autolock
         .timeout_secs
-        .store(secs.max(1), Ordering::SeqCst);
+        .store(secs.clamp(1, MAX_TIMEOUT_SECS), Ordering::SeqCst);
+    // Anything already pending was armed against the old value; the next blur
+    // arms against the new one.
+    autolock.timer.disarm();
     Ok(())
 }
 
 pub fn handle_event(app: &AppHandle, event: &WindowEvent) {
     if let WindowEvent::Focused(focused) = event {
-        let autolock = app.state::<AutoLock>();
         if *focused {
-            autolock.generation.fetch_add(1, Ordering::SeqCst);
+            app.state::<AutoLock>().timer.disarm();
         } else {
             arm(app);
         }
@@ -53,15 +64,9 @@ fn arm(app: &AppHandle) {
         return;
     }
     let state = app.state::<AutoLock>();
-    let generation = state.generation.fetch_add(1, Ordering::SeqCst) + 1;
     let timeout = Duration::from_secs(state.timeout_secs.load(Ordering::SeqCst));
     let app = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(timeout);
-        if app.state::<AutoLock>().generation.load(Ordering::SeqCst) == generation {
-            lock(&app);
-        }
-    });
+    state.timer.arm(timeout, move || lock(&app));
 }
 
 pub fn lock(app: &AppHandle) {
