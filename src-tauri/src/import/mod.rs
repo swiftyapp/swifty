@@ -23,6 +23,7 @@ pub enum EntryKind {
     Login,
     Note,
     Card,
+    Identity,
 }
 
 impl EntryKind {
@@ -31,6 +32,7 @@ impl EntryKind {
             EntryKind::Login => "login",
             EntryKind::Note => "note",
             EntryKind::Card => "card",
+            EntryKind::Identity => "identity",
         }
     }
 }
@@ -54,6 +56,13 @@ pub struct ImportedEntry {
     pub card_year: Option<String>,
     pub card_cvc: Option<String>,
     pub cardholder: Option<String>,
+    // ID-document fields (only meaningful when kind == Identity). Only the four
+    // a foreign format can actually carry — the rest of the document (dates,
+    // authority, nationality) has nowhere to go in Bitwarden or CXF.
+    pub doc_type: Option<String>,
+    pub doc_number: Option<String>,
+    pub doc_country: Option<String>,
+    pub holder_name: Option<String>,
     // WebAuthn passkeys (only meaningful when kind == Login). Empty when the
     // source format carries none, which is the case for every CSV dialect.
     pub passkeys: Vec<ImportedPasskey>,

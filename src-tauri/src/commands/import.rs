@@ -231,6 +231,15 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
         cvc: None,
         pin: None,
         name: None,
+        doc_type: None,
+        country: None,
+        nationality: None,
+        birth_date: None,
+        sex: None,
+        issue_date: None,
+        expiry_date: None,
+        authority: None,
+        personal_number: None,
         tags: (!imp.tags.is_empty()).then(|| imp.tags.clone()),
         // Set below for logins only; stays None so a passkey-less entry
         // serializes exactly as it did before passkeys existed.
@@ -257,6 +266,12 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
             e.cvc = imp.card_cvc.clone();
             e.name = imp.cardholder.clone();
         }
+        EntryKind::Identity => {
+            e.doc_type = imp.doc_type.clone();
+            e.number = imp.doc_number.clone();
+            e.country = imp.doc_country.clone();
+            e.name = imp.holder_name.clone();
+        }
         EntryKind::Note => {}
     }
     e
@@ -267,8 +282,12 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
     let kind = match e.kind.as_str() {
         "note" => EntryKind::Note,
         "card" => EntryKind::Card,
+        "identity" => EntryKind::Identity,
         _ => EntryKind::Login,
     };
+    // `number` and `name` are shared slots, so they are only read into the
+    // identity columns for an identity — a card must not export as one.
+    let identity = kind == EntryKind::Identity;
     ImportedEntry {
         kind,
         title: e.title.clone(),
@@ -278,11 +297,15 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
         notes: e.note.clone(),
         otp: e.otp.clone(),
         tags: e.tags.clone().unwrap_or_default(),
-        card_number: e.number.clone(),
+        card_number: (!identity).then(|| e.number.clone()).flatten(),
         card_month: e.month.clone(),
         card_year: e.year.clone(),
         card_cvc: e.cvc.clone(),
-        cardholder: e.name.clone(),
+        cardholder: (!identity).then(|| e.name.clone()).flatten(),
+        doc_type: e.doc_type.clone(),
+        doc_number: identity.then(|| e.number.clone()).flatten(),
+        doc_country: e.country.clone(),
+        holder_name: identity.then(|| e.name.clone()).flatten(),
         passkeys: e
             .passkeys
             .as_deref()

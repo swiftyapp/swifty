@@ -99,6 +99,53 @@ fn obscure_expose_round_trip() {
     assert_eq!(exposed.otp.as_deref(), Some("SEED"));
 }
 
+// An identity's document number and personal number are its secrets; the rest
+// of the document (dates, authority, country) is not.
+#[test]
+fn identity_obscures_only_its_numbers() {
+    let cryptor = Cryptor::new(&hash_secret("master-pw"));
+    let entry: Entry = serde_json::from_value(serde_json::json!({
+        "id": "1", "type": "identity", "title": "Passport",
+        "doc_type": "passport", "name": "ADA LOVELACE", "number": "X1234567",
+        "personal_number": "99-1815", "country": "GBR", "expiry_date": "2035-06-01"
+    }))
+    .unwrap();
+
+    let obscured = cryptor.obscure(&entry).unwrap();
+    assert_ne!(obscured.number.as_deref(), Some("X1234567"));
+    assert!(obscured.personal_number.as_ref().unwrap().len() > 32);
+    assert_eq!(obscured.name.as_deref(), Some("ADA LOVELACE"));
+    assert_eq!(obscured.expiry_date.as_deref(), Some("2035-06-01"));
+
+    let exposed = cryptor.expose(&obscured).unwrap();
+    assert_eq!(exposed.number.as_deref(), Some("X1234567"));
+    assert_eq!(exposed.personal_number.as_deref(), Some("99-1815"));
+}
+
+// Re-encrypting only what changed has to visit the identity slots in the same
+// order `transform` does, or a saved edit swaps the two numbers' ciphertexts.
+#[test]
+fn identity_keeps_unchanged_ciphertext_on_save() {
+    let cryptor = Cryptor::new(&hash_secret("master-pw"));
+    let plain: Entry = serde_json::from_value(serde_json::json!({
+        "id": "1", "type": "identity", "title": "Passport",
+        "number": "X1234567", "personal_number": "99-1815"
+    }))
+    .unwrap();
+    let stored = cryptor.obscure(&plain).unwrap();
+
+    // The editor sends plaintext for what it changed and the stored ciphertext
+    // for what it did not.
+    let mut next = stored.clone();
+    next.personal_number = Some("00-2024".into());
+    let saved = cryptor.obscure_changed(&next, Some(&stored)).unwrap();
+
+    assert_eq!(saved.number, stored.number);
+    let exposed = cryptor.expose(&saved).unwrap();
+    assert_eq!(exposed.number.as_deref(), Some("X1234567"));
+    assert_eq!(exposed.personal_number.as_deref(), Some("00-2024"));
+}
+
 #[test]
 fn empty_sensitive_fields_stay_empty() {
     let cryptor = Cryptor::new(&hash_secret("master-pw"));

@@ -1,6 +1,7 @@
 export { FieldsProvider, useField, useFields, type FieldsState } from './context'
 export { default as Field } from './Field'
 export { default as FieldRow } from './Row'
+export { default as DateField } from './DateField'
 export { default as EmailField } from './EmailField'
 export { default as NoteField } from './NoteField'
 export { default as OtpField } from './Otp'

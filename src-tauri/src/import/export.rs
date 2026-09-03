@@ -22,6 +22,7 @@ fn bw_type(kind: EntryKind) -> u8 {
         EntryKind::Login => 1,
         EntryKind::Note => 2,
         EntryKind::Card => 3,
+        EntryKind::Identity => 4,
     }
 }
 
@@ -59,6 +60,18 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
                         "code": e.card_cvc,
                     });
                 }
+                EntryKind::Identity => {
+                    let (first, last) = split_name(e.holder_name.as_deref());
+                    let mut identity = json!({
+                        "firstName": first,
+                        "lastName": last,
+                        "country": e.doc_country,
+                    });
+                    // Bitwarden holds exactly two document numbers, so the
+                    // document's own type picks which slot this one goes in.
+                    identity[license_slot(e)] = json!(e.doc_number);
+                    item["identity"] = identity;
+                }
                 EntryKind::Note => {}
             }
             item
@@ -76,6 +89,31 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
         folders: vec![],
         items,
     })
+}
+
+/// Which of Bitwarden's two document-number members carries this document.
+fn license_slot(e: &ImportedEntry) -> &'static str {
+    if e.doc_type.as_deref() == Some("driver_license") {
+        "licenseNumber"
+    } else {
+        "passportNumber"
+    }
+}
+
+/// A full name split into Bitwarden's first/last pair: first word against the
+/// rest. Lossy by nature — "ADA KING LOVELACE" cannot say which part is which —
+/// so the app keeps the whole name and only the export is split.
+fn split_name(name: Option<&str>) -> (Option<String>, Option<String>) {
+    let Some(name) = name.map(str::trim).filter(|n| !n.is_empty()) else {
+        return (None, None);
+    };
+    match name.split_once(char::is_whitespace) {
+        Some((first, rest)) => (
+            Some(first.to_owned()),
+            Some(rest.trim_start().to_owned()).filter(|r| !r.is_empty()),
+        ),
+        None => (Some(name.to_owned()), None),
+    }
 }
 
 /// One Bitwarden `fido2Credentials` element. Every value is a string there,
@@ -172,7 +210,11 @@ fn cxf_item(e: &ImportedEntry) -> Value {
             );
             credentials.push(card);
         }
-        EntryKind::Note => {}
+        // CXF has purpose-built `passport`/`drivers-license`/`identity-document`
+        // credentials, but nothing that covers all five document types the app
+        // holds; until they are mapped one by one, an identity exports as its
+        // title and note like a secure note does.
+        EntryKind::Identity | EntryKind::Note => {}
     }
     if let Some(notes) = &e.notes {
         credentials.push(json!({ "type": "note", "content": editable_value("string", notes) }));
@@ -268,6 +310,10 @@ const COLUMNS: &[&str] = &[
     "card_year",
     "card_cvc",
     "cardholder",
+    "doc_type",
+    "doc_number",
+    "doc_country",
+    "holder_name",
     "tags",
 ];
 
@@ -289,6 +335,10 @@ pub fn to_generic_csv(entries: &[ImportedEntry]) -> csv::Result<Vec<u8>> {
             e.card_year.clone().unwrap_or_default(),
             e.card_cvc.clone().unwrap_or_default(),
             e.cardholder.clone().unwrap_or_default(),
+            e.doc_type.clone().unwrap_or_default(),
+            e.doc_number.clone().unwrap_or_default(),
+            e.doc_country.clone().unwrap_or_default(),
+            e.holder_name.clone().unwrap_or_default(),
             e.tags.join(";"),
         ];
         wtr.write_record(row.iter().map(|c| sanitize_cell(c)))?;

@@ -39,6 +39,7 @@ describe('add a secret', () => {
     expect(dialog.getByTestId('add-kind-login')).toHaveTextContent('Login')
     expect(dialog.getByTestId('add-kind-card')).toHaveTextContent('Credit card')
     expect(dialog.getByTestId('add-kind-note')).toHaveTextContent('Secure note')
+    expect(dialog.getByTestId('add-kind-identity')).toHaveTextContent('Identity')
     // Each tile also carries the kind's one-line description.
     expect(dialog.getByTestId('add-kind-login')).toHaveTextContent('Passwords for apps & sites')
   })
@@ -61,9 +62,12 @@ describe('add a secret', () => {
     expect(screen.getByTestId('add-kind-login')).toHaveFocus()
     await userEvent.keyboard('{ArrowRight}')
     expect(screen.getByTestId('add-kind-card')).toHaveFocus()
-    // Two columns, three tiles: down from the second lands on the first again.
+    // Two columns: down from the second tile lands on the fourth.
     await userEvent.keyboard('{ArrowDown}')
-    expect(screen.getByTestId('add-kind-login')).toHaveFocus()
+    expect(screen.getByTestId('add-kind-identity')).toHaveFocus()
+    // And wraps from there back to the top of its own column.
+    await userEvent.keyboard('{ArrowDown}')
+    expect(screen.getByTestId('add-kind-card')).toHaveFocus()
   })
 
   it('picks the nth kind by digit', async () => {

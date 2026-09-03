@@ -31,11 +31,56 @@ const note = (overrides: Partial<EntryDraft> = {}): EntryDraft => ({
   ...overrides
 })
 
+// Everything a passport requires, which is the type a new identity starts as.
+const identity = (overrides: Partial<EntryDraft> = {}): EntryDraft => ({
+  type: 'identity',
+  title: 'UK Passport',
+  doc_type: 'passport',
+  name: 'ADA LOVELACE',
+  number: 'X1234567',
+  country: 'GBR',
+  expiry_date: '2035-06-01',
+  ...overrides
+})
+
 describe('isValid', () => {
   it('accepts a complete draft of every kind', () => {
     expect(kindOf('login').isValid(login())).toBe(true)
     expect(kindOf('card').isValid(card())).toBe(true)
     expect(kindOf('note').isValid(note())).toBe(true)
+    expect(kindOf('identity').isValid(identity())).toBe(true)
+  })
+
+  // Which fields an identity must have is the document's business, not the
+  // kind's: a licence is void without an expiry date, an ID card is not.
+  it('holds an identity to its own document type’s required fields', () => {
+    expect(kindOf('identity').isValid(identity({ number: '' }))).toBe(false)
+    expect(kindOf('identity').isValid(identity({ country: '' }))).toBe(false)
+    expect(kindOf('identity').isValid(identity({ expiry_date: '' }))).toBe(false)
+
+    // An ID card asks for no expiry date, so the same draft passes.
+    expect(
+      kindOf('identity').isValid(identity({ doc_type: 'id_card', expiry_date: '' }))
+    ).toBe(true)
+    // A licence asks for one again.
+    expect(
+      kindOf('identity').isValid(identity({ doc_type: 'driver_license', expiry_date: '' }))
+    ).toBe(false)
+    // "Other" asks only for a name and a number.
+    expect(
+      kindOf('identity').isValid(
+        identity({ doc_type: 'other', country: '', expiry_date: '' })
+      )
+    ).toBe(true)
+  })
+
+  // An unknown type still has to render and save as something, so it reads as
+  // the passport a new identity starts from.
+  it('falls back to the passport template on an unknown document type', () => {
+    expect(kindOf('identity').isValid(identity({ doc_type: 'spaceship' }))).toBe(true)
+    expect(
+      kindOf('identity').isValid(identity({ doc_type: 'spaceship', expiry_date: '' }))
+    ).toBe(false)
   })
 
   // A field holding only spaces reads as empty and saves as empty, so it is
@@ -47,6 +92,8 @@ describe('isValid', () => {
     expect(kindOf('card').isValid(card({ number: '  ' }))).toBe(false)
     expect(kindOf('card').isValid(card({ month: ' ' }))).toBe(false)
     expect(kindOf('note').isValid(note({ note: '  \n ' }))).toBe(false)
+    expect(kindOf('identity').isValid(identity({ name: ' ' }))).toBe(false)
+    expect(kindOf('identity').isValid(identity({ number: '\t' }))).toBe(false)
   })
 
   it('holds the login to the email complaint the row already shows', () => {

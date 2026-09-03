@@ -7,6 +7,8 @@ export {
   createLogin,
   createCard,
   createNote,
+  createIdentity,
+  pickDocType,
   entryItems,
   visibleTitles,
   expectTitles,
@@ -15,4 +17,6 @@ export {
   type LoginFields,
   type CardFields,
   type NoteFields,
+  type IdentityFields,
+  type DocType,
 } from "./entries";

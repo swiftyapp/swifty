@@ -115,6 +115,66 @@ describe('Type-aware fields', () => {
     expect(saveEntry).not.toHaveBeenCalled()
   })
 
+  // The identity form is cut from its document's template, so the rows on
+  // screen are the document's — and switching the document swaps them.
+  it('renders the rows the chosen document has, and only those', async () => {
+    renderWithStore(<Show type="identity" editing />)
+
+    expect(screen.getByLabelText('Full name')).toBe(input('name'))
+    expect(screen.getByLabelText('Document number')).toBe(input('number'))
+    expect(screen.getByLabelText('Nationality')).toBe(input('nationality'))
+    expect(screen.getByLabelText('Personal number')).toBe(input('personal_number'))
+
+    await userEvent.click(screen.getByTestId('identity-doc-type-driver_license'))
+
+    // A licence has neither, and says so by not offering them.
+    expect(screen.queryByLabelText('Nationality')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Personal number')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Document number')).toBe(input('number'))
+  })
+
+  it('clears what the new document type has no room for', async () => {
+    renderWithStore(<Show type="identity" editing />)
+    await userEvent.type(input('title'), 'Ada')
+    await userEvent.type(input('name'), 'ADA LOVELACE')
+    await userEvent.type(input('number'), 'X1234567')
+    await userEvent.type(input('country'), 'GBR')
+    await userEvent.type(input('nationality'), 'GBR')
+    await userEvent.type(input('expiry_date'), '06/01/2035')
+
+    await userEvent.click(screen.getByTestId('identity-doc-type-driver_license'))
+    await userEvent.click(screen.getByText('Save'))
+
+    // Nothing invisible rides along: the licence saves without the nationality
+    // the passport form had collected.
+    expect(saveEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'identity',
+        doc_type: 'driver_license',
+        number: 'X1234567',
+        nationality: ''
+      })
+    )
+  })
+
+  it('stores a date as ISO and reads it back in the user’s pattern', async () => {
+    renderWithStore(<Show type="identity" editing />)
+    await userEvent.type(input('title'), 'Ada')
+    await userEvent.type(input('name'), 'ADA LOVELACE')
+    await userEvent.type(input('number'), 'X1234567')
+    await userEvent.type(input('country'), 'GBR')
+    await userEvent.type(input('expiry_date'), '6/1/2035')
+
+    // Normalization lands on blur, like the URL row's.
+    await userEvent.tab()
+    expect(input('expiry_date').value).toBe('06/01/2035')
+
+    await userEvent.click(screen.getByText('Save'))
+    expect(saveEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ expiry_date: '2035-06-01' })
+    )
+  })
+
   it('takes an otpauth:// link and keeps only the secret inside it', async () => {
     renderWithStore(<Show type="login" editing />)
     await userEvent.click(input('otp'))

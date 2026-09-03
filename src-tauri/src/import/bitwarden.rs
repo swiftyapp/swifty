@@ -1,5 +1,5 @@
 //! Bitwarden unencrypted JSON export (`{"items":[...]}`). Item `type` is 1=login,
-//! 2=secure note, 3=card, 4=identity. We map 1/2/3; anything else is a row error.
+//! 2=secure note, 3=card, 4=identity. We map 1/2/3/4; anything else is a row error.
 
 use serde::Deserialize;
 
@@ -30,6 +30,8 @@ struct Item {
     login: Option<Login>,
     #[serde(default)]
     card: Option<Card>,
+    #[serde(default)]
+    identity: Option<Identity>,
 }
 
 #[derive(Deserialize)]
@@ -142,6 +144,39 @@ struct Card {
     code: Option<String>,
 }
 
+// Bitwarden's identity item is a whole address book; only the four members the
+// app has somewhere to put are read. Two document numbers, so which one is set
+// is also what says whether this is a licence or a passport.
+#[derive(Default, Deserialize)]
+struct Identity {
+    #[serde(default, rename = "firstName")]
+    first_name: Option<String>,
+    #[serde(default, rename = "middleName")]
+    middle_name: Option<String>,
+    #[serde(default, rename = "lastName")]
+    last_name: Option<String>,
+    #[serde(default)]
+    country: Option<String>,
+    #[serde(default, rename = "passportNumber")]
+    passport_number: Option<String>,
+    #[serde(default, rename = "licenseNumber")]
+    license_number: Option<String>,
+}
+
+impl Identity {
+    // The app keeps one full name, so the three parts are joined back up in
+    // reading order — the inverse of the split the exporter does.
+    fn full_name(&self) -> Option<String> {
+        let parts: Vec<&str> = [&self.first_name, &self.middle_name, &self.last_name]
+            .iter()
+            .filter_map(|p| p.as_deref())
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+            .collect();
+        (!parts.is_empty()).then(|| parts.join(" "))
+    }
+}
+
 impl Importer for Bitwarden {
     fn parse(&self, bytes: &[u8]) -> ImportResult {
         let mut result = ImportResult::default();
@@ -210,6 +245,28 @@ impl Importer for Bitwarden {
                         card_year: opt(card.exp_year),
                         card_cvc: opt(card.code),
                         cardholder: opt(card.cardholder_name),
+                        ..Default::default()
+                    });
+                }
+                4 => {
+                    let identity = item.identity.unwrap_or_default();
+                    // A licence number says "driver_license"; anything else —
+                    // including an item with neither number — is a passport,
+                    // which is what Bitwarden's own field is named after.
+                    let licence = opt(identity.license_number.clone());
+                    let doc_type = if licence.is_some() {
+                        "driver_license"
+                    } else {
+                        "passport"
+                    };
+                    result.entries.push(ImportedEntry {
+                        kind: EntryKind::Identity,
+                        title,
+                        notes: opt(item.notes),
+                        doc_type: Some(doc_type.to_owned()),
+                        doc_number: licence.or_else(|| opt(identity.passport_number.clone())),
+                        doc_country: opt(identity.country.clone()),
+                        holder_name: identity.full_name(),
                         ..Default::default()
                     });
                 }
