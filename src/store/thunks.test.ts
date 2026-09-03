@@ -10,7 +10,7 @@ import {
   lockVault
 } from './index'
 import { saveEntry as saveEntryCmd, toEntryMeta, syncNow } from '@/lib/commands'
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta, Passkey } from '@/lib/commands'
 
 const meta = (id: string, title = id): EntryMeta =>
   ({ id, type: 'login', title, tags: [], urlHost: '', favorite: false })
@@ -76,6 +76,29 @@ describe('saveEntry', () => {
 
     expect(store.getState().filters.type).toBe('login')
     expect(store.getState().entries.current?.title).toBe('New')
+  })
+
+  // A draft spread from a revealed login carries its passkeys, and they reach
+  // the backend untouched — while staying out of the list metadata.
+  it('carries a login draft passkeys through to the backend', async () => {
+    const store = makeStore()
+    const passkeys: Passkey[] = [
+      {
+        credentialId: 'Y3JlZDE',
+        rpId: 'acme.test',
+        userHandle: 'dWgx',
+        userName: 'alice',
+        userDisplayName: 'Alice',
+        privateKey: 'cGsx',
+        counter: 0
+      }
+    ]
+
+    await saveEntry({ type: 'login', title: 'Acme', username: 'u', password: 'p', passkeys })
+
+    const saved = vi.mocked(saveEntryCmd).mock.calls[0][0]
+    expect(saved.type === 'login' && saved.passkeys).toEqual(passkeys)
+    expect(store.getState().entries.items[0]).not.toHaveProperty('passkeys')
   })
 })
 

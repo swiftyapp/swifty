@@ -3,9 +3,14 @@
 
 use serde::Deserialize;
 
-use super::{EntryKind, ImportResult, ImportedEntry, Importer};
+use super::{EntryKind, ImportResult, ImportedEntry, ImportedPasskey, Importer};
 
 pub struct Bitwarden;
+
+/// The only passkey shape we support, on the way in and on the way out.
+pub const KEY_TYPE: &str = "public-key";
+pub const KEY_ALGORITHM: &str = "ECDSA";
+pub const KEY_CURVE: &str = "P-256";
 
 #[derive(Deserialize)]
 struct Export {
@@ -37,6 +42,84 @@ struct Login {
     totp: Option<String>,
     #[serde(default)]
     uris: Vec<Uri>,
+    #[serde(default, rename = "fido2Credentials")]
+    fido2_credentials: Vec<Fido2Credential>,
+}
+
+// Every value in a Bitwarden fido2Credentials element is a JSON string,
+// `counter` included — but a number is accepted too, so one odd producer
+// cannot fail the whole file.
+#[derive(Deserialize)]
+struct Fido2Credential {
+    #[serde(default, rename = "credentialId")]
+    credential_id: Option<String>,
+    #[serde(default, rename = "keyAlgorithm")]
+    key_algorithm: Option<String>,
+    #[serde(default, rename = "keyCurve")]
+    key_curve: Option<String>,
+    #[serde(default, rename = "keyValue")]
+    key_value: Option<String>,
+    #[serde(default, rename = "rpId")]
+    rp_id: Option<String>,
+    #[serde(default, rename = "rpName")]
+    rp_name: Option<String>,
+    #[serde(default, rename = "userHandle")]
+    user_handle: Option<String>,
+    #[serde(default, rename = "userName")]
+    user_name: Option<String>,
+    #[serde(default, rename = "userDisplayName")]
+    user_display_name: Option<String>,
+    #[serde(default)]
+    counter: Option<serde_json::Value>,
+    #[serde(default, rename = "creationDate")]
+    creation_date: Option<String>,
+}
+
+impl Fido2Credential {
+    // Absent algorithm/curve means "the default", which is the only one we
+    // support; a stated one that differs is a credential we cannot use. Nor is
+    // one missing its id, relying party or key — there is nothing to sign with.
+    fn is_usable(&self) -> bool {
+        let ok = |v: &Option<String>, want: &str| match v.as_deref() {
+            Some(v) => v == want,
+            None => true,
+        };
+        let present = |v: &Option<String>| v.as_deref().is_some_and(|s| !s.is_empty());
+        ok(&self.key_algorithm, KEY_ALGORITHM)
+            && ok(&self.key_curve, KEY_CURVE)
+            && present(&self.credential_id)
+            && present(&self.rp_id)
+            && present(&self.key_value)
+    }
+
+    // A missing or non-numeric counter starts the credential at zero rather
+    // than failing the import.
+    fn counter(&self) -> u32 {
+        match &self.counter {
+            Some(serde_json::Value::String(s)) => s.parse().unwrap_or(0),
+            Some(serde_json::Value::Number(n)) => {
+                n.as_u64().and_then(|n| n.try_into().ok()).unwrap_or(0)
+            }
+            _ => 0,
+        }
+    }
+}
+
+impl From<Fido2Credential> for ImportedPasskey {
+    fn from(c: Fido2Credential) -> Self {
+        let counter = c.counter();
+        ImportedPasskey {
+            credential_id: c.credential_id.unwrap_or_default(),
+            rp_id: c.rp_id.unwrap_or_default(),
+            rp_name: opt(c.rp_name),
+            user_handle: c.user_handle.unwrap_or_default(),
+            user_name: c.user_name.unwrap_or_default(),
+            user_display_name: c.user_display_name.unwrap_or_default(),
+            private_key: c.key_value.unwrap_or_default(),
+            counter,
+            created_at: opt(c.creation_date),
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -80,7 +163,18 @@ impl Importer for Bitwarden {
                         password: None,
                         totp: None,
                         uris: vec![],
+                        fido2_credentials: vec![],
                     });
+                    // An unusable credential is dropped on its own — the login
+                    // and its other passkeys still import.
+                    let mut passkeys = Vec::new();
+                    for cred in login.fido2_credentials {
+                        if cred.is_usable() {
+                            passkeys.push(cred.into());
+                        } else {
+                            result.push_err(row, "unsupported or incomplete passkey");
+                        }
+                    }
                     result.entries.push(ImportedEntry {
                         kind: EntryKind::Login,
                         title,
@@ -89,6 +183,7 @@ impl Importer for Bitwarden {
                         url: login.uris.into_iter().find_map(|u| opt(u.uri)),
                         notes: opt(item.notes),
                         otp: opt(login.totp),
+                        passkeys,
                         ..Default::default()
                     });
                 }

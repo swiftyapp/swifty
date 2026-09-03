@@ -23,7 +23,7 @@ export const emailError = (value: string): string =>
  * What every kind's `isValid` counts as a value: present, and not just spaces.
  * A type guard, so the same test narrows a draft key for the format checks.
  */
-export const filled = (value?: string | string[]): value is string =>
+export const filled = (value?: unknown): value is string =>
   typeof value === 'string' && value.trim() !== ''
 
 /**

@@ -53,6 +53,24 @@ pub struct ImportedEntry {
     pub card_year: Option<String>,
     pub card_cvc: Option<String>,
     pub cardholder: Option<String>,
+    // WebAuthn passkeys (only meaningful when kind == Login). Empty when the
+    // source format carries none, which is the case for every CSV dialect.
+    pub passkeys: Vec<ImportedPasskey>,
+}
+
+/// A normalized, plaintext passkey — mirrors `models::Passkey` field for field.
+/// Base64url values are carried through verbatim; this module never re-encodes.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ImportedPasskey {
+    pub credential_id: String,
+    pub rp_id: String,
+    pub rp_name: Option<String>,
+    pub user_handle: String,
+    pub user_name: String,
+    pub user_display_name: String,
+    pub private_key: String,
+    pub counter: u32,
+    pub created_at: Option<String>,
 }
 
 /// A per-row parse failure. `row` is 1-based in the source file so it points a

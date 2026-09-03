@@ -15,8 +15,8 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::commands::store_err;
 use crate::error::{Error, Result};
-use crate::import::{self, EntryKind, Format, ImportedEntry, RowError};
-use crate::models::Entry;
+use crate::import::{self, EntryKind, Format, ImportedEntry, ImportedPasskey, RowError};
+use crate::models::{Entry, Passkey};
 use crate::state::AppState;
 use crate::store::{migrate, Record, VaultStore};
 
@@ -239,6 +239,9 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
         pin: None,
         name: None,
         tags: (!imp.tags.is_empty()).then(|| imp.tags.clone()),
+        // Set below for logins only; stays None so a passkey-less entry
+        // serializes exactly as it did before passkeys existed.
+        passkeys: None,
         // No third-party format carries a star.
         favorite: false,
         created_at: Some(now.clone()),
@@ -251,6 +254,8 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
             e.password = imp.password.clone();
             e.website = imp.url.clone();
             e.otp = imp.otp.clone();
+            e.passkeys =
+                (!imp.passkeys.is_empty()).then(|| imp.passkeys.iter().map(to_passkey).collect());
         }
         EntryKind::Card => {
             e.number = imp.card_number.clone();
@@ -285,5 +290,42 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
         card_year: e.year.clone(),
         card_cvc: e.cvc.clone(),
         cardholder: e.name.clone(),
+        passkeys: e
+            .passkeys
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(to_imported_passkey)
+            .collect(),
+    }
+}
+
+// The two halves of the passkey mapping. Field-for-field: the import layer's
+// struct mirrors `models::Passkey`, and base64url values cross unchanged.
+fn to_passkey(p: &ImportedPasskey) -> Passkey {
+    Passkey {
+        credential_id: p.credential_id.clone(),
+        rp_id: p.rp_id.clone(),
+        rp_name: p.rp_name.clone(),
+        user_handle: p.user_handle.clone(),
+        user_name: p.user_name.clone(),
+        user_display_name: p.user_display_name.clone(),
+        private_key: p.private_key.clone(),
+        counter: p.counter,
+        created_at: p.created_at.clone(),
+    }
+}
+
+fn to_imported_passkey(p: &Passkey) -> ImportedPasskey {
+    ImportedPasskey {
+        credential_id: p.credential_id.clone(),
+        rp_id: p.rp_id.clone(),
+        rp_name: p.rp_name.clone(),
+        user_handle: p.user_handle.clone(),
+        user_name: p.user_name.clone(),
+        user_display_name: p.user_display_name.clone(),
+        private_key: p.private_key.clone(),
+        counter: p.counter,
+        created_at: p.created_at.clone(),
     }
 }

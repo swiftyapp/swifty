@@ -26,6 +26,22 @@ interface BaseEntry {
   updated_at?: string
 }
 
+// A WebAuthn credential held by a login entry. Only P-256 ECDSA is supported,
+// so there is no algorithm field. credentialId/userHandle/privateKey are
+// base64url and are carried verbatim — never re-encoded. privateKey is a secret
+// and only ever arrives inside a revealed entry.
+export interface Passkey {
+  credentialId: string
+  rpId: string
+  rpName?: string
+  userHandle: string
+  userName: string
+  userDisplayName: string
+  privateKey: string // PKCS#8 DER, base64url
+  counter: number
+  createdAt?: string // RFC3339
+}
+
 export interface LoginEntry extends BaseEntry {
   type: 'login'
   website: string
@@ -35,6 +51,8 @@ export interface LoginEntry extends BaseEntry {
   note: string
   otp: string // base32 TOTP secret
   password_updated_at?: string
+  // Absent on entries with no passkeys, so a pre-passkey vault is unchanged.
+  passkeys?: Passkey[]
 }
 
 export interface NoteEntry extends BaseEntry {

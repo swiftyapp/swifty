@@ -189,4 +189,53 @@ mod tests {
         let back = cipher.unseal(&sealed).unwrap();
         assert_eq!(back.password.as_deref(), Some("s3cret"));
     }
+
+    fn entry_with_passkey() -> Entry {
+        Entry {
+            passkeys: Some(vec![crate::models::Passkey {
+                credential_id: "Y3JlZDE".into(),
+                rp_id: "ex.com".into(),
+                rp_name: Some("Example".into()),
+                user_handle: "dWgx".into(),
+                user_name: "alice".into(),
+                user_display_name: "Alice".into(),
+                private_key: "cHJpdmF0ZUtleQ".into(),
+                counter: 3,
+                created_at: Some("2024-01-01T00:00:00Z".into()),
+            }]),
+            ..entry()
+        }
+    }
+
+    // Both payload ciphers carry passkeys through untouched — the legacy one
+    // obscures only the named secret fields, so this is the check that its
+    // per-field pass does not drop the new list.
+    #[test]
+    fn aead_payload_round_trips_passkeys() {
+        let cipher = argon2_key().payload_cipher();
+        let sealed = cipher.seal(&entry_with_passkey()).unwrap();
+        // The private key never appears in the sealed bytes.
+        let secret = b"cHJpdmF0ZUtleQ";
+        assert!(!sealed.windows(secret.len()).any(|w| w == secret));
+        let back = cipher.unseal(&sealed).unwrap();
+        assert_eq!(back.passkeys, entry_with_passkey().passkeys);
+    }
+
+    #[test]
+    fn legacy_payload_round_trips_passkeys() {
+        let cipher = VaultKey::legacy_from_password("pw").payload_cipher();
+        let sealed = cipher.seal(&entry_with_passkey()).unwrap();
+        let back = cipher.unseal(&sealed).unwrap();
+        assert_eq!(back.passkeys, entry_with_passkey().passkeys);
+    }
+
+    // The `.swftx` path: `export_entry`'s obscure + the import path's expose,
+    // under a second Cryptor, must leave passkeys byte-identical.
+    #[test]
+    fn legacy_obscure_expose_preserves_passkeys() {
+        let out = Cryptor::new("backup-password");
+        let obscured = out.obscure(&entry_with_passkey()).unwrap();
+        let back = out.expose(&obscured).unwrap();
+        assert_eq!(back.passkeys, entry_with_passkey().passkeys);
+    }
 }
