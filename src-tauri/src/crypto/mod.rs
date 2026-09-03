@@ -228,6 +228,7 @@ impl Cryptor {
             "login" => vec![&mut e.password, &mut e.otp],
             "note" => vec![&mut e.note],
             "card" => vec![&mut e.pin],
+            "identity" => vec![&mut e.number, &mut e.personal_number],
             _ => vec![],
         };
         for (i, slot) in slots.into_iter().enumerate() {
@@ -249,6 +250,7 @@ impl Cryptor {
             "login" => vec![&mut e.password, &mut e.otp],
             "note" => vec![&mut e.note],
             "card" => vec![&mut e.pin],
+            "identity" => vec![&mut e.number, &mut e.personal_number],
             _ => vec![],
         };
         for slot in slots {
@@ -270,6 +272,7 @@ fn sensitive_values(entry: &Entry) -> Vec<Option<&str>> {
         "login" => vec![entry.password.as_deref(), entry.otp.as_deref()],
         "note" => vec![entry.note.as_deref()],
         "card" => vec![entry.pin.as_deref()],
+        "identity" => vec![entry.number.as_deref(), entry.personal_number.as_deref()],
         _ => vec![],
     }
 }

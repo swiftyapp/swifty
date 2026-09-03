@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // A vault entry. Kept as a single flat struct (rather than an enum) so it
-// round-trips the untyped legacy object shape; `kind` discriminates login/note/card.
+// round-trips the untyped legacy object shape; `kind` discriminates
+// login/note/card/identity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entry {
     pub id: String,
@@ -33,6 +34,29 @@ pub struct Entry {
     pub pin: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// ID-document fields (`identity` entries). `doc_type` is one of `passport`,
+    /// `id_card`, `driver_license`, `residence_permit`, `other`; the three dates
+    /// are ISO `YYYY-MM-DD`. The document number and full name reuse `number` and
+    /// `name`. All `None` on every other kind, so a pre-identity vault JSON,
+    /// `.swftx` backup and fixture serializes byte-identically to before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doc_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nationality: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub birth_date: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sex: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issue_date: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expiry_date: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authority: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub personal_number: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
     /// WebAuthn passkeys stored on a login entry. `None` when the entry has
@@ -228,6 +252,40 @@ mod tests {
         assert_eq!(p["counter"], 0);
         assert!(p.get("rpName").is_none());
         assert!(p.get("createdAt").is_none());
+    }
+
+    // The identity fields are snake_case on the wire (the scanner and the
+    // frontend draft both key off these exact names), and absent when unset.
+    #[test]
+    fn identity_fields_round_trip_snake_case_and_stay_absent_when_unset() {
+        let entry: Entry = serde_json::from_str(
+            r#"{"id":"1","type":"identity","title":"Passport","name":"ADA LOVELACE",
+                 "number":"X1234567","doc_type":"passport","country":"GBR",
+                 "birth_date":"1815-12-10","personal_number":"99-1815"}"#,
+        )
+        .unwrap();
+        assert_eq!(entry.doc_type.as_deref(), Some("passport"));
+        assert_eq!(entry.birth_date.as_deref(), Some("1815-12-10"));
+        assert_eq!(entry.personal_number.as_deref(), Some("99-1815"));
+
+        let out = serde_json::to_value(&entry).unwrap();
+        assert_eq!(out["doc_type"], "passport");
+        assert_eq!(out["birth_date"], "1815-12-10");
+        assert!(out.get("issue_date").is_none());
+        assert!(out.get("nationality").is_none());
+    }
+
+    // A login has no identity fields, so its JSON is exactly what it always was.
+    #[test]
+    fn non_identity_entry_serializes_without_the_identity_keys() {
+        let entry: Entry =
+            serde_json::from_str(r#"{"id":"1","type":"login","title":"Site","password":"pw"}"#)
+                .unwrap();
+        let out = serde_json::to_string(&entry).unwrap();
+        assert_eq!(
+            out,
+            r#"{"id":"1","type":"login","title":"Site","password":"pw"}"#
+        );
     }
 
     fn meta(has_passkey: bool) -> crate::store::EntryMeta {

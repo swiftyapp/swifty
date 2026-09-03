@@ -6,17 +6,18 @@ fn parse(fmt: Format, bytes: &[u8]) -> super::ImportResult {
 }
 
 #[test]
-fn bitwarden_maps_login_note_card_and_flags_unsupported() {
+fn bitwarden_maps_every_item_type_and_flags_unsupported() {
     let json = br#"{"items":[
       {"type":1,"name":"GitHub","notes":"n","login":{"username":"octo","password":"pw","totp":"OTP","uris":[{"uri":"https://github.com"}]}},
       {"type":2,"name":"Secret","notes":"body"},
       {"type":3,"name":"Visa","card":{"cardholderName":"A B","number":"4111","expMonth":"01","expYear":"30","code":"123"}},
-      {"type":4,"name":"Identity"}
+      {"type":4,"name":"Passport","identity":{"firstName":"Ada","lastName":"Lovelace","country":"GBR","passportNumber":"X1234567"}},
+      {"type":9,"name":"Whatever"}
     ]}"#;
     let r = parse(Format::Bitwarden, json);
-    assert_eq!(r.entries.len(), 3);
+    assert_eq!(r.entries.len(), 4);
     assert_eq!(r.errors.len(), 1);
-    assert_eq!(r.errors[0].row, 4);
+    assert_eq!(r.errors[0].row, 5);
 
     let login = &r.entries[0];
     assert_eq!(login.kind, EntryKind::Login);
@@ -30,6 +31,62 @@ fn bitwarden_maps_login_note_card_and_flags_unsupported() {
     assert_eq!(card.kind, EntryKind::Card);
     assert_eq!(card.card_number.as_deref(), Some("4111"));
     assert_eq!(card.cardholder.as_deref(), Some("A B"));
+
+    let identity = &r.entries[3];
+    assert_eq!(identity.kind, EntryKind::Identity);
+    assert_eq!(identity.doc_type.as_deref(), Some("passport"));
+    assert_eq!(identity.doc_number.as_deref(), Some("X1234567"));
+    assert_eq!(identity.doc_country.as_deref(), Some("GBR"));
+    assert_eq!(identity.holder_name.as_deref(), Some("Ada Lovelace"));
+}
+
+// A licence number is the only thing in a Bitwarden identity that says what the
+// document is, so it also decides the type.
+#[test]
+fn bitwarden_reads_a_licence_number_as_a_driver_licence() {
+    let json = br#"{"items":[
+      {"type":4,"name":"Licence","identity":{"firstName":"Ada","middleName":"King","lastName":"Lovelace","licenseNumber":"D-99"}}
+    ]}"#;
+    let r = parse(Format::Bitwarden, json);
+    assert!(r.errors.is_empty());
+    let identity = &r.entries[0];
+    assert_eq!(identity.doc_type.as_deref(), Some("driver_license"));
+    assert_eq!(identity.doc_number.as_deref(), Some("D-99"));
+    assert_eq!(identity.holder_name.as_deref(), Some("Ada King Lovelace"));
+}
+
+// The identity is written into Bitwarden's own members, so it comes back as the
+// same document — bar the first/last split, which the full name absorbs again.
+#[test]
+fn round_trip_bitwarden_identity() {
+    let entries = vec![
+        ImportedEntry {
+            kind: EntryKind::Identity,
+            title: "Passport".into(),
+            doc_type: Some("passport".into()),
+            doc_number: Some("X1234567".into()),
+            doc_country: Some("GBR".into()),
+            holder_name: Some("ADA LOVELACE".into()),
+            ..Default::default()
+        },
+        ImportedEntry {
+            kind: EntryKind::Identity,
+            title: "Licence".into(),
+            doc_type: Some("driver_license".into()),
+            doc_number: Some("D-99".into()),
+            holder_name: Some("Mononym".into()),
+            ..Default::default()
+        },
+    ];
+    let bytes = to_bitwarden_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(out["items"][0]["type"], 4);
+    assert_eq!(out["items"][0]["identity"]["passportNumber"], "X1234567");
+    assert_eq!(out["items"][1]["identity"]["licenseNumber"], "D-99");
+
+    let back = parse(Format::Bitwarden, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, entries);
 }
 
 #[test]

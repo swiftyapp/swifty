@@ -21,7 +21,8 @@ const KEY_LEN = 32
 const SENSITIVE_FIELDS = {
   login: ['password', 'otp'],
   note: ['note'],
-  card: ['pin']
+  card: ['pin'],
+  identity: ['number', 'personal_number']
 }
 
 export const hashSecret = value =>
