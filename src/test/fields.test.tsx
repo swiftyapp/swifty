@@ -109,6 +109,26 @@ describe('Type-aware fields', () => {
     expect(screen.getByText('refreshes in 25s')).toBeInTheDocument()
   })
 
+  // The draft is seeded from the reveal, so an editor offered before the reveal
+  // lands takes typing it is about to throw away.
+  it('offers no editor until an existing entry has been decrypted', async () => {
+    let resolveReveal: (entry: ReturnType<typeof loginEntry>) => void = () => {}
+    vi.mocked(revealEntry).mockReturnValue(
+      new Promise(resolve => {
+        resolveReveal = resolve
+      })
+    )
+    renderWithStore(<Show entry={loginMeta()} editing />)
+
+    expect(document.querySelector('input[name="title"]')).toBeNull()
+
+    resolveReveal(loginEntry())
+    await waitFor(() => expect(input('title').value).toBe('Google'))
+
+    await userEvent.type(input('title'), '!')
+    expect(input('title').value).toBe('Google!')
+  })
+
   it('counts a recent rotation as a duration', async () => {
     const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
     vi.mocked(revealEntry).mockResolvedValue(
@@ -170,8 +190,9 @@ describe('Type-aware fields', () => {
     await userEvent.type(input('password'), '2')
 
     await userEvent.click(screen.getByText('Save'))
-    const saved = vi.mocked(saveEntry).mock.calls[0][0]
-    expect(saved.password).toBe('secret2')
-    expect(saved.password_updated_at).not.toBe(stamp)
+    expect(saveEntry).toHaveBeenCalledWith(expect.objectContaining({ password: 'secret2' }))
+    expect(saveEntry).not.toHaveBeenCalledWith(
+      expect.objectContaining({ password_updated_at: stamp })
+    )
   })
 })

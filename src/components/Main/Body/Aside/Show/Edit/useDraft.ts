@@ -27,27 +27,20 @@ export interface Draft {
  */
 export function useDraft(type: EntryType, revealed: Entry | null): Draft {
   const kind = kindOf(type)
-  const initial = (): EntryDraft => ({ ...kind.defaults })
+  // `Show` holds the editor back until an existing entry's reveal has landed,
+  // so the decrypted values are already here at mount. Seeding from them beats
+  // adopting them in an effect, which raced whatever was typed first — and
+  // means a later reveal (a sync merge moving `updatedAt`) cannot replace the
+  // draft. The baseline is the state at open; a concurrent change resolves
+  // through last-writer-wins on save.
+  const initial = (): EntryDraft => ({ ...(revealed ?? kind.defaults) })
 
   const [attempted, setAttempted] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [model, setModel] = useState<EntryDraft>(initial)
   // What the model looked like when it was loaded — the dirty baseline.
-  const [pristine, setPristine] = useState<EntryDraft>(initial)
-
-  // Secret fields arrive encrypted; swap in the decrypted values — once. The
-  // reveal refetches when the entry's `updatedAt` moves (e.g. a sync merge
-  // landing mid-edit), and adopting that refetch would silently replace
-  // whatever the user has typed. The baseline is the state at open; a
-  // concurrent change resolves through last-writer-wins on save.
-  const [adopted, setAdopted] = useState(false)
-  useEffect(() => {
-    if (!revealed || adopted) return
-    setAdopted(true)
-    setModel({ ...revealed })
-    setPristine({ ...revealed })
-  }, [revealed, adopted])
+  const [pristine] = useState<EntryDraft>(initial)
 
   const dirty = JSON.stringify(model) !== JSON.stringify(pristine)
 
