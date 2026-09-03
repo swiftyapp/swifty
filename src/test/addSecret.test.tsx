@@ -94,6 +94,17 @@ describe('add a secret', () => {
     expect(screen.getByTestId('add-secret-modal')).toBeInTheDocument()
   })
 
+  it('stays where it was when the picker is dismissed', async () => {
+    renderWithStore(<Main />, { store: seed() })
+    setView('trash')
+
+    await openFromRail()
+    await userEvent.keyboard('{Escape}')
+
+    // Only committing to a kind leaves the view; asking does not.
+    expect(useStore.getState().ui.view).toBe('trash')
+  })
+
   it('leaves the health view so the new form has a list to land in', async () => {
     renderWithStore(<Main />, { store: seed() })
     setView('health')
