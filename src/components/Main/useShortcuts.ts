@@ -1,35 +1,25 @@
 import { useEffect } from 'react'
 import { useStore, openPalette, openGenerator, openAddPicker, editEntry } from '@/store'
-import { focusSearch } from './Body/ListColumn/focus'
+import { dialogOpen } from '@/utils/dialogOpen'
+import { focusSearch } from '@/utils/focusSearch'
 import { lockVault } from './Palette/commands'
-
-// True while a dialog owns the keyboard. A chord that would reach the shell
-// underneath it (opening a second modal, or pulling focus into the list column
-// behind the scrim) is swallowed instead.
-const dialogOpen = () => {
-  const { palette, settings, addPicker } = useStore.getState().ui
-  return palette || settings || addPicker
-}
 
 // The app-level shortcut surface. One listener, one record — a new chord is
 // one line here. Mounted from Main, so chords are live only while unlocked.
 const BINDINGS: Record<string, () => void> = {
   k: openPalette,
   l: lockVault,
-  // Re-pressing ⌘G while the dialog is up must not drop the callback it was
-  // opened with, so an open dialog swallows the shortcut.
+  // Re-pressing ⌘G must not drop the callback the generator was opened with.
+  // Guarded on the store as well as the DOM: the flag flips before the card
+  // mounts, so one press cannot queue a second open.
   g: () => {
     if (!useStore.getState().generator.open) openGenerator()
   },
-  n: () => {
-    if (!dialogOpen()) openAddPicker()
-  },
-  f: () => {
-    if (!dialogOpen()) focusSearch()
-  },
+  n: openAddPicker,
+  f: focusSearch,
   // Edit whatever the list has selected — nothing to edit without a selection.
   e: () => {
-    if (!dialogOpen() && useStore.getState().entries.current) editEntry()
+    if (useStore.getState().entries.current) editEntry()
   }
 }
 
@@ -40,6 +30,10 @@ export const useShortcuts = () => {
       const run = BINDINGS[e.key.toLowerCase()]
       if (!run) return
       e.preventDefault()
+      // A dialog owns the keyboard while it is up: every chord here would
+      // otherwise act on the shell behind the scrim — opening a second modal,
+      // pulling focus into the list column, or editing what the dialog covers.
+      if (dialogOpen()) return
       run()
     }
 

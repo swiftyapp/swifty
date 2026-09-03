@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Generator from '@/components/Main/Generator'
+import Main from '@/components/Main'
 import { useShortcuts } from '@/components/Main/useShortcuts'
 import { copyToClipboard, generatePassword } from '@/lib/commands'
-import { renderWithStore } from './utils'
+import { makeStore, useStore, openPalette } from '@/store'
+import { renderWithStore, withEntries, loginMeta } from './utils'
 
 // ⌘G lives in the app-level shortcut surface now (Main/useShortcuts), so the
 // harness mounts it alongside the dialog the way Main does.
@@ -56,5 +58,53 @@ describe('Generator', () => {
     expect(await screen.findByText('Words')).toBeInTheDocument()
     expect(generatePassword).not.toHaveBeenCalled()
     expect(screen.getByTestId('generator-output').textContent).toMatch(/^[a-z]+(-[a-z]+)+-\d{2}$/)
+  })
+})
+
+// An open dialog owns the keyboard: every app-level chord stands down, and the
+// dialog's own window handler only answers while it is the topmost one.
+describe('Generator, with the shell behind it', () => {
+  const seed = () => {
+    const store = makeStore()
+    withEntries(store, [loginMeta({ id: 'l1', title: 'Google' })])
+    return store
+  }
+
+  const openGeneratorOver = async (ui = <Main />) => {
+    renderWithStore(ui, { store: seed() })
+    await userEvent.keyboard('{Meta>}g{/Meta}')
+    return screen.findByTestId('generator-dialog')
+  }
+
+  it('swallows ⌘F rather than pulling focus into the column behind it', async () => {
+    await openGeneratorOver()
+
+    await userEvent.keyboard('{Meta>}f{/Meta}')
+
+    expect(screen.getByTestId('search-input')).not.toHaveFocus()
+  })
+
+  it('swallows ⌘N rather than stacking the kind picker on top', async () => {
+    await openGeneratorOver()
+
+    await userEvent.keyboard('{Meta>}n{/Meta}')
+
+    expect(screen.queryByTestId('add-secret-modal')).not.toBeInTheDocument()
+    expect(useStore.getState().ui.addPicker).toBe(false)
+  })
+
+  it('leaves ⏎ to the palette stacked over it', async () => {
+    await openGeneratorOver()
+    expect(await screen.findByText('Generated123!')).toBeInTheDocument()
+    // ⌘K is swallowed while a dialog is up, so the palette is opened the way
+    // any other surface would open it.
+    openPalette()
+
+    const palette = await screen.findByTestId('command-palette')
+    await userEvent.type(within(palette).getByTestId('command-palette-input'), '{Enter}')
+
+    // The palette's own command ran; the generator did not also confirm.
+    expect(useStore.getState().entries.new).toBe('login')
+    expect(copyToClipboard).not.toHaveBeenCalled()
   })
 })
