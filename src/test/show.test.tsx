@@ -67,9 +67,8 @@ describe('Edit mode in the pane', () => {
     expect(screen.getByTestId('list-column')).not.toHaveClass('opacity-60')
 
     await userEvent.click(screen.getByTestId('edit-entry-button'))
-    expect(screen.getByTestId('list-column')).toHaveClass(
-      'opacity-60',
-      'pointer-events-none'
-    )
+    expect(screen.getByTestId('list-column')).toHaveClass('opacity-60')
+    // `inert`, not `pointer-events-none`: the keyboard has to stand down too.
+    expect(screen.getByTestId('list-column')).toHaveAttribute('inert')
   })
 })
