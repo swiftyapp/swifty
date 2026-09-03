@@ -15,11 +15,13 @@ const LOCK_OPTIONS = [
   { value: '3600', label: '1 h' }
 ]
 
-const CLIPBOARD_OPTIONS = [
+// Built per render so a locale switch retranslates. The unit values read the
+// same in every locale; only `Never` is words.
+const clipboardOptions = () => [
   { value: '15000', label: '15 s' },
   { value: '30000', label: '30 s' },
   { value: '60000', label: '60 s' },
-  { value: '0', label: 'Never' }
+  { value: '0', label: t('Never') }
 ]
 
 export default function SessionGroup() {
@@ -64,10 +66,7 @@ export default function SessionGroup() {
           <Segmented
             mono
             name={clipboardLabel}
-            options={CLIPBOARD_OPTIONS.map(option => ({
-              ...option,
-              label: t(option.label)
-            }))}
+            options={clipboardOptions()}
             value={clipboard}
             onChange={onClipboard}
             testidPrefix="settings-clipboard"
