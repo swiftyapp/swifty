@@ -25,6 +25,39 @@ const APP_BINARY =
 
 const TEST_DB_DIR = path.join(os.tmpdir(), `swifty-e2e-${Date.now()}`);
 
+const SPECS_DIR = path.join(__dirname, "specs");
+
+/**
+ * The spec files this run executes.
+ *
+ * Specs run one at a time (maxInstances: 1) because the in-app WebDriver
+ * server takes a single session, so CI splits the suite across parallel jobs
+ * instead: with `E2E_SHARD=k/n` this run takes every n-th spec starting at
+ * the k-th (1-based), over the alphabetically sorted list. Every shard sees
+ * the same order, so the shards are disjoint and together cover every spec.
+ * Unset (local runs) means all of them.
+ */
+function shardedSpecs(): string[] {
+  const all = fs
+    .readdirSync(SPECS_DIR)
+    .filter((f) => f.endsWith(".spec.ts"))
+    .sort()
+    .map((f) => path.join(SPECS_DIR, f));
+
+  const shard = process.env.E2E_SHARD;
+  if (!shard) return all;
+
+  const match = /^(\d+)\/(\d+)$/.exec(shard);
+  const index = match ? Number(match[1]) : NaN;
+  const total = match ? Number(match[2]) : NaN;
+  if (!match || total < 1 || index < 1 || index > total) {
+    throw new Error(`[e2e] E2E_SHARD must look like "1/3" (1-based), got "${shard}"`);
+  }
+  const mine = all.filter((_, i) => i % total === index - 1);
+  console.log(`[e2e] shard ${index}/${total}: ${mine.length} of ${all.length} specs`);
+  return mine;
+}
+
 let viteProcess: ChildProcess;
 let appProcess: ChildProcess;
 
@@ -73,7 +106,7 @@ export const config: WebdriverIO.Config = {
   port: 4445,
   path: "/",
 
-  specs: ["./specs/**/*.spec.ts"],
+  specs: shardedSpecs(),
   maxInstances: 1,
 
   capabilities: [

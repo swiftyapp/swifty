@@ -12,9 +12,76 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # On PRs, each job below runs only when its inputs changed (a docs-only PR
+  # runs nothing; a frontend-only PR skips the Rust matrix). Pushes to the
+  # protected branches always run everything. A skipped job satisfies branch
+  # protection, and if this detection job itself fails every job runs anyway
+  # (see the `needs.changes.result != 'success'` clause on each job).
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      rust: ${{ steps.filter.outputs.rust }}
+      crypto: ${{ steps.filter.outputs.crypto }}
+      e2e: ${{ steps.filter.outputs.e2e }}
+      supply-chain: ${{ steps.filter.outputs.supply-chain }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ci: &ci
+              - '.github/workflows/ci.yml'
+            frontend-src: &frontend-src
+              - 'src/**'
+              - 'index.html'
+              - 'package.json'
+              - 'bun.lock'
+              - 'tsconfig.json'
+              - 'tsconfig.node.json'
+              - 'vite.config.ts'
+              - 'eslint.config.js'
+            rust-src: &rust-src
+              - 'src-tauri/**'
+              - 'rust-toolchain.toml'
+            frontend:
+              - *ci
+              - *frontend-src
+            rust:
+              - *ci
+              - *rust-src
+            crypto:
+              - *ci
+              - *rust-src
+              - 'scripts/**'
+            e2e:
+              - *ci
+              - *frontend-src
+              - *rust-src
+              - 'tests/e2e/**'
+            supply-chain:
+              - *ci
+              - 'package.json'
+              - 'bun.lock'
+              - 'src-tauri/Cargo.toml'
+              - 'src-tauri/Cargo.lock'
+              - 'src-tauri/deny.toml'
+
   frontend:
     name: Frontend (build + lint)
     runs-on: ubuntu-latest
+    needs: changes
+    if: >-
+      !cancelled() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.result != 'success' ||
+        needs.changes.outputs.frontend == 'true'
+      )
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -27,6 +94,13 @@ jobs:
 
   rust:
     name: Rust (${{ matrix.os }})
+    needs: changes
+    if: >-
+      !cancelled() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.result != 'success' ||
+        needs.changes.outputs.rust == 'true'
+      )
     strategy:
       fail-fast: false
       matrix:
@@ -56,13 +130,12 @@ jobs:
           # every PR, from any branch, restores.
           save-if: ${{ github.event_name == 'push' }}
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.3
-
-      # generate_context! needs the built frontend (../dist) to exist.
-      - run: bun install --frozen-lockfile
-      - run: bun run build
+      # generate_context! only needs `../dist` to exist. Debug builds load the
+      # frontend from `devUrl` and never embed it, so a stub replaces the full
+      # `bun install` + `bun run build` here (that was ~2 min on Windows).
+      - name: Stub frontend dist
+        shell: bash
+        run: mkdir -p dist && echo '<!doctype html>' > dist/index.html
 
       - name: Format check
         working-directory: src-tauri
@@ -79,6 +152,13 @@ jobs:
   supply-chain:
     name: Supply chain (audit + cargo-deny)
     runs-on: ubuntu-latest
+    needs: changes
+    if: >-
+      !cancelled() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.result != 'success' ||
+        needs.changes.outputs.supply-chain == 'true'
+      )
     steps:
       - uses: actions/checkout@v4
 
@@ -114,6 +194,13 @@ jobs:
   crypto-compat:
     name: Crypto compatibility
     runs-on: ubuntu-latest
+    needs: changes
+    if: >-
+      !cancelled() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.result != 'success' ||
+        needs.changes.outputs.crypto == 'true'
+      )
     steps:
       - uses: actions/checkout@v4
 
@@ -141,9 +228,11 @@ jobs:
         with:
           bun-version: 1.3.3
 
-      # generate_context! needs the built frontend (../dist) to exist.
+      # The crosscheck script runs under bun; the Rust side only needs `../dist`
+      # to exist (debug builds never embed it), so no frontend build.
       - run: bun install --frozen-lockfile
-      - run: bun run build
+      - name: Stub frontend dist
+        run: mkdir -p dist && echo '<!doctype html>' > dist/index.html
 
       # Rust decrypts the Node-generated golden fixtures and asserts plaintext.
       - name: Fixture + round-trip tests
@@ -155,8 +244,23 @@ jobs:
         run: bun scripts/crypto-crosscheck.mjs
 
   e2e:
-    name: E2E smoke suite
+    # Specs run one at a time against a single app instance (the in-app
+    # WebDriver server takes one session), so the suite is split across
+    # parallel shards instead. tests/e2e/wdio.conf.ts reads E2E_SHARD and
+    # picks every Nth spec file; add a shard here to split further.
+    name: E2E smoke suite (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
+    needs: changes
+    if: >-
+      !cancelled() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.result != 'success' ||
+        needs.changes.outputs.e2e == 'true'
+      )
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
 
@@ -198,8 +302,10 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      # generate_context! needs the built frontend (../dist) to exist.
-      - run: bun run build
+      # The debug binary serves the frontend from the Vite dev server that
+      # wdio starts, so `../dist` only has to exist for generate_context!.
+      - name: Stub frontend dist
+        run: mkdir -p dist && echo '<!doctype html>' > dist/index.html
 
       - name: Build debug binary
         run: cargo build --manifest-path src-tauri/Cargo.toml
@@ -207,5 +313,6 @@ jobs:
       - name: Run E2E tests
         run: xvfb-run --server-args="-screen 0 1280x800x24" bun run test:e2e
         env:
+          E2E_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
           WEBKIT_DISABLE_COMPOSITING_MODE: 1
           NO_AT_BRIDGE: 1
