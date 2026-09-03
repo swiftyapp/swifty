@@ -45,12 +45,20 @@ import {
 interface IconProps {
   size?: number
   className?: string
+  // Solid rather than outline, for the glyphs that carry an on/off state (the
+  // favorite star). Outline is lucide's default, so this is opt-in everywhere.
+  filled?: boolean
 }
 
 const glyph =
   (Icon: LucideIcon, defaultSize: 14 | 16 | 20) =>
-  ({ size = defaultSize, className }: IconProps) => (
-    <Icon size={size} strokeWidth={1.75} className={className} />
+  ({ size = defaultSize, className, filled }: IconProps) => (
+    <Icon
+      size={size}
+      strokeWidth={1.75}
+      className={className}
+      fill={filled ? 'currentColor' : 'none'}
+    />
   )
 
 // Control tier (24–28px hit areas)
@@ -74,6 +82,7 @@ export const SortGlyph = glyph(ArrowDownWideNarrow, 14)
 export const ExternalGlyph = glyph(ExternalLink, 14)
 export const AtGlyph = glyph(AtSign, 14)
 export const UserGlyph = glyph(User, 14)
+export const StarGlyph = glyph(Star, 14)
 
 // Row / tile / rail tier
 export const PlusGlyph = glyph(Plus, 16)

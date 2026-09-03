@@ -8,9 +8,9 @@ import { makeStore, useStore } from '@/store'
 import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 
 const note = (id: string, title: string): EntryMeta =>
-  ({ id, type: 'note', title, tags: [], urlHost: '' })
+  ({ id, type: 'note', title, tags: [], urlHost: '', favorite: false })
 const card = (id: string, title: string): EntryMeta =>
-  ({ id, type: 'card', title, tags: [], urlHost: '' })
+  ({ id, type: 'card', title, tags: [], urlHost: '', favorite: false })
 
 beforeEach(() => vi.clearAllMocks())
 

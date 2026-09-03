@@ -3,9 +3,10 @@ import { filterEntries, isValid } from './entries'
 import type { EntryMeta } from '@/lib/commands'
 
 const login = (title: string, tags: string[] = [], urlHost = ''): EntryMeta =>
-  ({ id: title, type: 'login', title, tags, urlHost })
+  ({ id: title, type: 'login', title, tags, urlHost, favorite: false })
 
-const card = (title: string): EntryMeta => ({ id: title, type: 'card', title, tags: [], urlHost: '' })
+const card = (title: string): EntryMeta =>
+  ({ id: title, type: 'card', title, tags: [], urlHost: '', favorite: false })
 
 describe('filterEntries', () => {
   const entries = [login('Google', ['personal']), login('Airbnb'), login('Facebook', ['personal'])]

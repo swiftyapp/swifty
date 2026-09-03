@@ -49,14 +49,16 @@ fn migration_list() -> Vec<M<'static>> {
         // so listings show brand marks without touching the payload. NULL =
         // not yet derived (backfilled once on unlock).
         M::up("ALTER TABLE entries ADD COLUMN card_brand TEXT;"),
+        // The user's star. Pre-existing rows default to unstarred, which is the
+        // truth for every vault written before this column existed.
+        M::up("ALTER TABLE entries ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0;"),
     ]
 }
 
-// card_brand is appended last so pre-existing column indexes stay put.
-const COLS: &str =
-    "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, payload, card_brand";
+// New columns are appended last so pre-existing column indexes stay put.
+const COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, payload, card_brand, favorite";
 const META_COLS: &str =
-    "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, card_brand";
+    "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, card_brand, favorite";
 
 const META_UPSERT: &str = "INSERT INTO meta (key, value) VALUES (?1, ?2)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value";
@@ -164,6 +166,17 @@ impl SqliteStore {
         self.lock()
             .execute_batch(&format!("PRAGMA user_version = {version}"))?;
         Ok(())
+    }
+
+    /// Fetch one row by id **including tombstones**, unlike [`VaultStore::get`]
+    /// which hides them. Restore and purge both act on rows the live read cannot
+    /// see, and both report back the row they wrote.
+    pub fn row(&self, id: &str) -> Result<Option<Record>> {
+        let conn = self.lock();
+        let sql = format!("SELECT {COLS} FROM entries WHERE id = ?1");
+        Ok(conn
+            .query_row(&sql, params![id], row_to_record)
+            .optional()?)
     }
 
     /// Set the derived card-network slug without stamping `updated_at` — it is
@@ -290,6 +303,20 @@ impl VaultStore for SqliteStore {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    fn list_deleted(&self) -> Result<Vec<EntryMeta>> {
+        let conn = self.lock();
+        // A purged row keeps its tombstone (sync needs it) but has no payload
+        // left, so an empty payload is exactly "already permanently deleted".
+        let sql = format!(
+            "SELECT {META_COLS} FROM entries
+             WHERE deleted_at IS NOT NULL AND length(payload) > 0
+             ORDER BY deleted_at DESC, id"
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], row_to_meta)?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     fn get(&self, id: &str) -> Result<Option<Record>> {
         let conn = self.lock();
         let sql = format!("SELECT {COLS} FROM entries WHERE id = ?1 AND deleted_at IS NULL");
@@ -302,9 +329,12 @@ impl VaultStore for SqliteStore {
         let now = now_ms();
         let conn = self.lock();
         // created_at is set only on insert; updated_at is always stamped to now.
+        // `favorite` is deliberately absent from the update set: the star is not
+        // part of the entry the editor round-trips, so an ordinary save must
+        // leave whatever `set_favorite` last wrote alone.
         conn.execute(
             &format!(
-                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
+                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)
                  ON CONFLICT(id) DO UPDATE SET
                    kind=excluded.kind, title=excluded.title, tags=excluded.tags,
                    url_host=excluded.url_host, updated_at=excluded.updated_at,
@@ -326,6 +356,7 @@ impl VaultStore for SqliteStore {
                 rec.deleted_at,
                 rec.payload,
                 rec.card_brand,
+                rec.favorite,
             ],
         )?;
         Ok(())
@@ -337,6 +368,49 @@ impl VaultStore for SqliteStore {
         conn.execute(
             "UPDATE entries SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
             params![now, id],
+        )?;
+        Ok(())
+    }
+
+    fn restore(&self, id: &str) -> Result<()> {
+        let now = now_ms();
+        self.lock().execute(
+            "UPDATE entries SET deleted_at = NULL, updated_at = ?1 WHERE id = ?2",
+            params![now, id],
+        )?;
+        Ok(())
+    }
+
+    /// Discard a tombstoned record's contents for good.
+    ///
+    /// A bare `DELETE` would not survive sync: every push is the whole state and
+    /// [`SqliteStore::merge_records`] re-inserts any id it does not already hold,
+    /// so a peer still carrying the tombstone would hand the row — sealed payload
+    /// included — straight back on the next merge. Emptying the row in place and
+    /// stamping `updated_at` instead makes the purge *win* that merge, which
+    /// destroys the payload on every device rather than only this one. What is
+    /// left is a content-free tombstone, reclaimed later by
+    /// [`SqliteStore::purge_tombstones_before`] like any other.
+    fn purge(&self, id: &str) -> Result<()> {
+        let now = now_ms();
+        self.lock().execute(
+            "UPDATE entries
+             SET payload = x'', title = '', tags = '[]', url_host = '',
+                 card_brand = NULL, favorite = 0, updated_at = ?1
+             WHERE id = ?2 AND deleted_at IS NOT NULL",
+            params![now, id],
+        )?;
+        Ok(())
+    }
+
+    fn set_favorite(&self, id: &str, favorite: bool) -> Result<()> {
+        // `updated_at` moves because the sync merge is last-writer-wins on it: a
+        // star that left the clock alone would lose to (or coin-flip against, via
+        // the hash tie-break) every peer's copy and silently revert.
+        let now = now_ms();
+        self.lock().execute(
+            "UPDATE entries SET favorite = ?1, updated_at = ?2 WHERE id = ?3",
+            params![favorite, now, id],
         )?;
         Ok(())
     }
@@ -370,12 +444,13 @@ impl VaultStore for SqliteStore {
 // sync-in paths (import, merge_records) need.
 fn verbatim_upsert() -> String {
     format!(
-        "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
+        "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)
          ON CONFLICT(id) DO UPDATE SET
            kind=excluded.kind, title=excluded.title, tags=excluded.tags,
            url_host=excluded.url_host, created_at=excluded.created_at,
            updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
-           payload=excluded.payload, card_brand=excluded.card_brand"
+           payload=excluded.payload, card_brand=excluded.card_brand,
+           favorite=excluded.favorite"
     )
 }
 
@@ -391,6 +466,7 @@ fn exec_record(stmt: &mut Statement, r: &Record) -> rusqlite::Result<usize> {
         r.deleted_at,
         r.payload,
         r.card_brand,
+        r.favorite,
     ])
 }
 
@@ -406,6 +482,7 @@ fn row_to_record(row: &Row) -> rusqlite::Result<Record> {
         deleted_at: row.get(7)?,
         payload: row.get(8)?,
         card_brand: row.get(9)?,
+        favorite: row.get(10)?,
     })
 }
 
@@ -420,6 +497,7 @@ fn row_to_meta(row: &Row) -> rusqlite::Result<EntryMeta> {
         updated_at: row.get(6)?,
         deleted_at: row.get(7)?,
         card_brand: row.get(8)?,
+        favorite: row.get(9)?,
     })
 }
 

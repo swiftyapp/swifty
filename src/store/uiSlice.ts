@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand'
 import type { StoreState } from './index'
 
-export type View = 'items' | 'health'
+export type View = 'items' | 'favorites' | 'health' | 'trash'
 
 // The Settings sections, in nav order.
 export type Section = 'sync' | 'security' | 'audit' | 'import' | 'language'
@@ -24,7 +24,7 @@ export interface UiSlice {
   setView: (view: View) => void
 }
 
-export const createUiSlice: StateCreator<StoreState, [], [], UiSlice> = set => ({
+export const createUiSlice: StateCreator<StoreState, [], [], UiSlice> = (set, get) => ({
   ui: {
     palette: false,
     settings: false,
@@ -49,9 +49,14 @@ export const createUiSlice: StateCreator<StoreState, [], [], UiSlice> = set => (
   setSettingsSection: section => set(s => ({ ui: { ...s.ui, settingsSection: section } })),
   openAddPicker: () => set(s => ({ ui: { ...s.ui, palette: false, addPicker: true } })),
   closeAddPicker: () => set(s => ({ ui: { ...s.ui, addPicker: false } })),
-  setView: view =>
+  setView: view => {
     set(s => ({
       ui: { ...s.ui, view },
       entries: { ...s.entries, new: null, edit: false, current: null }
     }))
+    // Tombstones are not part of the unlock payload, so the Trash reads them
+    // when it is opened. Refetching on every visit is also what keeps it honest
+    // after a sync merged a peer's deletes.
+    if (view === 'trash') void get().loadTrash()
+  }
 })

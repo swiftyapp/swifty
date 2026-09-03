@@ -4,6 +4,8 @@ import { useStore, setCurrentEntry } from '@/store'
 import type { EntryMeta } from '@/lib/commands'
 import { kindOf } from '@/kinds'
 import { relativeTime } from '@/utils/time'
+import { t } from '@/i18n'
+import { StarGlyph } from '../../../icons'
 import { stampOf } from '../order'
 import Flag from './Flag'
 import { flagOf } from './audit'
@@ -20,7 +22,11 @@ export default function Item({ entry }: Props) {
   const flagKind = useStore(state => flagOf(state.audit?.[entry.id]))
 
   const flag = flagKind ? <Flag kind={flagKind} /> : undefined
-  const meta = relativeTime(stampOf(entry))
+  // A tombstone's one useful stamp is when it went, and it needs the word: "3d"
+  // alone would read as "edited 3 days ago" exactly like every live row.
+  const meta = entry.deletedAt
+    ? `${t('Deleted')} ${relativeTime(entry.deletedAt)}`
+    : relativeTime(stampOf(entry))
   const Content = kindOf(entry.type).ListRow
 
   // Keep the selected row in view when the keyboard walks past the fold, and
@@ -54,6 +60,11 @@ export default function Item({ entry }: Props) {
       onClick={() => setCurrentEntry(entry.id)}
     >
       <Content entry={entry} flag={flag} />
+      {entry.favorite && (
+        <span data-testid="entry-item-star" className="flex-none text-accent">
+          <StarGlyph size={12} filled />
+        </span>
+      )}
       {meta && (
         <span className="flex-none font-mono text-xs text-text3">{meta}</span>
       )}

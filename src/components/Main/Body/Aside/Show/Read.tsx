@@ -10,6 +10,7 @@ import { kindOf } from '@/kinds'
 import { relativeTime } from '@/utils/time'
 import { t } from '@/i18n'
 import Actions from './Actions'
+import Favorite from './Favorite'
 
 interface Props {
   entry: EntryMeta
@@ -32,9 +33,12 @@ export default function Read({ entry, revealed }: Props) {
   }
 
   const stamps = [
+    entry.deletedAt && `${t('Deleted')} ${relativeTime(entry.deletedAt)}`,
     `${t('Modified')} ${relativeTime(entry.updatedAt)}`,
     `${t('Created')} ${relativeTime(entry.createdAt)}`
-  ].join(' · ')
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <div className="mx-auto w-full max-w-[860px]">
@@ -64,7 +68,11 @@ export default function Read({ entry, revealed }: Props) {
             </h1>
           </div>
         </div>
-        <Actions type={entry.type} revealed={revealed} onDelete={onDelete} />
+        <div className="flex flex-none items-center gap-1.5">
+          {/* A tombstone cannot be starred — Favorites lists live entries. */}
+          {!entry.deletedAt && <Favorite entry={entry} />}
+          <Actions entry={entry} revealed={revealed} onDelete={onDelete} />
+        </div>
       </div>
 
       {revealed && (

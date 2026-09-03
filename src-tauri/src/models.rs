@@ -65,35 +65,31 @@ pub struct EntryMetaDto {
     pub url_host: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub card_brand: Option<String>,
+    pub favorite: bool,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
+    // Set only on the tombstones the Trash lists; absent for live entries.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deleted_at: Option<String>,
 }
 
-impl EntryMetaDto {
-    // Build from the shared metadata columns (timestamps are ms → RFC3339).
-    // One positional arg per DB column, mirrored by both callers — grouping
-    // them into a struct would just restate the column list a third time.
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_parts(
-        id: String,
-        kind: String,
-        title: String,
-        tags: &str,
-        url_host: String,
-        card_brand: Option<String>,
-        created_at: i64,
-        updated_at: i64,
-    ) -> Self {
+// The one projection of a stored metadata row onto the frontend DTO (timestamps
+// are ms → RFC3339). Records project through `Record::meta`, so save and list
+// cannot drift apart on which columns reach the UI.
+impl From<&crate::store::EntryMeta> for EntryMetaDto {
+    fn from(m: &crate::store::EntryMeta) -> Self {
         Self {
-            id,
-            kind,
-            title,
-            tags: serde_json::from_str(tags).unwrap_or_default(),
-            url_host,
+            id: m.id.clone(),
+            kind: m.kind.clone(),
+            title: m.title.clone(),
+            tags: serde_json::from_str(&m.tags).unwrap_or_default(),
+            url_host: m.url_host.clone(),
             // "none" marks a completed derivation with no match — internal only.
-            card_brand: card_brand.filter(|b| b != "none"),
-            created_at: iso(created_at),
-            updated_at: iso(updated_at),
+            card_brand: m.card_brand.clone().filter(|b| b != "none"),
+            favorite: m.favorite,
+            created_at: iso(m.created_at),
+            updated_at: iso(m.updated_at),
+            deleted_at: m.deleted_at.and_then(iso),
         }
     }
 }

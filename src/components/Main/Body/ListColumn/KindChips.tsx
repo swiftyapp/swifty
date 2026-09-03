@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useStore, setFilterType } from '@/store'
 import { KINDS } from '@/kinds'
 import { t } from '@/i18n'
+import { useRows } from '../List/useVisibleEntries'
 import Chip from './Chip'
 
 // The list-column kind filter: an "All" chip plus one per registered kind, each
@@ -9,9 +10,10 @@ import Chip from './Chip'
 // list, not navigating away from it.
 export default function KindChips() {
   const type = useStore(state => state.filters.type)
-  // Select stable store references and derive in a memo, never return a fresh
-  // object from the selector (useSyncExternalStore would re-render forever).
-  const items = useStore(state => state.entries.items)
+  // The current view's rows, not the whole vault, so the counts tell the truth
+  // in Favorites and the Trash as well as in All Items. `useRows` hands back
+  // stable references for exactly this memo.
+  const items = useRows()
   const counts = useMemo(() => {
     const totals = new Map<string, number>()
     for (const item of items) totals.set(item.type, (totals.get(item.type) ?? 0) + 1)

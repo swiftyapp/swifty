@@ -1,5 +1,5 @@
 use crate::commands::{
-    create_vault, derive_key, list_metas, live_records, record_meta_dto, store_err,
+    create_vault, derive_key, list_deleted_metas, list_metas, live_records, meta_dto_of, store_err,
 };
 use crate::error::{Error, Result};
 use crate::models::{Entry, EntryMetaDto, UnlockResult, VaultData};
@@ -45,11 +45,7 @@ pub fn save_entry(entry: Entry, state: State<'_, AppState>) -> Result<EntryMetaD
     let record = migrate::build_record(&entry, payload)?;
     store.upsert(&record).map_err(store_err)?;
 
-    let saved = store
-        .get(&record.id)
-        .map_err(store_err)?
-        .ok_or(Error::NotFound)?;
-    Ok(record_meta_dto(&saved))
+    meta_dto_of(store, &record.id)
 }
 
 // Tombstone one entry (retained for sync); it drops out of the list.
@@ -57,6 +53,45 @@ pub fn save_entry(entry: Entry, state: State<'_, AppState>) -> Result<EntryMetaD
 pub fn delete_entry(id: String, state: State<'_, AppState>) -> Result<()> {
     let session = state.session.lock().unwrap();
     session.store()?.delete(&id).map_err(store_err)
+}
+
+// The Trash: tombstoned entries' metadata, newest deletion first.
+#[tauri::command]
+pub fn list_deleted(state: State<'_, AppState>) -> Result<Vec<EntryMetaDto>> {
+    let session = state.session.lock().unwrap();
+    list_deleted_metas(session.store()?)
+}
+
+// Bring a tombstoned entry back; returns its refreshed metadata so the list can
+// take it back without a re-read.
+#[tauri::command]
+pub fn restore_entry(id: String, state: State<'_, AppState>) -> Result<EntryMetaDto> {
+    let session = state.session.lock().unwrap();
+    let store = session.store()?;
+    store.restore(&id).map_err(store_err)?;
+    meta_dto_of(store, &id)
+}
+
+// Discard a tombstoned entry's contents for good. See `SqliteStore::purge` for
+// why this empties the row rather than deleting it.
+#[tauri::command]
+pub fn purge_entry(id: String, state: State<'_, AppState>) -> Result<()> {
+    let session = state.session.lock().unwrap();
+    session.store()?.purge(&id).map_err(store_err)
+}
+
+// Star or unstar one entry. A metadata-only write: no payload is unsealed or
+// re-sealed, so the star never risks the secret fields.
+#[tauri::command]
+pub fn set_favorite(
+    id: String,
+    favorite: bool,
+    state: State<'_, AppState>,
+) -> Result<EntryMetaDto> {
+    let session = state.session.lock().unwrap();
+    let store = session.store()?;
+    store.set_favorite(&id, favorite).map_err(store_err)?;
+    meta_dto_of(store, &id)
 }
 
 // Open a file picker for a `.swftx` backup. Returns the chosen path, or None if cancelled.

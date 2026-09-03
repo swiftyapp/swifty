@@ -69,11 +69,18 @@ export interface EntryMeta {
   // Card network slug ("visa", …) derived from the number at save time;
   // absent for non-cards and unrecognized numbers.
   cardBrand?: string
+  // Starred by the user. Metadata rather than an entry field, so it is toggled
+  // through setFavorite and never travels with the secrets.
+  favorite: boolean
   createdAt?: string
   updatedAt?: string
+  // Present only on the tombstones listDeleted returns.
+  deletedAt?: string
 }
 
-// Project a full entry down to its list metadata.
+// Project a full entry down to its list metadata. The star is not part of an
+// entry, so it can only be reported as unset here; the backend's own projection
+// is what carries the stored value.
 export const toEntryMeta = (entry: Entry): EntryMeta => ({
   id: entry.id,
   type: entry.type,
@@ -81,6 +88,7 @@ export const toEntryMeta = (entry: Entry): EntryMeta => ({
   tags: entry.tags ?? [],
   urlHost: entry.type === 'login' ? hostOf(entry.website) : '',
   cardBrand: entry.type === 'card' ? cardBrandOf(entry.number) : undefined,
+  favorite: false,
   createdAt: entry.createdAt ?? entry.created_at,
   updatedAt: entry.updatedAt ?? entry.updated_at
 })
@@ -190,6 +198,22 @@ export const saveEntry = (entry: Entry): Promise<EntryMeta> =>
 // Tombstone one entry.
 export const deleteEntry = (id: string): Promise<void> =>
   invoke('delete_entry', { id })
+
+// The Trash: tombstoned entries' metadata, newest deletion first.
+export const listDeleted = (): Promise<EntryMeta[]> => invoke('list_deleted')
+
+// Un-tombstone one entry; returns its refreshed metadata.
+export const restoreEntry = (id: string): Promise<EntryMeta> =>
+  invoke('restore_entry', { id })
+
+// Discard a tombstoned entry's contents for good.
+export const purgeEntry = (id: string): Promise<void> =>
+  invoke('purge_entry', { id })
+
+// Star or unstar one entry; returns its refreshed metadata. A metadata-only
+// write — the payload is never unsealed, so it costs no reveal.
+export const setFavorite = (id: string, favorite: boolean): Promise<EntryMeta> =>
+  invoke('set_favorite', { id, favorite })
 
 export const pickBackup = (): Promise<string | null> => invoke('pick_backup')
 
