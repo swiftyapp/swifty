@@ -1,5 +1,6 @@
 import Panel from '@/components/elements/Panel'
 import {
+  CustomFieldsField,
   DateField,
   Field,
   NoteField,
@@ -52,6 +53,7 @@ export default function Fields() {
           )
         })}
       </Panel>
+      <CustomFieldsField />
       <TagsField />
     </>
   )
