@@ -10,6 +10,9 @@ mod hibp;
 mod import;
 mod locale;
 mod models;
+// The WebAuthn authenticator core. Declared only: its caller is the browser
+// extension host a later PR adds, so no command is registered below yet.
+mod passkey;
 mod secure_store;
 mod state;
 mod storage;

@@ -2,10 +2,21 @@
 //! file in the module that references the app's crypto/models — it is glue, not
 //! part of the pure trait, and stays thin. The store itself never sees it.
 
+use rand::RngCore;
+
 use super::Record;
 use crate::crypto::{Cryptor, PayloadCipher};
 use crate::error::Result;
 use crate::models::Entry;
+
+/// A random 16-byte hex id for an entry the app itself creates (an import row, a
+/// login opened for a new passkey). One generator so every such id has the same
+/// shape as the frontend's.
+pub fn new_entry_id() -> String {
+    let mut bytes = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    hex::encode(bytes)
+}
 
 /// Package a plaintext entry + its already-sealed payload into a store `Record`:
 /// non-secret metadata to columns, the opaque payload as-is. The single place the
