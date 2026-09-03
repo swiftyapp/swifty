@@ -8,7 +8,6 @@ interface Props {
   onChange: (value: string) => void
   name?: string
   testidPrefix?: string
-  className?: string
 }
 
 // A single-choice list on the card surface — the long-form alternative to
@@ -19,8 +18,7 @@ export default function RadioList({
   value,
   onChange,
   name,
-  testidPrefix,
-  className
+  testidPrefix
 }: Props) {
   const nav = useRadioNav(
     options.map(option => option.value),
@@ -34,7 +32,7 @@ export default function RadioList({
       role="radiogroup"
       aria-label={name}
       onKeyDown={nav.onKeyDown}
-      className={cx(CARD, className)}
+      className={CARD}
     >
       {options.map(option => {
         const selected = option.value === value
