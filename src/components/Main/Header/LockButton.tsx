@@ -1,5 +1,5 @@
+import { useTranslation } from 'react-i18next'
 import { lockVault } from '@/store'
-import { t } from '@/i18n'
 import IconButton from '@/components/elements/IconButton'
 import { LockGlyph } from '../icons'
 
@@ -7,6 +7,7 @@ import { LockGlyph } from '../icons'
 // for this action everywhere it appears — here, the command palette and the
 // tray menu.
 export default function LockButton() {
+  const { t } = useTranslation()
   const onLock = () => {
     void lockVault()
   }

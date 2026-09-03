@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TKey } from '@/i18n'
 import { useStore } from '@/store'
 import { restartForUpdate } from '@/services/autoUpdate'
-import { t } from '@/i18n'
 import Button from './Button'
 import { DownloadGlyph } from '../Main/icons'
 
@@ -20,6 +21,7 @@ const shell =
   'animate-pop fixed bottom-5 right-5 z-[1000] max-w-[340px] rounded-xl border border-line bg-detail text-text shadow-[var(--shadow)]'
 
 function ReadyToast({ version, notes }: { version: string; notes: string | null }) {
+  const { t } = useTranslation()
   const dismiss = useStore(state => state.dismissUpdate)
   const [restarting, setRestarting] = useState(false)
 
@@ -40,7 +42,7 @@ function ReadyToast({ version, notes }: { version: string; notes: string | null 
       <div className="flex flex-col gap-1">
         <strong className="text-base">{t('Update Ready')}</strong>
         <span className="text-base text-text2">
-          {t('Version {v} has been downloaded.').replace('{v}', version)}
+          {t('Version {{v}} has been downloaded.', { v: version })}
         </span>
         {notes && (
           <p className="mt-1 whitespace-pre-wrap text-base text-text3">{notes}</p>
@@ -66,13 +68,14 @@ function ReadyToast({ version, notes }: { version: string; notes: string | null 
   )
 }
 
-const STATUS_COPY: Record<'checking' | 'uptodate' | 'error', string> = {
+const STATUS_COPY: Record<'checking' | 'uptodate' | 'error', TKey> = {
   checking: 'Checking for updates…',
   uptodate: "You're up to date.",
   error: 'Update check failed.'
 }
 
 function StatusToast({ status }: { status: 'checking' | 'uptodate' | 'error' }) {
+  const { t } = useTranslation()
   return (
     <div className={`${shell} px-4 py-3`} role="status">
       <span className="text-base text-text2">{t(STATUS_COPY[status])}</span>

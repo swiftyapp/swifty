@@ -7,6 +7,7 @@ mod error;
 mod favicon;
 mod hibp;
 mod import;
+mod locale;
 mod models;
 mod secure_store;
 mod state;
@@ -101,6 +102,7 @@ pub fn run() {
             favicon::fetch_favicon,
             commands::clipboard::copy_to_clipboard,
             autolock::set_autolock_timeout,
+            locale::os_locale,
             commands::sync::sync_connect,
             commands::sync::sync_disconnect,
             commands::sync::sync_now,

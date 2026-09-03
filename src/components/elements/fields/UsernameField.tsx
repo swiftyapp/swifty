@@ -1,3 +1,4 @@
+import type { TKey } from '@/i18n'
 import { UserGlyph } from '../../Main/icons'
 import Field from './Field'
 
@@ -7,7 +8,7 @@ export default function UsernameField({
   required
 }: {
   name?: string
-  label?: string
+  label?: TKey
   required?: boolean
 }) {
   return (

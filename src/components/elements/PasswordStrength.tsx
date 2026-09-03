@@ -1,9 +1,10 @@
 import { cx } from '@/utils/cx'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
+import type { TKey } from '@/i18n'
 import { MIN_LENGTH } from '@/services/strength'
 import { useStrength } from '@/hooks/useStrength'
 
-const LABELS = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']
+const LABELS: TKey[] = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']
 
 // zxcvbn score 0..4 -> the token color of the lit segments.
 const SCORE_COLOR = ['bg-bad', 'bg-bad', 'bg-warn', 'bg-good', 'bg-good']
@@ -15,6 +16,7 @@ interface Props {
 // Non-punitive strength meter: a zxcvbn score bar plus guidance, no
 // composition rules. Renders nothing until the user starts typing.
 export default function PasswordStrength({ password }: Props) {
+  const { t } = useTranslation()
   const strength = useStrength(password)
 
   if (!password) return null
@@ -24,7 +26,7 @@ export default function PasswordStrength({ password }: Props) {
   const score = strength?.score ?? null
   const tooShort = password.length < MIN_LENGTH
   const hint = tooShort
-    ? `${t('Use at least')} ${MIN_LENGTH} ${t('characters')}`
+    ? t('Use at least {{count}} characters', { count: MIN_LENGTH })
     : strength?.warning || strength?.suggestions[0] || ''
 
   return (

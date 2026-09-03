@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'
 import { inputClass } from '@/components/elements/formStyles'
 import { CARD } from '@/components/elements/tokens'
@@ -12,6 +12,7 @@ const fileName = (path: string) => path.replace(/^.*[\\/]/, '')
 // The one card under the grid: what was picked, what it holds, and the button
 // that commits it.
 export default function Result({ flow }: { flow: ReturnType<typeof useImport> }) {
+  const { t } = useTranslation()
   const { picked, preview, result, count, running, error, progress } = flow
   const [password, setPassword] = useState('')
 
@@ -50,7 +51,7 @@ export default function Result({ flow }: { flow: ReturnType<typeof useImport> })
               {preview.skipped > 0 && (
                 <span className="text-bad">
                   {' '}
-                  · {preview.skipped} {t('rows skipped')}
+                  · {t('{{count}} rows skipped', { count: preview.skipped })}
                 </span>
               )}
             </span>
@@ -76,7 +77,7 @@ export default function Result({ flow }: { flow: ReturnType<typeof useImport> })
       {result && (
         <span className="text-base text-good">
           {t('Imported')} {result.imported}
-          {result.skipped > 0 && ` · ${result.skipped} ${t('skipped')}`}
+          {result.skipped > 0 && ` · ${t('{{count}} skipped', { count: result.skipped })}`}
         </span>
       )}
       {count !== null && (

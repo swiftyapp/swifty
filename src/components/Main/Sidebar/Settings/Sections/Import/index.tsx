@@ -1,4 +1,4 @@
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { MONO_LABEL } from '@/components/elements/tokens'
 import { useImport } from './useImport'
 import Tiles from './Tiles'
@@ -6,6 +6,7 @@ import DropZone from './DropZone'
 import Result from './Result'
 
 export default function Import() {
+  const { t } = useTranslation()
   const flow = useImport()
   const active =
     flow.picked === null

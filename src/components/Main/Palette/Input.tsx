@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import Kbd from '@/components/elements/Kbd'
 import { SearchGlyph } from '../icons'
 
@@ -17,6 +17,7 @@ interface Props {
 // result list below it — focus never leaves this field, so the list is only
 // reachable to a screen reader through these attributes.
 export default function Input({ value, onChange, onKeyDown, listId, activeId }: Props) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center gap-[11px] px-4 py-3.5 shadow-[inset_0_-1px_0_var(--c-line)]">
       <SearchGlyph className="flex-none text-text3" />

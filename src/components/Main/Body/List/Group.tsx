@@ -1,9 +1,10 @@
 import type { EntryMeta } from '@/lib/commands'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
+import type { TKey } from '@/i18n'
 import Item from './Item'
 
 interface Props {
-  title: string
+  title: TKey
   entries: EntryMeta[]
 }
 
@@ -11,6 +12,7 @@ interface Props {
 // header (label + hairline rule + count) over its rows; rendered only when the
 // group has members. The entry list itself is flat, so this is the only caller.
 export default function Group({ title, entries }: Props) {
+  const { t } = useTranslation()
   if (entries.length === 0) return null
 
   return (

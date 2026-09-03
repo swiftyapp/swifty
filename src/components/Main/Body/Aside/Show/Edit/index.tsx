@@ -1,6 +1,6 @@
 import type { Entry, EntryType } from '@/lib/commands'
 import { kindOf } from '@/kinds'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { FieldsProvider } from '@/components/elements/fields'
 import { MONO_TYPE } from '@/components/elements/tokens'
 import Actions from './Actions'
@@ -18,6 +18,7 @@ interface Props {
 // state — an accent frame around the pane, an accent eyebrow, and a title you
 // can type in — so there is never a doubt about which mode this is.
 export default function Edit({ type, revealed }: Props) {
+  const { t } = useTranslation()
   const draft = useDraft(type, revealed)
   const kind = kindOf(type)
   const Glyph = kind.Glyph
@@ -51,10 +52,7 @@ export default function Edit({ type, revealed }: Props) {
                 maxLength={40}
                 autoComplete="off"
                 spellCheck={false}
-                placeholder={t('Untitled {kind}').replace(
-                  '{kind}',
-                  t(kind.label).toLowerCase()
-                )}
+                placeholder={t(kind.untitledLabel)}
                 onChange={event => draft.set('title', event.target.value)}
                 className="min-w-0 flex-1 truncate border-b border-line2 bg-transparent text-2xl font-semibold tracking-display text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line"
               />

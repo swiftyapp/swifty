@@ -1,17 +1,19 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { changeMasterPassword } from '@/lib/commands'
-import { t } from '@/i18n'
+import type { TKey } from '@/i18n'
 import Button from '@/components/elements/Button'
 import { inputClass } from '@/components/elements/formStyles'
 import ExpandableRow from '../ExpandableRow'
 
-const FIELDS: { name: string; label: string }[] = [
+const FIELDS: { name: string; label: TKey }[] = [
   { name: 'current_password', label: 'Current Password' },
   { name: 'new_password', label: 'New Password' },
   { name: 'new_password_repeat', label: 'Repeat New Password' }
 ]
 
 export default function MasterPasswordRow() {
+  const { t } = useTranslation()
   const [values, setValues] = useState<Record<string, string>>({})
   const [processing, setProcessing] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)

@@ -8,6 +8,7 @@ Element.prototype.scrollIntoView = vi.fn()
 // screens render without a live backend. Individual tests override as needed.
 vi.mock('@/lib/commands', () => ({
   isInitialized: vi.fn().mockResolvedValue(true),
+  osLocale: vi.fn().mockResolvedValue('en-US'),
   setup: vi.fn().mockResolvedValue(undefined),
   unlock: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
   lock: vi.fn().mockResolvedValue(undefined),
@@ -98,3 +99,8 @@ vi.mock('@tauri-apps/api/dpi', () => ({
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn().mockResolvedValue(undefined)
 }))
+
+// Components under test call useTranslation(); the singleton must be
+// initialized once before any of them render.
+const { i18nReady } = await import('@/i18n')
+await i18nReady

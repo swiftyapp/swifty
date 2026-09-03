@@ -16,11 +16,14 @@ import enUS from '@/i18n/locales/en-US.json'
  * needs no Node types in the app's tsconfig.
  */
 
-const sources = import.meta.glob<string>(['../**/*.{ts,tsx}', '!../test/**'], {
-  query: '?raw',
-  import: 'default',
-  eager: true
-})
+const sources = import.meta.glob<string>(
+  ['../**/*.{ts,tsx}', '!../test/**', '!../**/*.d.ts'],
+  {
+    query: '?raw',
+    import: 'default',
+    eager: true
+  }
+)
 
 const locales = import.meta.glob<Record<string, string>>('../i18n/locales/*.json', {
   import: 'default',
@@ -46,12 +49,19 @@ const placeholders = (value: string) => [...value.matchAll(/\{[^}]*\}/g)].map(m 
 
 const catalogue: Record<string, string> = enUS
 
+// i18next resolves `t(key, { count })` against `${key}_zero|one|two|few|many|other`
+// rather than the bare key, so a pluralized entry never appears under `key`
+// itself in the catalogue.
+const PLURAL_SUFFIXES = ['_zero', '_one', '_two', '_few', '_many', '_other']
+const inCatalogue = (key: string) =>
+  key in catalogue || PLURAL_SUFFIXES.some(suffix => `${key}${suffix}` in catalogue)
+
 const translated = Object.entries(locales).filter(([path]) => !path.endsWith('en-US.json'))
 
 describe('i18n', () => {
   it('has an en-US entry for every literal t() key in src/', () => {
     const missing = [...literalKeys()]
-      .filter(([key]) => !(key in catalogue))
+      .filter(([key]) => !inCatalogue(key))
       .map(([key, path]) => `${JSON.stringify(key)} (${path})`)
 
     expect(missing).toEqual([])

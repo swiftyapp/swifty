@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import {
   biometricStatus,
   enableBiometric,
   disableBiometric,
   type BiometricMode
 } from '@/lib/commands'
-import { t } from '@/i18n'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Toggle from '@/components/elements/Toggle'
 
 // What the gate actually is, once we know it. Before enrollment we can only
 // describe the offer; afterwards the recorded mode says which guarantee holds.
-const description = (mode: BiometricMode | null) => {
+const description = (t: TFunction, mode: BiometricMode | null) => {
   if (mode === 'protected')
     return t(
       'Your vault key is protected by the Secure Enclave and invalidated if your fingerprints change.'
@@ -27,6 +28,7 @@ const description = (mode: BiometricMode | null) => {
 }
 
 export default function BiometricRow() {
+  const { t } = useTranslation()
   const [enabled, setEnabled] = useState(false)
   const [mode, setMode] = useState<BiometricMode | null>(null)
   const [busy, setBusy] = useState(false)
@@ -68,7 +70,7 @@ export default function BiometricRow() {
     <SettingsGroup label={t('Biometrics')}>
       <SettingsRow
         label={t('Unlock with Touch ID or Windows Hello')}
-        description={description(enabled ? mode : null)}
+        description={description(t, enabled ? mode : null)}
         control={
           <Toggle
             name="biometric"

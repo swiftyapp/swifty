@@ -59,7 +59,7 @@ describe('empty states', () => {
       setFilterType('card')
       renderWithStore(<Main />, { store })
 
-      expect(screen.getByText('No Credit cards yet')).toBeInTheDocument()
+      expect(screen.getByText('No credit cards yet')).toBeInTheDocument()
       // The detail pane stays on the quiet state — no second hero.
       expect(screen.getByText('Select an item')).toBeInTheDocument()
       expect(screen.queryByText('Your vault is empty')).not.toBeInTheDocument()
@@ -88,7 +88,7 @@ describe('empty states', () => {
       setFilterQuery('zzz')
       renderWithStore(<Main />, { store })
 
-      expect(screen.getByText('No matches for “zzz” in Logins')).toBeInTheDocument()
+      expect(screen.getByText('No matches for “zzz” in logins')).toBeInTheDocument()
 
       await userEvent.click(screen.getByText('Search all items'))
       expect(useStore.getState().filters.type).toBeNull()

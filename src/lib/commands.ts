@@ -334,3 +334,14 @@ export const syncNow = (): Promise<void> => invoke('sync_now')
 export const syncImport = (): Promise<void> => invoke('sync_import')
 
 export const syncStatus = (): Promise<SyncStatus> => invoke('sync_status')
+
+// ---------------------------------------------------------------------------
+// Locale
+// ---------------------------------------------------------------------------
+
+/**
+ * The OS locale, already narrowed to a catalog the app ships. Read from the
+ * system rather than `navigator.language`, which reports the webview engine's
+ * configuration and disagrees with the OS on some Linux and Windows setups.
+ */
+export const osLocale = (): Promise<string> => invoke('os_locale')

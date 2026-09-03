@@ -1,5 +1,7 @@
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { openGenerator } from '@/store'
-import { t } from '@/i18n'
+import type { TKey } from '@/i18n'
 import { relativeDuration, shortDate, toTime } from '@/utils/time'
 import { RefreshGlyph } from '../../Main/icons'
 import StrengthBar from '../StrengthBar'
@@ -10,14 +12,14 @@ import { useField, useFields } from './context'
 // How long this password has been in place. `now` reads as "just now" rather
 // than "changed now ago", and past a week — where the duration runs out — the
 // date goes in a sentence of its own rather than "changed 05/06/2026 ago".
-const rotationStamp = (iso?: string | string[]): string => {
+const rotationStamp = (t: TFunction, iso?: string | string[]): string => {
   if (typeof iso !== 'string') return ''
   const at = toTime(iso)
   if (at === null) return ''
   const ago = relativeDuration(iso)
   if (ago === 'now') return t('changed just now')
-  if (ago) return t('changed {t} ago').replace('{t}', ago)
-  return t('changed on {d}').replace('{d}', shortDate(at))
+  if (ago) return t('changed {{ago}} ago', { ago })
+  return t('changed on {{date}}', { date: shortDate(at) })
 }
 
 export default function PasswordField({
@@ -26,12 +28,13 @@ export default function PasswordField({
   required
 }: {
   name?: string
-  label?: string
+  label?: TKey
   required?: boolean
 }) {
+  const { t } = useTranslation()
   const { entry } = useFields()
   const { value, set, editing } = useField(name)
-  const stamp = rotationStamp(entry.password_updated_at)
+  const stamp = rotationStamp(t, entry.password_updated_at)
 
   return (
     <Field

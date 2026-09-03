@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import AuthShell from '@/components/elements/AuthShell'
 import Eyebrow from '@/components/elements/Eyebrow'
 import Import from './Import'
@@ -10,6 +10,7 @@ interface Props {
 }
 
 export default function Restore({ goBack }: Props) {
+  const { t } = useTranslation()
   const [path, setPath] = useState<string | null>(null)
   const chosen = path !== null
 

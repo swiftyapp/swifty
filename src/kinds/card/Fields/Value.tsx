@@ -1,5 +1,9 @@
 import { cx } from '@/utils/cx'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
+import type { TKey } from '@/i18n'
+
+/** Dot masks used as empty-state placeholders on the card face. */
+type Mask = '•••' | '••••' | '••/••' | '•••• •••• •••• ••••'
 import { useCopied } from '@/hooks/useCopied'
 import { useFields } from '@/components/elements/fields'
 import { CheckGlyph } from '@/components/Main/icons'
@@ -25,7 +29,7 @@ interface Props {
   /** The input's `name` — the selector the e2e suite owns. */
   name: string
   /** Untranslated; the bottom row labels its values, the number and name don't. */
-  label?: string
+  label?: TKey
   /** What reading shows: masked, grouped, or the empty placeholder. */
   display: string
   /** What clicking copies. Empty leaves the read value inert. */
@@ -34,7 +38,11 @@ interface Props {
   value: string
   onChange: (value: string) => void
   testid: string
-  placeholder: string
+  /**
+   * Either a catalogue key ("MM/YY") or a dot mask ("••••"), which is
+   * decoration rather than copy and has no entry to translate.
+   */
+  placeholder: TKey | Mask
   maxLength: number
   /** Type scale for the value line: the number is the big one. */
   ink: string
@@ -71,6 +79,7 @@ export default function Value({
   zone = 'base',
   className
 }: Props) {
+  const { t } = useTranslation()
   const { set, attempted } = useFields()
   const { copied, copy } = useCopied()
 
@@ -88,7 +97,9 @@ export default function Value({
         <input
           name={name}
           value={value}
-          placeholder={placeholder === undefined ? undefined : t(placeholder)}
+          // A mask falls through `t()` unchanged — an unknown key returns
+          // itself — so both cases go down the same path.
+          placeholder={t(placeholder as TKey)}
           maxLength={maxLength}
           autoComplete="off"
           spellCheck={false}

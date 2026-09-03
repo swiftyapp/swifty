@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { unlock, unlockBiometric, type UnlockResult } from '@/lib/commands'
 import { enterMain } from '@/store'
-import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
 import Controls from '@/components/elements/Controls'
 import AuthShell from '@/components/elements/AuthShell'
@@ -31,7 +32,7 @@ const isTooManyAttempts = (error: unknown): error is TooManyAttemptsError =>
 const isVaultTooNew = (error: unknown): boolean =>
   error === 'vault requires a newer version of the app'
 
-const unlockError = (error: unknown): string =>
+const unlockError = (t: TFunction, error: unknown): string =>
   isVaultTooNew(error)
     ? t('Vault needs a newer version of Swifty')
     : t('Incorrect Master Password')
@@ -40,11 +41,11 @@ const unlockError = (error: unknown): string =>
 // are a cancelled/failed prompt, a missing enrollment, or a keychain issue.
 // Claiming "Incorrect Master Password" for any of them would send the user
 // retyping a password that was never checked.
-const biometricError = (error: unknown): string =>
+const biometricError = (t: TFunction, error: unknown): string =>
   isVaultTooNew(error) ? t('Vault needs a newer version of Swifty') : t('Biometric unlock failed')
 
-const lockedMessage = (seconds: number) =>
-  `${t('Too many failed attempts')}. ${t('Try again in')} ${seconds}s`
+const lockedMessage = (t: TFunction, seconds: number) =>
+  t('Too many failed attempts. Try again in {{seconds}}s', { seconds })
 
 // One attempt-lifecycle slot instead of separate success/pending booleans:
 // only one of these can be true at a time, and everything below derives from
@@ -52,6 +53,7 @@ const lockedMessage = (seconds: number) =>
 type Phase = 'idle' | 'verifying' | 'success'
 
 export function Auth({ touchID }: Props) {
+  const { t } = useTranslation()
   const [error, setError] = useState<string | null>(null)
   const [retryAfter, setRetryAfter] = useState(0)
   const [count, setCount] = useState(0)
@@ -64,10 +66,10 @@ export function Auth({ touchID }: Props) {
     const id = setTimeout(() => {
       const next = retryAfter - 1
       setRetryAfter(next)
-      setError(next > 0 ? lockedMessage(next) : null)
+      setError(next > 0 ? lockedMessage(t, next) : null)
     }, 1000)
     return () => clearTimeout(id)
-  }, [retryAfter])
+  }, [retryAfter, t])
 
   useEffect(() => () => clearTimeout(holdTimer.current), [])
 
@@ -92,9 +94,9 @@ export function Auth({ touchID }: Props) {
         setPhase('idle')
         if (isTooManyAttempts(err)) {
           setRetryAfter(err.retryAfterSecs)
-          setError(lockedMessage(err.retryAfterSecs))
+          setError(lockedMessage(t, err.retryAfterSecs))
         } else {
-          setError(unlockError(err))
+          setError(unlockError(t, err))
         }
       })
   }
@@ -109,7 +111,7 @@ export function Auth({ touchID }: Props) {
       .then(holdThenEnter)
       .catch((err: unknown) => {
         setPhase('idle')
-        setError(biometricError(err))
+        setError(biometricError(t, err))
       })
   }
 

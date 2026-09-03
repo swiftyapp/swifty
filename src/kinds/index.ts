@@ -1,5 +1,5 @@
 import type { EntryType } from '@/lib/commands'
-import { t } from '@/i18n'
+import type { TKey } from '@/i18n'
 import type { Kind } from './types'
 import login from './login'
 import card from './card'
@@ -23,6 +23,7 @@ export const kindOf = (type: EntryType): Kind => BY_TYPE[type]
  * it creates. The editor sheet, the empty panes and any future surface phrase
  * it identically, so the wording lives with the registry it comes from instead
  * of drifting into a different per-surface literal on every screen.
+ *
+ * Returns the key, not the string — the caller has a `t` and re-renders with it.
  */
-export const addLabel = (type: EntryType): string =>
-  t('Add a {kind}').replace('{kind}', t(kindOf(type).label).toLowerCase())
+export const addLabel = (type: EntryType): TKey => kindOf(type).addLabel

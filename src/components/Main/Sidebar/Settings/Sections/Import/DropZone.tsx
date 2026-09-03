@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { DownloadGlyph } from '../../../../icons'
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 // a browser DataTransfer. The API is imported lazily so a non-Tauri host (the
 // vitest jsdom run) simply never wires the listener up.
 export default function DropZone({ onDrop }: Props) {
+  const { t } = useTranslation()
   useEffect(() => {
     let alive = true
     let unlisten: (() => void) | undefined

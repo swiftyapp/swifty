@@ -1,10 +1,11 @@
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
-import { t } from '@/i18n'
 import { useVaultMeta, vaultHome } from '@/hooks/useAuthMeta'
 
 // Version and update state, pinned under the nav. The status line doubles as the
 // "check for updates" control — there is no separate Updates section any more.
 export default function Footer() {
+  const { t } = useTranslation()
   const meta = useVaultMeta()
   const update = useStore(state => state.update)
   const runUpdateCheck = useStore(state => state.runUpdateCheck)

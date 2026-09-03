@@ -1,7 +1,8 @@
 import { useStore } from '@/store'
 import type { View } from '@/store/uiSlice'
 import { kindOf } from '@/kinds'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
+import type { TKey } from '@/i18n'
 import KindChips from './KindChips'
 import List from '../List'
 import SortMenu from '../List/SortMenu'
@@ -13,7 +14,7 @@ import { useListKeys } from './useListKeys'
 // The column is titled after the view, except in All Items, where a kind chip
 // renames it to what it is now showing ("Logins"). The other views keep their
 // own name: "Logins" would lose the fact that you are looking at the Trash.
-const TITLES: Record<View, string> = {
+const TITLES: Record<View, TKey> = {
   items: 'All Items',
   favorites: 'Favorites',
   health: 'Vault Health',
@@ -21,6 +22,7 @@ const TITLES: Record<View, string> = {
 }
 
 export default function ListColumn() {
+  const { t } = useTranslation()
   const view = useStore(state => state.ui.view)
   const type = useStore(state => state.filters.type)
   const health = view === 'health'

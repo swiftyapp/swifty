@@ -8,7 +8,7 @@ import { MONO_LABEL } from '@/components/elements/tokens'
 import { hasBrandMark } from '@/utils/cardBrand'
 import { kindOf } from '@/kinds'
 import { relativeTime } from '@/utils/time'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import Actions from './Actions'
 import Favorite from './Favorite'
 
@@ -19,6 +19,7 @@ interface Props {
 }
 
 export default function Read({ entry, revealed }: Props) {
+  const { t } = useTranslation()
   const icon = useFavicon(entry.urlHost)
   const kind = kindOf(entry.type)
   const Glyph = kind.Glyph
@@ -33,9 +34,9 @@ export default function Read({ entry, revealed }: Props) {
   }
 
   const stamps = [
-    entry.deletedAt && `${t('Deleted')} ${relativeTime(entry.deletedAt)}`,
-    `${t('Modified')} ${relativeTime(entry.updatedAt)}`,
-    `${t('Created')} ${relativeTime(entry.createdAt)}`
+    entry.deletedAt && t('Deleted {{time}}', { time: relativeTime(entry.deletedAt) }),
+    t('Modified {{time}}', { time: relativeTime(entry.updatedAt) }),
+    t('Created {{time}}', { time: relativeTime(entry.createdAt) })
   ]
     .filter(Boolean)
     .join(' · ')

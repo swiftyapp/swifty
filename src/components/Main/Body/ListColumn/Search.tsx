@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import { useStore, setFilterQuery } from '@/store'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { CloseGlyph, SearchGlyph } from '../../icons'
 
 // The app's one search field: it sits in the list column it filters and spans
@@ -8,6 +8,7 @@ import { CloseGlyph, SearchGlyph } from '../../icons'
 // the rows (↑/↓, ⏎, ⌘⏎) belong to the whole column, so they live one level up
 // in useListKeys and reach this field by bubbling.
 export default function Search() {
+  const { t } = useTranslation()
   const query = useStore(state => state.filters.query)
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {

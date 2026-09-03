@@ -1,6 +1,7 @@
+import { useTranslation } from 'react-i18next'
 import { useStore, openSettings } from '@/store'
 import { cx } from '@/utils/cx'
-import { t } from '@/i18n'
+import type { TKey } from '@/i18n'
 import Tooltip from '@/components/elements/Tooltip'
 
 // Sync pill: a status dot + mono label surfacing syncing / synced / error.
@@ -10,6 +11,7 @@ import Tooltip from '@/components/elements/Tooltip'
 // forever — a permanent slot spent on a fact the user cannot act on. Clicking
 // goes where the state is owned: Settings › Sync & devices.
 export default function SyncIndicator() {
+  const { t } = useTranslation()
   const sync = useStore(state => state.sync)
 
   if (!sync.enabled) return null
@@ -24,8 +26,10 @@ export default function SyncIndicator() {
     ? t('Syncing…')
     : sync.success
       ? t('Sync Successful')
-      : // The backend hands back an English message; it is a locale key too.
-        t(sync.error || 'Something went wrong')
+      : // The backend message is looked up opportunistically against the
+        // catalog and falls through to itself (rendering the raw backend
+        // text) when there's no match — it isn't a real TKey, so cast.
+        t((sync.error || 'Something went wrong') as TKey)
 
   return (
     <Tooltip content={message}>

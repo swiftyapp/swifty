@@ -1,4 +1,5 @@
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
+import type { TKey } from '@/i18n'
 import { useField } from './context'
 import { requiredError } from './formats'
 import FieldRow from './Row'
@@ -18,9 +19,10 @@ export default function NoteField({
 }: {
   name?: string
   /** Omitted for a note entry, whose body owns the whole panel. */
-  label?: string
+  label?: TKey
   required?: boolean
 }) {
+  const { t } = useTranslation()
   const { value, set, editing, attempted } = useField(name)
 
   if (!editing && value === '') return null

@@ -1,4 +1,4 @@
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import {
   LENGTH_RANGE,
   WORDS_RANGE,
@@ -13,6 +13,7 @@ interface Props {
 // One slider row that measures characters in random mode and words in
 // memorable mode — the only dimension that changes between the two.
 export default function Amount({ settings, onChange }: Props) {
+  const { t } = useTranslation()
   const byWords = settings.mode === 'memorable'
   const { min, max } = byWords ? WORDS_RANGE : LENGTH_RANGE
   const value = byWords ? settings.words : settings.length

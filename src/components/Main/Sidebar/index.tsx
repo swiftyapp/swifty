@@ -1,4 +1,4 @@
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import Brand from './Brand'
 import Add from './Add'
 import ViewButton from './ViewButton'
@@ -10,6 +10,7 @@ import { GridRailGlyph, StarRailGlyph, TrashRailGlyph } from '../icons'
 // vault-health · trash · settings. Rail tiles are 36px with 20px glyphs — one
 // step up from the in-pane tiers so the rail reads as primary navigation.
 export default function Sidebar() {
+  const { t } = useTranslation()
   return (
     <nav className="flex w-[56px] flex-none flex-col items-center gap-1.5 border-r border-line bg-rail py-3">
       <Brand />

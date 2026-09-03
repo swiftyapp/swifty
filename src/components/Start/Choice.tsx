@@ -1,4 +1,4 @@
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import AuthShell from '@/components/elements/AuthShell'
 import Eyebrow from '@/components/elements/Eyebrow'
 import Button from '@/components/elements/Button'
@@ -8,6 +8,7 @@ interface Props {
 }
 
 export default function Choice({ onSelect }: Props) {
+  const { t } = useTranslation()
   return (
     <AuthShell>
       <Eyebrow>{t('Welcome to Swifty')}</Eyebrow>

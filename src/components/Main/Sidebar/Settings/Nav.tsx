@@ -1,5 +1,5 @@
+import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
-import { t } from '@/i18n'
 import type { Section } from '@/store/uiSlice'
 import Footer from './Footer'
 import { SECTIONS } from './sections'
@@ -10,6 +10,7 @@ interface Props {
 }
 
 export default function Nav({ section, onSelect }: Props) {
+  const { t } = useTranslation()
   return (
     <nav className="flex w-[220px] flex-none flex-col border-r border-line bg-list p-5">
       <div className="mb-4 text-xl font-semibold tracking-display text-text">

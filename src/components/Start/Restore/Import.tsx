@@ -1,5 +1,5 @@
+import { useTranslation } from 'react-i18next'
 import { pickBackup } from '@/lib/commands'
-import { t } from '@/i18n'
 import Button from '@/components/elements/Button'
 
 interface Props {
@@ -8,6 +8,7 @@ interface Props {
 }
 
 export default function Import({ display, onImport }: Props) {
+  const { t } = useTranslation()
   const chooseFile = () => {
     pickBackup().then(path => {
       if (path) onImport(path)

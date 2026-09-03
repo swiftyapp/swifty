@@ -1,6 +1,6 @@
+import { useTranslation } from 'react-i18next'
 import type { Kind } from '@/kinds'
 import { KIND_TINT } from '@/kinds/tint'
-import { t } from '@/i18n'
 import { cx } from '@/utils/cx'
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
 // the one line that says what it holds. A real button, so ⏎/Space activate it
 // and the global :focus-visible ring is all the focus styling it needs.
 export default function KindTile({ kind, onSelect }: Props) {
+  const { t } = useTranslation()
   const { Glyph } = kind
 
   return (
