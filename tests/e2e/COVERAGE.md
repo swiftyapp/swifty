@@ -43,7 +43,7 @@ runs one app process against one data dir, so nothing may depend on file order.
 | Delete confirm | PR 2 | `delete-entry-button` → `delete-entry-confirm` inside `more-actions-button` |
 | Kind filter chips over the list | PR 2 | `filter-all` / `filter-login` / `filter-card` / `filter-note`, `aria-pressed` on the active chip |
 | All Items / Vault Health views in the rail | PR 2 | `view-items` / `view-health`; the pane title is `list-title` |
-| Favorites and Trash views in the rail | item 14 | `view-favorites` / `view-trash`, in rail order All Items · Favorites · Vault Health · Trash · Settings. Each view retitles `list-title` ("Favorites", "Trash"); search and the kind chips apply in all three item views, and the chip counts follow the view rather than the whole vault. |
+| Favorites and Trash views in the rail | item 14 | `view-favorites` / `view-trash`, in rail order All Items · Favorites · Vault Health · Trash · Settings. Each view retitles `list-title` ("Favorites", "Trash"); search and the kind chips apply in all three item views. |
 | Starring an entry | item 14 | `favorite-toggle` in the detail header (absent on a tombstone, which cannot be starred). Under Recent, starred rows are **pinned** above the rest — `list.spec.ts` proves it by touching another entry afterwards, since starring restamps `updatedAt` and recency alone would otherwise explain the order. Alphabetical is deliberately unpinned. Starred rows carry `entry-item-star`. |
 | Trash: delete → restore → purge | item 14 | `trash.spec.ts`. A deleted entry leaves All Items (`empty-vault`) and appears under `view-trash`, its row stamped "Deleted …" rather than the usual bare relative time. A trashed entry is read-only: `restore-entry-button` and `purge-entry-button` are the only actions, and `edit-entry-button` / `more-actions-button` / `primary-action-button` are all absent (`reveal_entry` does not serve deleted rows). `restore-entry-button` puts it back in All Items, editable again; `purge-entry-button` → `purge-entry-confirm` ("Delete forever?") removes it from both views. `empty-trash` is the empty state. |
 | A tombstone is un-editable by any route | item 14 | The read-only-ness is enforced in `editEntry` itself, not per-accelerator, so ⌘E over a trashed row is a no-op and no `entry-sheet` appears — covered as a unit test (`trash.test.tsx`) since it is a store guard rather than a rendering. ⌘⏎ on a trashed row still calls `reveal_entry`, which refuses it; `copySecret` swallows the rejection, so nothing reaches the clipboard and nothing throws. |
@@ -57,12 +57,12 @@ runs one app process against one data dir, so nothing may depend on file order.
 | Password generator | PR 4 | `generator-mode-random` / `-memorable`, `generator-amount`, `generator-regenerate`, `generator-output`, `generator-use-button` |
 | Change master password | PR 4 | `change-password-submit`, `change-password-error`, `change-password-success` |
 | Settings shell: nav + section titles | PR 4 | `settings-modal`, `settings-nav-<sync\|security\|audit\|import\|language>` (`aria-current="page"` on the active item), `settings-version` / `settings-update-status` in the pinned footer, `modal-close` |
-| Session preferences | PR 4 | `settings-autolock-<secs>` and `settings-clipboard-<ms>` segments, asserted through `swifty:autolockSecs` / `swifty:clipboardTimeout` in localStorage. Auto-lock also pushes to the `set_autolock_timeout` command. |
-| Generator defaults | PR 4 | `settings-generator-length` / `-symbols` / `-numbers`, asserted through `swifty:generatorDefaults` |
+| Session preferences | PR 4 | `settings-autolock-<secs>` and `settings-clipboard-<ms>` segments, asserted through `swifty:autolockSecs` / `swifty:clipboardTimeout` in localStorage. |
+| Generator defaults | PR 4 | `settings-generator-symbols`, asserted through `swifty:generatorDefaults`. `settings-generator-length` and `-numbers` exist but nothing asserts them yet. |
 | Breach monitoring switch | PR 4 | `settings-breach-toggle`; weak/reused are informational rows with no control, so the section holds exactly one `role="switch"` |
 | Import tiles | PR 4 | `import-tile-<bitwarden\|chrome\|lastpass\|keepass\|csv\|swftx>`, `import-dropzone`; the format `<select>` is gone |
-| Theme and date format | PR 4 | `settings-theme-<light\|dark\|system>` (asserted on `<html data-theme>`), `settings-date-format-<pattern>` (asserted through `swifty:dateFormat`) |
-| Sync indicator reads "Local" | PR 4 | `sync-indicator` |
+| Theme and date format | PR 4 | `settings-theme-light` / `-dark` (asserted on `<html data-theme>`), `settings-date-format-<pattern>` (asserted through `swifty:dateFormat`). `settings-theme-system` resolves against the OS, so the suite leaves it alone. |
+| Sync indicator absent with no provider | PR 4 | `sync-indicator`; with no provider configured the pill has no state to report and is not rendered, so `sync-indicator.spec.ts` asserts it does not exist. A connected reading is not e2e-able (see below). |
 | Copy toast | PR 4 | `copy-toast` — always in the DOM, toggled via the `hidden` class, so assert *visibility* |
 
 ---
@@ -84,12 +84,16 @@ These are not gaps in the suite; the coverage lives elsewhere and belongs there.
 
 ## Harness reference
 
-- `helpers/reset.ts` — `resetPristine()`, `resetEmpty(password)`
+- `helpers/reset.ts` — `resetPristine()`, `resetEmpty(password)` (both clear webview
+  localStorage and then re-seed `locale = "en-US"`, so every spec selects on English labels
+  without pinning it itself)
 - `helpers/vault.ts` — `setupVault(password)`, `unlock(password)`, `lockVault()`
-- `helpers/entries.ts` — `createLogin`, `createCard`, `createNote`, `entryItems()`
+- `helpers/entries.ts` — `createLogin`, `createCard`, `createNote`, `entryItems()`,
+  `visibleTitles()`, `expectTitles(titles)`, `openEntry(title)`, `toggleFavorite()`
   (each `create*` opens the kind picker from `add-entry-button`, presses its `add-kind-<kind>`
   tile, fills the pane editor by field `name`, and saves — `createCard` composes the one
-  `expiry` box from the `month` / `year` pair its caller still passes)
+  `expiry` box from the `month` / `year` pair its caller still passes. Rows carry no
+  per-entry testid, so `openEntry` matches on title text)
 - `helpers/app.ts` — `waitFor(testid)`, `waitForAppReady()`
 - `helpers/keys.ts` — `chord(key)` (Meta on macOS, Control on CI), `pressEnter()`, `pressArrowDown()`
 
