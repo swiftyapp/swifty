@@ -11,7 +11,9 @@ export default function TagsField({ name = 'tags' }) {
   const { t } = useTranslation()
   const { entry, set } = useFields()
   const raw = entry[name]
-  const tags = Array.isArray(raw) ? raw : []
+  // A draft array is not necessarily strings (a login also carries passkeys),
+  // so narrow rather than assume the key holds tags.
+  const tags = Array.isArray(raw) ? raw.filter(v => typeof v === 'string') : []
 
   if (!set && tags.length === 0) return null
 

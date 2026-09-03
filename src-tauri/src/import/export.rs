@@ -5,7 +5,8 @@
 use serde::Serialize;
 use serde_json::json;
 
-use super::{EntryKind, ImportedEntry};
+use super::bitwarden::{KEY_ALGORITHM, KEY_CURVE, KEY_TYPE};
+use super::{EntryKind, ImportedEntry, ImportedPasskey};
 
 /// Bitwarden `type` codes.
 fn bw_type(kind: EntryKind) -> u8 {
@@ -34,6 +35,12 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
                         "totp": e.otp,
                         "uris": e.url.as_ref().map(|u| vec![json!({ "uri": u })]).unwrap_or_default(),
                     });
+                    // Only written when there is something to write, so an
+                    // export of a passkey-less vault is unchanged.
+                    if !e.passkeys.is_empty() {
+                        item["login"]["fido2Credentials"] =
+                            json!(e.passkeys.iter().map(fido2_credential).collect::<Vec<_>>());
+                    }
                 }
                 EntryKind::Card => {
                     item["card"] = json!({
@@ -60,6 +67,26 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
         encrypted: false,
         folders: vec![],
         items,
+    })
+}
+
+/// One Bitwarden `fido2Credentials` element. Every value is a string there,
+/// `counter` included; the key material is passed through verbatim.
+fn fido2_credential(p: &ImportedPasskey) -> serde_json::Value {
+    json!({
+        "credentialId": p.credential_id,
+        "keyType": KEY_TYPE,
+        "keyAlgorithm": KEY_ALGORITHM,
+        "keyCurve": KEY_CURVE,
+        "keyValue": p.private_key,
+        "rpId": p.rp_id,
+        "rpName": p.rp_name,
+        "userHandle": p.user_handle,
+        "userName": p.user_name,
+        "userDisplayName": p.user_display_name,
+        "counter": p.counter.to_string(),
+        "discoverable": "true",
+        "creationDate": p.created_at,
     })
 }
 
