@@ -7,7 +7,7 @@ import { renderWithStore, withEntries, loginMeta } from './utils'
 
 const seed = () => {
   const store = makeStore()
-  withEntries(store, [loginMeta({ id: 'l1', title: 'Google' })])
+  withEntries([loginMeta({ id: 'l1', title: 'Google' })])
   return store
 }
 
@@ -118,7 +118,7 @@ describe('add a secret', () => {
 
   it('is reachable from the empty detail pane', async () => {
     const store = makeStore()
-    withEntries(store, [])
+    withEntries([])
     renderWithStore(<Main />, { store })
 
     const button = screen.getByTestId('create-first-entry-button')

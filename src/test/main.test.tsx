@@ -17,7 +17,7 @@ beforeEach(() => vi.clearAllMocks())
 describe('Main', () => {
   const seed = () => {
     const store = makeStore()
-    withEntries(store, [loginMeta({ id: 'l1', title: 'Google' }), note('n1', 'Journal'), card('c1', 'Visa')])
+    withEntries([loginMeta({ id: 'l1', title: 'Google' }), note('n1', 'Journal'), card('c1', 'Visa')])
     return store
   }
 
@@ -43,7 +43,7 @@ describe('Main', () => {
 
   it('filters entries by search query', async () => {
     const store = makeStore()
-    withEntries(store, [loginMeta({ id: 'a', title: 'Airbnb' }), loginMeta({ id: 'g', title: 'Google' })])
+    withEntries([loginMeta({ id: 'a', title: 'Airbnb' }), loginMeta({ id: 'g', title: 'Google' })])
     renderWithStore(<Main />, { store })
 
     await userEvent.type(screen.getByPlaceholderText('Search'), 'air')
@@ -150,7 +150,7 @@ describe('Main', () => {
 
   it('shows the empty-vault hero in the detail pane when there are no entries', () => {
     const store = makeStore()
-    withEntries(store, [])
+    withEntries([])
     renderWithStore(<Main />, { store })
     expect(screen.getByText('Your vault is empty')).toBeInTheDocument()
     expect(screen.getByTestId('create-first-entry-button')).toBeInTheDocument()

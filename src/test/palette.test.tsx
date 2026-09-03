@@ -9,7 +9,7 @@ const open = () => userEvent.keyboard('{Meta>}k{/Meta}')
 
 const seed = () => {
   const store = makeStore()
-  withEntries(store, [
+  withEntries([
     loginMeta({ id: 'l1', title: 'Google', urlHost: 'google.com' }),
     loginMeta({ id: 'l2', title: 'Airbnb', urlHost: 'airbnb.com' }),
     { id: 'c1', type: 'card', title: 'Visa', tags: [], urlHost: '', favorite: false }

@@ -16,7 +16,7 @@ const titles = () => screen.getAllByTestId('entry-item-title').map(el => el.text
 
 const seed = () => {
   const store = makeStore()
-  withEntries(store, [plain, starred])
+  withEntries([plain, starred])
   return store
 }
 
@@ -84,7 +84,7 @@ describe('the Favorites view', () => {
     // `plain` is the more recently touched of the two, so recency alone would
     // put it first: only the pin can float the starred row over it.
     const store = makeStore()
-    withEntries(store, [
+    withEntries([
       loginMeta({ id: 'plain', title: 'Airbnb', updatedAt: '2024-03-01T00:00:00.000Z' }),
       loginMeta({ id: 'star', title: 'Monzo', favorite: true, updatedAt: '2024-01-01T00:00:00.000Z' })
     ])
@@ -99,7 +99,7 @@ describe('the Favorites view', () => {
 
   it('says how to fill itself when nothing is starred', () => {
     const store = makeStore()
-    withEntries(store, [plain])
+    withEntries([plain])
     setView('favorites')
     renderWithStore(<Body />, { store })
 
@@ -111,7 +111,7 @@ describe('the Favorites view', () => {
   it('drops the selection when the shown entry is unstarred from inside it', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'star' }))
     const store = makeStore()
-    withEntries(store, [starred])
+    withEntries([starred])
     setView('favorites')
     setCurrentEntry('star')
     renderWithStore(<Body />, { store })

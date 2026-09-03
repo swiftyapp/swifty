@@ -66,7 +66,7 @@ describe('Generator', () => {
 describe('Generator, with the shell behind it', () => {
   const seed = () => {
     const store = makeStore()
-    withEntries(store, [loginMeta({ id: 'l1', title: 'Google' })])
+    withEntries([loginMeta({ id: 'l1', title: 'Google' })])
     return store
   }
 

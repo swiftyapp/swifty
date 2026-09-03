@@ -14,7 +14,7 @@ describe('empty states', () => {
 
   const seed = (entries = [loginMeta({ id: 'l1', title: 'Google' })]) => {
     const store = makeStore()
-    withEntries(store, entries)
+    withEntries(entries)
     return store
   }
 
@@ -111,7 +111,7 @@ describe('empty states', () => {
   describe('vault health with nothing to audit', () => {
     const healthStore = () => {
       const store = makeStore()
-      withEntries(store, [loginMeta({ id: 'l1', title: 'Google' })], {})
+      withEntries([loginMeta({ id: 'l1', title: 'Google' })], {})
       setView('health')
       return store
     }
@@ -135,7 +135,7 @@ describe('empty states', () => {
       unmount()
 
       const store = makeStore()
-      withEntries(store, [loginMeta({ id: 'l1', title: 'Google' })])
+      withEntries([loginMeta({ id: 'l1', title: 'Google' })])
       setView('health')
       renderWithStore(<AuditList />, { store })
       expect(screen.getByText('Loading Results..')).toBeInTheDocument()
