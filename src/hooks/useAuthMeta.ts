@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getVersion } from '@tauri-apps/api/app'
 import { syncStatus } from '@/lib/commands'
 import { t } from '@/i18n'
+import { APP_NAME } from '@/lib/app'
 
 export interface VaultMeta {
   version: string | null
@@ -41,5 +42,5 @@ export function useAuthMeta(): string | null {
   const meta = useVaultMeta()
   if (!meta) return null
   const home = vaultHome(meta.configured)
-  return meta.version ? `Swifty ${meta.version} · ${home}` : home
+  return meta.version ? `${APP_NAME} ${meta.version} · ${home}` : home
 }

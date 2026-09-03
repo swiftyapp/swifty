@@ -19,7 +19,7 @@ const description = (mode: BiometricMode | null) => {
     )
   if (mode === 'prompt')
     return t(
-      'Your vault key is stored in your OS credential store and released after a biometric check by Swifty.'
+      'Your vault key is stored in your OS credential store and released after a biometric check.'
     )
   return t(
     'Store your vault key in the OS secure store, released only after a biometric check.'
