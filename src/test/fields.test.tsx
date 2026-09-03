@@ -16,6 +16,27 @@ beforeEach(() => {
 // One behaviour per type-aware field: the thing that field knows and a plain
 // text box doesn't.
 describe('Type-aware fields', () => {
+  // Every editor input is reachable by the name the row shows, so a screen
+  // reader (and a test) can name what it is typing into.
+  it('names its inputs after their labels', () => {
+    renderWithStore(<Show type="login" editing />)
+
+    expect(screen.getByLabelText('Password')).toBe(input('password'))
+    expect(screen.getByLabelText('Username')).toBe(input('username'))
+    // The label is the translated one the row shows, not the draft key.
+    expect(screen.getByLabelText('URL')).toBe(input('website'))
+    expect(screen.getByLabelText('Email')).toBe(input('email'))
+    expect(screen.getByLabelText('OTP')).toBe(input('otp'))
+  })
+
+  it('names a full-bleed note body, which has no label column', () => {
+    renderWithStore(<Show type="note" editing />)
+
+    expect(screen.getByLabelText('Note')).toBe(
+      document.querySelector('textarea[name="note"]')
+    )
+  })
+
   it('gives a URL the scheme the user left out', async () => {
     renderWithStore(<Show type="login" editing />)
     await userEvent.type(input('website'), 'example.com')

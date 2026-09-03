@@ -28,6 +28,9 @@ export default function OtpField({ name = 'otp', label = 'OTP' }) {
       {editing && (
         <input
           name={name}
+          // The panel's heading is not a label element, so the input names
+          // itself rather than borrowing the row geometry it does not use.
+          aria-label={t(label)}
           value={value}
           placeholder={t('base32 secret or otpauth:// link')}
           autoComplete="off"
