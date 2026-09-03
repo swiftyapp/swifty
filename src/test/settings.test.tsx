@@ -13,6 +13,7 @@ import {
   disableBiometric,
   pickBackup,
   importSwftx,
+  exportEntries,
   syncConnect,
   setAutolockTimeout,
   getAudit
@@ -89,6 +90,25 @@ describe('Settings › sync', () => {
     expect(document.querySelector('input[name="export_password"]')).toBeNull()
     await userEvent.click(screen.getByText('Save…'))
     expect(document.querySelector('input[name="export_password"]')).toBeInTheDocument()
+  })
+
+  // One warning covers the whole picker, CXF included — it is as plaintext as
+  // the other two.
+  it('exports to CXF from the portable export picker', async () => {
+    vi.mocked(exportEntries).mockResolvedValue('/tmp/swifty-export.json')
+    await open()
+    expect(
+      screen.getByText('Bitwarden JSON, FIDO CXF or generic CSV, unencrypted')
+    ).toBeInTheDocument()
+
+    await userEvent.selectOptions(
+      document.querySelector('select[name="export_format"]')!,
+      'cxf'
+    )
+    await userEvent.click(screen.getByTestId('settings-export-run'))
+
+    expect(exportEntries).toHaveBeenCalledWith('cxf')
+    expect(await screen.findByText(/swifty-export\.json/)).toBeInTheDocument()
   })
 })
 
@@ -289,7 +309,15 @@ describe('Settings › import', () => {
   it('offers a tile per source and no format select', async () => {
     await open()
     await go('import')
-    for (const key of ['bitwarden', 'chrome', 'lastpass', 'keepass', 'csv', 'swftx'])
+    for (const key of [
+      'bitwarden',
+      'cxf',
+      'chrome',
+      'lastpass',
+      'keepass',
+      'csv',
+      'swftx'
+    ])
       expect(screen.getByTestId(`import-tile-${key}`)).toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })

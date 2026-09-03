@@ -261,12 +261,13 @@ export const exportVault = (password: string): Promise<string | null> =>
 export type ImportFormat =
   | 'auto'
   | 'bitwarden'
+  | 'cxf'
   | 'csv'
   | 'chrome'
   | 'lastpass'
   | 'keepass'
 
-export type ExportFormat = 'bitwarden' | 'csv'
+export type ExportFormat = 'bitwarden' | 'cxf' | 'csv'
 
 export interface RowError {
   row: number
