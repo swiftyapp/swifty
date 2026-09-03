@@ -44,14 +44,13 @@ export default function Modal({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      // Only the topmost dialog owns the keyboard: a stacked one (the generator
+      // over Settings) would otherwise be closed from underneath by Escape, or
+      // have its focus pulled back down by the trap below.
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      if (dialogs[dialogs.length - 1] !== card.current) return
       // Escape closes every modal — the scrim and the X are pointer-only exits.
-      // Only the topmost dialog reacts, or a stacked one would take the surface
-      // underneath it down as well.
-      if (e.key === 'Escape') {
-        const dialogs = document.querySelectorAll('[role="dialog"]')
-        if (dialogs[dialogs.length - 1] === card.current) onClose()
-        return
-      }
+      if (e.key === 'Escape') return onClose()
       // Arrow keys are left alone: the add-secret picker steers its grid with
       // them.
       if (e.key !== 'Tab') return
