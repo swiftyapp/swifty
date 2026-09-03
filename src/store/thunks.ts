@@ -128,7 +128,11 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       if (!entry) return
       const meta = await setFavorite(id, !entry.favorite)
       get().setEntries(upsertMeta(get().entries.items, meta))
-      get().entrySaved(meta.id)
+      // Un-starring inside Favorites drops the row out of the view, so keeping
+      // it selected would leave the detail pane on an entry the list no longer
+      // has (and hide the empty state).
+      if (get().ui.view === 'favorites' && !meta.favorite) get().setNoEntry()
+      else get().entrySaved(meta.id)
       scheduleSync()
     },
     enterMain: async result => {

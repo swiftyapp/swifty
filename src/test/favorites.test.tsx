@@ -6,7 +6,7 @@ import ListColumn from '@/components/Main/Body/ListColumn'
 import Body from '@/components/Main/Body'
 import Show from '@/components/Main/Body/Aside/Show'
 import { revealEntry, setFavorite } from '@/lib/commands'
-import { makeStore, useStore, setView, setSort } from '@/store'
+import { makeStore, useStore, setView, setSort, setCurrentEntry } from '@/store'
 import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 
 const starred = loginMeta({ id: 'star', title: 'Monzo', favorite: true })
@@ -109,5 +109,19 @@ describe('the Favorites view', () => {
     expect(screen.getByTestId('empty-favorites')).toBeInTheDocument()
     expect(screen.getByText('Star an entry to keep it here.')).toBeInTheDocument()
     expect(screen.queryByTestId('entry-item')).not.toBeInTheDocument()
+  })
+
+  it('drops the selection when the shown entry is unstarred from inside it', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'star' }))
+    const store = makeStore()
+    withEntries(store, [starred])
+    setView('favorites')
+    setCurrentEntry('star')
+    renderWithStore(<Body />, { store })
+
+    await userEvent.click(screen.getByTestId('favorite-toggle'))
+
+    await vi.waitFor(() => expect(useStore.getState().entries.current).toBeNull())
+    expect(screen.getByTestId('empty-favorites')).toBeInTheDocument()
   })
 })
