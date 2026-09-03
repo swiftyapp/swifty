@@ -97,6 +97,36 @@ KDF descriptor recorded in the `meta` table is currently the placeholder string
 > - **Attempt throttling.** There is no failed-unlock backoff, so offline guessing
 >   against a stolen database is bounded only by the KDF cost.
 
+### Passkeys
+
+A login entry can hold WebAuthn credentials (`models::Passkey`, one per site
+account). They live **inside the sealed payload**, in the entry's `passkeys`
+list — there is no passkey column and no separate table, so a credential's
+private key gets exactly the protection an entry's password gets: SQLCipher at
+rest, the app AEAD on top, unsealed only for the operation that needs it. Sync
+carries them as part of the opaque payload and never sees them.
+
+- **The private key never leaves the core.** `src-tauri/src/passkey/` unseals a
+  login, converts the stored PKCS#8 key to a COSE key in memory, signs, and drops
+  it. No command returns a private key to the webview. The one way a passkey
+  leaves the app is an **explicit user-initiated export** (`.swftx`, or Bitwarden
+  JSON, which is plaintext by construction and carries the key as base64url) —
+  the same deliberate exposure the password export already is.
+- **User verification is the unlocked session.** WebAuthn's "user verified" bit
+  is asserted on the strength of the vault being unlocked; there is no
+  per-ceremony prompt yet, so any code that can reach the authenticator can sign.
+  That is only sound while nothing can: the module has no Tauri command and no
+  transport, and the browser-extension PR that adds one adds the per-ceremony
+  confirmation with it.
+- **Signature counters stay at zero.** Credentials sync across devices, so a
+  per-device counter would look to a relying party like a cloned authenticator.
+  New credentials are created with the constant zero the spec recommends for
+  synced keys and are not incremented on sign-in; an imported credential that
+  arrived with a non-zero counter keeps counting.
+- **The AAGUID is a model identifier, not a device one.** One fixed value for
+  every Swifty install (`passkey::AAGUID`), so it cannot be used to correlate a
+  user across relying parties.
+
 ## Key lifecycle across the process split
 
 1. **Derive off the UI thread on unlock.** The user enters the master passphrase

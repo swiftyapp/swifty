@@ -7,7 +7,6 @@
 use std::fs;
 use std::path::Path;
 
-use rand::RngCore;
 use serde::Serialize;
 use serde_json::json;
 use tauri::{AppHandle, Emitter, State};
@@ -212,18 +211,11 @@ pub async fn export_entries(
     Ok(Some(dest.to_string_lossy().into_owned()))
 }
 
-// A random 16-byte hex id for a freshly imported entry.
-fn new_id() -> String {
-    let mut bytes = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut bytes);
-    hex::encode(bytes)
-}
-
 // ImportedEntry -> a plaintext models::Entry, ready to be obscured + sealed.
 fn imported_to_entry(imp: &ImportedEntry) -> Entry {
     let now = chrono::Utc::now().to_rfc3339();
     let mut e = Entry {
-        id: new_id(),
+        id: migrate::new_entry_id(),
         kind: imp.kind.as_str().to_string(),
         title: imp.title.clone(),
         username: None,

@@ -45,6 +45,19 @@ url = "2"
 zeroize = "1.8.2"
 argon2 = "0.5.3"
 sys-locale = "0.3"
+# WebAuthn authenticator core (1Password's passkey-rs, MIT OR Apache-2.0). Held
+# at 0.4 deliberately: 0.5 declares rust-version 1.85.1, above this crate's
+# 1.77 MSRV, so the MSRV-aware resolver refuses it. Revisit with the MSRV.
+passkey-types = "0.4"
+passkey-authenticator = "0.4"
+# P-256 keys (PKCS#8 <-> COSE) and the COSE key type passkey-types speaks.
+# Both pinned to what passkey-authenticator itself depends on, so exactly one
+# copy of each is linked.
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+coset = "0.3"
+# `CredentialStore` and `UserValidationMethod` are async traits; implementing
+# them needs the same attribute macro passkey-authenticator declares them with.
+async-trait = "0.1"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"
@@ -65,3 +78,12 @@ security-framework = { version = "3.6.0", features = ["OSX_10_15"] }
 windows = { version = "0.61", features = ["Security_Credentials_UI", "Win32_Foundation", "Win32_System_DataExchange", "Win32_System_Memory"] }
 # Credential Manager storage; retrieval is gated behind Windows Hello (verify-then-read).
 keyring = { version = "3", features = ["windows-native"] }
+
+[dev-dependencies]
+# A real WebAuthn client drives the authenticator through a full ceremony in the
+# passkey tests (origin checks, clientDataJSON, attestation) instead of us
+# hand-rolling CTAP2 requests. Test-only: the app never speaks WebAuthn itself.
+passkey-client = "0.4"
+# The CredentialStore/UserValidationMethod traits are async, so the tests need
+# a runtime; `rt` (current-thread) + `macros` is the whole of it.
+tokio = { version = "1", features = ["rt", "macros"] }
