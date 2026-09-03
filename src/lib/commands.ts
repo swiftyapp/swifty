@@ -14,11 +14,20 @@ import { cardBrandOf } from '@/utils/cardBrand'
 
 export type EntryType = 'login' | 'note' | 'card' | 'identity'
 
+// One free-form field on an entry: a label the user wrote and its value.
+export interface ExtraField {
+  label: string
+  value: string
+}
+
 interface BaseEntry {
   id: string
   type: EntryType
   title: string
   tags?: string[]
+  // Free-form label/value pairs, in the user's order. Any kind may carry them;
+  // absent when there are none, so an entry without any is unchanged.
+  extra?: ExtraField[]
   createdAt?: string
   updatedAt?: string
   // snake_case aliases kept for backward compatibility with legacy vaults

@@ -96,6 +96,22 @@ describe('isValid', () => {
     expect(kindOf('identity').isValid(identity({ number: '\t' }))).toBe(false)
   })
 
+  // Extra fields are free-form, so no kind can require one: a document with a
+  // half-filled row still saves, and a filled one buys nothing.
+  it('lets extra fields say nothing about validity', () => {
+    expect(kindOf('identity').isValid(identity({ extra: [{ label: '', value: '' }] }))).toBe(
+      true
+    )
+    expect(
+      kindOf('identity').isValid(identity({ extra: [{ label: 'Categories', value: 'B' }] }))
+    ).toBe(true)
+    expect(
+      kindOf('identity').isValid(
+        identity({ number: '', extra: [{ label: 'Categories', value: 'B' }] })
+      )
+    ).toBe(false)
+  })
+
   it('holds the login to the email complaint the row already shows', () => {
     expect(kindOf('login').isValid(login({ email: 'me@example.com' }))).toBe(true)
     // Optional stays optional.
