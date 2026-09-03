@@ -40,6 +40,12 @@ interface Props {
   ink: string
   /** Blocks the save while empty and marks the box after the first attempt. */
   required?: boolean
+  /**
+   * Overrides the box's own emptiness test, for a slot whose contents are more
+   * than one draft key: a half-typed "MM" is not an empty box, but it is not a
+   * saveable expiry either.
+   */
+  invalid?: boolean
   zone?: 'top' | 'base'
   className?: string
 }
@@ -61,6 +67,7 @@ export default function Value({
   maxLength,
   ink,
   required,
+  invalid: invalidOverride,
   zone = 'base',
   className
 }: Props) {
@@ -74,7 +81,7 @@ export default function Value({
   if (set) {
     // The face's own error ink: `text-bad` is tuned for the app ground, not for
     // dark plastic, so the card uses a lighter red like every other hex on it.
-    const invalid = required && attempted && !value.trim()
+    const invalid = invalidOverride ?? (required && attempted && !value.trim())
     return (
       <label className={cx('block min-w-0 px-1.5 py-1', className)}>
         {caption}
