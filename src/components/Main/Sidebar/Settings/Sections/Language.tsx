@@ -25,6 +25,10 @@ export default function Language() {
     setFormat(next)
   }
 
+  // Each row label doubles as its radiogroup's accessible name.
+  const formatLabel = t('Date format')
+  const themeLabel = t('Theme')
+
   return (
     <>
       <section className="mb-7">
@@ -44,11 +48,11 @@ export default function Language() {
 
       <SettingsGroup label={t('Formats')}>
         <SettingsRow
-          label={t('Date format')}
-          testid="settings-date-format-row"
+          label={formatLabel}
           control={
             <Segmented
               mono
+              name={formatLabel}
               options={DATE_FORMATS.map(value => ({ value, label: value }))}
               value={format}
               onChange={onFormat}
@@ -60,10 +64,10 @@ export default function Language() {
 
       <SettingsGroup label={t('Appearance')}>
         <SettingsRow
-          label={t('Theme')}
-          testid="settings-theme-row"
+          label={themeLabel}
           control={
             <Segmented
+              name={themeLabel}
               options={THEMES.map(option => ({ ...option, label: t(option.label) }))}
               value={theme}
               onChange={changeTheme}

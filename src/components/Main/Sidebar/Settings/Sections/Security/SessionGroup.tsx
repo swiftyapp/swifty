@@ -15,11 +15,13 @@ const LOCK_OPTIONS = [
   { value: '3600', label: '1 h' }
 ]
 
-const CLIPBOARD_OPTIONS = [
+// Built per render so a locale switch retranslates. The unit values read the
+// same in every locale; only `Never` is words.
+const clipboardOptions = () => [
   { value: '15000', label: '15 s' },
   { value: '30000', label: '30 s' },
   { value: '60000', label: '60 s' },
-  { value: '0', label: 'Never' }
+  { value: '0', label: t('Never') }
 ]
 
 export default function SessionGroup() {
@@ -37,15 +39,19 @@ export default function SessionGroup() {
     setClipboardTimeout(Number(value))
   }
 
+  // The row label doubles as the radiogroup's accessible name.
+  const lockLabel = t('Lock vault after')
+  const clipboardLabel = t('Clear clipboard')
+
   return (
     <SettingsGroup label={t('Session')}>
       <SettingsRow
-        label={t('Lock vault after')}
+        label={lockLabel}
         description={t('Idle time before the vault seals itself')}
-        testid="settings-autolock-row"
         control={
           <Segmented
             mono
+            name={lockLabel}
             options={LOCK_OPTIONS}
             value={lock}
             onChange={onLock}
@@ -54,16 +60,13 @@ export default function SessionGroup() {
         }
       />
       <SettingsRow
-        label={t('Clear clipboard')}
+        label={clipboardLabel}
         description={t('Copied secrets are wiped after this delay')}
-        testid="settings-clipboard-row"
         control={
           <Segmented
             mono
-            options={CLIPBOARD_OPTIONS.map(option => ({
-              ...option,
-              label: t(option.label)
-            }))}
+            name={clipboardLabel}
+            options={clipboardOptions()}
             value={clipboard}
             onChange={onClipboard}
             testidPrefix="settings-clipboard"

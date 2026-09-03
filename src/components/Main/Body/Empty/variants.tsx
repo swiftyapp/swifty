@@ -23,19 +23,6 @@ const Mark = ({ size }: { size: number }) => (
   <Logo width={size} height={size} className="fill-current" aria-hidden="true" />
 )
 
-// The accelerators an empty pane can advertise. The name doubles as the copy
-// key, and `hints()` resolves it at render so a locale switch retranslates.
-const HINT = {
-  browse: '↑↓',
-  copy: '⏎',
-  search: '⌘F',
-  add: '⌘N',
-  commands: '⌘K'
-} as const
-
-const hints = (...names: (keyof typeof HINT)[]) =>
-  names.map(name => ({ keys: HINT[name], label: t(name) }))
-
 // First run — the one hero in the app. Nothing exists yet, so this is the only
 // thing on screen worth looking at and it gets the full treatment.
 export function VaultEmpty() {
@@ -65,7 +52,10 @@ export function VaultEmpty() {
           ? { label: t('Restore from Google Drive'), onClick: restore, loading: importing }
           : { label: t('Import from another app'), onClick: openSettings }
       }
-      hints={hints('add', 'commands')}
+      hints={[
+        { keys: '⌘N', label: t('add') },
+        { keys: '⌘K', label: t('commands') }
+      ]}
     />
   )
 }
@@ -81,7 +71,13 @@ export function SelectEmpty() {
       markClassName="bg-transparent text-text3"
       titleClassName="text-text2"
       title={t('Select an item')}
-      hints={hints('browse', 'copy', 'search', 'add', 'commands')}
+      hints={[
+        { keys: '↑↓', label: t('browse') },
+        { keys: '⏎', label: t('copy') },
+        { keys: '⌘F', label: t('search') },
+        { keys: '⌘N', label: t('add') },
+        { keys: '⌘K', label: t('commands') }
+      ]}
     />
   )
 }
