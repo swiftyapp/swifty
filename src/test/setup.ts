@@ -62,6 +62,9 @@ vi.mock('@/lib/commands', () => ({
   syncNow: vi.fn().mockResolvedValue(undefined),
   syncImport: vi.fn().mockResolvedValue(undefined),
   syncStatus: vi.fn().mockResolvedValue({ configured: false }),
+  // Off by default, so no suite sees a scan affordance it did not ask for.
+  scanSupported: vi.fn().mockResolvedValue(false),
+  scanImage: vi.fn().mockRejectedValue('nothing recognized'),
   // Pure helper (not a command); mirror the real projection so tests and the
   // dead sync path can use it against the mocked module.
   toEntryMeta: (entry: { id: string; type: string; title: string; tags?: string[] }) => ({
@@ -98,6 +101,11 @@ vi.mock('@tauri-apps/api/dpi', () => ({
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn().mockResolvedValue(undefined)
+}))
+
+// The file dialog: nothing picked unless a test says otherwise.
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  open: vi.fn().mockResolvedValue(null)
 }))
 
 // Components under test call useTranslation(); the singleton must be
