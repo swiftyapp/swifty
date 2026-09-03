@@ -29,7 +29,7 @@ export default function Nav({ section, onSelect }: Props) {
                   'relative flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-sm px-2.5 text-left text-base transition-colors',
                   active
                     ? 'bg-tile text-text'
-                    : 'text-text2 hover:bg-hover hover:text-text'
+                    : 'text-text2 hover:bg-hover hover:text-text focus-visible:bg-hover'
                 )}
               >
                 <Glyph size={16} />
