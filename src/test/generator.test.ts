@@ -6,6 +6,7 @@ import {
   entropy,
   generate,
   memorable,
+  persistDefaults,
   type GeneratorSettings
 } from '@/services/generator'
 import WORDS from '@/services/wordlist'
@@ -134,5 +135,10 @@ describe('defaultSettings', () => {
     expect(initial.numbers).toBe(false)
     expect(initial.symbols).toBe(true)
     expect(initial.mode).toBe('random')
+  })
+
+  it('round-trips the look-alike exclusion through persistDefaults', () => {
+    persistDefaults(settings({ excludeSimilar: true }))
+    expect(defaultSettings().excludeSimilar).toBe(true)
   })
 })
