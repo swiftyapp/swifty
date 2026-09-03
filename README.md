@@ -33,8 +33,8 @@
 
 ## Screenshots
 
-<img width="1012" alt="swifty_screen_01" src="https://user-images.githubusercontent.com/695947/211563356-eb75a92d-2582-4034-9e53-a596159f4892.png">
-<img width="1012" alt="swifty_screen_02" src="https://user-images.githubusercontent.com/695947/211563370-6d965b21-5be8-410a-97b0-d528af4c0efc.png">
+<img width="1012" alt="Swifty lock screen — vault sealed, master password prompt with Touch ID" src="docs/screenshots/lock-screen.png">
+<img width="1012" alt="Swifty credit card view — card list and masked card details" src="docs/screenshots/card-view.png">
 
 
 ## Install
