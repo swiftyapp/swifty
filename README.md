@@ -1,4 +1,4 @@
-![swifty_banner_alpha](https://user-images.githubusercontent.com/695947/211563458-93194014-d14b-4f1a-be03-ce368b4456e3.png)
+![Swifty — Password Manager](docs/banner.svg)
 
 ## Free Offline-first Password Manager for MacOS, Windows and Linux.
 
