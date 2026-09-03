@@ -1,5 +1,6 @@
 import type { Entry, EntryMeta } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
+import { filled } from '@/components/elements/fields/formats'
 
 export const defaults: EntryDraft = {
   type: 'note',
@@ -7,7 +8,8 @@ export const defaults: EntryDraft = {
   note: ''
 }
 
-export const isValid = (draft: EntryDraft): boolean => !!(draft.title && draft.note)
+export const isValid = (draft: EntryDraft): boolean =>
+  filled(draft.title) && filled(draft.note)
 
 export const primarySecret = (entry: Entry): string =>
   entry.type === 'note' ? entry.note : ''

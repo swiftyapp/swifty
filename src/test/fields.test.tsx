@@ -42,6 +42,19 @@ describe('Type-aware fields', () => {
     expect(screen.queryByText('Not an email address')).not.toBeInTheDocument()
   })
 
+  it('refuses to save a login whose email is not one', async () => {
+    renderWithStore(<Show type="login" editing />)
+    await userEvent.type(input('title'), 'Acme')
+    await userEvent.type(input('username'), 'octocat')
+    await userEvent.type(input('password'), 'hunter2')
+    await userEvent.type(input('email'), 'me@example')
+
+    await userEvent.click(screen.getByText('Save'))
+
+    expect(saveEntry).not.toHaveBeenCalled()
+    expect(screen.getByText('Not an email address')).toBeInTheDocument()
+  })
+
   it('groups a card number as it is typed and names the network', async () => {
     renderWithStore(<Show type="card" editing />)
     await userEvent.type(input('number'), '4111111111111111')
