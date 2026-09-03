@@ -65,6 +65,21 @@ describe('Type-aware fields', () => {
     )
   })
 
+  it('says so when only half of the MM/YY box has been typed', async () => {
+    renderWithStore(<Show type="card" editing />)
+    await userEvent.type(input('title'), 'Visa')
+    await userEvent.type(input('number'), '4111111111111111')
+    await userEvent.type(input('cvc'), '123')
+    await userEvent.type(input('expiry'), '12')
+
+    await userEvent.click(screen.getByText('Save'))
+
+    // The box is not empty, so only the pair-aware check can complain — and
+    // without it the refusal to save was silent.
+    expect(screen.getByText('Required')).toBeInTheDocument()
+    expect(saveEntry).not.toHaveBeenCalled()
+  })
+
   it('takes an otpauth:// link and keeps only the secret inside it', async () => {
     renderWithStore(<Show type="login" editing />)
     await userEvent.click(input('otp'))
