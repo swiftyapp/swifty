@@ -25,7 +25,6 @@ interface Props {
   titleClassName?: string
   // Single-line variant for a list column: no tile, no title tier.
   compact?: boolean
-  className?: string
   // Hook for the surface as a whole — the copy is localised and quoted, so
   // e2e needs something stabler to wait on.
   testid?: string
@@ -44,7 +43,6 @@ export default function EmptyState({
   markClassName,
   titleClassName,
   compact,
-  className,
   testid
 }: Props) {
   // A column-width line has no room for buttons, so both actions read as
@@ -53,10 +51,7 @@ export default function EmptyState({
     return (
       <div
         data-testid={testid}
-        className={cx(
-          'flex items-center justify-center gap-2 px-3 py-6 text-base text-text3',
-          className
-        )}
+        className="flex items-center justify-center gap-2 px-3 py-6 text-base text-text3"
       >
         <span className="flex-none">{mark}</span>
         <span className="min-w-0 truncate">{body ?? title}</span>
@@ -79,10 +74,7 @@ export default function EmptyState({
   return (
     <div
       data-testid={testid}
-      className={cx(
-        'flex max-w-[320px] flex-col items-center gap-5 text-center animate-pop',
-        className
-      )}
+      className="flex max-w-[320px] flex-col items-center gap-5 text-center animate-pop"
     >
       <div
         className={cx(

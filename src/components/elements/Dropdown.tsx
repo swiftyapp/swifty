@@ -76,7 +76,6 @@ export function Dropdown({ onBlur, className, children }: DropdownProps) {
 }
 
 interface ItemProps {
-  id?: string
   separated?: boolean
   // Destructive entry (delete, disconnect, ...): inked in the `bad` token.
   danger?: boolean
@@ -86,7 +85,6 @@ interface ItemProps {
 }
 
 export function DropdownItem({
-  id,
   separated,
   danger,
   testid,
@@ -97,7 +95,6 @@ export function DropdownItem({
     <button
       type="button"
       role="menuitem"
-      id={id}
       data-testid={testid}
       onClick={onClick}
       className={cx(
