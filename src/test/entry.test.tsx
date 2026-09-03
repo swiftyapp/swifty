@@ -2,12 +2,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Show from '@/components/Main/Body/Aside/Show'
+import Aside from '@/components/Main/Body/Aside'
 import Generator from '@/components/Main/Generator'
 import AddSecret from '@/components/Main/AddSecret'
-import { openAddPicker } from '@/store'
+import { openAddPicker, makeStore, setCurrentEntry } from '@/store'
 import { saveEntry, revealEntry, generatePassword, generateOtp, copyToClipboard, deleteEntry, toEntryMeta } from '@/lib/commands'
 import type { LoginEntry } from '@/lib/commands'
-import { renderWithStore, loginEntry, loginMeta } from './utils'
+import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -188,6 +189,42 @@ describe('Editing in the pane', () => {
     await waitFor(() => expect(revealEntry).toHaveBeenCalledTimes(2))
 
     expect(titleInput().value).toBe('Renamed by me')
+  })
+
+  it('starts a new draft empty after reading an entry, and saves it as a new one', async () => {
+    // The reproducer behind every multi-entry e2e failure: read an entry, then
+    // press Add. Both modes are a `Show` in the same slot, so React kept one
+    // instance, and `useRevealed` only drops the old reveal in an effect — one
+    // render too late. The fresh draft adopted the read entry, id included, and
+    // "Add" quietly saved over it instead of creating a row.
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google' }))
+    const store = makeStore()
+    withEntries(store, [loginMeta()])
+    setCurrentEntry('l1')
+    renderWithStore(<Aside />, { store })
+
+    // The read view is up and the reveal has landed.
+    await screen.findByTestId('edit-entry-button')
+    await waitFor(() => expect(revealEntry).toHaveBeenCalledWith('l1'))
+
+    act(() => store.getState().newEntry('login'))
+    expect(titleInput().value).toBe('')
+
+    await userEvent.type(titleInput(), 'GitHub')
+    await userEvent.type(field('username'), 'octocat')
+    await userEvent.type(field('password'), 'pw')
+    await userEvent.click(screen.getByTestId('save-entry-button'))
+
+    // The store mints the id for a draft that has none, so what proves the
+    // draft was new is that the id is not the entry we were just reading.
+    expect(saveEntry).toHaveBeenCalledOnce()
+    const saved = vi.mocked(saveEntry).mock.calls[0][0]
+    expect(saved.title).toBe('GitHub')
+    expect(saved.id).not.toBe('l1')
+
+    // And the list grew instead of the read entry being overwritten.
+    await waitFor(() => expect(store.getState().entries.items).toHaveLength(2))
+    expect(store.getState().entries.items[0].title).toBe('Google')
   })
 })
 
