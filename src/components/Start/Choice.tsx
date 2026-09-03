@@ -11,7 +11,7 @@ export default function Choice({ onSelect }: Props) {
   const { t } = useTranslation()
   return (
     <AuthShell>
-      <Eyebrow>{t('Welcome to Swifty')}</Eyebrow>
+      <Eyebrow>{t('Welcome')}</Eyebrow>
       <h1 className="mt-8 text-center text-2xl font-medium tracking-display text-text">
         {t('Set up your vault')}
       </h1>

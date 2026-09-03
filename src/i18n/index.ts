@@ -2,6 +2,7 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import resourcesToBackend from 'i18next-resources-to-backend'
 import { osLocale } from '@/lib/commands'
+import { APP_NAME } from '@/lib/app'
 import enUS from './locales/en-US.json'
 
 /** Native names, never translated — a language picker reads in its own language. */
@@ -75,7 +76,12 @@ export const i18nReady = resolveInitial().then(lng =>
       returnNull: false,
       interpolation: {
         // React escapes for us; double-escaping would render raw entities.
-        escapeValue: false
+        escapeValue: false,
+        // No locale file spells the app name. Values interpolate `{{appName}}`
+        // and every call site gets it for free, so a rename stays one constant.
+        // Keys stay plain English, so a locale missing the key still renders
+        // what the caller passed.
+        defaultVariables: { appName: APP_NAME }
       }
     })
 )

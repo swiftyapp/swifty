@@ -34,7 +34,7 @@ const isVaultTooNew = (error: unknown): boolean =>
 
 const unlockError = (t: TFunction, error: unknown): string =>
   isVaultTooNew(error)
-    ? t('Vault needs a newer version of Swifty')
+    ? t('Vault needs a newer version of the app')
     : t('Incorrect Master Password')
 
 // A biometric failure is never a password problem: the backend's errors here
@@ -42,7 +42,9 @@ const unlockError = (t: TFunction, error: unknown): string =>
 // Claiming "Incorrect Master Password" for any of them would send the user
 // retyping a password that was never checked.
 const biometricError = (t: TFunction, error: unknown): string =>
-  isVaultTooNew(error) ? t('Vault needs a newer version of Swifty') : t('Biometric unlock failed')
+  isVaultTooNew(error)
+    ? t('Vault needs a newer version of the app')
+    : t('Biometric unlock failed')
 
 const lockedMessage = (t: TFunction, seconds: number) =>
   t('Too many failed attempts. Try again in {{seconds}}s', { seconds })

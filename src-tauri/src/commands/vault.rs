@@ -1,3 +1,4 @@
+use crate::app::APP_NAME;
 use crate::commands::{
     create_vault, derive_key, list_deleted_metas, list_metas, live_records, meta_dto_of, store_err,
 };
@@ -104,7 +105,7 @@ pub async fn pick_backup(app: AppHandle) -> Result<Option<String>> {
     let file = tauri::async_runtime::spawn_blocking(move || {
         app.dialog()
             .file()
-            .add_filter("Swifty backup", &["swftx"])
+            .add_filter(format!("{APP_NAME} backup"), &["swftx"])
             .blocking_pick_file()
     })
     .await
@@ -228,7 +229,7 @@ pub async fn export_vault(
         app.dialog()
             .file()
             .set_file_name("vault.swftx")
-            .add_filter("Swifty backup", &["swftx"])
+            .add_filter(format!("{APP_NAME} backup"), &["swftx"])
             .blocking_save_file()
     })
     .await
