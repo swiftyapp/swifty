@@ -2,17 +2,19 @@ import Row from './Row'
 import type { Command } from './commands'
 
 interface Props {
+  id: string
   command: Command
   focused: boolean
   onRun: () => void
   onHover: () => void
 }
 
-export default function CommandRow({ command, focused, onRun, onHover }: Props) {
+export default function CommandRow({ id, command, focused, onRun, onHover }: Props) {
   const Glyph = command.glyph
 
   return (
     <Row
+      id={id}
       focused={focused}
       onClick={onRun}
       onHover={onHover}
