@@ -116,14 +116,14 @@ pub fn record_kdf_meta(store: &SqliteStore, params: &KdfParams) -> Result<()> {
     Ok(())
 }
 
-// Look one row up by id and project it (used by the commands that must report
-// back the row they just wrote). Tombstones are visible here: restore and purge
-// both need to read a row the live `get` hides.
+// Look one row's metadata up by id (used by the commands that must report back
+// the row they just wrote). Tombstones are visible here: restore and purge both
+// need to read a row the live `get` hides.
 pub fn meta_dto_of(store: &SqliteStore, id: &str) -> Result<EntryMetaDto> {
     store
-        .row(id)
+        .row_meta(id)
         .map_err(store_err)?
-        .map(|r| EntryMetaDto::from(&r.meta()))
+        .map(|m| EntryMetaDto::from(&m))
         .ok_or(Error::NotFound)
 }
 

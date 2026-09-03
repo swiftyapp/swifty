@@ -280,6 +280,37 @@ fn set_favorite_round_trips_and_bumps_updated_at() {
     assert!(!store.list().unwrap()[0].favorite);
 }
 
+// The Trash offers no star (`favorite-toggle` is not rendered on a tombstone),
+// so this only guards the store — but the bump would give a deleted row a fresh
+// `updated_at` for the sync merge to carry, which is worth refusing outright.
+#[test]
+fn set_favorite_only_touches_live_rows() {
+    let store = seeded(&[Record {
+        deleted_at: Some(1000),
+        ..stamped("1", b"x", 1000)
+    }]);
+
+    store.set_favorite("1", true).unwrap();
+
+    let got = row(&store, "1");
+    assert!(!got.favorite);
+    assert_eq!(got.updated_at, 1000);
+}
+
+// The commands that report back a row they just wrote read it through
+// `row_meta`, which — like the write itself — has to see rows `list` hides.
+#[test]
+fn row_meta_sees_a_tombstone_that_list_hides() {
+    let store = seeded(&[stamped("1", b"x", 1000)]);
+    store.delete("1").unwrap();
+
+    assert!(store.list().unwrap().is_empty());
+    let meta = store.row_meta("1").unwrap().unwrap();
+    assert!(meta.deleted_at.is_some());
+    assert_eq!(meta.title, "Example");
+    assert_eq!(store.row_meta("missing").unwrap(), None);
+}
+
 #[test]
 fn saving_an_entry_leaves_the_star_alone() {
     let store = SqliteStore::open(&tmp_db(), KEY).unwrap();

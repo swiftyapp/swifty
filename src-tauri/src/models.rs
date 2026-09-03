@@ -85,8 +85,9 @@ pub struct EntryMetaDto {
 }
 
 // The one projection of a stored metadata row onto the frontend DTO (timestamps
-// are ms → RFC3339). Records project through `Record::meta`, so save and list
-// cannot drift apart on which columns reach the UI.
+// are ms → RFC3339). Every command reads its row as an `EntryMeta` (`list`,
+// `list_deleted`, `row_meta`), so save and list cannot drift apart on which
+// columns reach the UI.
 impl From<&crate::store::EntryMeta> for EntryMetaDto {
     fn from(m: &crate::store::EntryMeta) -> Self {
         Self {

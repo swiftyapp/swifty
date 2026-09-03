@@ -64,24 +64,6 @@ pub struct Record {
     pub favorite: bool,
 }
 
-impl Record {
-    /// This row's metadata, payload dropped — the projection every listing wants.
-    pub fn meta(&self) -> EntryMeta {
-        EntryMeta {
-            id: self.id.clone(),
-            kind: self.kind.clone(),
-            title: self.title.clone(),
-            tags: self.tags.clone(),
-            url_host: self.url_host.clone(),
-            created_at: self.created_at,
-            updated_at: self.updated_at,
-            deleted_at: self.deleted_at,
-            card_brand: self.card_brand.clone(),
-            favorite: self.favorite,
-        }
-    }
-}
-
 /// A row's metadata without its payload (what listings need).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EntryMeta {
@@ -119,7 +101,8 @@ pub trait VaultStore: Send {
     fn restore(&self, id: &str) -> Result<()>;
     /// Discard a tombstoned record's contents for good.
     fn purge(&self, id: &str) -> Result<()>;
-    /// Star or unstar a record, stamping `updated_at`.
+    /// Star or unstar a **live** record, stamping `updated_at`; a tombstone has
+    /// no star to set, so it is left alone.
     fn set_favorite(&self, id: &str, favorite: bool) -> Result<()>;
     /// Every record including tombstones, with timestamps intact (for sync).
     fn export_for_sync(&self) -> Result<Vec<Record>>;
