@@ -34,8 +34,10 @@ const SEARCH_KEYS = ['title', 'urlHost', 'tags']
 export const filterEntries = (entries: EntryMeta[], options: FilterOptions): EntryMeta[] => {
   const scoped = entries.filter(entry => matchType(entry, options.type))
 
+  // Unordered without a query: the list's own sort (recency or A–Z) is applied
+  // downstream, so ordering here would only be thrown away.
   const query = options.query.trim()
-  if (query === '') return scoped.sort((a, b) => a.title.localeCompare(b.title))
+  if (query === '') return scoped
 
   // Fuzzy rank across the searchable metadata (typo-tolerant, relevance-ordered).
   const fuse = new Fuse(scoped, { keys: SEARCH_KEYS, threshold: 0.4, ignoreLocation: true })
