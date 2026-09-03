@@ -1,26 +1,30 @@
-# Builds, signs, and publishes Swifty for macOS, Windows and Linux, and
-# uploads the `latest.json` update manifest consumed by tauri-plugin-updater.
+# Builds, signs, notarizes and publishes Swifty for macOS, Windows and Linux as
+# a DRAFT GitHub release, and uploads the `latest.json` update manifest that
+# tauri-plugin-updater reads from `releases/latest/download/latest.json`.
+# Publishing the draft is what makes a version visible to installed apps.
 #
-# Required repository secrets:
-#   TAURI_SIGNING_PRIVATE_KEY           minisign private key for update signatures
-#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  password for that key ("" if none)
-#   APPLE_CERTIFICATE                   base64 .p12 signing cert (macOS)
-#   APPLE_CERTIFICATE_PASSWORD          password for the .p12 (macOS)
-#   APPLE_SIGNING_IDENTITY              e.g. "Developer ID Application: … (TEAMID)" (macOS)
-#   APPLE_ID                            Apple ID for notarization (macOS)
-#   APPLE_PASSWORD                      app-specific password for notarization (macOS)
-#   APPLE_TEAM_ID                       Apple Developer team id (macOS)
-#   WINDOWS_CERTIFICATE                 base64 code-signing cert (Windows, optional)
-#   WINDOWS_CERTIFICATE_PASSWORD        password for that cert (Windows, optional)
-#   GOOGLE_OAUTH_CLIENT_ID             Desktop OAuth client id baked in at build time
-#   GOOGLE_OAUTH_CLIENT_SECRET         Desktop OAuth client secret (optional)
+# One-time secret setup and the per-release procedure: docs/RELEASING.md.
+#
+# Repository secrets used. The Apple/Google names are the ones already set on
+# the repo (from the Electron-era release workflows); the Tauri bundler expects
+# different env names, so they are mapped below.
+#   CERTIFICATES_P12 / CERTIFICATES_P12_PASSWORD        base64 .p12 Developer ID cert + password (macOS signing)
+#   APPLE_ID / APPLE_ID_PASSWORD / APPLE_TEAM_ID        Apple ID, app-specific password, team id (notarization)
+#   TAURI_SIGNING_PRIVATE_KEY(_PASSWORD)                minisign key for updater artifact signatures
+#   GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET Desktop OAuth client, baked in at compile time
+#                                                       (src-tauri/src/sync/auth.rs)
+# Windows installers are not code-signed (no certificate). macOS is signed and notarized.
 
 name: Release
 
+# Manual, or on a version tag. Either way the release tag/name comes from
+# `version` in src-tauri/tauri.conf.json (keep package.json + Cargo.toml in
+# sync). Note: GitHub only offers "Run workflow" for workflows present on the
+# repo's default branch; pushing a `v*` tag works from any branch.
 on:
+  workflow_dispatch:
   push:
     tags: ['v*']
-  workflow_dispatch:
 
 jobs:
   release:
@@ -51,45 +55,55 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgtk-3-dev
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      # Same pinned toolchain as ci.yml and local dev (rust-toolchain.toml is
+      # the single source of truth). The two Apple targets are release-only:
+      # Tauri lipos them into one universal binary.
+      - name: Install pinned Rust toolchain (from rust-toolchain.toml)
+        run: rustup toolchain install
+
+      - name: Add Apple targets for the universal build
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
       # Frontend toolchain is bun (matches ci.yml and the bun-based
-      # beforeBuildCommand in tauri.conf.json; the repo ships bun.lock, not an
-      # npm lockfile).
+      # beforeBuildCommand in tauri.conf.json; the repo ships bun.lock).
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.3
 
       - run: bun install --frozen-lockfile
 
-      - uses: tauri-apps/tauri-action@v0
+      - name: Build, sign, notarize and upload to the draft release
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Updater artifact signing (minisign keypair; pubkey in tauri.conf.json).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # macOS code signing (Developer ID Application cert) + notarization.
+          # The identity string is the certificate's name, not a secret; it is
+          # the output of `security find-identity -v -p codesigning`.
+          APPLE_CERTIFICATE: ${{ secrets.CERTIFICATES_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATES_P12_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: 'Developer ID Application: Oleksandr Chaplinsky (UFBL3F444A)'
           APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          # Google Drive sync OAuth client, read via option_env! at compile time.
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
           GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
         with:
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.run_number) }}
-          releaseName: 'Swifty v__VERSION__'
-          releaseBody: 'See the assets below to download and install this version.'
+          tagName: v__VERSION__
+          releaseName: Swifty v__VERSION__
+          releaseBody: See the assets below to download and install this version.
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
+          tauriScript: bun run tauri
           args: ${{ matrix.args }}
 
       # --- SLSA build provenance (T-CI-4) ---------------------------------
@@ -129,5 +143,6 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.run_number) }}
-        run: gh release upload "$TAG" sbom/* --clobber
+        run: |
+          TAG="v$(jq -r .version src-tauri/tauri.conf.json)"
+          gh release upload "$TAG" sbom/* --clobber
