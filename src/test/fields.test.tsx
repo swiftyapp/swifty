@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Show from '@/components/Main/Body/Aside/Show'
 import { saveEntry, revealEntry, generateOtp, toEntryMeta } from '@/lib/commands'
+import type { LoginEntry, Passkey } from '@/lib/commands'
 import { renderWithStore, loginEntry, loginMeta } from './utils'
 
 const input = (name: string) =>
@@ -246,5 +247,103 @@ describe('Type-aware fields', () => {
     expect(saveEntry).not.toHaveBeenCalledWith(
       expect.objectContaining({ password_updated_at: stamp })
     )
+  })
+})
+
+const PASSKEY: Passkey = {
+  credentialId: 'Y3JlZDE',
+  rpId: 'acme.test',
+  rpName: 'Acme',
+  userHandle: 'dWgx',
+  userName: 'alice@acme.test',
+  userDisplayName: 'Alice',
+  privateKey: 'cHJpdmF0ZS1rZXk',
+  counter: 0,
+  createdAt: '2024-02-01T00:00:00.000Z'
+}
+
+const passkeyLogin = (passkeys: Passkey[] = [PASSKEY]) =>
+  loginEntry({ passkeys }) as LoginEntry
+
+describe('Passkeys on a login', () => {
+  it('identifies each passkey by its site and account', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(passkeyLogin())
+    renderWithStore(<Show entry={loginMeta()} />)
+
+    expect(await screen.findByText('Passkeys')).toBeInTheDocument()
+    // The site's own name, not the bare rpId, when it has one.
+    expect(screen.getByText('Acme')).toBeInTheDocument()
+    expect(screen.getByText(/alice@acme\.test/)).toBeInTheDocument()
+  })
+
+  it('falls back to the relying-party id when the site named itself nothing', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(
+      passkeyLogin([{ ...PASSKEY, rpName: undefined }])
+    )
+    renderWithStore(<Show entry={loginMeta()} />)
+
+    expect(await screen.findByText('acme.test')).toBeInTheDocument()
+  })
+
+  // The private key is the credential itself, and the handle and credential id
+  // name it to the site and to nobody else. None of the three has any business
+  // on screen — or on a clipboard, so no row offers a copy button either.
+  it('never puts the private key, user handle or credential id on screen', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(passkeyLogin())
+    const { container } = renderWithStore(<Show entry={loginMeta()} />)
+
+    await screen.findByText('Passkeys')
+    const rendered = container.textContent ?? ''
+    expect(rendered).not.toContain(PASSKEY.privateKey)
+    expect(rendered).not.toContain(PASSKEY.userHandle)
+    expect(rendered).not.toContain(PASSKEY.credentialId)
+  })
+
+  it('shows nothing at all for a login with no passkeys', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry())
+    renderWithStore(<Show entry={loginMeta()} />)
+
+    await screen.findByTestId('entry-value-username')
+    expect(screen.queryByText('Passkeys')).not.toBeInTheDocument()
+  })
+
+  it('drops one from the draft when its remove button is pressed', async () => {
+    const other = { ...PASSKEY, credentialId: 'Y3JlZDI', rpName: 'Beta' }
+    vi.mocked(revealEntry).mockResolvedValue(passkeyLogin([PASSKEY, other]))
+    renderWithStore(<Show entry={loginMeta()} editing />)
+
+    await screen.findByText('Acme')
+    await userEvent.click(screen.getAllByTitle('Remove passkey')[0])
+
+    // Gone from the pane, and gone from what a save would send.
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+    expect(screen.getByText('Beta')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByText('Save'))
+    expect(saveEntry).toHaveBeenCalledWith(expect.objectContaining({ passkeys: [other] }))
+  })
+
+  it('offers no remove button while reading', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(passkeyLogin())
+    renderWithStore(<Show entry={loginMeta()} />)
+
+    await screen.findByText('Passkeys')
+    expect(screen.queryByTitle('Remove passkey')).not.toBeInTheDocument()
+  })
+
+  // A passkey IS the credential, so the password row stops demanding one —
+  // both in the complaint it shows and in what the save lets through.
+  it('saves a passkey-only login with no password', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(
+      passkeyLogin() as LoginEntry & { password: string }
+    )
+    renderWithStore(<Show entry={loginMeta()} editing />)
+
+    await screen.findByText('Acme')
+    await userEvent.clear(input('password'))
+    await userEvent.click(screen.getByText('Save'))
+
+    expect(screen.queryByText('Required')).not.toBeInTheDocument()
+    expect(saveEntry).toHaveBeenCalledWith(expect.objectContaining({ password: '' }))
   })
 })

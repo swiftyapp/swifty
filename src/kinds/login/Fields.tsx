@@ -3,18 +3,24 @@ import {
   EmailField,
   NoteField,
   OtpField,
+  PasskeysField,
   PasswordField,
   TagsField,
   UrlField,
   UsernameField,
   useFields
 } from '@/components/elements/fields'
+import { hasPasskey } from './meta'
 
 export default function Fields() {
   const { entry, set } = useFields()
   // The dial keeps its own column whenever there is a code to show — and
   // always while editing, since that is where an OTP gets added.
   const otp = !!set || !!entry.otp
+  // A passkey is a credential in its own right, so it lifts the password's
+  // "Required" — read through `isValid`'s own test, or the row would complain
+  // in red about a draft the save then lets through.
+  const passkeys = hasPasskey(entry)
 
   return (
     <>
@@ -26,12 +32,13 @@ export default function Fields() {
         <Panel>
           <UrlField />
           <UsernameField required />
-          <PasswordField required />
+          <PasswordField required={!passkeys} />
           <EmailField />
           <NoteField label="Note" />
         </Panel>
         {otp && <OtpField />}
       </div>
+      <PasskeysField />
       <TagsField />
     </>
   )

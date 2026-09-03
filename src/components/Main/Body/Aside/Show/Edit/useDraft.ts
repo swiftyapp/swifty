@@ -3,12 +3,13 @@ import { setCurrentEntry, setNoEntry, saveEntry } from '@/store'
 import { kindOf } from '@/kinds'
 import { dialogOpen } from '@/utils/dialogOpen'
 import type { EntryDraft } from '@/defaults/entries'
-import type { Entry, EntryType } from '@/lib/commands'
+import type { Entry, EntryType, Passkey } from '@/lib/commands'
 import { t } from '@/i18n'
 
 export interface Draft {
   model: EntryDraft
-  set: (name: string, value: string | string[]) => void
+  /** Writes one draft key. `Passkey[]` is how the passkeys block drops one. */
+  set: (name: string, value: string | string[] | Passkey[]) => void
   /** Something has been typed since the draft was loaded. */
   dirty: boolean
   /** Save has been attempted, so required fields may now complain. */
@@ -44,7 +45,7 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
 
   const dirty = JSON.stringify(model) !== JSON.stringify(pristine)
 
-  const set = (name: string, value: string | string[]) => {
+  const set = (name: string, value: string | string[] | Passkey[]) => {
     setConfirmDiscard(false)
     setModel(current => ({ ...current, [name]: value }))
   }

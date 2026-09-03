@@ -111,6 +111,21 @@ describe('Entry list', () => {
 
     expect(titles()).toEqual(['Airbnb', 'Basecamp', 'Monzo', 'Zebra'])
   })
+
+  // Read off the `hasPasskey` column, so a row is marked without the list
+  // decrypting anything — and unmarked rows stay unmarked.
+  it('marks only the logins that hold a passkey', () => {
+    const store = makeStore()
+    withEntries([
+      loginMeta({ id: 'key', title: 'Acme', hasPasskey: true }),
+      loginMeta({ id: 'plain', title: 'Basecamp' })
+    ])
+    renderWithStore(<ListColumn />, { store })
+
+    const marks = screen.getAllByTitle('Passkey')
+    expect(marks).toHaveLength(1)
+    expect(marks[0].closest('[data-testid="entry-item"]')).toHaveTextContent('Acme')
+  })
 })
 
 // The app's only search field lives in this column, so its accelerators are

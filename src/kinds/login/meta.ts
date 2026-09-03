@@ -13,10 +13,17 @@ export const defaults: EntryDraft = {
   otp: ''
 }
 
+// A passkey IS the credential, so a login carrying one needs no password —
+// which is the only shape an imported passkey-only login arrives in. Shared
+// with `Fields`, so the row's "Required" and the save agree on when a password
+// is one.
+export const hasPasskey = (draft: EntryDraft): boolean =>
+  Array.isArray(draft.passkeys) && draft.passkeys.length > 0
+
 export const isValid = (draft: EntryDraft): boolean =>
   filled(draft.title) &&
   filled(draft.username) &&
-  filled(draft.password) &&
+  (filled(draft.password) || hasPasskey(draft)) &&
   // The email is optional, but the row's "Not an email address" complaint is
   // binding: showing it in red and saving anyway is not a check.
   (!filled(draft.email) || !emailError(draft.email))

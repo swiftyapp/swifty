@@ -106,6 +106,9 @@ pub struct EntryMetaDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub card_brand: Option<String>,
     pub favorite: bool,
+    // Whether the entry holds a passkey. Derived metadata, so the list can mark
+    // the row without revealing anything; the passkeys themselves stay sealed.
+    pub has_passkey: bool,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
     // Set only on the tombstones the Trash lists; absent for live entries.
@@ -128,6 +131,7 @@ impl From<&crate::store::EntryMeta> for EntryMetaDto {
             // "none" marks a completed derivation with no match — internal only.
             card_brand: m.card_brand.clone().filter(|b| b != "none"),
             favorite: m.favorite,
+            has_passkey: m.has_passkey,
             created_at: iso(m.created_at),
             updated_at: iso(m.updated_at),
             deleted_at: m.deleted_at.and_then(iso),
@@ -224,5 +228,33 @@ mod tests {
         assert_eq!(p["counter"], 0);
         assert!(p.get("rpName").is_none());
         assert!(p.get("createdAt").is_none());
+    }
+
+    fn meta(has_passkey: bool) -> crate::store::EntryMeta {
+        crate::store::EntryMeta {
+            id: "1".into(),
+            kind: "login".into(),
+            title: "Site".into(),
+            tags: "[]".into(),
+            url_host: "acme.test".into(),
+            created_at: 0,
+            updated_at: 0,
+            deleted_at: None,
+            card_brand: None,
+            favorite: false,
+            has_passkey,
+        }
+    }
+
+    // The list needs to know a row has a passkey without revealing one, so the
+    // flag has to reach the UI as `hasPasskey` — and never the passkeys.
+    #[test]
+    fn meta_dto_carries_the_passkey_flag() {
+        let flagged = serde_json::to_value(EntryMetaDto::from(&meta(true))).unwrap();
+        assert_eq!(flagged["hasPasskey"], true);
+        assert!(flagged.get("passkeys").is_none());
+
+        let plain = serde_json::to_value(EntryMetaDto::from(&meta(false))).unwrap();
+        assert_eq!(plain["hasPasskey"], false);
     }
 }

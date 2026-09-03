@@ -52,13 +52,18 @@ fn migration_list() -> Vec<M<'static>> {
         // The user's star. Pre-existing rows default to unstarred, which is the
         // truth for every vault written before this column existed.
         M::up("ALTER TABLE entries ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0;"),
+        // Whether the entry holds a passkey, derived from the payload at save
+        // time so the list can mark the row without unsealing it. Pre-existing
+        // rows default to 0 and are corrected by a one-time unlock backfill —
+        // there is no NULL here to mark the derivation as pending, since 0 is
+        // also the truth for every entry that simply has no passkey.
+        M::up("ALTER TABLE entries ADD COLUMN has_passkey INTEGER NOT NULL DEFAULT 0;"),
     ]
 }
 
 // New columns are appended last so pre-existing column indexes stay put.
-const COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, payload, card_brand, favorite";
-const META_COLS: &str =
-    "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, card_brand, favorite";
+const COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, payload, card_brand, favorite, has_passkey";
+const META_COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, card_brand, favorite, has_passkey";
 
 const META_UPSERT: &str = "INSERT INTO meta (key, value) VALUES (?1, ?2)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value";
@@ -186,6 +191,17 @@ impl SqliteStore {
         self.lock().execute(
             "UPDATE entries SET card_brand = ?1 WHERE id = ?2",
             params![brand, id],
+        )?;
+        Ok(())
+    }
+
+    /// Set the derived passkey flag without stamping `updated_at`, for the same
+    /// reason [`SqliteStore::set_card_brand`] does not: it is a projection of
+    /// the payload the row already holds, not a user edit.
+    pub fn set_has_passkey(&self, id: &str, has_passkey: bool) -> Result<()> {
+        self.lock().execute(
+            "UPDATE entries SET has_passkey = ?1 WHERE id = ?2",
+            params![has_passkey, id],
         )?;
         Ok(())
     }
@@ -344,15 +360,17 @@ impl VaultStore for SqliteStore {
         // created_at is set only on insert; updated_at is always stamped to now.
         // `favorite` is deliberately absent from the update set: the star is not
         // part of the entry the editor round-trips, so an ordinary save must
-        // leave whatever `set_favorite` last wrote alone.
+        // leave whatever `set_favorite` last wrote alone. `has_passkey` is the
+        // opposite case and IS updated: it is derived from the payload being
+        // written, so a save that drops the last passkey has to clear it.
         conn.execute(
             &format!(
-                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)
+                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)
                  ON CONFLICT(id) DO UPDATE SET
                    kind=excluded.kind, title=excluded.title, tags=excluded.tags,
                    url_host=excluded.url_host, updated_at=excluded.updated_at,
                    deleted_at=excluded.deleted_at, payload=excluded.payload,
-                   card_brand=excluded.card_brand"
+                   card_brand=excluded.card_brand, has_passkey=excluded.has_passkey"
             ),
             params![
                 rec.id,
@@ -370,6 +388,7 @@ impl VaultStore for SqliteStore {
                 rec.payload,
                 rec.card_brand,
                 rec.favorite,
+                rec.has_passkey,
             ],
         )?;
         Ok(())
@@ -414,7 +433,8 @@ impl VaultStore for SqliteStore {
         self.lock().execute(
             "UPDATE entries
              SET payload = x'', title = '', tags = '[]', url_host = '',
-                 card_brand = NULL, favorite = 0, updated_at = ?1
+                 card_brand = NULL, favorite = 0, has_passkey = 0,
+                 updated_at = ?1
              WHERE id = ?2 AND deleted_at IS NOT NULL",
             params![now, id],
         )?;
@@ -466,13 +486,13 @@ impl VaultStore for SqliteStore {
 // sync-in paths (import, merge_records) need.
 fn verbatim_upsert() -> String {
     format!(
-        "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)
+        "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)
          ON CONFLICT(id) DO UPDATE SET
            kind=excluded.kind, title=excluded.title, tags=excluded.tags,
            url_host=excluded.url_host, created_at=excluded.created_at,
            updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
            payload=excluded.payload, card_brand=excluded.card_brand,
-           favorite=excluded.favorite"
+           favorite=excluded.favorite, has_passkey=excluded.has_passkey"
     )
 }
 
@@ -496,6 +516,7 @@ fn exec_record(stmt: &mut Statement, r: &Record) -> rusqlite::Result<usize> {
         r.payload,
         r.card_brand,
         r.favorite,
+        r.has_passkey,
     ])
 }
 
@@ -512,6 +533,7 @@ fn row_to_record(row: &Row) -> rusqlite::Result<Record> {
         payload: row.get(8)?,
         card_brand: row.get(9)?,
         favorite: row.get(10)?,
+        has_passkey: row.get(11)?,
     })
 }
 
@@ -527,6 +549,7 @@ fn row_to_meta(row: &Row) -> rusqlite::Result<EntryMeta> {
         deleted_at: row.get(7)?,
         card_brand: row.get(8)?,
         favorite: row.get(9)?,
+        has_passkey: row.get(10)?,
     })
 }
 

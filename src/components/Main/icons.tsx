@@ -26,6 +26,7 @@ import {
   FileText,
   Fingerprint,
   Globe,
+  KeyRound,
   LayoutGrid,
   Lock,
   Moon,
@@ -92,6 +93,8 @@ export const StarGlyph = glyph(Star, 14)
 export const DiskGlyph = glyph(HardDrive, 14)
 export const CloudGlyph = glyph(Cloud, 14)
 export const AlertGlyph = glyph(TriangleAlert, 14)
+// A passkey, on a login's detail rows and as the list-row mark.
+export const KeyGlyph = glyph(KeyRound, 14)
 
 // Row / tile / rail tier
 export const PlusGlyph = glyph(Plus, 16)
