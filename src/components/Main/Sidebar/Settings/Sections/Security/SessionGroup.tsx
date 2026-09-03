@@ -46,7 +46,6 @@ export default function SessionGroup() {
       <SettingsRow
         label={lockLabel}
         description={t('Idle time before the vault seals itself')}
-        testid="settings-autolock-row"
         control={
           <Segmented
             mono
@@ -61,7 +60,6 @@ export default function SessionGroup() {
       <SettingsRow
         label={clipboardLabel}
         description={t('Copied secrets are wiped after this delay')}
-        testid="settings-clipboard-row"
         control={
           <Segmented
             mono

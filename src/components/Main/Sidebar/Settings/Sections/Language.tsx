@@ -49,7 +49,6 @@ export default function Language() {
       <SettingsGroup label={t('Formats')}>
         <SettingsRow
           label={formatLabel}
-          testid="settings-date-format-row"
           control={
             <Segmented
               mono
@@ -66,7 +65,6 @@ export default function Language() {
       <SettingsGroup label={t('Appearance')}>
         <SettingsRow
           label={themeLabel}
-          testid="settings-theme-row"
           control={
             <Segmented
               name={themeLabel}

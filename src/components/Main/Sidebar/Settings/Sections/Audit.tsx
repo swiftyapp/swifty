@@ -33,7 +33,6 @@ export default function Audit() {
           description={t(
             'Only the first 5 characters of each password’s SHA-1 hash are sent (k-anonymity). Your password and its full hash never leave this device.'
           )}
-          testid="settings-breach-row"
           control={
             <Toggle
               name="breachCheck"
