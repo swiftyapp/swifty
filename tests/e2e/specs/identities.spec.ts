@@ -38,6 +38,9 @@ const LICENCE = {
 
 const EDITED_LICENCE_NUMBER = "LOVEL815129AB9XY";
 
+// A pair no document template has a row for.
+const EXTRA = { label: "Blood type", value: "O+" };
+
 const value = (field: string) => $(`[data-testid="entry-value-${field}"]`);
 const revealNumber = () => $('[data-testid="reveal-number"]');
 
@@ -167,6 +170,32 @@ describe("identity entries", () => {
       "true",
     );
     await expect($('[data-testid="filter-identity-count"]')).toHaveText("2");
+  });
+
+  // What the template has no row for goes in a custom field, so the pair has to
+  // survive a save and come back on the read view.
+  it("round-trips a custom field the template has no row for", async () => {
+    await reopen(PASSPORT.title);
+    await waitFor("edit-entry-button");
+    await $('[data-testid="edit-entry-button"]').click();
+    await waitFor("entry-sheet");
+
+    await $('[data-testid="add-extra-field"]').click();
+    await $('input[name="extra-label-0"]').setValue(EXTRA.label);
+    await $('input[name="extra-value-0"]').setValue(EXTRA.value);
+
+    await $('[data-testid="save-entry-button"]').click();
+    await $('[data-testid="entry-sheet"]').waitForDisplayed({
+      reverse: true,
+      timeout: 15_000,
+    });
+
+    await reopen(PASSPORT.title);
+    // The label column is a mono micro-label, so it is on screen in the case the
+    // CSS gives it rather than the one that was typed.
+    const label = await $('[data-testid="entry-extra-label-0"]').getText();
+    expect(label.toLowerCase()).toBe(EXTRA.label.toLowerCase());
+    await expect($('[data-testid="entry-extra-value-0"]')).toHaveText(EXTRA.value);
   });
 
   // Last, because it rewrites the passport into a licence: switching type has
