@@ -1,6 +1,5 @@
 import { useStore } from '@/store'
-import { filterEntries } from '@/services/entries'
-import { useRows } from '../List/useVisibleEntries'
+import { useRows, useVisibleEntries } from '../List/useVisibleEntries'
 
 /**
  * Every way the two content panes can have nothing to show.
@@ -18,9 +17,11 @@ export type Variant = 'vault' | 'kind' | 'search' | 'select' | 'health' | 'favor
 export const useVariant = (): Variant | null => {
   const view = useStore(state => state.ui.view)
   const audit = useStore(state => state.audit)
-  const type = useStore(state => state.filters.type)
   const query = useStore(state => state.filters.query)
   const rows = useRows()
+  // The same filtered set the list renders, rather than a second pass over it:
+  // only its size matters here.
+  const visible = useVisibleEntries()
 
   // Health is its own surface: it scores logins, not the filtered list, so the
   // item-side filters never apply. A null audit is still being computed.
@@ -29,6 +30,6 @@ export const useVariant = (): Variant | null => {
   // Nothing to filter means the view itself is empty, and each view says so in
   // its own words — "no favorites yet" is not "your vault is empty".
   if (rows.length === 0) return view === 'items' ? 'vault' : view
-  if (filterEntries(rows, { type, query }).length > 0) return 'select'
+  if (visible.length > 0) return 'select'
   return query.trim() ? 'search' : 'kind'
 }
