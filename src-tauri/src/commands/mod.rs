@@ -49,20 +49,28 @@ pub fn open_with_key(app: &AppHandle, key: &VaultKey) -> Result<(SqliteStore, Ve
             StoreError::SchemaNewer => Error::VaultTooNew,
             _ => Error::InvalidPassword,
         })?;
-    backfill_card_brands(&store, key);
+    backfill_derived_columns(&store, key);
     let metas = list_metas(&store)?;
     Ok((store, metas))
 }
 
-// One-time derivation for cards saved before the card_brand column existed
-// (NULL there): unseal each once, store the slug ("none" when unrecognized),
-// and it's plain metadata from then on. Best-effort — a failure just leaves
-// the row NULL for the next unlock.
-fn backfill_card_brands(store: &SqliteStore, key: &VaultKey) {
+// Derivation for the metadata columns added after a row was written: unseal each
+// candidate once and stamp what its payload says. Best-effort — a failure just
+// leaves the row for the next unlock.
+//
+// `card_brand` is a candidate while NULL, so that work stops for good once every
+// card is stamped. `has_passkey` has no such marker — the column is NOT NULL
+// DEFAULT 0, and 0 is also the truth for every login that simply has no passkey
+// — so an unflagged login is re-checked on each unlock. That is the same set of
+// payloads the post-unlock audit unseals anyway, and it is self-healing: a row
+// arriving from a peer still on an older build gets corrected here too.
+fn backfill_derived_columns(store: &SqliteStore, key: &VaultKey) {
     let Ok(metas) = store.list() else { return };
     let cipher = key.payload_cipher();
     for meta in metas {
-        if meta.kind != "card" || meta.card_brand.is_some() {
+        let brand_missing = meta.kind == "card" && meta.card_brand.is_none();
+        let passkey_unflagged = meta.kind == "login" && !meta.has_passkey;
+        if !brand_missing && !passkey_unflagged {
             continue;
         }
         let Ok(Some(record)) = store.get(&meta.id) else {
@@ -71,8 +79,15 @@ fn backfill_card_brands(store: &SqliteStore, key: &VaultKey) {
         let Ok(entry) = cipher.unseal(&record.payload) else {
             continue;
         };
-        if let Some(brand) = crate::store::migrate::derived_card_brand(&entry) {
-            let _ = store.set_card_brand(&meta.id, &brand);
+        if brand_missing {
+            if let Some(brand) = crate::store::migrate::derived_card_brand(&entry) {
+                let _ = store.set_card_brand(&meta.id, &brand);
+            }
+        }
+        // Only ever raised here: a stale `true` cannot survive, since every
+        // `upsert` recomputes the flag from the payload it is writing.
+        if passkey_unflagged && crate::store::migrate::derived_has_passkey(&entry) {
+            let _ = store.set_has_passkey(&meta.id, true);
         }
     }
 }

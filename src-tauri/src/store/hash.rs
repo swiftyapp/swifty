@@ -65,6 +65,12 @@ pub fn record_hash(r: &Record) -> [u8; 32] {
     field(&mut h, &r.payload);
     opt_field(&mut h, r.card_brand.as_deref());
     h.update([r.favorite as u8]);
+    // Included for the same reason `card_brand` is: it is a column, so two
+    // stores can hold the same payload under a different flag (one has run the
+    // backfill, the other has not), and a merge blind to it would leave the
+    // stale flag beside the winner's payload. Appended last so the field order
+    // keeps tracking the column order.
+    h.update([r.has_passkey as u8]);
     h.finalize().into()
 }
 

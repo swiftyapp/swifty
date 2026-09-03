@@ -24,6 +24,7 @@ import {
   FileText,
   Fingerprint,
   Globe,
+  KeyRound,
   LayoutGrid,
   Lock,
   Moon,
@@ -83,6 +84,8 @@ export const ExternalGlyph = glyph(ExternalLink, 14)
 export const AtGlyph = glyph(AtSign, 14)
 export const UserGlyph = glyph(User, 14)
 export const StarGlyph = glyph(Star, 14)
+// A passkey, on a login's detail rows and as the list-row mark.
+export const KeyGlyph = glyph(KeyRound, 14)
 
 // Row / tile / rail tier
 export const PlusGlyph = glyph(Plus, 16)

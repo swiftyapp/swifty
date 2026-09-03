@@ -182,6 +182,7 @@ mod tests {
             payload: b"sealed".to_vec(),
             card_brand: None,
             favorite: false,
+            has_passkey: false,
         }
     }
 

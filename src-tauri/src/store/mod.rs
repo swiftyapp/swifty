@@ -62,6 +62,11 @@ pub struct Record {
     /// filter and pin on it without decrypting anything; [`VaultStore::set_favorite`]
     /// is its only writer outside a sync merge.
     pub favorite: bool,
+    /// Whether the entry carries at least one passkey, derived from the payload
+    /// at save time (see `migrate::derived_has_passkey`) so a listing can mark
+    /// the row without unsealing it. Unlike `favorite` this is not user state:
+    /// it is a projection of the payload, so every write recomputes it.
+    pub has_passkey: bool,
 }
 
 /// A row's metadata without its payload (what listings need).
@@ -77,6 +82,7 @@ pub struct EntryMeta {
     pub deleted_at: Option<i64>,
     pub card_brand: Option<String>,
     pub favorite: bool,
+    pub has_passkey: bool,
 }
 
 /// The swappable storage contract. Any backend behind this interface is a drop-in.

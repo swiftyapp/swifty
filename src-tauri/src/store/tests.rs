@@ -28,6 +28,20 @@ fn sample_entry() -> Entry {
     .unwrap()
 }
 
+// A login whose only credential is a passkey: no website and no password, which
+// is exactly the shape a Bitwarden import of a passkey-only item lands in.
+fn passkey_entry() -> Entry {
+    serde_json::from_value(serde_json::json!({
+        "id": "p1", "type": "login", "title": "Acme",
+        "passkeys": [{
+            "credentialId": "Y3JlZDE", "rpId": "acme.test", "rpName": "Acme",
+            "userHandle": "dWgx", "userName": "alice",
+            "userDisplayName": "Alice", "privateKey": "cGsx"
+        }]
+    }))
+    .unwrap()
+}
+
 // A fresh, unique DB path under the temp dir for each test.
 fn tmp_db() -> PathBuf {
     static N: AtomicU64 = AtomicU64::new(0);
@@ -53,6 +67,7 @@ fn rec(id: &str, payload: &[u8]) -> Record {
         payload: payload.to_vec(),
         card_brand: None,
         favorite: false,
+        has_passkey: false,
     }
 }
 
@@ -347,6 +362,83 @@ fn favorite_is_part_of_a_records_identity() {
         ..plain.clone()
     };
     assert_ne!(record_hash(&plain), record_hash(&starred));
+}
+
+#[test]
+fn build_record_flags_an_entry_that_holds_a_passkey() {
+    let plain = migrate::build_record(&sample_entry(), b"sealed".to_vec()).unwrap();
+    assert!(!plain.has_passkey);
+
+    let with_key = migrate::build_record(&passkey_entry(), b"sealed".to_vec()).unwrap();
+    assert!(with_key.has_passkey);
+}
+
+// An imported passkey-only login has no website, and the relying-party id is
+// the site the credential is bound to — otherwise the row has no subtitle and
+// typing the site's name finds nothing.
+#[test]
+fn build_record_falls_back_to_the_passkeys_rp_id_for_the_host() {
+    let record = migrate::build_record(&passkey_entry(), b"sealed".to_vec()).unwrap();
+    assert_eq!(record.url_host, "acme.test");
+
+    // A website of its own still wins: it is what the user typed.
+    let mut entry = passkey_entry();
+    entry.website = Some("https://login.acme.example/in".into());
+    let record = migrate::build_record(&entry, b"sealed".to_vec()).unwrap();
+    assert_eq!(record.url_host, "login.acme.example");
+}
+
+#[test]
+fn has_passkey_round_trips_through_upsert_get_and_list() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    store
+        .upsert(&migrate::build_record(&passkey_entry(), b"sealed".to_vec()).unwrap())
+        .unwrap();
+
+    assert!(store.get("p1").unwrap().unwrap().has_passkey);
+    assert!(store.list().unwrap()[0].has_passkey);
+    assert!(store.row_meta("p1").unwrap().unwrap().has_passkey);
+}
+
+// The mirror image of `saving_an_entry_leaves_the_star_alone`: this flag IS
+// derived from the payload being written, so removing the last passkey has to
+// clear it rather than leave a glyph on a row that no longer has one.
+#[test]
+fn saving_an_entry_updates_the_passkey_flag() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    store
+        .upsert(&migrate::build_record(&passkey_entry(), b"sealed".to_vec()).unwrap())
+        .unwrap();
+
+    let mut stripped = passkey_entry();
+    stripped.passkeys = None;
+    store
+        .upsert(&migrate::build_record(&stripped, b"sealed".to_vec()).unwrap())
+        .unwrap();
+
+    assert!(!store.list().unwrap()[0].has_passkey);
+}
+
+#[test]
+fn has_passkey_survives_import_and_export_for_sync() {
+    let flagged = Record {
+        has_passkey: true,
+        ..stamped("1", b"x", 1000)
+    };
+    let store = seeded(std::slice::from_ref(&flagged));
+
+    assert_eq!(store.export_for_sync().unwrap(), vec![flagged]);
+    assert!(store.list().unwrap()[0].has_passkey);
+}
+
+#[test]
+fn has_passkey_is_part_of_a_records_identity() {
+    let plain = stamped("1", b"x", 1000);
+    let flagged = Record {
+        has_passkey: true,
+        ..plain.clone()
+    };
+    assert_ne!(record_hash(&plain), record_hash(&flagged));
 }
 
 #[test]

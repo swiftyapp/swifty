@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { kindOf } from '.'
 import type { EntryDraft } from '@/defaults/entries'
+import type { Passkey } from '@/lib/commands'
 
 // What each kind will let through to `saveEntry` — the only thing standing
 // between a typed draft and the vault.
@@ -53,5 +54,24 @@ describe('isValid', () => {
     // Optional stays optional.
     expect(kindOf('login').isValid(login({ email: '' }))).toBe(true)
     expect(kindOf('login').isValid(login({ email: 'me@example' }))).toBe(false)
+  })
+
+  // A passkey is a credential in its own right — a login that has one needs no
+  // password, which is the only shape an imported passkey-only login is in.
+  it('takes a passkey in place of a login password', () => {
+    const passkey: Passkey = {
+      credentialId: 'Y3JlZDE',
+      rpId: 'acme.test',
+      userHandle: 'dWgx',
+      userName: 'alice',
+      userDisplayName: 'Alice',
+      privateKey: 'cGsx',
+      counter: 0
+    }
+
+    expect(kindOf('login').isValid(login({ password: '', passkeys: [passkey] }))).toBe(true)
+    // Neither credential is still not a login.
+    expect(kindOf('login').isValid(login({ password: '' }))).toBe(false)
+    expect(kindOf('login').isValid(login({ password: '', passkeys: [] }))).toBe(false)
   })
 })

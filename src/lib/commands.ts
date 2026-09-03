@@ -90,6 +90,10 @@ export interface EntryMeta {
   // Starred by the user. Metadata rather than an entry field, so it is toggled
   // through setFavorite and never travels with the secrets.
   favorite: boolean
+  // Whether the entry holds at least one passkey, derived from the payload at
+  // save time so the list can mark the row without revealing anything. The
+  // passkeys themselves only ever arrive via revealEntry.
+  hasPasskey?: boolean
   createdAt?: string
   updatedAt?: string
   // Present only on the tombstones listDeleted returns.
@@ -104,12 +108,20 @@ export const toEntryMeta = (entry: Entry): EntryMeta => ({
   type: entry.type,
   title: entry.title,
   tags: entry.tags ?? [],
-  urlHost: entry.type === 'login' ? hostOf(entry.website) : '',
+  urlHost: entry.type === 'login' ? loginHost(entry) : '',
   cardBrand: entry.type === 'card' ? cardBrandOf(entry.number) : undefined,
   favorite: false,
+  hasPasskey: entry.type === 'login' && (entry.passkeys?.length ?? 0) > 0,
   createdAt: entry.createdAt ?? entry.created_at,
   updatedAt: entry.updatedAt ?? entry.updated_at
 })
+
+// The site a login is shown under: its own website, or — for a passkey-only
+// login, which routinely has no website — the first passkey's relying-party id,
+// since that is the site the credential is bound to. Mirrors
+// `store::migrate::derived_url_host` in Rust; keep the two in sync.
+const loginHost = (entry: LoginEntry): string =>
+  hostOf(entry.website) || (entry.passkeys?.[0]?.rpId ?? '')
 
 const hostOf = (website: string): string =>
   website

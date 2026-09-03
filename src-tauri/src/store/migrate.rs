@@ -16,7 +16,7 @@ pub fn build_record(entry: &Entry, payload: Vec<u8>) -> Result<Record> {
         kind: entry.kind.clone(),
         title: entry.title.clone(),
         tags: serde_json::to_string(&entry.tags.clone().unwrap_or_default())?,
-        url_host: host_of(entry.website.as_deref().unwrap_or_default()),
+        url_host: derived_url_host(entry),
         created_at: to_ms(&entry.created_at),
         updated_at: to_ms(&entry.updated_at),
         deleted_at: None,
@@ -28,6 +28,7 @@ pub fn build_record(entry: &Entry, payload: Vec<u8>) -> Result<Record> {
         // existing row's star. A `.swftx` import is the one caller that sets it,
         // and every entry it brings in is an insert on a fresh vault.
         favorite: entry.favorite,
+        has_passkey: derived_has_passkey(entry),
     })
 }
 
@@ -50,6 +51,35 @@ pub fn derived_card_brand(entry: &Entry) -> Option<String> {
             .unwrap_or("none")
             .to_string()
     })
+}
+
+/// Whether the entry holds any passkey — the plaintext flag a listing reads
+/// instead of unsealing the payload. Not secret: that an account has a passkey
+/// is no more revealing than that it has a password.
+pub fn derived_has_passkey(entry: &Entry) -> bool {
+    entry.passkeys.as_ref().is_some_and(|keys| !keys.is_empty())
+}
+
+/// The stored host: the website's, or — for a login that only has passkeys —
+/// the first one's `rp_id`.
+///
+/// A passkey-only login imported from another manager routinely carries no
+/// website at all, and the relying-party id *is* the site the credential is
+/// bound to. Without the fallback such a row shows an empty subtitle and cannot
+/// be found by typing the site's name, which is how anyone would look for it.
+/// Mirrored in the frontend's `toEntryMeta`; keep the two in step.
+fn derived_url_host(entry: &Entry) -> String {
+    let host = host_of(entry.website.as_deref().unwrap_or_default());
+    if !host.is_empty() {
+        return host;
+    }
+    entry
+        .passkeys
+        .as_deref()
+        .unwrap_or_default()
+        .first()
+        .map(|key| key.rp_id.clone())
+        .unwrap_or_default()
 }
 
 /// Re-seal `.swftx` entries (obscured under the source `Cryptor`, possibly a

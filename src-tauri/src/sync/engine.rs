@@ -377,6 +377,7 @@ mod tests {
             payload: payload.to_vec(),
             card_brand: None,
             favorite: false,
+            has_passkey: false,
         }
     }
 
