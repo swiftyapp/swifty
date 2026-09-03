@@ -52,7 +52,11 @@ const pickData = (s: StoreState) => ({
   sync: s.sync,
   i18n: s.i18n,
   update: s.update,
-  ui: s.ui
+  ui: s.ui,
+  // Both read a persisted preference at slice creation, so a test that changes
+  // one has to have it put back like everything else.
+  sort: s.sort,
+  theme: s.theme
 })
 
 const initialData = pickData(useStore.getState())
