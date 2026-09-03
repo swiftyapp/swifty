@@ -62,7 +62,7 @@ runs one app process against one data dir, so nothing may depend on file order.
 | Breach monitoring switch | PR 4 | `settings-breach-toggle`; weak/reused are informational rows with no control, so the section holds exactly one `role="switch"` |
 | Import tiles | PR 4 | `import-tile-<bitwarden\|chrome\|lastpass\|keepass\|csv\|swftx>`, `import-dropzone`; the format `<select>` is gone |
 | Theme and date format | PR 4 | `settings-theme-light` / `-dark` (asserted on `<html data-theme>`), `settings-date-format-<pattern>` (asserted through `swifty:dateFormat`). `settings-theme-system` resolves against the OS, so the suite leaves it alone. |
-| Sync indicator absent with no provider | PR 4 | `sync-indicator`; with no provider configured the pill has no state to report and is not rendered, so `sync-indicator.spec.ts` asserts it does not exist. A connected reading is not e2e-able (see below). |
+| Sync indicator reports a local-only vault | PR 4 | `sync-indicator`; the chip is mounted in every state, so with no provider configured `sync-indicator.spec.ts` asserts `data-tone="local"` rather than an absence. The tone, not the label — the label is localised. A connected reading is not e2e-able (see below). |
 | Copy toast | PR 4 | `copy-toast` — always in the DOM, toggled via the `hidden` class, so assert *visibility* |
 
 ---

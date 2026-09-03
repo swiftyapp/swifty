@@ -30,13 +30,13 @@ export default function AuthShell({ children, onBack }: Props) {
       {/*
         Lock/setup/restore render without the Header, so without this strip the
         window has no drag region at all on these screens. It matches the
-        Header's 46px height and sits under the traffic lights. It is painted
+        Header's 38px height and sits under the traffic lights. It is painted
         before the panel below, so any panel content that reaches into the top
         strip keeps its own clicks -- only bare background drags the window.
       */}
       <div
         data-tauri-drag-region
-        className="absolute inset-x-0 top-0 h-[46px]"
+        className="absolute inset-x-0 top-0 h-[38px]"
       />
 
       <div className="relative w-[560px] max-w-full">{children}</div>
