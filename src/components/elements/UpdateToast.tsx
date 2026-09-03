@@ -4,6 +4,7 @@ import type { TKey } from '@/i18n'
 import { useStore } from '@/store'
 import { restartForUpdate } from '@/services/autoUpdate'
 import Button from './Button'
+import { TOAST } from './tokens'
 import { DownloadGlyph } from '../Main/icons'
 
 // Bottom-right toast. Prefers the sticky "update ready → restart" prompt when one
@@ -17,8 +18,7 @@ export default function UpdateToast() {
   return null
 }
 
-const shell =
-  'animate-pop fixed bottom-5 right-5 z-[1000] max-w-[340px] rounded-xl border border-line bg-detail text-text shadow-[var(--shadow)]'
+const shell = `${TOAST} bottom-5 right-5`
 
 function ReadyToast({ version, notes }: { version: string; notes: string | null }) {
   const { t } = useTranslation()

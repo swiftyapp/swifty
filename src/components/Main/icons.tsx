@@ -35,6 +35,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  ScanLine,
   Search,
   Settings,
   ShieldCheck,
@@ -104,6 +105,7 @@ export const LoginGlyph = glyph(Globe, 16)
 export const NoteGlyph = glyph(FileText, 16)
 export const CardGlyph = glyph(CreditCard, 16)
 export const IdentityGlyph = glyph(IdCard, 16)
+export const ScanGlyph = glyph(ScanLine, 16)
 export const ShieldGlyph = glyph(ShieldCheck, 16)
 export const GlobeGlyph = glyph(Globe, 16)
 export const ActivityGlyph = glyph(Activity, 16)
