@@ -342,6 +342,31 @@ export const exportEntries = (
   invoke('export_entries', { path: path ?? null, format })
 
 // ---------------------------------------------------------------------------
+// Scanning
+// ---------------------------------------------------------------------------
+
+// What the OS text recognizer read out of one image: the kind of secret it is,
+// and its fields keyed exactly like that kind's draft.
+export interface ScanResult {
+  kind: 'card' | 'identity'
+  fields: Record<string, string>
+}
+
+/**
+ * Recognize a card or an identity document in the image at `path`.
+ *
+ * The path is the one the user already has (a drop, or the file dialog) — the
+ * image is read where it lies and never copied. Rejects with "nothing
+ * recognized" when the text is there but says neither.
+ */
+export const scanImage = (path: string): Promise<ScanResult> =>
+  invoke('scan_image', { path })
+
+// Whether this platform has a text recognizer at all. False on Linux and on a
+// Windows without an OCR language pack, where the UI offers no scanning.
+export const scanSupported = (): Promise<boolean> => invoke('scan_supported')
+
+// ---------------------------------------------------------------------------
 // Generator & OTP
 // ---------------------------------------------------------------------------
 

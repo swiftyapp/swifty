@@ -12,7 +12,8 @@ import {
   setup,
   readVault,
   importBackup,
-  setAutolockTimeout
+  setAutolockTimeout,
+  scanSupported
 } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
 import { getSecs } from '@/defaults/autolock'
@@ -155,6 +156,11 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       // the stored preference as soon as there is a session to protect.
       setAutolockTimeout(getSecs()).catch(() => {})
       get().syncInit(result.syncConfigured)
+      // Asked once per session: whether the OS can read a card off a photo
+      // decides whether any scan affordance is offered at all.
+      scanSupported()
+        .then(get().setScanSupported)
+        .catch(() => {})
       // One run on unlock: this device may have been off while another pushed,
       // and it may itself be holding writes a previous session never published.
       if (result.syncConfigured) syncNow().catch(() => {})
