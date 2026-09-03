@@ -15,9 +15,11 @@ import {
   AtSign,
   Check,
   ChevronDown,
+  Cloud,
   Copy,
   CreditCard,
   Download,
+  HardDrive,
   ExternalLink,
   Eye,
   EyeOff,
@@ -38,6 +40,7 @@ import {
   Star,
   Sun,
   Trash2,
+  TriangleAlert,
   User,
   X,
   type LucideIcon
@@ -84,6 +87,12 @@ export const ExternalGlyph = glyph(ExternalLink, 14)
 export const AtGlyph = glyph(AtSign, 14)
 export const UserGlyph = glyph(User, 14)
 export const StarGlyph = glyph(Star, 14)
+// The chrome's sync chip. Like the legacy indicator, the centre glyph says only
+// *where* the vault lives -- disk or cloud -- and never changes with status; the
+// state rides on the corner badge (CheckGlyph / AlertGlyph at 10) and the ring.
+export const DiskGlyph = glyph(HardDrive, 14)
+export const CloudGlyph = glyph(Cloud, 14)
+export const AlertGlyph = glyph(TriangleAlert, 14)
 // A passkey, on a login's detail rows and as the list-row mark.
 export const KeyGlyph = glyph(KeyRound, 14)
 
