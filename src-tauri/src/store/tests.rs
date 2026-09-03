@@ -66,10 +66,13 @@ fn stamped(id: &str, payload: &[u8], updated_at: i64) -> Record {
     }
 }
 
+// An ordinary tombstone: `delete` only stamps `deleted_at`, so the payload is
+// still there. Keeping it non-empty here is what separates this from the
+// content-free shell `purge` leaves behind, which the merge treats as absorbing.
 fn tombstone(id: &str, at: i64) -> Record {
     Record {
         deleted_at: Some(at),
-        ..stamped(id, b"", at)
+        ..stamped(id, b"sealed-payload", at)
     }
 }
 
@@ -212,6 +215,56 @@ fn purge_beats_a_peer_that_still_holds_the_row() {
     assert!(store.list_deleted().unwrap().is_empty());
 }
 
+// The sibling case, and the one last-writer-wins gets wrong: the peer did not
+// just re-push the row, it *edited* it after the purge, so its copy is newer.
+// LWW would hand the sealed payload back live — "Delete forever" has to beat a
+// newer stamp, not merely an equal one.
+#[test]
+fn purge_beats_a_peer_that_edited_the_row_afterwards() {
+    let store = seeded(&[Record {
+        deleted_at: Some(1000),
+        ..stamped("1", b"sealed-payload", 1000)
+    }]);
+    store.purge("1").unwrap();
+
+    store
+        .merge_records(&[stamped("1", b"edited-after-the-purge", i64::MAX)])
+        .unwrap();
+
+    assert!(row(&store, "1").payload.is_empty());
+    assert!(row(&store, "1").deleted_at.is_some());
+    assert!(store.list().unwrap().is_empty());
+    assert!(store.list_deleted().unwrap().is_empty());
+}
+
+// The other direction, and the reason the guard is symmetric: the purge has to
+// *travel*. Were the shell only absorbing locally, the peer that holds a newer
+// edit would keep its payload, the two digests would never match, and the pair
+// would push at each other forever.
+#[test]
+fn a_purged_shell_destroys_the_payload_on_the_peer_too() {
+    let purged = seeded(&[Record {
+        deleted_at: Some(1000),
+        ..stamped("1", b"sealed-payload", 1000)
+    }]);
+    purged.purge("1").unwrap();
+    let peer = seeded(&[stamped("1", b"edited-after-the-purge", i64::MAX)]);
+
+    peer.merge_records(&purged.export_for_sync().unwrap())
+        .unwrap();
+
+    assert!(row(&peer, "1").payload.is_empty());
+    assert!(peer.list().unwrap().is_empty());
+    // Both sides converged on the shell, so nothing is left to push.
+    assert_eq!(peer.state_digest().unwrap(), purged.state_digest().unwrap());
+    // And replaying it changes nothing.
+    assert_eq!(
+        peer.merge_records(&purged.export_for_sync().unwrap())
+            .unwrap(),
+        0
+    );
+}
+
 #[test]
 fn set_favorite_round_trips_and_bumps_updated_at() {
     let store = seeded(&[stamped("1", b"x", 1000)]);
@@ -225,6 +278,37 @@ fn set_favorite_round_trips_and_bumps_updated_at() {
 
     store.set_favorite("1", false).unwrap();
     assert!(!store.list().unwrap()[0].favorite);
+}
+
+// The Trash offers no star (`favorite-toggle` is not rendered on a tombstone),
+// so this only guards the store — but the bump would give a deleted row a fresh
+// `updated_at` for the sync merge to carry, which is worth refusing outright.
+#[test]
+fn set_favorite_only_touches_live_rows() {
+    let store = seeded(&[Record {
+        deleted_at: Some(1000),
+        ..stamped("1", b"x", 1000)
+    }]);
+
+    store.set_favorite("1", true).unwrap();
+
+    let got = row(&store, "1");
+    assert!(!got.favorite);
+    assert_eq!(got.updated_at, 1000);
+}
+
+// The commands that report back a row they just wrote read it through
+// `row_meta`, which — like the write itself — has to see rows `list` hides.
+#[test]
+fn row_meta_sees_a_tombstone_that_list_hides() {
+    let store = seeded(&[stamped("1", b"x", 1000)]);
+    store.delete("1").unwrap();
+
+    assert!(store.list().unwrap().is_empty());
+    let meta = store.row_meta("1").unwrap().unwrap();
+    assert!(meta.deleted_at.is_some());
+    assert_eq!(meta.title, "Example");
+    assert_eq!(store.row_meta("missing").unwrap(), None);
 }
 
 #[test]
@@ -636,6 +720,58 @@ fn import_swftx_reseals_across_passwords_and_upserts_by_id() {
         .unwrap();
     assert_eq!(revealed.password.as_deref(), Some("hunter2"));
     assert_eq!(revealed.username.as_deref(), Some("alice"));
+}
+
+// A `.swftx` backup has to carry the star. It is a column, never a payload
+// field, so the export re-attaches it (`export_entry`) and the import threads it
+// back through `build_record` — miss either half and a backup silently unstars
+// the whole vault.
+#[test]
+fn swftx_round_trip_preserves_a_starred_record() {
+    use crate::crypto::{hash_secret, Cryptor};
+    use crate::models::VaultData;
+
+    let key = argon2_key(
+        "current-pw",
+        &argon2_params(b"salt-h-01234567890123456789012345"),
+    );
+    let cipher = key.payload_cipher();
+    let source = SqliteStore::open(&tmp_db(), &key.sqlcipher_key()).unwrap();
+    let entry = sample_entry();
+    source
+        .upsert(&migrate::build_record(&entry, cipher.seal(&entry).unwrap()).unwrap())
+        .unwrap();
+    source.set_favorite("1", true).unwrap();
+
+    // export_vault: project every live row back to a plaintext entry, obscured
+    // and sealed under the backup password.
+    let out = Cryptor::new(&hash_secret("backup-pw"));
+    let blob = out
+        .encrypt_data(&VaultData {
+            entries: source
+                .export_for_sync()
+                .unwrap()
+                .iter()
+                .map(|r| migrate::export_entry(r, &cipher, &out).unwrap())
+                .collect(),
+        })
+        .unwrap();
+
+    // import_backup: decrypt the file and re-seal it into a fresh vault.
+    let file: VaultData = out.decrypt_data(&blob).unwrap();
+    let restored = SqliteStore::open(&tmp_db(), &key.sqlcipher_key()).unwrap();
+    restored
+        .import(&migrate::reseal_swftx(&file.entries, &out, &cipher).unwrap())
+        .unwrap();
+
+    let list = restored.list().unwrap();
+    assert_eq!(list.len(), 1);
+    assert!(list[0].favorite);
+    // The secrets still round-trip, so the star did not ride in on a broken export.
+    let revealed = cipher
+        .unseal(&restored.get("1").unwrap().unwrap().payload)
+        .unwrap();
+    assert_eq!(revealed.password.as_deref(), Some("s3cret"));
 }
 
 // A wrong source password fails the file decrypt before the store is touched.

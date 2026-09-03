@@ -31,10 +31,7 @@ async function submit(): Promise<void> {
 
 describe("change master password", () => {
   before(async () => {
-    // Every selector below is an English label, and the locale lives in
-    // localStorage (which no reset clears) — pin it rather than inherit it.
-    await browser.execute(() => localStorage.setItem("locale", "en-US"));
-
+    // Every selector below is an English label; `reset()` seeds the locale.
     await resetEmpty(OLD_PASSWORD);
     await unlock(OLD_PASSWORD);
     await openMasterPasswordSettings();

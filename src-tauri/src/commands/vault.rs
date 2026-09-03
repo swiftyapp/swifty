@@ -217,8 +217,8 @@ pub async fn export_vault(
         // under the legacy password-derived cryptor for a portable `.swftx`.
         let out = crypto::Cryptor::new(&crypto::hash_secret(&password));
         let entries = live_records(session.store()?)?
-            .into_iter()
-            .map(|r| out.obscure(&cipher.unseal(&r.payload)?))
+            .iter()
+            .map(|r| migrate::export_entry(r, &cipher, &out))
             .collect::<Result<Vec<Entry>>>()?;
         out.encrypt_data(&VaultData { entries })?
     };

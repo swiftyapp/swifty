@@ -27,28 +27,34 @@ export default function NoteField({
 
   return (
     <FieldRow label={label} error={requiredError(value, required, attempted)}>
-      {editing ? (
-        <textarea
-          name={name}
-          value={value}
-          rows={1}
-          placeholder={t('Anything worth remembering')}
-          spellCheck={false}
-          ref={grow}
-          onChange={event => {
-            grow(event.currentTarget)
-            set(event.target.value)
-          }}
-          className="block min-h-6 w-full resize-none overflow-hidden border-b border-line2 bg-transparent text-base leading-relaxed text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line"
-        />
-      ) : (
-        <div
-          className="whitespace-pre-wrap break-words text-base leading-relaxed text-text2"
-          data-testid={`entry-value-${name}`}
-        >
-          {value}
-        </div>
-      )}
+      {id =>
+        editing ? (
+          <textarea
+            id={id}
+            name={name}
+            // A note entry's body is a full-bleed row: there is no label column
+            // to point at it, so it names itself.
+            aria-label={label === undefined ? t('Note') : undefined}
+            value={value}
+            rows={1}
+            placeholder={t('Anything worth remembering')}
+            spellCheck={false}
+            ref={grow}
+            onChange={event => {
+              grow(event.currentTarget)
+              set(event.target.value)
+            }}
+            className="block min-h-6 w-full resize-none overflow-hidden border-b border-line2 bg-transparent text-base leading-relaxed text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line"
+          />
+        ) : (
+          <div
+            className="whitespace-pre-wrap break-words text-base leading-relaxed text-text2"
+            data-testid={`entry-value-${name}`}
+          >
+            {value}
+          </div>
+        )
+      }
     </FieldRow>
   )
 }

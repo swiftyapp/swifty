@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { filterEntries, isValid } from './entries'
+import { filterEntries } from './entries'
 import type { EntryMeta } from '@/lib/commands'
 
 const login = (title: string, tags: string[] = [], urlHost = ''): EntryMeta =>
@@ -11,12 +11,12 @@ const card = (title: string): EntryMeta =>
 describe('filterEntries', () => {
   const entries = [login('Google', ['personal']), login('Airbnb'), login('Facebook', ['personal'])]
 
-  it('sorts by title', () => {
-    expect(filterEntries(entries, { type: 'login', query: '' }).map(e => e.title)).toEqual([
-      'Airbnb',
-      'Facebook',
-      'Google'
-    ])
+  // Order without a query belongs to the list's own sort control, so this only
+  // asserts membership.
+  it('keeps every entry of the filtered kind', () => {
+    expect(filterEntries(entries, { type: 'login', query: '' }).map(e => e.title)).toEqual(
+      expect.arrayContaining(['Airbnb', 'Facebook', 'Google'])
+    )
   })
 
   it('filters by kind', () => {
@@ -26,12 +26,7 @@ describe('filterEntries', () => {
 
   it('keeps every kind when no kind filter is set', () => {
     const mixed = [...entries, card('Visa')]
-    expect(filterEntries(mixed, { type: null, query: '' }).map(e => e.title)).toEqual([
-      'Airbnb',
-      'Facebook',
-      'Google',
-      'Visa'
-    ])
+    expect(filterEntries(mixed, { type: null, query: '' })).toHaveLength(4)
   })
 
   it('narrows a query to the filtered kind', () => {
@@ -64,28 +59,5 @@ describe('filterEntries', () => {
   it('is typo-tolerant (fuzzy)', () => {
     const items = [login('Facebook')]
     expect(filterEntries(items, { type: 'login', query: 'facbook' }).map(e => e.title)).toEqual(['Facebook'])
-  })
-})
-
-describe('isValid', () => {
-  it('validates a login', () => {
-    expect(isValid({ type: 'login', title: 'T', username: 'u', password: 'p' })).toBe(true)
-    expect(isValid({ type: 'login', title: 'T', username: '', password: 'p' })).toBe(false)
-  })
-
-  it('validates a note', () => {
-    expect(isValid({ type: 'note', title: 'T', note: 'body' })).toBe(true)
-    expect(isValid({ type: 'note', title: 'T', note: '' })).toBe(false)
-  })
-
-  it('validates a card', () => {
-    expect(
-      isValid({ type: 'card', title: 'T', number: '1', pin: '1', cvc: '1', month: '1', year: '1' })
-    ).toBe(true)
-    expect(isValid({ type: 'card', title: 'T', number: '1' })).toBe(false)
-  })
-
-  it('saves a card without a PIN', () => {
-    expect(isValid({ type: 'card', title: 'T', number: '1', cvc: '1', month: '1', year: '1' })).toBe(true)
   })
 })

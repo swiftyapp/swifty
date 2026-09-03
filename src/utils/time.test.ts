@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { relativeTime, toTime } from './time'
+import { relativeDuration, relativeTime, toTime } from './time'
 
 // A fixed "now" so every case is deterministic: 2024-03-14, midday local time.
 const now = new Date(2024, 2, 14, 12, 0, 0).getTime()
@@ -37,6 +37,23 @@ describe('relativeTime', () => {
 
   it('keeps the year on dates outside the current one', () => {
     expect(relativeTime(new Date(2023, 0, 12, 9).toISOString(), now)).toBe('01/12/2023')
+  })
+})
+
+describe('relativeDuration', () => {
+  it('counts the same ladder as relativeTime inside the week', () => {
+    expect(relativeDuration(ago(0), now)).toBe('now')
+    expect(relativeDuration(ago(3 * MINUTE), now)).toBe('3m')
+    expect(relativeDuration(ago(3 * HOUR), now)).toBe('3h')
+    expect(relativeDuration(ago(6 * DAY), now)).toBe('6d')
+  })
+
+  // A duration is all this returns, so past the week it returns nothing and
+  // the caller phrases it as a date instead.
+  it('is empty past a week, and without a timestamp', () => {
+    expect(relativeDuration(ago(120 * DAY), now)).toBe('')
+    expect(relativeDuration(undefined, now)).toBe('')
+    expect(relativeDuration('not-a-date', now)).toBe('')
   })
 })
 

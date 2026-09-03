@@ -46,6 +46,13 @@ const SYNC_DEBOUNCE_MS = 30_000
 
 let syncTimer: ReturnType<typeof setTimeout> | undefined
 
+// Drops a write waiting to be published. Called on lock: the backend has no key
+// to push with any more, and the next unlock syncs anyway.
+export const cancelScheduledSync = () => {
+  if (syncTimer) clearTimeout(syncTimer)
+  syncTimer = undefined
+}
+
 const now = () => new Date().toISOString()
 
 // Complete a draft into a full entry: existing entries keep their id/createdAt,
@@ -67,7 +74,7 @@ const upsertMeta = (items: EntryMeta[], meta: EntryMeta): EntryMeta[] => {
 export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_set, get) => {
   const scheduleSync = () => {
     if (!get().sync.enabled) return
-    if (syncTimer) clearTimeout(syncTimer)
+    cancelScheduledSync()
     syncTimer = setTimeout(() => {
       syncTimer = undefined
       syncNow().catch(() => {})
@@ -98,18 +105,24 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       // the two can legitimately disagree).
       const { type } = get().filters
       if (type && type !== meta.type) get().setFilterType(null)
-      get().entrySaved(meta.id)
+      get().setCurrentEntry(meta.id)
       scheduleSync()
       refreshAudit()
     },
     deleteEntry: async id => {
       await deleteEntryCmd(id)
-      get().entryRemoved(get().entries.items.filter(e => e.id !== id))
+      get().setEntries(get().entries.items.filter(e => e.id !== id))
+      get().setNoEntry()
       scheduleSync()
       refreshAudit()
     },
     loadTrash: async () => {
-      get().setTrash(await listDeleted())
+      try {
+        get().setTrash(await listDeleted())
+      } catch {
+        // Keep the last known list: a failed read is not an empty Trash, and
+        // there is nothing the user can do about it from here.
+      }
     },
     restoreEntry: async id => {
       const meta = await restoreEntryCmd(id)
@@ -132,7 +145,7 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       // it selected would leave the detail pane on an entry the list no longer
       // has (and hide the empty state).
       if (get().ui.view === 'favorites' && !meta.favorite) get().setNoEntry()
-      else get().entrySaved(meta.id)
+      else get().setCurrentEntry(meta.id)
       scheduleSync()
     },
     enterMain: async result => {

@@ -14,7 +14,6 @@ const audit: Audit = {
 const seed = () => {
   const store = makeStore()
   withEntries(
-    store,
     [loginMeta({ id: 'l1', title: 'Weakling' }), loginMeta({ id: 'l2', title: 'Reuser' })],
     audit
   )
@@ -45,7 +44,7 @@ describe('Audit list', () => {
 
   it('shows a loading state before results arrive', () => {
     const store = makeStore()
-    withEntries(store, [loginMeta()])
+    withEntries([loginMeta()])
     renderWithStore(<AuditList />, { store })
     expect(screen.getByText('Loading Results..')).toBeInTheDocument()
   })
@@ -56,5 +55,19 @@ describe('Audit aside', () => {
     renderWithStore(<AuditAside />, { store: seed() })
     expect(screen.getByText('Password Audit')).toBeInTheDocument()
     expect(screen.getByText('Overall Score')).toBeInTheDocument()
+  })
+
+  // The dial numeral is on a 0-10 scale with one decimal — always one, or the
+  // numeral changes width as the vault improves.
+  it('always shows the score to one decimal', () => {
+    renderWithStore(<AuditAside />, { store: seed() })
+    expect(screen.getByTestId('audit-score')).toHaveTextContent('0.0')
+
+    const store = makeStore()
+    withEntries([loginMeta()], {
+      l1: { score: 4, isWeak: false, isRepeating: false, breached: false }
+    })
+    renderWithStore(<AuditAside />, { store })
+    expect(screen.getAllByTestId('audit-score')[1]).toHaveTextContent('10.0')
   })
 })

@@ -5,6 +5,12 @@ import Input from './Input'
 import CommandRow from './CommandRow'
 import { useResults } from './useResults'
 
+// Only one palette is ever mounted, so a constant is id enough. The rows need
+// ids of their own for `aria-activedescendant`: the focused row is never the
+// focused element, so nothing else tells a reader which one it is.
+const LIST_ID = 'palette-listbox'
+const optionId = (id: string) => `palette-option-${id}`
+
 // The palette itself. Mounted only while open, so the query, the focused row,
 // and the input focus all reset on every ⌘K.
 export default function Panel() {
@@ -63,9 +69,16 @@ export default function Panel() {
         onClick={e => e.stopPropagation()}
         className="w-[620px] overflow-hidden rounded-xl border border-line2 bg-detail shadow-[var(--shadow)] animate-pop"
       >
-        <Input value={query} onChange={setQuery} onKeyDown={onKeyDown} />
+        <Input
+          value={query}
+          onChange={setQuery}
+          onKeyDown={onKeyDown}
+          listId={LIST_ID}
+          activeId={commands[focused] && optionId(commands[focused].id)}
+        />
 
         <div
+          id={LIST_ID}
           role="listbox"
           // Clicking a row must not pull focus out of the input.
           onMouseDown={e => e.preventDefault()}
@@ -78,6 +91,7 @@ export default function Panel() {
           {commands.map((command, index) => (
             <CommandRow
               key={command.id}
+              id={optionId(command.id)}
               command={command}
               focused={index === focused}
               onRun={() => run(index)}

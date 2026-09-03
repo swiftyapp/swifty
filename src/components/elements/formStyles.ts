@@ -8,6 +8,3 @@ const controlBase =
 export const inputClass = `${controlBase} h-9`
 
 export const selectClass = `${controlBase} h-9 appearance-none pr-9`
-
-export const checkboxClass =
-  'h-4 w-4 flex-none accent-accent'

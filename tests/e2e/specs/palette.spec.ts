@@ -100,8 +100,9 @@ describe("command palette", () => {
       timeoutMsg: `<html data-theme> stayed at "${before}"`,
     });
 
-    // The theme is persisted to localStorage, which no reset clears — put it
-    // back so this spec leaves nothing behind for the rest of the run.
+    // The theme is persisted to localStorage, which only the next `reset()`
+    // clears — put it back so this spec leaves nothing behind for whatever runs
+    // before that.
     await openPalette();
     await query("Toggle theme", "Toggle theme");
     await runItem("Toggle theme");

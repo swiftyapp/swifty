@@ -4,10 +4,12 @@ import {
   createLogin,
   createNote,
   entryItems,
+  expectTitles,
   pressArrowDown,
   pressEnter,
   resetEmpty,
   unlock,
+  visibleTitles,
   waitFor,
 } from "../helpers";
 
@@ -32,26 +34,6 @@ const CARD = "Travel Card";
 const LOGINS_BY_RECENCY = [...LOGINS].reverse();
 
 const searchInput = () => $('[data-testid="search-input"]');
-
-/** Titles of the rows currently rendered, in list order. */
-async function visibleTitles(): Promise<string[]> {
-  const rows = await $$('[data-testid="entry-item-title"]');
-  const titles: string[] = [];
-  for (const row of rows) titles.push(await row.getText());
-  return titles;
-}
-
-/** Wait for the list to settle on an exact set of titles, then return them. */
-async function expectTitles(expected: string[]): Promise<void> {
-  await browser.waitUntil(
-    async () => (await visibleTitles()).join("|") === expected.join("|"),
-    {
-      timeout: 15_000,
-      timeoutMsg: `list never settled on [${expected.join(", ")}]`,
-    },
-  );
-  expect(await visibleTitles()).toEqual(expected);
-}
 
 /** Wait for the row with this title to be the list's selected option. */
 async function expectSelected(title: string): Promise<void> {
@@ -78,9 +60,8 @@ async function selectKind(kind: "all" | "login" | "note" | "card"): Promise<void
 
 /** The count rendered on one chip. */
 async function chipCount(kind: string): Promise<number> {
-  await waitFor(`filter-${kind}`);
-  const text = await $(`[data-testid="filter-${kind}"]`).$(".font-mono").getText();
-  return Number(text);
+  await waitFor(`filter-${kind}-count`);
+  return Number(await $(`[data-testid="filter-${kind}-count"]`).getText());
 }
 
 describe("search and kind filters", () => {

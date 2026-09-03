@@ -9,7 +9,7 @@ import { formatExpiry, splitExpiry } from '../expiry'
 import Value from './Value'
 
 export default function Fields() {
-  const { set } = useFields()
+  const { set, attempted } = useFields()
   const editing = !!set
   const [show, setShow] = useState(false)
   // Editing shows what is being typed; reading hides it until asked.
@@ -95,6 +95,9 @@ export default function Fields() {
               testid="entry-value-expires"
               placeholder="MM/YY"
               required
+              // One box, two draft keys: "12" fills the box but not the pair,
+              // and `isValid` wants both — so the box has to say so itself.
+              invalid={attempted && !(month.value && year.value)}
               maxLength={5}
               ink="text-[13px]"
             />

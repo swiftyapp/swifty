@@ -1,5 +1,5 @@
 import { useStore } from '@/store'
-import type { Audit, AuditItem, EntryMeta } from '@/lib/commands'
+import type { AuditItem, EntryMeta } from '@/lib/commands'
 import { t } from '@/i18n'
 import Group from '../Group'
 
@@ -7,12 +7,6 @@ export default function AuditList() {
   const audit = useStore(state => state.audit)
   const breachCheck = useStore(state => state.breachCheck)
   const items = useStore(state => state.entries.items)
-
-  const byProperty = (property: keyof AuditItem): EntryMeta[] =>
-    Object.keys(audit as Audit)
-      .filter(id => (audit as Audit)[id][property])
-      .map(id => items.find(entry => entry.id === id))
-      .filter((entry): entry is EntryMeta => entry !== undefined)
 
   if (!audit)
     return (
@@ -23,6 +17,13 @@ export default function AuditList() {
   // Nothing to score: the detail pane says so on its own (Body/Empty), so the
   // column stays blank rather than repeating it.
   if (Object.keys(audit).length === 0) return null
+
+  // Below the guard, so the audit is known to be there.
+  const byProperty = (property: keyof AuditItem): EntryMeta[] =>
+    Object.keys(audit)
+      .filter(id => audit[id][property])
+      .map(id => items.find(entry => entry.id === id))
+      .filter((entry): entry is EntryMeta => entry !== undefined)
 
   return (
     <div className="pb-6">

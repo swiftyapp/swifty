@@ -35,6 +35,13 @@ pub struct Entry {
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
+    /// The user's star. Stored as a column rather than in the payload, so it
+    /// rides along here only to survive a `.swftx` export/import round-trip —
+    /// the editor never sends it, which is what keeps an ordinary save from
+    /// clearing one (see `store::migrate::build_record`). Omitted when unset, so
+    /// a backup of an unstarred vault stays byte-identical to the legacy format.
+    #[serde(default, skip_serializing_if = "is_unset")]
+    pub favorite: bool,
     #[serde(rename = "createdAt", default, skip_serializing_if = "Option::is_none")]
     pub created_at: Option<String>,
     #[serde(rename = "updatedAt", default, skip_serializing_if = "Option::is_none")]
@@ -45,6 +52,10 @@ pub struct Entry {
         skip_serializing_if = "Option::is_none"
     )]
     pub password_updated_at: Option<String>,
+}
+
+fn is_unset(flag: &bool) -> bool {
+    !*flag
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,8 +85,9 @@ pub struct EntryMetaDto {
 }
 
 // The one projection of a stored metadata row onto the frontend DTO (timestamps
-// are ms → RFC3339). Records project through `Record::meta`, so save and list
-// cannot drift apart on which columns reach the UI.
+// are ms → RFC3339). Every command reads its row as an `EntryMeta` (`list`,
+// `list_deleted`, `row_meta`), so save and list cannot drift apart on which
+// columns reach the UI.
 impl From<&crate::store::EntryMeta> for EntryMetaDto {
     fn from(m: &crate::store::EntryMeta) -> Self {
         Self {

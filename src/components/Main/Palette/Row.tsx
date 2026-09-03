@@ -2,6 +2,9 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { cx } from '@/utils/cx'
 
 interface Props {
+  // What the input points `aria-activedescendant` at — the focused row is never
+  // the focused element, so this is the only way a reader is told about it.
+  id: string
   focused: boolean
   onClick: () => void
   onHover: () => void
@@ -14,7 +17,7 @@ interface Props {
 // Shared interaction shell for every palette row: one focus treatment (the
 // prototype's best-match wash) and one hover. The border is always present so
 // focusing a row never shifts the layout.
-export default function Row({ focused, onClick, onHover, className, children }: Props) {
+export default function Row({ id, focused, onClick, onHover, className, children }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   // Keep the keyboard-focused row visible when arrowing past the fold.
@@ -25,6 +28,7 @@ export default function Row({ focused, onClick, onHover, className, children }: 
   return (
     <div
       ref={ref}
+      id={id}
       role="option"
       aria-selected={focused}
       // Every palette result (entry and command alike) flows through this

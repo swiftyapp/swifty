@@ -168,15 +168,16 @@ impl SqliteStore {
         Ok(())
     }
 
-    /// Fetch one row by id **including tombstones**, unlike [`VaultStore::get`]
-    /// which hides them. Restore and purge both act on rows the live read cannot
-    /// see, and both report back the row they wrote.
-    pub fn row(&self, id: &str) -> Result<Option<Record>> {
+    /// Fetch one row's metadata by id **including tombstones**, unlike
+    /// [`VaultStore::list`] which hides them. Save, restore, favorite and purge
+    /// all report back the row they just wrote, and restore and purge act on
+    /// rows the live read cannot see. None of them wants the payload, so this
+    /// does not read it: the whole point of a metadata projection is that
+    /// reporting a write never decrypts anything.
+    pub fn row_meta(&self, id: &str) -> Result<Option<EntryMeta>> {
         let conn = self.lock();
-        let sql = format!("SELECT {COLS} FROM entries WHERE id = ?1");
-        Ok(conn
-            .query_row(&sql, params![id], row_to_record)
-            .optional()?)
+        let sql = format!("SELECT {META_COLS} FROM entries WHERE id = ?1");
+        Ok(conn.query_row(&sql, params![id], row_to_meta).optional()?)
     }
 
     /// Set the derived card-network slug without stamping `updated_at` — it is
@@ -206,6 +207,14 @@ impl SqliteStore {
     /// can win or lose), which is what makes "deleted on one device" and
     /// "edited on another" resolve by time rather than by which side ran first.
     ///
+    /// The one exception is a purged shell (see [`VaultStore::purge`]), which is
+    /// **absorbing**: it beats every incoming row and no incoming row can leave
+    /// it. Under plain last-writer-wins a peer that edited the entry *after* the
+    /// purge would hand the sealed payload straight back, so "Delete forever"
+    /// would not be forever. Making the shell the top of the lattice keeps the
+    /// merge a join — idempotent, commutative, associative — while making the
+    /// purge final: both sides of a conflict land on the shell.
+    ///
     /// Winners are written verbatim: no timestamp is stamped here, or the
     /// merged row would immediately look newer than its source everywhere else.
     pub fn merge_records(&self, recs: &[Record]) -> Result<usize> {
@@ -225,6 +234,10 @@ impl SqliteStore {
 
                 let wins = match &local {
                     None => true,
+                    // Absorbing in both directions, so the two devices agree:
+                    // a purge cannot be undone, and it always propagates.
+                    Some(local) if is_purged(local) => false,
+                    Some(_) if is_purged(incoming) => true,
                     Some(local) => {
                         incoming.updated_at > local.updated_at
                             || (incoming.updated_at == local.updated_at
@@ -386,11 +399,16 @@ impl VaultStore for SqliteStore {
     /// A bare `DELETE` would not survive sync: every push is the whole state and
     /// [`SqliteStore::merge_records`] re-inserts any id it does not already hold,
     /// so a peer still carrying the tombstone would hand the row — sealed payload
-    /// included — straight back on the next merge. Emptying the row in place and
-    /// stamping `updated_at` instead makes the purge *win* that merge, which
-    /// destroys the payload on every device rather than only this one. What is
-    /// left is a content-free tombstone, reclaimed later by
-    /// [`SqliteStore::purge_tombstones_before`] like any other.
+    /// included — straight back on the next merge. Emptying the row in place
+    /// instead makes the purge *win* that merge, which destroys the payload on
+    /// every device rather than only this one. What is left is a content-free
+    /// tombstone, reclaimed later by [`SqliteStore::purge_tombstones_before`]
+    /// like any other.
+    ///
+    /// The stamped `updated_at` is not what makes the purge win — that shell is
+    /// absorbing in [`SqliteStore::merge_records`], so a peer's *newer* edit of
+    /// the same id cannot resurrect it either. The stamp only keeps the row
+    /// ordered sensibly for anything else reading timestamps.
     fn purge(&self, id: &str) -> Result<()> {
         let now = now_ms();
         self.lock().execute(
@@ -408,8 +426,12 @@ impl VaultStore for SqliteStore {
         // star that left the clock alone would lose to (or coin-flip against, via
         // the hash tie-break) every peer's copy and silently revert.
         let now = now_ms();
+        // Tombstones are excluded like they are in `purge`: a trashed entry has
+        // no star to set, and the `updated_at` bump would hand a deleted row a
+        // fresh stamp for the sync merge to carry around.
         self.lock().execute(
-            "UPDATE entries SET favorite = ?1, updated_at = ?2 WHERE id = ?3",
+            "UPDATE entries SET favorite = ?1, updated_at = ?2
+             WHERE id = ?3 AND deleted_at IS NULL",
             params![favorite, now, id],
         )?;
         Ok(())
@@ -452,6 +474,13 @@ fn verbatim_upsert() -> String {
            payload=excluded.payload, card_brand=excluded.card_brand,
            favorite=excluded.favorite"
     )
+}
+
+// A row [`VaultStore::purge`] has emptied. An ordinary tombstone keeps its
+// payload (`delete` only stamps `deleted_at`), so "tombstoned and content-free"
+// is exactly "permanently deleted" — the same test `list_deleted` filters on.
+fn is_purged(rec: &Record) -> bool {
+    rec.deleted_at.is_some() && rec.payload.is_empty()
 }
 
 fn exec_record(stmt: &mut Statement, r: &Record) -> rusqlite::Result<usize> {

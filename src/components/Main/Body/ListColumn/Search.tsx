@@ -2,7 +2,6 @@ import type { KeyboardEvent } from 'react'
 import { useStore, setFilterQuery } from '@/store'
 import { t } from '@/i18n'
 import { CloseGlyph, SearchGlyph } from '../../icons'
-import { registerSearch } from './focus'
 
 // The app's one search field: it sits in the list column it filters and spans
 // the column. Esc clears the query, then blurs — the accelerators that act on
@@ -21,7 +20,6 @@ export default function Search() {
     <div className="mt-3 flex h-7 items-center gap-2.5 rounded-sm border border-line2 bg-field pl-[11px] pr-2 text-text3 transition-colors focus-within:border-accent-line">
       <SearchGlyph className="flex-none" />
       <input
-        ref={registerSearch}
         type="search"
         name="search"
         data-testid="search-input"

@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ListColumn from '@/components/Main/Body/ListColumn'
 import { copyToClipboard, fetchFavicon, revealEntry, type Audit } from '@/lib/commands'
-import { makeStore, useStore, setSort, setFilterType } from '@/store'
+import { makeStore, useStore, setFilterType } from '@/store'
 import { resetFavicons } from '@/hooks/useFavicon'
 import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 
@@ -26,14 +26,13 @@ const titles = () =>
 
 const seed = (audit?: Audit) => {
   const store = makeStore()
-  withEntries(store, entries, audit)
+  withEntries(entries, audit)
   return store
 }
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
-  setSort('recent')
   resetFavicons()
   vi.mocked(fetchFavicon).mockClear()
 })
@@ -91,7 +90,7 @@ describe('Entry list', () => {
 
   it('shows the network mark on card rows that carry a brand', () => {
     const store = makeStore()
-    withEntries(store, [
+    withEntries([
       loginMeta({ id: 'c1', type: 'card', title: 'Company Visa', cardBrand: 'visa', urlHost: '' }),
       loginMeta({ id: 'c2', type: 'card', title: 'Mystery Card', urlHost: '' })
     ])
@@ -130,6 +129,23 @@ describe('List search', () => {
 
     await userEvent.click(screen.getByTestId('search-clear-button'))
     expect(titles()).toEqual(['Zebra', 'Airbnb', 'Monzo', 'Basecamp'])
+  })
+
+  // A query is answered by relevance, not by the sort control: re-sorting the
+  // ranked results buried the closest match under whatever was newest.
+  it('keeps the search ranking, so the best match leads', async () => {
+    const store = makeStore()
+    withEntries([
+      loginMeta({ id: 'loose', title: 'Monzo Business Account', updatedAt: at(2024, 2, 14, 9) }),
+      loginMeta({ id: 'exact', title: 'Monzo', updatedAt: at(2024, 0, 12, 12) })
+    ])
+    renderWithStore(<ListColumn />, { store })
+
+    // Recency alone would lead with the newer, looser match.
+    expect(titles()).toEqual(['Monzo Business Account', 'Monzo'])
+
+    await userEvent.type(field(), 'monzo')
+    expect(titles()).toEqual(['Monzo', 'Monzo Business Account'])
   })
 
   it('selects the first visible row on ⏎', async () => {

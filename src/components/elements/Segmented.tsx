@@ -7,6 +7,9 @@ interface Props<T extends string> {
   onChange: (value: T) => void
   // Mono labels, for numeric/unit values like "10 m".
   mono?: boolean
+  // Names the radiogroup for screen readers — usually the row's own label,
+  // which is otherwise only visually associated with the control.
+  name?: string
   testidPrefix?: string
   className?: string
 }
@@ -19,6 +22,7 @@ export default function Segmented<T extends string>({
   value,
   onChange,
   mono,
+  name,
   testidPrefix,
   className
 }: Props<T>) {
@@ -32,6 +36,7 @@ export default function Segmented<T extends string>({
     <div
       ref={nav.ref}
       role="radiogroup"
+      aria-label={name}
       onKeyDown={nav.onKeyDown}
       className={cx('flex gap-0.5 rounded-sm border border-line2 p-0.5', className)}
     >

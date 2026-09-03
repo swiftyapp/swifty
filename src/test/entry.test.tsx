@@ -199,7 +199,7 @@ describe('Editing in the pane', () => {
     // "Add" quietly saved over it instead of creating a row.
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google' }))
     const store = makeStore()
-    withEntries(store, [loginMeta()])
+    withEntries([loginMeta()])
     setCurrentEntry('l1')
     renderWithStore(<Aside />, { store })
 
