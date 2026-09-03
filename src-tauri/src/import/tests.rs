@@ -89,6 +89,73 @@ fn round_trip_bitwarden_identity() {
     assert_eq!(back.entries, entries);
 }
 
+// Bitwarden's custom fields are the extras: text and hidden are values a person
+// typed, boolean and linked are its own machinery and have nothing to carry.
+#[test]
+fn bitwarden_reads_text_and_hidden_fields_as_extras() {
+    let json = br#"{"items":[
+      {"type":4,"name":"Licence","identity":{"licenseNumber":"D-99"},"fields":[
+        {"name":"Categories","value":"B, BE","type":0},
+        {"name":"Restrictions","value":"01","type":1},
+        {"name":"Favourite","value":"true","type":2},
+        {"name":"Linked","value":"3","type":3},
+        {"name":"","value":"","type":0},
+        {"name":"Issuer note"}
+      ]}
+    ]}"#;
+    let r = parse(Format::Bitwarden, json);
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(
+        r.entries[0].extra,
+        vec![
+            ("Categories".into(), "B, BE".into()),
+            ("Restrictions".into(), "01".into()),
+            // No type at all reads as text, and a value-less field is still a
+            // label the user wrote.
+            ("Issuer note".into(), String::new()),
+        ]
+    );
+}
+
+// Extras belong to no kind, so a login keeps them too — and comes back with the
+// same pairs in the same order.
+#[test]
+fn round_trip_bitwarden_extras() {
+    let entries = vec![ImportedEntry {
+        kind: EntryKind::Login,
+        title: "Acme".into(),
+        username: Some("alice".into()),
+        extra: vec![
+            ("Account ID".into(), "42".into()),
+            ("Blood type".into(), "O+".into()),
+        ],
+        ..Default::default()
+    }];
+    let bytes = to_bitwarden_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(out["items"][0]["fields"][0]["name"], "Account ID");
+    assert_eq!(out["items"][0]["fields"][0]["type"], 0);
+    assert_eq!(out["items"][0]["fields"][1]["value"], "O+");
+
+    let back = parse(Format::Bitwarden, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, entries);
+}
+
+// An export of a vault with no extras never mentions custom fields.
+#[test]
+fn bitwarden_export_omits_fields_without_extras() {
+    let entries = vec![ImportedEntry {
+        kind: EntryKind::Note,
+        title: "Wifi".into(),
+        notes: Some("on the router".into()),
+        ..Default::default()
+    }];
+    let bytes = to_bitwarden_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(out["items"][0].get("fields").is_none());
+}
+
 #[test]
 fn bitwarden_maps_fido2_credentials_onto_passkeys() {
     let json = br#"{"items":[
