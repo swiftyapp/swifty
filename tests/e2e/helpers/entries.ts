@@ -8,7 +8,15 @@ import { waitFor } from "./app";
  * has any say in what gets created.
  */
 
-type Kind = "login" | "card" | "note";
+type Kind = "login" | "card" | "note" | "identity";
+
+/** The `doc_type` values the identity form offers, in its own order. */
+export type DocType =
+  | "passport"
+  | "id_card"
+  | "driver_license"
+  | "residence_permit"
+  | "other";
 
 export interface LoginFields {
   title: string;
@@ -32,6 +40,30 @@ export interface CardFields {
 export interface NoteFields {
   title: string;
   note: string;
+  tags?: string[];
+}
+
+/**
+ * An ID document. Only `name` and `number` are on every document type; the rest
+ * are filled when the chosen type has a row for them, so a caller passes what
+ * its document actually carries. Dates go in as the user's own pattern
+ * (MM/DD/YYYY on a freshly reset app) — the form normalizes them to ISO.
+ */
+export interface IdentityFields {
+  title: string;
+  /** Defaults to the passport the form opens on. */
+  docType?: DocType;
+  name: string;
+  number: string;
+  country?: string;
+  nationality?: string;
+  birthDate?: string;
+  issueDate?: string;
+  expiryDate?: string;
+  sex?: string;
+  authority?: string;
+  personalNumber?: string;
+  note?: string;
   tags?: string[];
 }
 
@@ -111,6 +143,39 @@ export async function createNote(fields: NoteFields): Promise<void> {
   await fill("note", fields.note, "textarea");
   await fillTags(fields.tags);
   await save();
+}
+
+export async function createIdentity(fields: IdentityFields): Promise<void> {
+  await openForm("identity");
+  // The type goes first: it decides which rows exist, and switching it clears
+  // the ones the new document has no room for.
+  if (fields.docType) await pickDocType(fields.docType);
+  await fill("title", fields.title);
+  await fill("name", fields.name);
+  await fill("number", fields.number);
+  const optional: [string, string | undefined][] = [
+    ["country", fields.country],
+    ["nationality", fields.nationality],
+    ["birth_date", fields.birthDate],
+    ["sex", fields.sex],
+    ["issue_date", fields.issueDate],
+    ["expiry_date", fields.expiryDate],
+    ["authority", fields.authority],
+    ["personal_number", fields.personalNumber],
+  ];
+  for (const [name, value] of optional) {
+    if (value !== undefined) await fill(name, value);
+  }
+  if (fields.note !== undefined) await fill("note", fields.note, "textarea");
+  await fillTags(fields.tags);
+  await save();
+}
+
+/** Choose the document type in the open identity editor. */
+export async function pickDocType(type: DocType): Promise<void> {
+  const control = $(`[data-testid="identity-doc-type-${type}"]`);
+  await control.waitForDisplayed({ timeout: 5_000 });
+  await control.click();
 }
 
 /** Every entry row currently rendered in the list column. */
