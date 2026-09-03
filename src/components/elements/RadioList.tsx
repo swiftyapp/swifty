@@ -49,7 +49,10 @@ export default function RadioList({
             data-testid={testidPrefix && `${testidPrefix}-${option.value}`}
             onClick={() => onChange(option.value)}
             className={cx(
-              'flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-hover',
+              // The card surface clips the global focus outline, so keyboard
+              // focus borrows the hover treatment instead of inventing a ring
+              // of its own — same trade as the dropdown menu items.
+              'flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-hover focus-visible:bg-hover',
               ROW_HAIRLINE
             )}
           >

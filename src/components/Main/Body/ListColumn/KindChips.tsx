@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useStore, setFilterType } from '@/store'
 import { KINDS } from '@/kinds'
 import { t } from '@/i18n'
-import { useRows } from '../Body/List/useVisibleEntries'
+import { useRows } from '../List/useVisibleEntries'
 import Chip from './Chip'
 
 // The list-column kind filter: an "All" chip plus one per registered kind, each
