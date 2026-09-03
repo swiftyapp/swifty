@@ -1,5 +1,5 @@
 import type { Audit } from '@/lib/commands'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { vaultScore } from '@/utils/vaultScore'
 
 interface Props {
@@ -13,6 +13,7 @@ const toneOf = (score: number) =>
   score >= 7 ? 'var(--c-good)' : score >= 4 ? 'var(--c-warn)' : 'var(--c-bad)'
 
 export default function Score({ audit }: Props) {
+  const { t } = useTranslation()
   // The shared 0-100 vault score, shown here on a 0-10 scale with one decimal.
   const score = (vaultScore(audit) ?? 0) / 10
   const dash = `${(score / 10) * CIRCUMFERENCE} ${CIRCUMFERENCE}`

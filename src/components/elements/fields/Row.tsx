@@ -1,11 +1,12 @@
 import { useId, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
-import { t } from '@/i18n'
+import type { TKey } from '@/i18n'
 import { MONO_LABEL, ROW_HAIRLINE } from '../tokens'
 
 interface Props {
   /** Untranslated. Omitted for a full-bleed row — a note body. */
-  label?: string
+  label?: TKey
   /** A sigil in front of the value: what makes a URL look like a URL. */
   prefix?: ReactNode
   /** Trailing controls: reveal, copy, open, generate. */
@@ -26,6 +27,7 @@ interface Props {
 // controls, then anything that belongs under the value. Read values and their
 // editors both render through it, so switching modes never moves a row.
 export default function FieldRow({ label, prefix, actions, below, error, children }: Props) {
+  const { t } = useTranslation()
   const labelled = label !== undefined
   const id = useId()
 

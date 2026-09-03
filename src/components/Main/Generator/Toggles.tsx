@@ -1,12 +1,13 @@
+import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
-import { t } from '@/i18n'
+import type { TKey } from '@/i18n'
 import type { GeneratorSettings } from '@/services/generator'
 
 type Flag = 'symbols' | 'numbers' | 'excludeSimilar' | 'capitalize'
 
 interface Toggle {
   flag: Flag
-  label: string
+  label: TKey
 }
 
 // Only the switches that mean something in the active mode are offered: symbols
@@ -29,6 +30,7 @@ interface Props {
 }
 
 export default function Toggles({ settings, onChange }: Props) {
+  const { t } = useTranslation()
   const toggles = settings.mode === 'memorable' ? MEMORABLE : RANDOM
 
   return (

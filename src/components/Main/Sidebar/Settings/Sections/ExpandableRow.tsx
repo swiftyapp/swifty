@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'
 import SettingsRow from '@/components/elements/SettingsRow'
 
@@ -20,6 +20,7 @@ export default function ExpandableRow({
   testid,
   children
 }: Props) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
   return (

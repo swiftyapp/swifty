@@ -1,6 +1,6 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { exportVault } from '@/lib/commands'
-import { t } from '@/i18n'
 import Button from '@/components/elements/Button'
 import { inputClass } from '@/components/elements/formStyles'
 import ExpandableRow from '../ExpandableRow'
@@ -8,6 +8,7 @@ import ExpandableRow from '../ExpandableRow'
 // The whole vault as one `.swftx` file, resealed under the master password the
 // user re-types here (the open session's key is never handed to the exporter).
 export default function BackupRow() {
+  const { t } = useTranslation()
   const [password, setPassword] = useState('')
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)

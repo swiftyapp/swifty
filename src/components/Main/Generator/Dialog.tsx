@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { copy } from '@/services/copy'
 import Button from '@/components/elements/Button'
 import IconButton from '@/components/elements/IconButton'
@@ -19,6 +19,7 @@ interface Props {
 // 470px overlay card: header with the mode tabs, the generated secret and its
 // entropy, the shaping controls, then the action row. ⏎ confirms, Esc closes.
 export default function Dialog({ apply, onClose }: Props) {
+  const { t } = useTranslation()
   const { settings, value, update, regenerate, bits, level } = useGenerator()
   const cardRef = useRef<HTMLDivElement>(null)
 

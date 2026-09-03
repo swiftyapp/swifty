@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { closePalette } from '@/store'
-import { t } from '@/i18n'
 import Input from './Input'
 import CommandRow from './CommandRow'
 import { useResults } from './useResults'
@@ -14,6 +14,7 @@ const optionId = (id: string) => `palette-option-${id}`
 // The palette itself. Mounted only while open, so the query, the focused row,
 // and the input focus all reset on every ⌘K.
 export default function Panel() {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [focus, setFocus] = useState(0)
 

@@ -1,5 +1,5 @@
+import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
-import { t } from '@/i18n'
 import Meter from '@/components/elements/Meter'
 import { LEVEL_INK } from '@/components/elements/levels'
 import { ENTROPY_LABELS } from '@/services/generator'
@@ -12,6 +12,7 @@ interface Props {
 
 // The generated secret on its field tile, with the entropy meter underneath.
 export default function Output({ value, bits, level }: Props) {
+  const { t } = useTranslation()
   return (
     <>
       <div

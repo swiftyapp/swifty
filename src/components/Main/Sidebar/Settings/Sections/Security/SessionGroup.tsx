@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { setAutolockTimeout } from '@/lib/commands'
 import { getSecs, setSecs } from '@/defaults/autolock'
 import { getTimeout, setTimeout as setClipboardTimeout } from '@/defaults/clipboard'
-import { t } from '@/i18n'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Segmented from '@/components/elements/Segmented'
@@ -17,7 +18,7 @@ const LOCK_OPTIONS = [
 
 // Built per render so a locale switch retranslates. The unit values read the
 // same in every locale; only `Never` is words.
-const clipboardOptions = () => [
+const clipboardOptions = (t: TFunction) => [
   { value: '15000', label: '15 s' },
   { value: '30000', label: '30 s' },
   { value: '60000', label: '60 s' },
@@ -25,6 +26,7 @@ const clipboardOptions = () => [
 ]
 
 export default function SessionGroup() {
+  const { t } = useTranslation()
   const [lock, setLock] = useState(String(getSecs()))
   const [clipboard, setClipboard] = useState(String(getTimeout()))
 
@@ -66,7 +68,7 @@ export default function SessionGroup() {
           <Segmented
             mono
             name={clipboardLabel}
-            options={clipboardOptions()}
+            options={clipboardOptions(t)}
             value={clipboard}
             onChange={onClipboard}
             testidPrefix="settings-clipboard"

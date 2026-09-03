@@ -1,9 +1,10 @@
 import { useStore } from '@/store'
 import type { AuditItem, EntryMeta } from '@/lib/commands'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import Group from '../Group'
 
 export default function AuditList() {
+  const { t } = useTranslation()
   const audit = useStore(state => state.audit)
   const breachCheck = useStore(state => state.breachCheck)
   const items = useStore(state => state.entries.items)

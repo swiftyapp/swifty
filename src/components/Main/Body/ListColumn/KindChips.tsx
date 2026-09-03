@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useStore, setFilterType } from '@/store'
 import { KINDS } from '@/kinds'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { useRows } from '../List/useVisibleEntries'
 import Chip from './Chip'
 
@@ -9,6 +9,7 @@ import Chip from './Chip'
 // with a live count. This is what replaced the rail's type tabs — narrowing the
 // list, not navigating away from it.
 export default function KindChips() {
+  const { t } = useTranslation()
   const type = useStore(state => state.filters.type)
   // The current view's rows, not the whole vault, so the counts tell the truth
   // in Favorites and the Trash as well as in All Items. `useRows` hands back

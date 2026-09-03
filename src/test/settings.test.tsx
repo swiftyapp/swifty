@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
-import { setLocale } from '@/i18n'
+import i18n, { changeLocale } from '@/i18n'
 import { getTimeout } from '@/defaults/clipboard'
 import { getSecs } from '@/defaults/autolock'
 import { dateTime } from '@/utils/time'
@@ -28,7 +28,7 @@ beforeEach(() => {
   localStorage.removeItem('swifty:dateFormat')
 })
 
-afterEach(() => setLocale('en-US'))
+afterEach(() => changeLocale('en-US'))
 
 const open = async () => {
   const { container, store } = renderWithStore(<Settings />)
@@ -297,10 +297,22 @@ describe('Settings › import', () => {
 
 describe('Settings › language & region', () => {
   it('picks a language from the radio list', async () => {
-    const { store } = await open()
+    await open()
     await go('language')
     await userEvent.click(screen.getByTestId('settings-locale-de-DE'))
-    expect(store.getState().i18n.locale).toBe('de-DE')
+    // Switching is async now: the de-DE catalogue is a dynamic import, fetched
+    // on demand rather than bundled with the app.
+    await waitFor(() => expect(i18n.resolvedLanguage).toBe('de-DE'))
+  })
+
+  // The mono labels are uppercased by CSS, and `text-transform` follows the
+  // document language: under `lang="en"` Turkish "i" becomes "I" rather than
+  // "İ", misspelling every label in the Turkish UI.
+  it('tells the document what language it is in', async () => {
+    await open()
+    await go('language')
+    await userEvent.click(screen.getByTestId('settings-locale-tr-TR'))
+    await waitFor(() => expect(document.documentElement.lang).toBe('tr-TR'))
   })
 
   it('sets the theme from the segmented control', async () => {

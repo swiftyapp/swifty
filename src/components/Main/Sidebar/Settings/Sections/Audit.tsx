@@ -1,5 +1,5 @@
+import { useTranslation } from 'react-i18next'
 import { useStore, setBreachCheck, runAudit, setView, closeSettings } from '@/store'
-import { t } from '@/i18n'
 import { vaultScore, auditCounts } from '@/utils/vaultScore'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
@@ -9,6 +9,7 @@ import ScoreRing from '@/components/elements/ScoreRing'
 import { ROW_HAIRLINE } from '@/components/elements/tokens'
 
 export default function Audit() {
+  const { t } = useTranslation()
   const audit = useStore(state => state.audit)
   const breachCheck = useStore(state => state.breachCheck)
 

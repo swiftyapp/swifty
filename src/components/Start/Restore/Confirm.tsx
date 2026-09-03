@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { restoreBackup } from '@/store'
-import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
 import Button from '@/components/elements/Button'
 
@@ -10,6 +10,7 @@ interface Props {
 }
 
 export default function Confirm({ display, path }: Props) {
+  const { t } = useTranslation()
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
 

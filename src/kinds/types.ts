@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import type { TKey } from '@/i18n'
 import type { Entry, EntryMeta, EntryType } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
 import type { LoginGlyph } from '@/components/Main/icons'
@@ -17,11 +18,20 @@ export type Glyph = typeof LoginGlyph
 export interface Kind {
   type: EntryType
   /** Singular, untranslated — call sites wrap it in `t()`. */
-  label: string
+  label: TKey
   /** Plural, untranslated (list-column title, filter chip). */
-  pluralLabel: string
+  pluralLabel: TKey
   /** One line for pickers and empty states. */
-  description: string
+  description: TKey
+  /**
+   * Whole sentences rather than a template plus a spliced noun. Languages that
+   * inflect (ru, uk, pl) cannot take a nominative noun dropped into a slot, so
+   * each kind names its own phrasing and the translator gets a full sentence.
+   */
+  addLabel: TKey
+  untitledLabel: TKey
+  emptyLabel: TKey
+  noMatchesLabel: TKey
   Glyph: Glyph
   /** Key into the `--color-kind-*` tokens (see styles/theme.css). */
   tint: 'login' | 'card' | 'note'
@@ -32,7 +42,7 @@ export interface Kind {
   /** The one secret worth a shortcut — what ⏎ and ⌘⏎ copy. */
   primarySecret: (entry: Entry) => string
   /** Untranslated label for the detail header's primary button. */
-  primaryActionLabel: string
+  primaryActionLabel: TKey
   /** The row's secondary line, from non-secret metadata only. */
   listSubtitle: (entry: EntryMeta) => string
   ListRow: ComponentType<ContentProps>

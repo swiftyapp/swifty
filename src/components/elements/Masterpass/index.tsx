@@ -6,7 +6,8 @@ import {
   type KeyboardEvent
 } from 'react'
 import { cx } from '@/utils/cx'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
+import type { TKey } from '@/i18n'
 import Error from '../Error'
 import IconButton from '../IconButton'
 import { EyeGlyph, EyeOffGlyph, FingerprintGlyph } from '@/components/Main/icons'
@@ -62,6 +63,7 @@ export default function Masterpass({
   onChange,
   onTouchID
 }: Props) {
+  const { t } = useTranslation()
   const [value, setValue] = useState('')
   const [reveal, setReveal] = useState(false)
   const [focused, setFocused] = useState(false)
@@ -127,9 +129,11 @@ export default function Masterpass({
   )
 
   // The crossed eye alone carries the on state — no persistent wash.
+  // Neither string has a catalog entry (pre-existing gap); looked up
+  // opportunistically and falls through to the English text below.
   const revealButton = (
     <IconButton
-      label={t(reveal ? 'Hide passphrase' : 'Reveal passphrase')}
+      label={t((reveal ? 'Hide passphrase' : 'Reveal passphrase') as TKey)}
       className={
         lock
           ? 'animate-fade absolute right-1.5 top-1/2 -translate-y-1/2'

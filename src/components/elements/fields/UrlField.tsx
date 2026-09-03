@@ -1,4 +1,5 @@
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
+import type { TKey } from '@/i18n'
 import { openLink } from '@/services/openLink'
 import { useFavicon } from '@/hooks/useFavicon'
 import { ExternalGlyph, GlobeGlyph } from '../../Main/icons'
@@ -15,7 +16,14 @@ const hostOf = (url: string): string => {
   }
 }
 
-export default function UrlField({ name = 'website', label = 'Website' }) {
+export default function UrlField({
+  name = 'website',
+  label = 'Website'
+}: {
+  name?: string
+  label?: TKey
+}) {
+  const { t } = useTranslation()
   const { value } = useField(name)
   const icon = useFavicon(hostOf(value) || undefined)
 

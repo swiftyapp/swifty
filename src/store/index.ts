@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { getLocale } from '@/i18n'
 import { lock, isBiometricAvailable, type EntryType } from '@/lib/commands'
 import { createFlowSlice, type FlowSlice } from './flowSlice'
 import { createGeneratorSlice, type GeneratorSlice } from './generatorSlice'
@@ -8,7 +7,6 @@ import { createEntriesSlice, type EntriesSlice } from './entriesSlice'
 import { createAuditSlice, type AuditSlice } from './auditSlice'
 import { createListSlice, type ListSlice } from './listSlice'
 import { createSyncSlice, type SyncSlice } from './syncSlice'
-import { createI18nSlice, type I18nSlice } from './i18nSlice'
 import { createThemeSlice, type ThemeSlice } from './themeSlice'
 import { createUpdateSlice, type UpdateSlice } from './updateSlice'
 import { createUiSlice, type UiSlice } from './uiSlice'
@@ -21,7 +19,6 @@ export type StoreState = FlowSlice &
   AuditSlice &
   ListSlice &
   SyncSlice &
-  I18nSlice &
   ThemeSlice &
   UpdateSlice &
   UiSlice &
@@ -35,7 +32,6 @@ export const useStore = create<StoreState>()((...a) => ({
   ...createAuditSlice(...a),
   ...createListSlice(...a),
   ...createSyncSlice(...a),
-  ...createI18nSlice(...a),
   ...createThemeSlice(...a),
   ...createUpdateSlice(...a),
   ...createUiSlice(...a),
@@ -50,7 +46,6 @@ const pickData = (s: StoreState) => ({
   audit: s.audit,
   breachCheck: s.breachCheck,
   sync: s.sync,
-  i18n: s.i18n,
   update: s.update,
   ui: s.ui,
   // Both read a persisted preference at slice creation, so a test that changes
@@ -64,7 +59,7 @@ const initialData = pickData(useStore.getState())
 // Resets the (singleton) store to its initial state. Tests call this to isolate
 // state between runs; `false` merges so the action functions are preserved.
 export const makeStore = () => {
-  useStore.setState({ ...structuredClone(initialData), i18n: { locale: getLocale() } }, false)
+  useStore.setState(structuredClone(initialData), false)
   return useStore
 }
 
@@ -102,7 +97,6 @@ export const {
   syncDisconnected,
   syncStart,
   syncStop,
-  localeChanged,
   changeTheme,
   toggleTheme,
   setUpdateReady,

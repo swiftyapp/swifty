@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Entry, EntryMeta } from '@/lib/commands'
 import { editEntry } from '@/store'
 import { kindOf } from '@/kinds'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { useCopied } from '@/hooks/useCopied'
 import { dialogOpen } from '@/utils/dialogOpen'
 import Button from '@/components/elements/Button'
@@ -41,6 +41,7 @@ const inInteractive = (target: EventTarget | null) =>
 // The detail header's action cluster: Edit, an overflow menu and the per-type
 // primary copy action — or, for a tombstone, Restore and the last delete.
 export default function Actions({ entry, revealed, onDelete }: Props) {
+  const { t } = useTranslation()
   const [menu, setMenu] = useState(false)
   // Two-press delete: the first press arms the row ("Delete entry?"), the
   // second executes. Closing or reopening the menu disarms.

@@ -1,5 +1,6 @@
+import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
-import { t } from '@/i18n'
+import type { TKey } from '@/i18n'
 import type { ImportFormat } from '@/lib/commands'
 import { CARD } from '@/components/elements/tokens'
 
@@ -8,8 +9,8 @@ import { CARD } from '@/components/elements/tokens'
 const TILES: {
   key: string
   badge: string
-  name: string
-  hint: string
+  name: TKey
+  hint: TKey
   format?: ImportFormat
 }[] = [
   { key: 'bitwarden', badge: 'BW', name: 'Bitwarden', hint: '.json export', format: 'bitwarden' },
@@ -17,7 +18,7 @@ const TILES: {
   { key: 'lastpass', badge: 'LP', name: 'LastPass', hint: '.csv export', format: 'lastpass' },
   { key: 'keepass', badge: 'KP', name: 'KeePass', hint: '.csv export', format: 'keepass' },
   { key: 'csv', badge: 'CSV', name: 'Generic CSV', hint: '.csv export', format: 'csv' },
-  { key: 'swftx', badge: 'SW', name: 'Swifty backup (.swftx)', hint: '.swftx backup' }
+  { key: 'swftx', badge: 'SW', name: 'Backup file (.swftx)', hint: '.swftx backup' }
 ]
 
 interface Props {
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export default function Tiles({ active, disabled, onFormat, onBackup }: Props) {
+  const { t } = useTranslation()
   return (
     <div className="grid grid-cols-3 gap-3">
       {TILES.map(tile => (
@@ -48,7 +50,7 @@ export default function Tiles({ active, disabled, onFormat, onBackup }: Props) {
             {tile.badge}
           </div>
           <div className="mt-3 truncate text-base text-text">{t(tile.name)}</div>
-          <div className="mt-0.5 font-mono text-xs text-text3">{tile.hint}</div>
+          <div className="mt-0.5 font-mono text-xs text-text3">{t(tile.hint)}</div>
         </button>
       ))}
     </div>

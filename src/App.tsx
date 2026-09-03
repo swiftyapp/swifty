@@ -20,8 +20,6 @@ function Shell() {
 }
 
 export default function App() {
-  const locale = useStore(state => state.i18n.locale)
-
   useEffect(() => {
     const unsubscribe = subscribeToEvents()
     Promise.all([isInitialized(), isBiometricAvailable().catch(() => false)])
@@ -32,11 +30,9 @@ export default function App() {
     return unsubscribe
   }, [])
 
-  // `locale` as key remounts the tree on language change so `t()` re-runs.
-  // The toast sits outside so a staged update stays visible across that remount.
   return (
     <>
-      <Shell key={locale} />
+      <Shell />
       <UpdateToast />
     </>
   )

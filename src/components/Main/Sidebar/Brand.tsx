@@ -1,4 +1,5 @@
 import Logo from '@/assets/images/logo.svg?react'
+import { APP_NAME } from '@/lib/app'
 
 // Single-vault app: the rail top is just a brand mark (no vault switcher).
 //
@@ -13,7 +14,7 @@ export default function Brand() {
   return (
     <div
       className="grid h-9 w-9 flex-none place-items-center"
-      title="Swifty"
+      title={APP_NAME}
     >
       <Logo width={24} height={24} className="fill-brand" />
     </div>

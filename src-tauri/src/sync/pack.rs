@@ -53,7 +53,7 @@ const SQLITE_MIN_PAGE: usize = 512;
 /// surfaced verbatim without naming offsets, paths, or key material.
 #[derive(Debug, thiserror::Error)]
 pub enum PackError {
-    #[error("not a Swifty sync file")]
+    #[error("not a {} sync file", crate::app::APP_NAME)]
     BadMagic,
 
     // Kept apart from the corruption cases so a future format v2 reads as

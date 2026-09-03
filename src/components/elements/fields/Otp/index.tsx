@@ -1,4 +1,5 @@
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
+import type { TKey } from '@/i18n'
 import { copy } from '@/services/copy'
 import { useOtp } from '@/hooks/useOtp'
 import Panel from '../../Panel'
@@ -11,7 +12,14 @@ import { otpSecret } from './secret'
 // the dial, and the dial is the same size in both modes. Reading, it offers the
 // current code; editing, the secret's own input with that code as a live
 // preview — the only proof that what was pasted actually works.
-export default function OtpField({ name = 'otp', label = 'OTP' }) {
+export default function OtpField({
+  name = 'otp',
+  label = 'OTP'
+}: {
+  name?: string
+  label?: TKey
+}) {
+  const { t } = useTranslation()
   const { value, set, editing } = useField(name)
   const parsed = otpSecret(value)
   const { code, time } = useOtp(parsed)

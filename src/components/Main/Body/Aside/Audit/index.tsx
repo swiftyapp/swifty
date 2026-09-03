@@ -1,6 +1,6 @@
 import { useStore } from '@/store'
 import type { Audit, AuditItem } from '@/lib/commands'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import Score from './Score'
 import Panel from '@/components/elements/Panel'
 import { MONO_LABEL } from '@/components/elements/tokens'
@@ -9,6 +9,7 @@ const count = (audit: Audit, property: keyof AuditItem) =>
   Object.values(audit).filter(item => item[property]).length
 
 export default function Audit() {
+  const { t } = useTranslation()
   const audit = useStore(state => state.audit)
   const breachCheck = useStore(state => state.breachCheck)
   const isPristine = useStore(state => state.entries.items.length === 0)

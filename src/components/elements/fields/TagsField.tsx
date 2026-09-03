@@ -1,5 +1,5 @@
+import { useTranslation } from 'react-i18next'
 import { setFilterQuery } from '@/store'
-import { t } from '@/i18n'
 import TagsInput from '../TagsInput'
 import { MONO_LABEL } from '../tokens'
 import { TAG_CHIP } from './chip'
@@ -8,6 +8,7 @@ import { useFields } from './context'
 // Tags sit below the panel in both modes: a label column would waste the row
 // on what is already the widest thing on the line.
 export default function TagsField({ name = 'tags' }) {
+  const { t } = useTranslation()
   const { entry, set } = useFields()
   const raw = entry[name]
   const tags = Array.isArray(raw) ? raw : []
@@ -27,7 +28,7 @@ export default function TagsField({ name = 'tags' }) {
             key={tag}
             type="button"
             onClick={() => setFilterQuery(tag)}
-            aria-label={`${t('Filter by tag')} ${tag}`}
+            aria-label={t('Filter by tag {{tag}}', { tag })}
             className={`${TAG_CHIP} hover:text-text`}
           >
             {tag}

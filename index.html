@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Swifty</title>
+    <!--
+      Pre-paint ground, so the very first frame the webview draws is already
+      themed instead of a white flash (matters on reload and on the startup
+      fallback path in window.rs). Values mirror `--c-app` in styles/theme.css;
+      they have to be literal here because this paints before any CSS loads.
+      Keyed off the OS rather than the stored preference — reading localStorage
+      would need an inline script, which the CSP rightly forbids.
+    -->
+    <style>
+      html {
+        background: #e7e8ea;
+      }
+      @media (prefers-color-scheme: dark) {
+        html {
+          background: #0f1011;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
