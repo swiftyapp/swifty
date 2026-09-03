@@ -85,6 +85,24 @@ describe('command palette', () => {
     expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument()
   })
 
+  // Focus never leaves the field, so the row the arrows land on is only
+  // announced through aria-activedescendant.
+  it('points the field at the focused row for a screen reader', async () => {
+    renderWithStore(<Main />, { store: seed() })
+    await open()
+
+    const palette = within(screen.getByTestId('command-palette'))
+    const field = screen.getByTestId('command-palette-input')
+    const rows = screen.getAllByTestId('palette-item')
+    expect(field).toHaveAttribute('aria-controls', palette.getByRole('listbox').id)
+    expect(field).toHaveAttribute('aria-activedescendant', rows[0].id)
+
+    await userEvent.keyboard('{ArrowDown}')
+
+    expect(field).toHaveAttribute('aria-activedescendant', rows[1].id)
+    expect(rows[1].id).not.toBe('')
+  })
+
   it('runs a command on click', async () => {
     renderWithStore(<Main />, { store: seed() })
     const before = useStore.getState().theme
