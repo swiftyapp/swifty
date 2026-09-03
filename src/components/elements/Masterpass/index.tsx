@@ -3,7 +3,8 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type KeyboardEvent
+  type KeyboardEvent,
+  type MouseEvent
 } from 'react'
 import { cx } from '@/utils/cx'
 import { useTranslation } from 'react-i18next'
@@ -11,7 +12,7 @@ import type { TKey } from '@/i18n'
 import Error from '../Error'
 import IconButton from '../IconButton'
 import { EyeGlyph, EyeOffGlyph, FingerprintGlyph } from '@/components/Main/icons'
-import Dots from './Dots'
+import Dots, { CELL } from './Dots'
 import KeyCuts from './KeyCuts'
 
 interface Props {
@@ -37,10 +38,13 @@ interface Props {
   onTouchID?: () => void
 }
 
-// Shared master-passphrase field. The real value lives in the (uncontrolled)
-// input; a mirrored copy drives the dot overlay. Masking is done with a
+// Shared master-passphrase field. The real value and selection live in the
+// input; mirrored copies drive the dot overlay. Masking is done with a
 // text-transparent input + custom dots so the caret and letter spacing match
-// the design in both themes.
+// the design in both themes. Because the input's own glyph geometry never
+// matches the fixed cell grid, clicks are mapped to a character index against
+// the drawn cells rather than left to the browser, and the overlay caret tracks
+// the input's real selection so it always shows where the next edit lands.
 //
 // The lock variant is deliberately unlike every other field in the app: a
 // white card set gently into the window ground (see --lockfield-shadow) with
@@ -67,7 +71,9 @@ export default function Masterpass({
   const [value, setValue] = useState('')
   const [reveal, setReveal] = useState(false)
   const [focused, setFocused] = useState(false)
+  const [selection, setSelection] = useState<[number, number]>([0, 0])
   const inputRef = useRef<HTMLInputElement>(null)
+  const rowRef = useRef<HTMLDivElement>(null)
 
   const lock = variant === 'lock'
   const bad = !!error || !!invalid
@@ -87,13 +93,39 @@ export default function Masterpass({
     onEnter?.(val)
   }
 
+  // Mirror the input's selection into state so the overlay caret follows it.
+  // Called from every event that can move it (typing, arrows, select-all,
+  // focus, and our own click mapping).
+  const syncSelection = () => {
+    const el = inputRef.current
+    if (!el) return
+    const end = el.value.length
+    setSelection([el.selectionStart ?? end, el.selectionEnd ?? end])
+  }
+
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     setValue(event.currentTarget.value)
+    syncSelection()
     onChange?.(event)
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') doSubmit(event.currentTarget.value)
+  }
+
+  // Place the caret on the cell boundary nearest the click. The browser would
+  // otherwise position it by the input's own (transparent, differently spaced)
+  // glyphs, landing it on a different character than the one under the pointer.
+  const handleMouseDown = (event: MouseEvent<HTMLInputElement>) => {
+    const row = rowRef.current
+    if (event.button !== 0 || !row) return
+    event.preventDefault()
+    const input = event.currentTarget
+    const x = event.clientX - row.getBoundingClientRect().left
+    const at = Math.max(0, Math.min(input.value.length, Math.round(x / CELL)))
+    input.focus()
+    input.setSelectionRange(at, at)
+    syncSelection()
   }
 
   const input = (
@@ -103,8 +135,9 @@ export default function Masterpass({
       className={cx(
         // The input's own text never shows: masked dots and the revealed value
         // are both drawn by the cell overlay (see Dots) so they share one
-        // geometry. Only the placeholder renders from here (15px, muted ink).
-        'absolute inset-0 w-full border-0 bg-transparent text-center font-sans text-[15px] tracking-secret text-transparent caret-transparent outline-none placeholder:text-text3',
+        // geometry, including the selection wash. Only the placeholder renders
+        // from here (15px, muted ink).
+        'absolute inset-0 w-full border-0 bg-transparent text-center font-sans text-[15px] tracking-secret text-transparent caret-transparent outline-none selection:bg-transparent placeholder:text-text3',
         lock && 'rounded-xl px-10'
       )}
       placeholder={placeholder || t('Master Password')}
@@ -114,7 +147,13 @@ export default function Masterpass({
       value={value}
       onChange={handleChange}
       onKeyDown={handleKeyDown}
-      onFocus={() => setFocused(true)}
+      onKeyUp={syncSelection}
+      onSelect={syncSelection}
+      onMouseDown={handleMouseDown}
+      onFocus={() => {
+        setFocused(true)
+        syncSelection()
+      }}
       onBlur={() => setFocused(false)}
     />
   )
@@ -123,6 +162,8 @@ export default function Masterpass({
     <Dots
       count={value.length}
       caret={focused && !inert}
+      selection={selection}
+      rowRef={rowRef}
       text={reveal ? value : undefined}
       busy={pending}
     />
