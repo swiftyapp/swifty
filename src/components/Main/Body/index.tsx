@@ -12,9 +12,13 @@ export default function Body() {
 
   return (
     <>
+      {/* `inert` rather than `pointer-events-none`: the latter only stops the
+          mouse, leaving the column's own arrows and ⏎ free to re-select a row
+          and end the edit session out from under a dirty draft. */}
       <div
         data-testid="list-column"
-        className={cx('flex min-h-0 flex-none', writing && 'pointer-events-none opacity-60')}
+        inert={writing || undefined}
+        className={cx('flex min-h-0 flex-none', writing && 'opacity-60')}
       >
         <ListColumn />
       </div>
