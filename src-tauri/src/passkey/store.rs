@@ -205,6 +205,7 @@ fn new_login(passkey: &Passkey) -> Entry {
         personal_number: None,
         tags: None,
         passkeys: Some(vec![passkey.clone()]),
+        extra: None,
         favorite: false,
         created_at: Some(now.clone()),
         updated_at: Some(now),

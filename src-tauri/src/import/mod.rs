@@ -66,6 +66,10 @@ pub struct ImportedEntry {
     // WebAuthn passkeys (only meaningful when kind == Login). Empty when the
     // source format carries none, which is the case for every CSV dialect.
     pub passkeys: Vec<ImportedPasskey>,
+    // Free-form label/value pairs, in source order — meaningful on every kind.
+    // Empty when the source carries none; only Bitwarden has somewhere to put
+    // them (its custom `fields`), so CSV and CXF always leave this empty.
+    pub extra: Vec<(String, String)>,
 }
 
 /// A normalized, plaintext passkey — mirrors `models::Passkey` field for field.
