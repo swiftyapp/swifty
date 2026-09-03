@@ -22,10 +22,24 @@ pub fn build_record(entry: &Entry, payload: Vec<u8>) -> Result<Record> {
         deleted_at: None,
         payload,
         card_brand: derived_card_brand(entry),
-        // Only read on insert: `upsert` leaves an existing row's star alone, so
-        // saving an edit can never clear it (see `SqliteStore::upsert`).
-        favorite: false,
+        // Only reaches the DB on insert: `upsert` excludes `favorite` from its
+        // update set, so an ordinary save — which arrives with the field at its
+        // serde default of false, the editor never sending it — cannot clear an
+        // existing row's star. A `.swftx` import is the one caller that sets it,
+        // and every entry it brings in is an insert on a fresh vault.
+        favorite: entry.favorite,
     })
+}
+
+/// The inverse of [`build_record`], for a `.swftx` export: unseal the row's
+/// payload back into a plaintext entry, re-attach the metadata the payload does
+/// not carry (the star lives in a column), then obscure it under `out` for the
+/// portable file. Paired with `build_record` here so the two cannot drift on
+/// which columns survive a backup.
+pub fn export_entry(rec: &Record, cipher: &PayloadCipher, out: &Cryptor) -> Result<Entry> {
+    let mut entry = cipher.unseal(&rec.payload)?;
+    entry.favorite = rec.favorite;
+    out.obscure(&entry)
 }
 
 // The stored slug for a card entry: its detected network, or "none" so a
