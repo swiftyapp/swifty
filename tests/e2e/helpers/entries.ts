@@ -117,3 +117,60 @@ export async function createNote(fields: NoteFields): Promise<void> {
 export function entryItems() {
   return $$('[data-testid="entry-item"]');
 }
+
+/** Titles of the rows currently rendered, in list order. */
+export async function visibleTitles(): Promise<string[]> {
+  const rows = await $$('[data-testid="entry-item-title"]');
+  const titles: string[] = [];
+  for (const row of rows) titles.push(await row.getText());
+  return titles;
+}
+
+/**
+ * Wait for the list to settle on exactly `expected`, in order.
+ *
+ * The list is redrawn from a re-read after every write, so the titles are
+ * polled rather than read once — never a fixed pause.
+ */
+export async function expectTitles(expected: string[]): Promise<void> {
+  await browser.waitUntil(
+    async () => {
+      const titles = await visibleTitles();
+      return (
+        titles.length === expected.length &&
+        titles.every((title, i) => title === expected[i])
+      );
+    },
+    {
+      timeout: 15_000,
+      timeoutMsg: `list never settled on [${expected.join(", ")}]`,
+    },
+  );
+  expect(await visibleTitles()).toEqual(expected);
+}
+
+/**
+ * Click the list row with this title. Rows carry no per-entry testid, so they
+ * are matched on their title text.
+ */
+export async function openEntry(title: string): Promise<void> {
+  await waitFor("entry-item");
+  for (const row of await entryItems()) {
+    if ((await row.$('[data-testid="entry-item-title"]').getText()) === title) {
+      await row.click();
+      return;
+    }
+  }
+  throw new Error(`[e2e] no list row titled "${title}"`);
+}
+
+/**
+ * Star or unstar whatever the detail pane is showing.
+ *
+ * The wait is not decoration: the header's read cluster mounts a beat after the
+ * row is clicked, so clicking blind races the toggle into existence.
+ */
+export async function toggleFavorite(): Promise<void> {
+  await waitFor("favorite-toggle");
+  await $('[data-testid="favorite-toggle"]').click();
+}
