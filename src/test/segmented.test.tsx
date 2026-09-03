@@ -18,6 +18,12 @@ describe('Segmented', () => {
     expect(screen.getByRole('radiogroup')).toBeInTheDocument()
   })
 
+  it('names the radiogroup', () => {
+    render(<Segmented options={OPTIONS} value="random" onChange={vi.fn()} name="Mode" />)
+
+    expect(screen.getByRole('radiogroup', { name: 'Mode' })).toBeInTheDocument()
+  })
+
   it('selects on click', async () => {
     const onChange = vi.fn()
     render(<Segmented options={OPTIONS} value="random" onChange={onChange} />)
