@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { cardBrandOf, cardDigits, groupCardNumber, hasBrandMark } from '@/utils/cardBrand'
 import CardBrandMark from '@/components/elements/CardBrandMark'
 import { TagsField, useField, useFields } from '@/components/elements/fields'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
 import { CARD_MASK } from '../meta'
 import { formatExpiry, splitExpiry } from '../expiry'
 import Value from './Value'
 
 export default function Fields() {
+  const { t } = useTranslation()
   const { set, attempted } = useFields()
   const editing = !!set
   const [show, setShow] = useState(false)
@@ -48,7 +49,7 @@ export default function Fields() {
             value={name.value}
             onChange={name.set}
             testid="entry-value-name"
-            placeholder={t('Cardholder')}
+            placeholder="Cardholder"
             maxLength={40}
             ink="text-[12px] uppercase tracking-[0.18em] opacity-60"
             zone="top"
@@ -76,6 +77,8 @@ export default function Fields() {
           value={grouped}
           onChange={next => number.set(cardDigits(next))}
           testid="entry-value-number"
+          // Mask, not real catalog copy — it has no translation and falls
+          // through to itself.
           placeholder={CARD_MASK}
           required
           maxLength={23}
@@ -109,6 +112,7 @@ export default function Fields() {
               value={cvc.value}
               onChange={next => cvc.set(cardDigits(next))}
               testid="entry-value-cvc"
+              // Mask, not real catalog copy — falls through to itself.
               placeholder="•••"
               required
               maxLength={4}
@@ -123,6 +127,7 @@ export default function Fields() {
             value={pin.value}
             onChange={next => pin.set(cardDigits(next))}
             testid="entry-value-pin"
+            // Mask, not real catalog copy — falls through to itself.
             placeholder="••••"
             maxLength={6}
             ink="text-[13px]"

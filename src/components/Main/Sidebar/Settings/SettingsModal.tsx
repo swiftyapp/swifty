@@ -1,5 +1,5 @@
+import { useTranslation } from 'react-i18next'
 import { useStore, closeSettings, setSettingsSection } from '@/store'
-import { t } from '@/i18n'
 import Modal from '@/components/elements/Modal'
 import IconButton from '@/components/elements/IconButton'
 import Nav from './Nav'
@@ -14,6 +14,7 @@ import { CloseGlyph } from '../../icons'
 const TITLE_ID = 'settings-title'
 
 export default function SettingsModal() {
+  const { t } = useTranslation()
   const section = useStore(state => state.ui.settingsSection)
 
   return (

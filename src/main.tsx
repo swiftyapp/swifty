@@ -5,6 +5,7 @@ import { useStore } from './store'
 import { runStartupUpdateCheck } from './services/autoUpdate'
 import { applyPlatform } from './utils/platform'
 import { applyTheme, getTheme } from './theme'
+import { i18nReady } from './i18n'
 import './shortcuts'
 // Design tokens + base (Tailwind v4). Sole stylesheet now the SASS is gone.
 // Type comes from the OS system stacks (see --font-sans/--font-mono) — no
@@ -14,10 +15,14 @@ import './styles/theme.css'
 applyPlatform()
 applyTheme(getTheme())
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
+// Awaiting the catalog before the first paint means no flash of English on a
+// non-default language, and no Suspense boundary threaded through the tree.
+void i18nReady.then(() =>
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  )
 )
 
 // E2E state-reset bridge. Dynamic import behind the DEV flag: Vite substitutes

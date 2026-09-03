@@ -1,5 +1,6 @@
 import { generatePassword, type GeneratorOptions } from '@/lib/commands'
 import { getProps, setProps } from '@/defaults/generator'
+import type { TKey } from '@/i18n'
 import WORDS from './wordlist'
 
 /*
@@ -45,7 +46,7 @@ const SUFFIX = 100
 // excellent. 128 bits (a 20-character full-charset password) fills the bar.
 const THRESHOLDS = [28, 36, 60, 128]
 
-export const ENTROPY_LABELS = ['very weak', 'weak', 'fair', 'strong', 'excellent']
+export const ENTROPY_LABELS: TKey[] = ['very weak', 'weak', 'fair', 'strong', 'excellent']
 
 const clamp = (value: number, { min, max }: { min: number; max: number }) =>
   Math.min(max, Math.max(min, value))

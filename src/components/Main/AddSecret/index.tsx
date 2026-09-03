@@ -1,8 +1,8 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { EntryType } from '@/lib/commands'
 import { useStore, closeAddPicker, startEntry } from '@/store'
 import { KINDS } from '@/kinds'
-import { t } from '@/i18n'
 import Modal from '@/components/elements/Modal'
 import KindTile from './KindTile'
 
@@ -24,6 +24,7 @@ const STEP: Record<string, number> = {
 // The "Add a secret" kind picker: the one place the app asks *what* you are
 // saving. Mounted once from Main; renders nothing until `ui.addPicker`.
 export default function AddSecret() {
+  const { t } = useTranslation()
   const open = useStore(state => state.ui.addPicker)
   const grid = useRef<HTMLDivElement>(null)
 

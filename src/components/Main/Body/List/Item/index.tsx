@@ -4,7 +4,7 @@ import { useStore, setCurrentEntry } from '@/store'
 import type { EntryMeta } from '@/lib/commands'
 import { kindOf } from '@/kinds'
 import { relativeTime } from '@/utils/time'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { StarGlyph } from '../../../icons'
 import { stampOf } from '../order'
 import Flag from './Flag'
@@ -15,6 +15,7 @@ interface Props {
 }
 
 export default function Item({ entry }: Props) {
+  const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
   const selected = useStore(state => state.entries.current?.id === entry.id)
   // Read the flag off the audit the vault already ran on unlock — never score
@@ -25,7 +26,7 @@ export default function Item({ entry }: Props) {
   // A tombstone's one useful stamp is when it went, and it needs the word: "3d"
   // alone would read as "edited 3 days ago" exactly like every live row.
   const meta = entry.deletedAt
-    ? `${t('Deleted')} ${relativeTime(entry.deletedAt)}`
+    ? t('Deleted {{time}}', { time: relativeTime(entry.deletedAt) })
     : relativeTime(stampOf(entry))
   const Content = kindOf(entry.type).ListRow
 

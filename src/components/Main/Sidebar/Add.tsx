@@ -1,5 +1,5 @@
+import { useTranslation } from 'react-i18next'
 import { openAddPicker } from '@/store'
-import { t } from '@/i18n'
 import RailButton from '@/components/elements/RailButton'
 import { PlusRailGlyph } from '../icons'
 
@@ -8,6 +8,7 @@ import { PlusRailGlyph } from '../icons'
 // doing it here navigated away from whatever the user was looking at even when
 // they then dismissed the picker.
 export default function Add() {
+  const { t } = useTranslation()
   // The rail's only action tile: a filled accent wash rather than the
   // navigation inks, so it reads as "do" and not "go".
   return (

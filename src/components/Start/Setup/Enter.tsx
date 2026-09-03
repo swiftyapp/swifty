@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from 'react'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import Masterpass from '@/components/elements/Masterpass'
 import PasswordStrength from '@/components/elements/PasswordStrength'
 import Button from '@/components/elements/Button'
@@ -11,6 +11,7 @@ interface Props {
 }
 
 export default function Enter({ display, onEnter }: Props) {
+  const { t } = useTranslation()
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -23,7 +24,7 @@ export default function Enter({ display, onEnter }: Props) {
     if (!password) return setError(t('Fill in the password'))
     const { tooShort, acceptable } = evaluate(password)
     if (tooShort)
-      return setError(`${t('Use at least')} ${MIN_LENGTH} ${t('characters')}`)
+      return setError(t('Use at least {{count}} characters', { count: MIN_LENGTH }))
     if (!acceptable) return setError(t('Choose a stronger master password'))
     onEnter(password)
   }

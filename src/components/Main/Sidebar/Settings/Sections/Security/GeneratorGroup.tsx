@@ -1,8 +1,8 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { GeneratorOptions } from '@/lib/commands'
 import { getProps, setProps } from '@/defaults/generator'
 import { LENGTH_RANGE } from '@/services/generator'
-import { t } from '@/i18n'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Toggle from '@/components/elements/Toggle'
@@ -11,6 +11,7 @@ import Toggle from '@/components/elements/Toggle'
 // `uppercase` stays out of the UI — the dialog always draws from both cases —
 // but is preserved in the stored props.
 export default function GeneratorGroup() {
+  const { t } = useTranslation()
   const [options, setOptions] = useState<GeneratorOptions>(getProps())
 
   const update = (patch: Partial<GeneratorOptions>) => {

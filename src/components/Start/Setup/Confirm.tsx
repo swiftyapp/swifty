@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { completeSetup } from '@/store'
-import { t } from '@/i18n'
 import Masterpass from '@/components/elements/Masterpass'
 import Button from '@/components/elements/Button'
 
@@ -10,6 +10,7 @@ interface Props {
 }
 
 export default function Confirm({ display, password }: Props) {
+  const { t } = useTranslation()
   const [confirmation, setConfirmation] = useState('')
   const [error, setError] = useState<string | null>(null)
 

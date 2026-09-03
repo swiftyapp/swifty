@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useStore, setSort } from '@/store'
 import type { SortMode } from '@/defaults/list'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
+import type { TKey } from '@/i18n'
 import IconButton from '@/components/elements/IconButton'
 import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
 import { SortGlyph, CheckGlyph } from '@/components/Main/icons'
 
-const OPTIONS: { mode: SortMode; label: string }[] = [
+const OPTIONS: { mode: SortMode; label: TKey }[] = [
   { mode: 'recent', label: 'Recent' },
   { mode: 'alpha', label: 'Alphabetical' }
 ]
@@ -14,6 +15,7 @@ const OPTIONS: { mode: SortMode; label: string }[] = [
 // The list header's sort affordance. The menu is right-anchored under the
 // button so it never runs off the list column's edge.
 export default function SortMenu() {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const sort = useStore(state => state.sort)
 

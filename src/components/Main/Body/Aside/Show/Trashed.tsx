@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import type { EntryMeta } from '@/lib/commands'
 import { restoreEntry, purgeEntry } from '@/store'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'
 
 // The read header's action cluster for a tombstone. There is no Edit and no
 // copy: `reveal_entry` does not serve deleted rows, so a trashed entry has
 // nothing to show and nothing to change — only Restore or the last delete.
 export default function Trashed({ entry }: { entry: EntryMeta }) {
+  const { t } = useTranslation()
   const [armed, setArmed] = useState(false)
 
   return (

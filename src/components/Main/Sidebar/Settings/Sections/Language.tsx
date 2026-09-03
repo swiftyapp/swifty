@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { useStore, localeChanged, changeTheme } from '@/store'
-import { LANGUAGES, t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
+import { useStore, changeTheme } from '@/store'
+import { LANGUAGES, type TKey } from '@/i18n'
 import { getFormat, setFormat, DATE_FORMATS, type DateFormat } from '@/defaults/dateFormat'
 import type { ThemePreference } from '@/theme'
 import SettingsGroup from '@/components/elements/SettingsGroup'
@@ -9,14 +10,14 @@ import Segmented from '@/components/elements/Segmented'
 import RadioList from '@/components/elements/RadioList'
 import { MONO_LABEL } from '@/components/elements/tokens'
 
-const THEMES: { value: ThemePreference; label: string }[] = [
+const THEMES: { value: ThemePreference; label: TKey }[] = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
   { value: 'system', label: 'System' }
 ]
 
 export default function Language() {
-  const locale = useStore(state => state.i18n.locale)
+  const { t, i18n } = useTranslation()
   const theme = useStore(state => state.theme)
   const [format, setDateFormat] = useState<DateFormat>(getFormat())
 
@@ -35,8 +36,8 @@ export default function Language() {
         <div className={`${MONO_LABEL} mb-2`}>{t('Language')}</div>
         <RadioList
           name="locale"
-          value={locale}
-          onChange={localeChanged}
+          value={i18n.resolvedLanguage ?? ''}
+          onChange={locale => void i18n.changeLanguage(locale)}
           testidPrefix="settings-locale"
           options={Object.keys(LANGUAGES).map(key => ({
             value: key,

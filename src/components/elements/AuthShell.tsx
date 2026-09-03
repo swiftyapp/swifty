@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { useAuthMeta } from '@/hooks/useAuthMeta'
 import Back from '@/assets/images/back.svg?react'
 
@@ -14,6 +14,7 @@ interface Props {
 // the mono footer strip (version + vault home, from useAuthMeta). Reused by
 // the lock, setup and restore screens.
 export default function AuthShell({ children, onBack }: Props) {
+  const { t } = useTranslation()
   const meta = useAuthMeta()
   return (
     <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-app px-10 text-text select-none">

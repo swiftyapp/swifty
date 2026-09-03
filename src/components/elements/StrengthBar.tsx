@@ -1,10 +1,12 @@
 import { useStrength } from '@/hooks/useStrength'
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
+import type { TKey } from '@/i18n'
 import Meter from './Meter'
 
-const STRENGTH_LABELS = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']
+const STRENGTH_LABELS: TKey[] = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']
 
 export default function StrengthBar({ password }: { password: string }) {
+  const { t } = useTranslation()
   const strength = useStrength(password)
   if (!password) return null
   const score = strength?.score ?? null

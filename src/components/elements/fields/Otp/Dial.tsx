@@ -1,4 +1,4 @@
-import { t } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 import { OTP_PERIOD } from '@/hooks/useOtp'
 
 const R = 48
@@ -7,6 +7,7 @@ const CIRCUMFERENCE = 2 * Math.PI * R // ≈ 301
 // The code, and how long it lives, as one object: a countdown ring around the
 // six digits. Used to show a saved secret's code and to preview a typed one.
 export default function Dial({ code, time }: { code: string; time: number }) {
+  const { t } = useTranslation()
   return (
     <>
       <div className="relative m-[10px_0_4px] grid h-[108px] w-[108px] place-items-center">
@@ -33,7 +34,7 @@ export default function Dial({ code, time }: { code: string; time: number }) {
         </div>
       </div>
       <div className="font-mono text-xs text-text3">
-        {t('refreshes in {n}s').replace('{n}', String(time))}
+        {t('refreshes in {{n}}s', { n: time })}
       </div>
     </>
   )

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { syncConnect, syncDisconnect, syncNow } from '@/lib/commands'
-import { t } from '@/i18n'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
@@ -9,6 +9,7 @@ import BackupRow from './BackupRow'
 import ExportRow from './ExportRow'
 
 export default function Sync() {
+  const { t } = useTranslation()
   const sync = useStore(state => state.sync)
   const [connecting, setConnecting] = useState(false)
 

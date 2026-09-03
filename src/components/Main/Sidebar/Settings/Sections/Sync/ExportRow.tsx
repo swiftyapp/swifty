@@ -1,11 +1,12 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { exportEntries, type ExportFormat } from '@/lib/commands'
-import { t } from '@/i18n'
+import type { TKey } from '@/i18n'
 import Button from '@/components/elements/Button'
 import Select from '@/components/elements/Select'
 import SettingsRow from '@/components/elements/SettingsRow'
 
-const FORMATS: { value: ExportFormat; label: string }[] = [
+const FORMATS: { value: ExportFormat; label: TKey }[] = [
   { value: 'bitwarden', label: 'Bitwarden (JSON)' },
   { value: 'csv', label: 'Generic CSV' }
 ]
@@ -15,6 +16,7 @@ const fileName = (path: string) => path.replace(/^.*[\\/]/, '')
 // A portable, unencrypted dump. CSV cells are sanitized against formula
 // injection in the backend.
 export default function ExportRow() {
+  const { t } = useTranslation()
   const [format, setFormat] = useState<ExportFormat>('bitwarden')
   const [running, setRunning] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)

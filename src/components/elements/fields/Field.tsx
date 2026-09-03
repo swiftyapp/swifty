@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
-import { t } from '@/i18n'
+import type { TKey } from '@/i18n'
 import { EyeGlyph, EyeOffGlyph } from '../../Main/icons'
 import CopyButton from '../CopyButton'
 import IconButton from '../IconButton'
@@ -12,7 +13,7 @@ export interface FieldProps {
   /** Draft key, and the input's `name` — the selector the e2e suite owns. */
   name: string
   /** Untranslated row label; omit for a full-bleed row. */
-  label?: string
+  label?: TKey
   /** Blocks the save while empty and marks the row after the first attempt. */
   required?: boolean
   /** Masked until the eye is pressed, in both modes. */
@@ -53,6 +54,7 @@ export default function Field({
   normalize,
   check
 }: FieldProps) {
+  const { t } = useTranslation()
   const { value, set, editing, attempted } = useField(name)
   const [show, setShow] = useState(false)
 

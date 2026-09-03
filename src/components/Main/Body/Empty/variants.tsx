@@ -9,8 +9,8 @@ import {
   setFilterQuery,
   setFilterType
 } from '@/store'
-import { addLabel, kindOf } from '@/kinds'
-import { t } from '@/i18n'
+import { kindOf } from '@/kinds'
+import { useTranslation } from 'react-i18next'
 import Logo from '@/assets/images/logo.svg?react'
 import EmptyState from '@/components/elements/EmptyState'
 import { ActivityGlyph, SearchGlyph, StarGlyph, TrashGlyph } from '../../icons'
@@ -26,6 +26,7 @@ const Mark = ({ size }: { size: number }) => (
 // First run — the one hero in the app. Nothing exists yet, so this is the only
 // thing on screen worth looking at and it gets the full treatment.
 export function VaultEmpty() {
+  const { t } = useTranslation()
   const syncEnabled = useStore(state => state.sync.enabled)
   const [importing, setImporting] = useState(false)
 
@@ -64,6 +65,7 @@ export function VaultEmpty() {
 // body, no buttons: the hero treatment belongs to the empty vault alone, and
 // this state is one arrow key away from real content.
 export function SelectEmpty() {
+  const { t } = useTranslation()
   return (
     <EmptyState
       testid="empty-select"
@@ -84,13 +86,14 @@ export function SelectEmpty() {
 
 // Vault Health with no password to score yet.
 export function HealthEmpty() {
+  const { t } = useTranslation()
   return (
     <EmptyState
       testid="empty-health"
       mark={<ActivityGlyph size={28} />}
       title={t('Nothing to audit yet')}
       body={t('Your score appears once a login with a password is saved.')}
-      primary={{ label: addLabel('login'), onClick: () => startEntry('login') }}
+      primary={{ label: t(kindOf('login').addLabel), onClick: () => startEntry('login') }}
     />
   )
 }
@@ -98,6 +101,7 @@ export function HealthEmpty() {
 // The Favorites view with nothing starred yet — a whole-view state, so it gets
 // the pane's full hero and says how to fill itself.
 export function FavoritesEmpty() {
+  const { t } = useTranslation()
   return (
     <EmptyState
       testid="empty-favorites"
@@ -109,6 +113,7 @@ export function FavoritesEmpty() {
 }
 
 export function TrashEmpty() {
+  const { t } = useTranslation()
   return (
     <EmptyState
       testid="empty-trash"
@@ -120,15 +125,16 @@ export function TrashEmpty() {
 }
 
 export function KindEmpty({ type }: { type: EntryType }) {
-  const { Glyph, pluralLabel } = kindOf(type)
+  const { t } = useTranslation()
+  const { Glyph, emptyLabel, addLabel } = kindOf(type)
 
   return (
     <EmptyState
       compact
       testid="empty-kind"
       mark={<Glyph />}
-      title={t('No {kind} yet').replace('{kind}', t(pluralLabel))}
-      primary={{ label: addLabel(type), onClick: () => startEntry(type), testid: 'empty-kind-add' }}
+      title={t(emptyLabel)}
+      primary={{ label: t(addLabel), onClick: () => startEntry(type), testid: 'empty-kind-add' }}
     />
   )
 }
@@ -136,16 +142,17 @@ export function KindEmpty({ type }: { type: EntryType }) {
 // A query that matched nothing, naming the query back so it's obvious why the
 // list is blank. The kind filter, when one is on, is the other half of the why.
 export function SearchEmpty({ query, type }: { query: string; type: EntryType | null }) {
+  const { t } = useTranslation()
   const title = type
-    ? t('No matches for “{query}” in {kind}').replace('{kind}', t(kindOf(type).pluralLabel))
-    : t('No matches for “{query}”')
+    ? t(kindOf(type).noMatchesLabel, { query })
+    : t('No matches for “{{query}}”', { query })
 
   return (
     <EmptyState
       compact
       testid="empty-search"
       mark={<SearchGlyph size={16} />}
-      title={title.replace('{query}', query)}
+      title={title}
       primary={{ label: t('Clear search'), onClick: () => setFilterQuery(''), testid: 'empty-search-clear' }}
       // Widening the search is only an option when a kind is narrowing it.
       secondary={

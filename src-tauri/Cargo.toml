@@ -44,6 +44,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "tls1
 url = "2"
 zeroize = "1.8.2"
 argon2 = "0.5.3"
+sys-locale = "0.3"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"
