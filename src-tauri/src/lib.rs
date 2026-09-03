@@ -13,6 +13,7 @@ mod state;
 mod storage;
 pub mod store;
 mod sync;
+mod timer;
 mod tray;
 mod window;
 
