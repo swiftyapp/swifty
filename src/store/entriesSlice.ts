@@ -46,7 +46,20 @@ export const createEntriesSlice: StateCreator<StoreState, [], [], EntriesSlice> 
     if (get().entries.current?.deletedAt) return
     set(s => ({ entries: { ...s.entries, edit: true, new: null } }))
   },
-  setEntries: items => set(s => ({ entries: { ...s.entries, items } })),
+  // The list is replaced wholesale by a sync merge as well as by our own
+  // writes, so the selection is re-resolved against the incoming rows: keeping
+  // the old object would show a stale title, and keeping a row the merge
+  // dropped would show an entry the vault no longer has.
+  setEntries: items =>
+    set(s => ({
+      entries: {
+        ...s.entries,
+        items,
+        // Resolved through `find` so a selected tombstone (Trash view) is not
+        // dropped by a merge that only ever carries live rows.
+        current: s.entries.current ? find({ ...s.entries, items }, s.entries.current.id) : null
+      }
+    })),
   setTrash: trash => set(s => ({ entries: { ...s.entries, trash } })),
   setCurrentEntry: id =>
     set(s => ({

@@ -3,7 +3,7 @@ import { on, EVENTS, type EventName, type EventPayloads } from '@/lib/events'
 import { getAudit, isBiometricAvailable, listDeleted } from '@/lib/commands'
 import type { EntryMeta } from '@/lib/commands'
 import { subscribeToEvents } from './events'
-import { makeStore, setEntries, setView } from './index'
+import { makeStore, setEntries, setView, setCurrentEntry } from './index'
 
 const meta = (id: string): EntryMeta => ({
   id,
@@ -38,6 +38,30 @@ describe('vault:merged', () => {
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('a'), meta('b')] })
 
     expect(store.getState().entries.items.map(e => e.id)).toEqual(['a', 'b'])
+  })
+
+  // The selection is a row object, not an id, so a merge that rewrote or
+  // dropped that row has to be re-resolved against the incoming list.
+  it('re-reads the selected row from the merged list', () => {
+    const store = makeStore()
+    setEntries([meta('a')])
+    setCurrentEntry('a')
+    subscribeToEvents()
+
+    handlerFor(EVENTS.vaultMerged)({ entries: [{ ...meta('a'), title: 'Renamed' }] })
+
+    expect(store.getState().entries.current?.title).toBe('Renamed')
+  })
+
+  it('clears the selection when the merge dropped that row', () => {
+    const store = makeStore()
+    setEntries([meta('a'), meta('b')])
+    setCurrentEntry('b')
+    subscribeToEvents()
+
+    handlerFor(EVENTS.vaultMerged)({ entries: [meta('a')] })
+
+    expect(store.getState().entries.current).toBeNull()
   })
 
   it('re-runs the audit, since the new rows have no strength result yet', () => {
