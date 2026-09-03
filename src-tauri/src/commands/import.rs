@@ -239,6 +239,8 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
         pin: None,
         name: None,
         tags: (!imp.tags.is_empty()).then(|| imp.tags.clone()),
+        // No third-party format carries a star.
+        favorite: false,
         created_at: Some(now.clone()),
         updated_at: Some(now),
         password_updated_at: None,

@@ -691,6 +691,58 @@ fn import_swftx_reseals_across_passwords_and_upserts_by_id() {
     assert_eq!(revealed.username.as_deref(), Some("alice"));
 }
 
+// A `.swftx` backup has to carry the star. It is a column, never a payload
+// field, so the export re-attaches it (`export_entry`) and the import threads it
+// back through `build_record` — miss either half and a backup silently unstars
+// the whole vault.
+#[test]
+fn swftx_round_trip_preserves_a_starred_record() {
+    use crate::crypto::{hash_secret, Cryptor};
+    use crate::models::VaultData;
+
+    let key = argon2_key(
+        "current-pw",
+        &argon2_params(b"salt-h-01234567890123456789012345"),
+    );
+    let cipher = key.payload_cipher();
+    let source = SqliteStore::open(&tmp_db(), &key.sqlcipher_key()).unwrap();
+    let entry = sample_entry();
+    source
+        .upsert(&migrate::build_record(&entry, cipher.seal(&entry).unwrap()).unwrap())
+        .unwrap();
+    source.set_favorite("1", true).unwrap();
+
+    // export_vault: project every live row back to a plaintext entry, obscured
+    // and sealed under the backup password.
+    let out = Cryptor::new(&hash_secret("backup-pw"));
+    let blob = out
+        .encrypt_data(&VaultData {
+            entries: source
+                .export_for_sync()
+                .unwrap()
+                .iter()
+                .map(|r| migrate::export_entry(r, &cipher, &out).unwrap())
+                .collect(),
+        })
+        .unwrap();
+
+    // import_backup: decrypt the file and re-seal it into a fresh vault.
+    let file: VaultData = out.decrypt_data(&blob).unwrap();
+    let restored = SqliteStore::open(&tmp_db(), &key.sqlcipher_key()).unwrap();
+    restored
+        .import(&migrate::reseal_swftx(&file.entries, &out, &cipher).unwrap())
+        .unwrap();
+
+    let list = restored.list().unwrap();
+    assert_eq!(list.len(), 1);
+    assert!(list[0].favorite);
+    // The secrets still round-trip, so the star did not ride in on a broken export.
+    let revealed = cipher
+        .unseal(&restored.get("1").unwrap().unwrap().payload)
+        .unwrap();
+    assert_eq!(revealed.password.as_deref(), Some("s3cret"));
+}
+
 // A wrong source password fails the file decrypt before the store is touched.
 #[test]
 fn import_swftx_wrong_source_password_errors() {
