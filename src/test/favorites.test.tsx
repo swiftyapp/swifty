@@ -6,7 +6,7 @@ import ListColumn from '@/components/Main/Body/ListColumn'
 import Body from '@/components/Main/Body'
 import Show from '@/components/Main/Body/Aside/Show'
 import { revealEntry, setFavorite } from '@/lib/commands'
-import { makeStore, useStore, setView, setSort, setCurrentEntry } from '@/store'
+import { makeStore, useStore, setView, setCurrentEntry } from '@/store'
 import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 
 const starred = loginMeta({ id: 'star', title: 'Monzo', favorite: true })
@@ -20,10 +20,7 @@ const seed = () => {
   return store
 }
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  setSort('recent')
-})
+beforeEach(() => vi.clearAllMocks())
 
 describe('the favorite toggle', () => {
   it('stars an unstarred entry and keeps the new value in the list', async () => {

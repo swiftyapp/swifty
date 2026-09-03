@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ListColumn from '@/components/Main/Body/ListColumn'
 import { copyToClipboard, fetchFavicon, revealEntry, type Audit } from '@/lib/commands'
-import { makeStore, useStore, setSort, setFilterType } from '@/store'
+import { makeStore, useStore, setFilterType } from '@/store'
 import { resetFavicons } from '@/hooks/useFavicon'
 import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 
@@ -33,7 +33,6 @@ const seed = (audit?: Audit) => {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
-  setSort('recent')
   resetFavicons()
   vi.mocked(fetchFavicon).mockClear()
 })
