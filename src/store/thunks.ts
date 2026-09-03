@@ -46,6 +46,13 @@ const SYNC_DEBOUNCE_MS = 30_000
 
 let syncTimer: ReturnType<typeof setTimeout> | undefined
 
+// Drops a write waiting to be published. Called on lock: the backend has no key
+// to push with any more, and the next unlock syncs anyway.
+export const cancelScheduledSync = () => {
+  if (syncTimer) clearTimeout(syncTimer)
+  syncTimer = undefined
+}
+
 const now = () => new Date().toISOString()
 
 // Complete a draft into a full entry: existing entries keep their id/createdAt,
@@ -67,7 +74,7 @@ const upsertMeta = (items: EntryMeta[], meta: EntryMeta): EntryMeta[] => {
 export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_set, get) => {
   const scheduleSync = () => {
     if (!get().sync.enabled) return
-    if (syncTimer) clearTimeout(syncTimer)
+    cancelScheduledSync()
     syncTimer = setTimeout(() => {
       syncTimer = undefined
       syncNow().catch(() => {})

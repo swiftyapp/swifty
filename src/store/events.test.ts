@@ -124,6 +124,27 @@ describe('vault:locked', () => {
     expect(store.getState().flow.touchID).toBe(true)
   })
 
+  it('drops the session data with the key', async () => {
+    const store = makeStore()
+    subscribeToEvents()
+    store.getState().flowMain()
+    setEntries([meta('a')])
+    store.getState().setTrash([meta('t')])
+    setCurrentEntry('a')
+    setView('trash')
+
+    handlerFor(EVENTS.vaultLocked)()
+    await vi.waitFor(() => expect(store.getState().flow.name).toBe('auth'))
+
+    // Nothing of the unlocked vault survives the lock — the next unlock must
+    // not open onto the previous session's rows.
+    const state = store.getState()
+    expect(state.entries.items).toEqual([])
+    expect(state.entries.trash).toEqual([])
+    expect(state.entries.current).toBeNull()
+    expect(state.ui.view).toBe('items')
+  })
+
   it('lands on the plain lock screen when nothing is enrolled', async () => {
     vi.mocked(isBiometricAvailable).mockRejectedValue(new Error('no backend'))
     const store = makeStore()
