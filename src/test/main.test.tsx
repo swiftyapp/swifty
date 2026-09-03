@@ -72,6 +72,25 @@ describe('Main', () => {
     expect(useStore.getState().entries.edit).toBe(true)
   })
 
+  // jsdom implements no `inert` semantics, so the attribute itself is the
+  // assertion: it is what takes the column's rows, chips and arrows out of the
+  // browser's keyboard and pointer reach while a draft is open.
+  it('takes the list column out of the keyboard while a draft is open', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    renderWithStore(<Main />, { store: seed() })
+
+    const column = screen.getByTestId('list-column')
+    expect(column).not.toHaveAttribute('inert')
+
+    await userEvent.click(screen.getByText('Google'))
+    await userEvent.keyboard('{Meta>}e{/Meta}')
+    expect(useStore.getState().entries.edit).toBe(true)
+
+    expect(column).toHaveAttribute('inert')
+    // `pointer-events-none` only ever stopped the mouse.
+    expect(column.className).not.toContain('pointer-events-none')
+  })
+
   it('narrows the list to one kind through the filter chips', async () => {
     renderWithStore(<Main />, { store: seed() })
 
