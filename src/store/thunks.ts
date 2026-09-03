@@ -105,13 +105,14 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       // the two can legitimately disagree).
       const { type } = get().filters
       if (type && type !== meta.type) get().setFilterType(null)
-      get().entrySaved(meta.id)
+      get().setCurrentEntry(meta.id)
       scheduleSync()
       refreshAudit()
     },
     deleteEntry: async id => {
       await deleteEntryCmd(id)
-      get().entryRemoved(get().entries.items.filter(e => e.id !== id))
+      get().setEntries(get().entries.items.filter(e => e.id !== id))
+      get().setNoEntry()
       scheduleSync()
       refreshAudit()
     },
@@ -139,7 +140,7 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       // it selected would leave the detail pane on an entry the list no longer
       // has (and hide the empty state).
       if (get().ui.view === 'favorites' && !meta.favorite) get().setNoEntry()
-      else get().entrySaved(meta.id)
+      else get().setCurrentEntry(meta.id)
       scheduleSync()
     },
     enterMain: async result => {

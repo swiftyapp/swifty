@@ -22,8 +22,6 @@ export interface EntriesSlice {
   setEntries: (items: EntryMeta[]) => void
   setTrash: (trash: EntryMeta[]) => void
   setCurrentEntry: (id: string) => void
-  entrySaved: (id: string) => void
-  entryRemoved: (items: EntryMeta[]) => void
 }
 
 // Selection is by id across every row the app holds, live or tombstoned, so the
@@ -61,14 +59,10 @@ export const createEntriesSlice: StateCreator<StoreState, [], [], EntriesSlice> 
       }
     })),
   setTrash: trash => set(s => ({ entries: { ...s.entries, trash } })),
+  // Also what a save lands on: selecting the row just written is the same
+  // state change as selecting any other row.
   setCurrentEntry: id =>
     set(s => ({
-      entries: { ...s.entries, current: find(get().entries, id), new: null, edit: false }
-    })),
-  entrySaved: id =>
-    set(s => ({
-      entries: { ...s.entries, edit: false, new: null, current: find(get().entries, id) }
-    })),
-  entryRemoved: items =>
-    set(s => ({ entries: { ...s.entries, items, new: null, edit: false, current: null } }))
+      entries: { ...s.entries, current: find(s.entries, id), new: null, edit: false }
+    }))
 })
