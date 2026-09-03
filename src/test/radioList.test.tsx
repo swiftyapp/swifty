@@ -28,6 +28,14 @@ describe('RadioList', () => {
     expect(onChange).toHaveBeenCalledWith('0')
   })
 
+  // The card surface clips the global focus outline, so the focused option has
+  // to carry the hover treatment to be visible at all.
+  it('gives the focused option the hover treatment', () => {
+    render(<RadioList options={OPTIONS} value="60" onChange={vi.fn()} testidPrefix="lock" />)
+
+    expect(screen.getByTestId('lock-60')).toHaveClass('focus-visible:bg-hover')
+  })
+
   it('moves selection with the arrow keys', async () => {
     const Harness = () => {
       const [value, setValue] = useState('60')

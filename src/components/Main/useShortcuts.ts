@@ -7,8 +7,9 @@ import { lockVault } from './Palette/commands'
 // underneath it (opening a second modal, or pulling focus into the list column
 // behind the scrim) is swallowed instead.
 const dialogOpen = () => {
-  const { palette, settings, addPicker } = useStore.getState().ui
-  return palette || settings || addPicker
+  const state = useStore.getState()
+  const { palette, settings, addPicker } = state.ui
+  return palette || settings || addPicker || state.generator.open
 }
 
 // The app-level shortcut surface. One listener, one record — a new chord is
@@ -16,10 +17,10 @@ const dialogOpen = () => {
 const BINDINGS: Record<string, () => void> = {
   k: openPalette,
   l: lockVault,
-  // Re-pressing ⌘G while the dialog is up must not drop the callback it was
-  // opened with, so an open dialog swallows the shortcut.
+  // Re-pressing ⌘G while the generator is up must not drop the callback it was
+  // opened with, so an open dialog swallows the shortcut like every other chord.
   g: () => {
-    if (!useStore.getState().generator.open) openGenerator()
+    if (!dialogOpen()) openGenerator()
   },
   n: () => {
     if (!dialogOpen()) openAddPicker()

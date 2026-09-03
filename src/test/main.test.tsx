@@ -59,6 +59,20 @@ describe('Main', () => {
     expect(screen.getByTestId('search-input')).toHaveFocus()
   })
 
+  it('lets the open generator dialog swallow the shell chords', async () => {
+    renderWithStore(<Main />, { store: seed() })
+
+    await userEvent.keyboard('{Meta>}g{/Meta}')
+    expect(screen.getByTestId('generator-dialog')).toBeInTheDocument()
+
+    // The dialog owns the keyboard: neither chord may reach the shell behind it.
+    await userEvent.keyboard('{Meta>}f{/Meta}')
+    expect(screen.getByTestId('search-input')).not.toHaveFocus()
+
+    await userEvent.keyboard('{Meta>}n{/Meta}')
+    expect(useStore.getState().ui.addPicker).toBe(false)
+  })
+
   it('edits the selected entry on ⌘E, and needs a selection to do it', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
     renderWithStore(<Main />, { store: seed() })
