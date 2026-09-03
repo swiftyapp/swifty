@@ -203,6 +203,14 @@ describe('Settings › security', () => {
     expect(getTimeout()).toBe(0)
   })
 
+  it('names both session radiogroups after their rows', async () => {
+    await open()
+    await go('security')
+
+    expect(screen.getByRole('radiogroup', { name: 'Lock vault after' })).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Clear clipboard' })).toBeInTheDocument()
+  })
+
   it('writes the generator defaults the dialog reads', async () => {
     await open()
     await go('security')
@@ -309,6 +317,14 @@ describe('Settings › language & region', () => {
     await go('language')
     await userEvent.click(screen.getByTestId('settings-theme-system'))
     expect(store.getState().theme).toBe('system')
+  })
+
+  it('names both region radiogroups after their rows', async () => {
+    await open()
+    await go('language')
+
+    expect(screen.getByRole('radiogroup', { name: 'Date format' })).toBeInTheDocument()
+    expect(screen.getByRole('radiogroup', { name: 'Theme' })).toBeInTheDocument()
   })
 
   it('applies the date format to rendered timestamps', async () => {

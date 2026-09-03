@@ -37,15 +37,20 @@ export default function SessionGroup() {
     setClipboardTimeout(Number(value))
   }
 
+  // The row label doubles as the radiogroup's accessible name.
+  const lockLabel = t('Lock vault after')
+  const clipboardLabel = t('Clear clipboard')
+
   return (
     <SettingsGroup label={t('Session')}>
       <SettingsRow
-        label={t('Lock vault after')}
+        label={lockLabel}
         description={t('Idle time before the vault seals itself')}
         testid="settings-autolock-row"
         control={
           <Segmented
             mono
+            name={lockLabel}
             options={LOCK_OPTIONS}
             value={lock}
             onChange={onLock}
@@ -54,12 +59,13 @@ export default function SessionGroup() {
         }
       />
       <SettingsRow
-        label={t('Clear clipboard')}
+        label={clipboardLabel}
         description={t('Copied secrets are wiped after this delay')}
         testid="settings-clipboard-row"
         control={
           <Segmented
             mono
+            name={clipboardLabel}
             options={CLIPBOARD_OPTIONS.map(option => ({
               ...option,
               label: t(option.label)
