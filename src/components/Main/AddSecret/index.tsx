@@ -5,6 +5,7 @@ import { useStore, closeAddPicker, startEntry } from '@/store'
 import { KINDS } from '@/kinds'
 import Modal from '@/components/elements/Modal'
 import KindTile from './KindTile'
+import ScanAction from './ScanAction'
 
 const TITLE_ID = 'add-secret-title'
 
@@ -82,6 +83,8 @@ export default function AddSecret() {
             <KindTile key={kind.type} kind={kind} onSelect={() => pick(kind.type)} />
           ))}
         </div>
+
+        <ScanAction />
       </div>
     </Modal>
   )
