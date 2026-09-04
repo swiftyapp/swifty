@@ -41,6 +41,7 @@ import {
   ShieldCheck,
   Star,
   Sun,
+  Tags,
   Trash2,
   TriangleAlert,
   User,
@@ -115,4 +116,5 @@ export const PlusRailGlyph = glyph(Plus, 20)
 export const GearRailGlyph = glyph(Settings, 20)
 export const GridRailGlyph = glyph(LayoutGrid, 20)
 export const StarRailGlyph = glyph(Star, 20)
+export const TagsRailGlyph = glyph(Tags, 20)
 export const TrashRailGlyph = glyph(Trash2, 20)

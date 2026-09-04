@@ -3,6 +3,7 @@ import Brand from './Brand'
 import Add from './Add'
 import ViewButton from './ViewButton'
 import VaultHealth from './VaultHealth'
+import Tags from './Tags'
 import Settings from './Settings'
 import { GridRailGlyph, StarRailGlyph, TrashRailGlyph } from '../icons'
 
@@ -23,6 +24,8 @@ export default function Sidebar() {
       <ViewButton view="favorites" label={t('Favorites')} testid="view-favorites">
         <StarRailGlyph />
       </ViewButton>
+      <div className="h-1.5" />
+      <Tags />
       <div className="flex-1" />
       <VaultHealth />
       <ViewButton view="trash" label={t('Trash')} testid="view-trash">
