@@ -305,7 +305,6 @@
   "Too many failed attempts. Try again in {{seconds}}s": "Trop de tentatives échouées. Réessayez dans {{seconds}} s",
   "Filter by tag {{tag}}": "Filtrer par tag {{tag}}",
   "Deleted {{time}}": "Supprimé {{time}}",
-  "Modified {{time}}": "Modifié {{time}}",
   "Created {{time}}": "Créé {{time}}",
   "Too many failed attempts": "Trop de tentatives échouées",
   "Try again in": "Réessayez dans",

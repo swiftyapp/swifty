@@ -327,7 +327,6 @@
   "Too many failed attempts. Try again in {{seconds}}s": "Too many failed attempts. Try again in {{seconds}}s",
   "Filter by tag {{tag}}": "Filter by tag {{tag}}",
   "Deleted {{time}}": "Deleted {{time}}",
-  "Modified {{time}}": "Modified {{time}}",
   "Created {{time}}": "Created {{time}}",
   "Too many failed attempts": "Too many failed attempts",
   "Try again in": "Try again in",

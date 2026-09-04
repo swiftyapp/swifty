@@ -305,7 +305,6 @@
   "Too many failed attempts. Try again in {{seconds}}s": "Tentativas demais. Tente novamente em {{seconds}}s",
   "Filter by tag {{tag}}": "Filtrar pela tag {{tag}}",
   "Deleted {{time}}": "Excluído {{time}}",
-  "Modified {{time}}": "Modificado {{time}}",
   "Created {{time}}": "Criado {{time}}",
   "Too many failed attempts": "Tentativas demais",
   "Try again in": "Tente novamente em",

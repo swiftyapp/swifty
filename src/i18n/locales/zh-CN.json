@@ -295,7 +295,6 @@
   "Too many failed attempts. Try again in {{seconds}}s": "尝试次数过多，请在 {{seconds}} 秒后重试",
   "Filter by tag {{tag}}": "按标签 {{tag}} 筛选",
   "Deleted {{time}}": "删除 {{time}}",
-  "Modified {{time}}": "修改 {{time}}",
   "Created {{time}}": "创建 {{time}}",
   "Too many failed attempts": "尝试次数过多",
   "Try again in": "请稍后重试",

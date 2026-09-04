@@ -310,7 +310,6 @@
   "Too many failed attempts. Try again in {{seconds}}s": "Забагато невдалих спроб. Повторіть через {{seconds}} с",
   "Filter by tag {{tag}}": "Фільтрувати за тегом {{tag}}",
   "Deleted {{time}}": "Видалено {{time}}",
-  "Modified {{time}}": "Змінено {{time}}",
   "Created {{time}}": "Створено {{time}}",
   "Too many failed attempts": "Забагато невдалих спроб",
   "Try again in": "Повторіть через",

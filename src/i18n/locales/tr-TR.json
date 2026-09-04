@@ -300,7 +300,6 @@
   "Too many failed attempts. Try again in {{seconds}}s": "Çok fazla başarısız deneme. {{seconds}} sn sonra tekrar deneyin",
   "Filter by tag {{tag}}": "{{tag}} etiketine göre filtrele",
   "Deleted {{time}}": "Silindi {{time}}",
-  "Modified {{time}}": "Değiştirildi {{time}}",
   "Created {{time}}": "Oluşturuldu {{time}}",
   "Too many failed attempts": "Çok fazla başarısız deneme",
   "Try again in": "Şu süre sonra tekrar deneyin",

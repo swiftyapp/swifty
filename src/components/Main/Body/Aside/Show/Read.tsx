@@ -1,17 +1,16 @@
-import { Fragment, useState } from 'react'
+import { useState } from 'react'
 import { deleteEntry } from '@/store'
 import type { Entry, EntryMeta } from '@/lib/commands'
-import type { TKey } from '@/i18n'
 import { useFavicon } from '@/hooks/useFavicon'
 import CardBrandMark from '@/components/elements/CardBrandMark'
 import { FieldsProvider } from '@/components/elements/fields'
 import { MONO_LABEL } from '@/components/elements/tokens'
 import { hasBrandMark } from '@/utils/cardBrand'
 import { kindOf } from '@/kinds'
-import { dateTime, relativeLong } from '@/utils/time'
 import { useTranslation } from 'react-i18next'
 import Actions from './Actions'
 import Favorite from './Favorite'
+import Footer from './Footer'
 
 interface Props {
   entry: EntryMeta
@@ -40,16 +39,6 @@ export default function Read({ entry, revealed }: Props) {
   const fromKind = revealed ? kind.eyebrow?.(revealed) : null
   const segment: { text: string; testid?: string } | null =
     fromKind ?? (entry.urlHost ? { text: entry.urlHost } : null)
-
-  // Metadata sentences, not labels: long-form relative times, and the absolute
-  // one a hover away.
-  const stamps = (
-    [
-      ['Deleted {{time}}', entry.deletedAt],
-      ['Modified {{time}}', entry.updatedAt],
-      ['Created {{time}}', entry.createdAt]
-    ] as [TKey, string | undefined][]
-  ).filter(([, iso]) => iso)
 
   return (
     <div className="mx-auto w-full max-w-[860px]">
@@ -99,14 +88,13 @@ export default function Read({ entry, revealed }: Props) {
         </div>
       )}
 
-      <div data-testid="entry-stamps" className="mt-4 font-mono text-xs text-text3">
-        {stamps.map(([key, iso], index) => (
-          <Fragment key={key}>
-            {index > 0 && ' · '}
-            <span title={dateTime(iso)}>{t(key, { time: relativeLong(iso) })}</span>
-          </Fragment>
-        ))}
-      </div>
+      {/* Tags are metadata, so the footer needs no reveal to render. */}
+      <Footer
+        tags={entry.tags}
+        createdAt={entry.createdAt}
+        updatedAt={entry.updatedAt}
+        deletedAt={entry.deletedAt}
+      />
 
       {deleteError && (
         <div className="mt-3 rounded-lg border border-bad/40 bg-bad/5 px-4 py-3 text-base text-bad">
