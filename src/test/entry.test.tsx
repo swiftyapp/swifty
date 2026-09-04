@@ -325,18 +325,18 @@ describe('Show', () => {
     expect(copyToClipboard).not.toHaveBeenCalled()
   })
 
-  it('deletes from the more menu behind a two-press inline confirm', async () => {
+  it('archives from the more menu behind a two-press inline confirm', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry())
     renderWithStore(<Show entry={loginMeta()} />)
 
     await userEvent.click(screen.getByTestId('more-actions-button'))
 
     // First press only arms the row.
-    await userEvent.click(screen.getByText('Delete'))
+    await userEvent.click(screen.getByText('Archive'))
     expect(deleteEntry).not.toHaveBeenCalled()
 
-    // Second press deletes.
-    await userEvent.click(screen.getByText('Delete entry?'))
+    // Second press archives.
+    await userEvent.click(screen.getByText('Archive entry?'))
     await waitFor(() => expect(deleteEntry).toHaveBeenCalledWith('l1'))
   })
 })

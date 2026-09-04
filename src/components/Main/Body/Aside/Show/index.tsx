@@ -17,7 +17,7 @@ interface Props {
 // blank the rows on the way through.
 export default function Show({ entry, type, editing }: Props) {
   // A tombstone has nothing to reveal: `reveal_entry` does not serve deleted
-  // rows, so asking would only buy a rejected invoke per selection in the Trash.
+  // rows, so asking would only buy a rejected invoke per selection in the Archive.
   const revealed = useRevealed(entry?.deletedAt ? null : entry)
   const kindType = type ?? entry?.type
   // The reveal is cleared in an effect, so the first render after the props

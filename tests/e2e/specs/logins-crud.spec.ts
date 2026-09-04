@@ -142,15 +142,15 @@ describe("login entries", () => {
     await closeEditor();
   });
 
-  it("needs two presses to delete the entry", async () => {
+  it("needs two presses to archive the entry", async () => {
     await $('[data-testid="more-actions-button"]').click();
 
-    // Same menu row twice: the first press arms it, the second deletes.
+    // Same menu row twice: the first press arms it, the second archives.
     await waitFor("delete-entry-button");
     await $('[data-testid="delete-entry-button"]').click();
     await waitFor("delete-entry-confirm");
     await expect($('[data-testid="delete-entry-confirm"]')).toHaveText(
-      "Delete entry?",
+      "Archive entry?",
     );
     await $('[data-testid="delete-entry-confirm"]').click();
 
@@ -159,7 +159,7 @@ describe("login entries", () => {
       timeout: 15_000,
     });
     expect(await entryItems()).toHaveLength(0);
-    // Deleting the last entry lands back on the first-run hero.
+    // Archiving the last entry lands back on the first-run hero.
     await expect($('[data-testid="empty-vault"]')).toBeDisplayed();
     await expect($('[data-testid="create-first-entry-button"]')).toBeDisplayed();
   });

@@ -261,7 +261,7 @@ export const saveEntry = (entry: Entry): Promise<EntryMeta> =>
 export const deleteEntry = (id: string): Promise<void> =>
   invoke('delete_entry', { id })
 
-// The Trash: tombstoned entries' metadata, newest deletion first.
+// The Archive: tombstoned entries' metadata, newest deletion first.
 export const listDeleted = (): Promise<EntryMeta[]> => invoke('list_deleted')
 
 // Un-tombstone one entry; returns its refreshed metadata.

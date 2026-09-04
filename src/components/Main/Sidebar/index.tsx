@@ -2,13 +2,15 @@ import { useTranslation } from 'react-i18next'
 import Brand from './Brand'
 import Add from './Add'
 import ViewButton from './ViewButton'
-import VaultHealth from './VaultHealth'
+import Generator from './Generator'
 import Settings from './Settings'
-import { GridRailGlyph, StarRailGlyph, TrashRailGlyph } from '../icons'
+import { ArchiveRailGlyph, GridRailGlyph, StarRailGlyph } from '../icons'
 
-// The 56px icon rail: brand mark · new-secret · all-items · favorites · spacer ·
-// vault-health · trash · settings. Rail tiles are 36px with 20px glyphs — one
+// The 56px icon rail: brand mark · new-secret · all-items · favorites · archive ·
+// spacer · generator · settings. Rail tiles are 36px with 20px glyphs — one
 // step up from the in-pane tiers so the rail reads as primary navigation.
+// The Vault Health tile is parked, not removed: `VaultHealth.tsx` and the
+// `health` view stay, reachable from Settings › Audit.
 export default function Sidebar() {
   const { t } = useTranslation()
   return (
@@ -23,11 +25,11 @@ export default function Sidebar() {
       <ViewButton view="favorites" label={t('Favorites')} testid="view-favorites">
         <StarRailGlyph />
       </ViewButton>
-      <div className="flex-1" />
-      <VaultHealth />
-      <ViewButton view="trash" label={t('Trash')} testid="view-trash">
-        <TrashRailGlyph />
+      <ViewButton view="archive" label={t('Archive')} testid="view-archive">
+        <ArchiveRailGlyph />
       </ViewButton>
+      <div className="flex-1" />
+      <Generator />
       <Settings />
     </nav>
   )

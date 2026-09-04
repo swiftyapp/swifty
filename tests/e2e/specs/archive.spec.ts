@@ -10,14 +10,14 @@ import {
 const MASTER_PASSWORD = "Tq4$mZr7bKv2!xNd";
 
 const TITLE = "Retired Service";
-const USERNAME = "trash@example.com";
+const USERNAME = "archive@example.com";
 const PASSWORD = "Tomb-Stone-Passphrase-6!";
 
-const view = (name: "items" | "trash") =>
+const view = (name: "items" | "archive") =>
   $(`[data-testid="view-${name}"]`).click();
 
-/** Delete the currently open entry through the overflow menu's two presses. */
-async function deleteOpenEntry(): Promise<void> {
+/** Archive the currently open entry through the overflow menu's two presses. */
+async function archiveOpenEntry(): Promise<void> {
   await $('[data-testid="more-actions-button"]').click();
   await waitFor("delete-entry-button");
   await $('[data-testid="delete-entry-button"]').click();
@@ -29,7 +29,7 @@ async function deleteOpenEntry(): Promise<void> {
   });
 }
 
-describe("trash", () => {
+describe("archive", () => {
   before(async () => {
     await resetEmpty(MASTER_PASSWORD);
     await unlock(MASTER_PASSWORD);
@@ -37,20 +37,20 @@ describe("trash", () => {
     await waitFor("entry-item");
   });
 
-  it("moves a deleted entry out of All Items and into the Trash", async () => {
-    await deleteOpenEntry();
+  it("moves an archived entry out of All Items and into the Archive", async () => {
+    await archiveOpenEntry();
     await waitFor("empty-vault");
 
-    await view("trash");
+    await view("archive");
     await waitFor("entry-item");
 
-    await expect($('[data-testid="list-title"]')).toHaveText("Trash");
+    await expect($('[data-testid="list-title"]')).toHaveText("Archive");
     await expectTitles([TITLE]);
     // Tombstone rows are stamped with when they went, not when they changed.
     await expect($('[data-testid="entry-item"]')).toHaveTextContaining("Deleted");
   });
 
-  it("makes a trashed entry read-only: Restore or delete forever, nothing else", async () => {
+  it("makes an archived entry read-only: Restore or delete forever, nothing else", async () => {
     await $('[data-testid="entry-item"]').click();
     await waitFor("restore-entry-button");
 
@@ -64,7 +64,7 @@ describe("trash", () => {
 
   it("restores the entry back into All Items", async () => {
     await $('[data-testid="restore-entry-button"]').click();
-    await waitFor("empty-trash");
+    await waitFor("empty-archive");
     expect(await entryItems()).toHaveLength(0);
 
     await view("items");
@@ -76,8 +76,8 @@ describe("trash", () => {
   });
 
   it("needs two presses to delete permanently, and then it is gone for good", async () => {
-    await deleteOpenEntry();
-    await view("trash");
+    await archiveOpenEntry();
+    await view("archive");
     await waitFor("entry-item");
     await $('[data-testid="entry-item"]').click();
 
@@ -89,7 +89,7 @@ describe("trash", () => {
     );
     await $('[data-testid="purge-entry-confirm"]').click();
 
-    await waitFor("empty-trash");
+    await waitFor("empty-archive");
     expect(await entryItems()).toHaveLength(0);
 
     // A purge is not a restore: All Items stays empty too.

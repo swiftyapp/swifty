@@ -39,23 +39,20 @@ async function expectStat(key: string, expected: number): Promise<void> {
   });
 }
 
+// The rail's health tile is parked, so Settings › Audit is the way in.
 async function openAudit(): Promise<void> {
-  await waitFor("view-health");
-  await $('[data-testid="view-health"]').click();
+  await waitFor("settings-button");
+  await $('[data-testid="settings-button"]').click();
+  await waitFor("settings-nav-audit");
+  await $('[data-testid="settings-nav-audit"]').click();
+  await waitFor("settings-open-health");
+  await $('[data-testid="settings-open-health"]').click();
   await waitFor("audit-score");
 }
 
 async function auditScore(): Promise<number> {
   await waitFor("audit-score");
   return Number(await $('[data-testid="audit-score"]').getText());
-}
-
-// The rail dial's numeral is an SVG <text> node, which is neither "displayed"
-// nor readable by `getText` in every driver — read its textContent instead.
-async function railScore(): Promise<string> {
-  const dial = $('[data-testid="vault-health-score"]');
-  await dial.waitForExist({ timeout: 10_000 });
-  return String((await dial.getProperty("textContent")) ?? "").trim();
 }
 
 /** Leave the audit for the entry list, then select a login by its title. */
@@ -123,11 +120,6 @@ describe("password audit", () => {
   it("scores the vault and counts the weak and reused passwords", async () => {
     await openAudit();
 
-    // Both the rail dial and the pane's own dial render a number.
-    await browser.waitUntil(async () => /^\d+$/.test(await railScore()), {
-      timeout: 15_000,
-      timeoutMsg: "the rail's vault-health dial never showed a score",
-    });
     expect(await auditScore()).toBeLessThan(10);
 
     // One trivially guessable password; both copies of the shared one count.

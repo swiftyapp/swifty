@@ -12,7 +12,7 @@ export default function KindChips() {
   const { t } = useTranslation()
   const type = useStore(state => state.filters.type)
   // The current view's rows, not the whole vault, so the counts tell the truth
-  // in Favorites and the Trash as well as in All Items. `useRows` hands back
+  // in Favorites and the Archive as well as in All Items. `useRows` hands back
   // stable references for exactly this memo.
   const items = useRows()
   const counts = useMemo(() => {

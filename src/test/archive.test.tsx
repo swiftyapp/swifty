@@ -26,14 +26,14 @@ const Harness = () => {
   return <Body />
 }
 
-// Open the Trash the way the rail does, and wait for `list_deleted` to land.
-const openTrash = async (tombstones = [gone]) => {
+// Open the Archive the way the rail does, and wait for `list_deleted` to land.
+const openArchive = async (tombstones = [gone]) => {
   vi.mocked(listDeleted).mockResolvedValue(tombstones)
   const store = makeStore()
   withEntries([live])
   const rendered = renderWithStore(<Harness />, { store })
-  setView('trash')
-  await vi.waitFor(() => expect(useStore.getState().entries.trash).toEqual(tombstones))
+  setView('archive')
+  await vi.waitFor(() => expect(useStore.getState().entries.archive).toEqual(tombstones))
   return rendered
 }
 
@@ -45,12 +45,12 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers())
 
-describe('the Trash view', () => {
+describe('the Archive view', () => {
   it('lists the tombstones with when they went, not when they changed', async () => {
-    await openTrash()
+    await openArchive()
 
     expect(listDeleted).toHaveBeenCalledTimes(1)
-    expect(screen.getByTestId('list-title')).toHaveTextContent('Trash')
+    expect(screen.getByTestId('list-title')).toHaveTextContent('Archive')
     expect(screen.getByTestId('entry-item-title')).toHaveTextContent('Old Account')
     expect(screen.getByText('Deleted 3d')).toBeInTheDocument()
     // The live entry belongs to All Items, not here.
@@ -58,7 +58,7 @@ describe('the Trash view', () => {
   })
 
   it('offers Restore and a permanent delete instead of Edit, and reveals nothing', async () => {
-    await openTrash()
+    await openArchive()
     await userEvent.click(screen.getByTestId('entry-item'))
 
     expect(screen.getByTestId('restore-entry-button')).toBeInTheDocument()
@@ -70,24 +70,24 @@ describe('the Trash view', () => {
     expect(revealEntry).not.toHaveBeenCalled()
   })
 
-  it('restores an entry back into the live list and out of the Trash', async () => {
+  it('restores an entry back into the live list and out of the Archive', async () => {
     vi.mocked(restoreEntry).mockResolvedValue(loginMeta({ id: 'gone', title: 'Old Account' }))
-    await openTrash()
+    await openArchive()
     await userEvent.click(screen.getByTestId('entry-item'))
 
     await userEvent.click(screen.getByTestId('restore-entry-button'))
 
     expect(restoreEntry).toHaveBeenCalledWith('gone')
     await vi.waitFor(() => {
-      const { items, trash, current } = useStore.getState().entries
+      const { items, archive, current } = useStore.getState().entries
       expect(items.map(e => e.id)).toEqual(['live', 'gone'])
-      expect(trash).toEqual([])
+      expect(archive).toEqual([])
       expect(current).toBeNull()
     })
   })
 
   it('needs two presses to delete permanently', async () => {
-    await openTrash()
+    await openArchive()
     await userEvent.click(screen.getByTestId('entry-item'))
 
     await userEvent.click(screen.getByTestId('purge-entry-button'))
@@ -97,7 +97,7 @@ describe('the Trash view', () => {
     await userEvent.click(screen.getByTestId('purge-entry-confirm'))
 
     expect(purgeEntry).toHaveBeenCalledWith('gone')
-    await vi.waitFor(() => expect(useStore.getState().entries.trash).toEqual([]))
+    await vi.waitFor(() => expect(useStore.getState().entries.archive).toEqual([]))
     // It does not come back as a live entry either.
     expect(useStore.getState().entries.items.map(e => e.id)).toEqual(['live'])
   })
@@ -105,7 +105,7 @@ describe('the Trash view', () => {
   // ⌘E and ⌘⏎ reach the entry without going through the detail header, so the
   // pane's read-only-ness has to hold at the store and service level too.
   it('refuses ⌘E on a tombstone, so no editor can open on an unreadable row', async () => {
-    await openTrash()
+    await openArchive()
     await userEvent.click(screen.getByTestId('entry-item'))
 
     await userEvent.keyboard('{Meta>}e{/Meta}')
@@ -129,7 +129,7 @@ describe('the Trash view', () => {
 
   it('fails quietly when ⌘⏎ asks a tombstone for its secret', async () => {
     vi.mocked(revealEntry).mockRejectedValue(new Error('entry not found'))
-    await openTrash()
+    await openArchive()
 
     await userEvent.click(screen.getByTestId('search-input'))
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
@@ -140,11 +140,11 @@ describe('the Trash view', () => {
     expect(copyToClipboard).not.toHaveBeenCalled()
   })
 
-  it('shows the trash empty state when there is nothing to restore', async () => {
-    await openTrash([])
+  it('shows the archive empty state when there is nothing to restore', async () => {
+    await openArchive([])
 
-    expect(screen.getByTestId('empty-trash')).toBeInTheDocument()
-    expect(screen.getByText('Nothing in the trash')).toBeInTheDocument()
+    expect(screen.getByTestId('empty-archive')).toBeInTheDocument()
+    expect(screen.getByText('Nothing archived yet')).toBeInTheDocument()
     expect(screen.queryByTestId('entry-item')).not.toBeInTheDocument()
   })
 
@@ -154,18 +154,18 @@ describe('the Trash view', () => {
     withEntries([live])
     renderWithStore(<Harness />, { store })
 
-    setView('trash')
+    setView('archive')
     await vi.waitFor(() => expect(listDeleted).toHaveBeenCalled())
 
     // No unhandled rejection, and the view still renders its own empty state.
-    expect(screen.getByTestId('empty-trash')).toBeInTheDocument()
+    expect(screen.getByTestId('empty-archive')).toBeInTheDocument()
   })
 
   it('re-reads the tombstones on every visit, so a peer’s deletes show up', async () => {
-    await openTrash()
+    await openArchive()
 
     setView('items')
-    setView('trash')
+    setView('archive')
 
     await vi.waitFor(() => expect(listDeleted).toHaveBeenCalledTimes(2))
   })

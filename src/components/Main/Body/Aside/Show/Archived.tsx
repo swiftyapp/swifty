@@ -3,11 +3,12 @@ import type { EntryMeta } from '@/lib/commands'
 import { restoreEntry, purgeEntry } from '@/store'
 import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'
+import { ArchiveRestoreGlyph } from '../../../icons'
 
 // The read header's action cluster for a tombstone. There is no Edit and no
-// copy: `reveal_entry` does not serve deleted rows, so a trashed entry has
+// copy: `reveal_entry` does not serve deleted rows, so an archived entry has
 // nothing to show and nothing to change — only Restore or the last delete.
-export default function Trashed({ entry }: { entry: EntryMeta }) {
+export default function Archived({ entry }: { entry: EntryMeta }) {
   const { t } = useTranslation()
   const [armed, setArmed] = useState(false)
 
@@ -23,6 +24,7 @@ export default function Trashed({ entry }: { entry: EntryMeta }) {
       </Button>
 
       <Button size="md" testid="restore-entry-button" onClick={() => void restoreEntry(entry.id)}>
+        <ArchiveRestoreGlyph />
         {t('Restore')}
       </Button>
     </div>

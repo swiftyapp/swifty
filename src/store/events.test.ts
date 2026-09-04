@@ -69,10 +69,10 @@ describe('vault:merged', () => {
     expect(getAudit).toHaveBeenCalled()
   })
 
-  // A merge can add or drop tombstones too, and the Trash only loads on entry —
-  // so an open one has to be told, while a closed one refetches on its own.
-  it('re-reads the tombstones when the Trash is the open view', () => {
-    setView('trash')
+  // A merge can add or drop tombstones too, and the Archive only loads on entry
+  // — so an open one has to be told, while a closed one refetches on its own.
+  it('re-reads the tombstones when the Archive is the open view', () => {
+    setView('archive')
     vi.mocked(listDeleted).mockClear()
 
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
@@ -80,7 +80,7 @@ describe('vault:merged', () => {
     expect(listDeleted).toHaveBeenCalledTimes(1)
   })
 
-  it('leaves the tombstones alone when the Trash is not open', () => {
+  it('leaves the tombstones alone when the Archive is not open', () => {
     setView('items')
     vi.mocked(listDeleted).mockClear()
 
@@ -129,9 +129,9 @@ describe('vault:locked', () => {
     subscribeToEvents()
     store.getState().flowMain()
     setEntries([meta('a')])
-    store.getState().setTrash([meta('t')])
+    store.getState().setArchive([meta('t')])
     setCurrentEntry('a')
-    setView('trash')
+    setView('archive')
 
     handlerFor(EVENTS.vaultLocked)()
     await vi.waitFor(() => expect(store.getState().flow.name).toBe('auth'))
@@ -140,7 +140,7 @@ describe('vault:locked', () => {
     // not open onto the previous session's rows.
     const state = store.getState()
     expect(state.entries.items).toEqual([])
-    expect(state.entries.trash).toEqual([])
+    expect(state.entries.archive).toEqual([])
     expect(state.entries.current).toBeNull()
     expect(state.ui.view).toBe('items')
   })

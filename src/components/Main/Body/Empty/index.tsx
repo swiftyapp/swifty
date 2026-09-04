@@ -8,7 +8,7 @@ import {
   VaultEmpty,
   HealthEmpty,
   FavoritesEmpty,
-  TrashEmpty
+  ArchiveEmpty
 } from './variants'
 
 // The list column's share: only the filter states, and only ever as one line.
@@ -31,7 +31,7 @@ const DETAIL: Record<Variant, () => ReactElement> = {
   vault: VaultEmpty,
   health: HealthEmpty,
   favorites: FavoritesEmpty,
-  trash: TrashEmpty,
+  archive: ArchiveEmpty,
   kind: SelectEmpty,
   search: SelectEmpty,
   select: SelectEmpty

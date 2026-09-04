@@ -4,13 +4,13 @@ import { useRows, useVisibleEntries } from '../List/useVisibleEntries'
 /**
  * Every way the two content panes can have nothing to show.
  *
- * `vault`, `health`, `favorites` and `trash` are whole-view states and own the
+ * `vault`, `health`, `favorites` and `archive` are whole-view states and own the
  * detail pane's hero; `kind` and `search` are filter states and belong to the
  * list column, which leaves the detail pane on the quiet `select`. Deciding all
  * of it here is what keeps the two panes from ever showing a hero at the same
  * time.
  */
-export type Variant = 'vault' | 'kind' | 'search' | 'select' | 'health' | 'favorites' | 'trash'
+export type Variant = 'vault' | 'kind' | 'search' | 'select' | 'health' | 'favorites' | 'archive'
 
 // Which empty state the app is in, or `null` when there is real content to
 // show — which, for the surfaces that ask, only ever means a scored audit.

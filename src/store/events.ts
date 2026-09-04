@@ -4,7 +4,7 @@ import { isBiometricAvailable } from '@/lib/commands'
 import {
   useStore,
   setEntries,
-  loadTrash,
+  loadArchive,
   runAudit,
   auditDone,
   flowAuth,
@@ -15,12 +15,12 @@ import {
   resetVaultData
 } from './index'
 
-// A merge can add or drop tombstones as readily as live entries, but the Trash
-// only loads on entering the view — so an open Trash would sit stale until the
+// A merge can add or drop tombstones as readily as live entries, but the Archive
+// only loads on entering the view — so an open Archive would sit stale until the
 // user navigated away and back. Anywhere else there is nothing on screen to
 // correct, and the next visit refetches anyway.
-const refreshOpenTrash = () => {
-  if (useStore.getState().ui.view === 'trash') void loadTrash()
+const refreshOpenArchive = () => {
+  if (useStore.getState().ui.view === 'archive') void loadArchive()
 }
 
 // Wires backend events to store actions. Returns a cleanup function.
@@ -34,14 +34,14 @@ export const subscribeToEvents = (): (() => void) => {
     on(EVENTS.pullStopped, payload => {
       syncStop(payload)
       if (payload.data) setEntries(payload.data.entries)
-      refreshOpenTrash()
+      refreshOpenArchive()
     }),
     // A merge brought in entries from another device: refresh the list, and the
     // audit with it — the new rows have no strength or breach result yet.
     on(EVENTS.vaultMerged, payload => {
       setEntries(payload.entries)
       runAudit()
-      refreshOpenTrash()
+      refreshOpenArchive()
     }),
     on(EVENTS.auditDone, payload => auditDone(payload.data)),
     // Ask, don't assume: hardcoding `false` here meant the Touch ID button only
