@@ -103,6 +103,7 @@ pub fn run() {
             commands::import::import_entries,
             commands::import::export_entries,
             commands::generator::generate_password,
+            commands::generator::generate_ssh_key,
             commands::generator::generate_otp,
             commands::generator::verify_otp,
             commands::audit::get_audit,

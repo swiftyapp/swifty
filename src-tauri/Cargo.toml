@@ -55,6 +55,13 @@ passkey-authenticator = "0.4"
 # copy of each is linked.
 p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
 coset = "0.3"
+# OpenSSH key format (RustCrypto). ed25519 only for now: `rand_core` gives the
+# keygen, `std` the I/O impls the OpenSSH encoding needs.
+ssh-key = { version = "0.6.7", default-features = false, features = [
+  "ed25519",
+  "rand_core",
+  "std",
+] }
 # `CredentialStore` and `UserValidationMethod` are async traits; implementing
 # them needs the same attribute macro passkey-authenticator declares them with.
 async-trait = "0.1"

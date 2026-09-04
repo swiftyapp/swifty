@@ -8,5 +8,5 @@ export default function Generator() {
   const generator = useStore(state => state.generator)
 
   if (!generator.open) return null
-  return <Dialog apply={generator.apply} onClose={closeGenerator} />
+  return <Dialog apply={generator.apply} ssh={generator.ssh} onClose={closeGenerator} />
 }

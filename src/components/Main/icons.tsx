@@ -45,6 +45,7 @@ import {
   Star,
   Sun,
   Tags,
+  Terminal,
   Trash2,
   TriangleAlert,
   User,
@@ -112,6 +113,9 @@ export const LoginGlyph = glyph(Globe, 16)
 export const NoteGlyph = glyph(FileText, 16)
 export const CardGlyph = glyph(CreditCard, 16)
 export const IdentityGlyph = glyph(IdCard, 16)
+// An SSH key. A shell prompt rather than a key: the key glyph is already the
+// passkey's, and the login's is the globe — this has to read as neither.
+export const SshGlyph = glyph(Terminal, 16)
 export const ScanGlyph = glyph(ScanLine, 16)
 export const ShieldGlyph = glyph(ShieldCheck, 16)
 export const GlobeGlyph = glyph(Globe, 16)

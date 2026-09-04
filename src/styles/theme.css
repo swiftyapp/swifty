@@ -273,6 +273,8 @@
   --color-kind-note-soft: var(--c-kind-note-soft);
   --color-kind-identity: var(--c-kind-identity);
   --color-kind-identity-soft: var(--c-kind-identity-soft);
+  --color-kind-ssh: var(--c-kind-ssh);
+  --color-kind-ssh-soft: var(--c-kind-ssh-soft);
 }
 
 /*
@@ -423,6 +425,8 @@
   --c-kind-note-soft: rgba(201, 138, 28, 0.14);
   --c-kind-identity: #12867a;
   --c-kind-identity-soft: rgba(18, 134, 122, 0.12);
+  --c-kind-ssh: #7b5ea7;
+  --c-kind-ssh-soft: rgba(123, 94, 167, 0.12);
 
   /* Design vars that aren't color utilities (gradients/shadows/scrims). */
   --card: linear-gradient(180deg, #ffffff, #fbfbfc);
@@ -483,6 +487,8 @@
   --c-kind-note-soft: rgba(224, 169, 78, 0.18);
   --c-kind-identity: #3ab5a6;
   --c-kind-identity-soft: rgba(58, 181, 166, 0.18);
+  --c-kind-ssh: #a78bda;
+  --c-kind-ssh-soft: rgba(167, 139, 218, 0.18);
 
   --card: linear-gradient(
     180deg,

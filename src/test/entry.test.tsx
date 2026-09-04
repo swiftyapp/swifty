@@ -142,6 +142,39 @@ describe('Editing in the pane', () => {
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 
+  // One press of Generate settles three rows: an SSH key is a keypair, not a
+  // string, so the generator hands the whole thing back to the draft.
+  it('generates a whole SSH keypair into the draft', async () => {
+    renderWithStore(
+      <>
+        <Show type="ssh" editing />
+        <Generator />
+      </>
+    )
+    await userEvent.type(titleInput(), 'Deploy key')
+    await userEvent.click(screen.getByTestId('generate-ssh-key-link'))
+
+    expect(await screen.findByTestId('generator-ssh-public')).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('generator-use-button'))
+
+    await waitFor(() =>
+      expect(field('publicKey').value).toBe('ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI')
+    )
+    expect(screen.getByTestId('entry-value-fingerprint')).toHaveTextContent(
+      'SHA256:GeneratedFingerprint'
+    )
+
+    await userEvent.click(screen.getByText('Save'))
+    expect(saveEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'ssh',
+        title: 'Deploy key',
+        privateKey: expect.stringContaining('OPENSSH PRIVATE KEY'),
+        fingerprint: 'SHA256:GeneratedFingerprint'
+      })
+    )
+  })
+
   it('dismisses the generator on Escape without ending the edit session', async () => {
     // The reported reproducer: add a login, open the generator off the password
     // row, press Escape. The editor's Esc listener is on `document`, so it sees

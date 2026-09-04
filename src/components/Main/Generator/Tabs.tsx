@@ -3,22 +3,34 @@ import Segmented from '@/components/elements/Segmented'
 import type { TKey } from '@/i18n'
 import type { GeneratorMode } from '@/services/generator'
 
-const TABS: { value: GeneratorMode; label: TKey }[] = [
+/**
+ * What the dialog is showing. The password modes are the generator's own
+ * settings (see services/generator); `ssh` is a face of the dialog rather than
+ * a fourth password shape, so it stays out of the persisted defaults.
+ */
+export type DialogMode = GeneratorMode | 'ssh'
+
+const TABS: { value: DialogMode; label: TKey }[] = [
   { value: 'random', label: 'Random' },
-  { value: 'memorable', label: 'Memorable' }
+  { value: 'memorable', label: 'Memorable' },
+  { value: 'ssh', label: 'SSH key' }
 ]
 
 interface Props {
-  mode: GeneratorMode
-  onChange: (mode: GeneratorMode) => void
+  mode: DialogMode
+  onChange: (mode: DialogMode) => void
+  /** Offered only when nothing is waiting for a password: a password field has
+   *  no use for a keypair. */
+  ssh?: boolean
 }
 
 // Mode switch in the dialog header — the shared Segmented control.
-export default function Tabs({ mode, onChange }: Props) {
+export default function Tabs({ mode, onChange, ssh }: Props) {
   const { t } = useTranslation()
+  const tabs = ssh ? TABS : TABS.filter(tab => tab.value !== 'ssh')
   return (
     <Segmented
-      options={TABS.map(tab => ({ value: tab.value, label: t(tab.label) }))}
+      options={tabs.map(tab => ({ value: tab.value, label: t(tab.label) }))}
       value={mode}
       onChange={onChange}
       testidPrefix="generator-mode"

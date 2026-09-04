@@ -551,13 +551,14 @@ fn cxf_passkey_only_item_becomes_a_passkey_only_login() {
 }
 
 // An item whose only credential is a note is a note; an item with nothing we
-// can map is a row error, numbered across accounts.
+// can map — an unknown type, or an `ssh-key` with no key in it — is a row
+// error, numbered across accounts.
 #[test]
 fn cxf_maps_note_only_items_and_flags_unmappable_ones() {
     let json = br#"{"version":{"major":1,"minor":0},"accounts":[
       {"items":[{"id":"aQ","title":"Secret","credentials":[
         {"type":"note","content":{"fieldType":"string","value":"body"}}]}]},
-      {"items":[{"id":"aQ","title":"Mystery","credentials":[{"type":"ssh-key"}]}]}
+      {"items":[{"id":"aQ","title":"Mystery","credentials":[{"type":"wifi"},{"type":"ssh-key"}]}]}
     ]}"#;
     let r = parse(Format::Cxf, json);
     assert_eq!(r.entries.len(), 1);
@@ -740,4 +741,96 @@ fn detect_by_extension_and_content() {
         detect("noext", b"  {\"items\":[]}"),
         Some(Format::Bitwarden)
     );
+}
+
+fn ssh_entry() -> ImportedEntry {
+    ImportedEntry {
+        kind: EntryKind::Ssh,
+        title: "Deploy key".into(),
+        notes: Some("prod".into()),
+        tags: vec!["infra".into()],
+        ssh_private_key: Some(
+            "-----BEGIN OPENSSH PRIVATE KEY-----\nc2VjcmV0\n-----END OPENSSH PRIVATE KEY-----\n"
+                .into(),
+        ),
+        ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI alice@laptop".into()),
+        ssh_fingerprint: Some("SHA256:abc".into()),
+        ssh_passphrase: Some("hunter2".into()),
+        ..Default::default()
+    }
+}
+
+// An SSH key is Bitwarden's own item type 5, so it comes back as the same key.
+// The passphrase has no member there and rides as a hidden custom field — and
+// is taken back out of the extras on the way in.
+#[test]
+fn round_trip_bitwarden_ssh_key() {
+    let entries = vec![ssh_entry()];
+    let bytes = to_bitwarden_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(out["items"][0]["type"], 5);
+    assert_eq!(out["items"][0]["sshKey"]["keyFingerprint"], "SHA256:abc");
+    assert_eq!(out["items"][0]["fields"][0]["name"], "Passphrase");
+    assert_eq!(out["items"][0]["fields"][0]["type"], 1);
+    assert!(out["items"][0].get("login").is_none());
+
+    let back = parse(Format::Bitwarden, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    let mut expected = ssh_entry();
+    expected.tags.clear(); // Bitwarden items carry no tags
+    assert_eq!(back.entries, vec![expected]);
+}
+
+// CXF's `ssh-key` carries the private key; the public line, fingerprint and
+// passphrase travel in a custom-fields credential and are read back by label.
+#[test]
+fn round_trip_cxf_ssh_key() {
+    let entries = vec![ssh_entry()];
+    let bytes = to_cxf_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let creds = &out["accounts"][0]["items"][0]["credentials"];
+    assert_eq!(creds[0]["type"], "ssh-key");
+    assert_eq!(creds[0]["keyType"], "ssh-ed25519");
+    assert_eq!(creds[0]["keyComment"]["value"], "alice@laptop");
+    assert_eq!(creds[0]["privateKey"]["fieldType"], "concealed-string");
+    assert_eq!(creds[1]["type"], "custom-fields");
+    assert_eq!(creds[1]["fields"][2]["label"], "Passphrase");
+    assert_eq!(creds[2]["type"], "note");
+
+    let back = parse(Format::Cxf, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, entries);
+}
+
+// A pasted key with no public line still exports: the key type falls back to
+// the only algorithm the app generates, and no comment is written.
+#[test]
+fn cxf_ssh_key_without_public_line() {
+    let entries = vec![ImportedEntry {
+        ssh_public_key: None,
+        ssh_fingerprint: None,
+        ssh_passphrase: None,
+        ..ssh_entry()
+    }];
+    let bytes = to_cxf_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let creds = &out["accounts"][0]["items"][0]["credentials"];
+    assert_eq!(creds[0]["keyType"], "ssh-ed25519");
+    assert!(creds[0].get("keyComment").is_none());
+    // Nothing to put in custom fields, so there is no such credential.
+    assert_eq!(creds[1]["type"], "note");
+}
+
+// The generic CSV carries every SSH field in a column of its own.
+#[test]
+fn generic_csv_carries_ssh_fields() {
+    let out = String::from_utf8(to_generic_csv(&[ssh_entry()]).unwrap()).unwrap();
+    let mut lines = out.lines();
+    let header = lines.next().unwrap();
+    assert!(header.contains("ssh_private_key,ssh_public_key,ssh_fingerprint,ssh_passphrase"));
+    let row = lines.collect::<Vec<_>>().join("\n");
+    assert!(row.starts_with("ssh,Deploy key,"));
+    assert!(row.contains("BEGIN OPENSSH PRIVATE KEY"));
+    assert!(row.contains("SHA256:abc"));
+    assert!(row.contains("hunter2"));
 }

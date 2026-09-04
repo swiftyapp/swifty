@@ -24,6 +24,7 @@ pub enum EntryKind {
     Note,
     Card,
     Identity,
+    Ssh,
 }
 
 impl EntryKind {
@@ -33,6 +34,7 @@ impl EntryKind {
             EntryKind::Note => "note",
             EntryKind::Card => "card",
             EntryKind::Identity => "identity",
+            EntryKind::Ssh => "ssh",
         }
     }
 }
@@ -63,6 +65,13 @@ pub struct ImportedEntry {
     pub doc_number: Option<String>,
     pub doc_country: Option<String>,
     pub holder_name: Option<String>,
+    // SSH key fields (only meaningful when kind == Ssh). The private key is the
+    // credential; the public line and fingerprint are derivable from it but are
+    // carried where a format has room, so a round-trip needs no key parsing.
+    pub ssh_private_key: Option<String>,
+    pub ssh_public_key: Option<String>,
+    pub ssh_fingerprint: Option<String>,
+    pub ssh_passphrase: Option<String>,
     // WebAuthn passkeys (only meaningful when kind == Login). Empty when the
     // source format carries none, which is the case for every CSV dialect.
     pub passkeys: Vec<ImportedPasskey>,

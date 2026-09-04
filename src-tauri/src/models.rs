@@ -57,6 +57,24 @@ pub struct Entry {
     pub authority: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub personal_number: Option<String>,
+    /// SSH key fields (`ssh` entries). ed25519 only for now: `private_key` is an
+    /// OpenSSH PEM block, `public_key` the single `ssh-ed25519 AAAA… comment`
+    /// line and `fingerprint` its `SHA256:…` digest, derived once at save time so
+    /// the detail view needs no key parsing. `passphrase` is what the user
+    /// protected the key with elsewhere — we never encrypt the key ourselves.
+    /// camelCase on the wire, matching the draft keys the editor writes.
+    #[serde(
+        rename = "privateKey",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub private_key: Option<String>,
+    #[serde(rename = "publicKey", default, skip_serializing_if = "Option::is_none")]
+    pub public_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passphrase: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
     /// WebAuthn passkeys stored on a login entry. `None` when the entry has
@@ -207,6 +225,18 @@ pub struct GeneratorOptions {
     pub exclude_similar_characters: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub strict: Option<bool>,
+}
+
+/// A freshly generated ed25519 keypair, in the forms an entry stores them in:
+/// the OpenSSH PEM private block, the single-line public key, and the
+/// `SHA256:…` fingerprint. Keyed like the `ssh` draft, so the generator's
+/// output can be handed straight to a new entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshKeyPair {
+    pub private_key: String,
+    pub public_key: String,
+    pub fingerprint: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

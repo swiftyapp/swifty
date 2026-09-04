@@ -12,7 +12,7 @@ import { cardBrandOf } from '@/utils/cardBrand'
 // Shared types
 // ---------------------------------------------------------------------------
 
-export type EntryType = 'login' | 'note' | 'card' | 'identity'
+export type EntryType = 'login' | 'note' | 'card' | 'identity' | 'ssh'
 
 // One free-form field on an entry: a label the user wrote and its value.
 export interface ExtraField {
@@ -102,7 +102,21 @@ export interface IdentityEntry extends BaseEntry {
   note: string
 }
 
-export type Entry = LoginEntry | NoteEntry | CardEntry | IdentityEntry
+// An SSH keypair. ed25519 only for now, so there is no algorithm field: the
+// public line names it. `fingerprint` is derived from the key at generation or
+// paste time and stored alongside, so the detail view can show it without
+// parsing a PEM block. `passphrase` is what the key was protected with
+// elsewhere — the app never encrypts the private key itself.
+export interface SshEntry extends BaseEntry {
+  type: 'ssh'
+  privateKey: string // OpenSSH PEM
+  publicKey: string // `ssh-ed25519 AAAA… comment`
+  fingerprint: string // `SHA256:…`
+  passphrase: string
+  note: string
+}
+
+export type Entry = LoginEntry | NoteEntry | CardEntry | IdentityEntry | SshEntry
 
 export interface VaultData {
   entries: Entry[]
@@ -180,6 +194,16 @@ export interface GeneratorOptions {
 export interface OtpResult {
   code: string
   time: number // seconds left in the current 30s window
+}
+
+// A generated ed25519 keypair, keyed like the `ssh` draft so it can be handed
+// to `startEntry` as a prefill without a translation step — which is why it is
+// an alias rather than an interface: only the former gets the implicit index
+// signature that `Record<string, string>` wants.
+export type SshKeyPair = {
+  privateKey: string
+  publicKey: string
+  fingerprint: string
 }
 
 export interface AuditItem {
@@ -373,6 +397,10 @@ export const scanSupported = (): Promise<boolean> => invoke('scan_supported')
 
 export const generatePassword = (options: GeneratorOptions): Promise<string> =>
   invoke('generate_password', { options })
+
+// A new unencrypted ed25519 keypair. `comment` is the label on the public line.
+export const generateSshKey = (comment?: string): Promise<SshKeyPair> =>
+  invoke('generate_ssh_key', { comment: comment || null })
 
 export const generateOtp = (secret: string): Promise<OtpResult> =>
   invoke('generate_otp', { secret })
