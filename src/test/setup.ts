@@ -52,6 +52,11 @@ vi.mock('@/lib/commands', () => ({
   importSwftx: vi.fn().mockResolvedValue(0),
   exportVault: vi.fn().mockResolvedValue(null),
   generatePassword: vi.fn().mockResolvedValue('Generated123!'),
+  generateSshKey: vi.fn().mockResolvedValue({
+    privateKey: '-----BEGIN OPENSSH PRIVATE KEY-----\nc2VjcmV0\n-----END OPENSSH PRIVATE KEY-----\n',
+    publicKey: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI',
+    fingerprint: 'SHA256:GeneratedFingerprint'
+  }),
   generateOtp: vi.fn().mockResolvedValue({ code: '123456', time: 30 }),
   verifyOtp: vi.fn().mockResolvedValue(true),
   getAudit: vi.fn().mockResolvedValue({}),

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { kindOf } from '.'
+import { KINDS, kindOf } from '.'
 import type { EntryDraft } from '@/defaults/entries'
 import type { Passkey } from '@/lib/commands'
 
@@ -43,12 +43,45 @@ const identity = (overrides: Partial<EntryDraft> = {}): EntryDraft => ({
   ...overrides
 })
 
+const ssh = (overrides: Partial<EntryDraft> = {}): EntryDraft => ({
+  type: 'ssh',
+  title: 'Deploy key',
+  privateKey: '-----BEGIN OPENSSH PRIVATE KEY-----\nc2VjcmV0\n-----END OPENSSH PRIVATE KEY-----\n',
+  publicKey: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI alice@laptop',
+  fingerprint: 'SHA256:0123456789abcdef',
+  ...overrides
+})
+
+// The registry is the whole contract: a kind that is not in `KINDS` reaches no
+// picker, chip or palette command.
+describe('KINDS', () => {
+  it('registers every entry type exactly once, in display order', () => {
+    expect(KINDS.map(kind => kind.type)).toEqual([
+      'login',
+      'card',
+      'note',
+      'identity',
+      'ssh'
+    ])
+    for (const kind of KINDS) expect(kindOf(kind.type)).toBe(kind)
+  })
+})
+
 describe('isValid', () => {
   it('accepts a complete draft of every kind', () => {
     expect(kindOf('login').isValid(login())).toBe(true)
     expect(kindOf('card').isValid(card())).toBe(true)
     expect(kindOf('note').isValid(note())).toBe(true)
     expect(kindOf('identity').isValid(identity())).toBe(true)
+    expect(kindOf('ssh').isValid(ssh())).toBe(true)
+  })
+
+  // Everything but the private key is optional: a pasted key routinely has no
+  // fingerprint (nothing derives one) and no passphrase.
+  it('holds an SSH key to its title and its private half', () => {
+    expect(kindOf('ssh').isValid(ssh({ privateKey: '' }))).toBe(false)
+    expect(kindOf('ssh').isValid(ssh({ title: '' }))).toBe(false)
+    expect(kindOf('ssh').isValid(ssh({ publicKey: '', fingerprint: '' }))).toBe(true)
   })
 
   // Which fields an identity must have is the document's business, not the
@@ -94,6 +127,7 @@ describe('isValid', () => {
     expect(kindOf('note').isValid(note({ note: '  \n ' }))).toBe(false)
     expect(kindOf('identity').isValid(identity({ name: ' ' }))).toBe(false)
     expect(kindOf('identity').isValid(identity({ number: '\t' }))).toBe(false)
+    expect(kindOf('ssh').isValid(ssh({ privateKey: '  ' }))).toBe(false)
   })
 
   // Extra fields are free-form, so no kind can require one: a document with a
