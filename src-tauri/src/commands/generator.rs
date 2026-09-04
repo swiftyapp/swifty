@@ -1,7 +1,8 @@
 use crate::error::{Error, Result};
-use crate::models::{GeneratorOptions, OtpResult};
+use crate::models::{GeneratorOptions, OtpResult, SshKeyPair};
 use rand::seq::SliceRandom;
 use rand::Rng;
+use ssh_key::{private::PrivateKey, Algorithm as SshAlgorithm, HashAlg, LineEnding};
 use std::time::{SystemTime, UNIX_EPOCH};
 use totp_rs::{Algorithm, Secret, TOTP};
 
@@ -63,6 +64,24 @@ pub fn generate_password(options: GeneratorOptions) -> Result<String> {
     }
     chars.shuffle(&mut rng);
     Ok(chars.into_iter().collect())
+}
+
+/// A new ed25519 SSH keypair. Unencrypted on purpose: the vault is the
+/// protection, and a passphrase the app chose would be one more secret to keep
+/// somewhere. `comment` is the trailing label on the public line, empty when
+/// the caller has nothing to say.
+#[tauri::command]
+pub fn generate_ssh_key(comment: Option<String>) -> Result<SshKeyPair> {
+    let err = |e: ssh_key::Error| Error::Other(format!("could not generate an SSH key: {e}"));
+    let mut key =
+        PrivateKey::random(&mut rand::thread_rng(), SshAlgorithm::Ed25519).map_err(err)?;
+    key.set_comment(comment.unwrap_or_default());
+
+    Ok(SshKeyPair {
+        private_key: key.to_openssh(LineEnding::LF).map_err(err)?.to_string(),
+        public_key: key.public_key().to_openssh().map_err(err)?,
+        fingerprint: key.fingerprint(HashAlg::Sha256).to_string(),
+    })
 }
 
 fn totp(secret: &str) -> Result<TOTP> {
@@ -179,5 +198,37 @@ mod tests {
     fn otp_rejects_malformed_token() {
         let secret = "JBSWY3DPEHPK3PXP";
         assert!(!verify_otp(secret.to_string(), "1".to_string()).unwrap());
+    }
+
+    // The three strings have to describe one key: parse the private block back
+    // and let it re-derive the other two.
+    #[test]
+    fn ssh_key_parses_back_to_its_own_public_key_and_fingerprint() {
+        let pair = generate_ssh_key(Some("alice@laptop".into())).unwrap();
+        assert!(pair
+            .private_key
+            .starts_with("-----BEGIN OPENSSH PRIVATE KEY-----"));
+        assert!(pair.public_key.starts_with("ssh-ed25519 "));
+        assert!(pair.public_key.ends_with(" alice@laptop"));
+        assert!(pair.fingerprint.starts_with("SHA256:"));
+
+        let parsed = PrivateKey::from_openssh(&pair.private_key).unwrap();
+        assert!(!parsed.is_encrypted());
+        assert_eq!(parsed.public_key().to_openssh().unwrap(), pair.public_key);
+        assert_eq!(
+            parsed.fingerprint(HashAlg::Sha256).to_string(),
+            pair.fingerprint
+        );
+    }
+
+    #[test]
+    fn ssh_keys_are_unique_and_need_no_comment() {
+        let bare = generate_ssh_key(None).unwrap();
+        // No comment means no trailing label, not an empty one.
+        assert_eq!(bare.public_key.split(' ').count(), 2);
+        assert_ne!(
+            bare.private_key,
+            generate_ssh_key(None).unwrap().private_key
+        );
     }
 }

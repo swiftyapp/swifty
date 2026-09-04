@@ -240,6 +240,11 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
         expiry_date: None,
         authority: None,
         personal_number: None,
+        // No third-party format this importer reads carries an SSH key.
+        private_key: None,
+        public_key: None,
+        fingerprint: None,
+        passphrase: None,
         tags: (!imp.tags.is_empty()).then(|| imp.tags.clone()),
         // Set below for logins only; stays None so a passkey-less entry
         // serializes exactly as it did before passkeys existed.
