@@ -86,7 +86,10 @@ export default function Footer({ tags, onTags, createdAt, updatedAt, deletedAt }
 }
 
 // One footer cell: the mono micro-label over the value, the way the rows pair
-// theirs — only stacked, since the footer is a strip rather than a column.
+// theirs — only stacked, since the footer is a strip rather than a column. The
+// value is a tier up from the label (base over xs, as in the rows): uppercase
+// and tracking make an 11px label read larger than it is, so at the same size
+// it was the label that drew the eye. Secondary stays a matter of ink.
 function Cell({
   label,
   className,
@@ -100,7 +103,7 @@ function Cell({
   return (
     <div className={className}>
       <div className={MONO_LABEL}>{t(label)}</div>
-      <div className="mt-1.5 font-mono text-xs text-text2">{children}</div>
+      <div className="mt-1 font-mono text-base text-text2">{children}</div>
     </div>
   )
 }
