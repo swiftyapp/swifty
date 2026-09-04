@@ -1,8 +1,10 @@
 //! Bitwarden unencrypted JSON export (`{"items":[...]}`). Item `type` is 1=login,
-//! 2=secure note, 3=card, 4=identity. We map 1/2/3/4; anything else is a row error.
+//! 2=secure note, 3=card, 4=identity, 5=SSH key. We map 1–5; anything else is a
+//! row error.
 
 use serde::Deserialize;
 
+use super::export::PASSPHRASE_LABEL;
 use super::{EntryKind, ImportResult, ImportedEntry, ImportedPasskey, Importer};
 
 pub struct Bitwarden;
@@ -32,8 +34,22 @@ struct Item {
     card: Option<Card>,
     #[serde(default)]
     identity: Option<Identity>,
+    #[serde(default, rename = "sshKey")]
+    ssh_key: Option<SshKey>,
     #[serde(default)]
     fields: Vec<Field>,
+}
+
+/// Bitwarden's SSH key item: the three members are exactly the three the app
+/// stores. It has no passphrase member; ours travels as a hidden custom field.
+#[derive(Default, Deserialize)]
+struct SshKey {
+    #[serde(default, rename = "privateKey")]
+    private_key: Option<String>,
+    #[serde(default, rename = "publicKey")]
+    public_key: Option<String>,
+    #[serde(default, rename = "keyFingerprint")]
+    key_fingerprint: Option<String>,
 }
 
 /// A Bitwarden custom field. `type` is 0 = text, 1 = hidden, 2 = boolean,
@@ -302,6 +318,28 @@ impl Importer for Bitwarden {
                         doc_number: licence.or_else(|| opt(identity.passport_number.clone())),
                         doc_country: opt(identity.country.clone()),
                         holder_name: identity.full_name(),
+                        extra,
+                        ..Default::default()
+                    });
+                }
+                5 => {
+                    let key = item.ssh_key.unwrap_or_default();
+                    // The passphrase is the one field that is ours, not the
+                    // user's: it is taken back out of the extras it rode in.
+                    let (passphrase, extra): (Vec<_>, Vec<_>) = extra
+                        .into_iter()
+                        .partition(|(label, _)| label.eq_ignore_ascii_case(PASSPHRASE_LABEL));
+                    result.entries.push(ImportedEntry {
+                        kind: EntryKind::Ssh,
+                        title,
+                        notes: opt(item.notes),
+                        ssh_private_key: opt(key.private_key),
+                        ssh_public_key: opt(key.public_key),
+                        ssh_fingerprint: opt(key.key_fingerprint),
+                        ssh_passphrase: passphrase
+                            .into_iter()
+                            .next()
+                            .and_then(|(_, v)| opt(Some(v))),
                         extra,
                         ..Default::default()
                     });

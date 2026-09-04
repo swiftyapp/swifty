@@ -10,6 +10,7 @@
 //! reported — the format is meant to grow. A row is the 1-based item index
 //! counted across every account, which is the order they appear in the file.
 
+use super::export::{FINGERPRINT_LABEL, PASSPHRASE_LABEL, PUBLIC_KEY_LABEL};
 use super::{EntryKind, ImportResult, ImportedEntry, ImportedPasskey, Importer};
 use serde::Deserialize;
 use serde_json::Value;
@@ -92,6 +93,12 @@ struct Credential {
     // note
     #[serde(default)]
     content: Option<Value>,
+    // ssh-key
+    #[serde(default, rename = "privateKey")]
+    private_key: Option<Value>,
+    // custom-fields: a list of EditableFields with a `label` each
+    #[serde(default)]
+    fields: Vec<Value>,
 }
 
 impl Importer for Cxf {
@@ -132,6 +139,8 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
 
     let mut basic: Option<Credential> = None;
     let mut card: Option<Credential> = None;
+    let mut ssh: Option<Credential> = None;
+    let mut custom: Vec<Value> = Vec::new();
     let mut passkeys: Vec<ImportedPasskey> = Vec::new();
     let mut otp: Option<String> = None;
     let mut note: Option<String> = None;
@@ -139,6 +148,12 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
         match cred.kind.as_str() {
             "basic-auth" => basic = basic.or(Some(cred)),
             "credit-card" => card = card.or(Some(cred)),
+            // The private key *is* the credential: an `ssh-key` without one has
+            // nothing to restore and is left unmapped like any unknown type.
+            "ssh-key" if text(&cred.private_key).is_some() => ssh = ssh.or(Some(cred)),
+            // Only read for the labels the exporter writes beside an ssh-key;
+            // anything else in there has no slot on an entry.
+            "custom-fields" => custom.extend(cred.fields),
             "passkey" => match passkey(&cred, created_at.clone()) {
                 Some(p) => passkeys.push(p),
                 None => result.push_err(row, "incomplete passkey"),
@@ -173,6 +188,18 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
             otp,
             tags,
             passkeys,
+            ..Default::default()
+        });
+    } else if let Some(c) = ssh {
+        result.entries.push(ImportedEntry {
+            kind: EntryKind::Ssh,
+            title,
+            notes,
+            tags,
+            ssh_private_key: text(&c.private_key),
+            ssh_public_key: custom_field(&custom, PUBLIC_KEY_LABEL),
+            ssh_fingerprint: custom_field(&custom, FINGERPRINT_LABEL),
+            ssh_passphrase: custom_field(&custom, PASSPHRASE_LABEL),
             ..Default::default()
         });
     } else if let Some(c) = card {
@@ -218,6 +245,18 @@ fn passkey(c: &Credential, created_at: Option<String>) -> Option<ImportedPasskey
         counter: 0,
         created_at,
     })
+}
+
+/// The value of the custom field labelled `label` (case-insensitive), if any.
+fn custom_field(fields: &[Value], label: &str) -> Option<String> {
+    fields
+        .iter()
+        .find(|f| {
+            f.get("label")
+                .and_then(Value::as_str)
+                .is_some_and(|l| l.eq_ignore_ascii_case(label))
+        })
+        .and_then(|f| non_empty(f.get("value")?.as_str().map(str::to_owned)))
 }
 
 /// A CXF value is an `EditableField` (`{"fieldType":…,"value":…}`); older

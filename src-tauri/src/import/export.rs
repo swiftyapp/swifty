@@ -9,7 +9,7 @@ use rand::RngCore;
 use serde::Serialize;
 use serde_json::{json, Value};
 
-use super::bitwarden::{FIELD_TEXT, KEY_ALGORITHM, KEY_CURVE, KEY_TYPE};
+use super::bitwarden::{FIELD_HIDDEN, FIELD_TEXT, KEY_ALGORITHM, KEY_CURVE, KEY_TYPE};
 use super::{EntryKind, ImportedEntry, ImportedPasskey};
 use crate::app::APP_NAME;
 
@@ -23,8 +23,18 @@ fn bw_type(kind: EntryKind) -> u8 {
         EntryKind::Note => 2,
         EntryKind::Card => 3,
         EntryKind::Identity => 4,
+        EntryKind::Ssh => 5,
     }
 }
+
+/// The label under which the passphrase travels where a format has no member
+/// for it: a hidden custom field in Bitwarden, a custom-fields credential in
+/// CXF. The importers look for the same label, case-insensitively.
+pub const PASSPHRASE_LABEL: &str = "Passphrase";
+/// CXF has no members for the public line and fingerprint, so they ride in the
+/// same custom-fields credential under these labels.
+pub const PUBLIC_KEY_LABEL: &str = "Public key";
+pub const FINGERPRINT_LABEL: &str = "Fingerprint";
 
 /// Serialize to Bitwarden's unencrypted JSON export shape.
 pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8>> {
@@ -85,6 +95,26 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
                     // document's own type picks which slot this one goes in.
                     identity[license_slot(e)] = json!(e.doc_number);
                     item["identity"] = identity;
+                }
+                EntryKind::Ssh => {
+                    item["sshKey"] = json!({
+                        "privateKey": e.ssh_private_key,
+                        "publicKey": e.ssh_public_key,
+                        "keyFingerprint": e.ssh_fingerprint,
+                    });
+                    // Bitwarden's SSH item has no passphrase member, so it goes
+                    // in a hidden custom field rather than nowhere.
+                    if let Some(passphrase) = &e.ssh_passphrase {
+                        let field = json!({
+                            "name": PASSPHRASE_LABEL,
+                            "value": passphrase,
+                            "type": FIELD_HIDDEN,
+                        });
+                        match item["fields"].as_array_mut() {
+                            Some(fields) => fields.push(field),
+                            None => item["fields"] = json!([field]),
+                        }
+                    }
                 }
                 EntryKind::Note => {}
             }
@@ -224,6 +254,40 @@ fn cxf_item(e: &ImportedEntry) -> Value {
             );
             credentials.push(card);
         }
+        EntryKind::Ssh => {
+            // The private key is written as the app holds it (OpenSSH PEM),
+            // which is what `ssh` itself reads. The parts CXF's `ssh-key` has
+            // no member for travel in a custom-fields credential beside it.
+            let mut key = json!({ "type": "ssh-key", "keyType": ssh_key_type(e) });
+            put(
+                &mut key,
+                "privateKey",
+                editable("concealed-string", &e.ssh_private_key),
+            );
+            put(&mut key, "keyComment", editable("string", &ssh_comment(e)));
+            credentials.push(key);
+
+            let fields: Vec<Value> = [
+                (PUBLIC_KEY_LABEL, "string", &e.ssh_public_key),
+                (FINGERPRINT_LABEL, "string", &e.ssh_fingerprint),
+                (PASSPHRASE_LABEL, "concealed-string", &e.ssh_passphrase),
+            ]
+            .into_iter()
+            .filter_map(|(label, field_type, value)| {
+                value
+                    .as_deref()
+                    .map(|v| json!({ "fieldType": field_type, "label": label, "value": v }))
+            })
+            .collect();
+            if !fields.is_empty() {
+                credentials.push(json!({
+                    "type": "custom-fields",
+                    "id": random_id(),
+                    "label": "SSH key",
+                    "fields": fields,
+                }));
+            }
+        }
         // CXF has purpose-built `passport`/`drivers-license`/`identity-document`
         // credentials, but nothing that covers all five document types the app
         // holds; until they are mapped one by one, an identity exports as its
@@ -268,6 +332,25 @@ fn cxf_passkey(p: &ImportedPasskey) -> Value {
         "userHandle": p.user_handle,
         "key": p.private_key,
     })
+}
+
+/// CXF's `keyType` is the OpenSSH algorithm name — the first token of the
+/// public line. The app only generates ed25519, so that is the fallback for a
+/// pasted key whose public line was never filled in.
+fn ssh_key_type(e: &ImportedEntry) -> &str {
+    e.ssh_public_key
+        .as_deref()
+        .and_then(|line| line.split_whitespace().next())
+        .unwrap_or("ssh-ed25519")
+}
+
+/// The public line's trailing comment (`ssh-ed25519 AAAA… alice@laptop`), when
+/// there is one.
+fn ssh_comment(e: &ImportedEntry) -> Option<String> {
+    let mut parts = e.ssh_public_key.as_deref()?.splitn(3, ' ');
+    let (_, _, comment) = (parts.next()?, parts.next()?, parts.next()?);
+    let comment = comment.trim();
+    (!comment.is_empty()).then(|| comment.to_owned())
 }
 
 /// CXF wants `YYYY-MM`; the app stores month and year loose (`1`, `01`, `30`,
@@ -328,6 +411,10 @@ const COLUMNS: &[&str] = &[
     "doc_number",
     "doc_country",
     "holder_name",
+    "ssh_private_key",
+    "ssh_public_key",
+    "ssh_fingerprint",
+    "ssh_passphrase",
     "tags",
 ];
 
@@ -353,6 +440,10 @@ pub fn to_generic_csv(entries: &[ImportedEntry]) -> csv::Result<Vec<u8>> {
             e.doc_number.clone().unwrap_or_default(),
             e.doc_country.clone().unwrap_or_default(),
             e.holder_name.clone().unwrap_or_default(),
+            e.ssh_private_key.clone().unwrap_or_default(),
+            e.ssh_public_key.clone().unwrap_or_default(),
+            e.ssh_fingerprint.clone().unwrap_or_default(),
+            e.ssh_passphrase.clone().unwrap_or_default(),
             e.tags.join(";"),
         ];
         wtr.write_record(row.iter().map(|c| sanitize_cell(c)))?;

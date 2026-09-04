@@ -240,7 +240,7 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
         expiry_date: None,
         authority: None,
         personal_number: None,
-        // No third-party format this importer reads carries an SSH key.
+        // Set below for ssh entries only.
         private_key: None,
         public_key: None,
         fingerprint: None,
@@ -288,6 +288,12 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
             e.country = imp.doc_country.clone();
             e.name = imp.holder_name.clone();
         }
+        EntryKind::Ssh => {
+            e.private_key = imp.ssh_private_key.clone();
+            e.public_key = imp.ssh_public_key.clone();
+            e.fingerprint = imp.ssh_fingerprint.clone();
+            e.passphrase = imp.ssh_passphrase.clone();
+        }
         EntryKind::Note => {}
     }
     e
@@ -299,6 +305,7 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
         "note" => EntryKind::Note,
         "card" => EntryKind::Card,
         "identity" => EntryKind::Identity,
+        "ssh" => EntryKind::Ssh,
         _ => EntryKind::Login,
     };
     // `number` and `name` are shared slots, so they are only read into the
@@ -322,6 +329,10 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
         doc_number: identity.then(|| e.number.clone()).flatten(),
         doc_country: e.country.clone(),
         holder_name: identity.then(|| e.name.clone()).flatten(),
+        ssh_private_key: e.private_key.clone(),
+        ssh_public_key: e.public_key.clone(),
+        ssh_fingerprint: e.fingerprint.clone(),
+        ssh_passphrase: e.passphrase.clone(),
         passkeys: e
             .passkeys
             .as_deref()
