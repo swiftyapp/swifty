@@ -4,6 +4,7 @@ import { openGenerator } from '@/store'
 import type { TKey } from '@/i18n'
 import { relativeDuration, shortDate, toTime } from '@/utils/time'
 import { RefreshGlyph } from '../../Main/icons'
+import IconButton from '../IconButton'
 import StrengthBar from '../StrengthBar'
 import { MONO_LABEL } from '../tokens'
 import Field from './Field'
@@ -47,15 +48,13 @@ export default function PasswordField({
       placeholder="••••••••"
       actions={
         editing ? (
-          <button
-            type="button"
-            data-testid="generate-password-link"
+          <IconButton
+            title={t('Generate')}
+            testid="generate-password-link"
             onClick={() => openGenerator(set)}
-            className="flex cursor-pointer items-center gap-1.5 text-base text-accent hover:brightness-110"
           >
-            <RefreshGlyph size={13} />
-            <span>{t('generate')}</span>
-          </button>
+            <RefreshGlyph />
+          </IconButton>
         ) : undefined
       }
       below={
