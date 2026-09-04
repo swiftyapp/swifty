@@ -5,7 +5,6 @@ import {
   DateField,
   Field,
   NoteField,
-  TagsField,
   useFields
 } from '@/components/elements/fields'
 import { countryName } from '@/utils/countries'
@@ -104,7 +103,6 @@ export default function Fields() {
         ))}
       </Panel>
       <CustomFieldsField />
-      <TagsField />
     </>
   )
 }

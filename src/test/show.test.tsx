@@ -23,9 +23,10 @@ describe('Show chrome', () => {
     // "Type" ledger cell that repeated it is gone.
     expect(screen.getAllByText(t(kindOf('login').label))).toHaveLength(1)
     expect(screen.queryByText('Type')).not.toBeInTheDocument()
-    expect(screen.getByTestId('entry-stamps')).toHaveTextContent(
-      /^Modified .+ · Created .+$/
-    )
+    // The footer is labelled cells, not a sentence: a label over each stamp.
+    const footer = screen.getByTestId('entry-footer')
+    expect(footer).toHaveTextContent('Modified')
+    expect(footer).toHaveTextContent('Created')
   })
 
   it('filters the list by a tag pressed in the detail pane', async () => {

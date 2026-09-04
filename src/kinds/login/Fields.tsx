@@ -8,7 +8,6 @@ import {
   OtpField,
   PasskeysField,
   PasswordField,
-  TagsField,
   UrlField,
   UsernameField,
   useFields
@@ -65,7 +64,6 @@ export default function Fields() {
         {otp && <OtpField autoFocus={editing && !entry.otp} />}
       </div>
       <PasskeysField />
-      <TagsField />
     </>
   )
 }

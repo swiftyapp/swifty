@@ -300,7 +300,6 @@
   "Too many failed attempts. Try again in {{seconds}}s": "Zu viele Fehlversuche. Erneut versuchen in {{seconds}}s",
   "Filter by tag {{tag}}": "Nach Tag {{tag}} filtern",
   "Deleted {{time}}": "Gelöscht {{time}}",
-  "Modified {{time}}": "Geändert {{time}}",
   "Created {{time}}": "Erstellt {{time}}",
   "Too many failed attempts": "Zu viele Fehlversuche",
   "Try again in": "Erneut versuchen in",

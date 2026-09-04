@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { FieldsProvider } from '@/components/elements/fields'
 import { MONO_TYPE } from '@/components/elements/tokens'
 import Actions from './Actions'
+import Footer from '../Footer'
 import { useDraft } from './useDraft'
 
 interface Props {
@@ -24,6 +25,10 @@ export default function Edit({ type, revealed }: Props) {
   const Glyph = kind.Glyph
   const Fields = kind.Fields
   const title = typeof draft.model.title === 'string' ? draft.model.title : ''
+  // A draft array is not necessarily strings (a login also carries passkeys),
+  // so narrow rather than assume the key holds tags.
+  const raw = draft.model.tags
+  const tags = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : []
 
   return (
     <div className="mx-auto w-full max-w-[860px]">
@@ -72,6 +77,15 @@ export default function Edit({ type, revealed }: Props) {
             <Fields />
           </FieldsProvider>
         </div>
+
+        {/* The read view's footer, with the tags open for editing. A new entry
+            has no dates yet, so its footer is the tags cell alone. */}
+        <Footer
+          tags={tags}
+          onTags={next => draft.set('tags', next)}
+          createdAt={revealed?.createdAt ?? revealed?.created_at}
+          updatedAt={revealed?.updatedAt ?? revealed?.updated_at}
+        />
 
         {draft.saveError && (
           <div

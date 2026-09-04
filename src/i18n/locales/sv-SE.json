@@ -300,7 +300,6 @@
   "Too many failed attempts. Try again in {{seconds}}s": "För många misslyckade försök. Försök igen om {{seconds}} s",
   "Filter by tag {{tag}}": "Filtrera på taggen {{tag}}",
   "Deleted {{time}}": "Raderad {{time}}",
-  "Modified {{time}}": "Ändrad {{time}}",
   "Created {{time}}": "Skapad {{time}}",
   "Too many failed attempts": "För många misslyckade försök",
   "Try again in": "Försök igen om",

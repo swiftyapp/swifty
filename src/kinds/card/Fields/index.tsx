@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { cardBrandOf, cardDigits, groupCardNumber, hasBrandMark } from '@/utils/cardBrand'
 import CardBrandMark from '@/components/elements/CardBrandMark'
 import Panel from '@/components/elements/Panel'
-import { NoteField, TagsField, useField, useFields } from '@/components/elements/fields'
+import { NoteField, useField, useFields } from '@/components/elements/fields'
 import { useTranslation } from 'react-i18next'
 import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
 import { CARD_MASK } from '../meta'
@@ -11,7 +11,7 @@ import Value from './Value'
 
 export default function Fields() {
   const { t } = useTranslation()
-  const { entry, set, attempted } = useFields()
+  const { set, attempted } = useFields()
   const editing = !!set
   const [show, setShow] = useState(false)
   // Editing shows what is being typed; reading hides it until asked.
@@ -25,10 +25,9 @@ export default function Fields() {
   const year = useField('year')
   const note = useField('note')
 
-  // The card is 460 wide whatever else there is, so anything alongside it goes
-  // in a column of its own — and reading, an empty column is no column at all.
-  const tags = Array.isArray(entry.tags) ? entry.tags : []
-  const aside = editing || !!note.value || tags.length > 0
+  // The card is 460 wide whatever else there is, so the note goes in a column
+  // of its own — and reading, an empty column is no column at all.
+  const aside = editing || !!note.value
   const expired = !editing && isExpired(month.value, year.value)
 
   // Derived live from the number in hand, so it tracks an unsaved edit too.
@@ -166,15 +165,9 @@ export default function Fields() {
       </div>
 
       {aside && (
-        // Whatever leads the column starts level with the card, not a gap below it.
-        <div className="[&>*:first-child]:mt-0">
-          {(editing || note.value) && (
-            <Panel>
-              <NoteField label="Note" />
-            </Panel>
-          )}
-          <TagsField />
-        </div>
+        <Panel>
+          <NoteField label="Note" />
+        </Panel>
       )}
     </div>
   )
