@@ -30,7 +30,7 @@ export default function CustomFields({ name = 'extra' }) {
   const append = () => write([...rows, { label: '', value: '' }])
 
   return (
-    <div className="mt-3">
+    <div className="mt-4">
       <span className={`mb-1.5 block ${MONO_LABEL}`}>{t('Custom fields')}</span>
       {shown.length > 0 && (
         <Panel>

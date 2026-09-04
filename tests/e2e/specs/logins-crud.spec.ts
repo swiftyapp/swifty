@@ -48,6 +48,15 @@ async function openEditor(currentPassword: string): Promise<void> {
   );
 }
 
+/**
+ * Press the eye on the read view's password row. A read secret is a fixed dot
+ * mask until then, and every fresh read view starts masked again.
+ */
+async function revealPassword(): Promise<void> {
+  await waitFor("reveal-password");
+  await $('[data-testid="reveal-password"]').click();
+}
+
 /** Leave an editor with no unsaved edits — one press, no discard guard. */
 async function closeEditor(): Promise<void> {
   await $('[data-testid="cancel-entry-button"]').click();
@@ -72,6 +81,7 @@ describe("login entries", () => {
     expect(await entryItems()).toHaveLength(1);
     await expect($('[data-testid="entry-item-title"]')).toHaveText(TITLE);
     await expect($('[data-testid="entry-value-username"]')).toHaveText(USERNAME);
+    await revealPassword();
     await expect($('[data-testid="entry-value-password"]')).toHaveText(PASSWORD);
   });
 
@@ -91,6 +101,7 @@ describe("login entries", () => {
     // The pane re-decrypts after an in-place save (`useRevealed` keys on
     // updatedAt as well as the id), so the rotated secret shows up right here —
     // this assertion is the regression test for the stale-reveal bug.
+    await revealPassword();
     await browser.waitUntil(
       async () =>
         (await $('[data-testid="entry-value-password"]').getText()) ===

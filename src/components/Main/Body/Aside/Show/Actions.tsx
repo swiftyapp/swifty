@@ -8,7 +8,7 @@ import { dialogOpen } from '@/utils/dialogOpen'
 import Button from '@/components/elements/Button'
 import IconButton from '@/components/elements/IconButton'
 import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
-import { CheckGlyph, MoreGlyph, PencilGlyph, TrashGlyph } from '../../../icons'
+import { CheckGlyph, MoreGlyph, TrashGlyph } from '../../../icons'
 import Trashed from './Trashed'
 
 interface Props {
@@ -103,13 +103,8 @@ export default function Actions({ entry, revealed, onDelete }: Props) {
         </IconButton>
         {menu && (
           <Dropdown className="right-0 top-8" onBlur={toggleMenu}>
-            <DropdownItem onClick={run(editEntry)}>
-              <PencilGlyph />
-              {t('Edit')}
-            </DropdownItem>
             {/* Same element for both presses: arm, then confirm. */}
             <DropdownItem
-              separated
               danger
               testid={armDelete ? 'delete-entry-confirm' : 'delete-entry-button'}
               onClick={armDelete ? run(onDelete) : () => setArmDelete(true)}

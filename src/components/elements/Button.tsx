@@ -72,7 +72,13 @@ export default function Button({
       )}
     >
       {children}
-      {kbd && <span className="font-mono text-xs opacity-75">{kbd}</span>}
+      {/* A chip rather than dimmed text: on an accent fill, opacity is the one
+          thing that makes the hint disappear. */}
+      {kbd && (
+        <span className="flex-none rounded-[4px] bg-[color-mix(in_srgb,currentColor_14%,transparent)] px-1 font-mono text-[11px] leading-4">
+          {kbd}
+        </span>
+      )}
       {loading && (
         <span className="absolute right-3 h-3.5 w-3.5 animate-spin rounded-full border-2 border-transparent border-t-current" />
       )}

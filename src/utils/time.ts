@@ -1,4 +1,4 @@
-import { getLocale } from '@/i18n'
+import { getLocale, t } from '@/i18n'
 import { getFormat } from '@/defaults/dateFormat'
 
 const MINUTE = 60_000
@@ -32,6 +32,24 @@ export const relativeTime = (iso?: string, now: number = Date.now()): string => 
   const at = toTime(iso)
   if (at === null) return ''
   return relativeDuration(iso, now) || shortDate(at)
+}
+
+/**
+ * The same ladder spelled out for a sentence rather than a list column: "2 days
+ * ago", "9 minutes ago", and the date past a week. `Intl` owns the wording and
+ * the plural rules, so no locale has to carry a key per unit.
+ */
+export const relativeLong = (iso?: string, now: number = Date.now()): string => {
+  const at = toTime(iso)
+  if (at === null) return ''
+
+  const elapsed = now - at
+  if (elapsed < MINUTE) return t('just now')
+  const spell = new Intl.RelativeTimeFormat(getLocale(), { numeric: 'always' })
+  if (elapsed < HOUR) return spell.format(-Math.floor(elapsed / MINUTE), 'minute')
+  if (elapsed < DAY) return spell.format(-Math.floor(elapsed / HOUR), 'hour')
+  if (elapsed < 7 * DAY) return spell.format(-Math.floor(elapsed / DAY), 'day')
+  return shortDate(at)
 }
 
 const pad = (value: string | number) => String(value).padStart(2, '0')

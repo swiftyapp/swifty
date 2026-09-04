@@ -39,7 +39,11 @@ export interface FieldProps {
   check?: (value: string) => string
 }
 
+// An input cannot fake dots, so the editor hides its own text; a read value is
+// plain text and gets a fixed-length mask instead — one that says nothing about
+// how long the secret is.
 const MASK = { WebkitTextSecurity: 'disc' } as CSSProperties
+const DOTS = '•'.repeat(12)
 
 // One field, both modes. Reading, it is the detail row it has always been:
 // mono value, reveal toggle, copy button, hidden when empty. Editing, the same
@@ -63,7 +67,9 @@ export default function Field({
 }: FieldProps) {
   const { t } = useTranslation()
   const { value, set, editing, attempted } = useField(name)
-  const [show, setShow] = useState(false)
+  // Typing into dots is guesswork, so the editor starts revealed; the eye still
+  // takes it back.
+  const [show, setShow] = useState(editing)
   // What the row puts on screen and on the clipboard; the draft keeps `value`.
   const shown = format ? format(value) : value
 
@@ -79,9 +85,10 @@ export default function Field({
 
   const masked = secure && !show
   const mask = masked ? MASK : undefined
+  // The headline treatment is for a secret being read, not for its mask.
   const ink = cx(
-    'block h-6 w-full min-w-0 truncate font-mono leading-6 text-text',
-    big ? 'text-xl tracking-secret' : 'text-base'
+    'block h-6 w-full min-w-0 truncate font-mono leading-6',
+    big && !masked ? 'text-xl tracking-secret' : 'text-base'
   )
 
   return (
@@ -123,13 +130,16 @@ export default function Field({
           onBlur={normalize ? () => set(normalize(value)) : undefined}
           className={cx(
             ink,
-            'border-b bg-transparent outline-none transition-colors placeholder:text-text3',
+            'border-b bg-transparent text-text outline-none transition-colors placeholder:text-text3',
             error ? 'border-bad' : 'border-line2 focus:border-accent-line'
           )}
         />
         ) : (
-          <span className={ink} style={mask} data-testid={`entry-value-${name}`}>
-            {shown}
+          <span
+            className={cx(ink, masked ? 'text-text2' : 'text-text')}
+            data-testid={`entry-value-${name}`}
+          >
+            {masked ? DOTS : shown}
           </span>
         )
       }

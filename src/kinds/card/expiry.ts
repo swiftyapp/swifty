@@ -15,6 +15,22 @@ export const formatExpiry = (month: string, year: string): string => {
   return yy ? `${mm.padStart(2, '0')}/${yy}` : mm
 }
 
+/**
+ * Whether the stored pair is behind us. A card is good through the last day of
+ * its month, and the year is two digits — so the century is the one we are in,
+ * which is the only reading that makes sense for a card in a wallet.
+ */
+export const isExpired = (month: string, year: string, now: number = Date.now()): boolean => {
+  const mm = Number(month.replace(/\D/g, ''))
+  const yy = year.replace(/\D/g, '').slice(-2)
+  if (!mm || mm > 12 || yy.length !== 2) return false
+
+  const century = Math.floor(new Date(now).getFullYear() / 100) * 100
+  // Month index `mm` is the month *after* the printed one: the first instant
+  // the card is no longer good.
+  return now >= new Date(century + Number(yy), mm, 1).getTime()
+}
+
 /** Splits whatever is in the box back into the pair, digit by typed digit. */
 export const splitExpiry = (typed: string): { month: string; year: string } => {
   const digits = typed.replace(/\D/g, '').slice(0, 4)

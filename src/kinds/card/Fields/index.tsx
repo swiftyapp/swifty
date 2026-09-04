@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { cardBrandOf, cardDigits, groupCardNumber, hasBrandMark } from '@/utils/cardBrand'
 import CardBrandMark from '@/components/elements/CardBrandMark'
-import { TagsField, useField, useFields } from '@/components/elements/fields'
+import Panel from '@/components/elements/Panel'
+import { NoteField, TagsField, useField, useFields } from '@/components/elements/fields'
 import { useTranslation } from 'react-i18next'
 import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
 import { CARD_MASK } from '../meta'
-import { formatExpiry, splitExpiry } from '../expiry'
+import { formatExpiry, isExpired, splitExpiry } from '../expiry'
 import Value from './Value'
 
 export default function Fields() {
   const { t } = useTranslation()
-  const { set, attempted } = useFields()
+  const { entry, set, attempted } = useFields()
   const editing = !!set
   const [show, setShow] = useState(false)
   // Editing shows what is being typed; reading hides it until asked.
@@ -22,6 +23,13 @@ export default function Fields() {
   const pin = useField('pin')
   const month = useField('month')
   const year = useField('year')
+  const note = useField('note')
+
+  // The card is 460 wide whatever else there is, so anything alongside it goes
+  // in a column of its own — and reading, an empty column is no column at all.
+  const tags = Array.isArray(entry.tags) ? entry.tags : []
+  const aside = editing || !!note.value || tags.length > 0
+  const expired = !editing && isExpired(month.value, year.value)
 
   // Derived live from the number in hand, so it tracks an unsaved edit too.
   const brand = cardBrandOf(number.value)
@@ -34,11 +42,13 @@ export default function Fields() {
   }
 
   return (
-    <>
+    <div
+      className={aside ? 'grid grid-cols-[460px_minmax(0,1fr)] items-start gap-3' : undefined}
+    >
       {/* Card art: an always-dark plastic-card visual, deliberately off-system.
           Its gradient, hex inks, 16/4px radii and face letter-spacings imitate a
           real card, so they are exempt from the type/radius/tracking scales. */}
-      <div className="relative flex h-[288px] w-[460px] flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 font-mono text-[#EDEEF0] shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
+      <div className="relative flex h-[288px] w-[460px] flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 font-mono text-[#EDEEF0] shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
         <div className="absolute -right-10 -top-16 h-[240px] w-[240px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.07),transparent_70%)]" />
 
         <div className="relative flex items-start justify-between gap-4">
@@ -51,7 +61,7 @@ export default function Fields() {
             testid="entry-value-name"
             placeholder="Cardholder"
             maxLength={40}
-            ink="text-[12px] uppercase tracking-[0.18em] opacity-60"
+            ink="text-[13px] uppercase tracking-[0.12em] opacity-90"
             zone="top"
             className="-mx-1.5 flex-1"
           />
@@ -93,19 +103,26 @@ export default function Fields() {
         <div className="relative -mx-1.5 mt-5 grid grid-cols-[repeat(3,minmax(0,1fr))_34px] items-end gap-3.5">
           <Value
             name="expiry"
-              label="Expires"
-              display={expiry || '••/••'}
-              copyValue={expiry}
-              value={expiry}
-              onChange={setExpiry}
-              testid="entry-value-expires"
-              placeholder="MM/YY"
-              required
-              // One box, two draft keys: "12" fills the box but not the pair,
-              // and `isValid` wants both — so the box has to say so itself.
-              invalid={attempted && !(month.value && year.value)}
+            label="Expires"
+            display={expiry || '••/••'}
+            copyValue={expiry}
+            value={expiry}
+            onChange={setExpiry}
+            testid="entry-value-expires"
+            placeholder="MM/YY"
+            required
+            // One box, two draft keys: "12" fills the box but not the pair,
+            // and `isValid` wants both — so the box has to say so itself.
+            invalid={attempted && !(month.value && year.value)}
             maxLength={5}
             ink="text-[13px]"
+            flag={
+              expired && (
+                <span className="flex-none text-[10px] uppercase tracking-[0.12em] text-[#FF8A8A]">
+                  {t('Expired')}
+                </span>
+              )
+            }
           />
           <Value
             name="cvc"
@@ -147,7 +164,18 @@ export default function Fields() {
           )}
         </div>
       </div>
-      <TagsField />
-    </>
+
+      {aside && (
+        // Whatever leads the column starts level with the card, not a gap below it.
+        <div className="[&>*:first-child]:mt-0">
+          {(editing || note.value) && (
+            <Panel>
+              <NoteField label="Note" />
+            </Panel>
+          )}
+          <TagsField />
+        </div>
+      )}
+    </div>
   )
 }

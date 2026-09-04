@@ -10,7 +10,8 @@ export const defaults: EntryDraft = {
   month: '',
   cvc: '',
   pin: '',
-  name: ''
+  name: '',
+  note: ''
 }
 
 // Cards do not require a PIN — most cards have none.
