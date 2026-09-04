@@ -119,7 +119,7 @@ export const {
   runUpdateCheck,
   saveEntry,
   deleteEntry,
-  loadTrash,
+  loadArchive,
   restoreEntry,
   purgeEntry,
   toggleFavorite,

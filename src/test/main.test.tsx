@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
 import type { EntryMeta } from '@/lib/commands'
 import { revealEntry } from '@/lib/commands'
-import { makeStore, useStore } from '@/store'
+import { makeStore, useStore, setView } from '@/store'
 import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 
 const note = (id: string, title: string): EntryMeta =>
@@ -133,10 +133,12 @@ describe('Main', () => {
     expect(count('filter-note')).toBe('1')
   })
 
-  it('switches to the vault health view from the rail and back', async () => {
+  // The health tile is parked (Settings › Audit deep-links into it now), so the
+  // view is entered through the store rather than a rail press.
+  it('switches to the vault health view and back to the rail', async () => {
     renderWithStore(<Main />, { store: seed() })
 
-    await userEvent.click(screen.getByTestId('view-health'))
+    act(() => setView('health'))
     expect(screen.getByTestId('list-title')).toHaveTextContent('Vault Health')
     // Neither chip row applies to the audit.
     expect(screen.queryByTestId('kinds-list')).not.toBeInTheDocument()

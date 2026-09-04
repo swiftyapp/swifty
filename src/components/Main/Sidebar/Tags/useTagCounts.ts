@@ -9,7 +9,7 @@ export interface TagCount {
 // The tags of the current view's rows, with how many rows carry each.
 //
 // Counted off `useRows` — the view before any filter — for two reasons: the
-// counts stay truthful inside Favorites and the Trash, and picking a tag never
+// counts stay truthful inside Favorites and the Archive, and picking a tag never
 // shrinks the menu that offered it (counting the filtered list would leave the
 // chosen tag as the only row left).
 export const useTagCounts = (): TagCount[] => {

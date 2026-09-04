@@ -9,9 +9,9 @@ interface Entries {
   edit: boolean
   current: EntryMeta | null
   items: EntryMeta[]
-  // Tombstones, as the Trash view lists them. Not part of the unlock payload,
-  // so this stays empty until the Trash is opened.
-  trash: EntryMeta[]
+  // Tombstones, as the Archive view lists them. Not part of the unlock payload,
+  // so this stays empty until the Archive is opened.
+  archive: EntryMeta[]
   // Field values waiting for an editor to take them (what a scan read out of an
   // image). Consumed once — `useDraft` folds them into the draft and clears
   // them, so nothing is left to seed the next entry with.
@@ -26,17 +26,17 @@ export interface EntriesSlice {
   setNoEntry: () => void
   editEntry: () => void
   setEntries: (items: EntryMeta[]) => void
-  setTrash: (trash: EntryMeta[]) => void
+  setArchive: (archive: EntryMeta[]) => void
   setCurrentEntry: (id: string) => void
 }
 
 // Selection is by id across every row the app holds, live or tombstoned, so the
-// Trash needs no selection path of its own.
+// Archive needs no selection path of its own.
 const find = (entries: Entries, id?: string) =>
-  [...entries.items, ...entries.trash].find(item => item.id === id) ?? null
+  [...entries.items, ...entries.archive].find(item => item.id === id) ?? null
 
 export const createEntriesSlice: StateCreator<StoreState, [], [], EntriesSlice> = (set, get) => ({
-  entries: { new: null, edit: false, current: null, items: [], trash: [], prefill: null },
+  entries: { new: null, edit: false, current: null, items: [], archive: [], prefill: null },
   newEntry: (type, prefill) =>
     set(s => ({
       entries: { ...s.entries, new: type, edit: false, current: null, prefill: prefill ?? null }
@@ -66,12 +66,12 @@ export const createEntriesSlice: StateCreator<StoreState, [], [], EntriesSlice> 
       entries: {
         ...s.entries,
         items,
-        // Resolved through `find` so a selected tombstone (Trash view) is not
+        // Resolved through `find` so a selected tombstone (Archive view) is not
         // dropped by a merge that only ever carries live rows.
         current: s.entries.current ? find({ ...s.entries, items }, s.entries.current.id) : null
       }
     })),
-  setTrash: trash => set(s => ({ entries: { ...s.entries, trash } })),
+  setArchive: archive => set(s => ({ entries: { ...s.entries, archive } })),
   // Also what a save lands on: selecting the row just written is the same
   // state change as selecting any other row.
   setCurrentEntry: id =>

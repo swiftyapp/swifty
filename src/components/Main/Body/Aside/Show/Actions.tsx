@@ -8,8 +8,8 @@ import { dialogOpen } from '@/utils/dialogOpen'
 import Button from '@/components/elements/Button'
 import IconButton from '@/components/elements/IconButton'
 import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
-import { CheckGlyph, MoreGlyph, TrashGlyph } from '../../../icons'
-import Trashed from './Trashed'
+import { ArchiveGlyph, CheckGlyph, MoreGlyph } from '../../../icons'
+import Archived from './Archived'
 
 interface Props {
   entry: EntryMeta
@@ -43,7 +43,7 @@ const inInteractive = (target: EventTarget | null) =>
 export default function Actions({ entry, revealed, onDelete }: Props) {
   const { t } = useTranslation()
   const [menu, setMenu] = useState(false)
-  // Two-press delete: the first press arms the row ("Delete entry?"), the
+  // Two-press archive: the first press arms the row ("Archive entry?"), the
   // second executes. Closing or reopening the menu disarms.
   const [armDelete, setArmDelete] = useState(false)
   const { copied, copy } = useCopied()
@@ -76,8 +76,8 @@ export default function Actions({ entry, revealed, onDelete }: Props) {
   }
 
   // A tombstone is read-only, so it swaps the whole cluster rather than greying
-  // parts of it out: nothing here applies to a row that has already been deleted.
-  if (entry.deletedAt) return <Trashed entry={entry} />
+  // parts of it out: nothing here applies to a row that is already archived.
+  if (entry.deletedAt) return <Archived entry={entry} />
 
   return (
     <div className="flex flex-none items-center gap-1.5">
@@ -109,8 +109,8 @@ export default function Actions({ entry, revealed, onDelete }: Props) {
               testid={armDelete ? 'delete-entry-confirm' : 'delete-entry-button'}
               onClick={armDelete ? run(onDelete) : () => setArmDelete(true)}
             >
-              <TrashGlyph />
-              {armDelete ? t('Delete entry?') : t('Delete')}
+              <ArchiveGlyph />
+              {armDelete ? t('Archive entry?') : t('Archive')}
             </DropdownItem>
           </Dropdown>
         )}

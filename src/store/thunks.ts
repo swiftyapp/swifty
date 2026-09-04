@@ -22,7 +22,7 @@ import type { StoreState } from './index'
 export interface AsyncSlice {
   saveEntry: (draft: EntryDraft) => Promise<void>
   deleteEntry: (id: string) => Promise<void>
-  loadTrash: () => Promise<void>
+  loadArchive: () => Promise<void>
   restoreEntry: (id: string) => Promise<void>
   purgeEntry: (id: string) => Promise<void>
   toggleFavorite: (id: string) => Promise<void>
@@ -82,10 +82,10 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
     }, SYNC_DEBOUNCE_MS)
   }
 
-  // Restore and purge both take the row out of the Trash and leave nothing
+  // Restore and purge both take the row out of the Archive and leave nothing
   // selected: the detail pane must not keep showing a row this view no longer has.
-  const dropFromTrash = (id: string) => {
-    get().setTrash(get().entries.trash.filter(e => e.id !== id))
+  const dropFromArchive = (id: string) => {
+    get().setArchive(get().entries.archive.filter(e => e.id !== id))
     get().setNoEntry()
   }
 
@@ -111,6 +111,8 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       scheduleSync()
       refreshAudit()
     },
+    // What the UI calls "Archive": the backend op is a tombstone, so the row
+    // only leaves All Items — `loadArchive` still lists it.
     deleteEntry: async id => {
       await deleteEntryCmd(id)
       get().setEntries(get().entries.items.filter(e => e.id !== id))
@@ -118,24 +120,24 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       scheduleSync()
       refreshAudit()
     },
-    loadTrash: async () => {
+    loadArchive: async () => {
       try {
-        get().setTrash(await listDeleted())
+        get().setArchive(await listDeleted())
       } catch {
-        // Keep the last known list: a failed read is not an empty Trash, and
+        // Keep the last known list: a failed read is not an empty Archive, and
         // there is nothing the user can do about it from here.
       }
     },
     restoreEntry: async id => {
       const meta = await restoreEntryCmd(id)
       get().setEntries(upsertMeta(get().entries.items, meta))
-      dropFromTrash(id)
+      dropFromArchive(id)
       scheduleSync()
       refreshAudit()
     },
     purgeEntry: async id => {
       await purgeEntryCmd(id)
-      dropFromTrash(id)
+      dropFromArchive(id)
       scheduleSync()
     },
     toggleFavorite: async id => {

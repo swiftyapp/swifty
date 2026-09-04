@@ -100,13 +100,13 @@ describe('add a secret', () => {
 
   it('stays where it was when the picker is dismissed', async () => {
     renderWithStore(<Main />, { store: seed() })
-    setView('trash')
+    setView('archive')
 
     await openFromRail()
     await userEvent.keyboard('{Escape}')
 
     // Only committing to a kind leaves the view; asking does not.
-    expect(useStore.getState().ui.view).toBe('trash')
+    expect(useStore.getState().ui.view).toBe('archive')
   })
 
   it('leaves the health view so the new form has a list to land in', async () => {

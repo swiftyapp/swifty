@@ -14,12 +14,12 @@ import { byTitle, byRecency } from './order'
 export const useRows = (): EntryMeta[] => {
   const view = useStore(state => state.ui.view)
   const items = useStore(state => state.entries.items)
-  const trash = useStore(state => state.entries.trash)
+  const archive = useStore(state => state.entries.archive)
   // Memoized so every branch hands back a stable reference — callers put these
   // rows in `useMemo` deps (see `Header/KindChips`).
   const favorites = useMemo(() => items.filter(entry => entry.favorite), [items])
 
-  if (view === 'trash') return trash
+  if (view === 'archive') return archive
   if (view === 'favorites') return favorites
   return items
 }

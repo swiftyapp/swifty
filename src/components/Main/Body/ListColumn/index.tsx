@@ -14,12 +14,12 @@ import { useListKeys } from './useListKeys'
 // filter chips, over the scrollable entry list.
 // The column is titled after the view, except in All Items, where a kind chip
 // renames it to what it is now showing ("Logins"). The other views keep their
-// own name: "Logins" would lose the fact that you are looking at the Trash.
+// own name: "Logins" would lose the fact that you are looking at the Archive.
 const TITLES: Record<View, TKey> = {
   items: 'All Items',
   favorites: 'Favorites',
   health: 'Vault Health',
-  trash: 'Trash'
+  archive: 'Archive'
 }
 
 export default function ListColumn() {

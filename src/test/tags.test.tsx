@@ -52,10 +52,10 @@ describe('the tags popover', () => {
     expect(options()).toEqual(['work1'])
   })
 
-  it('counts the tombstones in the Trash', async () => {
+  it('counts the tombstones in the Archive', async () => {
     vi.mocked(listDeleted).mockResolvedValue([deletedMeta({ id: 't', tags: ['gone'] })])
-    seed(entries, () => setView('trash'))
-    await vi.waitFor(() => expect(useStore.getState().entries.trash).toHaveLength(1))
+    seed(entries, () => setView('archive'))
+    await vi.waitFor(() => expect(useStore.getState().entries.archive).toHaveLength(1))
 
     await open()
     expect(options()).toEqual(['gone1'])

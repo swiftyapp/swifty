@@ -44,14 +44,14 @@ describe('the favorite toggle', () => {
     expect(setFavorite).toHaveBeenCalledWith('star', false)
   })
 
-  it('is absent for a trashed entry — a tombstone cannot be starred', () => {
+  it('is absent for an archived entry — a tombstone cannot be starred', () => {
     renderWithStore(<Show entry={loginMeta({ deletedAt: '2024-02-01T00:00:00.000Z' })} />)
     expect(screen.queryByTestId('favorite-toggle')).not.toBeInTheDocument()
   })
 })
 
 describe('the Favorites view', () => {
-  it('sits between All Items and Vault Health in the rail', () => {
+  it('sits between All Items and the Archive in the rail', () => {
     renderWithStore(<Sidebar />)
 
     const rail = screen.getAllByRole('button').map(b => b.getAttribute('data-testid'))
@@ -59,9 +59,9 @@ describe('the Favorites view', () => {
       'add-entry-button',
       'view-items',
       'view-favorites',
+      'view-archive',
       'tags-button',
-      'view-health',
-      'view-trash',
+      'generator-button',
       'settings-button'
     ])
   })

@@ -41,6 +41,19 @@ describe('Generator', () => {
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 
+  // The rail tile is the pointer half of ⌘G: same open, no apply callback, so
+  // confirming copies rather than filling a field.
+  it('opens from the rail tile with nothing to apply the value to', async () => {
+    const store = makeStore()
+    withEntries([loginMeta({ id: 'l1', title: 'Google' })])
+    renderWithStore(<Main />, { store })
+
+    await userEvent.click(screen.getByTestId('generator-button'))
+
+    expect(await screen.findByTestId('generator-dialog')).toBeInTheDocument()
+    expect(useStore.getState().generator.apply).toBeNull()
+  })
+
   it('closes on escape without copying', async () => {
     renderWithStore(<Harness />)
     await open()

@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand'
 import type { StoreState } from './index'
 
-export type View = 'items' | 'favorites' | 'health' | 'trash'
+export type View = 'items' | 'favorites' | 'health' | 'archive'
 
 // The Settings sections, in nav order.
 export type Section = 'sync' | 'security' | 'audit' | 'import' | 'language'
@@ -76,9 +76,9 @@ export const createUiSlice: StateCreator<StoreState, [], [], UiSlice> = (set, ge
       ui: { ...s.ui, view },
       entries: { ...s.entries, new: null, edit: false, current: null, prefill: null }
     }))
-    // Tombstones are not part of the unlock payload, so the Trash reads them
+    // Tombstones are not part of the unlock payload, so the Archive reads them
     // when it is opened. Refetching on every visit is also what keeps it honest
     // after a sync merged a peer's deletes.
-    if (view === 'trash') void get().loadTrash()
+    if (view === 'archive') void get().loadArchive()
   }
 })

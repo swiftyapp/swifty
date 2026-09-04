@@ -11,6 +11,8 @@
 // place an icon choice lives.
 import {
   Activity,
+  Archive,
+  ArchiveRestore,
   ArrowDownWideNarrow,
   AtSign,
   Check,
@@ -18,6 +20,7 @@ import {
   Cloud,
   Copy,
   CreditCard,
+  Dices,
   Download,
   HardDrive,
   ExternalLink,
@@ -79,7 +82,10 @@ export const MoreGlyph = glyph(MoreHorizontal, 14)
 export const EyeGlyph = glyph(Eye, 14)
 export const EyeOffGlyph = glyph(EyeOff, 14)
 export const PencilGlyph = glyph(Pencil, 14)
+// Really deletes (a field row, a purge). Archiving has its own pair below.
 export const TrashGlyph = glyph(Trash2, 14)
+export const ArchiveGlyph = glyph(Archive, 14)
+export const ArchiveRestoreGlyph = glyph(ArchiveRestore, 14)
 export const RefreshGlyph = glyph(RefreshCw, 14)
 export const DownloadGlyph = glyph(Download, 14)
 export const CloseGlyph = glyph(X, 14)
@@ -117,4 +123,5 @@ export const GearRailGlyph = glyph(Settings, 20)
 export const GridRailGlyph = glyph(LayoutGrid, 20)
 export const StarRailGlyph = glyph(Star, 20)
 export const TagsRailGlyph = glyph(Tags, 20)
-export const TrashRailGlyph = glyph(Trash2, 20)
+export const ArchiveRailGlyph = glyph(Archive, 20)
+export const DicesRailGlyph = glyph(Dices, 20)

@@ -13,7 +13,7 @@ import { kindOf } from '@/kinds'
 import { useTranslation } from 'react-i18next'
 import Logo from '@/assets/images/logo.svg?react'
 import EmptyState from '@/components/elements/EmptyState'
-import { ActivityGlyph, SearchGlyph, StarGlyph, TrashGlyph } from '../../icons'
+import { ActivityGlyph, ArchiveGlyph, SearchGlyph, StarGlyph } from '../../icons'
 
 // The brand mark at whatever size the surface asks for — the same baked logo
 // the rail shows, so the empty vault and the open one read as one character.
@@ -112,14 +112,14 @@ export function FavoritesEmpty() {
   )
 }
 
-export function TrashEmpty() {
+export function ArchiveEmpty() {
   const { t } = useTranslation()
   return (
     <EmptyState
-      testid="empty-trash"
-      mark={<TrashGlyph size={28} />}
-      title={t('Nothing in the trash')}
-      body={t('Deleted entries wait here until you restore them or delete them for good.')}
+      testid="empty-archive"
+      mark={<ArchiveGlyph size={28} />}
+      title={t('Nothing archived yet')}
+      body={t('Archived entries wait here until you restore them or delete them for good.')}
     />
   )
 }
