@@ -269,18 +269,18 @@ describe('Type-aware fields', () => {
     )
     renderWithStore(<Show entry={loginMeta()} editing />)
 
-    expect(await screen.findByText('changed 3h ago')).toBeInTheDocument()
+    expect(await screen.findByText('Changed 3h ago')).toBeInTheDocument()
   })
 
   // Past a week the duration runs out; a date belongs in its own sentence and
-  // not inside "changed ... ago".
+  // not inside "Changed ... ago".
   it('names the date once the rotation is older than a week', async () => {
     const longAgo = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString()
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password_updated_at: longAgo }))
     renderWithStore(<Show entry={loginMeta()} editing />)
 
-    const stamp = await screen.findByText(/^changed /)
-    expect(stamp.textContent).toMatch(/^changed on /)
+    const stamp = await screen.findByText(/^Changed /)
+    expect(stamp.textContent).toMatch(/^Changed on /)
   })
 
   it('rates the password being typed and stamps when it changed', async () => {
@@ -292,10 +292,10 @@ describe('Type-aware fields', () => {
     // The strength meter is debounced through a timeout.
     expect(await screen.findByText('Very strong')).toBeInTheDocument()
     // The stamp belongs to the saved password, so it lands on Save.
-    expect(screen.queryByText('changed just now')).not.toBeInTheDocument()
+    expect(screen.queryByText('Changed just now')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByText('Save'))
-    expect(screen.getByText('changed just now')).toBeInTheDocument()
+    expect(screen.getByText('Changed just now')).toBeInTheDocument()
   })
 
   it('leaves the rotation stamp alone when the password ends up unchanged', async () => {

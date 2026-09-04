@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { cx } from '@/utils/cx'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
@@ -6,7 +7,7 @@ import type { TKey } from '@/i18n'
 type Mask = '•••' | '••••' | '••/••' | '•••• •••• •••• ••••'
 import { useCopied } from '@/hooks/useCopied'
 import { useFields } from '@/components/elements/fields'
-import { CheckGlyph } from '@/components/Main/icons'
+import { CheckGlyph, CopyGlyph } from '@/components/Main/icons'
 
 // Opaque version of the hover wash (white/10 composited over the card's
 // ground), so a click doesn't visibly shift the ground but the value is fully
@@ -54,6 +55,8 @@ interface Props {
    * saveable expiry either.
    */
   invalid?: boolean
+  /** A marker beside the read value — the expiry's "Expired" pill. */
+  flag?: ReactNode
   zone?: 'top' | 'base'
   className?: string
 }
@@ -76,6 +79,7 @@ export default function Value({
   ink,
   required,
   invalid: invalidOverride,
+  flag,
   zone = 'base',
   className
 }: Props) {
@@ -119,8 +123,11 @@ export default function Value({
   }
 
   const line = (
-    <span className={cx('relative block truncate', label && 'mt-1', ink)} data-testid={testid}>
-      {display}
+    <span className={cx('relative flex min-w-0 items-center gap-1.5', label && 'mt-1')}>
+      <span className={cx('block truncate', ink)} data-testid={testid}>
+        {display}
+      </span>
+      {flag}
       {copied && <CopiedMark zone={zone} />}
     </span>
   )
@@ -139,12 +146,17 @@ export default function Value({
       onClick={() => copy(copyValue)}
       title={t('Copy')}
       className={cx(
-        'min-w-0 cursor-pointer rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-white/10',
+        'group relative min-w-0 cursor-pointer rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-white/10',
         className
       )}
     >
       {caption}
       {line}
+      {/* The only hint that the face is clickable — the values themselves stay
+          plain, so the card keeps looking like a card. */}
+      <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-60">
+        <CopyGlyph size={12} />
+      </span>
     </button>
   )
 }

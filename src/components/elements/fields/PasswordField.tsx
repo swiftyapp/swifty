@@ -6,7 +6,6 @@ import { relativeDuration, shortDate, toTime } from '@/utils/time'
 import { RefreshGlyph } from '../../Main/icons'
 import IconButton from '../IconButton'
 import StrengthBar from '../StrengthBar'
-import { MONO_LABEL } from '../tokens'
 import Field from './Field'
 import { useField, useFields } from './context'
 
@@ -18,9 +17,9 @@ const rotationStamp = (t: TFunction, iso?: string | string[]): string => {
   const at = toTime(iso)
   if (at === null) return ''
   const ago = relativeDuration(iso)
-  if (ago === 'now') return t('changed just now')
-  if (ago) return t('changed {{ago}} ago', { ago })
-  return t('changed on {{date}}', { date: shortDate(at) })
+  if (ago === 'now') return t('Changed just now')
+  if (ago) return t('Changed {{ago}} ago', { ago })
+  return t('Changed on {{date}}', { date: shortDate(at) })
 }
 
 export default function PasswordField({
@@ -61,7 +60,8 @@ export default function PasswordField({
         (value || stamp) && (
           <>
             <StrengthBar password={value} />
-            {stamp && <span className={MONO_LABEL}>{stamp}</span>}
+            {/* A sentence about the password, not a label for one. */}
+            {stamp && <span className="font-mono text-xs text-text3">{stamp}</span>}
           </>
         )
       }

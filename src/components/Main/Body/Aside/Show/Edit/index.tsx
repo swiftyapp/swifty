@@ -65,7 +65,7 @@ export default function Edit({ type, revealed }: Props) {
           <div className="mt-1.5 pl-[38px] text-base text-bad">{t('Required')}</div>
         )}
 
-        <div className="mt-3">
+        <div className="mt-5">
           <FieldsProvider
             value={{ entry: draft.model, set: draft.set, attempted: draft.attempted }}
           >

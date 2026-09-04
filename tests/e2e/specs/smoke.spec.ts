@@ -34,6 +34,9 @@ describe("Tauri app smoke test", () => {
 
     // ── Reveal it and assert the values ──────────────────────────────────────
     await waitFor("entry-item");
+    // A read password is a fixed-length dot mask until the eye is pressed.
+    await waitFor("reveal-password");
+    await $('[data-testid="reveal-password"]').click();
     await expect($('[data-testid="entry-value-password"]')).toHaveText(ENTRY_PASSWORD);
     await expect($('[data-testid="entry-value-username"]')).toHaveText(ENTRY_USERNAME);
   });

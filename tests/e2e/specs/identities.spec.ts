@@ -47,10 +47,9 @@ const revealNumber = () => $('[data-testid="reveal-number"]');
 /**
  * The document number as text, with the mask lifted first.
  *
- * The mask is `-webkit-text-security`, a paint-level treatment that leaves the
- * real characters in the DOM — so revealing is what makes an assertion on the
- * number mean something either way, rather than depending on what the driver
- * chooses to report for a masked node.
+ * A masked read value is a fixed dot string standing in for the secret, not the
+ * secret under a paint treatment — so nothing can be asserted about the number
+ * until the eye has been pressed.
  */
 async function readNumber(): Promise<string> {
   await waitFor("reveal-number");

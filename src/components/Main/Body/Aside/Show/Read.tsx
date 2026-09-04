@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { deleteEntry } from '@/store'
 import type { Entry, EntryMeta } from '@/lib/commands'
+import type { TKey } from '@/i18n'
 import { useFavicon } from '@/hooks/useFavicon'
 import CardBrandMark from '@/components/elements/CardBrandMark'
 import { FieldsProvider } from '@/components/elements/fields'
 import { MONO_LABEL } from '@/components/elements/tokens'
 import { hasBrandMark } from '@/utils/cardBrand'
 import { kindOf } from '@/kinds'
-import { relativeTime } from '@/utils/time'
+import { dateTime, relativeLong } from '@/utils/time'
 import { useTranslation } from 'react-i18next'
 import Actions from './Actions'
 import Favorite from './Favorite'
@@ -33,13 +34,15 @@ export default function Read({ entry, revealed }: Props) {
     )
   }
 
-  const stamps = [
-    entry.deletedAt && t('Deleted {{time}}', { time: relativeTime(entry.deletedAt) }),
-    t('Modified {{time}}', { time: relativeTime(entry.updatedAt) }),
-    t('Created {{time}}', { time: relativeTime(entry.createdAt) })
-  ]
-    .filter(Boolean)
-    .join(' · ')
+  // Metadata sentences, not labels: long-form relative times, and the absolute
+  // one a hover away.
+  const stamps = (
+    [
+      ['Deleted {{time}}', entry.deletedAt],
+      ['Modified {{time}}', entry.updatedAt],
+      ['Created {{time}}', entry.createdAt]
+    ] as [TKey, string | undefined][]
+  ).filter(([, iso]) => iso)
 
   return (
     <div className="mx-auto w-full max-w-[860px]">
@@ -52,7 +55,7 @@ export default function Read({ entry, revealed }: Props) {
           <span className="text-text2">{t(kind.label)}</span>
           {entry.urlHost && (
             <>
-              <span>/</span>
+              <span>·</span>
               <span>{entry.urlHost}</span>
             </>
           )}
@@ -79,7 +82,7 @@ export default function Read({ entry, revealed }: Props) {
       </div>
 
       {revealed && (
-        <div className="mt-3">
+        <div className="mt-5">
           {/* No writer: every field in the set renders its read face. */}
           <FieldsProvider value={{ entry: { ...revealed }, set: null, attempted: false }}>
             <Fields />
@@ -87,8 +90,13 @@ export default function Read({ entry, revealed }: Props) {
         </div>
       )}
 
-      <div data-testid="entry-stamps" className={`mt-5 ${MONO_LABEL}`}>
-        {stamps}
+      <div data-testid="entry-stamps" className="mt-4 font-mono text-xs text-text3">
+        {stamps.map(([key, iso], index) => (
+          <Fragment key={key}>
+            {index > 0 && ' · '}
+            <span title={dateTime(iso)}>{t(key, { time: relativeLong(iso) })}</span>
+          </Fragment>
+        ))}
       </div>
 
       {deleteError && (

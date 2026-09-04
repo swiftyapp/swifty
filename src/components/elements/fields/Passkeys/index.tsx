@@ -29,7 +29,7 @@ export default function Passkeys({ name = 'passkeys' }) {
   if (passkeys.length === 0) return null
 
   return (
-    <div className="mt-3">
+    <div className="mt-4">
       <span className={`mb-1.5 block ${MONO_LABEL}`}>{t('Passkeys')}</span>
       <Panel>
         {passkeys.map(passkey => (

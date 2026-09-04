@@ -5,8 +5,9 @@ import { MONO_LABEL } from '../tokens'
 import { TAG_CHIP } from './chip'
 import { useFields } from './context'
 
-// Tags sit below the panel in both modes: a label column would waste the row
-// on what is already the widest thing on the line.
+// Tags sit below the panel in both modes, on the panel rows' own geometry —
+// label 96 + gap 12 + sigil 16 + gap 12 — so the first chip starts at the same
+// x as every value above it.
 export default function TagsField({ name = 'tags' }) {
   const { t } = useTranslation()
   const { entry, set } = useFields()
@@ -18,25 +19,33 @@ export default function TagsField({ name = 'tags' }) {
   if (!set && tags.length === 0) return null
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      <span className={`mr-1 ${MONO_LABEL}`}>{t('Tags')}</span>
-      {set ? (
-        <div className="min-w-0 flex-1">
-          <TagsInput value={tags} onChange={next => set(name, next)} />
-        </div>
-      ) : (
-        tags.map(tag => (
-          <button
-            key={tag}
-            type="button"
-            onClick={() => setFilterQuery(tag)}
-            aria-label={t('Filter by tag {{tag}}', { tag })}
-            className={`${TAG_CHIP} hover:text-text`}
-          >
-            {tag}
-          </button>
-        ))
-      )}
+    <div className="mt-4 flex items-center gap-3 px-3.5">
+      <span className={`w-24 flex-none ${MONO_LABEL}`}>{t('Tags')}</span>
+      {/* The sigil column the rows hold open, empty here. */}
+      <span className="w-4 flex-none" />
+      <div className="min-w-0 flex-1">
+        {set ? (
+          <TagsInput
+            value={tags}
+            onChange={next => set(name, next)}
+            placeholder={t('Add tag')}
+          />
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            {tags.map(tag => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setFilterQuery(tag)}
+                aria-label={t('Filter by tag {{tag}}', { tag })}
+                className={`${TAG_CHIP} hover:text-text`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

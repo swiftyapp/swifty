@@ -77,6 +77,7 @@ export interface CardEntry extends BaseEntry {
   cvc: string
   pin: string
   name: string
+  note: string
 }
 
 // An ID document. `number` (the document number) and `personal_number` are the
