@@ -1,6 +1,6 @@
 {
   "name": "swifty",
-  "version": "0.9.0",
+  "version": "1.0.0-alpha.1",
   "description": "Modern, Lightweight, Fast and Free Password Manager",
   "type": "module",
   "repository": "https://github.com/swiftyapp/swifty.git",
