@@ -80,6 +80,7 @@ export const {
   flowAuth,
   flowMain,
   openGenerator,
+  openSshGenerator,
   closeGenerator,
   setFilterQuery,
   setFilterType,
