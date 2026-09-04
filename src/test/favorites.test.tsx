@@ -59,6 +59,7 @@ describe('the Favorites view', () => {
       'add-entry-button',
       'view-items',
       'view-favorites',
+      'tags-button',
       'view-health',
       'view-trash',
       'settings-button'

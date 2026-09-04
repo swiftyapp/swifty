@@ -17,6 +17,9 @@ export const copySecret = (entry: EntryMeta): Promise<void> =>
 interface FilterOptions {
   // null means every kind — the "All Items" view.
   type: EntryType | null
+  // null means every tag. Tags compose with the kind filter rather than
+  // replacing it, so both are applied in the one pass below.
+  tag: string | null
   query: string
 }
 
@@ -27,7 +30,9 @@ interface FilterOptions {
 const SEARCH_KEYS = ['title', 'urlHost', 'tags']
 
 export const filterEntries = (entries: EntryMeta[], options: FilterOptions): EntryMeta[] => {
-  const scoped = entries.filter(entry => matchType(entry, options.type))
+  const scoped = entries.filter(
+    entry => matchType(entry, options.type) && matchTag(entry, options.tag)
+  )
 
   // Unordered without a query: the list's own sort (recency or A–Z) is applied
   // downstream, so ordering here would only be thrown away.
@@ -40,3 +45,7 @@ export const filterEntries = (entries: EntryMeta[], options: FilterOptions): Ent
 }
 
 const matchType = (entry: EntryMeta, type: EntryType | null) => !type || entry.type === type
+
+// Exact, case-sensitive: a tag is picked off a list of the tags that exist, not
+// typed, so there is nothing to be lenient about.
+const matchTag = (entry: EntryMeta, tag: string | null) => !tag || entry.tags.includes(tag)
