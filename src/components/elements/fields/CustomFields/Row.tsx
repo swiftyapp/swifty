@@ -46,7 +46,7 @@ export default function CustomFieldRow({
   }
 
   return (
-    <div className={cx('flex items-center gap-3 px-3.5 py-3', ROW_HAIRLINE)}>
+    <div className={cx('flex items-center gap-3 px-3.5 py-3', !editing && ROW_HAIRLINE)}>
       {onChange ? (
         <input
           name={`extra-label-${index}`}

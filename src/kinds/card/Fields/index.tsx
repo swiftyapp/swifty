@@ -83,13 +83,16 @@ export default function Fields() {
           required
           maxLength={23}
           ink="text-[24px] tracking-[0.14em]"
-          className="-mx-2 self-stretch"
+          className="-mx-1.5 self-stretch"
         />
 
-        <div className="relative mt-5 flex items-end gap-5">
-          <div className="-mx-1.5 flex min-w-0 flex-1 gap-3.5">
-            <Value
-              name="expiry"
+        {/* Three equal columns on the number's width, plus the reveal's slot —
+            held open while editing too, so the row is the same in both modes.
+            The slot is 28 + the 6px the -mx pulls in, so the eye sits on the
+            card's padding edge like the brand mark above it. */}
+        <div className="relative -mx-1.5 mt-5 grid grid-cols-[repeat(3,minmax(0,1fr))_34px] items-end gap-3.5">
+          <Value
+            name="expiry"
               label="Expires"
               display={expiry || '••/••'}
               copyValue={expiry}
@@ -101,24 +104,23 @@ export default function Fields() {
               // One box, two draft keys: "12" fills the box but not the pair,
               // and `isValid` wants both — so the box has to say so itself.
               invalid={attempted && !(month.value && year.value)}
-              maxLength={5}
-              ink="text-[13px]"
-            />
-            <Value
-              name="cvc"
-              label="CVC"
-              display={reveal ? cvc.value : '•••'}
-              copyValue={cvc.value}
-              value={cvc.value}
-              onChange={next => cvc.set(cardDigits(next))}
-              testid="entry-value-cvc"
-              // Mask, not real catalog copy — falls through to itself.
-              placeholder="•••"
-              required
-              maxLength={4}
-              ink="text-[13px]"
-            />
-          </div>
+            maxLength={5}
+            ink="text-[13px]"
+          />
+          <Value
+            name="cvc"
+            label="CVC"
+            display={reveal ? cvc.value : '•••'}
+            copyValue={cvc.value}
+            value={cvc.value}
+            onChange={next => cvc.set(cardDigits(next))}
+            testid="entry-value-cvc"
+            // Mask, not real catalog copy — falls through to itself.
+            placeholder="•••"
+            required
+            maxLength={4}
+            ink="text-[13px]"
+          />
           <Value
             name="pin"
             label="Pin"
@@ -131,7 +133,6 @@ export default function Fields() {
             placeholder="••••"
             maxLength={6}
             ink="text-[13px]"
-            className="w-[72px] flex-none"
           />
           {!editing && (
             <button
@@ -139,7 +140,7 @@ export default function Fields() {
               onClick={() => setShow(!show)}
               title={show ? t('Hide') : t('Reveal')}
               data-testid="card-reveal-button"
-              className="grid h-7 w-7 flex-none cursor-pointer place-items-center rounded-sm text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              className="mr-1.5 grid h-7 w-7 cursor-pointer place-items-center justify-self-end rounded-sm text-white/60 transition-colors hover:bg-white/10 hover:text-white"
             >
               {show ? <EyeOffGlyph /> : <EyeGlyph />}
             </button>
