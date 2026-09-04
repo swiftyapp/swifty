@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
 import { setFilterQuery } from '@/store'
+import { PlusGlyph } from '@/components/Main/icons'
 import TagsInput from '@/components/elements/TagsInput'
 import { TAG_CHIP } from '@/components/elements/fields/chip'
 import { MONO_LABEL } from '@/components/elements/tokens'
@@ -11,6 +12,11 @@ interface Props {
   tags: string[]
   /** Editing: writes the tags back. Absent while reading. */
   onTags?: (next: string[]) => void
+  /**
+   * Reading an entry that can still be edited: opens the editor from the empty
+   * tags cell. Absent for a tombstone, which has nothing left to file.
+   */
+  onAdd?: () => void
   createdAt?: string
   updatedAt?: string
   deletedAt?: string
@@ -34,15 +40,25 @@ const stamp = (label: TKey, iso: string | undefined, spell: Stamp[2]): Stamp | n
 // reads as a sentence tacked on under the rows. Tags take the left, where the
 // title sits in the header; the timestamps hold the right, under the header's
 // actions, and stay there whether or not there are tags.
-export default function Footer({ tags, onTags, createdAt, updatedAt, deletedAt }: Props) {
+export default function Footer({
+  tags,
+  onTags,
+  onAdd,
+  createdAt,
+  updatedAt,
+  deletedAt
+}: Props) {
   const { t } = useTranslation()
   const stamps = [
     stamp('Deleted', deletedAt, relativeLong),
     stamp('Modified', updatedAt, relativeLong),
     stamp('Created', createdAt, absolute)
   ].filter((entry): entry is Stamp => entry !== null)
-  // Reading, no tags is no cell; editing, the cell is where tags get added.
-  const filed = !!onTags || tags.length > 0
+  // The cell is there whenever tags could be: once the eye has learned that
+  // the left of the footer is a slot, an entry without tags would otherwise
+  // read as a hole. Empty, the slot is the way to fill it. Only a tombstone,
+  // which cannot be edited, has no cell.
+  const filed = !!onTags || !!onAdd || tags.length > 0
 
   if (!filed && stamps.length === 0) return null
 
@@ -55,6 +71,17 @@ export default function Footer({ tags, onTags, createdAt, updatedAt, deletedAt }
         <Cell label="Tags" className="min-w-0 flex-1">
           {onTags ? (
             <TagsInput value={tags} onChange={onTags} placeholder={t('Add tag')} />
+          ) : tags.length === 0 ? (
+            // Chip-height, so the footer is the same height with or without tags.
+            <button
+              type="button"
+              data-testid="add-tag-button"
+              onClick={onAdd}
+              className="flex h-6 cursor-pointer items-center gap-1 font-mono text-xs text-text3 transition-colors hover:text-text"
+            >
+              <PlusGlyph size={12} />
+              {t('Add tag')}
+            </button>
           ) : (
             <div className="flex flex-wrap gap-2">
               {tags.map(tag => (
@@ -86,7 +113,10 @@ export default function Footer({ tags, onTags, createdAt, updatedAt, deletedAt }
 }
 
 // One footer cell: the mono micro-label over the value, the way the rows pair
-// theirs — only stacked, since the footer is a strip rather than a column.
+// theirs — only stacked, since the footer is a strip rather than a column. The
+// value is a tier up from the label (base over xs, as in the rows): uppercase
+// and tracking make an 11px label read larger than it is, so at the same size
+// it was the label that drew the eye. Secondary stays a matter of ink.
 function Cell({
   label,
   className,
@@ -100,7 +130,7 @@ function Cell({
   return (
     <div className={className}>
       <div className={MONO_LABEL}>{t(label)}</div>
-      <div className="mt-1.5 font-mono text-xs text-text2">{children}</div>
+      <div className="mt-1 font-mono text-base text-text2">{children}</div>
     </div>
   )
 }

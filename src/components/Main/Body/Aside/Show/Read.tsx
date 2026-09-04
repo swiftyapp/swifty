@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { deleteEntry } from '@/store'
+import { deleteEntry, editEntry } from '@/store'
 import type { Entry, EntryMeta } from '@/lib/commands'
 import { useFavicon } from '@/hooks/useFavicon'
 import CardBrandMark from '@/components/elements/CardBrandMark'
@@ -91,6 +91,7 @@ export default function Read({ entry, revealed }: Props) {
       {/* Tags are metadata, so the footer needs no reveal to render. */}
       <Footer
         tags={entry.tags}
+        onAdd={entry.deletedAt ? undefined : () => editEntry()}
         createdAt={entry.createdAt}
         updatedAt={entry.updatedAt}
         deletedAt={entry.deletedAt}

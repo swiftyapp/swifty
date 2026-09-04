@@ -63,6 +63,18 @@ describe('Edit mode in the pane', () => {
     expect(screen.getByTestId('save-entry-button')).toBeInTheDocument()
   })
 
+  // The footer's tags cell is never a hole: with nothing filed, it is the way
+  // to file something, and that goes straight to the editor.
+  it('opens the editor from the empty tags cell', async () => {
+    const { store } = renderWithStore(<Aside />, { store: seed() })
+
+    expect(screen.queryByLabelText(/Filter by tag/)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('add-tag-button'))
+
+    expect(store.getState().entries.edit).toBe(true)
+    expect(screen.getByTestId('tags-input')).toBeInTheDocument()
+  })
+
   it('leaves the list column visible but quiet and inert while writing', async () => {
     renderWithStore(<Body />, { store: seed() })
     expect(screen.getByTestId('list-column')).not.toHaveClass('opacity-60')
