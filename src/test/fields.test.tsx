@@ -19,7 +19,7 @@ beforeEach(() => {
 describe('Type-aware fields', () => {
   // Every editor input is reachable by the name the row shows, so a screen
   // reader (and a test) can name what it is typing into.
-  it('names its inputs after their labels', () => {
+  it('names its inputs after their labels', async () => {
     renderWithStore(<Show type="login" editing />)
 
     expect(screen.getByLabelText('Password')).toBe(input('password'))
@@ -27,7 +27,25 @@ describe('Type-aware fields', () => {
     // The label is the translated one the row shows, not the draft key.
     expect(screen.getByLabelText('URL')).toBe(input('website'))
     expect(screen.getByLabelText('Email')).toBe(input('email'))
+    // The OTP row starts as the offer to add one; the box arrives on request.
+    expect(screen.getByLabelText('OTP')).toBe(screen.getByTestId('add-otp-button'))
+    await userEvent.click(screen.getByTestId('add-otp-button'))
     expect(screen.getByLabelText('OTP')).toBe(input('otp'))
+    expect(input('otp')).toHaveFocus()
+  })
+
+  // A login without a code keeps the read view's one-column layout while
+  // editing: the dial's column is opened by the user, not by the mode switch.
+  it('offers to add a one-time code instead of an empty dial', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry())
+    renderWithStore(<Show entry={loginMeta()} editing />)
+
+    // The editor mounts once the reveal lands.
+    await waitFor(() => expect(input('username')).not.toBeNull())
+    expect(input('otp')).toBeNull()
+    await userEvent.click(screen.getByTestId('add-otp-button'))
+    expect(screen.queryByTestId('add-otp-button')).not.toBeInTheDocument()
+    expect(input('otp')).not.toBeNull()
   })
 
   it('names a full-bleed note body, which has no label column', () => {
@@ -177,6 +195,7 @@ describe('Type-aware fields', () => {
 
   it('takes an otpauth:// link and keeps only the secret inside it', async () => {
     renderWithStore(<Show type="login" editing />)
+    await userEvent.click(screen.getByTestId('add-otp-button'))
     await userEvent.click(input('otp'))
     await userEvent.paste('otpauth://totp/Acme:me@acme.io?secret=JBSWY3DPEHPK3PXP&issuer=Acme')
     await userEvent.tab()
@@ -188,6 +207,7 @@ describe('Type-aware fields', () => {
 
   it('refuses an OTP secret it cannot read', async () => {
     renderWithStore(<Show type="login" editing />)
+    await userEvent.click(screen.getByTestId('add-otp-button'))
     await userEvent.type(input('otp'), 'not-a-secret')
 
     expect(screen.getByText('Not a one-time-password secret')).toBeInTheDocument()

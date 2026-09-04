@@ -14,10 +14,13 @@ import { otpSecret } from './secret'
 // preview — the only proof that what was pasted actually works.
 export default function OtpField({
   name = 'otp',
-  label = 'OTP'
+  label = 'OTP',
+  autoFocus
 }: {
   name?: string
   label?: TKey
+  /** The column was just opened to add a code: put the caret in the box. */
+  autoFocus?: boolean
 }) {
   const { t } = useTranslation()
   const { value, set, editing } = useField(name)
@@ -41,7 +44,9 @@ export default function OtpField({
           // itself rather than borrowing the row geometry it does not use.
           aria-label={t(label)}
           value={value}
-          placeholder={t('base32 secret or otpauth:// link')}
+          // Short enough to fit the column: the long form used to truncate mid-word.
+          placeholder={t('Paste secret or link')}
+          autoFocus={autoFocus}
           autoComplete="off"
           spellCheck={false}
           onChange={event => set(event.target.value)}

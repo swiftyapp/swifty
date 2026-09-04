@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
 import type { TKey } from '@/i18n'
 import { MONO_LABEL, ROW_HAIRLINE } from '../tokens'
+import { useFields } from './context'
 
 interface Props {
   /** Untranslated. Omitted for a full-bleed row — a note body. */
@@ -31,11 +32,14 @@ const VALUE_START = 'pl-[136px]'
 // editors both render through it, so switching modes never moves a row.
 export default function FieldRow({ label, prefix, actions, below, error, children }: Props) {
   const { t } = useTranslation()
+  const { set } = useFields()
   const labelled = label !== undefined
   const id = useId()
 
   return (
-    <div className={cx('item px-3.5 py-3', ROW_HAIRLINE)}>
+    // Editing, each input draws its own underline, so the hairline between
+    // rows would be a second line for the same job; the read view keeps it.
+    <div className={cx('item px-3.5 py-3', !set && ROW_HAIRLINE)}>
       <div className="flex items-center gap-3">
         {labelled && (
           <>
