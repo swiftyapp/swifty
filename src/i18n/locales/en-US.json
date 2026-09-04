@@ -45,6 +45,8 @@
   "Regenerate": "Regenerate",
   "Use & copy": "Use & copy",
   "Save as SSH key": "Save as SSH key",
+  "Could not generate a key.": "Could not generate a key.",
+  "Try again": "Try again",
   "Use": "Use",
   "very weak": "very weak",
   "weak": "weak",

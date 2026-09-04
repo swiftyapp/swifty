@@ -45,6 +45,8 @@
   "Regenerate": "Generera om",
   "Use & copy": "Använd & kopiera",
   "Save as SSH key": "Spara som SSH-nyckel",
+  "Could not generate a key.": "Kunde inte skapa en nyckel.",
+  "Try again": "Försök igen",
   "Use": "Använd",
   "very weak": "mycket svagt",
   "weak": "svagt",

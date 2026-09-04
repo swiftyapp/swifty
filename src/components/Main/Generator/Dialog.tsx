@@ -33,10 +33,12 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
   const keys = mode === 'ssh'
 
   // A keypair fills a whole draft, so standalone it opens a new entry rather
-  // than landing on the clipboard the way a password does.
+  // than landing on the clipboard the way a password does. While a draw is in
+  // flight (or has failed) ⏎ does nothing: the pair on screen is the one the
+  // user asked to replace, not the one they'd be saving.
   const confirm = useCallback(() => {
     if (keys) {
-      if (!key.pair) return
+      if (!key.ready || !key.pair) return
       if (ssh) ssh(key.pair)
       else startEntry('ssh', key.pair)
       onClose()
@@ -46,7 +48,7 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
     apply?.(value)
     copy(value)
     onClose()
-  }, [keys, key.pair, ssh, apply, value, onClose])
+  }, [keys, key.ready, key.pair, ssh, apply, value, onClose])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -106,7 +108,14 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
         </div>
         <div className="p-[18px]">
           {keys ? (
-            <Ssh pair={key.pair} comment={key.comment} onComment={key.setComment} />
+            <Ssh
+              pair={key.pair}
+              pending={key.pending}
+              error={key.error}
+              onRetry={key.regenerate}
+              comment={key.comment}
+              onComment={key.setComment}
+            />
           ) : (
             <>
               <Output value={value} bits={bits} level={level} />
@@ -127,7 +136,12 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
             <Button variant="ghost" onClick={onClose}>
               {t('Cancel')}
             </Button>
-            <Button testid="generator-use-button" kbd="⏎" onClick={confirm}>
+            <Button
+              testid="generator-use-button"
+              kbd="⏎"
+              onClick={confirm}
+              disabled={keys && !key.ready}
+            >
               {keys ? (ssh ? t('Use') : t('Save as SSH key')) : t('Use & copy')}
             </Button>
           </div>

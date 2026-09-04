@@ -45,6 +45,8 @@
   "Regenerate": "Сгенерировать заново",
   "Use & copy": "Применить",
   "Save as SSH key": "Сохранить как SSH-ключ",
+  "Could not generate a key.": "Не удалось создать ключ.",
+  "Try again": "Повторить",
   "Use": "Применить",
   "very weak": "очень слабый",
   "weak": "слабый",

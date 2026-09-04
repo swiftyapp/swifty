@@ -45,6 +45,8 @@
   "Regenerate": "重新生成",
   "Use & copy": "使用并复制",
   "Save as SSH key": "保存为 SSH 密钥",
+  "Could not generate a key.": "无法生成密钥。",
+  "Try again": "重试",
   "Use": "使用",
   "very weak": "很弱",
   "weak": "弱",

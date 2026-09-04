@@ -195,3 +195,63 @@ describe('Generator, with the shell behind it', () => {
     expect(copyToClipboard).not.toHaveBeenCalled()
   })
 })
+
+// A draw takes a round-trip to Rust. Until it lands, the pair on screen is the
+// one the user asked to replace, so nothing may accept it; and a refused draw
+// says so instead of leaving empty fields and a button that does nothing.
+describe('Generator, SSH keys in flight', () => {
+  const PAIR = {
+    privateKey: '-----BEGIN OPENSSH PRIVATE KEY-----\nc2VjcmV0\n-----END OPENSSH PRIVATE KEY-----\n',
+    publicKey: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI',
+    fingerprint: 'SHA256:GeneratedFingerprint'
+  }
+  const FRESH = { ...PAIR, publicKey: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI me' }
+
+  const openSsh = async () => {
+    await open()
+    await userEvent.click(screen.getByTestId('generator-mode-ssh'))
+    return screen.findByTestId('generator-ssh-public')
+  }
+
+  it('refuses the old pair while a replacement is on its way', async () => {
+    renderWithStore(<Harness />)
+    await openSsh()
+
+    let settle: (pair: typeof PAIR) => void = () => {}
+    vi.mocked(generateSshKey).mockImplementationOnce(
+      () => new Promise(resolve => (settle = resolve))
+    )
+    await userEvent.type(screen.getByTestId('generator-ssh-comment'), 'm')
+
+    const save = screen.getByTestId('generator-use-button')
+    expect(save).toBeDisabled()
+    expect(screen.getByTestId('generator-ssh-key')).toHaveAttribute('aria-busy', 'true')
+    await userEvent.keyboard('{Enter}')
+    expect(useStore.getState().entries.new).toBeNull()
+    expect(screen.getByTestId('generator-dialog')).toBeInTheDocument()
+
+    settle(FRESH)
+    await screen.findByText(FRESH.publicKey)
+    expect(save).toBeEnabled()
+    await userEvent.click(save)
+    expect(useStore.getState().entries.prefill).toEqual(FRESH)
+  })
+
+  it('shows a refused draw and offers to try again', async () => {
+    renderWithStore(<Harness />)
+    vi.mocked(generateSshKey).mockRejectedValueOnce(new Error('no entropy'))
+    await open()
+    await userEvent.click(screen.getByTestId('generator-mode-ssh'))
+
+    await screen.findByTestId('generator-ssh-error')
+    expect(screen.queryByTestId('generator-ssh-public')).not.toBeInTheDocument()
+    expect(screen.getByTestId('generator-use-button')).toBeDisabled()
+    await userEvent.keyboard('{Enter}')
+    expect(screen.getByTestId('generator-dialog')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('generator-ssh-retry'))
+    await screen.findByTestId('generator-ssh-public')
+    expect(generateSshKey).toHaveBeenCalledTimes(2)
+    expect(screen.getByTestId('generator-use-button')).toBeEnabled()
+  })
+})

@@ -45,6 +45,8 @@
   "Regenerate": "Yeniden oluştur",
   "Use & copy": "Kullan ve kopyala",
   "Save as SSH key": "SSH anahtarı olarak kaydet",
+  "Could not generate a key.": "Anahtar oluşturulamadı.",
+  "Try again": "Tekrar dene",
   "Use": "Kullan",
   "very weak": "çok zayıf",
   "weak": "zayıf",

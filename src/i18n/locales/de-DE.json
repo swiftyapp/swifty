@@ -45,6 +45,8 @@
   "Regenerate": "Neu generieren",
   "Use & copy": "Übernehmen & kopieren",
   "Save as SSH key": "Als SSH-Schlüssel speichern",
+  "Could not generate a key.": "Schlüssel konnte nicht erzeugt werden.",
+  "Try again": "Erneut versuchen",
   "Use": "Übernehmen",
   "very weak": "sehr schwach",
   "weak": "schwach",
