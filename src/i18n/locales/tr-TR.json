@@ -74,6 +74,7 @@
   "Copied to Clipboard": "Panoya kopyalandı",
   "Expires": "Son kullanma",
   "Expired": "Süresi doldu",
+  "Expires {{when}}": "{{when}} sona eriyor",
   "MM/YY": "MM/YY",
   "CVC": "CVC",
   "Pin": "PIN",
@@ -322,5 +323,9 @@
   "Untitled {kind}": "Adsız {kind}",
   "changed on {d}": "{d} tarihinde değişti",
   "changed {t} ago": "{t} önce değişti",
-  "refreshes in {n}s": "{n} sn içinde yenilenir"
+  "refreshes in {n}s": "{n} sn içinde yenilenir",
+  "Number": "Numara",
+  "Born": "Doğum",
+  "Country": "Ülke",
+  "Personal no.": "Kişisel no."
 }

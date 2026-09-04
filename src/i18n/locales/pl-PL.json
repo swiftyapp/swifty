@@ -74,11 +74,12 @@
   "Copied to Clipboard": "Skopiowano do schowka",
   "Expires": "Ważna do",
   "Expired": "Wygasła",
+  "Expires {{when}}": "Wygasa {{when}}",
   "MM/YY": "MM/YY",
   "CVC": "CVC",
   "Pin": "PIN",
   "OTP": "OTP",
-  "Username": "Nazwa użytkownika",
+  "Username": "Użytkownik",
   "Password": "Hasło",
   "Email": "E-mail",
   "Note": "Notatka",
@@ -332,5 +333,9 @@
   "Untitled {kind}": "{kind} bez nazwy",
   "changed on {d}": "zmienione {d}",
   "changed {t} ago": "zmienione {t} temu",
-  "refreshes in {n}s": "odświeży się za {n}s"
+  "refreshes in {n}s": "odświeży się za {n}s",
+  "Number": "Numer",
+  "Born": "Ur.",
+  "Country": "Kraj",
+  "Personal no.": "Nr osobowy"
 }

@@ -74,6 +74,7 @@
   "Copied to Clipboard": "已复制到剪贴板",
   "Expires": "有效期",
   "Expired": "已过期",
+  "Expires {{when}}": "{{when}}到期",
   "MM/YY": "MM/YY",
   "CVC": "CVC",
   "Pin": "PIN",
@@ -317,5 +318,9 @@
   "Untitled {kind}": "未命名{kind}",
   "changed on {d}": "{d} 修改",
   "changed {t} ago": "{t} 前修改",
-  "refreshes in {n}s": "{n} 秒后刷新"
+  "refreshes in {n}s": "{n} 秒后刷新",
+  "Number": "号码",
+  "Born": "出生",
+  "Country": "国家/地区",
+  "Personal no.": "个人编号"
 }

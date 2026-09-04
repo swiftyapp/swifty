@@ -1,6 +1,14 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { DEFAULT_DATE_FORMAT, setFormat, type DateFormat } from '@/defaults/dateFormat'
-import { formatDate, relativeDuration, relativeTime, toIsoDate, toTime } from './time'
+import {
+  daysUntil,
+  formatDate,
+  relativeDuration,
+  relativeFuture,
+  relativeTime,
+  toIsoDate,
+  toTime
+} from './time'
 
 // A fixed "now" so every case is deterministic: 2024-03-14, midday local time.
 const now = new Date(2024, 2, 14, 12, 0, 0).getTime()
@@ -55,6 +63,44 @@ describe('relativeDuration', () => {
     expect(relativeDuration(ago(120 * DAY), now)).toBe('')
     expect(relativeDuration(undefined, now)).toBe('')
     expect(relativeDuration('not-a-date', now)).toBe('')
+  })
+})
+
+// The other direction: how long a document has left, said in words. The dates
+// here are stored `YYYY-MM-DD`, not timestamps.
+describe('relativeFuture', () => {
+  const ahead = (days: number) => {
+    const date = new Date(now)
+    date.setDate(date.getDate() + days)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  }
+
+  it('counts years, then months, then days', () => {
+    expect(relativeFuture(ahead(2 * 365), now)).toBe('in 2 years')
+    expect(relativeFuture(ahead(92), now)).toBe('in 3 months')
+    expect(relativeFuture(ahead(12), now)).toBe('in 12 days')
+  })
+
+  it('reads the nearest dates as words', () => {
+    expect(relativeFuture(ahead(0), now)).toBe('today')
+    expect(relativeFuture(ahead(1), now)).toBe('tomorrow')
+  })
+
+  it('is empty for a date behind us, or no date at all', () => {
+    expect(relativeFuture(ahead(-1), now)).toBe('')
+    expect(relativeFuture(ahead(-400), now)).toBe('')
+    expect(relativeFuture('', now)).toBe('')
+    expect(relativeFuture('06/01/2035', now)).toBe('')
+  })
+})
+
+describe('daysUntil', () => {
+  it('counts whole days to a stored date, and null for anything else', () => {
+    expect(daysUntil('2024-03-16', now)).toBe(2)
+    expect(daysUntil('2024-03-14', now)).toBe(0)
+    expect(daysUntil('2024-03-13', now)).toBe(-1)
+    expect(daysUntil('not-a-date', now)).toBeNull()
   })
 })
 

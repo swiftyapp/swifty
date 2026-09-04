@@ -14,6 +14,16 @@ describe('TEMPLATES', () => {
       expect(new Set(rows.map(row => row.key)).size).toBe(rows.length)
     }
   })
+
+  // The read view bands the rows by watching the group change down the list, so
+  // a group that comes back later would open a second band of the same name.
+  it('keeps every group contiguous', () => {
+    for (const type of DOC_TYPES) {
+      const groups = TEMPLATES[type].map(row => specOf(row.key).group)
+      const bands = groups.filter((group, index) => group !== groups[index - 1])
+      expect(new Set(bands).size).toBe(bands.length)
+    }
+  })
 })
 
 describe('docTypeOf', () => {
@@ -29,8 +39,8 @@ describe('droppedKeys', () => {
   // report both — the editor clears them so a hidden row cannot save a value.
   it('reports what the target document has no room for', () => {
     expect(droppedKeys('passport', 'driver_license')).toEqual([
-      'nationality',
       'sex',
+      'nationality',
       'personal_number'
     ])
     expect(droppedKeys('driver_license', 'passport')).toEqual([])
