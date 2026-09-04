@@ -4,6 +4,7 @@ import { kindOf } from '@/kinds'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
 import KindChips from './KindChips'
+import ActiveTag from './ActiveTag'
 import List from '../List'
 import SortMenu from '../List/SortMenu'
 import Search from './Search'
@@ -57,6 +58,7 @@ export default function ListColumn() {
           <>
             <Search />
             <KindChips />
+            <ActiveTag />
           </>
         )}
       </div>

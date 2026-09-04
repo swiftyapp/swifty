@@ -83,6 +83,7 @@ export const {
   closeGenerator,
   setFilterQuery,
   setFilterType,
+  setFilterTag,
   newEntry,
   setPrefill,
   clearPrefill,

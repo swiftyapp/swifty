@@ -60,6 +60,7 @@ describe('the Favorites view', () => {
       'view-items',
       'view-favorites',
       'view-archive',
+      'tags-button',
       'generator-button',
       'settings-button'
     ])
