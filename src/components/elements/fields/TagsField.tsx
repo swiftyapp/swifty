@@ -6,7 +6,7 @@ import { TAG_CHIP } from './chip'
 import { useFields } from './context'
 
 // Tags sit below the panel in both modes, on the panel rows' own geometry —
-// label 96 + gap 12 + sigil 16 + gap 12 — so the first chip starts at the same
+// label 128 + gap 12 + sigil 16 + gap 12 — so the first chip starts at the same
 // x as every value above it.
 export default function TagsField({ name = 'tags' }) {
   const { t } = useTranslation()
@@ -20,7 +20,7 @@ export default function TagsField({ name = 'tags' }) {
 
   return (
     <div className="mt-4 flex items-center gap-3 px-3.5">
-      <span className={`w-24 flex-none ${MONO_LABEL}`}>{t('Tags')}</span>
+      <span className={`w-32 flex-none ${MONO_LABEL}`}>{t('Tags')}</span>
       {/* The sigil column the rows hold open, empty here. */}
       <span className="w-4 flex-none" />
       <div className="min-w-0 flex-1">

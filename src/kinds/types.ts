@@ -45,6 +45,13 @@ export interface Kind {
   primaryActionLabel: TKey
   /** The row's secondary line, from non-secret metadata only. */
   listSubtitle: (entry: EntryMeta) => string
+  /**
+   * A second eyebrow segment, cut from the decrypted entry — what kind of
+   * document an identity is. Translated by the kind, since only it knows how to
+   * phrase its own; `null` when the entry has nothing to add. Offered only
+   * once the secrets are in hand, so it can name what is inside the payload.
+   */
+  eyebrow?: (entry: Entry) => { text: string; testid: string } | null
   ListRow: ComponentType<ContentProps>
   /**
    * The kind's field set — the read view AND the editor. It takes no props:

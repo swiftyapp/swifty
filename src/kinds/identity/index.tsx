@@ -1,6 +1,6 @@
 import { IdentityGlyph } from '@/components/Main/icons'
 import type { Kind } from '../types'
-import { defaults, isValid, listSubtitle, primarySecret } from './meta'
+import { defaults, eyebrow, isValid, listSubtitle, primarySecret } from './meta'
 import ListRow from './ListRow'
 import Fields from './Fields'
 
@@ -20,6 +20,7 @@ const identity: Kind = {
   primarySecret,
   primaryActionLabel: 'Copy number',
   listSubtitle,
+  eyebrow,
   ListRow,
   Fields
 }

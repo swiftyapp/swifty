@@ -34,6 +34,13 @@ export default function Read({ entry, revealed }: Props) {
     )
   }
 
+  // The eyebrow's second half: whatever the kind can say about this entry —
+  // an identity's document type, once the payload is in hand — and the host
+  // otherwise, which is metadata and needs no reveal.
+  const fromKind = revealed ? kind.eyebrow?.(revealed) : null
+  const segment: { text: string; testid?: string } | null =
+    fromKind ?? (entry.urlHost ? { text: entry.urlHost } : null)
+
   // Metadata sentences, not labels: long-form relative times, and the absolute
   // one a hover away.
   const stamps = (
@@ -53,10 +60,12 @@ export default function Read({ entry, revealed }: Props) {
           className={`flex min-w-0 flex-1 items-center gap-2 truncate whitespace-nowrap ${MONO_LABEL}`}
         >
           <span className="text-text2">{t(kind.label)}</span>
-          {entry.urlHost && (
+          {/* What the entry is, once it can say so: the host it belongs to, or
+              — for a document, whose type is encrypted — what kind it is. */}
+          {segment && (
             <>
               <span>·</span>
-              <span>{entry.urlHost}</span>
+              <span data-testid={segment.testid}>{segment.text}</span>
             </>
           )}
         </div>

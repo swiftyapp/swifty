@@ -139,16 +139,16 @@ describe('Type-aware fields', () => {
     renderWithStore(<Show type="identity" editing />)
 
     expect(screen.getByLabelText('Full name')).toBe(input('name'))
-    expect(screen.getByLabelText('Document number')).toBe(input('number'))
+    expect(screen.getByLabelText('Number')).toBe(input('number'))
     expect(screen.getByLabelText('Nationality')).toBe(input('nationality'))
-    expect(screen.getByLabelText('Personal number')).toBe(input('personal_number'))
+    expect(screen.getByLabelText('Personal no.')).toBe(input('personal_number'))
 
     await userEvent.click(screen.getByTestId('identity-doc-type-driver_license'))
 
     // A licence has neither, and says so by not offering them.
     expect(screen.queryByLabelText('Nationality')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Personal number')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Document number')).toBe(input('number'))
+    expect(screen.queryByLabelText('Personal no.')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Number')).toBe(input('number'))
   })
 
   it('clears what the new document type has no room for', async () => {
@@ -595,5 +595,50 @@ describe('Custom fields', () => {
     expect(savedDraft()).toEqual(
       expect.objectContaining({ extra: [{ label: 'Categories', value: '' }] })
     )
+  })
+})
+
+// What the read view adds to the stored values: where the document type is
+// said, how long the document has left, and what the country code means.
+describe('Identity read view', () => {
+  // Days out rather than a fixed date, so the assertions cannot rot.
+  const away = (days: number) => {
+    const date = new Date()
+    date.setDate(date.getDate() + days)
+    return date.toISOString().slice(0, 10)
+  }
+
+  const document_ = (expiry: string) =>
+    ({ ...identityEntry(), expiry_date: expiry }) as Entry
+
+  it('names the document in the eyebrow instead of a line of its own', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    renderWithStore(<Show entry={identityMeta()} />)
+
+    expect(await screen.findByTestId('entry-value-doc_type')).toHaveTextContent('Passport')
+  })
+
+  it('says how long the document has left', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(document_(away(400)))
+    renderWithStore(<Show entry={identityMeta()} />)
+
+    expect(await screen.findByText(/Expires in 1 year/)).toBeInTheDocument()
+  })
+
+  it('says so once it has run out', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(document_(away(-1)))
+    renderWithStore(<Show entry={identityMeta()} />)
+
+    expect(await screen.findByText('Expired')).toBeInTheDocument()
+  })
+
+  // The code is what the document prints and what the copy button hands over;
+  // the name beside it is decoration.
+  it('names the country beside its alpha-3 code', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    renderWithStore(<Show entry={identityMeta()} />)
+
+    expect(await screen.findByTestId('entry-value-country')).toHaveTextContent('GBR')
+    expect(screen.getByText('· United Kingdom')).toBeInTheDocument()
   })
 })

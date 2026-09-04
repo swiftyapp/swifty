@@ -74,6 +74,7 @@
   "Copied to Clipboard": "In die Zwischenablage kopiert",
   "Expires": "Gültig bis",
   "Expired": "Abgelaufen",
+  "Expires {{when}}": "Läuft {{when}} ab",
   "MM/YY": "MM/YY",
   "CVC": "CVC",
   "Pin": "PIN",
@@ -322,5 +323,9 @@
   "Untitled {kind}": "{kind} ohne Titel",
   "changed on {d}": "geändert am {d}",
   "changed {t} ago": "vor {t} geändert",
-  "refreshes in {n}s": "erneuert in {n}s"
+  "refreshes in {n}s": "erneuert in {n}s",
+  "Number": "Nummer",
+  "Born": "Geboren",
+  "Country": "Land",
+  "Personal no.": "Personalnr."
 }

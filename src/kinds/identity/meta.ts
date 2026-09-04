@@ -1,7 +1,8 @@
+import { t } from '@/i18n'
 import type { Entry, EntryMeta } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
 import { filled } from '@/components/elements/fields/formats'
-import { docTypeOf, TEMPLATES } from './templates'
+import { docTypeOf, DOC_TYPE_LABELS, TEMPLATES } from './templates'
 
 export const defaults: EntryDraft = {
   type: 'identity',
@@ -31,6 +32,14 @@ export const isValid = (draft: EntryDraft): boolean =>
 
 export const primarySecret = (entry: Entry): string =>
   entry.type === 'identity' ? entry.number : ''
+
+// The document type is in the encrypted payload, so it can only be named once
+// the entry is revealed — and then it belongs in the eyebrow, next to the kind,
+// rather than on a line of its own above the rows.
+export const eyebrow = (entry: Entry) =>
+  entry.type === 'identity'
+    ? { text: t(DOC_TYPE_LABELS[docTypeOf({ ...entry })]), testid: 'entry-value-doc_type' }
+    : null
 
 // The document number is a secret and the document type is in the encrypted
 // payload, so there is nothing about the document itself to show here; the tags

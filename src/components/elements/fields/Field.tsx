@@ -5,6 +5,7 @@ import type { TKey } from '@/i18n'
 import { EyeGlyph, EyeOffGlyph } from '../../Main/icons'
 import CopyButton from '../CopyButton'
 import IconButton from '../IconButton'
+import { HOVER_ONLY } from '../tokens'
 import { useField } from './context'
 import { requiredError } from './formats'
 import FieldRow from './Row'
@@ -35,6 +36,12 @@ export interface FieldProps {
    * editor shows and accepts the same form the read view does.
    */
   format?: (value: string) => string
+  /**
+   * Reading only: a muted gloss after the value, from the value itself — the
+   * country an alpha-3 code names. Decoration, never storage: what is shown in
+   * the editor and what the copy button hands over are both untouched.
+   */
+  suffix?: (value: string) => string | undefined
   /** A format complaint about a non-empty value, or ''. */
   check?: (value: string) => string
 }
@@ -63,6 +70,7 @@ export default function Field({
   below,
   normalize,
   format,
+  suffix,
   check
 }: FieldProps) {
   const { t } = useTranslation()
@@ -87,9 +95,11 @@ export default function Field({
   const mask = masked ? MASK : undefined
   // The headline treatment is for a secret being read, not for its mask.
   const ink = cx(
-    'block h-6 w-full min-w-0 truncate font-mono leading-6',
+    'block h-6 min-w-0 truncate font-mono leading-6',
     big && !masked ? 'text-xl tracking-secret' : 'text-base'
   )
+  // Nothing to gloss about a mask, and nothing to gloss while typing.
+  const gloss = !editing && !masked ? suffix?.(value) : undefined
 
   return (
     <FieldRow
@@ -110,7 +120,13 @@ export default function Field({
               {show ? <EyeOffGlyph /> : <EyeGlyph />}
             </IconButton>
           )}
-          {!editing && <CopyButton value={shown} title={t('Copy')} />}
+          {!editing && (
+            // A row with a reveal has a control rail already; a plain one keeps
+            // its copy button quiet until the row is hovered or focused.
+            <span className={cx(!secure && HOVER_ONLY)}>
+              <CopyButton value={shown} title={t('Copy')} />
+            </span>
+          )}
         </>
       }
     >
@@ -130,16 +146,25 @@ export default function Field({
           onBlur={normalize ? () => set(normalize(value)) : undefined}
           className={cx(
             ink,
-            'border-b bg-transparent text-text outline-none transition-colors placeholder:text-text3',
+            'w-full border-b bg-transparent text-text outline-none transition-colors placeholder:text-text3',
             error ? 'border-bad' : 'border-line2 focus:border-accent-line'
           )}
         />
         ) : (
-          <span
-            className={cx(ink, masked ? 'text-text2' : 'text-text')}
-            data-testid={`entry-value-${name}`}
-          >
-            {masked ? DOTS : shown}
+          // The gloss rides alongside the value rather than inside it, so the
+          // testid — and everything reading it — still holds the value alone.
+          <span className="flex min-w-0 items-baseline gap-1.5">
+            <span
+              className={cx(ink, masked ? 'text-text2' : 'text-text')}
+              data-testid={`entry-value-${name}`}
+            >
+              {masked ? DOTS : shown}
+            </span>
+            {gloss && (
+              <span className="min-w-0 flex-none truncate font-mono text-base leading-6 text-text3">
+                · {gloss}
+              </span>
+            )}
           </span>
         )
       }

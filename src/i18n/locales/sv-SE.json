@@ -74,6 +74,7 @@
   "Copied to Clipboard": "Kopierat till urklipp",
   "Expires": "Giltigt till",
   "Expired": "Utgånget",
+  "Expires {{when}}": "Går ut {{when}}",
   "MM/YY": "MM/YY",
   "CVC": "CVC",
   "Pin": "PIN",
@@ -322,5 +323,9 @@
   "Untitled {kind}": "Namnlös {kind}",
   "changed on {d}": "ändrat {d}",
   "changed {t} ago": "ändrat för {t} sedan",
-  "refreshes in {n}s": "förnyas om {n} s"
+  "refreshes in {n}s": "förnyas om {n} s",
+  "Number": "Nummer",
+  "Born": "Född",
+  "Country": "Land",
+  "Personal no.": "Personnr."
 }

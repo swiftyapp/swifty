@@ -29,11 +29,25 @@ export const DOC_TYPE_LABELS: Record<DocType, TKey> = {
   other: 'Other document'
 }
 
+/**
+ * The three things a document says, in the order it says them: who is holding
+ * it, what the document itself is, and whatever else is printed on it. The rows
+ * are banded by these, so a passport reads as three short blocks instead of ten
+ * labelled lines.
+ */
+export type Group = 'holder' | 'document' | 'extra'
+
 /** How one row renders. `text` is the default and carries no flag. */
 interface Spec {
   label: TKey
+  /** Which band of the panel the row sits in. */
+  group: Group
   /** ISO `YYYY-MM-DD`, read and typed in the user's date pattern. */
   date?: boolean
+  /** A date the document runs out on: reading it also says how long it has. */
+  expiry?: boolean
+  /** ISO 3166-1 alpha-3, named in full beside the code while reading. */
+  country?: boolean
   /** In the encrypted payload: masked behind a reveal toggle. */
   secret?: boolean
   /** The document's headline value, set 2xl and letter-spaced. */
@@ -44,27 +58,43 @@ interface Spec {
   maxLength?: number
 }
 
+// The labels are short because the eyebrow already says what the document is:
+// on a passport, "Number" can only be the passport's.
+//
 // The document number and the personal number are the two fields the vault
 // encrypts (see `crypto::sensitive_values`); everything else is printed on the
 // document's face and reads plainly.
 const FIELDS = {
-  name: { label: 'Full name', placeholder: 'ADA LOVELACE', maxLength: 70 },
+  name: { label: 'Full name', group: 'holder', placeholder: 'ADA LOVELACE', maxLength: 70 },
+  birth_date: { label: 'Born', group: 'holder', date: true },
+  sex: { label: 'Sex', group: 'holder', placeholder: 'F', maxLength: 12 },
+  nationality: {
+    label: 'Nationality',
+    group: 'holder',
+    country: true,
+    placeholder: 'GBR',
+    maxLength: 40
+  },
   number: {
-    label: 'Document number',
+    label: 'Number',
+    group: 'document',
     secret: true,
     big: true,
     placeholder: 'X1234567',
     maxLength: 40
   },
-  country: { label: 'Issuing country', placeholder: 'GBR', maxLength: 40 },
-  nationality: { label: 'Nationality', placeholder: 'GBR', maxLength: 40 },
-  birth_date: { label: 'Date of birth', date: true },
-  sex: { label: 'Sex', placeholder: 'F', maxLength: 12 },
-  issue_date: { label: 'Issued', date: true },
-  expiry_date: { label: 'Expires', date: true },
-  authority: { label: 'Authority', placeholder: 'HMPO', maxLength: 60 },
-  personal_number: { label: 'Personal number', secret: true, maxLength: 40 },
-  note: { label: 'Note', note: true }
+  country: {
+    label: 'Country',
+    group: 'document',
+    country: true,
+    placeholder: 'GBR',
+    maxLength: 40
+  },
+  issue_date: { label: 'Issued', group: 'document', date: true },
+  expiry_date: { label: 'Expires', group: 'document', date: true, expiry: true },
+  authority: { label: 'Authority', group: 'document', placeholder: 'HMPO', maxLength: 60 },
+  personal_number: { label: 'Personal no.', group: 'extra', secret: true, maxLength: 40 },
+  note: { label: 'Note', group: 'extra', note: true }
 } satisfies Record<string, Spec>
 
 export type IdentityKey = keyof typeof FIELDS
@@ -78,15 +108,16 @@ export interface Row {
   required?: true
 }
 
-// Ordered as the document reads, not as the fields were declared: what is on the
-// front of a passport comes before what is stamped on it.
+// Ordered by band — holder, then document, then whatever else is printed on it
+// — and within a band as the document itself reads. Contiguous by construction:
+// `Fields` bands the rows by watching the group change down the list.
 export const TEMPLATES: Record<DocType, Row[]> = {
   passport: [
     { key: 'name', required: true },
-    { key: 'number', required: true },
-    { key: 'nationality' },
     { key: 'birth_date' },
     { key: 'sex' },
+    { key: 'nationality' },
+    { key: 'number', required: true },
     { key: 'country', required: true },
     { key: 'issue_date' },
     { key: 'expiry_date', required: true },
@@ -96,11 +127,11 @@ export const TEMPLATES: Record<DocType, Row[]> = {
   ],
   id_card: [
     { key: 'name', required: true },
-    { key: 'number', required: true },
-    { key: 'country', required: true },
     { key: 'birth_date' },
     { key: 'sex' },
     { key: 'nationality' },
+    { key: 'number', required: true },
+    { key: 'country', required: true },
     { key: 'issue_date' },
     { key: 'expiry_date' },
     { key: 'authority' },
@@ -109,9 +140,9 @@ export const TEMPLATES: Record<DocType, Row[]> = {
   ],
   driver_license: [
     { key: 'name', required: true },
+    { key: 'birth_date' },
     { key: 'number', required: true },
     { key: 'country', required: true },
-    { key: 'birth_date' },
     { key: 'issue_date' },
     { key: 'expiry_date', required: true },
     { key: 'authority' },
@@ -119,10 +150,10 @@ export const TEMPLATES: Record<DocType, Row[]> = {
   ],
   residence_permit: [
     { key: 'name', required: true },
+    { key: 'birth_date' },
+    { key: 'nationality' },
     { key: 'number', required: true },
     { key: 'country', required: true },
-    { key: 'nationality' },
-    { key: 'birth_date' },
     { key: 'issue_date' },
     { key: 'expiry_date', required: true },
     { key: 'authority' },

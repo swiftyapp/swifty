@@ -60,6 +60,19 @@ async function readNumber(): Promise<string> {
 }
 
 /**
+ * The document type, which reading shows in the eyebrow beside the kind.
+ *
+ * That is a mono micro-label, so it is on screen in the case the CSS gives it
+ * rather than the one the catalog spells — the same reason the custom-field
+ * label below is compared case-insensitively.
+ */
+async function expectDocType(label: string): Promise<void> {
+  await waitFor("entry-value-doc_type");
+  const shown = await value("doc_type").getText();
+  expect(shown.toLowerCase()).toBe(label.toLowerCase());
+}
+
+/**
  * Re-open an entry so its secrets are decrypted afresh.
  *
  * Same reason as in notes.spec.ts: `useRevealed` keys the decrypt on the entry
@@ -96,7 +109,7 @@ describe("identity entries", () => {
   });
 
   it("renders the saved passport, dates in the user's own pattern", async () => {
-    await expect(value("doc_type")).toHaveText("Passport");
+    await expectDocType("Passport");
     await expect(value("name")).toHaveText(PASSPORT.name);
     await expect(value("nationality")).toHaveText(PASSPORT.nationality);
     await expect(value("country")).toHaveText(PASSPORT.country);
@@ -122,7 +135,7 @@ describe("identity entries", () => {
     await createIdentity(LICENCE);
     await waitFor("entry-value-number");
 
-    await expect(value("doc_type")).toHaveText("Driver license");
+    await expectDocType("Driver license");
     await expect(value("expiry_date")).toHaveText(LICENCE.expiryDate);
     expect(await readNumber()).toBe(LICENCE.number);
     // A licence has no nationality row, so the licence has no nationality —
@@ -218,7 +231,7 @@ describe("identity entries", () => {
     });
 
     await reopen(PASSPORT.title);
-    await expect(value("doc_type")).toHaveText("Driver license");
+    await expectDocType("Driver license");
     await expect(value("nationality")).not.toBeExisting();
   });
 });

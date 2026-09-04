@@ -74,6 +74,7 @@
   "Copied to Clipboard": "Copiado para a área de transferência",
   "Expires": "Validade",
   "Expired": "Vencido",
+  "Expires {{when}}": "Expira {{when}}",
   "MM/YY": "MM/YY",
   "CVC": "CVC",
   "Pin": "PIN",
@@ -327,5 +328,9 @@
   "Untitled {kind}": "{kind} sem título",
   "changed on {d}": "alterada em {d}",
   "changed {t} ago": "alterada há {t}",
-  "refreshes in {n}s": "renova em {n}s"
+  "refreshes in {n}s": "renova em {n}s",
+  "Number": "Número",
+  "Born": "Nascimento",
+  "Country": "País",
+  "Personal no.": "Nº pessoal"
 }

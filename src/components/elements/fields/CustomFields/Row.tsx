@@ -5,7 +5,7 @@ import { cx } from '@/utils/cx'
 import { TrashGlyph } from '../../../Main/icons'
 import CopyButton from '../../CopyButton'
 import IconButton from '../../IconButton'
-import { MONO_LABEL, MONO_TYPE, ROW_HAIRLINE } from '../../tokens'
+import { HOVER_ONLY, MONO_LABEL, MONO_TYPE, ROW_HAIRLINE } from '../../tokens'
 
 interface Props {
   field: ExtraField
@@ -23,7 +23,7 @@ const INK = 'block h-6 w-full min-w-0 truncate font-mono text-base leading-6 tex
 const BOX =
   'border-b border-line2 bg-transparent outline-none transition-colors placeholder:text-text3 focus:border-accent-line'
 
-// One label/value pair, in the detail row's geometry: the label takes the w-24
+// One label/value pair, in the detail row's geometry: the label takes the w-32
 // mono column the fixed rows use, the value the rest. Reading, the value gets a
 // copy button like any other; editing, the label is typed too — it is the user's
 // word for this field, not a translated one — and the row can be dropped.
@@ -46,7 +46,9 @@ export default function CustomFieldRow({
   }
 
   return (
-    <div className={cx('flex items-center gap-3 px-3.5 py-3', !editing && ROW_HAIRLINE)}>
+    <div
+      className={cx('group flex items-center gap-3 px-3.5 py-3', !editing && ROW_HAIRLINE)}
+    >
       {onChange ? (
         <input
           name={`extra-label-${index}`}
@@ -57,12 +59,12 @@ export default function CustomFieldRow({
           autoComplete="off"
           spellCheck={false}
           onChange={event => onChange({ ...field, label: event.target.value })}
-          className={cx('w-24 flex-none text-text', MONO_TYPE, BOX)}
+          className={cx('w-32 flex-none text-text', MONO_TYPE, BOX)}
         />
       ) : (
         <span
           data-testid={`entry-extra-label-${index}`}
-          className={cx('w-24 flex-none truncate', MONO_LABEL)}
+          className={cx('w-32 flex-none truncate', MONO_LABEL)}
         >
           {field.label}
         </span>
@@ -101,7 +103,11 @@ export default function CustomFieldRow({
             <TrashGlyph />
           </IconButton>
         ) : (
-          <CopyButton value={field.value} title={t('Copy')} />
+          // Quiet until the row is under the cursor or the keyboard, like the
+          // fixed rows' own copy button.
+          <span className={HOVER_ONLY}>
+            <CopyButton value={field.value} title={t('Copy')} />
+          </span>
         )}
       </div>
     </div>

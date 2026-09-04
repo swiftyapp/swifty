@@ -24,10 +24,10 @@ interface Props {
   children: (id: string) => ReactNode
 }
 
-// Where the value column starts: label 96 (w-24) + gap 12 + sigil 16 (w-4) + gap 12.
-const VALUE_START = 'pl-[136px]'
+// Where the value column starts: label 128 (w-32) + gap 12 + sigil 16 (w-4) + gap 12.
+const VALUE_START = 'pl-[168px]'
 
-// THE detail-row geometry: a w-24 mono label column, the value, trailing
+// THE detail-row geometry: a w-32 mono label column, the value, trailing
 // controls, then anything that belongs under the value. Read values and their
 // editors both render through it, so switching modes never moves a row.
 export default function FieldRow({ label, prefix, actions, below, error, children }: Props) {
@@ -39,11 +39,18 @@ export default function FieldRow({ label, prefix, actions, below, error, childre
   return (
     // Editing, each input draws its own underline, so the hairline between
     // rows would be a second line for the same job; the read view keeps it.
-    <div className={cx('item px-3.5 py-3', !set && ROW_HAIRLINE)}>
+    // `group`: the read row's copy button only shows up on hover (see Field).
+    <div className={cx('item group px-3.5 py-3', !set && ROW_HAIRLINE)}>
       <div className="flex items-center gap-3">
         {labelled && (
           <>
-            <label htmlFor={id} className={`w-24 flex-none ${MONO_LABEL}`}>
+            {/* A label never wraps: the column is sized for the longest of them
+                and one that outgrows it gets shortened, here and in the
+                catalog, rather than folded onto a second line. */}
+            <label
+              htmlFor={id}
+              className={`w-32 flex-none whitespace-nowrap ${MONO_LABEL}`}
+            >
               {t(label)}
             </label>
             {/* Held open with or without a sigil, so every value starts at one x. */}

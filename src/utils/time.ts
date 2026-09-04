@@ -56,6 +56,50 @@ const pad = (value: string | number) => String(value).padStart(2, '0')
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/
 
+// Local midnight of a stored `YYYY-MM-DD`, or null if it is not one. Built from
+// the parts rather than parsed: `Date.parse` reads a date-only string as UTC,
+// which lands on the day before west of Greenwich.
+const isoDay = (iso: string): number | null => {
+  const match = ISO_DATE.exec(iso.trim())
+  if (!match) return null
+  const [, year, month, day] = match
+  return new Date(+year, +month - 1, +day).getTime()
+}
+
+/**
+ * Whole days from today to a stored `YYYY-MM-DD` — negative once it is behind
+ * us, null when it is not a date. Both ends are taken at local midnight, so the
+ * answer is a count of days rather than of 24-hour blocks.
+ */
+export const daysUntil = (iso: string, now: number = Date.now()): number | null => {
+  const at = isoDay(iso)
+  if (at === null) return null
+  const today = new Date(now)
+  today.setHours(0, 0, 0, 0)
+  return Math.round((at - today.getTime()) / DAY)
+}
+
+/**
+ * How far ahead a stored date is, as a sentence fragment: "in 2 years", "in 3
+ * months", "in 12 days", "tomorrow". '' for a date behind us or no date at all.
+ * `Intl` owns the wording and the plural rules, as it does for `relativeLong`.
+ */
+export const relativeFuture = (iso: string, now: number = Date.now()): string => {
+  const days = daysUntil(iso, now)
+  if (days === null || days < 0) return ''
+
+  // Today and tomorrow read as words; everything past them counts, so a year
+  // out is "in 1 year" and not the calendar's "next year".
+  const spell = new Intl.RelativeTimeFormat(getLocale(), {
+    numeric: days <= 1 ? 'auto' : 'always'
+  })
+  if (days >= 365) return spell.format(Math.floor(days / 365), 'year')
+  // The average month, so the last days before a year read as 11 months and
+  // not as a twelfth one.
+  if (days >= 30) return spell.format(Math.floor(days / 30.44), 'month')
+  return spell.format(days, 'day')
+}
+
 /**
  * A stored ISO `YYYY-MM-DD` date in the pattern picked in Settings › Language &
  * region. Anything else is passed through unchanged: a half-typed date is not a

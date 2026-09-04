@@ -74,6 +74,7 @@
   "Copied to Clipboard": "Copié dans le presse-papiers",
   "Expires": "Expiration",
   "Expired": "Expirée",
+  "Expires {{when}}": "Expire {{when}}",
   "MM/YY": "MM/YY",
   "CVC": "CVC",
   "Pin": "Code PIN",
@@ -327,5 +328,9 @@
   "Untitled {kind}": "{kind} sans titre",
   "changed on {d}": "modifié le {d}",
   "changed {t} ago": "modifié il y a {t}",
-  "refreshes in {n}s": "actualisé dans {n} s"
+  "refreshes in {n}s": "actualisé dans {n} s",
+  "Number": "Numéro",
+  "Born": "Né(e) le",
+  "Country": "Pays",
+  "Personal no.": "N° personnel"
 }

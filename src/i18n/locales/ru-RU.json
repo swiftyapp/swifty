@@ -74,6 +74,7 @@
   "Copied to Clipboard": "Скопировано в буфер обмена",
   "Expires": "Срок",
   "Expired": "Истёк",
+  "Expires {{when}}": "Истекает {{when}}",
   "MM/YY": "MM/YY",
   "CVC": "CVC",
   "Pin": "PIN",
@@ -332,5 +333,9 @@
   "Untitled {kind}": "{kind} без названия",
   "changed on {d}": "изменён {d}",
   "changed {t} ago": "изменён {t} назад",
-  "refreshes in {n}s": "обновится через {n} с"
+  "refreshes in {n}s": "обновится через {n} с",
+  "Number": "Номер",
+  "Born": "Рождение",
+  "Country": "Страна",
+  "Personal no.": "Личный №"
 }

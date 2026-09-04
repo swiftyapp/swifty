@@ -74,11 +74,12 @@
   "Copied to Clipboard": "Скопійовано до буфера обміну",
   "Expires": "Термін",
   "Expired": "Минув",
+  "Expires {{when}}": "Спливає {{when}}",
   "MM/YY": "MM/YY",
   "CVC": "CVC",
   "Pin": "PIN",
   "OTP": "OTP",
-  "Username": "Ім'я користувача",
+  "Username": "Користувач",
   "Password": "Пароль",
   "Email": "Ел. пошта",
   "Note": "Нотатка",
@@ -332,5 +333,9 @@
   "Untitled {kind}": "{kind} без назви",
   "changed on {d}": "змінено {d}",
   "changed {t} ago": "змінено {t} тому",
-  "refreshes in {n}s": "оновиться через {n} с"
+  "refreshes in {n}s": "оновиться через {n} с",
+  "Number": "Номер",
+  "Born": "Народження",
+  "Country": "Країна",
+  "Personal no.": "Особистий №"
 }
