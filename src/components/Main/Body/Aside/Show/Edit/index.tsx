@@ -33,37 +33,37 @@ export default function Edit({ type, revealed }: Props) {
         data-testid="entry-sheet"
         className="-m-4 rounded-xl border border-accent-line p-4"
       >
-        <div className="flex items-start gap-4">
-          <div className="min-w-0 flex-1">
-            <div
-              className={`flex items-center gap-2 whitespace-nowrap ${MONO_TYPE} text-accent`}
-            >
-              <span>{t('Editing')}</span>
-              <span>·</span>
-              <span>{t(kind.label)}</span>
-            </div>
-            <div className="mt-2 flex items-center gap-2.5">
-              <div className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent-soft text-accent">
-                <Glyph size={16} />
-              </div>
-              <input
-                name="title"
-                value={title}
-                maxLength={40}
-                autoComplete="off"
-                spellCheck={false}
-                placeholder={t(kind.untitledLabel)}
-                onChange={event => draft.set('title', event.target.value)}
-                className="min-w-0 flex-1 truncate border-b border-line2 bg-transparent text-2xl font-semibold tracking-display text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line"
-              />
-            </div>
-            {/* Every kind requires a title, so the pane owns this one message. */}
-            {draft.attempted && !title.trim() && (
-              <div className="mt-1.5 pl-[38px] text-base text-bad">{t('Required')}</div>
-            )}
+        {/* The eyebrow shares its line with the actions, so the title input below
+            runs the full content width and its underline ends where the rows do. */}
+        <div className="flex items-center justify-between gap-4">
+          <div
+            className={`flex min-w-0 flex-1 items-center gap-2 truncate whitespace-nowrap ${MONO_TYPE} text-accent`}
+          >
+            <span>{t('Editing')}</span>
+            <span>·</span>
+            <span>{t(kind.label)}</span>
           </div>
           <Actions draft={draft} />
         </div>
+        <div className="mt-2 flex items-center gap-2.5">
+          <div className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent-soft text-accent">
+            <Glyph size={16} />
+          </div>
+          <input
+            name="title"
+            value={title}
+            maxLength={40}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={t(kind.untitledLabel)}
+            onChange={event => draft.set('title', event.target.value)}
+            className="min-w-0 flex-1 truncate border-b border-line2 bg-transparent text-2xl font-semibold tracking-display text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line"
+          />
+        </div>
+        {/* Every kind requires a title, so the pane owns this one message. */}
+        {draft.attempted && !title.trim() && (
+          <div className="mt-1.5 pl-[38px] text-base text-bad">{t('Required')}</div>
+        )}
 
         <div className="mt-3">
           <FieldsProvider

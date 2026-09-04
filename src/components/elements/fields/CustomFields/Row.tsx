@@ -67,6 +67,9 @@ export default function CustomFieldRow({
           {field.label}
         </span>
       )}
+      {/* The fixed rows' sigil slot and actions slot (see FieldRow), held open
+          so these values start and end where the rows above them do. */}
+      <span className="w-4 flex-none" />
 
       <div className="min-w-0 flex-1">
         {onChange ? (
@@ -88,17 +91,19 @@ export default function CustomFieldRow({
         )}
       </div>
 
-      {editing ? (
-        <IconButton
-          title={t('Remove field')}
-          testid={`remove-extra-${index}`}
-          onClick={onRemove}
-        >
-          <TrashGlyph />
-        </IconButton>
-      ) : (
-        <CopyButton value={field.value} title={t('Copy')} />
-      )}
+      <div className="flex w-[60px] flex-none items-center justify-end gap-1">
+        {editing ? (
+          <IconButton
+            title={t('Remove field')}
+            testid={`remove-extra-${index}`}
+            onClick={onRemove}
+          >
+            <TrashGlyph />
+          </IconButton>
+        ) : (
+          <CopyButton value={field.value} title={t('Copy')} />
+        )}
+      </div>
     </div>
   )
 }

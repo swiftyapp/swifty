@@ -133,7 +133,7 @@ describe('Editing in the pane', () => {
         <Generator />
       </>
     )
-    await userEvent.click(screen.getByText('generate'))
+    await userEvent.click(screen.getByTestId('generate-password-link'))
     expect(await screen.findByTestId('generator-dialog')).toBeInTheDocument()
     await screen.findByText('Generated123!')
 
@@ -156,7 +156,7 @@ describe('Editing in the pane', () => {
     )
     store.getState().newEntry('login')
 
-    await userEvent.click(screen.getByText('generate'))
+    await userEvent.click(screen.getByTestId('generate-password-link'))
     expect(await screen.findByTestId('generator-dialog')).toBeInTheDocument()
 
     await userEvent.keyboard('{Escape}')
