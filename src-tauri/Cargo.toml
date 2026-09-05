@@ -34,7 +34,7 @@ sha2 = "0.10"
 rand = "0.8"
 hex = "0.4"
 base64 = "0.22"
-totp-rs = { version = "5", default-features = false }
+totp-rs = { version = "6", default-features = false }
 zxcvbn = "3"
 dirs = "5"
 log = "0.4.34"
