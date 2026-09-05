@@ -21,7 +21,7 @@ export default function Header() {
   return (
     <header
       data-tauri-drag-region="deep"
-      className="relative z-10 flex h-[38px] flex-none items-center gap-3.5 border-b border-line bg-[var(--chrome)] pl-[78px] pr-3 backdrop-blur-[14px]"
+      className="relative z-10 flex h-[38px] flex-none items-center gap-3.5 border-b border-line bg-chrome pl-[78px] pr-3 backdrop-blur-[14px]"
     >
       <Controls />
       <div className="flex-1" />

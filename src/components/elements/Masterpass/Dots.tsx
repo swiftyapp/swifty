@@ -48,7 +48,7 @@ export default function Dots({
           <span
             key={i}
             className={cx(
-              'animate-fade flex flex-none items-center justify-center rounded-[3px]',
+              'animate-fade flex flex-none items-center justify-center rounded-xs',
               i >= start && i < end && 'bg-accent-soft'
             )}
             style={{ width: CELL }}
@@ -57,8 +57,8 @@ export default function Dots({
               className={cx(
                 busy && 'animate-[dotwave_1.05s_ease-in-out_infinite]',
                 text === undefined
-                  ? 'h-[7px] w-[7px] rounded-full bg-text/75'
-                  : 'text-[15px] text-text'
+                  ? 'h-1.5 w-1.5 rounded-full bg-text/75'
+                  : 'text-md text-text'
               )}
               style={busy ? WAVE_DELAYS[i % WAVE_DELAYS.length] : undefined}
             >

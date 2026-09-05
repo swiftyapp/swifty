@@ -12,7 +12,7 @@ export default function Overlay() {
     <div
       data-testid="scan-overlay"
       aria-hidden
-      className="animate-fade pointer-events-none fixed inset-0 z-[1100] grid place-items-center bg-[var(--scrim)] backdrop-blur-sm"
+      className="animate-fade pointer-events-none fixed inset-0 z-[1100] grid place-items-center bg-scrim backdrop-blur-sm"
     >
       <div className="m-6 flex flex-col items-center gap-3 rounded-xl border border-dashed border-accent-line px-10 py-9 text-center">
         <span className="grid h-12 w-12 place-items-center rounded-lg bg-accent-soft text-accent">
@@ -21,7 +21,7 @@ export default function Overlay() {
         <strong className="text-lg font-semibold tracking-display">
           {t('Drop to scan the card or document')}
         </strong>
-        <span className="max-w-[320px] text-base text-text2">
+        <span className="max-w-xs text-base text-text2">
           {t('Read on this device. The image is never copied or uploaded.')}
         </span>
       </div>

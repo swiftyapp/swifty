@@ -24,7 +24,7 @@ export default function Menu({ onClose }: { onClose: () => void }) {
         {tags.length === 0 ? (
           <div className="px-3.5 py-2.5" data-testid="tags-empty">
             <div className="text-base text-text2">{t('No tags yet')}</div>
-            <div className="mt-1 text-sm text-text3">
+            <div className="mt-1 text-xs text-text3">
               {t('Add tags to an entry and they show up here.')}
             </div>
           </div>

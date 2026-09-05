@@ -60,7 +60,7 @@ export default function Panel() {
   return (
     <div
       onClick={closePalette}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-[var(--scrim)] pt-[92px] backdrop-blur-[4px] animate-fade"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-scrim pt-[92px] backdrop-blur-xs animate-fade"
     >
       <div
         data-testid="command-palette"
@@ -68,7 +68,7 @@ export default function Panel() {
         aria-modal="true"
         aria-label={t('Run a command')}
         onClick={e => e.stopPropagation()}
-        className="w-[620px] overflow-hidden rounded-xl border border-line2 bg-detail shadow-[var(--shadow)] animate-pop"
+        className="w-dialog overflow-hidden rounded-xl border border-line2 bg-detail shadow-float animate-pop"
       >
         <Input
           value={query}

@@ -32,13 +32,15 @@ const sizes: Record<Size, string> = {
 
 const blockStyle = 'w-full px-5 py-3 font-mono uppercase tracking-label'
 
+// The solid-fill treatment: light ink, a 1px top highlight, and a hover that
+// brightens the fill itself since there is no border or ground to swap.
+const filled = 'text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] hover:brightness-[1.09]'
+
 const variants: Record<Variant, string> = {
-  primary:
-    'bg-accent text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] hover:brightness-[1.09]',
+  primary: `bg-accent ${filled}`,
   ghost: 'border border-line bg-tile text-text hover:bg-hover',
   pale: 'border border-line2 bg-field text-text2 hover:border-accent-line hover:text-text',
-  danger:
-    'bg-bad text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] hover:brightness-[1.09]'
+  danger: `bg-bad ${filled}`
 }
 
 // Shared token-styled button. Serves both the full-width auth CTAs (`block`) and
@@ -75,7 +77,7 @@ export default function Button({
       {/* A chip rather than dimmed text: on an accent fill, opacity is the one
           thing that makes the hint disappear. */}
       {kbd && (
-        <span className="flex-none rounded-[4px] bg-[color-mix(in_srgb,currentColor_14%,transparent)] px-1 font-mono text-[11px] leading-4">
+        <span className="flex-none rounded-xs bg-[color-mix(in_srgb,currentColor_14%,transparent)] px-1 font-mono text-xs leading-4">
           {kbd}
         </span>
       )}

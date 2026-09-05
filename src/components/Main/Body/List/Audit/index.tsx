@@ -2,6 +2,7 @@ import { useStore } from '@/store'
 import type { AuditItem, EntryMeta } from '@/lib/commands'
 import { useTranslation } from 'react-i18next'
 import Group from '../Group'
+import { MONO_LABEL } from '@/components/elements/tokens'
 
 export default function AuditList() {
   const { t } = useTranslation()
@@ -11,7 +12,7 @@ export default function AuditList() {
 
   if (!audit)
     return (
-      <div className="px-4 py-6 font-mono text-xs uppercase tracking-label text-text3">
+      <div className={`px-4 py-6 ${MONO_LABEL}`}>
         {t('Loading Results..')}
       </div>
     )

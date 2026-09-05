@@ -1,6 +1,6 @@
 import { cx } from '@/utils/cx'
 import { useRadioNav } from '@/hooks/useRadioNav'
-import { CARD, ROW_HAIRLINE } from './tokens'
+import { CARD, MONO_META, ROW_HAIRLINE } from './tokens'
 
 interface Props {
   options: { value: string; label: string; meta?: string }[]
@@ -64,7 +64,7 @@ export default function RadioList({
             </span>
             <span className="min-w-0 flex-1 truncate text-base text-text">{option.label}</span>
             {option.meta && (
-              <span className="flex-none font-mono text-xs text-text3">{option.meta}</span>
+              <span className={`flex-none ${MONO_META}`}>{option.meta}</span>
             )}
           </button>
         )

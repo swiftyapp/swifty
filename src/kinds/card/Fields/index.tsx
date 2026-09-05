@@ -45,8 +45,9 @@ export default function Fields() {
       className={aside ? 'grid grid-cols-[460px_minmax(0,1fr)] items-start gap-3' : undefined}
     >
       {/* Card art: an always-dark plastic-card visual, deliberately off-system.
-          Its gradient, hex inks, 16/4px radii and face letter-spacings imitate a
-          real card, so they are exempt from the type/radius/tracking scales. */}
+          Its gradient, hex inks, 16/4px radii, unleaded type sizes and the
+          number's wide letter-spacing imitate a real card, so they are exempt
+          from the type/radius/tracking scales. */}
       <div className="relative flex h-[288px] w-[460px] flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 font-mono text-[#EDEEF0] shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
         <div className="absolute -right-10 -top-16 h-[240px] w-[240px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.07),transparent_70%)]" />
 
@@ -60,14 +61,14 @@ export default function Fields() {
             testid="entry-value-name"
             placeholder="Cardholder"
             maxLength={40}
-            ink="text-[13px] uppercase tracking-[0.12em] opacity-90"
+            ink="text-[13px] uppercase tracking-label opacity-90"
             zone="top"
             className="-mx-1.5 flex-1"
           />
           {hasBrandMark(brand) ? (
             <CardBrandMark brand={brand} size={22} tone="light" />
           ) : (
-            <div className="h-7 w-[40px] flex-none rounded-[4px] border border-white/15 bg-white/10" />
+            <div className="h-7 w-[40px] flex-none rounded-xs border border-white/15 bg-white/10" />
           )}
         </div>
 
@@ -117,7 +118,7 @@ export default function Fields() {
             ink="text-[13px]"
             flag={
               expired && (
-                <span className="flex-none text-[10px] uppercase tracking-[0.12em] text-[#FF8A8A]">
+                <span className="flex-none text-[10px] uppercase tracking-label text-[#FF8A8A]">
                   {t('Expired')}
                 </span>
               )

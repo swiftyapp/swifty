@@ -29,11 +29,13 @@ export default function KeyCuts({ count, tone = 'idle' }: Props) {
         )}
       />
       <div className="absolute inset-x-0 top-px flex justify-center">
+        {/* 5 + 6 rather than 5.5 each side: the same 12px pitch, but every 1px
+            bar starts on a whole pixel instead of straddling two. */}
         {Array.from({ length: bars }).map((_, i) => (
           <span
             key={i}
             className={cx(
-              'mx-[5.5px] w-px rounded-b-sm transition-all duration-300',
+              'ml-[5px] mr-[6px] w-px rounded-b-sm transition-all duration-300',
               bar
             )}
             style={{ height: HEIGHTS[i % HEIGHTS.length] }}

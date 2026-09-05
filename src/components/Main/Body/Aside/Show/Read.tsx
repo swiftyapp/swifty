@@ -41,7 +41,7 @@ export default function Read({ entry, revealed }: Props) {
     fromKind ?? (entry.urlHost ? { text: entry.urlHost } : null)
 
   return (
-    <div className="mx-auto w-full max-w-[860px]">
+    <div className="mx-auto w-full max-w-sheet">
       {/* The eyebrow shares its line with the actions, so the title below can
           run the full content width. */}
       <div className="flex items-center justify-between gap-4">

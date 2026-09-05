@@ -60,7 +60,7 @@ export function Dropdown({ onBlur, className, children }: DropdownProps) {
         role="menu"
         onKeyDown={onKeyDown}
         className={cx(
-          'animate-pop absolute z-20 min-w-[180px] overflow-hidden rounded-xl border border-line2 bg-detail py-1 text-text shadow-[var(--shadow)]',
+          'animate-pop absolute z-20 min-w-[180px] overflow-hidden rounded-xl border border-line2 bg-detail py-1 text-text shadow-float',
           className
         )}
       >

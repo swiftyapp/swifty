@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { cx } from '@/utils/cx'
 import Button from './Button'
 import Kbd from './Kbd'
+import { MONO_META } from './tokens'
 
 interface Action {
   label: string
@@ -74,7 +75,7 @@ export default function EmptyState({
   return (
     <div
       data-testid={testid}
-      className="flex max-w-[320px] flex-col items-center gap-5 text-center animate-pop"
+      className="flex max-w-xs flex-col items-center gap-5 text-center animate-pop"
     >
       <div
         className={cx(
@@ -125,7 +126,7 @@ export default function EmptyState({
             {hints.map(hint => (
               <span key={hint.keys} className="flex items-center gap-1.5">
                 <Kbd>{hint.keys}</Kbd>
-                <span className="font-mono text-xs text-text3">{hint.label}</span>
+                <span className={MONO_META}>{hint.label}</span>
               </span>
             ))}
           </div>

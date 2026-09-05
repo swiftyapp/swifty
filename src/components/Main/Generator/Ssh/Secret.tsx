@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import CopyButton from '@/components/elements/CopyButton'
 import IconButton from '@/components/elements/IconButton'
 import { MONO_LABEL } from '@/components/elements/tokens'
+import { wellClass } from '@/components/elements/formStyles'
 import { EyeGlyph, EyeOffGlyph } from '../../icons'
 
 // A fixed mask, so the block says nothing about the key it is hiding.
@@ -19,7 +20,7 @@ export default function Secret({ value }: { value: string }) {
       <div className="mt-1 flex items-start gap-1.5">
         <div
           data-testid="generator-ssh-private"
-          className={`min-w-0 flex-1 rounded-lg border border-line2 bg-field px-3 py-2 font-mono text-base leading-[1.55] break-all ${
+          className={`min-w-0 flex-1 ${wellClass} px-3 py-2 font-mono text-base leading-relaxed break-all ${
             show ? 'max-h-40 overflow-auto whitespace-pre-wrap text-text' : 'text-text2'
           }`}
         >

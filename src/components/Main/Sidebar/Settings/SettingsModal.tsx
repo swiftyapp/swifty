@@ -20,7 +20,7 @@ export default function SettingsModal() {
   return (
     <Modal
       onClose={closeSettings}
-      className="h-[600px] w-[860px]"
+      className="h-[600px] w-sheet"
       labelledBy={TITLE_ID}
       testid="settings-modal"
       hideClose

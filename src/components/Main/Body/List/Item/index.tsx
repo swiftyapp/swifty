@@ -9,6 +9,7 @@ import { StarGlyph } from '../../../icons'
 import { stampOf } from '../order'
 import Flag from './Flag'
 import { flagOf } from './audit'
+import { MONO_META } from '@/components/elements/tokens'
 
 interface Props {
   entry: EntryMeta
@@ -52,7 +53,7 @@ export default function Item({ entry }: Props) {
       tabIndex={selected ? 0 : -1}
       className={cx(
         'flex cursor-pointer items-center gap-3 border-l-2 py-2.5 pl-[14px] pr-4',
-        'shadow-[inset_0_-1px_0_var(--c-line)]',
+        'inset-shadow-hairline',
         selected
           ? 'border-accent bg-sel'
           : 'border-transparent hover:bg-hover'
@@ -67,7 +68,7 @@ export default function Item({ entry }: Props) {
         </span>
       )}
       {meta && (
-        <span className="flex-none font-mono text-xs text-text3">{meta}</span>
+        <span className={`flex-none ${MONO_META}`}>{meta}</span>
       )}
     </div>
   )

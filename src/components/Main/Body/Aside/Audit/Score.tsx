@@ -1,6 +1,7 @@
 import type { Audit } from '@/lib/commands'
 import { useTranslation } from 'react-i18next'
 import { vaultScore } from '@/utils/vaultScore'
+import { MONO_LABEL } from '@/components/elements/tokens'
 
 interface Props {
   audit: Audit
@@ -43,11 +44,11 @@ export default function Score({ audit }: Props) {
             display tier so it fills the ring. */}
         <div
           data-testid="audit-score"
-          className="text-[34px] font-semibold tracking-display text-text"
+          className="text-3xl font-semibold tracking-display text-text"
         >
           {score.toFixed(1)}
         </div>
-        <div className="font-mono text-xs uppercase tracking-label text-text3">
+        <div className={MONO_LABEL}>
           {t('Overall Score')}
         </div>
       </div>

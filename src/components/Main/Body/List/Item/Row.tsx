@@ -3,6 +3,7 @@ import type { EntryMeta } from '@/lib/commands'
 import type { Kind } from '@/kinds/types'
 import { KIND_TINT } from '@/kinds/tint'
 import { cx } from '@/utils/cx'
+import { MONO_META } from '@/components/elements/tokens'
 
 // What every kind's list row component is handed (see src/kinds/*/ListRow).
 export interface ContentProps {
@@ -48,7 +49,7 @@ export default function Row({ glyph, title, sub, flag, tint }: Props) {
           {flag}
         </div>
         {sub && (
-          <div className="mt-0.5 truncate font-mono text-xs text-text3">
+          <div className={`mt-0.5 truncate ${MONO_META}`}>
             {sub}
           </div>
         )}

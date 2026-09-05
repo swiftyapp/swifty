@@ -39,7 +39,7 @@ function Mascot({
   // tints for the verdict, then the eye shapes carry the expression.
   const fill = ok ? 'var(--c-good)' : bad ? 'var(--c-bad)' : color
   const bodyAnim = ok
-    ? 'animate-[cheer_780ms_cubic-bezier(0.2,0.8,0.2,1)_both]'
+    ? 'animate-[cheer_780ms_var(--ease-swift)_both]'
     : bad
       ? 'animate-[deny_540ms_ease_both]'
       : undefined
