@@ -255,7 +255,6 @@
   --color-good: var(--c-good);
   --color-warn: var(--c-warn);
   --color-bad: var(--c-bad);
-  --color-accent-deep: var(--c-accent-deep);
   --color-touchid: var(--c-touchid);
   --color-brand: var(--c-brand);
 
@@ -408,9 +407,6 @@
   --c-bad: #c9453a;
   /* The macOS Touch ID fingerprint rose (biometric affordances). */
   --c-touchid: #ee5d6f;
-  /* Deep end of the brand gradient; same in both themes (it sits under the
-   * accent, which does adapt). */
-  --c-accent-deep: #2b3a8f;
   /* The brand asterisk's ink (mascot body + rail mark) and the paper its eyes
    * are cut from. Graphite on light ground; flips to chalk on dark. */
   --c-brand: #34373e;
