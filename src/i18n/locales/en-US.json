@@ -175,6 +175,7 @@
   "Google Drive": "Google Drive",
   "Connected": "Connected",
   "Not connected": "Not connected",
+  "Waiting for Google…": "Waiting for Google…",
   "Connect": "Connect",
   "Disconnect": "Disconnect",
   "Sync": "Sync",
@@ -240,6 +241,7 @@
   ".csv export": ".csv export",
   ".swftx backup": ".swftx backup",
   "Or drop an export file here": "Or drop an export file here",
+  "Or choose an export file": "Or choose an export file",
   "csv, json — parsed locally, never uploaded": "csv, json — parsed locally, never uploaded",
   "Imports are merged. Existing items are never overwritten.": "Imports are merged. Existing items are never overwritten.",
   "Ready to import": "Ready to import",
@@ -379,5 +381,7 @@
   "Good, even light helps — with the whole card, or the two or three machine-readable lines, inside the frame.": "Good, even light helps — with the whole card, or the two or three machine-readable lines, inside the frame.",
   "Scan a card or document…": "Scan a card or document…",
   "A photo or screenshot, read on this device.": "A photo or screenshot, read on this device.",
+  "Scan a photo…": "Scan a photo…",
+  "A card or document from your photo library, read on this device.": "A card or document from your photo library, read on this device.",
   "Images": "Images"
 }

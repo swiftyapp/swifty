@@ -1,20 +1,27 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isMobile } from '@/lib/platform'
+import { pickImportFile } from '@/lib/commands'
 import { DownloadGlyph } from '../../../../icons'
 
 interface Props {
   onDrop: (path: string) => void
 }
 
-// Files dropped onto the window arrive as OS paths through the webview, not as
-// a browser DataTransfer. The API is imported lazily so a non-Tauri host (the
-// vitest jsdom run) simply never wires the listener up.
+// The "I don't see my provider" route into the same import: any export file,
+// with the backend sniffing its format. Nothing drags a file onto a phone, so
+// there the drop target becomes the button it was the alternative to — the
+// picker is `pick_import_file`, the very one the tiles above already use.
 export default function DropZone({ onDrop }: Props) {
   const { t } = useTranslation()
   useEffect(() => {
+    if (isMobile) return
     let alive = true
     let unlisten: (() => void) | undefined
 
+    // Files dropped onto the window arrive as OS paths through the webview,
+    // not as a browser DataTransfer. The API is imported lazily so a non-Tauri
+    // host (the vitest jsdom run) simply never wires the listener up.
     import('@tauri-apps/api/webview')
       .then(({ getCurrentWebview }) =>
         getCurrentWebview().onDragDropEvent(event => {
@@ -35,18 +42,42 @@ export default function DropZone({ onDrop }: Props) {
     }
   }, [onDrop])
 
-  return (
-    <div
-      data-testid="import-dropzone"
-      className="flex items-center gap-3.5 rounded-lg border border-dashed border-line2 px-4 py-5 text-text3"
-    >
+  const pick = () =>
+    pickImportFile()
+      .then(path => {
+        if (path) onDrop(path)
+      })
+      .catch(() => {})
+
+  const body = (
+    <>
       <DownloadGlyph size={16} />
-      <div className="min-w-0">
-        <div className="text-base text-text2">{t('Or drop an export file here')}</div>
+      <div className="min-w-0 text-left">
+        <div className="text-base text-text2">
+          {isMobile ? t('Or choose an export file') : t('Or drop an export file here')}
+        </div>
         <div className="font-mono text-xs">
           {t('csv, json — parsed locally, never uploaded')}
         </div>
       </div>
+    </>
+  )
+
+  const className =
+    'flex items-center gap-3.5 rounded-lg border border-dashed border-line2 px-4 py-5 text-text3'
+
+  return isMobile ? (
+    <button
+      type="button"
+      data-testid="import-dropzone"
+      onClick={() => void pick()}
+      className={`${className} w-full cursor-pointer transition-colors hover:border-accent-line`}
+    >
+      {body}
+    </button>
+  ) : (
+    <div data-testid="import-dropzone" className={className}>
+      {body}
     </div>
   )
 }

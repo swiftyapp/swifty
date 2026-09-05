@@ -22,6 +22,8 @@ mod storage;
 pub mod store;
 mod sync;
 mod timer;
+// `tauri::tray` and `tauri::menu` are desktop-only.
+#[cfg(desktop)]
 mod tray;
 mod window;
 
@@ -29,6 +31,8 @@ use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Only the desktop-gated blocks below reassign it.
+    #[cfg_attr(mobile, allow(unused_mut))]
     let mut builder = tauri::Builder::default();
 
     // Desktop-only plugins.
@@ -42,9 +46,18 @@ pub fn run() {
             .plugin(tauri_plugin_process::init());
     }
 
+    // Mobile-only plugins.
+    #[cfg(mobile)]
+    {
+        // The OAuth redirect for the public mobile client arrives on the app's
+        // own URL scheme (see `tauri.ios.conf.json`), not on a loopback port.
+        builder = builder.plugin(tauri_plugin_deep_link::init());
+    }
+
     // In-app W3C WebDriver server (port 4445) for the E2E smoke suite. Never
-    // compiled into a release binary.
-    #[cfg(debug_assertions)]
+    // compiled into a release binary, and desktop-only — the suite drives the
+    // desktop app.
+    #[cfg(all(debug_assertions, desktop))]
     {
         builder = builder.plugin(tauri_plugin_webdriver::init());
     }
@@ -73,7 +86,20 @@ pub fn run() {
         .setup(|app| {
             storage::ensure_migrated(app.handle()); // one-time copy from the legacy Electron vault
             window::create(app.handle())?;
+            #[cfg(desktop)]
             tray::create(app.handle())?;
+            // The second half of the mobile OAuth flow: iOS reopens the app
+            // with Google's redirect once the user has approved.
+            #[cfg(mobile)]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    for url in event.urls() {
+                        commands::sync::on_redirect(&handle, &url);
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { APP_NAME } from '@/lib/app'
+import { isMobile } from '@/lib/platform'
 import { useVaultMeta, vaultHome } from '@/hooks/useAuthMeta'
 import { MONO_META } from '@/components/elements/tokens'
 
@@ -20,21 +21,29 @@ export default function Footer() {
         ? t('check failed')
         : t('up to date')
 
+  const home = meta ? vaultHome(meta.configured) : null
+
   return (
     <div className={`mt-4 flex flex-col items-start gap-0.5 ${MONO_META}`}>
       <div data-testid="settings-version">
         {meta?.version ? `${APP_NAME} ${meta.version}` : APP_NAME}
       </div>
-      <button
-        type="button"
-        title={t('Check for updates')}
-        data-testid="settings-update-status"
-        onClick={() => runUpdateCheck()}
-        className="cursor-pointer text-left transition-colors hover:text-text2"
-      >
-        {status}
-        {meta && ` · ${vaultHome(meta.configured)}`}
-      </button>
+      {isMobile ? (
+        // The App Store owns updates on mobile: there is nothing to check and no
+        // version to report, so the line drops to plain text.
+        home && <div data-testid="settings-vault-home">{home}</div>
+      ) : (
+        <button
+          type="button"
+          title={t('Check for updates')}
+          data-testid="settings-update-status"
+          onClick={() => runUpdateCheck()}
+          className="cursor-pointer text-left transition-colors hover:text-text2"
+        >
+          {status}
+          {home && ` · ${home}`}
+        </button>
+      )}
     </div>
   )
 }

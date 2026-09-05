@@ -27,6 +27,7 @@ jobs:
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       rust: ${{ steps.filter.outputs.rust }}
+      ios: ${{ steps.filter.outputs.ios }}
       crypto: ${{ steps.filter.outputs.crypto }}
       e2e: ${{ steps.filter.outputs.e2e }}
       supply-chain: ${{ steps.filter.outputs.supply-chain }}
@@ -55,6 +56,12 @@ jobs:
             rust:
               - *ci
               - *rust-src
+            # The iOS gate covers the crate, the Xcode project and app metadata
+            # (all under src-tauri/), and the iOS frontend bundle.
+            ios:
+              - *ci
+              - *rust-src
+              - *frontend-src
             crypto:
               - *ci
               - *rust-src
@@ -148,6 +155,75 @@ jobs:
       - name: Build
         working-directory: src-tauri
         run: cargo build --locked
+
+  ios:
+    # Everything about the iOS app that a hosted runner can check without an
+    # Apple developer identity: the crate cross-compiles, the frontend bundles
+    # under the iOS Vite target, and the committed Xcode project + app metadata
+    # still parse. A full `tauri ios build` is deliberately not here — archiving
+    # needs a signing certificate and provisioning profile that only exist as
+    # release secrets, so it belongs with the release workflow, not on every PR.
+    name: iOS (crate + app config)
+    runs-on: macos-latest
+    needs: changes
+    if: >-
+      !cancelled() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.result != 'success' ||
+        needs.changes.outputs.ios == 'true'
+      )
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pinned Rust toolchain (from rust-toolchain.toml)
+        run: rustup toolchain install
+
+      - name: Add the iOS simulator target
+        run: rustup target add aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          # See the `rust` job: restore everywhere, save only on push.
+          save-if: ${{ github.event_name == 'push' }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+      - run: bun install --frozen-lockfile
+
+      # The real iOS bundle, not the stub the other Rust jobs use: this is the
+      # only place `TAURI_ENV_PLATFORM=ios` is exercised, so it covers the
+      # `__TAURI_PLATFORM__` define and the safari16 build target (a syntax the
+      # WKWebView on iOS 16 can't parse fails here rather than on a device).
+      - name: Build the frontend for iOS
+        run: bun run build
+        env:
+          TAURI_ENV_PLATFORM: ios
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --target aarch64-apple-ios-sim --all-targets -- -D warnings
+
+      # Malformed XML in any of these only surfaces at build or upload time
+      # otherwise, and a dropped privacy manifest is not an error at all — App
+      # Store Connect just rejects the submission by email days later.
+      - name: Validate the iOS app metadata
+        run: |
+          set -euo pipefail
+          plutil -lint \
+            src-tauri/Info.ios.plist \
+            src-tauri/PrivacyInfo.xcprivacy \
+            src-tauri/gen/apple/ExportOptions.plist \
+            src-tauri/gen/apple/swifty_iOS/Info.plist \
+            src-tauri/gen/apple/swifty_iOS/swifty_iOS.entitlements
+          grep -q 'PrivacyInfo.xcprivacy' src-tauri/gen/apple/swifty.xcodeproj/project.pbxproj \
+            || { echo '::error::PrivacyInfo.xcprivacy is not a resource of the iOS target'; exit 1; }
+
+      # Parses the committed project.pbxproj and proves the scheme the release
+      # build names still exists.
+      - name: Validate the Xcode project
+        run: xcodebuild -list -project src-tauri/gen/apple/swifty.xcodeproj
 
   supply-chain:
     name: Supply chain (audit + cargo-deny)

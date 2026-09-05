@@ -7,6 +7,7 @@ pub mod clipboard;
 pub mod e2e;
 pub mod generator;
 pub mod import;
+pub mod save;
 pub mod sync;
 pub mod vault;
 

@@ -6,13 +6,23 @@ import svgr from 'vite-plugin-svgr'
 import tailwindcss from '@tailwindcss/vite'
 
 const host = process.env.TAURI_DEV_HOST
+// The Tauri CLI exports this to the before*Command it runs ('ios', 'darwin',
+// 'windows', 'linux'). Empty for a plain `vite`/`vitest` run, which reads as
+// desktop — see src/lib/platform.ts.
+const platform = process.env.TAURI_ENV_PLATFORM ?? ''
 
 // https://vitejs.dev/config/ — tuned for Tauri (fixed port, no clearScreen).
 export default defineConfig({
   plugins: [react(), svgr(), tailwindcss()],
   clearScreen: false,
+  define: { __TAURI_PLATFORM__: JSON.stringify(platform) },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) }
+  },
+  build: {
+    // WKWebView on the minimum supported iOS (16) is Safari 16. Everywhere else
+    // keeps Vite's default target, so desktop output is untouched.
+    target: platform === 'ios' ? 'safari16' : undefined
   },
   server: {
     port: 1420,

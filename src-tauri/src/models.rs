@@ -260,6 +260,9 @@ pub type Audit = HashMap<String, AuditItem>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncStatus {
     pub configured: bool,
+    /// A consent flow is out with the browser. Owned here, not by the frontend:
+    /// the backend is what starts and ends it, so it is the one that can say.
+    pub pending: bool,
 }
 
 #[cfg(test)]

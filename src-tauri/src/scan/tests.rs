@@ -2,7 +2,7 @@
 //! picture into lines, and everything that can be wrong about a scan is wrong
 //! about the lines.
 
-use super::{card, mrz, scan_lines};
+use super::{card, local_path, mrz, scan_lines};
 
 // The ICAO 9303 specimen document (Utopia / ANNA MARIA ERIKSSON), the one set
 // of MRZ lines whose every check digit is published.
@@ -226,4 +226,21 @@ fn scan_lines_finds_nothing_in_plain_text() {
         "call mum on 555 1234"
     ]))
     .is_none());
+}
+
+// The iOS picker hands back the sandbox copy as a `file://` URL; every other
+// source gives a plain path, and a Windows path must not be read as a URL.
+#[test]
+fn a_file_url_resolves_to_the_path_it_names() {
+    assert_eq!(
+        local_path("file:///var/mobile/Containers/Data/Application/Caches/IMG_0001.HEIC"),
+        std::path::PathBuf::from("/var/mobile/Containers/Data/Application/Caches/IMG_0001.HEIC")
+    );
+}
+
+#[test]
+fn a_plain_path_is_left_alone() {
+    for path in ["/Users/a/card.png", r"C:\Users\a\card.png", "card.png"] {
+        assert_eq!(local_path(path), std::path::PathBuf::from(path));
+    }
 }

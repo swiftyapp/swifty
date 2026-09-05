@@ -50,7 +50,15 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 
     let window = builder.build()?;
     let handle = app.clone();
-    window.on_window_event(move |event| autolock::handle_event(&handle, event));
+    window.on_window_event(move |event| {
+        autolock::handle_event(&handle, event);
+        // Coming back to the foreground is how a consent flow the user walked
+        // away from gets noticed (see `commands::sync::on_resume`).
+        #[cfg(mobile)]
+        if let tauri::WindowEvent::Focused(true) = event {
+            crate::commands::sync::on_resume(&handle);
+        }
+    });
 
     let fallback = app.clone();
     std::thread::spawn(move || {
@@ -83,6 +91,8 @@ fn reveal(app: &AppHandle, revealed: &std::sync::atomic::AtomicBool) {
 pub fn show(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(MAIN) {
         let _ = window.show();
+        // Minimization is a desktop window state; the API doesn't exist on mobile.
+        #[cfg(desktop)]
         let _ = window.unminimize();
         let _ = window.set_focus();
     }

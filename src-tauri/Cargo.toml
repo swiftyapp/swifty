@@ -23,7 +23,6 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-log = "2"
 tauri-plugin-opener = "2"
-tauri-plugin-webdriver = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 csv = "1"
@@ -38,7 +37,6 @@ hex = "0.4"
 base64 = "0.23"
 totp-rs = { version = "5", default-features = false }
 zxcvbn = "3"
-dirs = "6"
 log = "0.4.34"
 chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "form", "query", "rustls-no-provider"] }
@@ -68,15 +66,22 @@ ssh-key = { version = "0.6.7", default-features = false, features = [
 # them needs the same attribute macro passkey-authenticator declares them with.
 async-trait = "0.1"
 
+# Desktop-only (the `desktop` cfg alias tauri-build defines is this same
+# predicate). None of these support a mobile target.
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+tauri-plugin-webdriver = "0.2"
+# Only the legacy-Electron vault migration needs it, and that only ever ran on
+# desktop (see `storage::ensure_migrated`).
+dirs = "6"
 
-[target.'cfg(target_os = "macos")'.dependencies]
+# Frameworks that exist on both macOS and iOS: Foundation, LocalAuthentication,
+# Vision and the Keychain.
+[target.'cfg(target_vendor = "apple")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = "0.3"
-objc2-app-kit = { version = "0.3", features = ["NSPasteboard"] }
 objc2-local-authentication = { version = "0.3", features = ["LAContext", "block2"] }
 block2 = "0.6"
 # On-device text recognition (VNRecognizeTextRequest) for the image scanner.
@@ -93,8 +98,26 @@ objc2-vision = { version = "0.3.2", default-features = false, features = [
   "objc2-core-foundation",
 ] }
 # Biometric-gated Keychain (SecAccessControl / kSecAccessControlBiometryCurrentSet).
-# OSX_10_15 enables the data-protection keychain required for biometric ACLs.
+# OSX_10_15 enables the data-protection keychain required for biometric ACLs on
+# macOS; on iOS every keychain item already lives there, so the feature is inert.
 security-framework = { version = "3.6.0", features = ["OSX_10_15"] }
+
+# Mobile-only. The OAuth redirect for a public (iOS/Android) client comes back
+# on the app's own URL scheme, which is what this registers and listens for;
+# desktop keeps its loopback listener and never links this in.
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-deep-link = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+# UIPasteboard: the iOS clipboard write, with the local-only + expiry options
+# that keep a secret off Universal Clipboard (see `commands/clipboard.rs`).
+objc2-ui-kit = { version = "0.3", default-features = false, features = [
+  "std",
+  "UIPasteboard",
+] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # `Media_Ocr` + the imaging/storage stack it needs are for the image scanner:

@@ -43,6 +43,17 @@ pub fn set_autolock_timeout(app: AppHandle, secs: u64) -> Result<()> {
     Ok(())
 }
 
+/// Backgrounding counts as a blur on every platform, so this one hook covers
+/// the phone too: tao's iOS scene delegate posts `Focused(false)` from
+/// `sceneWillResignActive:` and `Focused(true)` from `sceneDidBecomeActive:`
+/// (tao 0.35.3, `platform_impl/ios/scene.rs:75-101`), and tauri-runtime-wry
+/// forwards both unchanged off Windows (`lib.rs:522`). Sending the app to the
+/// home screen therefore arms the same timer that alt-tabbing does.
+///
+/// One iOS-only caveat, which no code here can fix: the timer thread does not
+/// run while iOS has the process suspended, so a lock that comes due in the
+/// background lands when the app is next resumed rather than at the second it
+/// was owed.
 pub fn handle_event(app: &AppHandle, event: &WindowEvent) {
     if let WindowEvent::Focused(focused) = event {
         if *focused {

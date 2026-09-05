@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Swifty",
+        "create": false
+      }
+    ]
+  },
+  "plugins": {
+    "deep-link": {
+      "mobile": [
+        {
+          "scheme": ["com.googleusercontent.apps.YOUR_IOS_CLIENT_ID"]
+        }
+      ]
+    }
+  }
+}

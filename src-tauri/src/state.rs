@@ -67,6 +67,30 @@ impl Session {
     }
 }
 
+/// A mobile consent flow waiting for the browser to come back.
+///
+/// The OAuth redirect arrives as a deep link long after `sync_connect`
+/// returned, so what the exchange needs has to survive in between: the PKCE
+/// verifier the code is redeemed with, the cryptor the tokens are written
+/// under, and which flow asked (connect, or "import from Drive"). Holding the
+/// cryptor is the same bargain the desktop path already makes — it clones one
+/// before opening the browser and keeps it for the whole round trip — and it is
+/// what lets an auto-lock behind the Safari sheet cost the user nothing worse
+/// than the follow-up sync.
+///
+/// It has an identity and an age. The `state` nonce went out in the consent URL
+/// and must come back on the redirect, so a stray URL on the same scheme cannot
+/// consume this in place of Google's callback; `started` is what lets a flow
+/// nobody finished expire instead of pending forever.
+#[cfg(mobile)]
+pub struct PendingAuth {
+    pub verifier: String,
+    pub state: String,
+    pub cryptor: Cryptor,
+    pub import: bool,
+    pub started: std::time::Instant,
+}
+
 #[derive(Default)]
 pub struct AppState {
     pub session: Mutex<Session>,
@@ -74,4 +98,6 @@ pub struct AppState {
     // and releases the session lock repeatedly (never across a network call),
     // so the "one at a time" guard cannot live behind that same lock.
     pub syncing: AtomicBool,
+    #[cfg(mobile)]
+    pub pending_auth: Mutex<Option<PendingAuth>>,
 }

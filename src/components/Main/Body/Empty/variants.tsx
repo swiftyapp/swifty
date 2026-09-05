@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { EntryType } from '@/lib/commands'
 import { syncImport } from '@/lib/commands'
 import {
@@ -7,7 +6,8 @@ import {
   openSettings,
   startEntry,
   setFilterQuery,
-  setFilterType
+  setFilterType,
+  syncFailed
 } from '@/store'
 import { kindOf } from '@/kinds'
 import { useTranslation } from 'react-i18next'
@@ -27,14 +27,16 @@ const Mark = ({ size }: { size: number }) => (
 // thing on screen worth looking at and it gets the full treatment.
 export function VaultEmpty() {
   const { t } = useTranslation()
-  const syncEnabled = useStore(state => state.sync.enabled)
-  const [importing, setImporting] = useState(false)
+  const sync = useStore(state => state.sync)
 
-  // On success the restored entries replace this screen; on failure the button
-  // has to come back, or it spins forever.
+  // The spinner runs off the store, not off the promise: the backend reports
+  // `sync:pending` when the consent page opens and `sync:connected`/`sync:error`
+  // when it hears back, then the pull's own events. On mobile `sync_import`
+  // resolves the moment Safari is on screen. On success the restored entries
+  // replace this screen; on failure the button has to come back rather than
+  // spin forever.
   const restore = () => {
-    setImporting(true)
-    syncImport().catch(() => setImporting(false))
+    syncImport().catch(error => syncFailed(String(error)))
   }
 
   return (
@@ -49,8 +51,12 @@ export function VaultEmpty() {
         testid: 'create-first-entry-button'
       }}
       secondary={
-        syncEnabled
-          ? { label: t('Restore from Google Drive'), onClick: restore, loading: importing }
+        sync.enabled
+          ? {
+              label: t('Restore from Google Drive'),
+              onClick: restore,
+              loading: sync.pending || sync.inProgress
+            }
           : { label: t('Import from another app'), onClick: openSettings }
       }
       hints={[

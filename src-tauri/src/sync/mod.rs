@@ -38,10 +38,17 @@ pub fn is_configured(app: &AppHandle, cryptor: &Cryptor) -> bool {
     auth::is_configured(app, cryptor)
 }
 
-// Run the OAuth consent flow and persist the resulting tokens.
+// Run the OAuth consent flow and persist the resulting tokens. Desktop only:
+// it blocks on the loopback listener, which no mobile OS will redirect to.
+#[cfg(desktop)]
 pub fn setup(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
     auth::authenticate(app, cryptor)
 }
+
+// The mobile consent flow, cut in two around the browser hand-off. See
+// `auth.rs`; the halves are joined by the deep-link handler in `lib.rs`.
+#[cfg(mobile)]
+pub use auth::{begin, complete, parse_redirect, redirect_matches, Redirect};
 
 pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
     auth::disconnect(app, cryptor)
