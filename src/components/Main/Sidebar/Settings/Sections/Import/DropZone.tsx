@@ -38,6 +38,10 @@ export default function DropZone({ onDrop }: Props) {
     }
   }, [onDrop])
 
+  // ...so nothing here would ever fire, and an inert panel would advertise an
+  // import route that silently does nothing. The tiles above still work.
+  if (isMobile) return null
+
   return (
     <div
       data-testid="import-dropzone"
