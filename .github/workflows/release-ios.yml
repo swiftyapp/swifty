@@ -1,0 +1,197 @@
+# Builds the iOS App Store IPA and uploads it to App Store Connect, where it
+# becomes a TestFlight build and, once submitted and approved, an App Store
+# release. iOS has no updater plugin and no `latest.json`: the App Store is the
+# update channel, so nothing here touches the updater artifacts that
+# .github/workflows/release.yml produces for desktop.
+#
+# One-time secret setup and the per-release procedure: docs/releasing-ios.md.
+#
+# tauri-action's iOS support is experimental, so this calls the Tauri CLI
+# directly instead.
+#
+# Repository secrets used:
+#   APPLE_API_ISSUER            App Store Connect API key issuer id (a UUID)
+#   APPLE_API_KEY               App Store Connect API key id (the <ID> in AuthKey_<ID>.p8)
+#   APPLE_API_KEY_P8            base64 of the AuthKey_<ID>.p8 private key file
+#                               (used for automatic signing AND the altool upload)
+#   APPLE_TEAM_ID               Apple Developer team id; exported as
+#                               APPLE_DEVELOPMENT_TEAM. Already set on this repo for
+#                               desktop notarization. If it is ever unset, the
+#                               fallback below matches bundle.iOS.developmentTeam in
+#                               src-tauri/tauri.conf.json.
+#   GOOGLE_OAUTH_IOS_CLIENT_ID  Google iOS OAuth client id for Drive sync, exported as
+#                               GOOGLE_OAUTH_CLIENT_ID and baked in at compile time
+#                               (src-tauri/src/sync/auth.rs). iOS OAuth clients have no
+#                               client secret, so GOOGLE_OAUTH_CLIENT_SECRET is
+#                               deliberately not set here.
+#
+# Signing is fully automatic: the App Store Connect API key lets Xcode create
+# and download the Apple Distribution certificate and the App Store provisioning
+# profile on the runner. No .p12 or .mobileprovision secrets are needed.
+
+name: Release iOS
+
+# Manual, or on a version tag — same triggers as the desktop release, so one
+# `v*` tag ships every platform. The tag/release name comes from `version` in
+# src-tauri/tauri.conf.json, exactly as in release.yml.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  release-ios:
+    runs-on: macos-latest # Xcode + the iOS SDK only exist on macOS runners
+    permissions:
+      contents: write # attach the IPA to the GitHub release for the tag
+      id-token: write # OIDC token for SLSA build-provenance attestation (T-CI-4)
+      attestations: write # record the provenance attestation
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same pinned toolchain as ci.yml, release.yml and local dev
+      # (rust-toolchain.toml is the single source of truth).
+      - name: Install pinned Rust toolchain (from rust-toolchain.toml)
+        run: rustup toolchain install
+
+      - name: Add the iOS device target
+        run: rustup target add aarch64-apple-ios
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Frontend toolchain is bun (matches ci.yml and the bun-based
+      # beforeBuildCommand in tauri.conf.json; the repo ships bun.lock).
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+
+      - run: bun install --frozen-lockfile
+
+      # `tauri ios build` runs `pod install` against src-tauri/gen/apple.
+      # CocoaPods ships on the GitHub macOS images; install it only if that
+      # ever changes.
+      - name: Verify CocoaPods
+        run: |
+          set -euo pipefail
+          if ! command -v pod >/dev/null 2>&1; then
+            brew install cocoapods
+          fi
+          pod --version
+
+      # The Xcode project is committed (src-tauri/gen/apple). Fail loudly here
+      # rather than deep inside the Tauri CLI if it is ever missing, since
+      # `tauri ios init` is a local, interactive step.
+      - name: Check the Xcode project is present
+        run: |
+          set -euo pipefail
+          if [ ! -d src-tauri/gen/apple ]; then
+            echo "::error::src-tauri/gen/apple is missing; run 'bun run tauri ios init' and commit it" >&2
+            exit 1
+          fi
+
+      # One key file serves two consumers with different lookup rules:
+      #   * the Tauri CLI / Xcode read the path in APPLE_API_KEY_PATH;
+      #   * altool ignores that and only searches ./private_keys,
+      #     ~/private_keys, ~/.private_keys and ~/.appstoreconnect/private_keys
+      #     for AuthKey_<KEY_ID>.p8.
+      # So it is written under $RUNNER_TEMP (outside the workspace, so it can
+      # never be picked up by a build or committed) and copied to
+      # ~/private_keys. Both copies are deleted at the end of the job.
+      - name: Write the App Store Connect API key
+        env:
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$APPLE_API_KEY" ] || [ -z "$APPLE_API_KEY_P8" ]; then
+            echo "::error::APPLE_API_KEY and APPLE_API_KEY_P8 must be set (see docs/releasing-ios.md)" >&2
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/private_keys" "$HOME/private_keys"
+          KEY_PATH="$RUNNER_TEMP/private_keys/AuthKey_$APPLE_API_KEY.p8"
+          printf '%s' "$APPLE_API_KEY_P8" | base64 --decode > "$KEY_PATH"
+          cp "$KEY_PATH" "$HOME/private_keys/AuthKey_$APPLE_API_KEY.p8"
+          chmod 600 "$KEY_PATH" "$HOME/private_keys/AuthKey_$APPLE_API_KEY.p8"
+          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      # --build-number sets CFBundleVersion. App Store Connect rejects an
+      # upload whose build number is not strictly greater than every previous
+      # upload of the same version string, and github.run_number only ever
+      # increases for this workflow — so re-running a release (or shipping a
+      # rebuild of the same version) never collides.
+      - name: Build the App Store IPA
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          # APPLE_API_KEY_PATH is exported by the previous step via $GITHUB_ENV.
+          APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID || 'UFBL3F444A' }}
+          # Google Drive sync OAuth client, read via option_env! at compile time.
+          # iOS clients are public: there is no client secret to set.
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_IOS_CLIENT_ID }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          bun run tauri ios build --ci \
+            --export-method app-store-connect \
+            --build-number "$BUILD_NUMBER"
+
+      # Path is src-tauri/gen/apple/build/<arch>/<productName>.ipa; resolved by
+      # glob so it does not have to be kept in sync with productName.
+      - name: Locate the IPA
+        id: ipa
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          ipas=(src-tauri/gen/apple/build/*.ipa src-tauri/gen/apple/build/*/*.ipa)
+          if [ ${#ipas[@]} -eq 0 ]; then
+            echo "::error::no .ipa found under src-tauri/gen/apple/build" >&2
+            exit 1
+          fi
+          echo "path=${ipas[0]}" >> "$GITHUB_OUTPUT"
+          echo "Built ${ipas[0]}"
+
+      # Uploaded before the App Store step so the IPA is still retrievable if
+      # App Store Connect rejects it.
+      - name: Upload the IPA as a workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: swifty-ios-ipa
+          path: ${{ steps.ipa.outputs.path }}
+          if-no-files-found: error
+
+      - name: Upload to App Store Connect (TestFlight)
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          IPA_PATH: ${{ steps.ipa.outputs.path }}
+        run: |
+          xcrun altool --upload-app --type ios --file "$IPA_PATH" \
+            --apiKey "$APPLE_API_KEY" --apiIssuer "$APPLE_API_ISSUER"
+
+      # Same tag derivation as release.yml. The desktop workflow creates the
+      # release as a draft; if it has not run (or was not triggered by a tag)
+      # there is nothing to attach to and the artifact above is the only copy,
+      # which is not an error.
+      - name: Attach the IPA to the GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IPA_PATH: ${{ steps.ipa.outputs.path }}
+        run: |
+          set -euo pipefail
+          TAG="v$(jq -r .version src-tauri/tauri.conf.json)"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$IPA_PATH" --clobber
+          else
+            echo "::notice::no GitHub release $TAG (yet); the IPA is available as the swifty-ios-ipa artifact"
+          fi
+
+      # --- SLSA build provenance (T-CI-4) ---------------------------------
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: ${{ steps.ipa.outputs.path }}
+
+      - name: Remove the App Store Connect API key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/private_keys" "$HOME/private_keys"
