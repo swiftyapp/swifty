@@ -20,7 +20,7 @@ export default function Line({ label, value, testid }: Props) {
       <div className="mt-1 flex items-start gap-1.5">
         <div
           data-testid={testid}
-          className={`min-w-0 flex-1 ${wellClass} px-3 py-2 font-mono text-base leading-[1.55] break-all`}
+          className={`min-w-0 flex-1 ${wellClass} px-3 py-2 font-mono text-base leading-relaxed break-all`}
         >
           {value}
         </div>

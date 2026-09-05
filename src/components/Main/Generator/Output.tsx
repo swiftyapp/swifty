@@ -18,7 +18,7 @@ export default function Output({ value, bits, level }: Props) {
     <>
       <div
         data-testid="generator-output"
-        className={`min-h-14 ${wellClass} p-4 font-mono text-lg leading-[1.55] break-all`}
+        className={`min-h-14 ${wellClass} p-4 font-mono text-lg leading-relaxed break-all`}
       >
         {value}
       </div>
