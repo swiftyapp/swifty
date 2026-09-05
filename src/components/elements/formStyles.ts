@@ -8,3 +8,8 @@ const controlBase =
 export const inputClass = `${controlBase} h-9`
 
 export const selectClass = `${controlBase} h-9 appearance-none pr-9`
+
+// A read-only well on the field surface (generated output, key material, an
+// inline error row): the input's edge and ground at the tile radius, with no
+// control sizing — the caller sets padding and type.
+export const wellClass = 'rounded-lg border border-line2 bg-field'

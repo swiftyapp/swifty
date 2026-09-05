@@ -3,6 +3,7 @@ import { cx } from '@/utils/cx'
 import Meter from '@/components/elements/Meter'
 import { LEVEL_INK } from '@/components/elements/levels'
 import { ENTROPY_LABELS } from '@/services/generator'
+import { wellClass } from '@/components/elements/formStyles'
 
 interface Props {
   value: string
@@ -17,7 +18,7 @@ export default function Output({ value, bits, level }: Props) {
     <>
       <div
         data-testid="generator-output"
-        className="min-h-14 rounded-lg border border-line2 bg-field p-4 font-mono text-lg leading-[1.55] break-all"
+        className={`min-h-14 ${wellClass} p-4 font-mono text-lg leading-[1.55] break-all`}
       >
         {value}
       </div>

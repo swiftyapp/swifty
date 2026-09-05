@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import type { SshKeyPair } from '@/lib/commands'
 import Button from '@/components/elements/Button'
 import { MONO_LABEL } from '@/components/elements/tokens'
+import { inputClass, wellClass } from '@/components/elements/formStyles'
 import { cx } from '@/utils/cx'
 import Line from './Line'
 import Secret from './Secret'
@@ -28,7 +29,7 @@ export default function Ssh({ pair, pending, error, onRetry, comment, onComment 
       {error ? (
         <div
           data-testid="generator-ssh-error"
-          className="flex items-center gap-3 rounded-lg border border-line2 bg-field px-3 py-2.5"
+          className={`flex items-center gap-3 ${wellClass} px-3 py-2.5`}
         >
           <div className="flex-1 font-mono text-xs tracking-label text-bad">
             {t('Could not generate a key.')}
@@ -68,7 +69,7 @@ export default function Ssh({ pair, pending, error, onRetry, comment, onComment 
           placeholder="alice@laptop"
           data-testid="generator-ssh-comment"
           onChange={event => onComment(event.target.value)}
-          className="mt-1 block h-9 w-full rounded-lg border border-line2 bg-field px-3 font-mono text-base text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line"
+          className={`mt-1 block font-mono ${inputClass}`}
         />
       </div>
     </div>
