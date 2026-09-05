@@ -28,7 +28,7 @@ csv = "1"
 thiserror = "2"
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl", "backup"] }
 rusqlite_migration = "1"
-aes-gcm = "0.10"
+aes-gcm = "0.11"
 ring = "0.17"
 sha2 = "0.10"
 rand = "0.8"
