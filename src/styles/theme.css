@@ -304,7 +304,7 @@
  *             lg 16 / xl 20 / 2xl 24 display tiers · 3xl 34 the vault score
  *   Tracking  label .12em (mono uppercase) · display −.02em (16px and up)
  *             secret .08em (revealed secrets, card numbers, TOTP)
- *   Radius    sm 8 controls · lg 12 tiles & cards · xl 14 overlays
+ *   Radius    xs 4 chips & inlays · sm 8 controls · lg 12 tiles & cards · xl 14 overlays
  *   Motion    one duration (160ms), one easing, three shapes (fade/pop/sheet)
  */
 @theme {
@@ -332,6 +332,7 @@
   --tracking-secret: 0.08em;
 
   --radius-*: initial;
+  --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-lg: 12px;
   --radius-xl: 14px;

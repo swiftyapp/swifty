@@ -68,7 +68,7 @@ export default function Fields() {
           {hasBrandMark(brand) ? (
             <CardBrandMark brand={brand} size={22} tone="light" />
           ) : (
-            <div className="h-7 w-[40px] flex-none rounded-[4px] border border-white/15 bg-white/10" />
+            <div className="h-7 w-[40px] flex-none rounded-xs border border-white/15 bg-white/10" />
           )}
         </div>
 

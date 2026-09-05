@@ -48,7 +48,7 @@ export default function Dots({
           <span
             key={i}
             className={cx(
-              'animate-fade flex flex-none items-center justify-center rounded-[3px]',
+              'animate-fade flex flex-none items-center justify-center rounded-xs',
               i >= start && i < end && 'bg-accent-soft'
             )}
             style={{ width: CELL }}
