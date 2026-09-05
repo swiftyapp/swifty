@@ -16,7 +16,7 @@ jobs:
     name: Frontend (build + lint)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.3
@@ -33,7 +33,7 @@ jobs:
         os: [macos-latest, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux system dependencies
         if: matrix.os == 'ubuntu-latest'
@@ -72,7 +72,7 @@ jobs:
     name: Supply chain (audit + cargo-deny)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # JS dependency vulnerabilities. The blocking gate audits PRODUCTION
       # dependencies only — those are what ship in the app bundle (Tauri packages
@@ -107,7 +107,7 @@ jobs:
     name: Crypto compatibility
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux system dependencies
         run: |
@@ -142,7 +142,7 @@ jobs:
     name: E2E smoke suite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux system dependencies
         run: |

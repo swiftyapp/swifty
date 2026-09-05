@@ -43,7 +43,7 @@ jobs:
             bundlePath: src-tauri/target/release/bundle
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-latest'
