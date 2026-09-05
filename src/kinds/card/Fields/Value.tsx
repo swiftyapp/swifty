@@ -88,7 +88,7 @@ export default function Value({
   const { copied, copy } = useCopied()
 
   const caption = label && (
-    <span className="block text-[11px] uppercase tracking-[0.12em] opacity-50">{t(label)}</span>
+    <span className="block text-[11px] uppercase tracking-label opacity-50">{t(label)}</span>
   )
 
   if (set) {

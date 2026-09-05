@@ -77,7 +77,7 @@ export default function Button({
       {/* A chip rather than dimmed text: on an accent fill, opacity is the one
           thing that makes the hint disappear. */}
       {kbd && (
-        <span className="flex-none rounded-[4px] bg-[color-mix(in_srgb,currentColor_14%,transparent)] px-1 font-mono text-[11px] leading-4">
+        <span className="flex-none rounded-[4px] bg-[color-mix(in_srgb,currentColor_14%,transparent)] px-1 font-mono text-xs leading-4">
           {kbd}
         </span>
       )}

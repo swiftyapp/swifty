@@ -21,7 +21,7 @@ export default function Overlay() {
         <strong className="text-lg font-semibold tracking-display">
           {t('Drop to scan the card or document')}
         </strong>
-        <span className="max-w-[320px] text-base text-text2">
+        <span className="max-w-xs text-base text-text2">
           {t('Read on this device. The image is never copied or uploaded.')}
         </span>
       </div>

@@ -75,7 +75,7 @@ export default function EmptyState({
   return (
     <div
       data-testid={testid}
-      className="flex max-w-[320px] flex-col items-center gap-5 text-center animate-pop"
+      className="flex max-w-xs flex-col items-center gap-5 text-center animate-pop"
     >
       <div
         className={cx(
