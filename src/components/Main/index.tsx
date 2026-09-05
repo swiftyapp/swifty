@@ -1,17 +1,19 @@
 import { useTranslation } from 'react-i18next'
-import Sidebar from './Sidebar'
-import Header from './Header'
-import Body from './Body'
+import { useLayout } from '@/hooks/useLayout'
+import Wide from './Wide'
+import Compact from './Compact'
 import Generator from './Generator'
 import Palette from './Palette'
 import AddSecret from './AddSecret'
 import Scan from './Scan'
 import { useShortcuts } from './useShortcuts'
 
-// Three-pane shell: a full-width top chrome bar over a row of
-// rail (56px) · list column (348px) · detail pane (flex).
+// Two shells, one set of overlays. `Wide` is the three-pane desktop/iPad layout
+// (rail 56px · list 348px · detail flex); `Compact` is the phone one, a screen
+// at a time over a tab bar. The overlays frame themselves for whichever is up.
 export function Main() {
   const { t } = useTranslation()
+  const compact = useLayout() === 'compact'
   useShortcuts()
 
   return (
@@ -19,13 +21,11 @@ export function Main() {
       data-testid="main-view"
       className="flex h-full flex-col overflow-hidden bg-app font-sans text-text select-none"
     >
-      <Header />
-      <div className="flex min-h-0 flex-1">
-        <Sidebar />
-        <Body />
-      </div>
+      {compact ? <Compact /> : <Wide />}
       <Generator />
-      <Palette />
+      {/* ⌘K needs a keyboard to reach and a rail's worth of room to read: on a
+          phone it is neither reachable nor the way anything is found. */}
+      {!compact && <Palette />}
       <AddSecret />
       <Scan />
       {/* `copied-notification` + `hidden` are toggled by services/copy.ts; the

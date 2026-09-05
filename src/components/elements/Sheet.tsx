@@ -57,6 +57,9 @@ export default function Sheet({
       aria-label={title}
       aria-labelledby={title ? undefined : labelledBy}
       data-testid={testid}
+      // Which frame won, for anything asking (tests, styling hooks) without
+      // having to read class names off the element.
+      data-frame="sheet"
       style={{ height: height ?? undefined }}
       className="animate-fade fixed inset-0 z-50 flex flex-col bg-detail pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-text"
     >

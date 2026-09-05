@@ -1,12 +1,20 @@
 import { useTranslation } from 'react-i18next'
 import { useStore, setFilterTag } from '@/store'
+import { cx } from '@/utils/cx'
 import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
 import { CheckGlyph } from '../../icons'
 import { useTagCounts } from './useTagCounts'
 
 // Hangs off the right edge of the 36px rail tile, floating over the list column
-// — the rail itself is too narrow to hold a menu.
-export default function Menu({ onClose }: { onClose: () => void }) {
+// — the rail itself is too narrow to hold a menu. `className` is where it is
+// pinned, which the compact header changes.
+export default function Menu({
+  onClose,
+  className
+}: {
+  onClose: () => void
+  className?: string
+}) {
   const { t } = useTranslation()
   const active = useStore(state => state.filters.tag)
   const tags = useTagCounts()
@@ -19,7 +27,7 @@ export default function Menu({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="absolute left-full top-0 ml-3 w-[220px]">
+    <div className={cx('absolute z-20 w-[220px]', className ?? 'left-full top-0 ml-3')}>
       <Dropdown onBlur={onClose} className="w-full">
         {tags.length === 0 ? (
           <div className="px-3.5 py-2.5" data-testid="tags-empty">
