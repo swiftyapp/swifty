@@ -8,6 +8,7 @@
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-clear",
     "dialog:allow-open",
+    "dialog:allow-save",
     {
       "identifier": "opener:allow-open-url",
       "allow": [{ "url": "http://*" }, { "url": "https://*" }]

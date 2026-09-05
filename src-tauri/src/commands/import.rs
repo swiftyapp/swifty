@@ -12,7 +12,7 @@ use serde_json::json;
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::commands::store_err;
+use crate::commands::{save, store_err};
 use crate::error::{Error, Result};
 use crate::import::{self, EntryKind, Format, ImportedEntry, ImportedPasskey, RowError};
 use crate::models::{Entry, ExtraField, Passkey};
@@ -185,31 +185,16 @@ pub async fn export_entries(
         other => return Err(Error::Other(format!("unknown export format: {other}"))),
     };
 
+    // An explicit path skips the dialog (the E2E suite exports to a temp file).
     let dest = match path {
-        Some(p) => Some(std::path::PathBuf::from(p)),
-        None => {
-            // Off-main-thread so the blocking save dialog can't hang the window.
-            let chosen = tauri::async_runtime::spawn_blocking(move || {
-                app.dialog()
-                    .file()
-                    .set_file_name(format!("swifty-export.{ext}"))
-                    .add_filter("Export", &[ext])
-                    .blocking_save_file()
-            })
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?;
-            chosen.and_then(|f| f.into_path().ok())
+        Some(p) => {
+            let dest = save::with_extension(std::path::PathBuf::from(p), ext);
+            fs::write(&dest, bytes)?;
+            Some(dest)
         }
+        None => save::save_export(&app, &format!("swifty-export.{ext}"), "Export", bytes).await?,
     };
-    let Some(dest) = dest else {
-        return Ok(None);
-    };
-    let dest = match dest.extension() {
-        Some(e) if e == ext => dest,
-        _ => dest.with_extension(ext),
-    };
-    fs::write(&dest, bytes)?;
-    Ok(Some(dest.to_string_lossy().into_owned()))
+    Ok(dest.map(|p| p.to_string_lossy().into_owned()))
 }
 
 // ImportedEntry -> a plaintext models::Entry, ready to be obscured + sealed.
