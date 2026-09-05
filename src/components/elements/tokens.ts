@@ -19,3 +19,8 @@ export const TOAST =
 export const MONO_TYPE = 'font-mono text-xs uppercase tracking-label'
 
 export const MONO_LABEL = `${MONO_TYPE} text-text3`
+
+// The mono meta face: counts, timestamps, hints, shortcuts — the same 11px mono
+// as the label tier, muted, but set as ordinary text rather than a tracked
+// uppercase eyebrow.
+export const MONO_META = 'font-mono text-xs text-text3'

@@ -4,7 +4,7 @@ import { cx } from '@/utils/cx'
 import { shortDate, toTime } from '@/utils/time'
 import { KeyGlyph, TrashGlyph } from '../../../Main/icons'
 import IconButton from '../../IconButton'
-import { ROW_HAIRLINE } from '../../tokens'
+import { MONO_META, ROW_HAIRLINE } from '../../tokens'
 
 interface Props {
   passkey: Passkey
@@ -34,7 +34,7 @@ export default function PasskeyRow({ passkey, onRemove }: Props) {
         <div className="truncate text-base text-text">
           {passkey.rpName || passkey.rpId}
         </div>
-        <div className="mt-0.5 truncate font-mono text-xs text-text3">
+        <div className={`mt-0.5 truncate ${MONO_META}`}>
           {passkey.userName}
           {created !== null &&
             ` · ${t('Created {{time}}', { time: shortDate(created) })}`}

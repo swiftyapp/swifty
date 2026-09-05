@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { APP_NAME } from '@/lib/app'
 import { useVaultMeta, vaultHome } from '@/hooks/useAuthMeta'
+import { MONO_META } from '@/components/elements/tokens'
 
 // Version and update state, pinned under the nav. The status line doubles as the
 // "check for updates" control — there is no separate Updates section any more.
@@ -20,7 +21,7 @@ export default function Footer() {
         : t('up to date')
 
   return (
-    <div className="mt-4 flex flex-col items-start gap-0.5 font-mono text-xs text-text3">
+    <div className={`mt-4 flex flex-col items-start gap-0.5 ${MONO_META}`}>
       <div data-testid="settings-version">
         {meta?.version ? `${APP_NAME} ${meta.version}` : APP_NAME}
       </div>

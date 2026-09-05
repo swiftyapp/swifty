@@ -2,7 +2,7 @@ import type { EntryMeta } from '@/lib/commands'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
 import Item from './Item'
-import { MONO_LABEL } from '@/components/elements/tokens'
+import { MONO_LABEL, MONO_META } from '@/components/elements/tokens'
 
 interface Props {
   title: TKey
@@ -23,7 +23,7 @@ export default function Group({ title, entries }: Props) {
           {t(title)}
         </span>
         <span className="h-px flex-1 bg-line" />
-        <span className="font-mono text-xs text-text3">{entries.length}</span>
+        <span className={MONO_META}>{entries.length}</span>
       </div>
       {entries.map(entry => (
         <Item entry={entry} key={entry.id} />

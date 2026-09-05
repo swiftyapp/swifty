@@ -8,6 +8,7 @@ import IconButton from '../IconButton'
 import StrengthBar from '../StrengthBar'
 import Field from './Field'
 import { useField, useFields } from './context'
+import { MONO_META } from '../tokens'
 
 // How long this password has been in place. `now` reads as "just now" rather
 // than "changed now ago", and past a week — where the duration runs out — the
@@ -61,7 +62,7 @@ export default function PasswordField({
           <>
             <StrengthBar password={value} />
             {/* A sentence about the password, not a label for one. */}
-            {stamp && <span className="font-mono text-xs text-text3">{stamp}</span>}
+            {stamp && <span className={MONO_META}>{stamp}</span>}
           </>
         )
       }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'
 import { inputClass } from '@/components/elements/formStyles'
-import { CARD } from '@/components/elements/tokens'
+import { CARD, MONO_META } from '@/components/elements/tokens'
 import Progress from './Progress'
 import RowErrors from './RowErrors'
 import type { useImport } from './useImport'
@@ -20,7 +20,7 @@ export default function Result({ flow }: { flow: ReturnType<typeof useImport> })
 
   return (
     <div className={`${CARD} flex flex-col gap-3 p-4`} data-testid="import-result">
-      <div className="font-mono text-xs text-text3">{fileName(picked.path)}</div>
+      <div className={MONO_META}>{fileName(picked.path)}</div>
 
       {picked.kind === 'swftx' ? (
         <div className="flex flex-wrap items-center gap-3">

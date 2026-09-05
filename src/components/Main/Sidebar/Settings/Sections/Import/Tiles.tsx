@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
 import type { TKey } from '@/i18n'
 import type { ImportFormat } from '@/lib/commands'
-import { CARD } from '@/components/elements/tokens'
+import { CARD, MONO_META } from '@/components/elements/tokens'
 
 // One tile per source. `format` absent means the Swifty backup tile, which goes
 // through its own picker and password.
@@ -57,7 +57,7 @@ export default function Tiles({ active, disabled, onFormat, onBackup }: Props) {
             {tile.badge}
           </div>
           <div className="mt-3 truncate text-base text-text">{t(tile.name)}</div>
-          <div className="mt-0.5 font-mono text-xs text-text3">{t(tile.hint)}</div>
+          <div className={`mt-0.5 ${MONO_META}`}>{t(tile.hint)}</div>
         </button>
       ))}
     </div>

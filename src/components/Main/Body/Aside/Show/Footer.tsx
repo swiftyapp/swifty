@@ -5,7 +5,7 @@ import { setFilterQuery } from '@/store'
 import { PlusGlyph } from '@/components/Main/icons'
 import TagsInput from '@/components/elements/TagsInput'
 import { TAG_CHIP } from '@/components/elements/fields/chip'
-import { MONO_LABEL } from '@/components/elements/tokens'
+import { MONO_LABEL, MONO_META } from '@/components/elements/tokens'
 import { dateTime, relativeLong, shortDate, toTime } from '@/utils/time'
 
 interface Props {
@@ -77,7 +77,7 @@ export default function Footer({
               type="button"
               data-testid="add-tag-button"
               onClick={onAdd}
-              className="flex h-6 cursor-pointer items-center gap-1 font-mono text-xs text-text3 transition-colors hover:text-text"
+              className={`flex h-6 cursor-pointer items-center gap-1 ${MONO_META} transition-colors hover:text-text`}
             >
               <PlusGlyph size={12} />
               {t('Add tag')}
