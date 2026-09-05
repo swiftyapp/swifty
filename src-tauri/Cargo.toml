@@ -55,7 +55,7 @@ passkey-authenticator = "0.4"
 # P-256 keys (PKCS#8 <-> COSE) and the COSE key type passkey-types speaks.
 # Both pinned to what passkey-authenticator itself depends on, so exactly one
 # copy of each is linked.
-p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+p256 = { version = "0.14", features = ["ecdsa", "pkcs8"] }
 coset = "0.3"
 # OpenSSH key format (RustCrypto). ed25519 only for now: `rand_core` gives the
 # keygen, `std` the I/O impls the OpenSSH encoding needs.
