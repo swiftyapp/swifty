@@ -8,7 +8,7 @@ const TABBABLE =
 
 interface Props {
   onClose: () => void
-  // Replaces the card's default sizing (`w-full max-w-[720px]`) rather than
+  // Replaces the card's default sizing (`w-full max-w-dialog-lg`) rather than
   // adding to it, so a narrower dialog does not fight the default width.
   className?: string
   // id of the element that names the dialog, for `aria-labelledby`.
@@ -82,7 +82,7 @@ export default function Modal({
         data-testid={testid}
         className={cx(
           'animate-pop relative flex max-h-[80vh] overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-float',
-          className ?? 'w-full max-w-[720px]'
+          className ?? 'w-full max-w-dialog-lg'
         )}
         onClick={e => e.stopPropagation()}
       >

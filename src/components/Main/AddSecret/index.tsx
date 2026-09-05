@@ -66,7 +66,7 @@ export default function AddSecret() {
   return (
     <Modal
       onClose={closeAddPicker}
-      className="w-[640px]"
+      className="w-dialog"
       labelledBy={TITLE_ID}
       testid="add-secret-modal"
     >

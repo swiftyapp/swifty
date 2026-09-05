@@ -38,7 +38,7 @@ export default function Show({ entry, type, editing }: Props) {
     // always resolves. (`reveal_entry` refuses deleted rows; `editEntry` does
     // too.)
     if (entry && !current && served.current !== entry.id)
-      return <div className="mx-auto min-h-[320px] w-full max-w-[860px]" />
+      return <div className="mx-auto min-h-[320px] w-full max-w-sheet" />
     // Keyed per entry: each editing session starts from a fresh draft. A new
     // entry has no id to key on, so it is keyed by its kind — choosing another
     // kind (the picker again, or a scan that recognized a different one) is a

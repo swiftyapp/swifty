@@ -68,7 +68,7 @@ export default function Panel() {
         aria-modal="true"
         aria-label={t('Run a command')}
         onClick={e => e.stopPropagation()}
-        className="w-[620px] overflow-hidden rounded-xl border border-line2 bg-detail shadow-float animate-pop"
+        className="w-dialog overflow-hidden rounded-xl border border-line2 bg-detail shadow-float animate-pop"
       >
         <Input
           value={query}

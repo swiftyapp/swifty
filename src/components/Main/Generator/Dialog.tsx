@@ -87,7 +87,7 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
         aria-modal="true"
         aria-labelledby="generator-title"
         data-testid="generator-dialog"
-        className="w-[470px] animate-pop overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-float"
+        className="w-dialog-sm animate-pop overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-float"
         onClick={event => event.stopPropagation()}
       >
         <div className="flex items-center gap-2.5 px-[18px] py-[15px] inset-shadow-hairline">

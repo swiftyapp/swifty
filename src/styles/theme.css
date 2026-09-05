@@ -305,6 +305,9 @@
  *   Tracking  label .12em (mono uppercase) · display −.02em (16px and up)
  *             secret .08em (revealed secrets, card numbers, TOTP)
  *   Radius    xs 4 chips & inlays · sm 8 controls · lg 12 tiles & cards · xl 14 overlays
+ *   Width     dialog-sm 470 (generator) · dialog 640 (pickers: add, palette)
+ *             dialog-lg 720 (the Modal default) · sheet 860 (settings, the
+ *             entry detail column) — on top of Tailwind's rem container scale
  *   Motion    one duration (160ms) — plus a 300ms slow tier for sweeps that
  *             should be seen moving (the lock field, a progress bar) —
  *             one easing (ease-swift), three shapes (fade/pop/sheet)
@@ -338,6 +341,11 @@
   --radius-sm: 8px;
   --radius-lg: 12px;
   --radius-xl: 14px;
+
+  --container-dialog-sm: 470px;
+  --container-dialog: 640px;
+  --container-dialog-lg: 720px;
+  --container-sheet: 860px;
 
   --ease-swift: cubic-bezier(0.2, 0.8, 0.2, 1);
   --default-transition-duration: 160ms;
