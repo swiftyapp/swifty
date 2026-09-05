@@ -31,7 +31,7 @@ jobs:
       e2e: ${{ steps.filter.outputs.e2e }}
       supply-chain: ${{ steps.filter.outputs.supply-chain }}
     steps:
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -83,7 +83,7 @@ jobs:
         needs.changes.outputs.frontend == 'true'
       )
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.3
@@ -107,7 +107,7 @@ jobs:
         os: [macos-latest, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux system dependencies
         if: matrix.os == 'ubuntu-latest'
@@ -160,7 +160,7 @@ jobs:
         needs.changes.outputs.supply-chain == 'true'
       )
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # JS dependency vulnerabilities. The blocking gate audits PRODUCTION
       # dependencies only — those are what ship in the app bundle (Tauri packages
@@ -202,7 +202,7 @@ jobs:
         needs.changes.outputs.crypto == 'true'
       )
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux system dependencies
         run: |
@@ -262,7 +262,7 @@ jobs:
       matrix:
         shard: [1, 2, 3]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux system dependencies
         run: |
@@ -277,7 +277,7 @@ jobs:
             unzip
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
 
