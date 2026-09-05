@@ -305,7 +305,9 @@
  *   Tracking  label .12em (mono uppercase) · display −.02em (16px and up)
  *             secret .08em (revealed secrets, card numbers, TOTP)
  *   Radius    xs 4 chips & inlays · sm 8 controls · lg 12 tiles & cards · xl 14 overlays
- *   Motion    one duration (160ms), one easing, three shapes (fade/pop/sheet)
+ *   Motion    one duration (160ms) — plus a 300ms slow tier for sweeps that
+ *             should be seen moving (the lock field, a progress bar) —
+ *             one easing (ease-swift), three shapes (fade/pop/sheet)
  */
 @theme {
   --text-*: initial;
@@ -337,12 +339,13 @@
   --radius-lg: 12px;
   --radius-xl: 14px;
 
+  --ease-swift: cubic-bezier(0.2, 0.8, 0.2, 1);
   --default-transition-duration: 160ms;
-  --default-transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --default-transition-timing-function: var(--ease-swift);
 
-  --animate-fade: fade 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  --animate-pop: pop 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  --animate-sheet: sheet 160ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-fade: fade 160ms var(--ease-swift) both;
+  --animate-pop: pop 160ms var(--ease-swift) both;
+  --animate-sheet: sheet 160ms var(--ease-swift) both;
 }
 
 /*
