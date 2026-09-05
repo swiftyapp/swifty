@@ -77,11 +77,18 @@ impl Session {
 /// before opening the browser and keeps it for the whole round trip — and it is
 /// what lets an auto-lock behind the Safari sheet cost the user nothing worse
 /// than the follow-up sync.
+///
+/// It has an identity and an age. The `state` nonce went out in the consent URL
+/// and must come back on the redirect, so a stray URL on the same scheme cannot
+/// consume this in place of Google's callback; `started` is what lets a flow
+/// nobody finished expire instead of pending forever.
 #[cfg(mobile)]
 pub struct PendingAuth {
     pub verifier: String,
+    pub state: String,
     pub cryptor: Cryptor,
     pub import: bool,
+    pub started: std::time::Instant,
 }
 
 #[derive(Default)]

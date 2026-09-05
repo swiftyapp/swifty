@@ -66,7 +66,7 @@ vi.mock('@/lib/commands', () => ({
   syncDisconnect: vi.fn().mockResolvedValue(undefined),
   syncNow: vi.fn().mockResolvedValue(undefined),
   syncImport: vi.fn().mockResolvedValue(undefined),
-  syncStatus: vi.fn().mockResolvedValue({ configured: false }),
+  syncStatus: vi.fn().mockResolvedValue({ configured: false, pending: false }),
   // Off by default, so no suite sees a scan affordance it did not ask for.
   scanSupported: vi.fn().mockResolvedValue(false),
   scanImage: vi.fn().mockRejectedValue('nothing recognized'),

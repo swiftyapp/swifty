@@ -50,7 +50,15 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 
     let window = builder.build()?;
     let handle = app.clone();
-    window.on_window_event(move |event| autolock::handle_event(&handle, event));
+    window.on_window_event(move |event| {
+        autolock::handle_event(&handle, event);
+        // Coming back to the foreground is how a consent flow the user walked
+        // away from gets noticed (see `commands::sync::on_resume`).
+        #[cfg(mobile)]
+        if let tauri::WindowEvent::Focused(true) = event {
+            crate::commands::sync::on_resume(&handle);
+        }
+    });
 
     let fallback = app.clone();
     std::thread::spawn(move || {

@@ -48,7 +48,7 @@ pub fn setup(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
 // The mobile consent flow, cut in two around the browser hand-off. See
 // `auth.rs`; the halves are joined by the deep-link handler in `lib.rs`.
 #[cfg(mobile)]
-pub use auth::{begin, complete, is_oauth_redirect};
+pub use auth::{begin, complete, parse_redirect, redirect_matches, Redirect};
 
 pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
     auth::disconnect(app, cryptor)

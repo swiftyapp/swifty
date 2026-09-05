@@ -10,6 +10,7 @@ import {
   flowAuth,
   syncStart,
   syncStop,
+  syncPending,
   syncConnected,
   syncFailed,
   syncDisconnected,
@@ -29,6 +30,7 @@ export const subscribeToEvents = (): (() => void) => {
   const pending: Promise<UnlistenFn>[] = [
     on(EVENTS.syncStarted, () => syncStart()),
     on(EVENTS.syncStopped, payload => syncStop(payload)),
+    on(EVENTS.syncPending, () => syncPending()),
     on(EVENTS.syncConnected, () => syncConnected()),
     on(EVENTS.syncError, payload => syncFailed(payload.error)),
     on(EVENTS.syncDisconnected, () => syncDisconnected()),
