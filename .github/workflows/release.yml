@@ -97,7 +97,7 @@ jobs:
       # nothing is simply skipped; every platform matches at least its own
       # installers, so the attestation always has a subject.
       - name: Attest build provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             ${{ matrix.bundlePath }}/**/*.dmg
