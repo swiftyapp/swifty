@@ -43,7 +43,7 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "for
 rustls = { version = "0.23", default-features = false, features = ["ring", "tls12"] }
 url = "2"
 zeroize = "1.8.2"
-argon2 = "0.5.3"
+argon2 = "0.6.0"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"
