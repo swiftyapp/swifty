@@ -11,6 +11,12 @@
 //! app with the redirect. Everything between the two (the PKCE pair, the auth
 //! URL, the token exchange, the token file) is shared.
 //!
+//! Every request carries a random `state` that the redirect has to echo back
+//! ([`parse_redirect`]). On desktop that is belt-and-braces over a loopback port
+//! only this process listens on; on iOS it is the whole defence — any app can
+//! open a URL on our scheme, and without the nonce one could pass off a stray
+//! URL as Google's answer to a flow it never saw.
+//!
 //! Tokens are stored encrypted via the vault cryptor either way.
 
 #[cfg(desktop)]
@@ -59,6 +65,20 @@ const IOS_CLIENT_ID_SUFFIX: &str = ".apps.googleusercontent.com";
 /// second one to separate. This is the exact string Google registers.
 #[cfg(any(mobile, test))]
 const IOS_REDIRECT_PATH: &str = ":/oauth2redirect";
+
+/// What a redirect URL turned out to be, once checked against the request that
+/// is waiting for one.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Redirect {
+    /// Google's answer to *our* request: the code to exchange.
+    Code(String),
+    /// Google's answer to our request, and the answer was no (or nothing).
+    Denied(String),
+    /// Not an answer to our request at all: the `state` is missing or belongs
+    /// to some other flow. Whatever is pending must not be touched on its
+    /// account.
+    Foreign,
+}
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Tokens {
@@ -177,11 +197,23 @@ fn deep_link_scheme(app: &AppHandle) -> Result<String> {
         .ok_or_else(no_client)
 }
 
-/// Whether a deep link is the OAuth redirect rather than some other URL the
-/// app was opened with.
+/// Whether a deep link is *this build's* OAuth redirect — the configured
+/// scheme and path exactly — rather than some other URL the app was opened
+/// with. Says nothing about which request it answers; [`parse_redirect`] does.
 #[cfg(mobile)]
-pub fn is_oauth_redirect(url: &Url) -> bool {
-    url.scheme().starts_with(IOS_SCHEME_PREFIX)
+pub fn redirect_matches(app: &AppHandle, url: &Url) -> bool {
+    Credentials::resolve(app).is_ok_and(|c| matches_redirect_uri(url, &c.redirect_uri))
+}
+
+/// `url` is `redirect_uri` plus, at most, a query: same scheme (schemes are
+/// case-insensitive, and the `url` crate lowercases the parsed one) and the same
+/// path. A prefix match on the scheme would accept every Google client's
+/// redirect, not just ours.
+#[cfg(any(mobile, test))]
+fn matches_redirect_uri(url: &Url, redirect_uri: &str) -> bool {
+    Url::parse(redirect_uri).is_ok_and(|expected| {
+        url.scheme().eq_ignore_ascii_case(expected.scheme()) && url.path() == expected.path()
+    })
 }
 
 // --- token persistence (encrypted `auth/gdrive.swftx`) ---
@@ -216,10 +248,23 @@ pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
 
 // --- OAuth flow ---
 
-// Send the user to Google's consent page for `verifier`'s challenge.
-fn open_consent(app: &AppHandle, credentials: &Credentials, verifier: &str) -> Result<()> {
-    let url = auth_url(credentials, &challenge(verifier))?;
-    app.opener().open_url(url, None::<&str>).map_err(other)
+/// One consent request in flight: the PKCE verifier the code will be redeemed
+/// with, and the `state` nonce the redirect has to echo to be believed.
+pub struct Started {
+    pub verifier: String,
+    pub state: String,
+}
+
+// Send the user to Google's consent page, and hand back what the redirect will
+// need to be recognised and redeemed.
+fn open_consent(app: &AppHandle, credentials: &Credentials) -> Result<Started> {
+    let started = Started {
+        verifier: gen_nonce(),
+        state: gen_nonce(),
+    };
+    let url = auth_url(credentials, &challenge(&started.verifier), &started.state)?;
+    app.opener().open_url(url, None::<&str>).map_err(other)?;
+    Ok(started)
 }
 
 /// Desktop: open the browser and block on the loopback listener until Google
@@ -227,49 +272,65 @@ fn open_consent(app: &AppHandle, credentials: &Credentials, verifier: &str) -> R
 #[cfg(desktop)]
 pub fn authenticate(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
     let credentials = Credentials::resolve(app)?;
-    let verifier = gen_verifier();
-    open_consent(app, &credentials, &verifier)?;
-    let code = listen_for_code()?;
+    let started = open_consent(app, &credentials)?;
+    let code = listen_for_code(&started.state)?;
     let client = super::http_client();
-    let tokens =
-        tauri::async_runtime::block_on(exchange_code(&client, &credentials, &code, &verifier))?;
+    let tokens = tauri::async_runtime::block_on(exchange_code(
+        &client,
+        &credentials,
+        &code,
+        &started.verifier,
+    ))?;
     write_tokens(app, cryptor, &tokens)
 }
 
-/// Mobile, first half: open the consent page and hand back the PKCE verifier
-/// the caller must keep until the redirect arrives.
+/// Mobile, first half: open the consent page and hand back what the caller
+/// must keep until the redirect arrives.
 #[cfg(mobile)]
-pub fn begin(app: &AppHandle) -> Result<String> {
-    let credentials = Credentials::resolve(app)?;
-    let verifier = gen_verifier();
-    open_consent(app, &credentials, &verifier)?;
-    Ok(verifier)
+pub fn begin(app: &AppHandle) -> Result<Started> {
+    open_consent(app, &Credentials::resolve(app)?)
 }
 
-/// Mobile, second half: exchange the code the redirect carries and store the
-/// tokens. Async — this runs off the URL-open callback, not on it.
+/// Mobile, second half: exchange a code [`parse_redirect`] accepted and store
+/// the tokens. Async — this runs off the URL-open callback, not on it.
 #[cfg(mobile)]
-pub async fn complete(app: &AppHandle, cryptor: &Cryptor, url: &Url, verifier: &str) -> Result<()> {
-    let code = code_from_redirect(url)?;
+pub async fn complete(
+    app: &AppHandle,
+    cryptor: &Cryptor,
+    code: &str,
+    verifier: &str,
+) -> Result<()> {
     let credentials = Credentials::resolve(app)?;
-    let tokens = exchange_code(&super::http_client(), &credentials, &code, verifier).await?;
+    let tokens = exchange_code(&super::http_client(), &credentials, code, verifier).await?;
     write_tokens(app, cryptor, &tokens)
 }
 
-/// The auth code out of a redirect URL, or the error Google put there instead.
-fn code_from_redirect(url: &Url) -> Result<String> {
+/// Read a redirect URL as the answer to the request identified by `state`.
+///
+/// The nonce is checked before anything else is believed: a URL without it, or
+/// with someone else's, is [`Redirect::Foreign`] no matter what code or error
+/// it carries.
+pub fn parse_redirect(url: &Url, state: &str) -> Redirect {
     let mut code = None;
     let mut error = None;
+    let mut echoed = None;
     for (key, value) in url.query_pairs() {
         match &*key {
             "code" => code = Some(value.into_owned()),
             "error" => error = Some(value.into_owned()),
+            "state" => echoed = Some(value.into_owned()),
             _ => {}
         }
     }
-    code.ok_or_else(|| {
-        Error::Other(error.unwrap_or_else(|| "Authorization was cancelled or failed".into()))
-    })
+    if echoed.as_deref() != Some(state) {
+        return Redirect::Foreign;
+    }
+    match code {
+        Some(code) => Redirect::Code(code),
+        None => Redirect::Denied(
+            error.unwrap_or_else(|| "Authorization was cancelled or failed".into()),
+        ),
+    }
 }
 
 // Return a valid access token, refreshing it if expired.
@@ -299,7 +360,7 @@ fn needs_refresh(tokens: &Tokens) -> bool {
     }
 }
 
-fn auth_url(credentials: &Credentials, challenge: &str) -> Result<String> {
+fn auth_url(credentials: &Credentials, challenge: &str, state: &str) -> Result<String> {
     let mut url = Url::parse(AUTH_URL).map_err(other)?;
     url.query_pairs_mut()
         .append_pair("client_id", &credentials.client_id)
@@ -308,6 +369,7 @@ fn auth_url(credentials: &Credentials, challenge: &str) -> Result<String> {
         .append_pair("scope", SCOPE)
         .append_pair("access_type", "offline")
         .append_pair("prompt", "consent")
+        .append_pair("state", state)
         .append_pair("code_challenge", challenge)
         .append_pair("code_challenge_method", "S256");
     Ok(url.into())
@@ -372,7 +434,9 @@ async fn post_token(
 
 // --- PKCE ---
 
-fn gen_verifier() -> String {
+// 48 random bytes, url-safe: within the 43-128 characters PKCE allows a
+// verifier, and more than enough for the `state` nonce.
+fn gen_nonce() -> String {
     let mut bytes = [0u8; 48];
     rand::thread_rng().fill_bytes(&mut bytes);
     URL_SAFE_NO_PAD.encode(bytes)
@@ -386,7 +450,7 @@ fn challenge(verifier: &str) -> String {
 
 // Block until the browser hits the callback, returning the auth code.
 #[cfg(desktop)]
-fn listen_for_code() -> Result<String> {
+fn listen_for_code(state: &str) -> Result<String> {
     let listener = TcpListener::bind((HOST, PORT)).map_err(other)?;
     let (mut stream, _) = listener.accept()?;
     stream.set_read_timeout(Some(Duration::from_secs(300)))?;
@@ -398,7 +462,13 @@ fn listen_for_code() -> Result<String> {
     // "GET /auth/callback?code=... HTTP/1.1"
     let path = request_line.split_whitespace().nth(1).unwrap_or("");
     let url = Url::parse(&format!("http://{HOST}:{PORT}{path}")).map_err(other)?;
-    let code = code_from_redirect(&url);
+    let code = match parse_redirect(&url, state) {
+        Redirect::Code(code) => Ok(code),
+        Redirect::Denied(error) => Err(Error::Other(error)),
+        Redirect::Foreign => Err(Error::Other(
+            "the browser's reply did not match this sign-in request".into(),
+        )),
+    };
 
     let _ = stream.write_all(response_html(code.as_ref().err()).as_bytes());
     code
@@ -440,8 +510,41 @@ mod tests {
 
     #[test]
     fn verifier_length_within_pkce_bounds() {
-        let v = gen_verifier();
+        let v = gen_nonce();
         assert!((43..=128).contains(&v.len()));
+    }
+
+    #[test]
+    fn the_consent_url_carries_the_state() {
+        let credentials = Credentials {
+            client_id: "1-a.apps.googleusercontent.com".into(),
+            redirect_uri: "com.googleusercontent.apps.1-a:/oauth2redirect".into(),
+            secret: None,
+        };
+        let url = Url::parse(&auth_url(&credentials, "chal", "nonce-1").unwrap()).unwrap();
+        let state = url
+            .query_pairs()
+            .find(|(k, _)| k == "state")
+            .map(|(_, v)| v.into_owned());
+        assert_eq!(state.as_deref(), Some("nonce-1"));
+    }
+
+    #[test]
+    fn only_the_exact_redirect_matches() {
+        let ours = "com.googleusercontent.apps.1-a:/oauth2redirect";
+        let matches = |s: &str| matches_redirect_uri(&Url::parse(s).unwrap(), ours);
+        assert!(matches(
+            "com.googleusercontent.apps.1-a:/oauth2redirect?code=x&state=s"
+        ));
+        // Schemes are case-insensitive.
+        assert!(matches("COM.googleusercontent.apps.1-a:/oauth2redirect"));
+        // Another Google client's scheme shares the prefix and is not ours.
+        assert!(!matches(
+            "com.googleusercontent.apps.2-b:/oauth2redirect?code=x"
+        ));
+        // Our scheme, some other path.
+        assert!(!matches("com.googleusercontent.apps.1-a:/anything?code=x"));
+        assert!(!matches("swifty:/oauth2redirect"));
     }
 
     #[test]
@@ -464,29 +567,45 @@ mod tests {
         assert!(scheme_from_client_id("123-abc.example.com").is_none());
     }
 
+    const REDIRECT: &str = "com.googleusercontent.apps.1-a:/oauth2redirect";
+
     #[test]
-    fn a_redirect_yields_its_code() {
-        let url = Url::parse("com.googleusercontent.apps.1-a:/oauth2redirect?code=4/abc&scope=x")
-            .unwrap();
-        assert_eq!(code_from_redirect(&url).unwrap(), "4/abc");
+    fn a_redirect_with_our_state_yields_its_code() {
+        let url = Url::parse(&format!("{REDIRECT}?code=4/abc&scope=x&state=nonce-1")).unwrap();
+        assert_eq!(
+            parse_redirect(&url, "nonce-1"),
+            Redirect::Code("4/abc".into())
+        );
     }
 
     #[test]
     fn a_denied_redirect_yields_googles_error() {
-        let url = Url::parse("com.googleusercontent.apps.1-a:/oauth2redirect?error=access_denied")
-            .unwrap();
+        let url = Url::parse(&format!("{REDIRECT}?error=access_denied&state=nonce-1")).unwrap();
         assert_eq!(
-            code_from_redirect(&url).unwrap_err().to_string(),
-            "access_denied"
+            parse_redirect(&url, "nonce-1"),
+            Redirect::Denied("access_denied".into())
         );
     }
 
     #[test]
     fn a_redirect_with_neither_is_a_cancellation() {
-        let url = Url::parse("com.googleusercontent.apps.1-a:/oauth2redirect").unwrap();
-        assert!(code_from_redirect(&url)
-            .unwrap_err()
-            .to_string()
-            .contains("cancelled"));
+        let url = Url::parse(&format!("{REDIRECT}?state=nonce-1")).unwrap();
+        match parse_redirect(&url, "nonce-1") {
+            Redirect::Denied(why) => assert!(why.contains("cancelled")),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    // The whole point of the nonce: a code — or an error — on our scheme that
+    // does not echo our state is nobody's business of ours, and must not end a
+    // flow that is still waiting for the real answer.
+    #[test]
+    fn a_redirect_with_the_wrong_or_no_state_is_foreign() {
+        let wrong = Url::parse(&format!("{REDIRECT}?code=4/abc&state=someone-elses")).unwrap();
+        assert_eq!(parse_redirect(&wrong, "nonce-1"), Redirect::Foreign);
+        let missing = Url::parse(&format!("{REDIRECT}?code=4/abc")).unwrap();
+        assert_eq!(parse_redirect(&missing, "nonce-1"), Redirect::Foreign);
+        let denied = Url::parse(&format!("{REDIRECT}?error=access_denied")).unwrap();
+        assert_eq!(parse_redirect(&denied, "nonce-1"), Redirect::Foreign);
     }
 }

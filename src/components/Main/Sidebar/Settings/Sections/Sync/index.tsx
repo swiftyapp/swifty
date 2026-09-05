@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useStore, syncPending, syncFailed } from '@/store'
+import { useStore, syncFailed } from '@/store'
 import { syncConnect, syncDisconnect, syncNow } from '@/lib/commands'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
@@ -17,12 +17,12 @@ export default function Sync() {
   const { t } = useTranslation()
   const sync = useStore(state => state.sync)
 
-  // Consent happens in the browser, so what ends the wait is `sync:connected`
-  // or `sync:error`, never this promise: on mobile it resolves as soon as
-  // Safari is on screen. A rejection here is the call itself failing (no
-  // client configured, vault locked), which no event will report.
+  // Consent happens in the browser: the backend says `sync:pending` when it
+  // opens it and `sync:connected` / `sync:error` when it hears back, so nothing
+  // here touches the store — on mobile the promise resolves as soon as Safari is
+  // on screen. A rejection is the call itself failing (no client configured,
+  // vault locked), which no event will report.
   const onConnect = () => {
-    syncPending()
     syncConnect().catch(error => syncFailed(String(error)))
   }
 

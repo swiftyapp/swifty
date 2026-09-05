@@ -10,6 +10,7 @@ import type { Audit, EntryMeta } from './commands'
 export const EVENTS = {
   syncStarted: 'sync:started',
   syncStopped: 'sync:stopped',
+  syncPending: 'sync:pending',
   syncConnected: 'sync:connected',
   syncDisconnected: 'sync:disconnected',
   syncError: 'sync:error',
@@ -28,9 +29,12 @@ export interface SyncStoppedPayload {
 }
 
 /**
- * A connect attempt failed. Separate from `sync:stopped`, which reports a *run*
- * — on mobile the consent flow finishes long after `sync_connect` resolved, so
- * a rejected promise cannot carry this.
+ * A consent flow is out with the browser (`sync:pending`), then finished by
+ * exactly one of `sync:connected` or `sync:error`. The backend owns all three:
+ * it is what opens the browser and what hears back from it, so the frontend
+ * mirrors these rather than guessing from a click. On mobile the command
+ * resolves the moment Safari is on screen; on desktop it blocks — either way
+ * the promise is not what carries the outcome.
  */
 export interface SyncErrorPayload {
   error: string
@@ -68,6 +72,7 @@ export interface ImportDonePayload {
 export interface EventPayloads {
   'sync:started': void
   'sync:stopped': SyncStoppedPayload
+  'sync:pending': void
   'sync:connected': void
   'sync:disconnected': void
   'sync:error': SyncErrorPayload

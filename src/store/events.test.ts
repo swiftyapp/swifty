@@ -108,13 +108,22 @@ describe('sync:stopped', () => {
   })
 })
 
-// On mobile `sync_connect` resolves the moment Safari is on screen, so the
-// wait can only be ended by one of these two events.
+// The backend owns the consent flow: `sync:pending` when it opens the browser,
+// then exactly one of `sync:connected` / `sync:error`. The frontend only mirrors.
 describe('the pending connect', () => {
+  it('is started by sync:pending', () => {
+    const store = makeStore()
+    subscribeToEvents()
+
+    handlerFor(EVENTS.syncPending)()
+
+    expect(store.getState().sync.pending).toBe(true)
+  })
+
   it('is finished by sync:connected', () => {
     const store = makeStore()
     subscribeToEvents()
-    store.getState().syncPending()
+    handlerFor(EVENTS.syncPending)()
     expect(store.getState().sync.pending).toBe(true)
 
     handlerFor(EVENTS.syncConnected)()

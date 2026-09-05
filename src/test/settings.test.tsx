@@ -86,12 +86,14 @@ describe('Settings › sync', () => {
   })
 
   // The mobile shape of the same flow: `sync_connect` resolves as soon as
-  // Safari has the screen, so the row has to keep waiting on the event.
+  // Safari has the screen, so the row waits on the backend's events — the
+  // click itself claims nothing.
   it('waits for Google after a connect that resolved early', async () => {
     const { store } = await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
+    expect(store.getState().sync.pending).toBe(false)
 
-    expect(store.getState().sync.pending).toBe(true)
+    store.getState().syncPending()
     expect(await screen.findByText('Waiting for Google…')).toBeInTheDocument()
 
     store.getState().syncConnected()
@@ -101,6 +103,7 @@ describe('Settings › sync', () => {
   it('reports a consent that failed, and stays disconnected', async () => {
     const { store } = await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
+    store.getState().syncPending()
     store.getState().syncFailed('access_denied')
 
     expect(await screen.findByTestId('settings-sync-error')).toHaveTextContent(

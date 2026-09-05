@@ -52,6 +52,7 @@ dependencies, and tools contained in the `swiftyapp/swifty` repository.
   yarn test
   ```
 
+  * If a change starts something in one call and finishes it in another (a browser hand-off, a staged file, a background run), treat the in-between as a value with a lifecycle, not a flag: give it an identity that the finishing side has to prove, a way to expire, and a teardown that runs on *every* exit, ideally a `Drop`. The backend owns it and announces each transition; the frontend mirrors, never guesses. List the states and every way out of each in the PR description, and give each exit a test — "happy path plus cancel" is where these bugs hide.
   * Once your commits are ready to go (with passing tests and linting) begin the process of opening a pull request by pushing your working branch to your fork on GitHub.
   * From within GitHub, opening a new pull request will present you with a template that should be filled out
 

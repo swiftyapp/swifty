@@ -77,10 +77,35 @@ where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = Result<Option<PathBuf>>>,
 {
-    write_and_scrub(staged, bytes)?;
-    let chosen = dialog().await;
-    let _ = std::fs::remove_file(staged);
-    chosen
+    let _staged = Staged::write(staged, bytes)?;
+    dialog().await
+}
+
+/// A file that exists only as long as this value does.
+///
+/// The removal lives in `Drop` rather than after the dialog so that *every* way
+/// out of the scope — a dismissed dialog, a failed dialog, a write that ran out
+/// of disk halfway, a panic — takes the file with it. Cleanup that has to be
+/// remembered at each exit is cleanup that one of them will forget.
+#[cfg(any(mobile, test))]
+struct Staged(PathBuf);
+
+#[cfg(any(mobile, test))]
+impl Staged {
+    /// Claim the path first, then fill it: a write that fails partway has
+    /// already created the file, and only a guard that exists by then removes it.
+    fn write(path: &Path, bytes: Vec<u8>) -> Result<Self> {
+        let staged = Self(path.to_path_buf());
+        write_and_scrub(path, bytes)?;
+        Ok(staged)
+    }
+}
+
+#[cfg(any(mobile, test))]
+impl Drop for Staged {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
 }
 
 // Present the save dialog off the main thread; blocking on it there would
@@ -144,6 +169,49 @@ mod tests {
 
         assert_eq!(chosen, Some(PathBuf::from("/somewhere/vault.swftx")));
         assert!(!staged.exists(), "the staged copy outlived the dialog");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // Nor a dialog that failed outright.
+    #[tokio::test]
+    async fn staging_cleans_up_after_a_failed_dialog() {
+        let dir = std::env::temp_dir().join(format!("swifty-save-fail-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let staged = dir.join("swifty-export.csv");
+
+        let result = stage_then(&staged, b"name,password".to_vec(), || async {
+            Err(Error::Other("picker crashed".into()))
+        })
+        .await;
+
+        assert!(result.is_err());
+        assert!(!staged.exists());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // A write that fails is the one exit the old "delete after the dialog"
+    // ordering missed: the guard exists before the bytes go down, so whatever
+    // the failed write left at the path is removed exactly like a complete file.
+    // Unix-only because a read-only file is the portable way to make the write
+    // fail, and Windows then refuses to remove it as well.
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_write_leaves_nothing_behind() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!("swifty-save-partial-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let staged = dir.join("swifty-export.csv");
+        std::fs::write(&staged, b"a stale export nobody cleaned up").unwrap();
+        std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o444)).unwrap();
+
+        let result = Staged::write(&staged, b"name,password".to_vec());
+
+        assert!(
+            result.is_err(),
+            "a read-only file should have refused the write"
+        );
+        assert!(!staged.exists(), "a staged file survived its failed write");
         std::fs::remove_dir_all(&dir).ok();
     }
 

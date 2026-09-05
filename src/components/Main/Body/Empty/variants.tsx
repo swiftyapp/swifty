@@ -7,7 +7,6 @@ import {
   startEntry,
   setFilterQuery,
   setFilterType,
-  syncPending,
   syncFailed
 } from '@/store'
 import { kindOf } from '@/kinds'
@@ -30,13 +29,13 @@ export function VaultEmpty() {
   const { t } = useTranslation()
   const sync = useStore(state => state.sync)
 
-  // The spinner runs off the store, not off the promise: on mobile `sync_import`
-  // resolves the moment the consent page is on screen, and what ends the wait is
-  // `sync:connected`/`sync:error` and then the pull's own events. On success the
-  // restored entries replace this screen; on failure the button has to come back
-  // rather than spin forever.
+  // The spinner runs off the store, not off the promise: the backend reports
+  // `sync:pending` when the consent page opens and `sync:connected`/`sync:error`
+  // when it hears back, then the pull's own events. On mobile `sync_import`
+  // resolves the moment Safari is on screen. On success the restored entries
+  // replace this screen; on failure the button has to come back rather than
+  // spin forever.
   const restore = () => {
-    syncPending()
     syncImport().catch(error => syncFailed(String(error)))
   }
 
