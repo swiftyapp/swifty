@@ -55,7 +55,7 @@ export default function Audit() {
             <div
               key={s.key}
               data-testid={`audit-stat-${s.key}`}
-              className="flex items-center gap-3 px-4 py-3 shadow-[inset_0_-1px_0_var(--c-line)] last:shadow-none"
+              className="flex items-center gap-3 px-4 py-3 inset-shadow-hairline last:inset-shadow-none"
             >
               <span className={`h-[7px] w-[7px] flex-none rounded-full ${s.dot}`} />
               <span className="flex-1 text-base text-text2">{s.label}</span>

@@ -19,7 +19,7 @@ interface Props {
 export default function Input({ value, onChange, onKeyDown, listId, activeId }: Props) {
   const { t } = useTranslation()
   return (
-    <div className="flex items-center gap-[11px] px-4 py-3.5 shadow-[inset_0_-1px_0_var(--c-line)]">
+    <div className="flex items-center gap-[11px] px-4 py-3.5 inset-shadow-hairline">
       <SearchGlyph className="flex-none text-text3" />
       <input
         // The palette is mounted only while open, so this focuses on every open.

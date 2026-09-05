@@ -201,7 +201,7 @@ export default function Masterpass({
           'relative mx-auto flex h-12 max-w-[380px] items-stretch rounded-xl border bg-detail transition-all duration-300 [&_button:hover]:bg-hover/60!',
           // The inset shadow is the cut; focus goes a touch deeper. It and the
           // state halo (ring) are both box-shadow, so Tailwind composes them.
-          'shadow-[var(--lockfield-shadow)] focus-within:shadow-[var(--lockfield-shadow-deep)]',
+          'shadow-lockfield focus-within:shadow-lockfield-deep',
           bad
             ? 'border-bad/60 ring-4 ring-bad/10 animate-[nudge_420ms_ease_both]'
             : success

@@ -34,7 +34,7 @@ export function Main() {
           auto margins so the pop's transform doesn't fight it. */}
       <div
         data-testid="copy-toast"
-        className="copied-notification hidden animate-pop fixed inset-x-0 top-4 z-50 mx-auto w-max rounded-full bg-text px-5 py-2 text-base text-detail shadow-[var(--shadow)]"
+        className="copied-notification hidden animate-pop fixed inset-x-0 top-4 z-50 mx-auto w-max rounded-full bg-text px-5 py-2 text-base text-detail shadow-float"
       >
         {t('Copied to Clipboard')}
       </div>

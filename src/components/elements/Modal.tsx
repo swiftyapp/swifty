@@ -69,7 +69,7 @@ export default function Modal({
 
   return (
     <div
-      className="animate-fade fixed inset-0 z-50 flex items-start justify-center bg-[var(--scrim)] p-4 pt-[10vh] backdrop-blur-sm"
+      className="animate-fade fixed inset-0 z-50 flex items-start justify-center bg-scrim p-4 pt-[10vh] backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -80,7 +80,7 @@ export default function Modal({
         aria-labelledby={labelledBy}
         data-testid={testid}
         className={cx(
-          'animate-pop relative flex max-h-[80vh] overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-[var(--shadow)]',
+          'animate-pop relative flex max-h-[80vh] overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-float',
           className ?? 'w-full max-w-[720px]'
         )}
         onClick={e => e.stopPropagation()}

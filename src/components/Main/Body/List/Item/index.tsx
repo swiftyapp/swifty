@@ -52,7 +52,7 @@ export default function Item({ entry }: Props) {
       tabIndex={selected ? 0 : -1}
       className={cx(
         'flex cursor-pointer items-center gap-3 border-l-2 py-2.5 pl-[14px] pr-4',
-        'shadow-[inset_0_-1px_0_var(--c-line)]',
+        'inset-shadow-hairline',
         selected
           ? 'border-accent bg-sel'
           : 'border-transparent hover:bg-hover'

@@ -1,6 +1,6 @@
-export const CARD = 'overflow-hidden rounded-lg border border-line bg-[image:var(--card)]'
+export const CARD = 'overflow-hidden rounded-lg border border-line bg-card'
 
-export const ROW_HAIRLINE = 'shadow-[inset_0_-1px_0_var(--c-line)] last:shadow-none'
+export const ROW_HAIRLINE = 'inset-shadow-hairline last:inset-shadow-none'
 
 // A trailing control that stays out of the way until the row is asked about —
 // hovered, or holding the keyboard. Pairs with a `group` on the row itself.
@@ -12,7 +12,7 @@ export const HOVER_ONLY =
 // panel on the detail surface. Each toast places itself — two of them in the
 // same corner would sit on top of each other.
 export const TOAST =
-  'animate-pop fixed z-[1000] max-w-[340px] rounded-xl border border-line bg-detail text-text shadow-[var(--shadow)]'
+  'animate-pop fixed z-[1000] max-w-[340px] rounded-xl border border-line bg-detail text-text shadow-float'
 
 // The mono micro-label face, without an ink. Take this when the label needs a
 // different colour (the accent "EDITING ·" eyebrow) and MONO_LABEL otherwise.

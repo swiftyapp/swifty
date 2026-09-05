@@ -74,7 +74,7 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 grid animate-fade place-items-center bg-[var(--scrim)] p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 grid animate-fade place-items-center bg-scrim p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       {/* Announces itself as modal like `elements/Modal` does. Beyond the
@@ -87,10 +87,10 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
         aria-modal="true"
         aria-labelledby="generator-title"
         data-testid="generator-dialog"
-        className="w-[470px] animate-pop overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-[var(--shadow)]"
+        className="w-[470px] animate-pop overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-float"
         onClick={event => event.stopPropagation()}
       >
-        <div className="flex items-center gap-2.5 px-[18px] py-[15px] shadow-[inset_0_-1px_0_var(--c-line)]">
+        <div className="flex items-center gap-2.5 px-[18px] py-[15px] inset-shadow-hairline">
           <div id="generator-title" className="flex-1 text-lg font-semibold tracking-display">
             {t('Generate')}
           </div>

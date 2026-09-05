@@ -259,6 +259,21 @@
   --color-brand: var(--c-brand);
 
   /*
+   * Surfaces and shadows that are more than a flat colour (see the design vars
+   * on :root below). Named here so `bg-scrim`, `bg-chrome`, `bg-card`,
+   * `shadow-float`, `shadow-lockfield` and `inset-shadow-hairline` compile
+   * instead of every call site spelling out `bg-[var(--scrim)]`.
+   */
+  --color-scrim: var(--scrim);
+  --color-chrome: var(--chrome);
+  --background-image-card: var(--card);
+  --shadow-float: var(--shadow);
+  --shadow-lockfield: var(--lockfield-shadow);
+  --shadow-lockfield-deep: var(--lockfield-shadow-deep);
+  /* The 1px rule under a list row, drawn as a shadow so it costs no layout. */
+  --inset-shadow-hairline: inset 0 -1px 0 var(--c-line);
+
+  /*
    * Per-kind identity inks (see src/kinds). A solid for the glyph and a soft
    * wash for the tile behind it, so `text-kind-card` / `bg-kind-card-soft`
    * compile. One pair per kind in `KINDS` — a new kind adds a new pair here
@@ -424,7 +439,7 @@
   --c-kind-ssh: #7b5ea7;
   --c-kind-ssh-soft: rgba(123, 94, 167, 0.12);
 
-  /* Design vars that aren't color utilities (gradients/shadows/scrims). */
+  /* Gradients, shadows and scrims; exposed as utilities via @theme above. */
   --card: linear-gradient(180deg, #ffffff, #fbfbfc);
   --chrome: rgba(246, 247, 248, 0.92);
   --topglow: rgba(255, 255, 255, 0.7);
