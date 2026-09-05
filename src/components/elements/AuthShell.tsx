@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuthMeta } from '@/hooks/useAuthMeta'
 import Back from '@/assets/images/back.svg?react'
+import { MONO_LABEL } from './tokens'
 
 interface Props {
   children: ReactNode
@@ -46,7 +47,7 @@ export default function AuthShell({ children, onBack }: Props) {
           type="button"
           data-testid="go-back-button"
           onClick={onBack}
-          className="absolute bottom-14 left-1/2 flex -translate-x-1/2 items-center gap-1.5 border-0 bg-transparent font-mono text-xs uppercase tracking-label text-text3 transition-colors hover:text-text"
+          className={`absolute bottom-14 left-1/2 flex -translate-x-1/2 items-center gap-1.5 border-0 bg-transparent ${MONO_LABEL} transition-colors hover:text-text`}
         >
           <Back width="13" className="[&_path]:fill-current" />
           {t('Go Back')}
