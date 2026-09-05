@@ -107,7 +107,11 @@ describe('overlay frames', () => {
   it('gives settings a sheet on compact and the modal on wide', () => {
     const { unmount } = renderWithStore(<Main />, { store: seed() })
     act(() => openSettings())
-    expect(screen.getByTestId('settings-modal')).toHaveAttribute('data-frame', 'sheet')
+    const sheet = screen.getByTestId('settings-modal')
+    expect(sheet).toHaveAttribute('data-frame', 'sheet')
+    // Outside the shell: a translated ancestor would become the containing
+    // block for the sheet's `fixed` and stack the keyboard offset twice.
+    expect(screen.getByTestId('compact-shell')).not.toContainElement(sheet)
     unmount()
 
     setLayout('wide')

@@ -21,26 +21,31 @@ export default function Compact() {
   const view = useVisualViewport()
 
   return (
-    <div
-      data-testid="compact-shell"
-      style={viewportStyle(view)}
-      className="flex h-full min-h-0 flex-col"
-    >
-      <TopBar detail={detail} />
-      {detail ? (
-        <DetailPane />
-      ) : (
-        <ListColumn
-          actions={
-            <>
-              <Tags compact />
-              <Add compact />
-            </>
-          }
-        />
-      )}
-      {!detail && <TabBar />}
+    <>
+      <div
+        data-testid="compact-shell"
+        style={viewportStyle(view)}
+        className="flex h-full min-h-0 flex-col"
+      >
+        <TopBar detail={detail} />
+        {detail ? (
+          <DetailPane />
+        ) : (
+          <ListColumn
+            actions={
+              <>
+                <Tags compact />
+                <Add compact />
+              </>
+            }
+          />
+        )}
+        {!detail && <TabBar />}
+      </div>
+      {/* A sibling, not a child: the shell's translate would make it the
+          containing block for the sheet's `fixed`, and the sheet already
+          applies the same offset itself — inside, it would move twice. */}
       <SettingsOverlay />
-    </div>
+    </>
   )
 }
