@@ -98,7 +98,8 @@ jobs:
       #     for AuthKey_<KEY_ID>.p8.
       # So it is written under $RUNNER_TEMP (outside the workspace, so it can
       # never be picked up by a build or committed) and copied to
-      # ~/private_keys. Both copies are deleted at the end of the job.
+      # ~/private_keys. Both copies are deleted as soon as the upload step is
+      # done with them, well before the job ends.
       - name: Write the App Store Connect API key
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
@@ -151,15 +152,6 @@ jobs:
           echo "path=${ipas[0]}" >> "$GITHUB_OUTPUT"
           echo "Built ${ipas[0]}"
 
-      # Uploaded before the App Store step so the IPA is still retrievable if
-      # App Store Connect rejects it.
-      - name: Upload the IPA as a workflow artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: swifty-ios-ipa
-          path: ${{ steps.ipa.outputs.path }}
-          if-no-files-found: error
-
       - name: Upload to App Store Connect (TestFlight)
         env:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
@@ -169,29 +161,66 @@ jobs:
           xcrun altool --upload-app --type ios --file "$IPA_PATH" \
             --apiKey "$APPLE_API_KEY" --apiIssuer "$APPLE_API_ISSUER"
 
-      # Same tag derivation as release.yml. The desktop workflow creates the
-      # release as a draft; if it has not run (or was not triggered by a tag)
-      # there is nothing to attach to and the artifact above is the only copy,
-      # which is not an error.
-      - name: Attach the IPA to the GitHub release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          IPA_PATH: ${{ steps.ipa.outputs.path }}
-        run: |
-          set -euo pipefail
-          TAG="v$(jq -r .version src-tauri/tauri.conf.json)"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$IPA_PATH" --clobber
-          else
-            echo "::notice::no GitHub release $TAG (yet); the IPA is available as the swifty-ios-ipa artifact"
-          fi
+      # The build and the altool upload are the only consumers of the key, so
+      # it is deleted here rather than at the end of the job: nothing that runs
+      # after this point — including third-party actions — sees it on disk.
+      # `always()` covers a failed or skipped build too.
+      - name: Remove the App Store Connect API key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/private_keys" "$HOME/private_keys"
+
+      # Retained and attested even when the upload above fails, so a build that
+      # App Store Connect rejects is still downloadable and still carries
+      # provenance. Both are skipped when the IPA was never produced.
+      - name: Upload the IPA as a workflow artifact
+        if: ${{ !cancelled() && steps.ipa.outputs.path != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: swifty-ios-ipa
+          path: ${{ steps.ipa.outputs.path }}
+          if-no-files-found: error
 
       # --- SLSA build provenance (T-CI-4) ---------------------------------
       - name: Attest build provenance
+        if: ${{ !cancelled() && steps.ipa.outputs.path != '' }}
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ steps.ipa.outputs.path }}
 
-      - name: Remove the App Store Connect API key
-        if: always()
-        run: rm -rf "$RUNNER_TEMP/private_keys" "$HOME/private_keys"
+      # A tag run attaches to the tag that triggered it, which is the revision
+      # that was just built. A manual run has no tag, so it falls back to the
+      # version in the config the way release.yml does — but that release may
+      # have been built from an older revision, so a manual run never replaces
+      # an IPA that is already attached. Either way, no release yet (the
+      # desktop workflow creates it as a draft) is not an error: the artifact
+      # above is then the only copy.
+      - name: Attach the IPA to the GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IPA_PATH: ${{ steps.ipa.outputs.path }}
+          PUSHED_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          if [ -n "$PUSHED_TAG" ]; then
+            TAG="$PUSHED_TAG"
+          else
+            TAG="v$(jq -r .version src-tauri/tauri.conf.json)"
+          fi
+
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::no GitHub release $TAG (yet); the IPA is available as the swifty-ios-ipa artifact"
+            exit 0
+          fi
+
+          if [ -n "$PUSHED_TAG" ]; then
+            # Re-running a tag rebuilds that same tag, so replacing is safe.
+            gh release upload "$TAG" "$IPA_PATH" --clobber
+            exit 0
+          fi
+
+          ASSETS=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+          if grep -Fxq "$(basename "$IPA_PATH")" <<<"$ASSETS"; then
+            echo "::warning::$TAG already has an IPA and this run was not triggered by that tag; leaving it in place. This build is the swifty-ios-ipa artifact"
+            exit 0
+          fi
+          gh release upload "$TAG" "$IPA_PATH"

@@ -99,10 +99,17 @@ it. If `APPLE_TEAM_ID` is ever removed, the workflow falls back to the literal
    for the same version always produces an acceptable new build.
 
 4. **TestFlight processing** takes roughly 5–30 minutes after the upload step
-   succeeds. The build then appears under **TestFlight → iOS builds**. It also
-   attaches the IPA to the draft GitHub release for the tag (created by the
-   desktop workflow) and always uploads it as the `swifty-ios-ipa` workflow
-   artifact.
+   succeeds. The build then appears under **TestFlight → iOS builds**. The IPA
+   is always kept as the `swifty-ios-ipa` workflow artifact — including when
+   App Store Connect rejects the upload — and is also attached to the draft
+   GitHub release for the tag (created by the desktop workflow).
+
+   A tag run attaches to the tag that triggered it. A manual run builds the
+   default branch, which may be ahead of the released version, so it attaches
+   to `v<version from tauri.conf.json>` only when that release does not already
+   carry an IPA; otherwise it logs a warning and leaves the existing asset
+   alone. To replace the IPA on a release, re-run the workflow by pushing (or
+   re-pushing) that tag.
 
 5. **Export compliance** must be answered for the build — see below. Until it
    is answered the build stays in "Missing Compliance" and cannot be
