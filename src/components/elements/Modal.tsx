@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { cx } from '@/utils/cx'
 import { CloseGlyph } from '../Main/icons'
+import IconButton from './IconButton'
 
 const TABBABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -86,14 +87,14 @@ export default function Modal({
         onClick={e => e.stopPropagation()}
       >
         {!hideClose && (
-          <button
-            type="button"
-            data-testid="modal-close"
+          <IconButton
+            muted
+            testid="modal-close"
             onClick={onClose}
-            className="absolute right-3 top-3 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-sm text-text3 transition-colors hover:bg-hover hover:text-text"
+            className="absolute right-3 top-3 z-10"
           >
             <CloseGlyph />
-          </button>
+          </IconButton>
         )}
         {children}
       </div>
