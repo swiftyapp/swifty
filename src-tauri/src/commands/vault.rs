@@ -1,6 +1,7 @@
 use crate::app::APP_NAME;
 use crate::commands::{
-    create_vault, derive_key, list_deleted_metas, list_metas, live_records, meta_dto_of, store_err,
+    create_vault, derive_key, list_deleted_metas, list_metas, live_records, meta_dto_of, save,
+    store_err,
 };
 use crate::error::{Error, Result};
 use crate::models::{Entry, EntryMetaDto, UnlockResult, VaultData};
@@ -8,7 +9,6 @@ use crate::state::AppState;
 use crate::store::{migrate, Record, VaultStore};
 use crate::{crypto, storage};
 use serde_json::json;
-use std::fs;
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_dialog::DialogExt;
 
@@ -224,23 +224,12 @@ pub async fn export_vault(
         out.encrypt_data(&VaultData { entries })?
     };
 
-    // Off-main-thread so the blocking save dialog can't deadlock the event loop.
-    let dest = tauri::async_runtime::spawn_blocking(move || {
-        app.dialog()
-            .file()
-            .set_file_name("vault.swftx")
-            .add_filter(format!("{APP_NAME} backup"), &["swftx"])
-            .blocking_save_file()
-    })
-    .await
-    .map_err(|e| Error::Other(e.to_string()))?;
-    let Some(dest) = dest.and_then(|f| f.into_path().ok()) else {
-        return Ok(None);
-    };
-    let dest = match dest.extension() {
-        Some(e) if e == "swftx" => dest,
-        _ => dest.with_extension("swftx"),
-    };
-    fs::write(&dest, blob)?;
-    Ok(Some(dest.to_string_lossy().into_owned()))
+    let dest = save::save_export(
+        &app,
+        "vault.swftx",
+        &format!("{APP_NAME} backup"),
+        blob.into_bytes(),
+    )
+    .await?;
+    Ok(dest.map(|p| p.to_string_lossy().into_owned()))
 }

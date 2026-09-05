@@ -82,6 +82,7 @@
 		CD8041F7C16E1206CBDFE19F /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		CF75DFC97BD51569166E3648 /* favicon.rs */ = {isa = PBXFileReference; path = favicon.rs; sourceTree = "<group>"; };
 		D0968005A451DBC79A73D5B5 /* ocr_windows.rs */ = {isa = PBXFileReference; path = ocr_windows.rs; sourceTree = "<group>"; };
+		D2AFDA4791125346DFE65392 /* save.rs */ = {isa = PBXFileReference; path = save.rs; sourceTree = "<group>"; };
 		D6CE18C1DF25FC4B364BC424 /* kdf.rs */ = {isa = PBXFileReference; path = kdf.rs; sourceTree = "<group>"; };
 		D948F63D62242E02F86ABA95 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		DB401C52B369CA7A8DE9ED44 /* autolock.rs */ = {isa = PBXFileReference; path = autolock.rs; sourceTree = "<group>"; };
@@ -245,6 +246,7 @@
 				369A7B386AD08EF0BA349562 /* generator.rs */,
 				753BE25B1B1324C3765A34CF /* import.rs */,
 				B3F1636CBC614B9404F1295E /* mod.rs */,
+				D2AFDA4791125346DFE65392 /* save.rs */,
 				B29A76205BBD887820FDC5F4 /* sync.rs */,
 				535805A14F44E433BA0E69B7 /* vault.rs */,
 			);
