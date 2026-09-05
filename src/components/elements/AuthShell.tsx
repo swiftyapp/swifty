@@ -18,7 +18,14 @@ export default function AuthShell({ children, onBack }: Props) {
   const { t } = useTranslation()
   const meta = useAuthMeta()
   return (
-    <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-app px-10 text-text select-none">
+    // Compact narrows the gutters, pads past the notch and the home indicator,
+    // and reserves the bottom chrome's height so the centered column is never
+    // laid over the "Go Back" link or the footer strip on a short screen. The
+    // column then centers with `my-auto` rather than `justify-center`, which
+    // keeps it scrollable instead of clipped when it still does not fit. At
+    // md: — the same 768px the shell switches on — every one of those is off
+    // again and the wide layout is what it was.
+    <div className="relative flex h-full flex-col items-center overflow-x-hidden overflow-y-auto overscroll-contain bg-app px-5 pt-[env(safe-area-inset-top)] pb-[calc(env(safe-area-inset-bottom)+7rem)] text-text select-none md:px-10 md:pt-0 md:pb-0">
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-[44%] h-[700px] w-[1200px] max-w-none -translate-x-1/2 -translate-y-1/2"
@@ -40,7 +47,7 @@ export default function AuthShell({ children, onBack }: Props) {
         className="absolute inset-x-0 top-0 h-[38px]"
       />
 
-      <div className="relative w-[560px] max-w-full">{children}</div>
+      <div className="relative my-auto w-[560px] max-w-full">{children}</div>
 
       {onBack && (
         <button

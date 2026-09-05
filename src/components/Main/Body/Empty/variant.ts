@@ -12,6 +12,15 @@ import { useRows, useVisibleEntries } from '../List/useVisibleEntries'
  */
 export type Variant = 'vault' | 'kind' | 'search' | 'select' | 'health' | 'favorites' | 'archive'
 
+const WHOLE_VIEW: Variant[] = ['vault', 'health', 'favorites', 'archive']
+
+/**
+ * Whether a variant is a whole-view state rather than a filter one. The wide
+ * shell always has a detail pane to put these in; the compact shell has only
+ * the list, so it asks this before showing the hero there itself.
+ */
+export const isWholeView = (variant: Variant) => WHOLE_VIEW.includes(variant)
+
 // Which empty state the app is in, or `null` when there is real content to
 // show — which, for the surfaces that ask, only ever means a scored audit.
 export const useVariant = (): Variant | null => {

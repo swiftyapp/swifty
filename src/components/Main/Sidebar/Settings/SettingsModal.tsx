@@ -3,12 +3,8 @@ import { useStore, closeSettings, setSettingsSection } from '@/store'
 import Modal from '@/components/elements/Modal'
 import IconButton from '@/components/elements/IconButton'
 import Nav from './Nav'
+import Section from './Section'
 import { titleOf } from './sections'
-import Sync from './Sections/Sync'
-import Security from './Sections/Security'
-import Audit from './Sections/Audit'
-import Import from './Sections/Import'
-import Language from './Sections/Language'
 import { CloseGlyph } from '../../icons'
 
 const TITLE_ID = 'settings-title'
@@ -44,11 +40,7 @@ export default function SettingsModal() {
           </IconButton>
         </div>
         <div className="flex-1 overflow-y-auto p-7">
-          {section === 'sync' && <Sync />}
-          {section === 'security' && <Security />}
-          {section === 'audit' && <Audit />}
-          {section === 'import' && <Import />}
-          {section === 'language' && <Language />}
+          <Section section={section} />
         </div>
       </div>
     </Modal>
