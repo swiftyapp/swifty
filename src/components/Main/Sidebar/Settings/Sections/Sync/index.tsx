@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useStore } from '@/store'
+import { useStore, syncPending, syncFailed } from '@/store'
 import { syncConnect, syncDisconnect, syncNow } from '@/lib/commands'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
@@ -8,18 +7,23 @@ import Button from '@/components/elements/Button'
 import BackupRow from './BackupRow'
 import ExportRow from './ExportRow'
 
+const ErrorNote = ({ message }: { message: string }) => (
+  <div data-testid="settings-sync-error" className="px-4 py-3 text-base text-bad">
+    {message}
+  </div>
+)
+
 export default function Sync() {
   const { t } = useTranslation()
   const sync = useStore(state => state.sync)
-  const [connecting, setConnecting] = useState(false)
 
-  // The OAuth round-trip lands as a store event, not a resolved promise, so the
-  // spinner runs until `enabled` actually flips.
-  useEffect(() => setConnecting(false), [sync.enabled])
-
+  // Consent happens in the browser, so what ends the wait is `sync:connected`
+  // or `sync:error`, never this promise: on mobile it resolves as soon as
+  // Safari is on screen. A rejection here is the call itself failing (no
+  // client configured, vault locked), which no event will report.
   const onConnect = () => {
-    setConnecting(true)
-    syncConnect()
+    syncPending()
+    syncConnect().catch(error => syncFailed(String(error)))
   }
 
   const lastSynced = sync.inProgress
@@ -33,7 +37,13 @@ export default function Sync() {
       <SettingsGroup label={t('Account')}>
         <SettingsRow
           label={t('Google Drive')}
-          description={sync.enabled ? t('Connected') : t('Not connected')}
+          description={
+            sync.pending
+              ? t('Waiting for Google…')
+              : sync.enabled
+                ? t('Connected')
+                : t('Not connected')
+          }
           testid="settings-drive-row"
           control={
             sync.enabled ? (
@@ -50,7 +60,7 @@ export default function Sync() {
               <Button
                 variant="pale"
                 size="md"
-                loading={connecting || sync.inProgress}
+                loading={sync.pending || sync.inProgress}
                 onClick={onConnect}
                 testid="settings-drive-connect"
               >
@@ -59,6 +69,9 @@ export default function Sync() {
             )
           }
         />
+        {/* A connect that never got as far as being connected has no Sync
+            group to report itself in, so it says so here instead. */}
+        {!sync.enabled && sync.error && <ErrorNote message={sync.error} />}
       </SettingsGroup>
 
       {sync.enabled && (
@@ -78,14 +91,7 @@ export default function Sync() {
               </Button>
             }
           />
-          {sync.error && (
-            <div
-              data-testid="settings-sync-error"
-              className="px-4 py-3 text-base text-bad"
-            >
-              {sync.error}
-            </div>
-          )}
+          {sync.error && <ErrorNote message={sync.error} />}
         </SettingsGroup>
       )}
 

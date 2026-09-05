@@ -12,6 +12,7 @@ export const EVENTS = {
   syncStopped: 'sync:stopped',
   syncConnected: 'sync:connected',
   syncDisconnected: 'sync:disconnected',
+  syncError: 'sync:error',
   pullStarted: 'vault:pull:started',
   pullStopped: 'vault:pull:stopped',
   vaultMerged: 'vault:merged',
@@ -24,6 +25,15 @@ export const EVENTS = {
 export interface SyncStoppedPayload {
   success: boolean
   error?: string
+}
+
+/**
+ * A connect attempt failed. Separate from `sync:stopped`, which reports a *run*
+ * — on mobile the consent flow finishes long after `sync_connect` resolved, so
+ * a rejected promise cannot carry this.
+ */
+export interface SyncErrorPayload {
+  error: string
 }
 
 export interface PullStoppedPayload {
@@ -60,6 +70,7 @@ export interface EventPayloads {
   'sync:stopped': SyncStoppedPayload
   'sync:connected': void
   'sync:disconnected': void
+  'sync:error': SyncErrorPayload
   'vault:pull:started': void
   'vault:pull:stopped': PullStoppedPayload
   'vault:merged': VaultMergedPayload

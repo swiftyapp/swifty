@@ -11,6 +11,7 @@ import {
   syncStart,
   syncStop,
   syncConnected,
+  syncFailed,
   syncDisconnected,
   resetVaultData
 } from './index'
@@ -29,6 +30,7 @@ export const subscribeToEvents = (): (() => void) => {
     on(EVENTS.syncStarted, () => syncStart()),
     on(EVENTS.syncStopped, payload => syncStop(payload)),
     on(EVENTS.syncConnected, () => syncConnected()),
+    on(EVENTS.syncError, payload => syncFailed(payload.error)),
     on(EVENTS.syncDisconnected, () => syncDisconnected()),
     on(EVENTS.pullStarted, () => syncStart()),
     on(EVENTS.pullStopped, payload => {

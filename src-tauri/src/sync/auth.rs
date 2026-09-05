@@ -1,10 +1,23 @@
-//! Google OAuth2 with PKCE for a Desktop-app client (port of `gdrive/auth.js`).
-//! The consent URL opens in the browser; a one-shot loopback listener on
-//! 127.0.0.1 captures the auth code; tokens are stored encrypted via the vault
-//! cryptor. Credentials come from env vars with documented placeholders.
+//! Google OAuth2 with PKCE (port of `gdrive/auth.js`), in two shapes.
+//!
+//! Desktop talks to a Desktop-app client: the consent URL opens in the browser
+//! and a one-shot loopback listener on 127.0.0.1 captures the auth code, so the
+//! whole flow is one blocking call.
+//!
+//! iOS talks to an iOS client, which is public (no secret, PKCE mandatory) and
+//! is registered against a redirect URI on its own URL scheme. Safari takes the
+//! screen and the app is suspended behind it, so the flow has to be cut in half
+//! — [`begin`] opens the consent page, [`complete`] runs when iOS reopens the
+//! app with the redirect. Everything between the two (the PKCE pair, the auth
+//! URL, the token exchange, the token file) is shared.
+//!
+//! Tokens are stored encrypted via the vault cryptor either way.
 
+#[cfg(desktop)]
 use std::io::{BufRead, BufReader, Write};
+#[cfg(desktop)]
 use std::net::TcpListener;
+#[cfg(desktop)]
 use std::time::Duration;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -17,19 +30,35 @@ use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 use url::Url;
 
+#[cfg(desktop)]
 use crate::app::APP_NAME;
 use crate::error::{Error, Result};
 use crate::{crypto::Cryptor, storage};
 
+#[cfg(desktop)]
 const HOST: &str = "127.0.0.1";
+#[cfg(desktop)]
 const PORT: u16 = 4567;
+#[cfg(desktop)]
 const CALLBACK: &str = "/auth/callback";
 const SCOPE: &str = "https://www.googleapis.com/auth/drive.file";
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 
-// Supply your own Google Desktop OAuth client at build or run time.
+// Supply your own Google OAuth client at build or run time.
 const CLIENT_ID_PLACEHOLDER: &str = "YOUR_GOOGLE_OAUTH_CLIENT_ID";
+
+/// A Google iOS client is addressed by its *reversed* client id, which is also
+/// the URL scheme the app registers: client id `123-abc.apps.googleusercontent
+/// .com` <-> scheme `com.googleusercontent.apps.123-abc`.
+#[cfg(any(mobile, test))]
+const IOS_SCHEME_PREFIX: &str = "com.googleusercontent.apps.";
+#[cfg(any(mobile, test))]
+const IOS_CLIENT_ID_SUFFIX: &str = ".apps.googleusercontent.com";
+/// One slash, not two: a reversed-client-id scheme has no authority for a
+/// second one to separate. This is the exact string Google registers.
+#[cfg(any(mobile, test))]
+const IOS_REDIRECT_PATH: &str = ":/oauth2redirect";
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Tokens {
@@ -52,30 +81,107 @@ fn other<E: std::fmt::Display>(e: E) -> Error {
     Error::Other(e.to_string())
 }
 
-fn redirect_uri() -> String {
-    format!("http://{HOST}:{PORT}{CALLBACK}")
+// --- which client this build talks to ---
+
+/// The OAuth client and redirect this platform uses. Resolved per call rather
+/// than cached: it is three string reads, and a cache would only add a way for
+/// the two halves of the mobile flow to disagree.
+struct Credentials {
+    client_id: String,
+    redirect_uri: String,
+    /// Desktop clients ship a (non-confidential) secret. An iOS client is a
+    /// public client and must never send one, so this stays `None` there.
+    secret: Option<String>,
 }
 
-fn client_id() -> Result<String> {
-    let id = std::env::var("GOOGLE_OAUTH_CLIENT_ID")
+fn env_client_id() -> Option<String> {
+    std::env::var("GOOGLE_OAUTH_CLIENT_ID")
         .ok()
         .or_else(|| option_env!("GOOGLE_OAUTH_CLIENT_ID").map(String::from))
-        .unwrap_or_default();
-    if id.is_empty() || id == CLIENT_ID_PLACEHOLDER {
-        return Err(Error::Other(
-            "Google OAuth client not configured; set GOOGLE_OAUTH_CLIENT_ID".into(),
-        ));
-    }
-    Ok(id)
+        .filter(|id| !id.is_empty() && id != CLIENT_ID_PLACEHOLDER)
 }
 
-// Desktop clients ship a (non-confidential) secret; optional so PKCE-only
-// clients also work.
-fn client_secret() -> Option<String> {
-    std::env::var("GOOGLE_OAUTH_CLIENT_SECRET")
-        .ok()
-        .or_else(|| option_env!("GOOGLE_OAUTH_CLIENT_SECRET").map(String::from))
-        .filter(|s| !s.is_empty())
+fn no_client() -> Error {
+    Error::Other("Google OAuth client not configured; set GOOGLE_OAUTH_CLIENT_ID".into())
+}
+
+#[cfg(desktop)]
+impl Credentials {
+    fn resolve(_app: &AppHandle) -> Result<Self> {
+        Ok(Self {
+            client_id: env_client_id().ok_or_else(no_client)?,
+            redirect_uri: format!("http://{HOST}:{PORT}{CALLBACK}"),
+            secret: std::env::var("GOOGLE_OAUTH_CLIENT_SECRET")
+                .ok()
+                .or_else(|| option_env!("GOOGLE_OAUTH_CLIENT_SECRET").map(String::from))
+                .filter(|s| !s.is_empty()),
+        })
+    }
+}
+
+#[cfg(mobile)]
+impl Credentials {
+    /// The committed deep-link scheme is the source of truth (iOS client ids
+    /// are public, and the scheme is what actually registers the app for the
+    /// redirect). `GOOGLE_OAUTH_CLIENT_ID` overrides it for a build that is
+    /// given the id from a secret — and the redirect is then derived back from
+    /// that same id, so the two can never disagree at runtime.
+    fn resolve(app: &AppHandle) -> Result<Self> {
+        let client_id = match env_client_id() {
+            Some(id) => id,
+            None => client_id_from_scheme(&deep_link_scheme(app)?).ok_or_else(no_client)?,
+        };
+        let scheme = scheme_from_client_id(&client_id).ok_or_else(no_client)?;
+        Ok(Self {
+            redirect_uri: format!("{scheme}{IOS_REDIRECT_PATH}"),
+            client_id,
+            secret: None,
+        })
+    }
+}
+
+/// `com.googleusercontent.apps.123-abc` -> `123-abc.apps.googleusercontent.com`
+#[cfg(any(mobile, test))]
+fn client_id_from_scheme(scheme: &str) -> Option<String> {
+    let id = scheme.strip_prefix(IOS_SCHEME_PREFIX)?;
+    (!id.is_empty()).then(|| format!("{id}{IOS_CLIENT_ID_SUFFIX}"))
+}
+
+/// The inverse of [`client_id_from_scheme`].
+#[cfg(any(mobile, test))]
+fn scheme_from_client_id(client_id: &str) -> Option<String> {
+    let id = client_id.strip_suffix(IOS_CLIENT_ID_SUFFIX)?;
+    (!id.is_empty()).then(|| format!("{IOS_SCHEME_PREFIX}{id}"))
+}
+
+/// The reversed-client-id scheme out of `plugins.deep-link.mobile` (see
+/// `tauri.ios.conf.json`). Other schemes may be configured for other purposes,
+/// so this picks the one that looks like a Google client rather than the first.
+#[cfg(mobile)]
+fn deep_link_scheme(app: &AppHandle) -> Result<String> {
+    app.config()
+        .plugins
+        .0
+        .get("deep-link")
+        .and_then(|c| c.get("mobile")?.as_array())
+        .and_then(|domains| {
+            domains.iter().find_map(|d| {
+                d.get("scheme")?
+                    .as_array()?
+                    .iter()
+                    .filter_map(|s| s.as_str())
+                    .find(|s| s.starts_with(IOS_SCHEME_PREFIX))
+                    .map(str::to_owned)
+            })
+        })
+        .ok_or_else(no_client)
+}
+
+/// Whether a deep link is the OAuth redirect rather than some other URL the
+/// app was opened with.
+#[cfg(mobile)]
+pub fn is_oauth_redirect(url: &Url) -> bool {
+    url.scheme().starts_with(IOS_SCHEME_PREFIX)
 }
 
 // --- token persistence (encrypted `auth/gdrive.swftx`) ---
@@ -110,14 +216,60 @@ pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
 
 // --- OAuth flow ---
 
+// Send the user to Google's consent page for `verifier`'s challenge.
+fn open_consent(app: &AppHandle, credentials: &Credentials, verifier: &str) -> Result<()> {
+    let url = auth_url(credentials, &challenge(verifier))?;
+    app.opener().open_url(url, None::<&str>).map_err(other)
+}
+
+/// Desktop: open the browser and block on the loopback listener until Google
+/// redirects to it, then exchange the code.
+#[cfg(desktop)]
 pub fn authenticate(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
+    let credentials = Credentials::resolve(app)?;
     let verifier = gen_verifier();
-    let url = auth_url(&challenge(&verifier))?;
-    app.opener().open_url(url, None::<&str>).map_err(other)?;
+    open_consent(app, &credentials, &verifier)?;
     let code = listen_for_code()?;
     let client = super::http_client();
-    let tokens = tauri::async_runtime::block_on(exchange_code(&client, &code, &verifier))?;
+    let tokens =
+        tauri::async_runtime::block_on(exchange_code(&client, &credentials, &code, &verifier))?;
     write_tokens(app, cryptor, &tokens)
+}
+
+/// Mobile, first half: open the consent page and hand back the PKCE verifier
+/// the caller must keep until the redirect arrives.
+#[cfg(mobile)]
+pub fn begin(app: &AppHandle) -> Result<String> {
+    let credentials = Credentials::resolve(app)?;
+    let verifier = gen_verifier();
+    open_consent(app, &credentials, &verifier)?;
+    Ok(verifier)
+}
+
+/// Mobile, second half: exchange the code the redirect carries and store the
+/// tokens. Async — this runs off the URL-open callback, not on it.
+#[cfg(mobile)]
+pub async fn complete(app: &AppHandle, cryptor: &Cryptor, url: &Url, verifier: &str) -> Result<()> {
+    let code = code_from_redirect(url)?;
+    let credentials = Credentials::resolve(app)?;
+    let tokens = exchange_code(&super::http_client(), &credentials, &code, verifier).await?;
+    write_tokens(app, cryptor, &tokens)
+}
+
+/// The auth code out of a redirect URL, or the error Google put there instead.
+fn code_from_redirect(url: &Url) -> Result<String> {
+    let mut code = None;
+    let mut error = None;
+    for (key, value) in url.query_pairs() {
+        match &*key {
+            "code" => code = Some(value.into_owned()),
+            "error" => error = Some(value.into_owned()),
+            _ => {}
+        }
+    }
+    code.ok_or_else(|| {
+        Error::Other(error.unwrap_or_else(|| "Authorization was cancelled or failed".into()))
+    })
 }
 
 // Return a valid access token, refreshing it if expired.
@@ -128,7 +280,7 @@ pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -
             .refresh_token
             .clone()
             .ok_or(Error::SyncNotConfigured)?;
-        let fresh = refresh(client, &refresh_token).await?;
+        let fresh = refresh(client, &Credentials::resolve(app)?, &refresh_token).await?;
         tokens.access_token = fresh.access_token;
         tokens.expires_at = fresh.expires_at;
         if fresh.refresh_token.is_some() {
@@ -147,11 +299,11 @@ fn needs_refresh(tokens: &Tokens) -> bool {
     }
 }
 
-fn auth_url(challenge: &str) -> Result<String> {
+fn auth_url(credentials: &Credentials, challenge: &str) -> Result<String> {
     let mut url = Url::parse(AUTH_URL).map_err(other)?;
     url.query_pairs_mut()
-        .append_pair("client_id", &client_id()?)
-        .append_pair("redirect_uri", &redirect_uri())
+        .append_pair("client_id", &credentials.client_id)
+        .append_pair("redirect_uri", &credentials.redirect_uri)
         .append_pair("response_type", "code")
         .append_pair("scope", SCOPE)
         .append_pair("access_type", "offline")
@@ -161,33 +313,42 @@ fn auth_url(challenge: &str) -> Result<String> {
     Ok(url.into())
 }
 
-async fn exchange_code(client: &Client, code: &str, verifier: &str) -> Result<Tokens> {
-    let mut form = vec![
+async fn exchange_code(
+    client: &Client,
+    credentials: &Credentials,
+    code: &str,
+    verifier: &str,
+) -> Result<Tokens> {
+    let form = vec![
         ("code", code.to_string()),
-        ("client_id", client_id()?),
-        ("redirect_uri", redirect_uri()),
+        ("redirect_uri", credentials.redirect_uri.clone()),
         ("grant_type", "authorization_code".to_string()),
         ("code_verifier", verifier.to_string()),
     ];
-    if let Some(secret) = client_secret() {
-        form.push(("client_secret", secret));
-    }
-    post_token(client, form).await
+    post_token(client, credentials, form).await
 }
 
-async fn refresh(client: &Client, refresh_token: &str) -> Result<Tokens> {
-    let mut form = vec![
-        ("client_id", client_id()?),
+async fn refresh(
+    client: &Client,
+    credentials: &Credentials,
+    refresh_token: &str,
+) -> Result<Tokens> {
+    let form = vec![
         ("refresh_token", refresh_token.to_string()),
         ("grant_type", "refresh_token".to_string()),
     ];
-    if let Some(secret) = client_secret() {
-        form.push(("client_secret", secret));
-    }
-    post_token(client, form).await
+    post_token(client, credentials, form).await
 }
 
-async fn post_token(client: &Client, form: Vec<(&str, String)>) -> Result<Tokens> {
+async fn post_token(
+    client: &Client,
+    credentials: &Credentials,
+    mut form: Vec<(&str, String)>,
+) -> Result<Tokens> {
+    form.push(("client_id", credentials.client_id.clone()));
+    if let Some(secret) = &credentials.secret {
+        form.push(("client_secret", secret.clone()));
+    }
     let resp = client
         .post(TOKEN_URL)
         .form(&form)
@@ -221,9 +382,10 @@ fn challenge(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
 }
 
-// --- loopback listener ---
+// --- loopback listener (desktop) ---
 
 // Block until the browser hits the callback, returning the auth code.
+#[cfg(desktop)]
 fn listen_for_code() -> Result<String> {
     let listener = TcpListener::bind((HOST, PORT)).map_err(other)?;
     let (mut stream, _) = listener.accept()?;
@@ -236,37 +398,25 @@ fn listen_for_code() -> Result<String> {
     // "GET /auth/callback?code=... HTTP/1.1"
     let path = request_line.split_whitespace().nth(1).unwrap_or("");
     let url = Url::parse(&format!("http://{HOST}:{PORT}{path}")).map_err(other)?;
-    let code = url
-        .query_pairs()
-        .find(|(k, _)| k == "code")
-        .map(|(_, v)| v.into_owned());
-    let error = url
-        .query_pairs()
-        .find(|(k, _)| k == "error")
-        .map(|(_, v)| v.into_owned());
+    let code = code_from_redirect(&url);
 
-    let ok = code.is_some();
-    let _ = stream.write_all(response_html(ok, error.as_deref()).as_bytes());
-
-    code.ok_or_else(|| Error::Other("Authorization was cancelled or failed".into()))
+    let _ = stream.write_all(response_html(code.as_ref().err()).as_bytes());
+    code
 }
 
-fn response_html(ok: bool, error: Option<&str>) -> String {
-    let (status, body) = if ok {
-        (
+#[cfg(desktop)]
+fn response_html(error: Option<&Error>) -> String {
+    let (status, body) = match error {
+        None => (
             "200 OK",
             format!(
                 "<h2>You've successfully connected!</h2><p>You may now close this window and return to {APP_NAME}.</p>"
             ),
-        )
-    } else {
-        (
+        ),
+        Some(error) => (
             "400 Bad Request",
-            format!(
-                "<h2>Failed to connect your Google Drive account.</h2><p>{}</p>",
-                error.unwrap_or("Unknown error")
-            ),
-        )
+            format!("<h2>Failed to connect your Google Drive account.</h2><p>{error}</p>"),
+        ),
     };
     format!(
         "HTTP/1.1 {status}\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n\
@@ -292,5 +442,51 @@ mod tests {
     fn verifier_length_within_pkce_bounds() {
         let v = gen_verifier();
         assert!((43..=128).contains(&v.len()));
+    }
+
+    #[test]
+    fn ios_scheme_and_client_id_are_inverses() {
+        let scheme = "com.googleusercontent.apps.123456-abcdef";
+        let client_id = "123456-abcdef.apps.googleusercontent.com";
+        assert_eq!(client_id_from_scheme(scheme).as_deref(), Some(client_id));
+        assert_eq!(scheme_from_client_id(client_id).as_deref(), Some(scheme));
+        assert_eq!(
+            format!("{scheme}{IOS_REDIRECT_PATH}"),
+            "com.googleusercontent.apps.123456-abcdef:/oauth2redirect"
+        );
+    }
+
+    #[test]
+    fn a_foreign_scheme_yields_no_client_id() {
+        assert!(client_id_from_scheme("swifty").is_none());
+        // The prefix alone names no client.
+        assert!(client_id_from_scheme("com.googleusercontent.apps.").is_none());
+        assert!(scheme_from_client_id("123-abc.example.com").is_none());
+    }
+
+    #[test]
+    fn a_redirect_yields_its_code() {
+        let url = Url::parse("com.googleusercontent.apps.1-a:/oauth2redirect?code=4/abc&scope=x")
+            .unwrap();
+        assert_eq!(code_from_redirect(&url).unwrap(), "4/abc");
+    }
+
+    #[test]
+    fn a_denied_redirect_yields_googles_error() {
+        let url = Url::parse("com.googleusercontent.apps.1-a:/oauth2redirect?error=access_denied")
+            .unwrap();
+        assert_eq!(
+            code_from_redirect(&url).unwrap_err().to_string(),
+            "access_denied"
+        );
+    }
+
+    #[test]
+    fn a_redirect_with_neither_is_a_cancellation() {
+        let url = Url::parse("com.googleusercontent.apps.1-a:/oauth2redirect").unwrap();
+        assert!(code_from_redirect(&url)
+            .unwrap_err()
+            .to_string()
+            .contains("cancelled"));
     }
 }
