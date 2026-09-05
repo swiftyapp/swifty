@@ -83,6 +83,8 @@ fn reveal(app: &AppHandle, revealed: &std::sync::atomic::AtomicBool) {
 pub fn show(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(MAIN) {
         let _ = window.show();
+        // Minimization is a desktop window state; the API doesn't exist on mobile.
+        #[cfg(desktop)]
         let _ = window.unminimize();
         let _ = window.set_focus();
     }

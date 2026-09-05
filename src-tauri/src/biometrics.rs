@@ -3,7 +3,9 @@
 
 use crate::error::{Error, Result};
 
-#[cfg(target_os = "macos")]
+// LocalAuthentication is the same framework on both Apple platforms: Touch ID /
+// Face ID come out of the same `LAContext` policy evaluation.
+#[cfg(target_vendor = "apple")]
 mod imp {
     use super::*;
     use block2::RcBlock;
@@ -63,7 +65,7 @@ mod imp {
     }
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 mod imp {
     use super::*;
 
@@ -83,10 +85,13 @@ pub fn is_available() -> bool {
     imp::is_available()
 }
 
-// The verify-then-read gate: Windows always, and macOS in `GateMode::Prompt`
+// The verify-then-read gate: Windows always, and macOS/iOS in `GateMode::Prompt`
 // (unentitled builds, where the OS cannot enforce biometry on keychain read).
 // Nothing calls it on Linux, where the secure store is unsupported outright.
-#[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
+#[cfg_attr(
+    not(any(target_vendor = "apple", target_os = "windows")),
+    allow(dead_code)
+)]
 pub fn authenticate() -> Result<()> {
     imp::authenticate()
 }
