@@ -57,7 +57,7 @@ export default function Dots({
               className={cx(
                 busy && 'animate-[dotwave_1.05s_ease-in-out_infinite]',
                 text === undefined
-                  ? 'h-[7px] w-[7px] rounded-full bg-text/75'
+                  ? 'h-1.5 w-1.5 rounded-full bg-text/75'
                   : 'text-md text-text'
               )}
               style={busy ? WAVE_DELAYS[i % WAVE_DELAYS.length] : undefined}
