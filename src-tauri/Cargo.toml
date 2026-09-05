@@ -61,6 +61,6 @@ block2 = "0.6"
 security-framework = { version = "3.6.0", features = ["OSX_10_15"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.61", features = ["Security_Credentials_UI", "Win32_Foundation", "Win32_System_DataExchange", "Win32_System_Memory"] }
+windows = { version = "0.62", features = ["Security_Credentials_UI", "Win32_Foundation", "Win32_System_DataExchange", "Win32_System_Memory"] }
 # Credential Manager storage; retrieval is gated behind Windows Hello (verify-then-read).
 keyring = { version = "3", features = ["windows-native"] }
