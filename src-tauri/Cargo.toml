@@ -107,7 +107,7 @@ keyring = { version = "3", features = ["windows-native"] }
 # A real WebAuthn client drives the authenticator through a full ceremony in the
 # passkey tests (origin checks, clientDataJSON, attestation) instead of us
 # hand-rolling CTAP2 requests. Test-only: the app never speaks WebAuthn itself.
-passkey-client = "0.4"
+passkey-client = "0.5"
 # The CredentialStore/UserValidationMethod traits are async, so the tests need
 # a runtime; `rt` (current-thread) + `macros` is the whole of it.
 tokio = { version = "1", features = ["rt", "macros"] }
