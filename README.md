@@ -101,8 +101,11 @@ cd src-tauri && cargo test   # backend tests
 
 ### Google Drive sync (optional)
 
-Drive sync uses **your own** Google OAuth **Desktop** client — no credentials
-are bundled with the app. To enable it:
+Drive sync uses **your own** Google OAuth client — no credentials are bundled
+with the app. Desktop and iOS need one client each, because Google will not let
+a Desktop client redirect to a mobile app.
+
+#### Desktop
 
 1. In the [Google Cloud Console](https://console.cloud.google.com) create an
    OAuth 2.0 Client ID of type **Desktop app**.
@@ -121,6 +124,43 @@ are bundled with the app. To enable it:
    value baked in at compile time (`option_env!`). The build succeeds without
    them — sync simply reports "Google OAuth client not configured" until a
    client id is supplied.
+
+#### iOS
+
+An iOS client is a *public* client: it has **no secret**, PKCE is mandatory, and
+its redirect URI is its own client id reversed. So the one thing to configure is
+that URL scheme, and the client id is derived from it.
+
+1. In the same project create a second OAuth 2.0 Client ID, of type **iOS**,
+   with the bundle id from `src-tauri/tauri.conf.json` (`pro.getswifty.app`).
+2. Take the client id it gives you — `123456-abcdef.apps.googleusercontent.com`
+   — and reverse it into a scheme: `com.googleusercontent.apps.123456-abcdef`.
+   (Google shows this as the "iOS URL scheme" on the credential page.)
+3. Replace the placeholder in `src-tauri/tauri.ios.conf.json`:
+
+   ```json
+   "plugins": {
+     "deep-link": {
+       "mobile": [{ "scheme": ["com.googleusercontent.apps.123456-abcdef"] }]
+     }
+   }
+   ```
+
+   This is the committed source of truth for iOS, and it is safe to commit —
+   an iOS client id is public by design. The Tauri CLI registers the scheme as
+   `CFBundleURLTypes` in the generated `Info.plist` during `tauri ios build`
+   (via `tauri-plugin-deep-link`'s build script), and the app derives both the
+   client id and the redirect URI `com.googleusercontent.apps.<id>:/oauth2redirect`
+   from it at runtime. Re-run `bun run tauri ios init` if the Xcode project is
+   out of date.
+4. Add the **redirect URI** `com.googleusercontent.apps.123456-abcdef:/oauth2redirect`
+   to the client in the console.
+
+`GOOGLE_OAUTH_CLIENT_ID` still overrides the scheme on iOS (the release workflow
+sets it from a secret), and the redirect is then derived back from that id — but
+the scheme in `tauri.ios.conf.json` is what actually registers the app with the
+OS, so it has to be right either way. `GOOGLE_OAUTH_CLIENT_SECRET` is ignored on
+iOS and must never be shipped in a mobile binary.
 
 ### Auto-update signing
 

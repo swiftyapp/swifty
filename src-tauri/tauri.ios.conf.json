@@ -8,5 +8,14 @@
         "create": false
       }
     ]
+  },
+  "plugins": {
+    "deep-link": {
+      "mobile": [
+        {
+          "scheme": ["com.googleusercontent.apps.YOUR_IOS_CLIENT_ID"]
+        }
+      ]
+    }
   }
 }

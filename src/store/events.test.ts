@@ -108,6 +108,47 @@ describe('sync:stopped', () => {
   })
 })
 
+// On mobile `sync_connect` resolves the moment Safari is on screen, so the
+// wait can only be ended by one of these two events.
+describe('the pending connect', () => {
+  it('is finished by sync:connected', () => {
+    const store = makeStore()
+    subscribeToEvents()
+    store.getState().syncPending()
+    expect(store.getState().sync.pending).toBe(true)
+
+    handlerFor(EVENTS.syncConnected)()
+
+    const { pending, enabled, error } = store.getState().sync
+    expect(pending).toBe(false)
+    expect(enabled).toBe(true)
+    expect(error).toBeNull()
+  })
+
+  it('is finished by sync:error, which leaves the vault unconnected', () => {
+    const store = makeStore()
+    subscribeToEvents()
+    store.getState().syncPending()
+
+    handlerFor(EVENTS.syncError)({ error: 'access_denied' })
+
+    const { pending, enabled, error } = store.getState().sync
+    expect(pending).toBe(false)
+    expect(enabled).toBe(false)
+    expect(error).toBe('access_denied')
+  })
+
+  it('clears a previous failure when the user tries again', () => {
+    const store = makeStore()
+    subscribeToEvents()
+    handlerFor(EVENTS.syncError)({ error: 'access_denied' })
+
+    store.getState().syncPending()
+
+    expect(store.getState().sync.error).toBeNull()
+  })
+})
+
 describe('vault:locked', () => {
   it('shows the Touch ID button when a key is enrolled, not a hardcoded false', async () => {
     vi.mocked(isBiometricAvailable).mockResolvedValue(true)
