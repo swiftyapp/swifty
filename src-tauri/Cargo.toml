@@ -51,7 +51,7 @@ sys-locale = "0.3"
 # at 0.4 deliberately: 0.5 declares rust-version 1.85.1, above this crate's
 # 1.85 MSRV, so the MSRV-aware resolver refuses it. Revisit with the MSRV.
 passkey-types = "0.4"
-passkey-authenticator = "0.4"
+passkey-authenticator = "0.5"
 # P-256 keys (PKCS#8 <-> COSE) and the COSE key type passkey-types speaks.
 # Both pinned to what passkey-authenticator itself depends on, so exactly one
 # copy of each is linked.
