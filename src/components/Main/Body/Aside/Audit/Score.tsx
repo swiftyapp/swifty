@@ -44,7 +44,7 @@ export default function Score({ audit }: Props) {
             display tier so it fills the ring. */}
         <div
           data-testid="audit-score"
-          className="text-[34px] font-semibold tracking-display text-text"
+          className="text-3xl font-semibold tracking-display text-text"
         >
           {score.toFixed(1)}
         </div>

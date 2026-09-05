@@ -137,7 +137,7 @@ export default function Masterpass({
         // are both drawn by the cell overlay (see Dots) so they share one
         // geometry, including the selection wash. Only the placeholder renders
         // from here (15px, muted ink).
-        'absolute inset-0 w-full border-0 bg-transparent text-center font-sans text-[15px] tracking-secret text-transparent caret-transparent outline-none selection:bg-transparent placeholder:text-text3',
+        'absolute inset-0 w-full border-0 bg-transparent text-center font-sans text-md tracking-secret text-transparent caret-transparent outline-none selection:bg-transparent placeholder:text-text3',
         lock && 'rounded-xl px-10'
       )}
       placeholder={placeholder || t('Master Password')}
