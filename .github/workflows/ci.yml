@@ -149,6 +149,41 @@ jobs:
         working-directory: src-tauri
         run: cargo build --locked
 
+  rust-ios:
+    # Cross-compile gate only: no simulator runtime and no signing identity on a
+    # hosted runner, so this proves the iOS target still builds, not that the app
+    # runs. Same path filter as `rust` — the sources are the same crate.
+    name: Rust (iOS simulator target)
+    runs-on: macos-latest
+    needs: changes
+    if: >-
+      !cancelled() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.result != 'success' ||
+        needs.changes.outputs.rust == 'true'
+      )
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pinned Rust toolchain (from rust-toolchain.toml)
+        run: rustup toolchain install
+
+      - name: Add the iOS simulator target
+        run: rustup target add aarch64-apple-ios-sim
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          # See the `rust` job: restore everywhere, save only on push.
+          save-if: ${{ github.event_name == 'push' }}
+
+      - name: Stub frontend dist
+        run: mkdir -p dist && echo '<!doctype html>' > dist/index.html
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --target aarch64-apple-ios-sim --all-targets -- -D warnings
+
   supply-chain:
     name: Supply chain (audit + cargo-deny)
     runs-on: ubuntu-latest
