@@ -218,8 +218,11 @@ jobs:
             exit 0
           fi
 
-          ASSETS=$(gh release view "$TAG" --json assets --jq '.assets[].name')
-          if grep -Fxq "$(basename "$IPA_PATH")" <<<"$ASSETS"; then
+          # Any .ipa counts, whatever it is called: a rename or a productName
+          # change must not let a second IPA onto the same release.
+          ATTACHED=$(gh release view "$TAG" --json assets \
+            --jq '[.assets[].name | select(endswith(".ipa"))] | length')
+          if [ "$ATTACHED" -gt 0 ]; then
             echo "::warning::$TAG already has an IPA and this run was not triggered by that tag; leaving it in place. This build is the swifty-ios-ipa artifact"
             exit 0
           fi
