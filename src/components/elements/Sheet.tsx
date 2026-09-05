@@ -1,6 +1,7 @@
-import { useEffect, type ReactNode, type Ref } from 'react'
+import { useRef, type ReactNode, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useVisualViewport } from '@/hooks/useVisualViewport'
+import { useDialogFocus } from '@/hooks/useDialogFocus'
+import { useVisualViewport, viewportStyle } from '@/hooks/useVisualViewport'
 import { CloseGlyph } from '../Main/icons'
 import IconButton from './IconButton'
 
@@ -15,6 +16,7 @@ interface Props {
   testid?: string
   /** Pinned under the bar, outside the scroller (a section switcher, say). */
   toolbar?: ReactNode
+  /** The frame element, for a caller that runs its own topmost-dialog check. */
   ref?: Ref<HTMLDivElement>
   children: ReactNode
 }
@@ -24,8 +26,9 @@ interface Props {
  *
  * A phone has no room for a 470–860px card floating on a scrim, so the same
  * content takes the whole screen instead: safe-area padded, its own close
- * control in a 44px bar, and one scroller sized to the visible viewport so a
- * focused field is not left under the keyboard.
+ * control in a 44px bar, and one scroller pinned to the visible viewport so a
+ * focused field is not left under the keyboard. It is as modal as the card:
+ * focus starts inside, Tab stays inside, and closing hands focus back.
  */
 export default function Sheet({
   onClose,
@@ -37,30 +40,30 @@ export default function Sheet({
   children
 }: Props) {
   const { t } = useTranslation()
-  const height = useVisualViewport()
+  const view = useVisualViewport()
+  const frame = useRef<HTMLDivElement>(null)
+  useDialogFocus(frame, onClose)
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return
-      event.preventDefault()
-      onClose()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  // One node, two refs: the focus trap's and whatever the caller asked for.
+  const setFrame = (node: HTMLDivElement | null) => {
+    frame.current = node
+    if (typeof ref === 'function') ref(node)
+    else if (ref) ref.current = node
+  }
 
   return (
     <div
-      ref={ref}
+      ref={setFrame}
       role="dialog"
       aria-modal="true"
+      tabIndex={-1}
       aria-label={title}
       aria-labelledby={title ? undefined : labelledBy}
       data-testid={testid}
       // Which frame won, for anything asking (tests, styling hooks) without
       // having to read class names off the element.
       data-frame="sheet"
-      style={{ height: height ?? undefined }}
+      style={viewportStyle(view)}
       className="animate-fade fixed inset-0 z-50 flex flex-col bg-detail pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-text"
     >
       <div className="flex h-14 flex-none items-center gap-1 border-b border-line px-2">

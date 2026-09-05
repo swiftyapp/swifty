@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useLayout } from '@/hooks/useLayout'
-import { useVisualViewport } from '@/hooks/useVisualViewport'
+import { useVisualViewport, viewportStyle } from '@/hooks/useVisualViewport'
 import { setLayout } from './layout'
 
 describe('useLayout', () => {
@@ -28,12 +28,32 @@ describe('useVisualViewport', () => {
     expect(renderHook(() => useVisualViewport()).result.current).toBeNull()
   })
 
-  it('reports the visible height when the API is there', () => {
+  const install = (height: number, offsetTop: number) =>
     Object.defineProperty(window, 'visualViewport', {
       configurable: true,
-      value: { height: 640, addEventListener: () => {}, removeEventListener: () => {} }
+      value: { height, offsetTop, addEventListener: () => {}, removeEventListener: () => {} }
     })
-    expect(renderHook(() => useVisualViewport()).result.current).toBe(640)
+  const uninstall = () =>
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: undefined })
+
+  it('reports the visible height and how far iOS panned it', () => {
+    install(640, 120)
+    expect(renderHook(() => useVisualViewport()).result.current).toEqual({
+      height: 640,
+      offsetTop: 120
+    })
+    uninstall()
+  })
+
+  it('turns that into a height plus a translate, and no translate when unpanned', () => {
+    expect(viewportStyle(null)).toBeUndefined()
+    expect(viewportStyle({ height: 640, offsetTop: 0 })).toEqual({
+      height: 640,
+      transform: undefined
+    })
+    expect(viewportStyle({ height: 640, offsetTop: 120 })).toEqual({
+      height: 640,
+      transform: 'translateY(120px)'
+    })
   })
 })

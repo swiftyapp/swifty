@@ -1,5 +1,5 @@
 import { useStore } from '@/store'
-import { useVisualViewport } from '@/hooks/useVisualViewport'
+import { useVisualViewport, viewportStyle } from '@/hooks/useVisualViewport'
 import ListColumn from '../Body/ListColumn'
 import DetailPane from '../Body/DetailPane'
 import SettingsOverlay from '../Sidebar/Settings/Overlay'
@@ -18,12 +18,12 @@ import TabBar from './TabBar'
  */
 export default function Compact() {
   const detail = useStore(state => state.entries.current !== null || state.entries.new !== null)
-  const height = useVisualViewport()
+  const view = useVisualViewport()
 
   return (
     <div
       data-testid="compact-shell"
-      style={{ height: height ?? undefined }}
+      style={viewportStyle(view)}
       className="flex h-full min-h-0 flex-col"
     >
       <TopBar detail={detail} />
