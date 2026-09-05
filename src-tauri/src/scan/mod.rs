@@ -11,8 +11,8 @@
 
 mod card;
 mod mrz;
-#[cfg(target_os = "macos")]
-mod ocr_macos;
+#[cfg(target_vendor = "apple")]
+mod ocr_apple;
 #[cfg(target_os = "windows")]
 mod ocr_windows;
 #[cfg(test)]
@@ -42,10 +42,10 @@ pub trait Ocr {
     fn recognize(&self, image_path: &Path) -> Result<Vec<String>>;
 }
 
-/// Apple's Vision framework.
-#[cfg(target_os = "macos")]
+/// Apple's Vision framework (same API on macOS and iOS).
+#[cfg(target_vendor = "apple")]
 pub fn platform_ocr() -> Option<Box<dyn Ocr>> {
-    Some(Box::new(ocr_macos::VisionOcr))
+    Some(Box::new(ocr_apple::VisionOcr))
 }
 
 /// Windows' `Windows.Media.Ocr`, which needs a language pack to be installed.
@@ -56,7 +56,7 @@ pub fn platform_ocr() -> Option<Box<dyn Ocr>> {
 
 /// Linux has no system text recognizer to call, and bundling an OCR engine is
 /// not worth the binary — the feature is simply absent there.
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 pub fn platform_ocr() -> Option<Box<dyn Ocr>> {
     None
 }

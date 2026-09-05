@@ -40,4 +40,19 @@ describe('checkForUpdate', () => {
     expect(result.kind).toBe('error')
     expect(result).toMatchObject({ kind: 'error', message: expect.stringContaining('offline') })
   })
+
+  // The updater plugin isn't linked into a mobile build, so no version is ever
+  // queried there. Reporting `uptodate` would tell the user the app is current
+  // on the strength of a check that never happened.
+  it('reports unsupported on mobile rather than claiming the app is current', async () => {
+    vi.resetModules()
+    vi.doMock('@/lib/platform', () => ({ isIOS: true, isAndroid: false, isMobile: true }))
+    try {
+      const mobile = await import('./autoUpdate')
+      expect(await mobile.checkForUpdate()).toEqual({ kind: 'unsupported' })
+    } finally {
+      vi.doUnmock('@/lib/platform')
+      vi.resetModules()
+    }
+  })
 })

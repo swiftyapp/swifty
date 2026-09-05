@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isMobile } from '@/lib/platform'
 import { dialogOpen } from '@/utils/dialogOpen'
 import { firstImage } from './fields'
 import { runScan } from './run'
@@ -19,7 +20,8 @@ export function useDropScan(enabled: boolean): boolean {
   const [over, setOver] = useState(false)
 
   useEffect(() => {
-    if (!enabled) return
+    // Nothing drags a photo onto a phone; a later PR gives mobile a picker.
+    if (!enabled || isMobile) return
     let alive = true
     let unlisten: (() => void) | undefined
 

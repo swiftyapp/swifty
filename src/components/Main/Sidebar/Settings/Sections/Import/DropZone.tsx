@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isMobile } from '@/lib/platform'
 import { DownloadGlyph } from '../../../../icons'
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
 export default function DropZone({ onDrop }: Props) {
   const { t } = useTranslation()
   useEffect(() => {
+    // Nothing drags a file onto a phone; a later PR gives mobile a picker.
+    if (isMobile) return
     let alive = true
     let unlisten: (() => void) | undefined
 
@@ -34,6 +37,10 @@ export default function DropZone({ onDrop }: Props) {
       unlisten?.()
     }
   }, [onDrop])
+
+  // ...so nothing here would ever fire, and an inert panel would advertise an
+  // import route that silently does nothing. The tiles above still work.
+  if (isMobile) return null
 
   return (
     <div
