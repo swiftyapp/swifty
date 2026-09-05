@@ -54,7 +54,7 @@
     "@wdio/cli": "^8.46.0",
     "@wdio/globals": "^8.46.0",
     "@wdio/local-runner": "^8.46.0",
-    "@wdio/mocha-framework": "^8.46.0",
+    "@wdio/mocha-framework": "^9.31.5",
     "@wdio/spec-reporter": "^8.43.0",
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^5.2.0",
