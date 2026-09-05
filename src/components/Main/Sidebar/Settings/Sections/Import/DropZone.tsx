@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isMobile } from '@/lib/platform'
 import { DownloadGlyph } from '../../../../icons'
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
 export default function DropZone({ onDrop }: Props) {
   const { t } = useTranslation()
   useEffect(() => {
+    // Nothing drags a file onto a phone; a later PR gives mobile a picker.
+    if (isMobile) return
     let alive = true
     let unlisten: (() => void) | undefined
 

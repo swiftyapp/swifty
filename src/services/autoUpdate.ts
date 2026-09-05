@@ -1,5 +1,6 @@
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check } from '@tauri-apps/plugin-updater'
+import { isMobile } from '@/lib/platform'
 
 // A signed update is staged (downloaded) in the background, then applied on the
 // next launch. Rather than silently relaunching, we surface a toast so the user
@@ -13,6 +14,9 @@ export type UpdateCheckResult =
 // Checks once and, if a newer release exists, downloads + stages it. Never
 // throws — offline / endpoint down / bad manifest all come back as `error`.
 export const checkForUpdate = async (): Promise<UpdateCheckResult> => {
+  // The App Store ships mobile updates; the updater plugin isn't even linked there.
+  if (isMobile) return { kind: 'uptodate' }
+
   try {
     const update = await check()
     if (!update) return { kind: 'uptodate' }
