@@ -31,7 +31,7 @@ rusqlite_migration = "1"
 aes-gcm = "0.10"
 ring = "0.17"
 sha2 = "0.10"
-rand = "0.8"
+rand = "0.10"
 hex = "0.4"
 base64 = "0.22"
 totp-rs = { version = "5", default-features = false }
