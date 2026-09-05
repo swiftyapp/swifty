@@ -158,6 +158,22 @@
     height: 100%;
   }
 
+  /*
+   * Touch manners. `manipulation` drops the 300ms double-tap-to-zoom wait (the
+   * app has nothing to zoom into); `overscroll-behavior: none` stops the whole
+   * shell from rubber-banding when a list hits its end; the tap highlight is
+   * WebKit's grey flash, which the app's own hover/active inks already replace.
+   */
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+
+  #root {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     margin: 0;
     background: var(--c-app);
