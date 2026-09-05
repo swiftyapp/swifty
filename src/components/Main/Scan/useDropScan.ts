@@ -20,7 +20,8 @@ export function useDropScan(enabled: boolean): boolean {
   const [over, setOver] = useState(false)
 
   useEffect(() => {
-    // Nothing drags a photo onto a phone; a later PR gives mobile a picker.
+    // Nothing drags a photo onto a phone; there the way in is the picker in
+    // `AddSecret/ScanAction`, which opens the Photos library (see `pick.ts`).
     if (!enabled || isMobile) return
     let alive = true
     let unlisten: (() => void) | undefined

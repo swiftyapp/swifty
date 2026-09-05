@@ -93,7 +93,7 @@ pub async fn scan_image(path: String) -> Result<ScanResult> {
     tauri::async_runtime::spawn_blocking(move || {
         let ocr = platform_ocr()
             .ok_or_else(|| Error::Other("scanning is not available on this platform".into()))?;
-        let mut lines = ocr.recognize(Path::new(&path))?;
+        let mut lines = ocr.recognize(&local_path(&path))?;
         let found = scan_lines(&lines);
         // The recognized lines are the card number in the clear; the parsed
         // result is all that may outlive this call.
@@ -102,6 +102,21 @@ pub async fn scan_image(path: String) -> Result<ScanResult> {
     })
     .await
     .map_err(|e| Error::Other(e.to_string()))?
+}
+
+/// What the frontend calls a path may be a `file://` URL.
+///
+/// The iOS dialog plugin copies a picked photo into the app sandbox and hands
+/// back that copy's URL (`FilePath::Url`, which serializes as the URL string),
+/// where every other source of a path — a drop, the desktop dialog — gives a
+/// plain one. A Windows path parses as a URL too (`C:` reads as a scheme), so
+/// only `file:` is unwrapped.
+fn local_path(path: &str) -> std::path::PathBuf {
+    url::Url::parse(path)
+        .ok()
+        .filter(|u| u.scheme() == "file")
+        .and_then(|u| u.to_file_path().ok())
+        .unwrap_or_else(|| std::path::PathBuf::from(path))
 }
 
 /// Whether this platform can scan at all, so the UI can leave the affordance
