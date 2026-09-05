@@ -4,7 +4,9 @@ version = "1.0.0-alpha.1"
 description = "Modern, Lightweight, Fast and Free Password Manager"
 authors = ["Alex Chaplinsky"]
 edition = "2021"
-rust-version = "1.77"
+# Floor set by the RustCrypto 0.11 generation (sha2, argon2, digest). The
+# toolchain itself is pinned in rust-toolchain.toml.
+rust-version = "1.85"
 # Desktop application, never published to crates.io.
 publish = false
 
@@ -30,24 +32,24 @@ rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl",
 rusqlite_migration = "1"
 aes-gcm = "0.10"
 ring = "0.17"
-sha2 = "0.10"
+sha2 = "0.11"
 rand = "0.8"
 hex = "0.4"
-base64 = "0.22"
+base64 = "0.23"
 totp-rs = { version = "5", default-features = false }
 zxcvbn = "3"
-dirs = "5"
+dirs = "6"
 log = "0.4.34"
 chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "form", "query", "rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "tls12"] }
 url = "2"
 zeroize = "1.8.2"
-argon2 = "0.5.3"
+argon2 = "0.6"
 sys-locale = "0.3"
 # WebAuthn authenticator core (1Password's passkey-rs, MIT OR Apache-2.0). Held
 # at 0.4 deliberately: 0.5 declares rust-version 1.85.1, above this crate's
-# 1.77 MSRV, so the MSRV-aware resolver refuses it. Revisit with the MSRV.
+# 1.85 MSRV, so the MSRV-aware resolver refuses it. Revisit with the MSRV.
 passkey-types = "0.4"
 passkey-authenticator = "0.4"
 # P-256 keys (PKCS#8 <-> COSE) and the COSE key type passkey-types speaks.

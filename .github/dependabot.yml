@@ -1,7 +1,7 @@
 # Dependabot keeps dependencies patched across all three ecosystems the app
 # ships from: the JS frontend (npm, repo root), the Rust backend (cargo,
 # src-tauri/), and the CI/release workflows themselves (github-actions).
-# All PRs target the v1-0-0 release branch.
+# All PRs target main (the default branch); release branches are cut from it.
 version: 2
 updates:
   # JS/TS frontend — package.json / bun.lock at the repo root.
@@ -9,7 +9,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    target-branch: v1-0-0
+    target-branch: main
     open-pull-requests-limit: 10
     labels:
       - dependencies
@@ -25,7 +25,7 @@ updates:
     directory: /src-tauri
     schedule:
       interval: weekly
-    target-branch: v1-0-0
+    target-branch: main
     open-pull-requests-limit: 10
     labels:
       - dependencies
@@ -41,7 +41,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    target-branch: v1-0-0
+    target-branch: main
     open-pull-requests-limit: 10
     labels:
       - dependencies
