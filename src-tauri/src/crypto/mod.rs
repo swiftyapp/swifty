@@ -35,6 +35,13 @@ const TAG_LEN: usize = 16;
 const ITERATIONS: u32 = 100_000;
 const KEY_LEN: usize = 32;
 
+/// Borrow `bytes` as a 16-byte GCM nonce. aes-gcm 0.11 models nonces as
+/// `hybrid_array::Array` and deprecates its `from_slice`, so the length check is
+/// ours to make: the decrypt paths take the nonce off the wire as a slice.
+fn to_nonce(bytes: &[u8]) -> Result<Nonce<U16>> {
+    Nonce::<U16>::try_from(bytes).map_err(|_| Error::Crypto("invalid nonce length".into()))
+}
+
 /// `base64( SHA512(pw) )` — the "secret" fed to the cryptor.
 pub fn hash_secret(password: &str) -> String {
     STANDARD.encode(Sha512::digest(password.as_bytes()))
@@ -80,7 +87,7 @@ pub(crate) fn seal_aead(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
     rand::thread_rng().fill_bytes(&mut nonce);
     let sealed = cipher
         .encrypt(
-            Nonce::from_slice(&nonce),
+            &to_nonce(&nonce)?,
             Payload {
                 msg: plaintext,
                 aad: &[],
@@ -102,7 +109,7 @@ pub(crate) fn unseal_aead(key: &[u8], blob: &[u8]) -> Result<Vec<u8>> {
     let cipher = Aes256Gcm16::new_from_slice(key).map_err(err)?;
     cipher
         .decrypt(
-            Nonce::from_slice(nonce),
+            &to_nonce(nonce)?,
             Payload {
                 msg: sealed,
                 aad: &[],
@@ -157,9 +164,7 @@ impl Cryptor {
             aad: &[],
         };
         // aes-gcm returns `ciphertext ‖ tag`; the vault format wants the tag before it.
-        let sealed = cipher
-            .encrypt(Nonce::from_slice(&iv), payload)
-            .map_err(err)?;
+        let sealed = cipher.encrypt(&to_nonce(&iv)?, payload).map_err(err)?;
         let (ciphertext, tag) = sealed.split_at(sealed.len() - TAG_LEN);
 
         let mut out = Vec::with_capacity(SALT_LEN + IV_LEN + TAG_LEN + ciphertext.len());
@@ -190,9 +195,7 @@ impl Cryptor {
             msg: &sealed,
             aad: &[],
         };
-        let plain = cipher
-            .decrypt(Nonce::from_slice(iv), payload)
-            .map_err(err)?;
+        let plain = cipher.decrypt(&to_nonce(iv)?, payload).map_err(err)?;
         String::from_utf8(plain).map_err(err)
     }
 
