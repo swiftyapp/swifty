@@ -22,6 +22,13 @@ export interface FrameProps {
   className?: string
   /** Where the card sits on the scrim. */
   align?: 'top' | 'center'
+  /**
+   * How much room the body needs where room is scarce: a screen of its own, or
+   * only as much as it takes. It describes the *content*, not the platform —
+   * `Modal` always has the room and ignores it, and `Sheet` reads it to choose
+   * between a full page and a bottom sheet.
+   */
+  fit?: 'screen' | 'content'
   /** For a body that carries its own close control. */
   hideClose?: boolean
   /** The frame element, for a caller that runs its own topmost-dialog check. */
