@@ -6,7 +6,7 @@ import { useVariant, isWholeView } from '../../Body/Empty/variant'
 import Tags from '../../Sidebar/Tags'
 import Add from '../../Sidebar/Add'
 import { TAB_BAR_CLEARANCE } from '../chrome'
-import Heading from './Heading'
+import Heading from '../Heading'
 
 // iOS's minimum touch target, for the controls the rail draws at 36px.
 const TOUCH = 'h-11 w-11'
@@ -33,7 +33,7 @@ export default function Vault() {
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-list pt-[env(safe-area-inset-top)]">
       <ListColumn
-        heading={<Heading title={title} />}
+        heading={<Heading title={title} testid="list-title" />}
         actions={
           <>
             <SortMenu className={TOUCH} />

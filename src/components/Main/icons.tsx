@@ -18,6 +18,7 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   Cloud,
   Copy,
   CreditCard,
@@ -121,6 +122,8 @@ export const ScanGlyph = glyph(ScanLine, 16)
 export const ShieldGlyph = glyph(ShieldCheck, 16)
 export const GlobeGlyph = glyph(Globe, 16)
 export const ActivityGlyph = glyph(Activity, 16)
+// The iOS disclosure mark: a row that pushes a screen rather than doing a thing.
+export const ChevronRightGlyph = glyph(ChevronRight, 16)
 
 // Rail tier (20px, for the 40px+ rail hit areas and Settings nav headers)
 export const PlusRailGlyph = glyph(Plus, 20)
