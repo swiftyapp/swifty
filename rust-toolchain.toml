@@ -6,6 +6,6 @@
 # floating toolchain would let a new release's lints or formatting break CI on
 # unchanged code. Pin deliberately: bump `channel` here and nowhere else.
 [toolchain]
-channel = "1.90.0"
+channel = "1.97.0"
 components = ["clippy", "rustfmt"]
 profile = "minimal"
