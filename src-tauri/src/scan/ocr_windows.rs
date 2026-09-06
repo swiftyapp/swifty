@@ -38,26 +38,27 @@ impl Ocr for WindowsOcr {
             .to_str()
             .ok_or_else(|| Error::Other("image path is not valid UTF-8".into()))?;
 
-        // Each `get()` blocks on the WinRT async operation; the whole call
-        // already runs off the UI thread.
+        // Each `join()` blocks on the WinRT async operation (windows-rs 0.62's
+        // name for what used to be `get()`); the whole call already runs off the
+        // UI thread.
         let file = StorageFile::GetFileFromPathAsync(&HSTRING::from(path))
-            .and_then(|op| op.get())
+            .and_then(|op| op.join())
             .map_err(failed)?;
         let stream = file
             .OpenAsync(FileAccessMode::Read)
-            .and_then(|op| op.get())
+            .and_then(|op| op.join())
             .map_err(failed)?;
         let decoder = BitmapDecoder::CreateAsync(&stream)
-            .and_then(|op| op.get())
+            .and_then(|op| op.join())
             .map_err(failed)?;
         let bitmap = decoder
             .GetSoftwareBitmapAsync()
-            .and_then(|op| op.get())
+            .and_then(|op| op.join())
             .map_err(failed)?;
         let recognized = self
             .engine
             .RecognizeAsync(&bitmap)
-            .and_then(|op| op.get())
+            .and_then(|op| op.join())
             .map_err(failed)?;
 
         let mut lines = Vec::new();
