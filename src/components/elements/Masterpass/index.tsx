@@ -11,7 +11,8 @@ import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
 import Error from '../Error'
 import IconButton from '../IconButton'
-import { EyeGlyph, EyeOffGlyph, FingerprintGlyph } from '@/components/Main/icons'
+import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
+import { BIOMETRY_LABEL, BiometryGlyph } from '@/lib/biometry'
 import Dots, { CELL } from './Dots'
 import KeyCuts from './KeyCuts'
 
@@ -228,20 +229,21 @@ export default function Masterpass({
           {value.length > 0 && revealButton}
         </div>
 
-        {/* Touch ID is the card's own end segment: a taller divider than the
-            reveal tier, and the fingerprint in the macOS Touch ID rose, sized
-            to nearly fill the 28px button. */}
+        {/* Biometrics are the card's own end segment: a taller divider than the
+            reveal tier, and the glyph in the macOS Touch ID rose, sized to
+            nearly fill the 28px button. Which glyph and name — Touch ID or Face
+            ID — is `lib/biometry`'s call, made once per build. */}
         {touchID && (
           <>
             <span aria-hidden className="my-auto h-7 w-px bg-line" />
             <IconButton
-              label={t('Touch ID')}
+              label={t(BIOMETRY_LABEL)}
               className="mx-1.5 my-auto"
               onClick={onTouchID}
             >
               {/* Child span so the rose survives IconButton's hover ink. */}
               <span className="text-touchid">
-                <FingerprintGlyph size={22} />
+                <BiometryGlyph size={22} />
               </span>
             </IconButton>
           </>

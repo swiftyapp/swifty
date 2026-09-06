@@ -40,6 +40,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  ScanFace,
   ScanLine,
   Search,
   Settings,
@@ -94,6 +95,9 @@ export const DownloadGlyph = glyph(Download, 14)
 export const CloseGlyph = glyph(X, 14)
 export const ChevronDownGlyph = glyph(ChevronDown, 14)
 export const FingerprintGlyph = glyph(Fingerprint, 14)
+// The other biometry: Face ID. Which of the two a build shows is decided once,
+// by platform, in `lib/biometry` — never per call site.
+export const ScanFaceGlyph = glyph(ScanFace, 14)
 export const SortGlyph = glyph(ArrowDownWideNarrow, 14)
 export const ExternalGlyph = glyph(ExternalLink, 14)
 export const AtGlyph = glyph(AtSign, 14)

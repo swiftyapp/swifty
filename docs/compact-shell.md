@@ -17,7 +17,7 @@ desktop app, which stays the source of truth.
 | 3 | Detail read screen: nav row, kind header, container-query row geometry, tap-to-copy rows, bottom primary action | ✅ |
 | 4 | Form screen: `Edit` split into `Title` + `Body`, slide-up form with Save/Cancel in the nav row, add picker as a bottom sheet | ✅ |
 | 5 | Generator and Settings as tab roots; Archive reachable from Settings | ✅ |
-| 6 | Lock screen: `useUnlock` hook, biometric-first compact layout, platform-correct biometric label | ❌ |
+| 6 | Lock screen: `useUnlock` hook, biometric-first compact layout, platform-correct biometric label | ✅ |
 
 ## The three rules
 
@@ -25,8 +25,10 @@ Platform differences are handled by exactly one of these, chosen by what kind
 of difference it is. Nothing else branches on layout.
 
 1. **Screen structure is composition, decided once in the shell.**
-   `Main/index.tsx` is the only component that calls `useLayout()`. `Wide` and
-   `Compact` each assemble their screens from shared content components. Leaf
+   `useLayout()` is called once per flow root and nowhere below it: `App.tsx`
+   picks `LockScreen` or `Auth` for the `auth` flow, `Main/index.tsx` picks
+   `Compact` or `Wide` for the vault. Each pair assembles its screens from
+   shared content components (the lock screens from `Auth/useUnlock`). Leaf
    components never ask which shell they are in. Where a leaf must be framed
    differently (a dialog card on desktop, a sheet on a phone) it renders the
    `Frame` from `elements/Frame`, and the shell provides the implementation
@@ -91,6 +93,20 @@ passes the other a layout flag; each only decides where the parts go. The form
 holds its frame behind `useShown().held` exactly as `Show` does: an editor
 seeded from a reveal that has not landed would discard whatever is typed first.
 
+Before any of that there is the lock, which is not a screen of the vault but a
+flow of its own: `App` renders `Auth/LockScreen` on compact and `Auth` on wide,
+both driven by `Auth/useUnlock` (attempt phase, lockout countdown, mascot gaze,
+the eyebrow's text and tone). The desktop leads with the passphrase card and
+keeps biometrics as its end segment; the phone leads with an 88px biometric
+tile when a key is enrolled and reveals the same card under "Enter Master
+Password". Which biometry the copy names is `lib/biometry` — `BIOMETRY_LABEL`
+and `BiometryGlyph`, chosen once from `isIOS`, so `Masterpass` says the same
+thing wherever it is drawn. **Caveat:** the backend reports only *whether*
+biometrics are available (one `LAContext::canEvaluatePolicy`), not which kind,
+so iOS is labelled Face ID unconditionally — right for every current iPhone,
+wrong for the few Touch ID iPads until `LAContext.biometryType` is plumbed
+through as its own command.
+
 Overlays that stay overlays on a phone: the add picker (`fit="content"`, so a
 bottom sheet) and the generator opened from a password row (a page sheet). Both
 go through `Frame`.
@@ -154,3 +170,24 @@ palettes. Prototype-only colours map to existing tokens (`--list` → `bg-list`,
   passphrase card. No auto-prompt on launch.
 - Not adopted from the prototype: share button, recent searches, vault
   switcher, card face art. The Swifty mascot stays on the lock screen.
+
+## Follow-ups
+
+What the six slices deliberately left behind, smallest first:
+
+- **Archive's nav-row buttons are the desktop's 28px tier.** Restore and Delete
+  on a pushed archive detail still draw at control size; they want the 44px
+  touch tier the rest of the nav row has.
+- **`SyncIndicator` does not deep-link on compact.** On the desktop the chip
+  opens Settings → Sync; the compact settings root has no equivalent entry
+  point yet, so the state is visible but not actionable.
+- **Generator controls have no touch tier.** The length slider and the toggle
+  rows are the desktop's sizes inside `Generator/Panel`, which both shells
+  share; giving them a touch tier means sizing them through the panel rather
+  than around it.
+- **iPad Touch ID reads "Face ID".** See the caveat above: a `biometry_type`
+  command over `LAContext.biometryType`, carried alongside `touchID` in the
+  `flowAuth` payload, would settle it without any new store state.
+- **`big` secrets truncate when stacked.** A long SSH private key in a narrow
+  container clips rather than wrapping; the stacked row needs its own
+  presentation for the multi-line value tier.

@@ -1,180 +1,43 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react'
-import { useTranslation } from 'react-i18next'
-import type { TFunction } from 'i18next'
-import { unlock, unlockBiometric, type UnlockResult } from '@/lib/commands'
-import { enterMain } from '@/store'
 import Masterpass from '@/components/elements/Masterpass'
 import Controls from '@/components/elements/Controls'
 import AuthShell from '@/components/elements/AuthShell'
 import Eyebrow from '@/components/elements/Eyebrow'
 import Mascot from '@/components/elements/Mascot'
-
-// How long the mascot gets to celebrate before the vault fades in.
-const SUCCESS_HOLD_MS = 650
+import { useUnlock } from './useUnlock'
 
 interface Props {
   touchID: boolean
 }
 
-// Rust's `Error::TooManyAttempts` serializes as this shape (see error.rs);
-// every other backend error is a plain string.
-interface TooManyAttemptsError {
-  retryAfterSecs: number
-}
-
-const isTooManyAttempts = (error: unknown): error is TooManyAttemptsError =>
-  typeof error === 'object' &&
-  error !== null &&
-  typeof (error as TooManyAttemptsError).retryAfterSecs === 'number'
-
-// Rust's `Error::VaultTooNew` (see error.rs) — the vault's schema is ahead of
-// this build. Shown as its own message: blaming the password would be wrong.
-const isVaultTooNew = (error: unknown): boolean =>
-  error === 'vault requires a newer version of the app'
-
-const unlockError = (t: TFunction, error: unknown): string =>
-  isVaultTooNew(error)
-    ? t('Vault needs a newer version of the app')
-    : t('Incorrect Master Password')
-
-// A biometric failure is never a password problem: the backend's errors here
-// are a cancelled/failed prompt, a missing enrollment, or a keychain issue.
-// Claiming "Incorrect Master Password" for any of them would send the user
-// retyping a password that was never checked.
-const biometricError = (t: TFunction, error: unknown): string =>
-  isVaultTooNew(error)
-    ? t('Vault needs a newer version of the app')
-    : t('Biometric unlock failed')
-
-const lockedMessage = (t: TFunction, seconds: number) =>
-  t('Too many failed attempts. Try again in {{seconds}}s', { seconds })
-
-// One attempt-lifecycle slot instead of separate success/pending booleans:
-// only one of these can be true at a time, and everything below derives from
-// the same precedence.
-type Phase = 'idle' | 'verifying' | 'success'
-
+// The wide lock screen: mascot, status line and the passphrase card, centered
+// in the auth ground. Biometrics live inside the card as its end segment —
+// there is a keyboard here, so typing is the lead affordance. The phone leads
+// the other way round (see LockScreen); both run the same `useUnlock`.
 export function Auth({ touchID }: Props) {
-  const { t } = useTranslation()
-  const [error, setError] = useState<string | null>(null)
-  const [retryAfter, setRetryAfter] = useState(0)
-  const [count, setCount] = useState(0)
-  const [phase, setPhase] = useState<Phase>('idle')
-  const holdTimer = useRef(0)
-
-  // Countdown ticks once a second while locked out; re-enables the input at 0.
-  useEffect(() => {
-    if (retryAfter <= 0) return
-    const id = setTimeout(() => {
-      const next = retryAfter - 1
-      setRetryAfter(next)
-      setError(next > 0 ? lockedMessage(t, next) : null)
-    }, 1000)
-    return () => clearTimeout(id)
-  }, [retryAfter, t])
-
-  useEffect(() => () => clearTimeout(holdTimer.current), [])
-
-  // Let the mascot celebrate before the vault takes over.
-  const holdThenEnter = (result: UnlockResult) => {
-    setPhase('success')
-    holdTimer.current = window.setTimeout(
-      () => enterMain(result),
-      SUCCESS_HOLD_MS
-    )
-  }
-
-  const handleEnter = (value: string) => {
-    if (retryAfter > 0 || phase !== 'idle') return
-    // Key derivation is deliberately slow; acknowledge the Enter immediately
-    // (and drop any stale error — this attempt owns the eyebrow now).
-    setError(null)
-    setPhase('verifying')
-    unlock(value)
-      .then(holdThenEnter)
-      .catch((err: unknown) => {
-        setPhase('idle')
-        if (isTooManyAttempts(err)) {
-          setRetryAfter(err.retryAfterSecs)
-          setError(lockedMessage(t, err.retryAfterSecs))
-        } else {
-          setError(unlockError(t, err))
-        }
-      })
-  }
-
-  const handleTouchId = () => {
-    // Biometric unlock is never subject to the password backoff (the OS gate
-    // already rate-limits it), so it stays available even while locked out.
-    if (phase !== 'idle') return
-    setError(null)
-    setPhase('verifying')
-    unlockBiometric()
-      .then(holdThenEnter)
-      .catch((err: unknown) => {
-        setPhase('idle')
-        setError(biometricError(t, err))
-      })
-  }
-
-  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setCount(event.currentTarget.value.length)
-    if (retryAfter <= 0) setError(null)
-  }
-
-  // The mascot reads along as you type: the gaze pans left-to-right with the
-  // caret (16 chars ≈ full sweep, like the prototype; Mascot clamps to ±1).
-  const gaze = count > 0 ? (count / 16) * 2 - 1 : 0
-  const mascotState =
-    phase !== 'idle'
-      ? phase === 'success'
-        ? 'success'
-        : 'checking'
-      : error
-        ? 'error'
-        : count > 0
-          ? 'typing'
-          : 'idle'
+  const { mascot, eyebrow, field, submit, biometric, change } = useUnlock()
 
   return (
     <>
       <Controls />
       <AuthShell>
         <div className="mb-7 flex justify-center">
-          <Mascot state={mascotState} gaze={gaze} />
+          <Mascot state={mascot.state} gaze={mascot.gaze} />
         </div>
-        {/* One element carries all three states, so the testid names which one
-            is showing rather than forcing specs to parse the message. */}
-        <Eyebrow
-          tone={error ? 'bad' : 'muted'}
-          busy={phase === 'verifying'}
-          testid={
-            retryAfter > 0
-              ? 'unlock-lockout'
-              : error
-                ? 'unlock-error'
-                : 'unlock-status'
-          }
-        >
-          {error ??
-            (phase === 'success'
-              ? t('Unsealing')
-              : phase === 'verifying'
-                ? t('Verifying')
-                : t('Vault sealed'))}
+        <Eyebrow tone={eyebrow.tone} busy={eyebrow.busy} testid={eyebrow.testid}>
+          {eyebrow.text}
         </Eyebrow>
         <div className="mt-8">
           <Masterpass
             variant="lock"
             touchID={touchID}
             testid="unlock-password-input"
-            invalid={!!error}
-            success={phase === 'success'}
-            pending={phase === 'verifying'}
-            disabled={retryAfter > 0}
-            onChange={handleChange}
-            onEnter={handleEnter}
-            onTouchID={handleTouchId}
+            invalid={field.invalid}
+            success={field.success}
+            pending={field.pending}
+            disabled={field.disabled}
+            onChange={change}
+            onEnter={submit}
+            onTouchID={biometric}
           />
         </div>
       </AuthShell>
