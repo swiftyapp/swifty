@@ -4,7 +4,7 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 use ssh_key::{private::PrivateKey, Algorithm as SshAlgorithm, HashAlg, LineEnding};
 use std::time::{SystemTime, UNIX_EPOCH};
-use totp_rs::{Algorithm, Secret, TOTP};
+use totp_rs::{Algorithm, Builder, Secret, Totp};
 
 const LOWER: &str = "abcdefghijklmnopqrstuvwxyz";
 const UPPER: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -84,35 +84,49 @@ pub fn generate_ssh_key(comment: Option<String>) -> Result<SshKeyPair> {
     })
 }
 
-fn totp(secret: &str) -> Result<TOTP> {
-    let bytes = Secret::Encoded(secret.to_string())
-        .to_bytes()
+fn totp(secret: &str) -> Result<Totp> {
+    let secret = Secret::try_from_base32(secret)
         .map_err(|e| Error::Other(format!("invalid otp secret: {e:?}")))?;
     // SHA1, 6 digits, 30s period, ±1 window — matches legacy speakeasy defaults.
-    Ok(TOTP::new_unchecked(Algorithm::SHA1, 6, 1, 30, bytes))
+    // `build_noncompliant` skips the RFC secret-length and digit checks, exactly
+    // as the old `new_unchecked` did: stored secrets are whatever the issuer
+    // handed the user, and refusing a short one would lock them out.
+    Ok(Builder::new()
+        .with_algorithm(Algorithm::SHA1)
+        .with_digits(6)
+        .with_skew(1)
+        .with_step_duration(30)
+        .with_secret(secret)
+        .build_noncompliant())
+}
+
+// Seconds since the Unix epoch: the step counter a code is derived from, and the
+// same reading the window countdown is measured against.
+fn unix_now() -> Result<u64> {
+    Ok(SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| Error::Other(e.to_string()))?
+        .as_secs())
 }
 
 // Generate the current TOTP code for a base32 secret plus seconds left in the window.
 #[tauri::command]
 pub fn generate_otp(secret: String) -> Result<OtpResult> {
-    let code = totp(&secret)?
-        .generate_current()
-        .map_err(|e| Error::Other(e.to_string()))?;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| Error::Other(e.to_string()))?
-        .as_secs();
+    let now = unix_now()?;
     Ok(OtpResult {
-        code,
+        // `Token`'s Display zero-pads to the configured digit count, which is
+        // exactly the string 5.x's `generate` returned.
+        code: totp(&secret)?.generate(now).to_string(),
         time: 30 - (now % 30) as u32,
     })
 }
 
 #[tauri::command]
 pub fn verify_otp(secret: String, token: String) -> Result<bool> {
-    totp(&secret)?
-        .check_current(&token)
-        .map_err(|e| Error::Other(e.to_string()))
+    // 6.0 returns the matched step instead of a bool, so a caller can reject a
+    // replayed code. Nothing here tracks used steps, so "matched at all" is the
+    // same answer 5.x gave.
+    Ok(totp(&secret)?.check(&token, unix_now()?).is_some())
 }
 
 #[cfg(test)]

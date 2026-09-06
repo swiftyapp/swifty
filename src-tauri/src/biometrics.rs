@@ -64,9 +64,11 @@ mod imp {
         UserConsentVerificationResult, UserConsentVerifier, UserConsentVerifierAvailability,
     };
 
+    // `join` is windows-rs 0.62's name for what used to be `get`: block the
+    // calling thread until the WinRT async operation completes.
     pub fn is_available() -> bool {
         UserConsentVerifier::CheckAvailabilityAsync()
-            .and_then(|op| op.get())
+            .and_then(|op| op.join())
             .map(|a| a == UserConsentVerifierAvailability::Available)
             .unwrap_or(false)
     }
@@ -74,7 +76,7 @@ mod imp {
     pub fn authenticate() -> Result<()> {
         let message = HSTRING::from("Confirm your identity");
         let verified = UserConsentVerifier::RequestVerificationAsync(&message)
-            .and_then(|op| op.get())
+            .and_then(|op| op.join())
             .map(|r| r == UserConsentVerificationResult::Verified)
             .unwrap_or(false);
         if verified {
