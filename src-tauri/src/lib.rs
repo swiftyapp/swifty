@@ -31,6 +31,11 @@ use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Before anything else: on mobile Tauri builds a reqwest client while
+    // launching, and with `rustls-no-provider` that aborts the process unless
+    // a provider is already installed (see `sync::install_crypto_provider`).
+    sync::install_crypto_provider();
+
     // Only the desktop-gated blocks below reassign it.
     #[cfg_attr(mobile, allow(unused_mut))]
     let mut builder = tauri::Builder::default();

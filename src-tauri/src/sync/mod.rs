@@ -24,13 +24,24 @@ use engine::{Remote, RemoteFile, SessionVault, SyncOutcome};
 
 const FOLDER_NAME: &str = "Swifty";
 
-// Build an HTTPS client, installing the ring rustls provider once per process
-// (reqwest is built with `rustls-no-provider`).
-pub(crate) fn http_client() -> Client {
+/// Install the ring rustls provider, once per process.
+///
+/// reqwest is built with `rustls-no-provider`, and building a `Client` before a
+/// provider is installed is a panic, not an error. Our own clients all come
+/// through [`http_client`], which installs first — but on iOS and Android Tauri
+/// itself builds a reqwest client during launch (the `tauri://` protocol proxies
+/// the dev server through one, see `tauri/src/protocol/tauri.rs`), so `run()`
+/// has to install before `tauri::Builder` ever runs. Idempotent.
+pub(crate) fn install_crypto_provider() {
     static ONCE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     ONCE.get_or_init(|| {
         let _ = rustls::crypto::ring::default_provider().install_default();
     });
+}
+
+// Build an HTTPS client (see [`install_crypto_provider`] for why it comes first).
+pub(crate) fn http_client() -> Client {
+    install_crypto_provider();
     Client::new()
 }
 
