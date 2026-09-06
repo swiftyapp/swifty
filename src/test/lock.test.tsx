@@ -58,6 +58,28 @@ describe('lock screen on compact', () => {
     expect(screen.queryByTestId('use-password-button')).not.toBeInTheDocument()
   })
 
+  // The launch probe answers after the mount, so `touchID` can flip under a
+  // card that already has something typed into it.
+  it('keeps the card once it has been typed in, whatever the probe says after', async () => {
+    const { rerender } = renderWithStore(<LockScreen touchID={false} />)
+
+    await userEvent.type(screen.getByTestId('unlock-password-input'), 'a')
+    rerender(<LockScreen touchID />)
+
+    const input = screen.getByTestId<HTMLInputElement>('unlock-password-input')
+    expect(input).toBeInTheDocument()
+    expect(input.value).toBe('a')
+    expect(screen.queryByTestId('biometric-tile')).not.toBeInTheDocument()
+  })
+
+  // The device says which gate it has; the same iOS build runs on both.
+  it('names the biometry the backend reported', () => {
+    renderWithStore(<LockScreen touchID biometry="face" />)
+
+    expect(screen.getByLabelText('Face ID')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Touch ID')).not.toBeInTheDocument()
+  })
+
   it('is what the auth flow renders on a phone', async () => {
     vi.mocked(isBiometricAvailable).mockResolvedValue(true)
     renderWithStore(<App />)

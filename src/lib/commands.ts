@@ -240,6 +240,14 @@ export const unlockBiometric = (): Promise<UnlockResult> =>
 export const isBiometricAvailable = (): Promise<boolean> =>
   invoke('is_biometric_available')
 
+// Which biometry this device gates with, straight from the OS (Apple reads
+// `LAContext.biometryType`; everywhere else a fingerprint is the only kind
+// there has ever been). The platform alone cannot answer it — iPhones and Touch
+// ID iPads are the same build.
+export type BiometryType = 'face' | 'touch' | 'none'
+
+export const biometryType = (): Promise<BiometryType> => invoke('biometry_type')
+
 // How the enrolled vault key is gated. `protected` is OS-enforced (the macOS
 // data-protection keychain releases the key only to Touch ID); `prompt` is
 // app-enforced (we run the biometric check, then read a plain credential-store

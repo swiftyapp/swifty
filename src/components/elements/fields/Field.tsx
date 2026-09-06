@@ -161,6 +161,9 @@ export default function Field({
                 the real one, exactly as the button beside it already does. */}
             <button
               type="button"
+              // Masked, the button's text is twelve dots and names nothing, so
+              // it says what it is and what pressing it does instead.
+              aria-label={label ? `${t(label)} · ${t('Copy')}` : t('Copy')}
               onClick={() => copy(shown)}
               className={cx(ink, 'cursor-pointer text-left', masked ? 'text-text2' : 'text-text')}
               data-testid={`entry-value-${name}`}

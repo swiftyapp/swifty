@@ -11,13 +11,33 @@ mod imp {
     use block2::RcBlock;
     use objc2::runtime::Bool;
     use objc2_foundation::{NSError, NSString};
-    use objc2_local_authentication::{LAContext, LAPolicy};
+    use objc2_local_authentication::{LABiometryType, LAContext, LAPolicy};
     use std::sync::mpsc;
 
     const POLICY: LAPolicy = LAPolicy::DeviceOwnerAuthenticationWithBiometrics;
 
     pub fn is_available() -> bool {
         unsafe { LAContext::new().canEvaluatePolicy_error(POLICY).is_ok() }
+    }
+
+    // `biometryType` is only populated once the context has been asked whether
+    // it can evaluate the policy, so the check is not an availability guard we
+    // could skip — it is what fills the property in.
+    pub fn kind() -> &'static str {
+        let ctx = unsafe { LAContext::new() };
+        if unsafe { ctx.canEvaluatePolicy_error(POLICY) }.is_err() {
+            return super::NONE;
+        }
+        let biometry = unsafe { ctx.biometryType() };
+        if biometry == LABiometryType::FaceID {
+            super::FACE
+        } else if biometry == LABiometryType::TouchID {
+            super::TOUCH
+        } else {
+            // Optic ID and anything Apple adds later: we have no name for it, so
+            // say nothing rather than name the wrong gate.
+            super::NONE
+        }
     }
 
     pub fn authenticate() -> Result<()> {
@@ -81,8 +101,37 @@ mod imp {
     }
 }
 
+// What the UI calls the gate. Kept as the three wire strings the frontend's
+// `BiometryType` union already names, so neither side has a mapping table.
+
+// Only Apple can report a face.
+#[cfg_attr(not(target_vendor = "apple"), allow(dead_code))]
+const FACE: &str = "face";
+const TOUCH: &str = "touch";
+const NONE: &str = "none";
+
 pub fn is_available() -> bool {
     imp::is_available()
+}
+
+/// Which biometry this device gates with: `"face"`, `"touch"` or `"none"`.
+///
+/// The hardware, not the opt-in — `is_available` still says whether it can be
+/// used at all. Only Apple platforms distinguish the two kinds; everywhere else
+/// the gate has always been a fingerprint (Windows Hello's), so availability is
+/// the whole answer.
+#[cfg(target_vendor = "apple")]
+pub fn kind() -> &'static str {
+    imp::kind()
+}
+
+#[cfg(not(target_vendor = "apple"))]
+pub fn kind() -> &'static str {
+    if imp::is_available() {
+        TOUCH
+    } else {
+        NONE
+    }
 }
 
 // The verify-then-read gate: Windows always, and macOS/iOS in `GateMode::Prompt`

@@ -4,18 +4,21 @@ import AuthShell from '@/components/elements/AuthShell'
 import Eyebrow from '@/components/elements/Eyebrow'
 import Mascot from '@/components/elements/Mascot'
 import Masterpass from '@/components/elements/Masterpass'
+import type { BiometryType } from '@/lib/commands'
 import BiometricTile from './BiometricTile'
 import { useUnlock } from './useUnlock'
 
 interface Props {
   touchID: boolean
+  /** Which gate the tile and the card's end segment name (see lib/biometry). */
+  biometry?: BiometryType
 }
 
 // The phone lock screen. Same parts as the wide one and the same `useUnlock`,
 // ordered for a thumb instead of a keyboard: the biometric tile leads when a
 // key is enrolled and the passphrase card is one tap away under it. Without an
 // enrollment there is nothing to lead with, so the card shows straight away.
-export default function LockScreen({ touchID }: Props) {
+export default function LockScreen({ touchID, biometry = 'touch' }: Props) {
   const { t } = useTranslation()
   const { mascot, eyebrow, field, submit, biometric, change } = useUnlock()
   // Derived, not seeded: `touchID` only becomes true once the launch probe
@@ -23,6 +26,12 @@ export default function LockScreen({ touchID }: Props) {
   // seeded from the first render would never give way to the tile.
   const [revealed, setRevealed] = useState(false)
   const password = revealed || !touchID
+
+  // ...but that probe can also land *between* two keystrokes, and swapping the
+  // card for the tile then would throw away a passphrase already being typed.
+  // So any use of the card is itself a decision to keep it, whatever the probe
+  // says afterwards.
+  const keep = () => setRevealed(true)
 
   return (
     <AuthShell>
@@ -40,20 +49,27 @@ export default function LockScreen({ touchID }: Props) {
           <Masterpass
             variant="lock"
             touchID={touchID}
+            biometry={biometry}
             testid="unlock-password-input"
             invalid={field.invalid}
             success={field.success}
             pending={field.pending}
             disabled={field.disabled}
-            onChange={change}
-            onEnter={submit}
+            onChange={event => {
+              keep()
+              change(event)
+            }}
+            onEnter={value => {
+              keep()
+              submit(value)
+            }}
             onTouchID={biometric}
           />
         </div>
       ) : (
         <>
           <div className="mt-8 flex justify-center">
-            <BiometricTile onUnlock={biometric} />
+            <BiometricTile biometry={biometry} onUnlock={biometric} />
           </div>
           {/* 52px, the phone's secondary tier: bordered rather than filled, so
               the tile above stays the one thing being offered. */}

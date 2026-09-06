@@ -12,13 +12,18 @@ import type { TKey } from '@/i18n'
 import Error from '../Error'
 import IconButton from '../IconButton'
 import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
-import { BIOMETRY_LABEL, BiometryGlyph } from '@/lib/biometry'
+import type { BiometryType } from '@/lib/commands'
+import { biometryLabel, biometryGlyph } from '@/lib/biometry'
 import Dots, { CELL } from './Dots'
 import KeyCuts from './KeyCuts'
 
 interface Props {
   error?: string | null
   touchID?: boolean
+  // Which gate the end segment names, from the backend (see lib/biometry). The
+  // fingerprint is the default because it is the only kind every non-Apple
+  // platform has, and what this card said before the type was asked for.
+  biometry?: BiometryType
   // The field genuinely must not accept input (lockout countdown); dims it.
   disabled?: boolean
   placeholder?: string
@@ -57,6 +62,7 @@ interface Props {
 export default function Masterpass({
   error,
   touchID,
+  biometry = 'touch',
   disabled,
   placeholder,
   testid,
@@ -77,6 +83,7 @@ export default function Masterpass({
   const rowRef = useRef<HTMLDivElement>(null)
 
   const lock = variant === 'lock'
+  const BiometryMark = biometryGlyph(biometry)
   const bad = !!error || !!invalid
   // The input can't accept keystrokes while locked out, verifying, or during
   // the success hold; only the lockout also dims the card.
@@ -232,18 +239,18 @@ export default function Masterpass({
         {/* Biometrics are the card's own end segment: a taller divider than the
             reveal tier, and the glyph in the macOS Touch ID rose, sized to
             nearly fill the 28px button. Which glyph and name — Touch ID or Face
-            ID — is `lib/biometry`'s call, made once per build. */}
+            ID — is `lib/biometry`'s call, from what the device reports. */}
         {touchID && (
           <>
             <span aria-hidden className="my-auto h-7 w-px bg-line" />
             <IconButton
-              label={t(BIOMETRY_LABEL)}
+              label={t(biometryLabel(biometry))}
               className="mx-1.5 my-auto"
               onClick={onTouchID}
             >
               {/* Child span so the rose survives IconButton's hover ink. */}
               <span className="text-touchid">
-                <BiometryGlyph size={22} />
+                <BiometryMark size={22} />
               </span>
             </IconButton>
           </>
