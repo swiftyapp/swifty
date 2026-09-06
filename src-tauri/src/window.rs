@@ -49,6 +49,8 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     }
 
     let window = builder.build()?;
+    #[cfg(target_os = "ios")]
+    cover_safe_area(&window)?;
     let handle = app.clone();
     window.on_window_event(move |event| {
         autolock::handle_event(&handle, event);
@@ -67,6 +69,25 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     });
 
     Ok(())
+}
+
+// Give the page the whole screen. WKWebView's scroll view inherits UIKit's
+// automatic safe-area content insets, which take the notch and the home
+// indicator out of the page's layout viewport (874 → 778pt on an iPhone 17)
+// even though `viewport-fit=cover` paints under them — so a `height: 100%`
+// shell ended 96pt above the bottom edge, tab bar and all. With the adjustment
+// off the layout viewport is the screen, and the compact chrome keeps clear of
+// the edges with `env(safe-area-inset-*)`, which UIKit still reports.
+#[cfg(target_os = "ios")]
+fn cover_safe_area(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    window.with_webview(|webview| unsafe {
+        use objc2::{msg_send, runtime::AnyObject};
+        // UIScrollViewContentInsetAdjustmentNever
+        const NEVER: isize = 2;
+        let webview = webview.inner() as *mut AnyObject;
+        let scroll_view: *mut AnyObject = msg_send![webview, scrollView];
+        let () = msg_send![scroll_view, setContentInsetAdjustmentBehavior: NEVER];
+    })
 }
 
 // Block in-app navigation to external sites; open them in the OS browser instead.

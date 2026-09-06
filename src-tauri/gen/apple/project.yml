@@ -74,6 +74,10 @@ targets:
         LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
+        # `tauri ios dev` rewrites the entitlements file from tauri.conf.json on
+        # every run, sometimes mid-build; without this Xcode refuses the build
+        # ("Entitlements file was modified during the build").
+        CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION: true
       groups: [app]
     dependencies:
       - framework: libapp.a
