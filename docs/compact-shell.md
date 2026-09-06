@@ -16,7 +16,7 @@ desktop app, which stays the source of truth.
 | 2 | Compact shell as screens: derived screen selection, floating tab bar, large-title list root, top bar removed | ✅ |
 | 3 | Detail read screen: nav row, kind header, container-query row geometry, tap-to-copy rows, bottom primary action | ✅ |
 | 4 | Form screen: `Edit` split into `Title` + `Body`, slide-up form with Save/Cancel in the nav row, add picker as a bottom sheet | ✅ |
-| 5 | Generator and Settings as tab roots; Archive reachable from Settings | ❌ |
+| 5 | Generator and Settings as tab roots; Archive reachable from Settings | ✅ |
 | 6 | Lock screen: `useUnlock` hook, biometric-first compact layout, platform-correct biometric label | ❌ |
 
 ## The three rules
@@ -68,12 +68,21 @@ already has:
 | `generator.open` with no `apply`/`ssh` callback | Generator tab root |
 | otherwise | List root for `ui.view` |
 
-As of slice 2 the standalone generator is not yet a screen: it is still the
-sheet `Main` mounts, and the Generator tab only opens it and lights up while it
-is open. Slice 5 finishes it. Every other row is its own screen: the detail as
-of slice 3 (`Compact/Detail/Read` — nav row, kind header, bottom primary
-action), the form as of slice 4 (`Compact/Form` — Cancel/Save in the nav row
-over one `@container` scroller).
+The one exception is which settings pane is open: that is `useState` inside
+`Compact/Settings`, because `ui.settingsSection` is the *wide* modal's nav
+selection and persists, so a phone reading it would open Settings already
+inside a pane. It is one level deep and resets with the screen.
+
+Every row is its own screen: the detail as of slice 3 (`Compact/Detail/Read` —
+nav row, kind header, bottom primary action), the form as of slice 4
+(`Compact/Form` — Cancel/Save in the nav row over one `@container` scroller),
+and as of slice 5 the two remaining roots. The generator splits by *how it was
+opened*, not by shell: standalone it is `Compact/Generator` (large title, mode
+switch, `Generator/Panel`, a bottom Use & copy), and opened from a password row
+it is `Generator/Attached` — the same `Dialog` the wide shell mounts, framed as
+a page sheet. Both take `useGeneratorDialog`, so the two shells generate the
+same way. Settings is a root list of rows over the desktop's own `Section`
+panes, and carries the lock control the vanished top bar used to.
 
 Both screens compose parts the desktop's `Aside/Show` also composes —
 `Identity`, `Eyebrow`, `Edit/Title`, `Edit/Body`, `Footer`, `MoreMenu`, and the
@@ -87,8 +96,9 @@ bottom sheet) and the generator opened from a password row (a page sheet). Both
 go through `Frame`.
 
 Tabs (labels are the desktop's i18n keys): **All Items · Favorites · Generator
-· Settings**. Archive is a row in Settings on compact. Tapping a tab closes
-settings and the standalone generator and calls `setView`.
+· Settings**. Archive is a row in Settings on compact. A list tab closes
+settings and the standalone generator and calls `setView`; Generator and
+Settings are one screen slot between them, so each closes the other.
 
 Transitions are mount animations only (`animate-sheet` slides in from the
 right, `animate-rise` slides up, `animate-fade` for roots). No exit animations.

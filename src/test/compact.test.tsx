@@ -5,7 +5,14 @@ import Main from '@/components/Main'
 import AuthShell from '@/components/elements/AuthShell'
 import Frame, { FrameProvider } from '@/components/elements/Frame'
 import Sheet from '@/components/elements/Sheet'
-import { copyToClipboard, revealEntry, saveEntry, type Entry } from '@/lib/commands'
+import {
+  copyToClipboard,
+  generatePassword,
+  lock,
+  revealEntry,
+  saveEntry,
+  type Entry
+} from '@/lib/commands'
 import {
   makeStore,
   useStore,
@@ -30,6 +37,7 @@ const field = (name: string) => document.querySelector<HTMLInputElement>(`input[
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(generatePassword).mockResolvedValue('Generated123!')
   setLayout('compact')
 })
 
@@ -209,15 +217,67 @@ describe('compact shell', () => {
     renderWithStore(<Main />, { store: seed() })
 
     await userEvent.click(screen.getByTestId('tab-generator'))
-    expect(screen.getByTestId('generator-dialog')).toHaveAttribute('data-frame', 'sheet')
+    // A root screen rather than the sheet it used to be: no dialog, and the bar
+    // it was opened from is still up.
+    expect(screen.getByTestId('generator-screen')).toBeInTheDocument()
+    expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
     expect(screen.getByTestId('tab-generator')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('tab-bar')).toBeInTheDocument()
 
-    await userEvent.keyboard('{Escape}')
     await userEvent.click(screen.getByTestId('tab-settings'))
     expect(useStore.getState().ui.settings).toBe(true)
+    // The two non-list roots are one slot: taking it closes the other.
+    expect(useStore.getState().generator.open).toBe(false)
+    expect(screen.queryByTestId('generator-screen')).not.toBeInTheDocument()
     // A root screen, with the bar still up: the tab bar is the way out of it.
     expect(screen.getByTestId('settings-nav-security')).toBeInTheDocument()
     expect(screen.getByTestId('tab-bar')).toBeInTheDocument()
+  })
+
+  it('generates and copies from the generator root, and leaves it by tab', async () => {
+    renderWithStore(<Main />, { store: seed() })
+
+    await userEvent.click(screen.getByTestId('tab-generator'))
+    expect(await screen.findByText('Generated123!')).toBeInTheDocument()
+
+    // The bottom button is what the desktop card calls its confirm, in the
+    // thumb's half of the screen.
+    const use = screen.getByTestId('generator-use-button')
+    expect(use).toHaveTextContent('Use & copy')
+    await userEvent.click(use)
+    expect(copyToClipboard).toHaveBeenCalledWith('Generated123!', expect.any(Number))
+    // Confirming is not leaving: a tab root is left through the tab bar.
+    expect(screen.getByTestId('generator-screen')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('tab-items'))
+    expect(useStore.getState().generator.open).toBe(false)
+    expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
+  })
+
+  it('pushes a settings section and comes back to the root', async () => {
+    renderWithStore(<Main />, { store: seed() })
+
+    act(() => openSettings())
+    // Every section is a row, in the desktop nav's order.
+    expect(screen.getAllByTestId(/^settings-nav-/)).toHaveLength(5)
+
+    await userEvent.click(screen.getByTestId('settings-nav-security'))
+    expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument()
+    // One level deep, not a modal: the tab bar is still there.
+    expect(screen.getByTestId('tab-bar')).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-nav-security')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-back'))
+    expect(screen.getByTestId('settings-nav-security')).toBeInTheDocument()
+  })
+
+  it('locks the vault from the settings root', async () => {
+    renderWithStore(<Main />, { store: seed() })
+
+    act(() => openSettings())
+    await userEvent.click(screen.getByTestId('lock-vault-button'))
+
+    expect(lock).toHaveBeenCalledOnce()
   })
 
   it('shows the empty-vault hero on the one pane it has', () => {
@@ -276,10 +336,15 @@ describe('overlay frames', () => {
     expect(screen.getByTestId('generator-dialog')).toHaveAttribute('data-frame', 'sheet')
   })
 
-  it('gives the generator a sheet on compact and the card on wide', () => {
+  it('makes the standalone generator a screen on compact and the card on wide', () => {
     const { unmount } = renderWithStore(<Main />, { store: seed() })
     act(() => openGenerator())
-    expect(screen.getByTestId('generator-dialog')).toHaveAttribute('data-frame', 'sheet')
+    // Nothing is waiting for the value, so there is nothing to overlay: it is a
+    // tab root of its own.
+    expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
+    expect(screen.getByTestId('compact-shell')).toContainElement(
+      screen.getByTestId('generator-screen')
+    )
     unmount()
 
     setLayout('wide')
