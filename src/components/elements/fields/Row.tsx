@@ -25,7 +25,25 @@ interface Props {
 }
 
 // Where the value column starts: label 128 (w-32) + gap 12 + sigil 16 (w-4) + gap 12.
-const VALUE_START = 'pl-[168px]'
+// Stacked, there is no label column in front of the value, so the slot under it
+// starts at the row's own edge.
+const VALUE_START = 'pl-[168px] @max-[420px]:pl-0'
+
+/*
+ * Below 420px of *container* the row folds instead of shrinking: the label
+ * takes a line of its own (`w-full` on a wrapping flex line is the break), the
+ * sigil goes with the column it was aligning to, and value + actions keep the
+ * next line to themselves. No render branch — every kind's rows inherit it from
+ * whichever surface declares itself a `@container` (see Show/Read).
+ */
+const STACK = '@max-[420px]:flex-wrap @max-[420px]:gap-y-1.5'
+const STACK_LABEL = '@max-[420px]:w-full'
+const STACK_SIGIL = '@max-[420px]:hidden'
+// The rail no longer has a fixed column to fit, so where the pointer is also a
+// finger its controls grow to the 44px target. Both conditions: an iPad running
+// the wide shell keeps the 60px rail, which only holds two 28px buttons.
+const STACK_RAIL =
+  '@max-[420px]:w-auto @max-[420px]:pointer-coarse:[&_button]:h-11 @max-[420px]:pointer-coarse:[&_button]:w-11'
 
 // THE detail-row geometry: a w-32 mono label column, the value, trailing
 // controls, then anything that belongs under the value. Read values and their
@@ -41,7 +59,7 @@ export default function FieldRow({ label, prefix, actions, below, error, childre
     // rows would be a second line for the same job; the read view keeps it.
     // `group`: the read row's copy button only shows up on hover (see Field).
     <div className={cx('item group px-3.5 py-3', !set && ROW_HAIRLINE)}>
-      <div className="flex items-center gap-3">
+      <div className={`flex items-center gap-3 ${STACK}`}>
         {labelled && (
           <>
             {/* A label never wraps: the column is sized for the longest of them
@@ -49,12 +67,12 @@ export default function FieldRow({ label, prefix, actions, below, error, childre
                 catalog, rather than folded onto a second line. */}
             <label
               htmlFor={id}
-              className={`w-32 flex-none whitespace-nowrap ${MONO_LABEL}`}
+              className={`w-32 flex-none whitespace-nowrap ${MONO_LABEL} ${STACK_LABEL}`}
             >
               {t(label)}
             </label>
             {/* Held open with or without a sigil, so every value starts at one x. */}
-            <span className="grid w-4 flex-none place-items-center text-text3">
+            <span className={`grid w-4 flex-none place-items-center text-text3 ${STACK_SIGIL}`}>
               {prefix}
             </span>
           </>
@@ -63,7 +81,7 @@ export default function FieldRow({ label, prefix, actions, below, error, childre
         {/* Two 28px controls wide (28 + gap 4 + 28), held open so every value —
             and every editor's underline — ends at one x too. */}
         {labelled ? (
-          <div className="flex w-[60px] flex-none items-center justify-end gap-1">
+          <div className={`flex w-[60px] flex-none items-center justify-end gap-1 ${STACK_RAIL}`}>
             {actions}
           </div>
         ) : (

@@ -14,7 +14,7 @@ desktop app, which stays the source of truth.
 |---|---|---|
 | 1 | Foundations: `Frame` context, layout branches lifted out of leaves, glass token, rise keyframe, touch-visible copy buttons | ✅ |
 | 2 | Compact shell as screens: derived screen selection, floating tab bar, large-title list root, top bar removed | ✅ |
-| 3 | Detail read screen: nav row, kind header, container-query row geometry, tap-to-copy rows, bottom primary action | ❌ |
+| 3 | Detail read screen: nav row, kind header, container-query row geometry, tap-to-copy rows, bottom primary action | ✅ |
 | 4 | Form screen: `Edit` split into `useDraft` + `EditBody`, slide-up form with Save/Cancel in the nav row, add picker as a bottom sheet | ❌ |
 | 5 | Generator and Settings as tab roots; Archive reachable from Settings | ❌ |
 | 6 | Lock screen: `useUnlock` hook, biometric-first compact layout, platform-correct biometric label | ❌ |
@@ -35,6 +35,9 @@ of difference it is. Nothing else branches on layout.
    `FieldRow`, `Field`, the detail header and `Footer` stack label-over-value
    when their container is narrow. Tailwind v4's `@container` / `@max-*`
    variants do this with zero render branches, and every kind inherits it.
+   The threshold is 420px and the container is whichever surface declares
+   itself one — `Show/Read` and `Show/Edit` on the desktop, the detail
+   scroller on the phone.
 3. **Capability differences use compile-time constants and media features.**
    `isMobile` / `isIOS` from `lib/platform` (Face ID vs Touch ID, no updater,
    no drag-and-drop). Hover-only affordances become visible under
@@ -59,8 +62,15 @@ already has:
 
 As of slice 2 the standalone generator is not yet a screen: it is still the
 sheet `Main` mounts, and the Generator tab only opens it and lights up while it
-is open. Slice 5 finishes it. The form and detail rows render one interim
-screen (the wide detail pane with a back control) until slices 3 and 4.
+is open. Slice 5 finishes it. The detail row is the phone's own screen as of
+slice 3 (`Compact/Detail/Read` — nav row, kind header, bottom primary action);
+the form row is still the wide editor under an empty nav row
+(`Compact/Detail/Writing`) until slice 4.
+
+The detail screen composes parts the desktop's `Aside/Show` also composes —
+`Identity`, `Eyebrow`, the kind's `Fields`, `Footer`, `MoreMenu`, and the
+`usePrimaryAction` / `useShown` / `useDelete` hooks. Neither shell passes the
+other a layout flag; each only decides where the parts go.
 
 Overlays that stay overlays on a phone: the add picker (bottom sheet) and the
 generator opened from a password row (sheet). Both go through `Frame`.
@@ -115,6 +125,9 @@ palettes. Prototype-only colours map to existing tokens (`--list` → `bg-list`,
 
 - Search stays the inline field that filters the list live (no separate search
   screen). Styled at 44pt.
+- A read row's value is itself the copy affordance, on both shells. Text
+  selection is off app-wide (`select-none`), so a press on it has no other
+  meaning, and the desktop keeps its copy button beside it.
 - The list stays flat and sorted (no Pinned/Recent groups).
 - Unlock leads with the biometric tile when biometrics are enrolled, else the
   passphrase card. No auto-prompt on launch.
