@@ -5,7 +5,7 @@ import Main from '@/components/Main'
 import AuthShell from '@/components/elements/AuthShell'
 import Frame, { FrameProvider } from '@/components/elements/Frame'
 import Sheet from '@/components/elements/Sheet'
-import { revealEntry } from '@/lib/commands'
+import { copyToClipboard, revealEntry, type Entry } from '@/lib/commands'
 import {
   makeStore,
   useStore,
@@ -48,6 +48,9 @@ describe('compact shell', () => {
 
     await userEvent.click(screen.getByText('Google'))
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
+    // The way back is named after where it goes, iOS-style — the list root's
+    // own title, from the same hook the list root draws it with.
+    expect(screen.getByTestId('compact-back')).toHaveTextContent('All Items')
     // One screen at a time: the list and the tab bar are gone while it is up.
     expect(screen.queryByTestId('entry-item')).not.toBeInTheDocument()
     expect(screen.queryByTestId('tab-bar')).not.toBeInTheDocument()
@@ -69,6 +72,52 @@ describe('compact shell', () => {
     // dropped by a stray tap on the bar.
     expect(screen.queryByTestId('compact-back')).not.toBeInTheDocument()
     expect(screen.getByTestId('cancel-entry-button')).toBeInTheDocument()
+  })
+
+  it('enters the editor from the nav row', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    renderWithStore(<Main />, { store: seed() })
+
+    await userEvent.click(screen.getByText('Google'))
+    await userEvent.click(screen.getByTestId('edit-entry-button'))
+
+    expect(useStore.getState().entries.edit).toBe(true)
+    expect(screen.getByTestId('entry-sheet')).toBeInTheDocument()
+    // The form owns its own exits from here (slice 4 gives it a nav row).
+    expect(screen.queryByTestId('compact-back')).not.toBeInTheDocument()
+  })
+
+  it('holds the primary action at the bottom until the secrets are in', async () => {
+    let land: (entry: Entry) => void = () => {}
+    vi.mocked(revealEntry).mockReturnValue(
+      new Promise<Entry>(resolve => {
+        land = resolve
+      })
+    )
+    renderWithStore(<Main />, { store: seed() })
+
+    await userEvent.click(screen.getByText('Google'))
+    const action = screen.getByTestId('primary-action-button')
+    // Nothing decrypted yet: a button that copies '' is worse than one that is
+    // plainly not ready.
+    expect(action).toBeDisabled()
+
+    await act(async () => land(loginEntry({ id: 'l1', password: 'hunter2' })))
+    expect(action).toBeEnabled()
+    expect(action).toHaveTextContent('Copy password')
+
+    await userEvent.click(action)
+    expect(copyToClipboard).toHaveBeenCalledWith('hunter2', expect.any(Number))
+  })
+
+  it('copies a field value when the value itself is tapped', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', username: 'copyme' }))
+    renderWithStore(<Main />, { store: seed() })
+
+    await userEvent.click(screen.getByText('Google'))
+    await userEvent.click(await screen.findByTestId('entry-value-username'))
+
+    expect(copyToClipboard).toHaveBeenCalledWith('copyme', expect.any(Number))
   })
 
   it('switches view from the tab bar', async () => {

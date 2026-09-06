@@ -35,7 +35,12 @@ export default function Fields() {
     <>
       <div
         className={
-          otp ? 'grid grid-cols-[minmax(0,1fr)_208px] items-start gap-3' : 'grid gap-3'
+          // The dial's column is a fixed 208px, so a container that cannot
+          // spare it puts the panel back on the full width and the dial under
+          // it — otherwise the rows would be read through a 140px window.
+          otp
+            ? 'grid grid-cols-[minmax(0,1fr)_208px] items-start gap-3 @max-[420px]:grid-cols-1'
+            : 'grid gap-3'
         }
       >
         <Panel>

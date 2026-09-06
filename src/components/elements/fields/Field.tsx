@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
+import { copy } from '@/services/copy'
 import type { TKey } from '@/i18n'
 import { EyeGlyph, EyeOffGlyph } from '../../Main/icons'
 import CopyButton from '../CopyButton'
@@ -154,12 +155,18 @@ export default function Field({
           // The gloss rides alongside the value rather than inside it, so the
           // testid — and everything reading it — still holds the value alone.
           <span className="flex min-w-0 items-baseline gap-1.5">
-            <span
-              className={cx(ink, masked ? 'text-text2' : 'text-text')}
+            {/* The value IS the copy affordance: a finger cannot hover a row to
+                find the button, and text selection is off app-wide, so there is
+                nothing else a press on it could mean. A masked value hands over
+                the real one, exactly as the button beside it already does. */}
+            <button
+              type="button"
+              onClick={() => copy(shown)}
+              className={cx(ink, 'cursor-pointer text-left', masked ? 'text-text2' : 'text-text')}
               data-testid={`entry-value-${name}`}
             >
               {masked ? DOTS : shown}
-            </span>
+            </button>
             {gloss && (
               <span className="min-w-0 flex-none truncate font-mono text-base leading-6 text-text3">
                 · {gloss}
