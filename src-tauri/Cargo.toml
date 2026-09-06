@@ -4,10 +4,11 @@ version = "1.0.0-alpha.1"
 description = "Modern, Lightweight, Fast and Free Password Manager"
 authors = ["Alex Chaplinsky"]
 edition = "2021"
-# Floor set by the RustCrypto 0.11 generation (sha2, argon2, digest) and by
-# passkey-rs, whose 0.5 release declares 1.85.1. The toolchain itself is pinned
-# in rust-toolchain.toml.
-rust-version = "1.85.1"
+# Floor set by the locked dependency graph: glib/gio-sys 0.22 (pulled in by the
+# tauri plugins on Linux) declare 1.92, above the RustCrypto 0.11 crates (1.85)
+# and passkey-rs 0.5 (1.85.1). The toolchain itself is pinned in
+# rust-toolchain.toml.
+rust-version = "1.92"
 # Desktop application, never published to crates.io.
 publish = false
 
