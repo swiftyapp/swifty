@@ -30,8 +30,9 @@ interface Props {
   /** Extra classes for the scroller, so a shell can reserve room under it. */
   scroller?: string
   /**
-   * Rendered inside the listbox under the rows. The compact shell has no second
-   * pane, so it puts the empty-vault hero here.
+   * Rendered in the scroller under the listbox — outside it, so a hero and its
+   * buttons are never announced as options. The compact shell has no second
+   * pane, so it puts there what the wide one puts in its detail pane.
    */
   footer?: ReactNode
 }
@@ -78,14 +79,14 @@ export default function ListColumn({ actions, heading, search, scroller, footer 
           </>
         )}
       </div>
-      {/* The scroller is the listbox itself: rows report their selection to it
-          (List/Item), and it is what a selected row scrolls itself into. */}
-      <div
-        role="listbox"
-        aria-label={title}
-        className={cx('min-h-0 flex-1 overflow-y-auto', scroller)}
-      >
-        <List />
+      {/* The scroller is what a selected row scrolls itself into (List/Item's
+          `scrollIntoView`), but it is not the listbox: the footer under the rows
+          is a hero with its own buttons, and inside `role="listbox"` those are
+          neither options nor reachable as controls. */}
+      <div className={cx('min-h-0 flex-1 overflow-y-auto', scroller)}>
+        <div role="listbox" aria-label={title}>
+          <List />
+        </div>
         {footer}
       </div>
     </div>

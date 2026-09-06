@@ -1,5 +1,5 @@
-import { useRef } from 'react'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
+import { useForwardedRef } from '@/hooks/useForwardedRef'
 import { useVisualViewport, viewportStyle } from '@/hooks/useVisualViewport'
 import type { FrameProps } from './Frame'
 
@@ -13,25 +13,10 @@ import type { FrameProps } from './Frame'
  * visual viewport for the same reason `Sheet` is: if a field in it ever takes
  * focus, the keyboard must not land on top of it.
  */
-export default function BottomSheet({
-  onClose,
-  title,
-  labelledBy,
-  testid,
-  toolbar,
-  ref,
-  children
-}: FrameProps) {
+export default function BottomSheet({ onClose, labelledBy, testid, ref, children }: FrameProps) {
   const view = useVisualViewport()
-  const frame = useRef<HTMLDivElement>(null)
+  const [frame, setFrame] = useForwardedRef<HTMLDivElement>(ref)
   useDialogFocus(frame, onClose)
-
-  // One node, two refs: the focus trap's and whatever the caller asked for.
-  const setFrame = (node: HTMLDivElement | null) => {
-    frame.current = node
-    if (typeof ref === 'function') ref(node)
-    else if (ref) ref.current = node
-  }
 
   return (
     <div
@@ -39,8 +24,7 @@ export default function BottomSheet({
       role="dialog"
       aria-modal="true"
       tabIndex={-1}
-      aria-label={title}
-      aria-labelledby={title ? undefined : labelledBy}
+      aria-labelledby={labelledBy}
       data-testid={testid}
       // Which frame won, for anything asking (tests, styling hooks) without
       // having to read class names off the element.
@@ -55,7 +39,6 @@ export default function BottomSheet({
         <div className="flex flex-none justify-center pt-2.5 pb-1">
           <span className="h-1 w-9 rounded-full bg-line2" />
         </div>
-        {toolbar}
         {/* The home indicator lives under the card's last row; 24px keeps the
             content off it. */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+24px)]">

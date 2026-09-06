@@ -62,15 +62,25 @@ export const createEntriesSlice: StateCreator<StoreState, [], [], EntriesSlice> 
   // the old object would show a stale title, and keeping a row the merge
   // dropped would show an entry the vault no longer has.
   setEntries: items =>
-    set(s => ({
-      entries: {
-        ...s.entries,
-        items,
-        // Resolved through `find` so a selected tombstone (Archive view) is not
-        // dropped by a merge that only ever carries live rows.
-        current: s.entries.current ? find({ ...s.entries, items }, s.entries.current.id) : null
+    set(s => {
+      // Resolved through `find` so a selected tombstone (Archive view) is not
+      // dropped by a merge that only ever carries live rows.
+      const current = s.entries.current
+        ? find({ ...s.entries, items }, s.entries.current.id)
+        : null
+      return {
+        entries: {
+          ...s.entries,
+          items,
+          current,
+          // An edit is an edit *of* the selection, so losing the selection ends
+          // it: a merge that dropped the row being changed would otherwise leave
+          // `edit` true with nothing to edit, and the phone (whose form is a
+          // whole screen) would draw a form with no subject and no way back.
+          edit: current ? s.entries.edit : false
+        }
       }
-    })),
+    }),
   setArchive: archive => set(s => ({ entries: { ...s.entries, archive } })),
   // Also what a save lands on: selecting the row just written is the same
   // state change as selecting any other row.

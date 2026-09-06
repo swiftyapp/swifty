@@ -1,10 +1,10 @@
-import { useTranslation } from 'react-i18next'
 import type { Entry, EntryMeta, EntryType } from '@/lib/commands'
 import { kindOf } from '@/kinds'
 import Body from '../../Body/Aside/Show/Edit/Body'
 import Title from '../../Body/Aside/Show/Edit/Title'
 import { useDraft } from '../../Body/Aside/Show/Edit/useDraft'
 import NavRow from './NavRow'
+import { useHeading } from './useHeading'
 
 interface Props {
   /** The entry being edited. Absent while creating: nothing is saved yet. */
@@ -24,11 +24,9 @@ interface Props {
  * it rose from the bottom edge and says Cancel/Save at the top.
  */
 export default function Editor({ entry, type, revealed }: Props) {
-  const { t } = useTranslation()
   const draft = useDraft(type, revealed)
   const kind = kindOf(type)
-  // A new entry is named by what it will be; an existing one by what it is.
-  const heading = entry ? entry.title || t(kind.untitledLabel) : t(kind.addLabel)
+  const heading = useHeading(type, entry)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col animate-rise bg-detail text-text">

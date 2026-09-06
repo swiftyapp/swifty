@@ -25,8 +25,7 @@ export default function Generator() {
   // goes next anyway.
   const stay = useCallback(() => {}, [])
   const generator = useGeneratorDialog(null, null, stay)
-  const { mode, setMode, keys, key, regenerate, confirm, confirmLabel } = generator
-  const held = keys && !key.ready
+  const { mode, setMode, ready, regenerate, confirm, confirmLabel } = generator
 
   return (
     // `relative`: what the bottom action is pinned to.
@@ -65,9 +64,9 @@ export default function Generator() {
       <button
         type="button"
         data-testid="generator-use-button"
-        disabled={held}
+        disabled={!ready}
         onClick={confirm}
-        className={cx(ACTION_BUTTON, ROOT_ACTION, held && 'opacity-50')}
+        className={cx(ACTION_BUTTON, ROOT_ACTION, !ready && 'opacity-50')}
       >
         {t(confirmLabel)}
       </button>

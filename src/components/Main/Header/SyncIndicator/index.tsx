@@ -25,7 +25,17 @@ const BADGE: Partial<Record<SyncTone, string>> = {
 // changes are on this disk and nowhere else" is a standing property of the
 // vault worth a permanent slot, not noise. Clicking goes where the state is
 // owned: Settings > Sync & devices, which holds Connect and Sync now.
-export default function SyncIndicator({ className }: { className?: string }) {
+//
+// How to get there is the shell's to say. The default opens the wide modal on
+// that section; a shell whose settings are a screen of its own (the phone's)
+// passes its own way of pushing the same pane -- the store's `settingsSection`
+// is the modal's nav selection and means nothing there.
+interface Props {
+  className?: string
+  onClick?: () => void
+}
+
+export default function SyncIndicator({ className, onClick }: Props) {
   // The hook, not the bare `t` -- only it re-renders the chip when the language
   // changes, and the chip can sit untouched in the chrome for a whole session.
   const { t } = useTranslation()
@@ -45,7 +55,7 @@ export default function SyncIndicator({ className }: { className?: string }) {
         data-testid="sync-indicator"
         data-tone={tone}
         aria-label={label}
-        onClick={() => openSettings('sync')}
+        onClick={onClick ?? (() => openSettings('sync'))}
         className={cx(
           'relative grid h-7 w-7 flex-none cursor-pointer place-items-center rounded-full text-text2 transition-colors hover:bg-hover hover:text-text',
           className
