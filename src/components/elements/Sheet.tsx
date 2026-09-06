@@ -1,44 +1,31 @@
-import { useRef, type ReactNode, type Ref } from 'react'
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
 import { useVisualViewport, viewportStyle } from '@/hooks/useVisualViewport'
 import { CloseGlyph } from '../Main/icons'
+import BottomSheet from './BottomSheet'
+import type { FrameProps } from './Frame'
 import IconButton from './IconButton'
 
-interface Props {
-  onClose: () => void
-  /**
-   * Shown in the bar beside the close control. Left out where the body already
-   * carries its own heading, so the sheet does not say it twice.
-   */
-  title?: string
-  labelledBy?: string
-  testid?: string
-  /** Pinned under the bar, outside the scroller (a section switcher, say). */
-  toolbar?: ReactNode
-  /** The frame element, for a caller that runs its own topmost-dialog check. */
-  ref?: Ref<HTMLDivElement>
-  children: ReactNode
+/**
+ * The compact shell's frame for what the wide shell shows as a centered dialog.
+ *
+ * How much screen it takes is the dialog's own answer (`fit`), not this file's:
+ * a settings surface or a generator needs the page, a short picker needs a
+ * bottom sheet. Everything else about the two is the same contract.
+ */
+export default function Sheet({ fit = 'screen', ...props }: FrameProps) {
+  return fit === 'content' ? <BottomSheet {...props} /> : <Page {...props} />
 }
 
 /**
- * The compact frame for what the wide shell shows as a centered dialog.
- *
  * A phone has no room for a 470–860px card floating on a scrim, so the same
  * content takes the whole screen instead: safe-area padded, its own close
  * control in a 44px bar, and one scroller pinned to the visible viewport so a
  * focused field is not left under the keyboard. It is as modal as the card:
  * focus starts inside, Tab stays inside, and closing hands focus back.
  */
-export default function Sheet({
-  onClose,
-  title,
-  labelledBy,
-  testid,
-  toolbar,
-  ref,
-  children
-}: Props) {
+function Page({ onClose, title, labelledBy, testid, toolbar, ref, children }: FrameProps) {
   const { t } = useTranslation()
   const view = useVisualViewport()
   const frame = useRef<HTMLDivElement>(null)

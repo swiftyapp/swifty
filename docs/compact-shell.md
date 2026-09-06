@@ -15,7 +15,7 @@ desktop app, which stays the source of truth.
 | 1 | Foundations: `Frame` context, layout branches lifted out of leaves, glass token, rise keyframe, touch-visible copy buttons | ✅ |
 | 2 | Compact shell as screens: derived screen selection, floating tab bar, large-title list root, top bar removed | ✅ |
 | 3 | Detail read screen: nav row, kind header, container-query row geometry, tap-to-copy rows, bottom primary action | ✅ |
-| 4 | Form screen: `Edit` split into `useDraft` + `EditBody`, slide-up form with Save/Cancel in the nav row, add picker as a bottom sheet | ❌ |
+| 4 | Form screen: `Edit` split into `Title` + `Body`, slide-up form with Save/Cancel in the nav row, add picker as a bottom sheet | ✅ |
 | 5 | Generator and Settings as tab roots; Archive reachable from Settings | ❌ |
 | 6 | Lock screen: `useUnlock` hook, biometric-first compact layout, platform-correct biometric label | ❌ |
 
@@ -47,6 +47,14 @@ Corollaries: no `compact` boolean props on shared components (a slot such as
 `actions` is composition and is fine); no new navigation state when the store
 already implies the screen; no new dependency for animation or routing.
 
+A dialog that needs a different frame on a phone says so by describing its own
+content, never the platform: `FrameProps.fit` is `'screen'` (the default — a
+settings surface, the generator) or `'content'` (a short one, the add picker).
+`Modal` always has the room and ignores it; `Sheet` reads it to choose between
+a full-screen page and `elements/BottomSheet`. Sizes travel the same way —
+`className`, `tile`, `glyph` — so `Show/Edit/Title` draws a 28px tile in the
+pane and a 44px one on the phone without being told which it is.
+
 ## Navigation model
 
 There is no router. The compact shell derives its screen from state the store
@@ -62,18 +70,21 @@ already has:
 
 As of slice 2 the standalone generator is not yet a screen: it is still the
 sheet `Main` mounts, and the Generator tab only opens it and lights up while it
-is open. Slice 5 finishes it. The detail row is the phone's own screen as of
-slice 3 (`Compact/Detail/Read` — nav row, kind header, bottom primary action);
-the form row is still the wide editor under an empty nav row
-(`Compact/Detail/Writing`) until slice 4.
+is open. Slice 5 finishes it. Every other row is its own screen: the detail as
+of slice 3 (`Compact/Detail/Read` — nav row, kind header, bottom primary
+action), the form as of slice 4 (`Compact/Form` — Cancel/Save in the nav row
+over one `@container` scroller).
 
-The detail screen composes parts the desktop's `Aside/Show` also composes —
-`Identity`, `Eyebrow`, the kind's `Fields`, `Footer`, `MoreMenu`, and the
-`usePrimaryAction` / `useShown` / `useDelete` hooks. Neither shell passes the
-other a layout flag; each only decides where the parts go.
+Both screens compose parts the desktop's `Aside/Show` also composes —
+`Identity`, `Eyebrow`, `Edit/Title`, `Edit/Body`, `Footer`, `MoreMenu`, and the
+`useDraft` / `usePrimaryAction` / `useShown` / `useDelete` hooks. Neither shell
+passes the other a layout flag; each only decides where the parts go. The form
+holds its frame behind `useShown().held` exactly as `Show` does: an editor
+seeded from a reveal that has not landed would discard whatever is typed first.
 
-Overlays that stay overlays on a phone: the add picker (bottom sheet) and the
-generator opened from a password row (sheet). Both go through `Frame`.
+Overlays that stay overlays on a phone: the add picker (`fit="content"`, so a
+bottom sheet) and the generator opened from a password row (a page sheet). Both
+go through `Frame`.
 
 Tabs (labels are the desktop's i18n keys): **All Items · Favorites · Generator
 · Settings**. Archive is a row in Settings on compact. Tapping a tab closes
