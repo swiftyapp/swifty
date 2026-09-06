@@ -5,12 +5,14 @@
 //! interprets it. The biometric gate model differs per platform, and on macOS
 //! it differs per *build*, so the gate in force is named by a [`GateMode`]:
 //!
-//! - [`GateMode::Protected`] (macOS only): a data-protection Keychain item with
+//! - [`GateMode::Protected`] (Apple only): a data-protection Keychain item with
 //!   a `SecAccessControl` requiring biometry (`kSecAccessControlBiometryCurrentSet`).
-//!   The OS enforces Touch ID on *read* and auto-invalidates the item if the
-//!   enrolled fingerprints change. Adding such an item requires the
+//!   The OS enforces Touch ID / Face ID on *read* and auto-invalidates the item
+//!   if the enrolled biometrics change. Adding such an item requires the
 //!   `keychain-access-groups` entitlement, so it only works in a properly
 //!   signed build — an ad-hoc-signed dev build gets `errSecMissingEntitlement`.
+//!   On iOS the data-protection keychain is the only keychain, so the switch
+//!   macOS needs is simply absent there.
 //! - [`GateMode::Prompt`]: verify-then-read. The app runs an explicit biometric
 //!   check ([`crate::biometrics::authenticate`]) and only then reads the key
 //!   from an ordinary credential-store item (macOS login keychain / Windows
@@ -31,17 +33,17 @@
 use crate::error::{Error, Result};
 use zeroize::Zeroizing;
 
-// Used only by the macOS/Windows key-store impls; absent on the unsupported
+// Used only by the Apple/Windows key-store impls; absent on the unsupported
 // fallback (Linux), so gate them to avoid a dead_code error there.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_vendor = "apple", target_os = "windows"))]
 const SERVICE: &str = "pro.getswifty.app.vault";
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_vendor = "apple", target_os = "windows"))]
 const ACCOUNT: &str = "master-key";
-// Separate account for the verify-then-read item on macOS. The two modes live in
-// different keychains with different access control, so they must never be able
-// to resolve each other's item: a distinct account makes a cross-mode read a
-// clean `NotFound` rather than an item read under the wrong gate.
-#[cfg(target_os = "macos")]
+// Separate account for the verify-then-read item on Apple platforms. The two
+// modes carry different access control, so they must never be able to resolve
+// each other's item: a distinct account makes a cross-mode read a clean
+// `NotFound` rather than an item read under the wrong gate.
+#[cfg(target_vendor = "apple")]
 const ACCOUNT_PROMPT: &str = "master-key-prompt";
 
 /// How an enrolled key is gated. Recorded at enrollment; never re-derived.
@@ -76,10 +78,11 @@ impl GateMode {
     }
 
     // Pre-mode enrollments: macOS only ever wrote the protected item, every
-    // other platform only ever wrote the verify-then-read one.
-    #[cfg(target_os = "macos")]
+    // other platform only ever wrote the verify-then-read one. iOS had no
+    // pre-mode build at all, but shares macOS' enrollment path.
+    #[cfg(target_vendor = "apple")]
     const LEGACY: Self = Self::Protected;
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(target_vendor = "apple"))]
     const LEGACY: Self = Self::Prompt;
 }
 
@@ -119,7 +122,7 @@ pub fn is_supported() -> bool {
 
 /// Outcome of a protected-mode store attempt, classified so the enrollment
 /// policy below can be expressed — and tested — without a real keychain.
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(target_vendor = "apple", test))]
 enum ProtectedOutcome {
     Stored,
     /// The platform refused for lack of a code-signing entitlement. Recoverable:
@@ -133,7 +136,7 @@ enum ProtectedOutcome {
 // one *only* for the one recoverable reason (no entitlement). Every other
 // failure propagates: a keychain that is broken rather than unentitled must not
 // quietly hand the user a weaker gate than the one they'd otherwise have got.
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(target_vendor = "apple", test))]
 fn enroll(
     protected: impl FnOnce() -> ProtectedOutcome,
     prompt: impl FnOnce() -> Result<()>,
@@ -145,7 +148,7 @@ fn enroll(
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(target_vendor = "apple")]
 mod imp {
     use super::*;
     use crate::biometrics;
@@ -164,14 +167,18 @@ mod imp {
     const ERR_MISSING_ENTITLEMENT: i32 = -34018;
 
     // Data-protection keychain: the only one that honours a biometric
-    // SecAccessControl, and the only one that needs an entitlement.
+    // SecAccessControl, and the only one that needs an entitlement. macOS has to
+    // opt in; on iOS it is the only keychain there is, and the switch that opts
+    // in does not exist.
     fn protected_options() -> PasswordOptions {
+        #[allow(unused_mut)]
         let mut opts = PasswordOptions::new_generic_password(SERVICE, ACCOUNT);
+        #[cfg(target_os = "macos")]
         opts.use_protected_keychain();
         opts
     }
 
-    // Ordinary login keychain: no access control, no entitlement, no OS gate.
+    // Ordinary keychain item: no access control, no entitlement, no OS gate.
     // The biometric check happens in `retrieve` before we ever read this.
     fn prompt_options() -> PasswordOptions {
         PasswordOptions::new_generic_password(SERVICE, ACCOUNT_PROMPT)
@@ -281,7 +288,7 @@ mod imp {
     }
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 mod imp {
     use super::*;
 

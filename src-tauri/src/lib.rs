@@ -22,6 +22,8 @@ mod storage;
 pub mod store;
 mod sync;
 mod timer;
+// `tauri::tray` and `tauri::menu` are desktop-only.
+#[cfg(desktop)]
 mod tray;
 mod window;
 
@@ -29,6 +31,8 @@ use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Only the desktop-gated blocks below reassign it.
+    #[cfg_attr(mobile, allow(unused_mut))]
     let mut builder = tauri::Builder::default();
 
     // Desktop-only plugins.
@@ -43,8 +47,9 @@ pub fn run() {
     }
 
     // In-app W3C WebDriver server (port 4445) for the E2E smoke suite. Never
-    // compiled into a release binary.
-    #[cfg(debug_assertions)]
+    // compiled into a release binary, and desktop-only — the suite drives the
+    // desktop app.
+    #[cfg(all(debug_assertions, desktop))]
     {
         builder = builder.plugin(tauri_plugin_webdriver::init());
     }
@@ -73,6 +78,7 @@ pub fn run() {
         .setup(|app| {
             storage::ensure_migrated(app.handle()); // one-time copy from the legacy Electron vault
             window::create(app.handle())?;
+            #[cfg(desktop)]
             tray::create(app.handle())?;
             Ok(())
         })

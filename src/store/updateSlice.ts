@@ -41,6 +41,13 @@ export const createUpdateSlice: StateCreator<StoreState, [], [], UpdateSlice> = 
       return
     }
 
+    // Nothing to report on a build without an updater (mobile ships through the
+    // App Store); the control that starts a check is hidden there anyway.
+    if (result.kind === 'unsupported') {
+      set(s => ({ update: { ...s.update, status: null } }))
+      return
+    }
+
     const status = result.kind === 'uptodate' ? 'uptodate' : 'error'
     set(s => ({ update: { ...s.update, status } }))
     setTimeout(() => {

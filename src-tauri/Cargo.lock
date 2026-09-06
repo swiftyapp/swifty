@@ -5068,6 +5068,7 @@ dependencies = [
  "objc2-app-kit",
  "objc2-foundation",
  "objc2-local-authentication",
+ "objc2-ui-kit",
  "objc2-vision",
  "p256",
  "passkey-authenticator",

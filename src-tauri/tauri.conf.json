@@ -45,6 +45,10 @@
     "macOS": {
       "entitlements": "./Entitlements.plist"
     },
+    "iOS": {
+      "developmentTeam": "UFBL3F444A",
+      "minimumSystemVersion": "16.0"
+    },
     "fileAssociations": [
       {
         "ext": ["swftx"],

@@ -1,26 +1,17 @@
 {
-  "$schema": "../gen/schemas/desktop-schema.json",
+  "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for the main window",
+  "description": "Capabilities the main window has on every platform. Validated against the mobile schema — the narrower of the two — so a desktop-only permission added here is caught in the editor rather than at the iOS build.",
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "core:window:allow-start-dragging",
-    "core:window:allow-minimize",
-    "core:window:allow-maximize",
-    "core:window:allow-unmaximize",
-    "core:window:allow-close",
-    "core:window:allow-set-size",
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-clear",
     "dialog:allow-open",
-    "dialog:allow-save",
     {
       "identifier": "opener:allow-open-url",
       "allow": [{ "url": "http://*" }, { "url": "https://*" }]
     },
-    "log:default",
-    "updater:default",
-    "process:default"
+    "log:default"
   ]
 }

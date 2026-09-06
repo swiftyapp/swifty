@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Shown in the Face ID consent sheet the first time the vault is unlocked
+	     biometrically. Required: LAContext raises without it. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Swifty uses Face ID to unlock your vault.</string>
+</dict>
+</plist>

@@ -5,11 +5,15 @@
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+#[cfg(desktop)]
 use std::sync::OnceLock;
 use tauri::{AppHandle, Manager};
 
 use crate::error::{Error, Result};
 
+// The legacy Electron JSON vault, superseded by DB_FILE. Only the one-time
+// migration below still names it, and that only ever ran on desktop.
+#[cfg(desktop)]
 pub const VAULT_FILE: &str = "vault.swftx";
 pub const DB_FILE: &str = "vault.db";
 // Pre-change recovery snapshot of the encrypted DB, written next to it before the
@@ -50,6 +54,7 @@ fn app_dir(app: &AppHandle) -> Result<PathBuf> {
     })
 }
 
+#[cfg(desktop)]
 pub fn vault_path(app: &AppHandle) -> Result<PathBuf> {
     Ok(app_dir(app)?.join(VAULT_FILE))
 }
@@ -244,12 +249,14 @@ pub fn sync_configured(app: &AppHandle) -> bool {
 
 // Legacy Electron userData dir (productName "Swifty"): equals `config_dir/Swifty`
 // on all platforms (Roaming\Swifty, ~/Library/Application Support/Swifty, ~/.config/Swifty).
+#[cfg(desktop)]
 fn legacy_dir() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("Swifty"))
 }
 
 // One-time copy of the legacy vault (and gdrive creds) into the new location.
 // Idempotent: skips if the new vault already exists or no legacy vault is found.
+#[cfg(desktop)]
 fn migrate_legacy(app: &AppHandle) -> Result<()> {
     let new_vault = vault_path(app)?;
     if new_vault.exists() {
@@ -275,13 +282,19 @@ fn migrate_legacy(app: &AppHandle) -> Result<()> {
 }
 
 // Run the migration at most once per process; errors are logged, not fatal.
+// There was never a mobile Electron app to migrate from, so on mobile this is
+// a no-op.
+#[cfg_attr(mobile, allow(unused_variables))]
 pub fn ensure_migrated(app: &AppHandle) {
-    static DONE: OnceLock<()> = OnceLock::new();
-    DONE.get_or_init(|| {
-        if let Err(e) = migrate_legacy(app) {
-            log::warn!("legacy vault migration failed: {e}");
-        }
-    });
+    #[cfg(desktop)]
+    {
+        static DONE: OnceLock<()> = OnceLock::new();
+        DONE.get_or_init(|| {
+            if let Err(e) = migrate_legacy(app) {
+                log::warn!("legacy vault migration failed: {e}");
+            }
+        });
+    }
 }
 
 #[cfg(test)]
