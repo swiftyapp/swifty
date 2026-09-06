@@ -35,6 +35,25 @@ updates:
         patterns:
           - 'tauri'
           - 'tauri-*'
+      # 1Password's passkey-rs crates share one release train; bumping one
+      # alone breaks the CredentialStore trait impls in src/passkey.
+      passkey-rs:
+        patterns:
+          - 'passkey-*'
+    ignore:
+      # passkey-rs requires p256 ^0.13. 0.14 would link a second copy and
+      # break the COSE key bridge. Lift once passkey-rs moves to p256 0.14.
+      - dependency-name: p256
+        versions: ['>=0.14']
+      # passkey-rs caps coset at 0.4.0, so 0.4.x gains nothing and splits the
+      # tree. Lift together with the p256 rule.
+      - dependency-name: coset
+        versions: ['>=0.4']
+      # rand 0.9+ moves to a new rand_core generation. passkey-rs (rand ^0.8),
+      # p256 0.13 and ssh-key 0.6 (rand_core 0.6) are not there yet, so a lone
+      # bump leaves two rand generations and breaks every RNG handoff.
+      - dependency-name: rand
+        versions: ['>=0.9']
 
   # GitHub Actions used by ci.yml / release.yml / codeql.yml.
   - package-ecosystem: github-actions
