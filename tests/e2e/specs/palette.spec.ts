@@ -23,7 +23,7 @@ async function openPalette(): Promise<void> {
 
 /** The first result whose text contains `label`, or null while none does. */
 async function findItem(label: string) {
-  const rows = await $$('[data-testid="palette-item"]');
+  const rows = await $$('[data-testid="palette-item"]').getElements();
   for (const row of rows) {
     if ((await row.getText()).includes(label)) return row;
   }
@@ -68,7 +68,8 @@ describe("command palette", () => {
     // list column searches entries — here it scores nothing at all.
     await $('[data-testid="command-palette-input"]').setValue("Palette Target");
     await browser.waitUntil(
-      async () => (await $$('[data-testid="palette-item"]')).length === 0,
+      async () =>
+        (await $$('[data-testid="palette-item"]').getElements()).length === 0,
       {
         timeout: 10_000,
         timeoutMsg: `"${ENTRY_TITLE}" still surfaces as a palette result`,

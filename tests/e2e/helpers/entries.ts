@@ -178,14 +178,21 @@ export async function pickDocType(type: DocType): Promise<void> {
   await control.click();
 }
 
-/** Every entry row currently rendered in the list column. */
-export function entryItems() {
-  return $$('[data-testid="entry-item"]');
+/**
+ * Every entry row currently rendered in the list column.
+ *
+ * `getElements()` is what resolves the chainable `$$` result into a real array:
+ * since WebdriverIO v9 a `ChainablePromiseArray` is no longer a promise, so
+ * `await $$(...)` hands back the chainable itself and `.length` on it is a
+ * `Promise<number>` that never equals a plain count.
+ */
+export function entryItems(): Promise<WebdriverIO.ElementArray> {
+  return $$('[data-testid="entry-item"]').getElements();
 }
 
 /** Titles of the rows currently rendered, in list order. */
 export async function visibleTitles(): Promise<string[]> {
-  const rows = await $$('[data-testid="entry-item-title"]');
+  const rows = await $$('[data-testid="entry-item-title"]').getElements();
   const titles: string[] = [];
   for (const row of rows) titles.push(await row.getText());
   return titles;

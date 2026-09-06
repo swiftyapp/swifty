@@ -47,7 +47,9 @@ describe("archive", () => {
     await expect($('[data-testid="list-title"]')).toHaveText("Archive");
     await expectTitles([TITLE]);
     // Tombstone rows are stamped with when they went, not when they changed.
-    await expect($('[data-testid="entry-item"]')).toHaveTextContaining("Deleted");
+    await expect($('[data-testid="entry-item"]')).toHaveText(
+      expect.stringContaining("Deleted"),
+    );
   });
 
   it("makes an archived entry read-only: Restore or delete forever, nothing else", async () => {

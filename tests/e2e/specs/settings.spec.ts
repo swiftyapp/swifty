@@ -129,7 +129,9 @@ describe("settings", () => {
     );
 
     // Weak and reused cannot be switched off, so they carry no control.
-    const switches = await $('[data-testid="settings-modal"]').$$('[role="switch"]');
+    const switches = await $('[data-testid="settings-modal"]')
+      .$$('[role="switch"]')
+      .getElements();
     expect(switches).toHaveLength(1);
 
     // The audit spec runs with the breach check off (no network in the suite).

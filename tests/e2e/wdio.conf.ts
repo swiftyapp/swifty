@@ -125,13 +125,9 @@ export const config: WebdriverIO.Config = {
     timeout: 60_000,
   },
 
-  autoCompileOpts: {
-    autoCompile: true,
-    tsNodeOpts: {
-      project: path.join(__dirname, "tsconfig.json"),
-      transpileOnly: true,
-    },
-  },
+  // WebdriverIO v9 dropped `autoCompileOpts`/ts-node and transpiles specs with
+  // tsx automatically; `tsConfigPath` is how you point it at our tsconfig.
+  tsConfigPath: path.join(__dirname, "tsconfig.json"),
 
   // No global `before` hook: waiting for the setup screen here would assume
   // every spec inherits a pristine vault, which is exactly the run-order
