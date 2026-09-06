@@ -1,7 +1,9 @@
 import { useStore } from '@/store'
 import { useVisualViewport, viewportStyle } from '@/hooks/useVisualViewport'
+import Attached from '../Generator/Attached'
 import Detail from './Detail'
 import Form from './Form'
+import Generator from './Generator'
 import Settings from './Settings'
 import Vault from './Vault'
 import TabBar from './TabBar'
@@ -23,6 +25,12 @@ export default function Compact() {
   const writing = useStore(state => state.entries.new !== null || state.entries.edit)
   const entry = useStore(state => state.entries.current !== null)
   const settings = useStore(state => state.ui.settings)
+  // The standalone generator is a root here. Opened from a password row it
+  // carries somewhere to put the value, and stays the overlay it is on the
+  // desktop — that one is `Attached`, below.
+  const generator = useStore(
+    state => state.generator.open && !state.generator.apply && !state.generator.ssh
+  )
   const viewport = useVisualViewport()
   const pushed = writing || entry
 
@@ -33,10 +41,19 @@ export default function Compact() {
       // `relative` is what the floating tab bar and its fade are pinned to.
       className="relative flex h-full min-h-0 flex-col"
     >
-      {writing ? <Form /> : entry ? <Detail /> : settings ? <Settings /> : <Vault />}
-      {/* The standalone generator is still the sheet `Main` mounts (slice 5
-          makes it a root), so it is not a screen here — only a lit tab. */}
+      {writing ? (
+        <Form />
+      ) : entry ? (
+        <Detail />
+      ) : settings ? (
+        <Settings />
+      ) : generator ? (
+        <Generator />
+      ) : (
+        <Vault />
+      )}
       {!pushed && <TabBar />}
+      <Attached />
     </div>
   )
 }

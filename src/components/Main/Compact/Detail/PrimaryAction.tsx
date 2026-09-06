@@ -3,7 +3,7 @@ import type { Entry, EntryMeta } from '@/lib/commands'
 import { cx } from '@/utils/cx'
 import { usePrimaryAction } from '../../Body/Aside/Show/usePrimaryAction'
 import { CheckGlyph } from '../../icons'
-import { PRIMARY_ACTION } from '../chrome'
+import { ACTION_BUTTON, PRIMARY_ACTION } from '../chrome'
 
 interface Props {
   entry: EntryMeta
@@ -34,11 +34,7 @@ export default function PrimaryAction({ entry, revealed }: Props) {
         // copies '' is worse than one that is plainly not ready yet.
         disabled={!secret}
         onClick={copy}
-        className={cx(
-          'absolute flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-accent text-md font-medium text-accent-fg shadow-float transition-opacity disabled:cursor-default',
-          PRIMARY_ACTION,
-          !secret && 'opacity-50'
-        )}
+        className={cx(ACTION_BUTTON, PRIMARY_ACTION, !secret && 'opacity-50')}
       >
         {copied ? (
           <>

@@ -69,11 +69,16 @@ export default function TabBar() {
         >
           <StarRailGlyph />
         </Tab>
+        {/* The two non-list roots are one screen slot between them, so each
+            closes the other: tapping a tab always lands where it says. */}
         <Tab
           label={t('Generator')}
           testid="tab-generator"
           selected={generator}
-          onClick={() => openGenerator()}
+          onClick={() => {
+            closeSettings()
+            openGenerator()
+          }}
         >
           <DicesRailGlyph />
         </Tab>
@@ -81,7 +86,10 @@ export default function TabBar() {
           label={t('Settings')}
           testid="tab-settings"
           selected={settings}
-          onClick={() => openSettings()}
+          onClick={() => {
+            closeGenerator()
+            openSettings()
+          }}
         >
           <GearRailGlyph />
         </Tab>

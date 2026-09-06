@@ -5,7 +5,6 @@ import Modal from '@/components/elements/Modal'
 import Sheet from '@/components/elements/Sheet'
 import Wide from './Wide'
 import Compact from './Compact'
-import Generator from './Generator'
 import Palette from './Palette'
 import AddSecret from './AddSecret'
 import Scan from './Scan'
@@ -27,8 +26,9 @@ export function Main() {
       className="flex h-full flex-col overflow-hidden bg-app font-sans text-text select-none"
     >
       <FrameProvider value={compact ? Sheet : Modal}>
+        {/* The generator is not here: it is a dialog on one shell and a tab
+            root plus an overlay on the other, so each shell mounts its own. */}
         {compact ? <Compact /> : <Wide />}
-        <Generator />
         {/* ⌘K needs a keyboard to reach and a rail's worth of room to read: on a
             phone it is neither reachable nor the way anything is found. */}
         {!compact && <Palette />}
