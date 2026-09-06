@@ -41,9 +41,11 @@ of difference it is. Nothing else branches on layout.
    itself one — `Show/Read` and `Show/Edit` on the desktop, the detail
    scroller on the phone.
 3. **Capability differences use compile-time constants and media features.**
-   `isMobile` / `isIOS` from `lib/platform` (Face ID vs Touch ID, no updater,
-   no drag-and-drop). Hover-only affordances become visible under
-   `@media (hover: none)`. Both are constants or CSS, never `useLayout`.
+   `isMobile` / `isIOS` from `lib/platform` (no updater, no drag-and-drop);
+   what the device reports (the biometry kind, from the backend). Touch tiers
+   key off `any-pointer-coarse`, not `pointer-coarse`: a device with a trackpad
+   **and** a touchscreen still needs the 44pt targets and the always-visible
+   copy button. All of it is constants or CSS, never `useLayout`.
 
 Corollaries: no `compact` boolean props on shared components (a slot such as
 `actions` is composition and is fine); no new navigation state when the store
@@ -55,7 +57,9 @@ settings surface, the generator) or `'content'` (a short one, the add picker).
 `Modal` always has the room and ignores it; `Sheet` reads it to choose between
 a full-screen page and `elements/BottomSheet`. Sizes travel the same way —
 `className`, `tile`, `glyph` — so `Show/Edit/Title` draws a 28px tile in the
-pane and a 44px one on the phone without being told which it is.
+pane and a 44px one on the phone without being told which it is. A dialog names
+itself through `labelledBy` and carries its own heading; the frames add no title
+bar of their own.
 
 ## Navigation model
 
@@ -130,13 +134,12 @@ both driven by `Auth/useUnlock` (attempt phase, lockout countdown, mascot gaze,
 the eyebrow's text and tone). The desktop leads with the passphrase card and
 keeps biometrics as its end segment; the phone leads with an 88px biometric
 tile when a key is enrolled and reveals the same card under "Enter Master
-Password". Which biometry the copy names is `lib/biometry` — `BIOMETRY_LABEL`
-and `BiometryGlyph`, chosen once from `isIOS`, so `Masterpass` says the same
-thing wherever it is drawn. **Caveat:** the backend reports only *whether*
-biometrics are available (one `LAContext::canEvaluatePolicy`), not which kind,
-so iOS is labelled Face ID unconditionally — right for every current iPhone,
-wrong for the few Touch ID iPads until `LAContext.biometryType` is plumbed
-through as its own command.
+Password". Which biometry the copy names is `lib/biometry` — `biometryLabel(type)`
+and `biometryGlyph(type)`, from the `biometry_type` command (`LAContext.biometryType`
+on Apple, the fingerprint everywhere else), carried alongside `touchID` in the
+`flowAuth` payload — so `Masterpass` says the same thing wherever it is drawn.
+The card also survives a late probe: once the user has typed into it, it stays
+even if `touchID` flips true underneath (`src/test/lock.test.tsx`).
 
 Overlays that stay overlays on a phone: the add picker (`fit="content"`, so a
 bottom sheet) and the generator opened from a password row (a page sheet). Both
@@ -210,9 +213,6 @@ What the six slices deliberately left behind, smallest first:
   rows are the desktop's sizes inside `Generator/Panel`, which both shells
   share; giving them a touch tier means sizing them through the panel rather
   than around it.
-- **iPad Touch ID reads "Face ID".** See the caveat above: a `biometry_type`
-  command over `LAContext.biometryType`, carried alongside `touchID` in the
-  `flowAuth` payload, would settle it without any new store state.
 - **`big` secrets truncate when stacked.** A long SSH private key in a narrow
   container clips rather than wrapping; the stacked row needs its own
   presentation for the multi-line value tier.
