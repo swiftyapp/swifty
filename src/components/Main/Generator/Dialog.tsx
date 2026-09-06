@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { copy } from '@/services/copy'
-import { useLayout } from '@/hooks/useLayout'
 import Button from '@/components/elements/Button'
 import IconButton from '@/components/elements/IconButton'
-import Sheet from '@/components/elements/Sheet'
+import Frame from '@/components/elements/Frame'
 import { startEntry } from '@/store'
 import type { GeneratorApply, SshApply } from '@/store/generatorSlice'
 import { RefreshGlyph } from '../icons'
@@ -32,7 +31,6 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
   const [mode, setMode] = useState<DialogMode>(ssh ? 'ssh' : settings.mode)
   const key = useSshKey(mode === 'ssh')
   const cardRef = useRef<HTMLDivElement>(null)
-  const compact = useLayout() === 'compact'
   const keys = mode === 'ssh'
 
   // A keypair fills a whole draft, so standalone it opens a new entry rather
@@ -75,8 +73,19 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [confirm, onClose])
 
-  const content = (
-    <>
+  // The card carries its own title row and its own Cancel, so the frame adds no
+  // chrome of its own. It takes `cardRef` too, so the topmost-dialog check above
+  // still finds itself.
+  return (
+    <Frame
+      ref={cardRef}
+      onClose={onClose}
+      labelledBy="generator-title"
+      testid="generator-dialog"
+      className="w-dialog-sm"
+      align="center"
+      hideClose
+    >
       <div className="flex items-center gap-2.5 px-[18px] py-[15px] inset-shadow-hairline">
         <div id="generator-title" className="flex-1 text-lg font-semibold tracking-display">
           {t('Generate')}
@@ -133,43 +142,6 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
           </Button>
         </div>
       </div>
-    </>
-  )
-
-  // The card carries its own title row, so the compact frame stays bare. It
-  // takes `cardRef` too, so the topmost-dialog check above still finds itself.
-  if (compact)
-    return (
-      <Sheet
-        ref={cardRef}
-        onClose={onClose}
-        labelledBy="generator-title"
-        testid="generator-dialog"
-      >
-        {content}
-      </Sheet>
-    )
-
-  return (
-    <div
-      className="fixed inset-0 z-50 grid animate-fade place-items-center bg-scrim p-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      {/* Announces itself as modal like `elements/Modal` does. Beyond the
-          a11y, this is what tells the window-level accelerators to stand down:
-          `utils/dialogOpen` asks the DOM, so without the role the editor's Esc
-          would close the edit session underneath this dialog. */}
-      <div
-        ref={cardRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="generator-title"
-        data-testid="generator-dialog"
-        className="w-dialog-sm animate-pop overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-float"
-        onClick={event => event.stopPropagation()}
-      >
-        {content}
-      </div>
-    </div>
+    </Frame>
   )
 }

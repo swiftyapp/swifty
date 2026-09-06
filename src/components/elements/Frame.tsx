@@ -1,0 +1,52 @@
+import { createContext, useContext, type ComponentType, type ReactNode, type Ref } from 'react'
+import Modal from './Modal'
+
+/**
+ * What a dialog hands its frame, whichever frame it turns out to be.
+ *
+ * The two implementations read different halves of it — `Modal` the card's box
+ * (`className`, `align`, `hideClose`), `Sheet` the full-screen chrome (`title`,
+ * `toolbar`) — and ignore the rest, which is what lets a dialog describe itself
+ * once without knowing which shell it is in.
+ */
+export interface FrameProps {
+  onClose: () => void
+  /** Shown in the frame's own bar; left out where the body already has a heading. */
+  title?: string
+  /** id of the element that names the dialog, for `aria-labelledby`. */
+  labelledBy?: string
+  testid?: string
+  /** Pinned under the bar, outside the scroller (a section switcher, say). */
+  toolbar?: ReactNode
+  /** Replaces the card's default box — its width, mostly. */
+  className?: string
+  /** Where the card sits on the scrim. */
+  align?: 'top' | 'center'
+  /** For a body that carries its own close control. */
+  hideClose?: boolean
+  /** The frame element, for a caller that runs its own topmost-dialog check. */
+  ref?: Ref<HTMLDivElement>
+  children: ReactNode
+}
+
+// The card is the default, so a dialog rendered outside either shell — a test,
+// an isolated screen — still comes up framed.
+const FrameContext = createContext<ComponentType<FrameProps>>(Modal)
+
+/** Hands every `Frame` below it the implementation this shell wants. */
+export const FrameProvider = ({
+  value,
+  children
+}: {
+  value: ComponentType<FrameProps>
+  children: ReactNode
+}) => <FrameContext value={value}>{children}</FrameContext>
+
+/**
+ * The frame the current shell puts its dialogs in: a centered card on desktop,
+ * a full-screen sheet on a phone. Which one is decided once, in `Main`.
+ */
+export default function Frame(props: FrameProps) {
+  const Implementation = useContext(FrameContext)
+  return <Implementation {...props} />
+}

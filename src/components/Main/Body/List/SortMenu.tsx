@@ -14,7 +14,7 @@ const OPTIONS: { mode: SortMode; label: TKey }[] = [
 
 // The list header's sort affordance. The menu is right-anchored under the
 // button so it never runs off the list column's edge.
-export default function SortMenu({ compact }: { compact?: boolean }) {
+export default function SortMenu({ className }: { className?: string }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const sort = useStore(state => state.sort)
@@ -32,7 +32,7 @@ export default function SortMenu({ compact }: { compact?: boolean }) {
         expanded={open}
         testid="sort-menu"
         onClick={() => setOpen(value => !value)}
-        className={compact ? 'h-11 w-11' : undefined}
+        className={className}
       >
         <SortGlyph />
       </IconButton>

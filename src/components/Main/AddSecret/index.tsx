@@ -2,11 +2,8 @@ import { useEffect, useRef, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { EntryType } from '@/lib/commands'
 import { useStore, closeAddPicker, startEntry } from '@/store'
-import { useLayout } from '@/hooks/useLayout'
-import { cx } from '@/utils/cx'
 import { KINDS } from '@/kinds'
-import Modal from '@/components/elements/Modal'
-import Sheet from '@/components/elements/Sheet'
+import Frame from '@/components/elements/Frame'
 import KindTile from './KindTile'
 import ScanAction from './ScanAction'
 
@@ -30,7 +27,6 @@ const STEP: Record<string, number> = {
 export default function AddSecret() {
   const { t } = useTranslation()
   const open = useStore(state => state.ui.addPicker)
-  const compact = useLayout() === 'compact'
   const grid = useRef<HTMLDivElement>(null)
 
   const tiles = () => Array.from(grid.current?.querySelectorAll('button') ?? [])
@@ -67,38 +63,34 @@ export default function AddSecret() {
     event.preventDefault()
   }
 
-  const picker = (
-    <div className={cx('w-full', compact ? 'p-5' : 'p-7')}>
-      <h2 id={TITLE_ID} className="text-lg font-semibold tracking-display">
-        {t('Add a secret')}
-      </h2>
-      <p className="mt-1.5 text-base text-text2">
-        {t('Everything is encrypted before it touches disk.')}
-      </p>
-
-      <div ref={grid} onKeyDown={onKeyDown} className="mt-6 grid grid-cols-2 gap-3">
-        {KINDS.map(kind => (
-          <KindTile key={kind.type} kind={kind} onSelect={() => pick(kind.type)} />
-        ))}
-      </div>
-
-      <ScanAction />
-    </div>
-  )
-
-  // The picker carries its own heading, so the compact frame stays bare.
-  return compact ? (
-    <Sheet onClose={closeAddPicker} labelledBy={TITLE_ID} testid="add-secret-modal">
-      {picker}
-    </Sheet>
-  ) : (
-    <Modal
+  // The picker carries its own heading, so the frame is handed no title. The
+  // gutters come off the frame's own width rather than the shell's: 28px is a
+  // tenth of the card and a fifteenth of a phone.
+  return (
+    <Frame
       onClose={closeAddPicker}
-      className="w-dialog"
       labelledBy={TITLE_ID}
       testid="add-secret-modal"
+      className="flex max-h-[80vh] w-dialog"
     >
-      {picker}
-    </Modal>
+      <div className="@container w-full">
+        <div className="p-7 @max-[500px]:p-5">
+          <h2 id={TITLE_ID} className="text-lg font-semibold tracking-display">
+            {t('Add a secret')}
+          </h2>
+          <p className="mt-1.5 text-base text-text2">
+            {t('Everything is encrypted before it touches disk.')}
+          </p>
+
+          <div ref={grid} onKeyDown={onKeyDown} className="mt-6 grid grid-cols-2 gap-3">
+            {KINDS.map(kind => (
+              <KindTile key={kind.type} kind={kind} onSelect={() => pick(kind.type)} />
+            ))}
+          </div>
+
+          <ScanAction />
+        </div>
+      </div>
+    </Frame>
   )
 }
