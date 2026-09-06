@@ -39,7 +39,7 @@ const searchInput = () => $('[data-testid="search-input"]');
 async function expectSelected(title: string): Promise<void> {
   await browser.waitUntil(
     async () => {
-      for (const row of await $$('[data-testid="entry-item"]')) {
+      for (const row of await $$('[data-testid="entry-item"]').getElements()) {
         const rowTitle = await row.$('[data-testid="entry-item-title"]').getText();
         if (rowTitle === title) return (await row.getAttribute("aria-selected")) === "true";
       }

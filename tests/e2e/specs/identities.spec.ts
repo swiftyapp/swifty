@@ -86,7 +86,7 @@ async function reopen(title: string): Promise<void> {
   await waitFor("filter-identity");
   await $('[data-testid="filter-identity"]').click();
   await waitFor("entry-item");
-  for (const row of await $$('[data-testid="entry-item"]')) {
+  for (const row of await $$('[data-testid="entry-item"]').getElements()) {
     if ((await row.$('[data-testid="entry-item-title"]').getText()) === title) {
       await row.click();
       await waitFor("entry-value-number");
