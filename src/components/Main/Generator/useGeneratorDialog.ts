@@ -67,6 +67,10 @@ export function useGeneratorDialog(
     setMode: changeMode,
     keys,
     key,
+    // Whether confirming can do anything: a password is always there, a keypair
+    // only once the draw has landed. Both shells disable their confirm on it,
+    // rather than each re-deriving what "not ready" means.
+    ready: !keys || key.ready,
     settings,
     value,
     bits,

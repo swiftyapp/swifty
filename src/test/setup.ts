@@ -20,6 +20,8 @@ vi.mock('@/lib/commands', () => ({
   lock: vi.fn().mockResolvedValue(undefined),
   unlockBiometric: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
   isBiometricAvailable: vi.fn().mockResolvedValue(false),
+  // The desktop's gate, and what every pre-existing spec asserts by name.
+  biometryType: vi.fn().mockResolvedValue('touch'),
   biometricStatus: vi.fn().mockResolvedValue({ enabled: false, mode: null }),
   enableBiometric: vi.fn().mockResolvedValue('protected'),
   disableBiometric: vi.fn().mockResolvedValue(undefined),

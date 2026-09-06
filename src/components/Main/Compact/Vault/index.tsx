@@ -1,15 +1,13 @@
 import ListColumn from '../../Body/ListColumn'
 import { useListTitle } from '../../Body/ListColumn/useListTitle'
 import SortMenu from '../../Body/List/SortMenu'
+import Audit from '../../Body/Aside/Audit'
 import { DetailEmpty } from '../../Body/Empty'
 import { useVariant, isWholeView } from '../../Body/Empty/variant'
 import Tags from '../../Sidebar/Tags'
 import Add from '../../Sidebar/Add'
-import { TAB_BAR_CLEARANCE } from '../chrome'
+import { TAB_BAR_CLEARANCE, TOUCH } from '../chrome'
 import Heading from '../Heading'
-
-// iOS's minimum touch target, for the controls the rail draws at 36px.
-const TOUCH = 'h-11 w-11'
 
 // The 44px search field. Passed as classes rather than asked for by a flag:
 // the box is the same field, dressed for a finger.
@@ -25,10 +23,24 @@ const SEARCH =
  * floating bar the rows slide under.
  */
 export default function Vault() {
-  // The list is the only pane here, so it also carries the hero the wide shell
-  // shows in its detail pane — otherwise an empty vault is a blank screen.
+  // The list is the only pane here, so it also carries whatever the wide shell
+  // puts in its detail pane — otherwise an empty vault is a blank screen, and
+  // the audit view is its groups with no score.
   const variant = useVariant()
   const title = useListTitle()
+
+  // The same call `Body/Aside` makes for the wide detail pane: no variant means
+  // the audit has a score to show, and the audit is the only view that can be
+  // scored. A filter-shaped empty (`kind`, `search`, `select`) belongs to the
+  // list column, which draws it among the rows itself.
+  const footer = variant ? (
+    isWholeView(variant) && <DetailEmpty variant={variant} />
+  ) : (
+    // The rows run edge to edge; the score panel wants the screen's gutters.
+    <div className="px-4">
+      <Audit />
+    </div>
+  )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-list pt-[env(safe-area-inset-top)]">
@@ -45,7 +57,7 @@ export default function Vault() {
         }
         search={SEARCH}
         scroller={TAB_BAR_CLEARANCE}
-        footer={variant && isWholeView(variant) ? <DetailEmpty variant={variant} /> : null}
+        footer={footer}
       />
     </div>
   )

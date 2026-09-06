@@ -53,9 +53,10 @@ export default function Item({ entry }: Props) {
       tabIndex={selected ? 0 : -1}
       className={cx(
         // A finger needs a 44pt row where a mouse is happy with 30. This is a
-        // capability rule, not a shell one: it holds wherever the pointer is
-        // coarse, and costs no render branch.
-        'flex cursor-pointer items-center gap-3 border-l-2 py-2.5 pl-[14px] pr-4 pointer-coarse:py-3.5',
+        // capability rule, not a shell one: it holds wherever *any* pointer is
+        // coarse — a touch laptop has a fine one too — and costs no render
+        // branch.
+        'flex cursor-pointer items-center gap-3 border-l-2 py-2.5 pl-[14px] pr-4 any-pointer-coarse:py-3.5',
         'inset-shadow-hairline',
         selected
           ? 'border-accent bg-sel'

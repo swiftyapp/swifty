@@ -1,31 +1,34 @@
-import type { EntryMeta } from '@/lib/commands'
-import { editEntry } from '@/store'
+import type { Entry, EntryMeta } from '@/lib/commands'
 import { cx } from '@/utils/cx'
-import { kindOf } from '@/kinds'
-import { FieldsProvider } from '@/components/elements/fields'
-import DeleteError from '../../Body/Aside/Show/DeleteError'
+import Body from '../../Body/Aside/Show/Body'
 import Eyebrow from '../../Body/Aside/Show/Eyebrow'
-import Footer from '../../Body/Aside/Show/Footer'
 import Identity from '../../Body/Aside/Show/Identity'
 import { useDelete } from '../../Body/Aside/Show/useDelete'
-import { useShown } from '../../Body/Aside/Show/useShown'
 import { PRIMARY_CLEARANCE } from '../chrome'
 import NavRow from './NavRow'
 import PrimaryAction from './PrimaryAction'
+
+interface Props {
+  entry: EntryMeta
+  /** The decrypted entry, or null while `revealEntry` is still in flight. */
+  revealed: Entry | null
+}
 
 /**
  * Reading one entry, on a phone: a nav row, the entry's own identity at the
  * size a 390px screen can afford, the kind's field set, the footer, and the
  * primary action pinned where a thumb is.
  *
- * Every part below the nav row is the desktop's, unchanged. What differs is
- * where they are placed and how much room they have — the scroller declares
- * itself a `@container`, and the rows fold themselves (see fields/Row).
+ * Every part below the nav row is the desktop's, unchanged — the whole block
+ * under the header is literally `Show/Body`. What differs is where they are
+ * placed and how much room they have: the scroller declares itself a
+ * `@container`, and the rows fold themselves (see fields/Row).
+ *
+ * The reveal is the screen's, not this face's (`Compact/Entry`), so entering
+ * and leaving edit never re-fetches the secrets.
  */
-export default function Read({ entry }: { entry: EntryMeta }) {
-  const { current } = useShown(entry)
+export default function Read({ entry, revealed }: Props) {
   const { error, remove } = useDelete(entry.id)
-  const Fields = kindOf(entry.type).Fields
 
   return (
     // `relative`: what the bottom action and its fade are pinned to.
@@ -48,35 +51,17 @@ export default function Read({ entry }: { entry: EntryMeta }) {
         >
           <Eyebrow
             entry={entry}
-            revealed={current}
+            revealed={revealed}
             className="mb-1 flex items-center gap-2 truncate whitespace-nowrap"
           />
         </Identity>
 
-        {current && (
-          <div className="mt-5">
-            {/* No writer: every field in the set renders its read face. */}
-            <FieldsProvider value={{ entry: { ...current }, set: null, attempted: false }}>
-              <Fields />
-            </FieldsProvider>
-          </div>
-        )}
-
-        {/* Tags are metadata, so the footer needs no reveal to render. */}
-        <Footer
-          tags={entry.tags}
-          onAdd={entry.deletedAt ? undefined : () => editEntry()}
-          createdAt={entry.createdAt}
-          updatedAt={entry.updatedAt}
-          deletedAt={entry.deletedAt}
-        />
-
-        <DeleteError error={error} />
+        <Body entry={entry} revealed={revealed} error={error} />
       </div>
 
       {/* `reveal_entry` does not serve deleted rows, so a tombstone has no
           secret to offer and nothing to offer it with. */}
-      {!entry.deletedAt && <PrimaryAction entry={entry} revealed={current} />}
+      {!entry.deletedAt && <PrimaryAction entry={entry} revealed={revealed} />}
     </div>
   )
 }

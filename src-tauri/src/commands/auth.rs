@@ -263,6 +263,15 @@ pub fn is_biometric_available(app: AppHandle) -> Result<bool> {
         && storage::biometric_enrolled(&app))
 }
 
+// Which biometry this device gates with — "face", "touch" or "none" — so the UI
+// can name it instead of guessing from the platform (a Touch ID iPad is not
+// Face ID). Hardware only: `is_biometric_available` still says whether the user
+// opted in, and the two are asked together at launch.
+#[tauri::command]
+pub fn biometry_type() -> Result<String> {
+    Ok(biometrics::kind().to_string())
+}
+
 // Enrollment state for the settings UI: whether biometric unlock is on, and
 // which gate the key sits behind (so the copy can describe it honestly).
 #[derive(Debug, Serialize)]

@@ -17,7 +17,7 @@ desktop app, which stays the source of truth.
 | 3 | Detail read screen: nav row, kind header, container-query row geometry, tap-to-copy rows, bottom primary action | ✅ |
 | 4 | Form screen: `Edit` split into `Title` + `Body`, slide-up form with Save/Cancel in the nav row, add picker as a bottom sheet | ✅ |
 | 5 | Generator and Settings as tab roots; Archive reachable from Settings | ✅ |
-| 6 | Lock screen: `useUnlock` hook, biometric-first compact layout, platform-correct biometric label | ❌ |
+| 6 | Lock screen: `useUnlock` hook, biometric-first compact layout, platform-correct biometric label | ✅ |
 
 ## The three rules
 
@@ -25,8 +25,10 @@ Platform differences are handled by exactly one of these, chosen by what kind
 of difference it is. Nothing else branches on layout.
 
 1. **Screen structure is composition, decided once in the shell.**
-   `Main/index.tsx` is the only component that calls `useLayout()`. `Wide` and
-   `Compact` each assemble their screens from shared content components. Leaf
+   `useLayout()` is called once per flow root and nowhere below it: `App.tsx`
+   picks `LockScreen` or `Auth` for the `auth` flow, `Main/index.tsx` picks
+   `Compact` or `Wide` for the vault. Each pair assembles its screens from
+   shared content components (the lock screens from `Auth/useUnlock`). Leaf
    components never ask which shell they are in. Where a leaf must be framed
    differently (a dialog card on desktop, a sheet on a phone) it renders the
    `Frame` from `elements/Frame`, and the shell provides the implementation
@@ -39,9 +41,11 @@ of difference it is. Nothing else branches on layout.
    itself one — `Show/Read` and `Show/Edit` on the desktop, the detail
    scroller on the phone.
 3. **Capability differences use compile-time constants and media features.**
-   `isMobile` / `isIOS` from `lib/platform` (Face ID vs Touch ID, no updater,
-   no drag-and-drop). Hover-only affordances become visible under
-   `@media (hover: none)`. Both are constants or CSS, never `useLayout`.
+   `isMobile` / `isIOS` from `lib/platform` (no updater, no drag-and-drop);
+   what the device reports (the biometry kind, from the backend). Touch tiers
+   key off `any-pointer-coarse`, not `pointer-coarse`: a device with a trackpad
+   **and** a touchscreen still needs the 44pt targets and the always-visible
+   copy button. All of it is constants or CSS, never `useLayout`.
 
 Corollaries: no `compact` boolean props on shared components (a slot such as
 `actions` is composition and is fine); no new navigation state when the store
@@ -53,7 +57,9 @@ settings surface, the generator) or `'content'` (a short one, the add picker).
 `Modal` always has the room and ignores it; `Sheet` reads it to choose between
 a full-screen page and `elements/BottomSheet`. Sizes travel the same way —
 `className`, `tile`, `glyph` — so `Show/Edit/Title` draws a 28px tile in the
-pane and a 44px one on the phone without being told which it is.
+pane and a 44px one on the phone without being told which it is. A dialog names
+itself through `labelledBy` and carries its own heading; the frames add no title
+bar of their own.
 
 ## Navigation model
 
@@ -63,20 +69,28 @@ already has:
 | State | Screen |
 |---|---|
 | `entries.new !== null` or `entries.edit` | Form (slide-up) |
-| `entries.current !== null` | Detail (pushed from the right) |
 | `ui.settings` | Settings tab root (a section pushes its pane) |
 | `generator.open` with no `apply`/`ssh` callback | Generator tab root |
+| `entries.current !== null` | Detail (pushed from the right) |
 | otherwise | List root for `ui.view` |
+
+The order is what makes an *open* land. Both roots can be opened while a row is
+selected (⌘G, ⌘, , the Settings row of a menu), so they come before the
+selection — behind it, `generator.open` would go true and nothing visible would
+happen. A draft still outranks all of it: it is the one screen with unsaved
+work on it. Tabs need no rule, because `setView` clears the selection anyway.
 
 The one exception is which settings pane is open: that is `useState` inside
 `Compact/Settings`, because `ui.settingsSection` is the *wide* modal's nav
 selection and persists, so a phone reading it would open Settings already
 inside a pane. It is one level deep and resets with the screen.
 
-Every row is its own screen: the detail as of slice 3 (`Compact/Detail/Read` —
-nav row, kind header, bottom primary action), the form as of slice 4
-(`Compact/Form` — Cancel/Save in the nav row over one `@container` scroller),
-and as of slice 5 the two remaining roots. The generator splits by *how it was
+Every row is its own screen — one screen, `Compact/Entry`, with two faces:
+`Detail/Read` (nav row, kind header, bottom primary action) and `Form/Editor`
+(Cancel/Save in the nav row over one `@container` scroller). One component for
+both, the way the desktop's `Aside/Show` is one pane for both, because the
+decrypt has to be shared. As of slice 5 there are also the two remaining roots.
+The generator splits by *how it was
 opened*, not by shell: standalone it is `Compact/Generator` (large title, mode
 switch, `Generator/Panel`, a bottom Use & copy), and opened from a password row
 it is `Generator/Attached` — the same `Dialog` the wide shell mounts, framed as
@@ -84,12 +98,48 @@ a page sheet. Both take `useGeneratorDialog`, so the two shells generate the
 same way. Settings is a root list of rows over the desktop's own `Section`
 panes, and carries the lock control the vanished top bar used to.
 
-Both screens compose parts the desktop's `Aside/Show` also composes —
-`Identity`, `Eyebrow`, `Edit/Title`, `Edit/Body`, `Footer`, `MoreMenu`, and the
-`useDraft` / `usePrimaryAction` / `useShown` / `useDelete` hooks. Neither shell
-passes the other a layout flag; each only decides where the parts go. The form
-holds its frame behind `useShown().held` exactly as `Show` does: an editor
-seeded from a reveal that has not landed would discard whatever is typed first.
+The three pushed headers — the entry's, the form's, a settings pane's — are one
+`Compact/NavBar` (leading · title · trailing) with `Compact/BackButton` in the
+leading slot. Everything they measure themselves against lives in
+`Compact/chrome.ts`, including the 44px `TOUCH` tier the desktop's 28px
+controls are dressed in through their `className`.
+
+The list root is the only pane there is, so it also carries what the wide shell
+puts in its detail pane: the whole-view empty heroes, and on the audit view the
+score panel under the groups (`Body/Aside/Audit`, the same call `Body/Aside`
+makes). Both travel as `ListColumn`'s `footer`, which sits in the scroller but
+*outside* the `role="listbox"` — a hero's buttons are not options.
+
+Both faces compose parts the desktop's `Aside/Show` also composes —
+`Identity`, `Eyebrow`, `Show/Body`, `Edit/Title`, `Edit/Body`, `MoreMenu`, and
+the `useDraft` / `usePrimaryAction` / `useShown` / `useDelete` hooks. Neither
+shell passes the other a layout flag; each only decides where the parts go.
+`useShown` is called once, by the screen rather than by either face, so
+stepping into edit decrypts nothing again. It still holds the form's frame
+behind `held` exactly as `Show` does — an editor seeded from a reveal that has
+not landed would discard whatever is typed first — but that can now only happen
+for an edit asked for before the *first* reveal landed, and the held frame
+(`Form/Held`) carries a working Cancel so a reveal that never arrives is not a
+dead end.
+
+Overlays are not screens and do not live in the shell div. That div carries
+`viewportStyle`'s translate, which makes it the containing block of anything
+`fixed` inside it, so a sheet mounted there would take the keyboard offset
+twice. `Generator/Attached`, and every fixed overlay after it, is a sibling of
+the shell.
+
+Before any of that there is the lock, which is not a screen of the vault but a
+flow of its own: `App` renders `Auth/LockScreen` on compact and `Auth` on wide,
+both driven by `Auth/useUnlock` (attempt phase, lockout countdown, mascot gaze,
+the eyebrow's text and tone). The desktop leads with the passphrase card and
+keeps biometrics as its end segment; the phone leads with an 88px biometric
+tile when a key is enrolled and reveals the same card under "Enter Master
+Password". Which biometry the copy names is `lib/biometry` — `biometryLabel(type)`
+and `biometryGlyph(type)`, from the `biometry_type` command (`LAContext.biometryType`
+on Apple, the fingerprint everywhere else), carried alongside `touchID` in the
+`flowAuth` payload — so `Masterpass` says the same thing wherever it is drawn.
+The card also survives a late probe: once the user has typed into it, it stays
+even if `touchID` flips true underneath (`src/test/lock.test.tsx`).
 
 Overlays that stay overlays on a phone: the add picker (`fit="content"`, so a
 bottom sheet) and the generator opened from a password row (a page sheet). Both
@@ -154,3 +204,15 @@ palettes. Prototype-only colours map to existing tokens (`--list` → `bg-list`,
   passphrase card. No auto-prompt on launch.
 - Not adopted from the prototype: share button, recent searches, vault
   switcher, card face art. The Swifty mascot stays on the lock screen.
+
+## Follow-ups
+
+What the six slices deliberately left behind, smallest first:
+
+- **Generator controls have no touch tier.** The length slider and the toggle
+  rows are the desktop's sizes inside `Generator/Panel`, which both shells
+  share; giving them a touch tier means sizing them through the panel rather
+  than around it.
+- **`big` secrets truncate when stacked.** A long SSH private key in a narrow
+  container clips rather than wrapping; the stacked row needs its own
+  presentation for the multi-line value tier.

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { lock, isBiometricAvailable, type EntryType } from '@/lib/commands'
+import { lock, isBiometricAvailable, biometryType, type EntryType } from '@/lib/commands'
 import { createFlowSlice, type FlowSlice } from './flowSlice'
 import { createGeneratorSlice, type GeneratorSlice } from './generatorSlice'
 import { createFiltersSlice, type FiltersSlice } from './filtersSlice'
@@ -150,7 +150,10 @@ export const startEntry = (type: EntryType, prefill?: Record<string, string>) =>
 export const lockVault = () =>
   lock().finally(() => {
     resetVaultData()
-    return isBiometricAvailable()
-      .catch(() => false)
-      .then(flowAuth)
+    // Which gate it is comes along for the ride: the lock screen names it, and
+    // asking here is free next to the availability probe we already make.
+    return Promise.all([
+      isBiometricAvailable().catch(() => false),
+      biometryType().catch(() => 'touch' as const)
+    ]).then(([available, biometry]) => flowAuth(available, biometry))
   })

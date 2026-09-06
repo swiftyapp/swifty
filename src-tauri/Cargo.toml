@@ -82,7 +82,13 @@ dirs = "6"
 [target.'cfg(target_vendor = "apple")'.dependencies]
 objc2 = "0.6"
 objc2-foundation = "0.3"
-objc2-local-authentication = { version = "0.3", features = ["LAContext", "block2"] }
+# `LABiometryType` gates the `LAContext.biometryType` property — which biometry
+# this device actually has, so Touch ID iPads are not labelled Face ID.
+objc2-local-authentication = { version = "0.3", features = [
+  "LAContext",
+  "LABiometryType",
+  "block2",
+] }
 block2 = "0.6"
 # On-device text recognition (VNRecognizeTextRequest) for the image scanner.
 # Only the headers the scanner touches are enabled; `objc2-core-foundation`
