@@ -7,7 +7,7 @@ import { useTagCounts } from './useTagCounts'
 
 // Hangs off the right edge of the 36px rail tile, floating over the list column
 // — the rail itself is too narrow to hold a menu. `className` is where it is
-// pinned, which the compact header changes.
+// pinned, which a caller that puts the tile elsewhere overrides.
 export default function Menu({
   onClose,
   className

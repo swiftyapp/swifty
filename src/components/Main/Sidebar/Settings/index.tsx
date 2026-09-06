@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next'
 import { useStore, openSettings, closeSettings } from '@/store'
 import RailButton from '@/components/elements/RailButton'
-import Overlay from './Overlay'
+import SettingsModal from './SettingsModal'
 import { GearRailGlyph } from '../../icons'
 
+// The rail's settings tile and the card it opens. The compact shell mounts the
+// sheet version itself — only one shell renders, so it is never both.
 export default function Settings() {
   const { t } = useTranslation()
   // Open state lives in the store so the ⌘K palette can open Settings too.
@@ -19,7 +21,7 @@ export default function Settings() {
       >
         <GearRailGlyph />
       </RailButton>
-      <Overlay />
+      {modal && <SettingsModal />}
     </div>
   )
 }

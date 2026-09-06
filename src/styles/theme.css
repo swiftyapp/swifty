@@ -51,6 +51,17 @@
     transform: none;
   }
 }
+/* A screen arriving from the bottom edge — the phone shell's slide-up form. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 
 /*
  * Lock-screen mascot motion (from the Lock v3 prototype): a slow occasional
@@ -276,12 +287,13 @@
 
   /*
    * Surfaces and shadows that are more than a flat colour (see the design vars
-   * on :root below). Named here so `bg-scrim`, `bg-chrome`, `bg-card`,
-   * `shadow-float`, `shadow-lockfield` and `inset-shadow-hairline` compile
-   * instead of every call site spelling out `bg-[var(--scrim)]`.
+   * on :root below). Named here so `bg-scrim`, `bg-chrome`, `bg-glass`,
+   * `bg-card`, `shadow-float`, `shadow-lockfield` and `inset-shadow-hairline`
+   * compile instead of every call site spelling out `bg-[var(--scrim)]`.
    */
   --color-scrim: var(--scrim);
   --color-chrome: var(--chrome);
+  --color-glass: var(--glass);
   --background-image-card: var(--card);
   --shadow-float: var(--shadow);
   --shadow-lockfield: var(--lockfield-shadow);
@@ -326,7 +338,7 @@
  *             entry detail column) — on top of Tailwind's rem container scale
  *   Motion    one duration (160ms) — plus a 300ms slow tier for sweeps that
  *             should be seen moving (the lock field, a progress bar) —
- *             one easing (ease-swift), three shapes (fade/pop/sheet)
+ *             one easing (ease-swift), four shapes (fade/pop/sheet/rise)
  */
 @theme {
   --text-*: initial;
@@ -370,6 +382,7 @@
   --animate-fade: fade 160ms var(--ease-swift) both;
   --animate-pop: pop 160ms var(--ease-swift) both;
   --animate-sheet: sheet 160ms var(--ease-swift) both;
+  --animate-rise: rise 300ms var(--ease-swift) both;
 }
 
 /*
@@ -478,6 +491,9 @@
   /* Gradients, shadows and scrims; exposed as utilities via @theme above. */
   --card: linear-gradient(180deg, #ffffff, #fbfbfc);
   --chrome: rgba(246, 247, 248, 0.92);
+  /* `chrome`'s floating cousin: the surface of something the content scrolls
+   * under (the compact tab bar), so it is thinner and wants a backdrop blur. */
+  --glass: rgba(255, 255, 255, 0.8);
   --topglow: rgba(255, 255, 255, 0.7);
   --shadow: 0 24px 60px rgba(24, 26, 30, 0.16), 0 1px 3px rgba(24, 26, 30, 0.1);
   --scrim: rgba(40, 43, 48, 0.3);
@@ -543,6 +559,7 @@
     rgba(255, 255, 255, 0.012)
   );
   --chrome: rgba(15, 16, 17, 0.82);
+  --glass: rgba(40, 42, 46, 0.72);
   --topglow: rgba(255, 255, 255, 0.06);
   --shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
   --scrim: rgba(8, 9, 10, 0.7);

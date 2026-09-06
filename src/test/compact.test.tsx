@@ -1,10 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { act, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
 import AuthShell from '@/components/elements/AuthShell'
+import Frame, { FrameProvider } from '@/components/elements/Frame'
+import Sheet from '@/components/elements/Sheet'
 import { revealEntry } from '@/lib/commands'
-import { makeStore, useStore, openPalette, openSettings, openAddPicker } from '@/store'
+import {
+  makeStore,
+  useStore,
+  openPalette,
+  openSettings,
+  openAddPicker,
+  openGenerator
+} from '@/store'
 import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 import { setLayout } from './layout'
 
@@ -120,10 +129,50 @@ describe('overlay frames', () => {
     expect(screen.getByTestId('settings-modal')).not.toHaveAttribute('data-frame')
   })
 
-  it('gives the add picker a sheet on compact', () => {
-    renderWithStore(<Main />, { store: seed() })
+  it('gives the add picker a sheet on compact and the card on wide', () => {
+    const { unmount } = renderWithStore(<Main />, { store: seed() })
     act(() => openAddPicker())
     expect(screen.getByTestId('add-secret-modal')).toHaveAttribute('data-frame', 'sheet')
+    unmount()
+
+    setLayout('wide')
+    renderWithStore(<Main />, { store: seed() })
+    act(() => openAddPicker())
+    expect(screen.getByTestId('add-secret-modal')).not.toHaveAttribute('data-frame')
+  })
+
+  it('gives the generator a sheet on compact and the card on wide', () => {
+    const { unmount } = renderWithStore(<Main />, { store: seed() })
+    act(() => openGenerator())
+    expect(screen.getByTestId('generator-dialog')).toHaveAttribute('data-frame', 'sheet')
+    unmount()
+
+    setLayout('wide')
+    renderWithStore(<Main />, { store: seed() })
+    act(() => openGenerator())
+    const card = screen.getByTestId('generator-dialog')
+    expect(card).not.toHaveAttribute('data-frame')
+    // The e2e suite and `utils/dialogOpen` both read the card off the DOM.
+    expect(card).toHaveAttribute('role', 'dialog')
+    expect(card).toHaveAttribute('aria-labelledby', 'generator-title')
+  })
+})
+
+// The frame a dialog gets is context, not a layout question it asks itself.
+describe('Frame', () => {
+  const dialog = (
+    <Frame onClose={() => {}} testid="framed">
+      <button type="button">inside</button>
+    </Frame>
+  )
+
+  it('is the card by default and whatever the shell provides otherwise', () => {
+    const { unmount } = render(dialog)
+    expect(screen.getByTestId('framed')).not.toHaveAttribute('data-frame')
+    unmount()
+
+    render(<FrameProvider value={Sheet}>{dialog}</FrameProvider>)
+    expect(screen.getByTestId('framed')).toHaveAttribute('data-frame', 'sheet')
   })
 })
 

@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Sidebar from '@/components/Main/Sidebar'
 import ListColumn from '@/components/Main/Body/ListColumn'
+import SortMenu from '@/components/Main/Body/List/SortMenu'
 import Body from '@/components/Main/Body'
 import Show from '@/components/Main/Body/Aside/Show'
 import { revealEntry, setFavorite } from '@/lib/commands'
@@ -89,7 +90,7 @@ describe('the Favorites view', () => {
       loginMeta({ id: 'plain', title: 'Airbnb', updatedAt: '2024-03-01T00:00:00.000Z' }),
       loginMeta({ id: 'star', title: 'Monzo', favorite: true, updatedAt: '2024-01-01T00:00:00.000Z' })
     ])
-    renderWithStore(<ListColumn />, { store })
+    renderWithStore(<ListColumn actions={<SortMenu />} />, { store })
 
     expect(titles()).toEqual(['Monzo', 'Airbnb'])
 

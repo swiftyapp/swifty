@@ -1,6 +1,7 @@
 import { useStore } from '@/store'
 import { cx } from '@/utils/cx'
 import ListColumn from './ListColumn'
+import SortMenu from './List/SortMenu'
 import DetailPane from './DetailPane'
 
 // The two content panes to the right of the rail: list column + detail pane.
@@ -18,9 +19,12 @@ export default function Body() {
       <div
         data-testid="list-column"
         inert={writing || undefined}
-        className={cx('flex min-h-0 flex-none', writing && 'opacity-60')}
+        className={cx(
+          'flex min-h-0 w-[348px] flex-none border-r border-line',
+          writing && 'opacity-60'
+        )}
       >
-        <ListColumn />
+        <ListColumn actions={<SortMenu />} />
       </div>
       <DetailPane />
     </>

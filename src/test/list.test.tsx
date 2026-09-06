@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ListColumn from '@/components/Main/Body/ListColumn'
+import SortMenu from '@/components/Main/Body/List/SortMenu'
 import { copyToClipboard, fetchFavicon, revealEntry, type Audit } from '@/lib/commands'
 import { makeStore, useStore, setFilterType } from '@/store'
 import { resetFavicons } from '@/hooks/useFavicon'
@@ -104,7 +105,9 @@ describe('Entry list', () => {
   })
 
   it('sorts alphabetically', async () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    // The sort control is one of the title row's actions, handed down by the
+    // shell — the wide one sends exactly this.
+    renderWithStore(<ListColumn actions={<SortMenu />} />, { store: seed() })
 
     await userEvent.click(screen.getByTestId('sort-menu'))
     await userEvent.click(screen.getByText('Alphabetical'))
@@ -276,7 +279,7 @@ describe('List keyboard navigation', () => {
   })
 
   it('leaves ⏎ on the column’s own controls to that control', async () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    renderWithStore(<ListColumn actions={<SortMenu />} />, { store: seed() })
 
     // The sort button opens its menu on ⏎; selecting a row as well would be
     // two actions on one press.
@@ -288,7 +291,7 @@ describe('List keyboard navigation', () => {
   })
 
   it('leaves the arrows alone while the sort menu owns them', async () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    renderWithStore(<ListColumn actions={<SortMenu />} />, { store: seed() })
 
     await userEvent.click(screen.getByTestId('sort-menu'))
     await userEvent.keyboard('{ArrowDown}{ArrowDown}')

@@ -5,8 +5,9 @@ export const ROW_HAIRLINE = 'inset-shadow-hairline last:inset-shadow-none'
 // A trailing control that stays out of the way until the row is asked about —
 // hovered, or holding the keyboard. Pairs with a `group` on the row itself.
 // Opacity only: the control keeps its place in the layout and in the tab order.
+// A finger cannot hover, so on touch the control is simply always there.
 export const HOVER_ONLY =
-  'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'
+  'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100'
 
 // App-level transient feedback (the update prompt, the scan status): a floating
 // panel on the detail surface. Each toast places itself — two of them in the
