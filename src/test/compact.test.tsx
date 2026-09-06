@@ -78,11 +78,33 @@ describe('compact shell', () => {
     expect(useStore.getState().ui.view).toBe('favorites')
     expect(screen.getByTestId('list-title')).toHaveTextContent('Favorites')
 
-    await userEvent.click(screen.getByTestId('tab-archive'))
-    expect(useStore.getState().ui.view).toBe('archive')
-
     await userEvent.click(screen.getByTestId('tab-items'))
     expect(useStore.getState().ui.view).toBe('items')
+  })
+
+  it('carries four tabs and keeps the archive in settings', async () => {
+    renderWithStore(<Main />, { store: seed() })
+
+    expect(screen.getByTestId('tab-bar').querySelectorAll('button')).toHaveLength(4)
+    expect(screen.queryByTestId('tab-archive')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('tab-settings'))
+    await userEvent.click(screen.getByTestId('settings-archive'))
+
+    expect(useStore.getState().ui.view).toBe('archive')
+    expect(useStore.getState().ui.settings).toBe(false)
+    expect(screen.getByTestId('list-title')).toHaveTextContent('Archive')
+  })
+
+  it('leaves the settings root when a list tab is tapped', async () => {
+    renderWithStore(<Main />, { store: seed() })
+
+    act(() => openSettings())
+    expect(screen.queryByTestId('entry-item')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('tab-items'))
+    expect(useStore.getState().ui.settings).toBe(false)
+    expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
   })
 
   it('opens the generator and settings from the tab bar', async () => {
@@ -90,10 +112,14 @@ describe('compact shell', () => {
 
     await userEvent.click(screen.getByTestId('tab-generator'))
     expect(screen.getByTestId('generator-dialog')).toHaveAttribute('data-frame', 'sheet')
+    expect(screen.getByTestId('tab-generator')).toHaveAttribute('aria-pressed', 'true')
 
     await userEvent.keyboard('{Escape}')
     await userEvent.click(screen.getByTestId('tab-settings'))
     expect(useStore.getState().ui.settings).toBe(true)
+    // A root screen, with the bar still up: the tab bar is the way out of it.
+    expect(screen.getByTestId('settings-nav-security')).toBeInTheDocument()
+    expect(screen.getByTestId('tab-bar')).toBeInTheDocument()
   })
 
   it('shows the empty-vault hero on the one pane it has', () => {
@@ -113,14 +139,15 @@ describe('compact shell', () => {
 })
 
 describe('overlay frames', () => {
-  it('gives settings a sheet on compact and the modal on wide', () => {
+  it('makes settings a screen on compact and the modal on wide', () => {
     const { unmount } = renderWithStore(<Main />, { store: seed() })
     act(() => openSettings())
-    const sheet = screen.getByTestId('settings-modal')
-    expect(sheet).toHaveAttribute('data-frame', 'sheet')
-    // Outside the shell: a translated ancestor would become the containing
-    // block for the sheet's `fixed` and stack the keyboard offset twice.
-    expect(screen.getByTestId('compact-shell')).not.toContainElement(sheet)
+    // A tab root rather than an overlay: no sheet over the list, and the
+    // sections it navigates are in the shell itself.
+    expect(screen.queryByTestId('settings-modal')).not.toBeInTheDocument()
+    expect(screen.getByTestId('compact-shell')).toContainElement(
+      screen.getByTestId('settings-nav-security')
+    )
     unmount()
 
     setLayout('wide')
