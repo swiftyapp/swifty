@@ -1,20 +1,23 @@
 import type { TKey } from '@/i18n'
-import { isIOS } from '@/lib/platform'
+import type { BiometryType } from '@/lib/commands'
 import { FingerprintGlyph, ScanFaceGlyph } from '@/components/Main/icons'
 
 /**
- * What this build calls the OS biometric gate, decided once at compile time
- * (rule 3 — `isIOS` is baked in by vite.config.ts, not sniffed at runtime).
+ * What the OS biometric gate is called on *this device*, and the glyph that
+ * goes with the name.
  *
- * The backend only reports *whether* biometrics are available, not which kind:
- * `is_biometric_available` is one `LAContext::canEvaluatePolicy` on Apple
- * platforms. So iOS is labelled Face ID, which is right for every current
- * iPhone; the few Touch ID iPads read the wrong name until `LAContext`'s
- * `biometryType` is plumbed through (see docs/compact-shell.md, Follow-ups).
- * Everywhere else keeps Touch ID / Windows Hello's fingerprint, which is what
- * the desktop has always said.
+ * Asked of the backend (`biometry_type`, over `LAContext.biometryType`) rather
+ * than derived from the build: iPhones and Touch ID iPads run the same iOS
+ * binary, so a compile-time `isIOS` labelled the iPads Face ID.
+ *
+ * `'none'` falls to the fingerprint pair. It only reaches a call site when the
+ * device has no biometry at all — in which case nothing biometric is drawn —
+ * or before the probe has answered, where the desktop's historical name is the
+ * safer placeholder.
  */
-export const BIOMETRY_LABEL: TKey = isIOS ? 'Face ID' : 'Touch ID'
+export const biometryLabel = (type: BiometryType): TKey =>
+  type === 'face' ? 'Face ID' : 'Touch ID'
 
-/** The glyph that goes with that name. */
-export const BiometryGlyph = isIOS ? ScanFaceGlyph : FingerprintGlyph
+/** The matching glyph, as a component the call site sizes itself. */
+export const biometryGlyph = (type: BiometryType) =>
+  type === 'face' ? ScanFaceGlyph : FingerprintGlyph

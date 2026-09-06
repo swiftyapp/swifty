@@ -1,6 +1,7 @@
-import { useRef, type ReactNode, type Ref } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { cx } from '@/utils/cx'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
+import { useForwardedRef } from '@/hooks/useForwardedRef'
 import { CloseGlyph } from '../Main/icons'
 import IconButton from './IconButton'
 
@@ -33,15 +34,8 @@ export default function Modal({
   ref,
   children
 }: Props) {
-  const card = useRef<HTMLDivElement>(null)
+  const [card, setCard] = useForwardedRef<HTMLDivElement>(ref)
   useDialogFocus(card, onClose)
-
-  // One node, two refs: the focus trap's and whatever the caller asked for.
-  const setCard = (node: HTMLDivElement | null) => {
-    card.current = node
-    if (typeof ref === 'function') ref(node)
-    else if (ref) ref.current = node
-  }
 
   return (
     <div

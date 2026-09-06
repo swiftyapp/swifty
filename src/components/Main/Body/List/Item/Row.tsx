@@ -33,7 +33,7 @@ export default function Row({ glyph, title, sub, flag, tint }: Props) {
       <div
         className={cx(
           // The tile grows with the row it sits in (see Item/index.tsx).
-          'grid h-[30px] w-[30px] flex-none place-items-center overflow-hidden rounded-lg pointer-coarse:h-10 pointer-coarse:w-10',
+          'grid h-[30px] w-[30px] flex-none place-items-center overflow-hidden rounded-lg any-pointer-coarse:h-10 any-pointer-coarse:w-10',
           tint ? KIND_TINT[tint] : 'bg-tile text-text2'
         )}
       >
