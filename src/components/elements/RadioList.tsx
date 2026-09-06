@@ -20,7 +20,9 @@ export default function RadioList({
   name,
   testidPrefix
 }: Props) {
-  const nav = useRadioNav(
+  // Destructured rather than kept as one `nav` object: reading `nav.ref` in the
+  // render body is a ref access as far as `react-hooks/refs` is concerned.
+  const { ref, onKeyDown } = useRadioNav(
     options.map(option => option.value),
     value,
     onChange
@@ -28,10 +30,10 @@ export default function RadioList({
 
   return (
     <div
-      ref={nav.ref}
+      ref={ref}
       role="radiogroup"
       aria-label={name}
-      onKeyDown={nav.onKeyDown}
+      onKeyDown={onKeyDown}
       className={CARD}
     >
       {options.map(option => {

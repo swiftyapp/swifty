@@ -26,7 +26,9 @@ export default function Segmented<T extends string>({
   testidPrefix,
   className
 }: Props<T>) {
-  const nav = useRadioNav(
+  // Destructured rather than kept as one `nav` object: reading `nav.ref` in the
+  // render body is a ref access as far as `react-hooks/refs` is concerned.
+  const { ref, onKeyDown } = useRadioNav(
     options.map(option => option.value),
     value,
     onChange
@@ -34,10 +36,10 @@ export default function Segmented<T extends string>({
 
   return (
     <div
-      ref={nav.ref}
+      ref={ref}
       role="radiogroup"
       aria-label={name}
-      onKeyDown={nav.onKeyDown}
+      onKeyDown={onKeyDown}
       className={cx('flex gap-0.5 rounded-sm border border-line2 p-0.5', className)}
     >
       {options.map(option => {

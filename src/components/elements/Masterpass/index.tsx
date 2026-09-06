@@ -13,7 +13,8 @@ import Error from '../Error'
 import IconButton from '../IconButton'
 import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
 import type { BiometryType } from '@/lib/commands'
-import { biometryLabel, biometryGlyph } from '@/lib/biometry'
+import { biometryLabel } from '@/lib/biometry'
+import BiometryGlyph from '../BiometryGlyph'
 import Dots, { CELL } from './Dots'
 import KeyCuts from './KeyCuts'
 
@@ -83,7 +84,6 @@ export default function Masterpass({
   const rowRef = useRef<HTMLDivElement>(null)
 
   const lock = variant === 'lock'
-  const BiometryMark = biometryGlyph(biometry)
   const bad = !!error || !!invalid
   // The input can't accept keystrokes while locked out, verifying, or during
   // the success hold; only the lockout also dims the card.
@@ -250,7 +250,7 @@ export default function Masterpass({
             >
               {/* Child span so the rose survives IconButton's hover ink. */}
               <span className="text-touchid">
-                <BiometryMark size={22} />
+                <BiometryGlyph type={biometry} size={22} />
               </span>
             </IconButton>
           </>

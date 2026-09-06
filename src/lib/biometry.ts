@@ -1,10 +1,9 @@
 import type { TKey } from '@/i18n'
 import type { BiometryType } from '@/lib/commands'
-import { FingerprintGlyph, ScanFaceGlyph } from '@/components/Main/icons'
 
 /**
- * What the OS biometric gate is called on *this device*, and the glyph that
- * goes with the name.
+ * What the OS biometric gate is called on *this device*. The glyph that goes
+ * with the name is `<BiometryGlyph>` (components/elements/BiometryGlyph.tsx).
  *
  * Asked of the backend (`biometry_type`, over `LAContext.biometryType`) rather
  * than derived from the build: iPhones and Touch ID iPads run the same iOS
@@ -17,7 +16,3 @@ import { FingerprintGlyph, ScanFaceGlyph } from '@/components/Main/icons'
  */
 export const biometryLabel = (type: BiometryType): TKey =>
   type === 'face' ? 'Face ID' : 'Touch ID'
-
-/** The matching glyph, as a component the call site sizes itself. */
-export const biometryGlyph = (type: BiometryType) =>
-  type === 'face' ? ScanFaceGlyph : FingerprintGlyph
