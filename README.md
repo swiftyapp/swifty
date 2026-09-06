@@ -76,7 +76,8 @@ Swifty is built with [Tauri 2](https://v2.tauri.app) (Rust backend + TypeScript/
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org) 20+
+- [Node.js](https://nodejs.org) 22 (what `.nvmrc` and CI pin; 20.19 or newer also
+  works — ESLint 10 requires `^20.19.0 || ^22.13.0 || >=24`)
 - [Rust](https://rustup.rs) (stable toolchain)
 - Platform build dependencies for Tauri — see the
   [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/)
