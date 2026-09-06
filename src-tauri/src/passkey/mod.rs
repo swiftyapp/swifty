@@ -13,7 +13,10 @@
 //! from an unlocked session in the first place. That makes registering and
 //! signing in silent, which is the weakest acceptable stance and only tenable
 //! because nothing can reach this module yet: the extension PR adds the
-//! per-ceremony confirm prompt and replaces the check with its answer.
+//! per-ceremony confirm prompt and replaces the check with its answer. The one
+//! ceremony it does refuse is a registration whose excludeCredentials names a
+//! credential we already hold — `passkey-authenticator` leaves that answer to
+//! the verification method.
 //!
 //! ## Signature counters
 //! Passkeys here sync between devices, so a per-device counter would look like
@@ -33,7 +36,7 @@ pub mod store;
 #[cfg(test)]
 mod tests;
 
-use passkey_authenticator::{UserCheck, UserValidationMethod};
+use passkey_authenticator::{UiHint, UserCheck, UserValidationMethod};
 use passkey_types::ctap2::{get_assertion, make_credential, Aaguid, Ctap2Error, StatusCode};
 
 use crate::error::{Error, Result};
@@ -108,10 +111,20 @@ impl UserValidationMethod for UnlockedSession {
 
     async fn check_user<'a>(
         &self,
-        _credential: Option<&'a Self::PasskeyItem>,
+        hint: UiHint<'a, Self::PasskeyItem>,
         _presence: bool,
         _verification: bool,
     ) -> std::result::Result<UserCheck, Ctap2Error> {
+        // `make_credential` no longer refuses an excludeCredentials hit itself
+        // (passkey-authenticator 0.5 hands the decision here, so a UI can say
+        // "you already have one"), so refusing is now ours to do — otherwise a
+        // second registration would silently store a duplicate credential.
+        if matches!(hint, UiHint::InformExcludedCredentialFound(_)) {
+            return Err(Ctap2Error::CredentialExcluded);
+        }
+        // Every other hint is something a device with a display would show;
+        // nothing here can draw, so it is dropped. The extension PR's confirm
+        // prompt is where it becomes the prompt's text.
         Ok(UserCheck {
             presence: true,
             verification: true,

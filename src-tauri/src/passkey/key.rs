@@ -48,6 +48,10 @@ pub fn to_passkey_types(passkey: &models::Passkey) -> Result<passkey_types::Pass
         // Ours are always discoverable: the vault is the credential list, so a
         // sign-in with no allowCredentials must still find them.
         user_handle: Some(decode(&passkey.user_handle, "user handle")?.into()),
+        // Carried so the authenticator can name the account in a UI hint; the
+        // relying party never sees either (see `get_assertion`'s response).
+        username: Some(passkey.user_name.clone()),
+        user_display_name: Some(passkey.user_display_name.clone()),
         counter: (passkey.counter != 0).then_some(passkey.counter),
         extensions: Default::default(),
     })

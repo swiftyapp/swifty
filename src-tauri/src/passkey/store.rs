@@ -250,6 +250,11 @@ impl<V: PasskeyVault> passkey_authenticator::CredentialStore for VaultCredential
         &self,
         ids: Option<&[PublicKeyCredentialDescriptor]>,
         rp_id: &str,
+        // The user handle the ceremony knows about, only ever `Some` on the
+        // exclude-list check of a registration. Ignored, as `MemoryStore` does:
+        // an exclude list is matched on credential id, and narrowing by user
+        // handle would let a site re-register over an account it already has.
+        _user_handle: Option<&[u8]>,
     ) -> std::result::Result<Vec<Self::PasskeyItem>, StatusCode> {
         let found: Vec<_> = self
             .vault
@@ -299,7 +304,7 @@ impl<V: PasskeyVault> passkey_authenticator::CredentialStore for VaultCredential
 
     async fn update_credential(
         &mut self,
-        cred: passkey_types::Passkey,
+        cred: &passkey_types::Passkey,
     ) -> std::result::Result<(), StatusCode> {
         let stored = self
             .vault
