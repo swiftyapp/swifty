@@ -48,9 +48,9 @@ pub async fn save_export(
             .path()
             .document_dir()
             .map_err(|e| Error::Other(e.to_string()))?;
-        std::fs::create_dir_all(&dir)?;
-        stage_then(&dir.join(file_name), bytes, || {
-            ask(app, file_name, filter, &extension)
+        let (staged, asked) = staging(&dir, file_name);
+        stage_then(&staged, file_name, bytes, || {
+            ask(app, &asked, filter, &extension)
         })
         .await
     }
@@ -65,38 +65,63 @@ pub async fn save_export(
     }
 }
 
-/// Put the bytes at `staged`, run the dialog, then take `staged` away again
-/// however the dialog ended — the `.csv` export is plaintext and must not be
-/// left sitting in a directory the Files app can browse.
+/// Where one export stages inside `dir`, and the name to ask the dialog for so
+/// that it exports exactly that: a directory of its own, plus `file_name`
+/// prefixed with it.
+///
+/// Staging directly at `<Documents>/vault.swftx` made the export the owner of a
+/// path it had not created — it truncated whatever was there and then deleted
+/// it — and `<Documents>` is itself one of the destinations the iOS picker
+/// offers, so a user who exported there watched the export vanish. A per-export
+/// directory is the only part of the path free to change: `file_name` is what
+/// the picker labels the file with, and the plugin resolves what to export from
+/// the name we ask for (`<Documents>/<fileName>`), which is why the directory
+/// has to travel in that name rather than beside it.
+#[cfg(any(mobile, test))]
+fn staging(dir: &Path, file_name: &str) -> (PathBuf, String) {
+    let unique = format!("export-{}", crate::store::migrate::new_entry_id());
+    (dir.join(&unique), format!("{unique}/{file_name}"))
+}
+
+/// Put the bytes at `file_name` inside `staged`, run the dialog, then take
+/// `staged` away again however the dialog ended — the `.csv` export is
+/// plaintext, so no copy of it outlives the one dialog it was staged for.
 ///
 /// Split out from [`save_export`] (and compiled on every platform) so the
 /// ordering the iOS dialog demands can be tested without one.
 #[cfg(any(mobile, test))]
-async fn stage_then<F, Fut>(staged: &Path, bytes: Vec<u8>, dialog: F) -> Result<Option<PathBuf>>
+async fn stage_then<F, Fut>(
+    staged: &Path,
+    file_name: &str,
+    bytes: Vec<u8>,
+    dialog: F,
+) -> Result<Option<PathBuf>>
 where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = Result<Option<PathBuf>>>,
 {
-    let _staged = Staged::write(staged, bytes)?;
+    let _staged = Staged::write(staged, file_name, bytes)?;
     dialog().await
 }
 
-/// A file that exists only as long as this value does.
+/// A directory that exists only as long as this value does.
 ///
 /// The removal lives in `Drop` rather than after the dialog so that *every* way
 /// out of the scope — a dismissed dialog, a failed dialog, a write that ran out
-/// of disk halfway, a panic — takes the file with it. Cleanup that has to be
-/// remembered at each exit is cleanup that one of them will forget.
+/// of disk halfway, a panic — takes the directory with it. Cleanup that has to
+/// be remembered at each exit is cleanup that one of them will forget.
 #[cfg(any(mobile, test))]
 struct Staged(PathBuf);
 
 #[cfg(any(mobile, test))]
 impl Staged {
-    /// Claim the path first, then fill it: a write that fails partway has
-    /// already created the file, and only a guard that exists by then removes it.
-    fn write(path: &Path, bytes: Vec<u8>) -> Result<Self> {
-        let staged = Self(path.to_path_buf());
-        write_and_scrub(path, bytes)?;
+    /// Claim the directory first, then create and fill it: a create or a write
+    /// that fails partway has already left something on disk, and only a guard
+    /// that exists by then removes it.
+    fn write(dir: &Path, file_name: &str, bytes: Vec<u8>) -> Result<Self> {
+        let staged = Self(dir.to_path_buf());
+        std::fs::create_dir_all(dir)?;
+        write_and_scrub(&dir.join(file_name), bytes)?;
         Ok(staged)
     }
 }
@@ -104,7 +129,7 @@ impl Staged {
 #[cfg(any(mobile, test))]
 impl Drop for Staged {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.0);
+        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 
@@ -157,13 +182,18 @@ mod tests {
     #[tokio::test]
     async fn staging_writes_before_the_dialog_and_cleans_up_after() {
         let dir = std::env::temp_dir().join(format!("swifty-save-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let staged = dir.join("vault.swftx");
+        let (staged, _) = staging(&dir, "vault.swftx");
 
-        let chosen = stage_then(&staged, b"exported bytes".to_vec(), || async {
-            assert_eq!(std::fs::read(&staged).unwrap(), b"exported bytes");
-            Ok(Some(PathBuf::from("/somewhere/vault.swftx")))
-        })
+        let chosen = stage_then(
+            &staged,
+            "vault.swftx",
+            b"exported bytes".to_vec(),
+            || async {
+                let file = staged.join("vault.swftx");
+                assert_eq!(std::fs::read(file).unwrap(), b"exported bytes");
+                Ok(Some(PathBuf::from("/somewhere/vault.swftx")))
+            },
+        )
         .await
         .unwrap();
 
@@ -172,16 +202,61 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
+    // The name the dialog is asked for is the only thing the iOS plugin uses to
+    // decide what to export, so it has to resolve — from the same directory the
+    // staging is relative to — to the staged file itself, under the plain name
+    // the user is shown.
+    #[test]
+    fn the_asked_name_resolves_to_the_staged_file() {
+        let dir = Path::new("/documents");
+        let (staged, asked) = staging(dir, "vault.swftx");
+
+        assert_eq!(dir.join(&asked), staged.join("vault.swftx"));
+        assert_eq!(Path::new(&asked).file_name().unwrap(), "vault.swftx");
+        assert_ne!(staging(dir, "vault.swftx").0, staged);
+    }
+
+    // The path the export takes over is one it created, so an export that lands
+    // in the directory the app exports *from* leaves the neighbours alone —
+    // staging used to truncate `<Documents>/vault.swftx` and then remove it.
+    #[tokio::test]
+    async fn staging_leaves_the_rest_of_the_directory_alone() {
+        let dir = std::env::temp_dir().join(format!("swifty-save-nbr-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let kept = dir.join("vault.swftx");
+        std::fs::write(&kept, b"an export the user already saved here").unwrap();
+        let (staged, _) = staging(&dir, "vault.swftx");
+
+        let chosen = stage_then(
+            &staged,
+            "vault.swftx",
+            b"exported bytes".to_vec(),
+            || async { Ok(Some(dir.join("vault.swftx"))) },
+        )
+        .await
+        .unwrap();
+
+        assert!(chosen.is_some());
+        assert_eq!(
+            std::fs::read(&kept).unwrap(),
+            b"an export the user already saved here"
+        );
+        assert!(!staged.exists());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
     // Nor a dialog that failed outright.
     #[tokio::test]
     async fn staging_cleans_up_after_a_failed_dialog() {
         let dir = std::env::temp_dir().join(format!("swifty-save-fail-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let staged = dir.join("swifty-export.csv");
+        let (staged, _) = staging(&dir, "swifty-export.csv");
 
-        let result = stage_then(&staged, b"name,password".to_vec(), || async {
-            Err(Error::Other("picker crashed".into()))
-        })
+        let result = stage_then(
+            &staged,
+            "swifty-export.csv",
+            b"name,password".to_vec(),
+            || async { Err(Error::Other("picker crashed".into())) },
+        )
         .await;
 
         assert!(result.is_err());
@@ -191,27 +266,31 @@ mod tests {
 
     // A write that fails is the one exit the old "delete after the dialog"
     // ordering missed: the guard exists before the bytes go down, so whatever
-    // the failed write left at the path is removed exactly like a complete file.
-    // Unix-only because a read-only file is the portable way to make the write
-    // fail, and Windows then refuses to remove it as well.
+    // the failed write left in the directory is removed exactly like a complete
+    // export. Unix-only because a read-only file is the portable way to make
+    // the write fail, and Windows then refuses to remove it as well.
     #[cfg(unix)]
     #[test]
     fn a_failed_write_leaves_nothing_behind() {
         use std::os::unix::fs::PermissionsExt;
 
         let dir = std::env::temp_dir().join(format!("swifty-save-partial-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let staged = dir.join("swifty-export.csv");
-        std::fs::write(&staged, b"a stale export nobody cleaned up").unwrap();
-        std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o444)).unwrap();
+        let (staged, _) = staging(&dir, "swifty-export.csv");
+        std::fs::create_dir_all(&staged).unwrap();
+        let file = staged.join("swifty-export.csv");
+        std::fs::write(&file, b"").unwrap();
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o444)).unwrap();
 
-        let result = Staged::write(&staged, b"name,password".to_vec());
+        let result = Staged::write(&staged, "swifty-export.csv", b"name,password".to_vec());
 
         assert!(
             result.is_err(),
             "a read-only file should have refused the write"
         );
-        assert!(!staged.exists(), "a staged file survived its failed write");
+        assert!(
+            !staged.exists(),
+            "a staging directory survived its failed write"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -219,12 +298,16 @@ mod tests {
     #[tokio::test]
     async fn staging_cleans_up_after_a_cancelled_dialog() {
         let dir = std::env::temp_dir().join(format!("swifty-save-cancel-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let staged = dir.join("swifty-export.csv");
+        let (staged, _) = staging(&dir, "swifty-export.csv");
 
-        let chosen = stage_then(&staged, b"name,password".to_vec(), || async { Ok(None) })
-            .await
-            .unwrap();
+        let chosen = stage_then(
+            &staged,
+            "swifty-export.csv",
+            b"name,password".to_vec(),
+            || async { Ok(None) },
+        )
+        .await
+        .unwrap();
 
         assert!(chosen.is_none());
         assert!(!staged.exists());
