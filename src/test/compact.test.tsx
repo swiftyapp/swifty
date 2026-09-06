@@ -5,14 +5,15 @@ import Main from '@/components/Main'
 import AuthShell from '@/components/elements/AuthShell'
 import Frame, { FrameProvider } from '@/components/elements/Frame'
 import Sheet from '@/components/elements/Sheet'
-import { copyToClipboard, revealEntry, type Entry } from '@/lib/commands'
+import { copyToClipboard, revealEntry, saveEntry, type Entry } from '@/lib/commands'
 import {
   makeStore,
   useStore,
   openPalette,
   openSettings,
   openAddPicker,
-  openGenerator
+  openGenerator,
+  startEntry
 } from '@/store'
 import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
 import { setLayout } from './layout'
@@ -22,6 +23,10 @@ const seed = () => {
   withEntries([loginMeta({ id: 'l1', title: 'Google' }), loginMeta({ id: 'l2', title: 'Airbnb' })])
   return store
 }
+
+// The form's inputs carry names rather than testids, as the wide suite's do.
+const titleInput = () => document.querySelector<HTMLInputElement>('input[name="title"]')!
+const field = (name: string) => document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -60,31 +65,75 @@ describe('compact shell', () => {
     expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
   })
 
-  it('lands a new entry on the detail screen, without an unguarded way back', async () => {
+  it('lands a new entry on the form screen, titled by its kind', async () => {
     renderWithStore(<Main />, { store: seed() })
 
     await userEvent.click(screen.getByTestId('add-entry-button'))
     await userEvent.click(screen.getByTestId('add-kind-login'))
 
     expect(useStore.getState().entries.new).toBe('login')
-    expect(screen.getByTestId('entry-sheet')).toBeInTheDocument()
-    // Cancel/Discard in the editor is the only exit, so a draft cannot be
-    // dropped by a stray tap on the bar.
+    // Cancel · what this screen is for · Save, the iOS way round. The kind
+    // names the screen because there is no entry to name it yet.
+    expect(screen.getByTestId('cancel-entry-button')).toHaveTextContent('Cancel')
+    expect(screen.getByRole('heading', { name: 'Add a login' })).toBeInTheDocument()
+    expect(screen.getByTestId('save-entry-button')).toHaveTextContent('Save')
+    // Cancel/Discard is the only exit, so a draft cannot be dropped by a stray
+    // tap on a back button.
     expect(screen.queryByTestId('compact-back')).not.toBeInTheDocument()
-    expect(screen.getByTestId('cancel-entry-button')).toBeInTheDocument()
+    // The desktop's accent frame is the pane saying which mode it is in; here
+    // the nav row says it.
+    expect(screen.queryByTestId('entry-sheet')).not.toBeInTheDocument()
   })
 
-  it('enters the editor from the nav row', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+  it('refuses to save an untitled draft and stays on the form', async () => {
+    renderWithStore(<Main />, { store: seed() })
+
+    act(() => startEntry('login'))
+    await userEvent.click(screen.getByTestId('save-entry-button'))
+
+    // The title's own message plus the two rows login also requires.
+    expect(screen.getAllByText('Required')).toHaveLength(3)
+    expect(saveEntry).not.toHaveBeenCalled()
+    expect(useStore.getState().entries.new).toBe('login')
+  })
+
+  it('guards a dirty draft behind two presses of Cancel', async () => {
+    renderWithStore(<Main />, { store: seed() })
+
+    act(() => startEntry('login'))
+    await userEvent.type(titleInput(), 'Netflix')
+
+    const cancel = screen.getByTestId('cancel-entry-button')
+    await userEvent.click(cancel)
+    // Armed, and saying so where the way out is.
+    expect(cancel).toHaveTextContent('Discard changes?')
+    expect(useStore.getState().entries.new).toBe('login')
+
+    await userEvent.click(cancel)
+    expect(useStore.getState().entries.new).toBeNull()
+    expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
+  })
+
+  it('opens an existing entry seeded from its reveal, and saves it', async () => {
+    vi.mocked(revealEntry).mockResolvedValue(
+      loginEntry({ id: 'l1', title: 'Google', username: 'me@example.com' })
+    )
     renderWithStore(<Main />, { store: seed() })
 
     await userEvent.click(screen.getByText('Google'))
     await userEvent.click(screen.getByTestId('edit-entry-button'))
 
     expect(useStore.getState().entries.edit).toBe(true)
-    expect(screen.getByTestId('entry-sheet')).toBeInTheDocument()
-    // The form owns its own exits from here (slice 4 gives it a nav row).
+    // The entry names its own form, and the draft holds the decrypted values:
+    // the screen is held back until the reveal lands, so it never seeds empty.
+    expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
+    expect(field('username')).toHaveValue('me@example.com')
     expect(screen.queryByTestId('compact-back')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('save-entry-button'))
+    expect(saveEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'l1', title: 'Google', username: 'me@example.com' })
+    )
   })
 
   it('holds the primary action at the bottom until the secrets are in', async () => {
@@ -205,16 +254,26 @@ describe('overlay frames', () => {
     expect(screen.getByTestId('settings-modal')).not.toHaveAttribute('data-frame')
   })
 
-  it('gives the add picker a sheet on compact and the card on wide', () => {
+  // `fit="content"`: the picker is short, so the phone answers it from the
+  // bottom edge instead of giving it a page.
+  it('gives the add picker a bottom sheet on compact and the card on wide', () => {
     const { unmount } = renderWithStore(<Main />, { store: seed() })
     act(() => openAddPicker())
-    expect(screen.getByTestId('add-secret-modal')).toHaveAttribute('data-frame', 'sheet')
+    expect(screen.getByTestId('add-secret-modal')).toHaveAttribute('data-frame', 'bottom-sheet')
     unmount()
 
     setLayout('wide')
     renderWithStore(<Main />, { store: seed() })
     act(() => openAddPicker())
     expect(screen.getByTestId('add-secret-modal')).not.toHaveAttribute('data-frame')
+  })
+
+  it('keeps the page sheet for the generator a password row opens', () => {
+    renderWithStore(<Main />, { store: seed() })
+    // What the login form's generate action does: a full dialog with a callback
+    // to fill, which needs the whole screen rather than a card off the edge.
+    act(() => openGenerator(() => {}))
+    expect(screen.getByTestId('generator-dialog')).toHaveAttribute('data-frame', 'sheet')
   })
 
   it('gives the generator a sheet on compact and the card on wide', () => {

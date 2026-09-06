@@ -66,11 +66,16 @@ export default function AddSecret() {
   // The picker carries its own heading, so the frame is handed no title. The
   // gutters come off the frame's own width rather than the shell's: 28px is a
   // tenth of the card and a fifteenth of a phone.
+  //
+  // `fit="content"`: a heading, a 2-column grid and one link are short enough to
+  // answer from the bottom edge, so the phone frames this as a bottom sheet
+  // rather than a page.
   return (
     <Frame
       onClose={closeAddPicker}
       labelledBy={TITLE_ID}
       testid="add-secret-modal"
+      fit="content"
       className="flex max-h-[80vh] w-dialog"
     >
       <div className="@container w-full">

@@ -1,6 +1,7 @@
 import { useStore } from '@/store'
 import { useVisualViewport, viewportStyle } from '@/hooks/useVisualViewport'
 import Detail from './Detail'
+import Form from './Form'
 import Settings from './Settings'
 import Vault from './Vault'
 import TabBar from './TabBar'
@@ -32,7 +33,7 @@ export default function Compact() {
       // `relative` is what the floating tab bar and its fade are pinned to.
       className="relative flex h-full min-h-0 flex-col"
     >
-      {pushed ? <Detail /> : settings ? <Settings /> : <Vault />}
+      {writing ? <Form /> : entry ? <Detail /> : settings ? <Settings /> : <Vault />}
       {/* The standalone generator is still the sheet `Main` mounts (slice 5
           makes it a root), so it is not a screen here — only a lit tab. */}
       {!pushed && <TabBar />}
