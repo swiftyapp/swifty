@@ -65,7 +65,10 @@ export default function Footer({
   return (
     <footer
       data-testid="entry-footer"
-      className="mt-5 flex items-start gap-10 border-t border-line pt-4"
+      // Narrow: a strip with two ends needs two ends to have. Below 420px of
+      // container the cells stack instead, tags first, and the stamps give up
+      // the right edge they were holding against the header's actions.
+      className="mt-5 flex items-start gap-10 border-t border-line pt-4 @max-[420px]:flex-col @max-[420px]:gap-4"
     >
       {filed && (
         <Cell label="Tags" className="min-w-0 flex-1">
@@ -100,9 +103,9 @@ export default function Footer({
         </Cell>
       )}
       {stamps.length > 0 && (
-        <div className="ml-auto flex flex-none gap-10">
+        <div className="ml-auto flex flex-none gap-10 @max-[420px]:ml-0 @max-[420px]:gap-6">
           {stamps.map(([label, iso, spell]) => (
-            <Cell key={label} label={label} className="text-right">
+            <Cell key={label} label={label} className="text-right @max-[420px]:text-left">
               <span title={dateTime(iso)}>{spell(iso)}</span>
             </Cell>
           ))}

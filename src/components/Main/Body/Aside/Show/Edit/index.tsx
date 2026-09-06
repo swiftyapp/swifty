@@ -31,7 +31,9 @@ export default function Edit({ type, revealed }: Props) {
   const tags = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : []
 
   return (
-    <div className="mx-auto w-full max-w-sheet">
+    // A container, like the read view's root: the editor renders the same rows
+    // through the same geometry, so it folds where they fold.
+    <div className="@container mx-auto w-full max-w-sheet">
       {/* Negative margin cancels the frame's padding, so the content sits
           exactly where the read view puts it. */}
       <div
