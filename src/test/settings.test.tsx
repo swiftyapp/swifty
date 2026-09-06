@@ -85,6 +85,44 @@ describe('Settings › sync', () => {
     expect(syncConnect).toHaveBeenCalledOnce()
   })
 
+  // The mobile shape of the same flow: `sync_connect` resolves as soon as
+  // Safari has the screen, so the row waits on the backend's events — the
+  // click itself claims nothing.
+  it('waits for Google after a connect that resolved early', async () => {
+    const { store } = await open()
+    await userEvent.click(screen.getByTestId('settings-drive-connect'))
+    expect(store.getState().sync.pending).toBe(false)
+
+    store.getState().syncPending()
+    expect(await screen.findByText('Waiting for Google…')).toBeInTheDocument()
+
+    store.getState().syncConnected()
+    expect(await screen.findByText('Connected')).toBeInTheDocument()
+  })
+
+  it('reports a consent that failed, and stays disconnected', async () => {
+    const { store } = await open()
+    await userEvent.click(screen.getByTestId('settings-drive-connect'))
+    store.getState().syncPending()
+    store.getState().syncFailed('access_denied')
+
+    expect(await screen.findByTestId('settings-sync-error')).toHaveTextContent(
+      'access_denied'
+    )
+    expect(store.getState().sync.enabled).toBe(false)
+  })
+
+  it('surfaces a connect that could not even start', async () => {
+    vi.mocked(syncConnect).mockRejectedValueOnce('no OAuth client configured')
+    const { store } = await open()
+    await userEvent.click(screen.getByTestId('settings-drive-connect'))
+
+    await waitFor(() => expect(store.getState().sync.pending).toBe(false))
+    expect(screen.getByTestId('settings-sync-error')).toHaveTextContent(
+      'no OAuth client configured'
+    )
+  })
+
   it('offers the encrypted backup behind its own control', async () => {
     await open()
     expect(document.querySelector('input[name="export_password"]')).toBeNull()

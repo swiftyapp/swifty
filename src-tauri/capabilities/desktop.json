@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "desktop",
-  "description": "Window chrome, the save dialog and the updater — desktop only",
+  "description": "Window chrome and the updater — desktop only",
   "platforms": ["linux", "macOS", "windows"],
   "windows": ["main"],
   "permissions": [
@@ -11,7 +11,6 @@
     "core:window:allow-unmaximize",
     "core:window:allow-close",
     "core:window:allow-set-size",
-    "dialog:allow-save",
     "updater:default",
     "process:default"
   ]

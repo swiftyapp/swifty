@@ -10,8 +10,10 @@ import type { Audit, EntryMeta } from './commands'
 export const EVENTS = {
   syncStarted: 'sync:started',
   syncStopped: 'sync:stopped',
+  syncPending: 'sync:pending',
   syncConnected: 'sync:connected',
   syncDisconnected: 'sync:disconnected',
+  syncError: 'sync:error',
   pullStarted: 'vault:pull:started',
   pullStopped: 'vault:pull:stopped',
   vaultMerged: 'vault:merged',
@@ -24,6 +26,18 @@ export const EVENTS = {
 export interface SyncStoppedPayload {
   success: boolean
   error?: string
+}
+
+/**
+ * A consent flow is out with the browser (`sync:pending`), then finished by
+ * exactly one of `sync:connected` or `sync:error`. The backend owns all three:
+ * it is what opens the browser and what hears back from it, so the frontend
+ * mirrors these rather than guessing from a click. On mobile the command
+ * resolves the moment Safari is on screen; on desktop it blocks — either way
+ * the promise is not what carries the outcome.
+ */
+export interface SyncErrorPayload {
+  error: string
 }
 
 export interface PullStoppedPayload {
@@ -58,8 +72,10 @@ export interface ImportDonePayload {
 export interface EventPayloads {
   'sync:started': void
   'sync:stopped': SyncStoppedPayload
+  'sync:pending': void
   'sync:connected': void
   'sync:disconnected': void
+  'sync:error': SyncErrorPayload
   'vault:pull:started': void
   'vault:pull:stopped': PullStoppedPayload
   'vault:merged': VaultMergedPayload

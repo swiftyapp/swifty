@@ -7,6 +7,8 @@
 //! from the command thread and froze the window for the length of a round trip.
 
 use std::sync::atomic::Ordering;
+#[cfg(mobile)]
+use std::time::Duration;
 
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -23,12 +25,28 @@ use crate::sync;
 ///
 /// `async` because the consent flow blocks on a browser round trip and a
 /// loopback listener; a synchronous command would run that on the main thread.
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     authorize(&app, &state).await?;
-    let _ = app.emit("sync:connected", ());
+    connected(&app);
     start_run(&app);
     Ok(())
+}
+
+/// Start the consent flow and return — see [`on_redirect`] for the other half.
+///
+/// Nothing here waits: Safari takes the screen and iOS suspends the app behind
+/// it, so there is no result to wait for. The frontend is told by `sync:connected`
+/// or `sync:error` rather than by this promise.
+///
+/// Synchronous on purpose, unlike its desktop twin. It does no blocking work,
+/// and running on the IPC (main) thread is what puts the opener plugin's
+/// `UIApplication.open` where UIKit requires it.
+#[cfg(mobile)]
+#[tauri::command]
+pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    start_consent(&app, &state, false)
 }
 
 // Disconnect the sync provider (keeps the refresh token, per legacy).
@@ -69,24 +87,194 @@ pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 /// install that has none, and that is [`sync::restore`]'s job, not this one.
 /// The caller is an unlocked (usually empty) vault, so a merge gives the same
 /// result the user expects — every remote entry appears — without the risk.
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     authorize(&app, &state).await?;
-    let _ = app.emit("sync:connected", ());
+    connected(&app);
+    let cryptor = state.session.lock().unwrap().cryptor()?;
+    pull(&app, cryptor).await
+}
 
+/// The mobile twin of [`sync_import`]: start consent, adopt on the redirect.
+#[cfg(mobile)]
+#[tauri::command]
+pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    start_consent(&app, &state, true)
+}
+
+/// Take on whatever the account holds, reporting through `vault:pull:*`.
+async fn pull(app: &AppHandle, cryptor: Cryptor) -> Result<()> {
     let _ = app.emit("vault:pull:started", ());
     let handle = app.clone();
-    let cryptor = state.session.lock().unwrap().cryptor()?;
     let result = tauri::async_runtime::spawn_blocking(move || sync::run(&handle, cryptor))
         .await
         .map_err(|e| Error::Other(e.to_string()))?;
 
     let payload = match &result {
-        Ok(_) => json!({ "success": true, "data": { "entries": entry_metas(&app) } }),
+        Ok(_) => json!({ "success": true, "data": { "entries": entry_metas(app) } }),
         Err(e) => json!({ "success": false, "error": e.to_string() }),
     };
     let _ = app.emit("vault:pull:stopped", payload);
     result.map(|_| ())
+}
+
+// --- the mobile consent flow ---
+//
+// A consent flow is a value with a lifecycle, not a flag. It is created by
+// `start_consent`, identified by its `state` nonce, and ends in exactly one of
+// four ways — the redirect it was waiting for (`on_redirect`), Google's refusal
+// (also `on_redirect`), the user coming back without one (`on_resume`), or old
+// age (`CONSENT_TTL`). Each end is announced to the frontend, so `sync:pending`
+// is always followed by `sync:connected` or `sync:error`.
+
+/// How long a consent request stays redeemable. Google's own codes die well
+/// inside this; it exists so a flow the OS never told us about (the app was
+/// killed in the background, say) cannot be finished by a redirect from a
+/// previous life.
+#[cfg(mobile)]
+const CONSENT_TTL: Duration = Duration::from_secs(10 * 60);
+
+/// How long after the app comes back to the foreground a redirect may still
+/// arrive for a pending flow before it is written off as abandoned. iOS delivers
+/// the URL around the same activation, not seconds later, so this is generous.
+#[cfg(mobile)]
+const RESUME_GRACE: Duration = Duration::from_secs(3);
+
+/// Open the consent page and remember what the redirect will need.
+///
+/// The record is stored *after* the page is opened, which cannot race: iOS
+/// delivers the redirect on a later turn of the same (main) run loop, so this
+/// call has long returned by then. A flow already pending is simply replaced —
+/// its nonce dies with it, so its redirect, if one ever comes, is foreign.
+#[cfg(mobile)]
+fn start_consent(app: &AppHandle, state: &AppState, import: bool) -> Result<()> {
+    let cryptor = state.session.lock().unwrap().cryptor()?;
+    let started = sync::begin(app)?;
+    *state.pending_auth.lock().unwrap() = Some(crate::state::PendingAuth {
+        verifier: started.verifier,
+        state: started.state,
+        cryptor,
+        import,
+        started: std::time::Instant::now(),
+    });
+    let _ = app.emit("sync:pending", ());
+    Ok(())
+}
+
+/// iOS reopened the app with a URL. If it is Google's answer to the consent
+/// flow we have pending, finish it; anything else is not ours and leaves the
+/// pending flow exactly as it was.
+///
+/// Registered in `lib.rs`'s `setup`. Returns immediately — the token exchange
+/// is a network round trip and must not run on the URL-open callback.
+#[cfg(mobile)]
+pub fn on_redirect(app: &AppHandle, url: &url::Url) {
+    if !sync::redirect_matches(app, url) {
+        return;
+    }
+    let state = app.state::<AppState>();
+    let mut slot = state.pending_auth.lock().unwrap();
+    let Some(pending) = slot.as_ref() else {
+        return;
+    };
+    // Judge the URL against the pending request *before* consuming it, so a URL
+    // that is not the answer costs the real answer nothing.
+    let code = match sync::parse_redirect(url, &pending.state) {
+        sync::Redirect::Foreign => {
+            log::warn!("ignoring a redirect that does not answer the pending sign-in");
+            return;
+        }
+        sync::Redirect::Denied(why) => {
+            slot.take();
+            drop(slot);
+            fail(app, why);
+            return;
+        }
+        sync::Redirect::Code(code) => code,
+    };
+    let pending = slot.take().expect("checked above");
+    drop(slot);
+    if pending.started.elapsed() > CONSENT_TTL {
+        fail(app, "Google sign-in took too long; try again".into());
+        return;
+    }
+
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        match sync::complete(&app, &pending.cryptor, &code, &pending.verifier).await {
+            Ok(()) => {
+                connected(&app);
+                if pending.import {
+                    let _ = pull(&app, pending.cryptor).await;
+                } else {
+                    start_run(&app);
+                }
+            }
+            Err(e) => fail(&app, e.to_string()),
+        }
+    });
+}
+
+/// The window is back in front. If a consent flow is still pending once the
+/// redirect has had its chance to arrive, the user came back without finishing
+/// it — close the flow out, so the frontend is not left waiting on an answer
+/// that is never coming.
+///
+/// Called from the window event hook (`window.rs`) on iOS scene activation.
+#[cfg(mobile)]
+pub fn on_resume(app: &AppHandle) {
+    // Only ever abandon the flow that was pending *at resume*: if the user
+    // starts a fresh one inside the grace period, its nonce differs and it is
+    // left alone.
+    let Some(nonce) = app
+        .state::<AppState>()
+        .pending_auth
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map(|p| p.state.clone())
+    else {
+        return;
+    };
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        std::thread::sleep(RESUME_GRACE);
+        let abandoned = {
+            let state = app.state::<AppState>();
+            let mut slot = state.pending_auth.lock().unwrap();
+            match slot.as_ref() {
+                Some(p) if p.state == nonce => slot.take(),
+                _ => None,
+            }
+        };
+        if abandoned.is_some() {
+            fail(&app, "Google sign-in was cancelled".into());
+        }
+    });
+}
+
+/// The consent flow ended without a connection. One place, so every ending
+/// reports the same way.
+#[cfg(mobile)]
+fn fail(app: &AppHandle, why: String) {
+    log::warn!("sync connect failed: {why}");
+    let _ = app.emit("sync:error", json!({ "error": why }));
+}
+
+/// Mark the session connected and say so. The flag is session-only — what
+/// actually makes a vault "configured" is the token file `write_tokens` just
+/// wrote, which is what a later unlock reads.
+fn connected(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mut session = state.session.lock().unwrap();
+    // A vault that locked behind the browser has no session to flag; the tokens
+    // are on disk, so the next unlock picks the connection up anyway.
+    if session.is_unlocked() {
+        session.sync_configured = true;
+    }
+    drop(session);
+    let _ = app.emit("sync:connected", ());
 }
 
 #[tauri::command]
@@ -100,18 +288,30 @@ pub fn sync_status(app: AppHandle, state: State<'_, AppState>) -> Result<SyncSta
     } else {
         crate::storage::sync_configured(&app)
     };
-    Ok(SyncStatus { configured })
+    drop(session);
+    #[cfg(mobile)]
+    let pending = state.pending_auth.lock().unwrap().is_some();
+    // Desktop's consent flow blocks its command, so there is never a moment to
+    // ask this in.
+    #[cfg(desktop)]
+    let pending = false;
+    Ok(SyncStatus {
+        configured,
+        pending,
+    })
 }
 
-// Run the OAuth consent flow off the main thread and mark the session connected.
+// Run the OAuth consent flow off the main thread.
+#[cfg(desktop)]
 async fn authorize(app: &AppHandle, state: &State<'_, AppState>) -> Result<()> {
     let cryptor = state.session.lock().unwrap().cryptor()?;
+    // The same three-event shape as mobile, so the frontend has one story: the
+    // backend says when the browser is out and when it has heard back.
+    let _ = app.emit("sync:pending", ());
     let handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || sync::setup(&handle, &cryptor))
         .await
-        .map_err(|e| Error::Other(e.to_string()))??;
-    state.session.lock().unwrap().sync_configured = true;
-    Ok(())
+        .map_err(|e| Error::Other(e.to_string()))?
 }
 
 /// Start a run unless one is already in flight, in which case this is a no-op:

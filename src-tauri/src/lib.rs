@@ -31,6 +31,11 @@ use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Before anything else: on mobile Tauri builds a reqwest client while
+    // launching, and with `rustls-no-provider` that aborts the process unless
+    // a provider is already installed (see `sync::install_crypto_provider`).
+    sync::install_crypto_provider();
+
     // Only the desktop-gated blocks below reassign it.
     #[cfg_attr(mobile, allow(unused_mut))]
     let mut builder = tauri::Builder::default();
@@ -44,6 +49,14 @@ pub fn run() {
             }))
             .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_process::init());
+    }
+
+    // Mobile-only plugins.
+    #[cfg(mobile)]
+    {
+        // The OAuth redirect for the public mobile client arrives on the app's
+        // own URL scheme (see `tauri.ios.conf.json`), not on a loopback port.
+        builder = builder.plugin(tauri_plugin_deep_link::init());
     }
 
     // In-app W3C WebDriver server (port 4445) for the E2E smoke suite. Never
@@ -80,6 +93,18 @@ pub fn run() {
             window::create(app.handle())?;
             #[cfg(desktop)]
             tray::create(app.handle())?;
+            // The second half of the mobile OAuth flow: iOS reopens the app
+            // with Google's redirect once the user has approved.
+            #[cfg(mobile)]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    for url in event.urls() {
+                        commands::sync::on_redirect(&handle, &url);
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

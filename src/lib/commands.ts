@@ -218,6 +218,8 @@ export type Audit = Record<string, AuditItem>
 
 export interface SyncStatus {
   configured: boolean
+  // A consent flow is out with the browser (see `sync:pending` in events.ts).
+  pending: boolean
 }
 
 // ---------------------------------------------------------------------------
