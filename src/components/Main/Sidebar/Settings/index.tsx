@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useStore, openSettings, closeSettings } from '@/store'
 import RailButton from '@/components/elements/RailButton'
-import SettingsModal from './SettingsModal'
+import Overlay from './Overlay'
 import { GearRailGlyph } from '../../icons'
 
 export default function Settings() {
@@ -19,7 +19,7 @@ export default function Settings() {
       >
         <GearRailGlyph />
       </RailButton>
-      {modal && <SettingsModal />}
+      <Overlay />
     </div>
   )
 }

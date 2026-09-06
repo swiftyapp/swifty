@@ -51,7 +51,9 @@ export function VaultEmpty() {
       secondary={
         syncEnabled
           ? { label: t('Restore from Google Drive'), onClick: restore, loading: importing }
-          : { label: t('Import from another app'), onClick: openSettings }
+          : // Wrapped, and named: handed straight to onClick it took the click
+            // event as its section argument and Settings opened on none at all.
+            { label: t('Import from another app'), onClick: () => openSettings('import') }
       }
       hints={[
         { keys: '⌘N', label: t('add') },

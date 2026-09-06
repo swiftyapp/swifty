@@ -17,6 +17,7 @@ import {
   AtSign,
   Check,
   ChevronDown,
+  ChevronLeft,
   Cloud,
   Copy,
   CreditCard,
@@ -129,3 +130,4 @@ export const StarRailGlyph = glyph(Star, 20)
 export const TagsRailGlyph = glyph(Tags, 20)
 export const ArchiveRailGlyph = glyph(Archive, 20)
 export const DicesRailGlyph = glyph(Dices, 20)
+export const BackGlyph = glyph(ChevronLeft, 20)

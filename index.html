@@ -2,7 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      `viewport-fit=cover` lets the shell paint under the notch and the home
+      indicator; the safe-area insets it unlocks are what the compact chrome
+      pads itself with. No maximum-scale / user-scalable: pinch zoom stays.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <title>Swifty</title>
     <!--
       Pre-paint ground, so the very first frame the webview draws is already

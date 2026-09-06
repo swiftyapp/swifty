@@ -1,10 +1,8 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { cx } from '@/utils/cx'
+import { useDialogFocus } from '@/hooks/useDialogFocus'
 import { CloseGlyph } from '../Main/icons'
 import IconButton from './IconButton'
-
-const TABBABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 interface Props {
   onClose: () => void
@@ -28,45 +26,7 @@ export default function Modal({
   children
 }: Props) {
   const card = useRef<HTMLDivElement>(null)
-
-  const tabbables = () =>
-    Array.from(card.current?.querySelectorAll<HTMLElement>(TABBABLE) ?? [])
-
-  // A modal owns the keyboard while it is up, so focus starts inside it and
-  // goes back to whatever opened it on close — otherwise the tab order resumes
-  // at the top of the document.
-  useEffect(() => {
-    const trigger = document.activeElement as HTMLElement | null
-    const first = tabbables()[0]
-    if (first) first.focus()
-    else card.current?.focus()
-    return () => trigger?.focus()
-  }, [])
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      // Only the topmost dialog owns the keyboard: a stacked one (the generator
-      // over Settings) would otherwise be closed from underneath by Escape, or
-      // have its focus pulled back down by the trap below.
-      const dialogs = document.querySelectorAll('[role="dialog"]')
-      if (dialogs[dialogs.length - 1] !== card.current) return
-      // Escape closes every modal — the scrim and the X are pointer-only exits.
-      if (e.key === 'Escape') return onClose()
-      // Arrow keys are left alone: the add-secret picker steers its grid with
-      // them.
-      if (e.key !== 'Tab') return
-      const all = tabbables()
-      if (all.length === 0) return
-      const edge = e.shiftKey ? all[0] : all[all.length - 1]
-      const inside = card.current?.contains(document.activeElement)
-      if (!inside || document.activeElement === edge) {
-        e.preventDefault()
-        ;(e.shiftKey ? all[all.length - 1] : all[0]).focus()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  useDialogFocus(card, onClose)
 
   return (
     <div

@@ -42,13 +42,17 @@ export default function Fields() {
 
   return (
     <div
-      className={aside ? 'grid grid-cols-[460px_minmax(0,1fr)] items-start gap-3' : undefined}
+      // Compact has no room for the art and the rest of the fields side by
+      // side, so below 768px the pair stacks instead.
+      className={
+        aside ? 'grid grid-cols-1 items-start gap-3 md:grid-cols-[460px_minmax(0,1fr)]' : undefined
+      }
     >
       {/* Card art: an always-dark plastic-card visual, deliberately off-system.
           Its gradient, hex inks, 16/4px radii, unleaded type sizes and the
           number's wide letter-spacing imitate a real card, so they are exempt
           from the type/radius/tracking scales. */}
-      <div className="relative flex h-[288px] w-[460px] flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 font-mono text-[#EDEEF0] shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+      <div className="relative flex h-[288px] w-[460px] max-w-full flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 font-mono text-[#EDEEF0] shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
         <div className="absolute -right-10 -top-16 h-[240px] w-[240px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.07),transparent_70%)]" />
 
         <div className="relative flex items-start justify-between gap-4">
@@ -92,7 +96,9 @@ export default function Fields() {
           placeholder={CARD_MASK}
           required
           maxLength={23}
-          ink="text-[24px] tracking-[0.14em]"
+          // A shrunk card cannot hold 19 glyphs at 24px; below 768px it steps
+          // down a tier so the number still fits its plastic.
+          ink="text-[19px] tracking-[0.14em] md:text-[24px]"
           className="-mx-1.5 self-stretch"
         />
 

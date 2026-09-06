@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { copy } from '@/services/copy'
+import { useLayout } from '@/hooks/useLayout'
 import Button from '@/components/elements/Button'
 import IconButton from '@/components/elements/IconButton'
+import Sheet from '@/components/elements/Sheet'
 import { startEntry } from '@/store'
 import type { GeneratorApply, SshApply } from '@/store/generatorSlice'
 import { RefreshGlyph } from '../icons'
@@ -30,6 +32,7 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
   const [mode, setMode] = useState<DialogMode>(ssh ? 'ssh' : settings.mode)
   const key = useSshKey(mode === 'ssh')
   const cardRef = useRef<HTMLDivElement>(null)
+  const compact = useLayout() === 'compact'
   const keys = mode === 'ssh'
 
   // A keypair fills a whole draft, so standalone it opens a new entry rather
@@ -72,6 +75,81 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [confirm, onClose])
 
+  const content = (
+    <>
+      <div className="flex items-center gap-2.5 px-[18px] py-[15px] inset-shadow-hairline">
+        <div id="generator-title" className="flex-1 text-lg font-semibold tracking-display">
+          {t('Generate')}
+        </div>
+        {/* Opened for a key, there is nothing to switch to. */}
+        {!ssh && (
+          <Tabs
+            mode={mode}
+            ssh={!apply}
+            onChange={next => {
+              setMode(next)
+              if (next !== 'ssh') update({ mode: next })
+            }}
+          />
+        )}
+      </div>
+      <div className="p-[18px]">
+        {keys ? (
+          <Ssh
+            pair={key.pair}
+            pending={key.pending}
+            error={key.error}
+            onRetry={key.regenerate}
+            comment={key.comment}
+            onComment={key.setComment}
+          />
+        ) : (
+          <>
+            <Output value={value} bits={bits} level={level} />
+            <Amount settings={settings} onChange={update} />
+            <Toggles settings={settings} onChange={update} />
+          </>
+        )}
+        <div className="mt-[18px] flex items-center gap-1.5">
+          <IconButton
+            title={t('Regenerate')}
+            testid="generator-regenerate"
+            onClick={keys ? key.regenerate : regenerate}
+            className="h-9 w-9 border border-line2 hover:border-accent-line"
+          >
+            <RefreshGlyph />
+          </IconButton>
+          <div className="flex-1" />
+          <Button variant="ghost" onClick={onClose}>
+            {t('Cancel')}
+          </Button>
+          <Button
+            testid="generator-use-button"
+            kbd="⏎"
+            onClick={confirm}
+            disabled={keys && !key.ready}
+          >
+            {keys ? (ssh ? t('Use') : t('Save as SSH key')) : t('Use & copy')}
+          </Button>
+        </div>
+      </div>
+    </>
+  )
+
+  // The card carries its own title row, so the compact frame stays bare. It
+  // takes `cardRef` too, so the topmost-dialog check above still finds itself.
+  if (compact)
+    return (
+      <Sheet
+        ref={cardRef}
+        onClose={onClose}
+        labelledBy="generator-title"
+        testid="generator-dialog"
+      >
+        {content}
+      </Sheet>
+    )
+
   return (
     <div
       className="fixed inset-0 z-50 grid animate-fade place-items-center bg-scrim p-4 backdrop-blur-sm"
@@ -90,62 +168,7 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
         className="w-dialog-sm animate-pop overflow-hidden rounded-xl border border-line2 bg-detail text-text shadow-float"
         onClick={event => event.stopPropagation()}
       >
-        <div className="flex items-center gap-2.5 px-[18px] py-[15px] inset-shadow-hairline">
-          <div id="generator-title" className="flex-1 text-lg font-semibold tracking-display">
-            {t('Generate')}
-          </div>
-          {/* Opened for a key, there is nothing to switch to. */}
-          {!ssh && (
-            <Tabs
-              mode={mode}
-              ssh={!apply}
-              onChange={next => {
-                setMode(next)
-                if (next !== 'ssh') update({ mode: next })
-              }}
-            />
-          )}
-        </div>
-        <div className="p-[18px]">
-          {keys ? (
-            <Ssh
-              pair={key.pair}
-              pending={key.pending}
-              error={key.error}
-              onRetry={key.regenerate}
-              comment={key.comment}
-              onComment={key.setComment}
-            />
-          ) : (
-            <>
-              <Output value={value} bits={bits} level={level} />
-              <Amount settings={settings} onChange={update} />
-              <Toggles settings={settings} onChange={update} />
-            </>
-          )}
-          <div className="mt-[18px] flex items-center gap-1.5">
-            <IconButton
-              title={t('Regenerate')}
-              testid="generator-regenerate"
-              onClick={keys ? key.regenerate : regenerate}
-              className="h-9 w-9 border border-line2 hover:border-accent-line"
-            >
-              <RefreshGlyph />
-            </IconButton>
-            <div className="flex-1" />
-            <Button variant="ghost" onClick={onClose}>
-              {t('Cancel')}
-            </Button>
-            <Button
-              testid="generator-use-button"
-              kbd="⏎"
-              onClick={confirm}
-              disabled={keys && !key.ready}
-            >
-              {keys ? (ssh ? t('Use') : t('Save as SSH key')) : t('Use & copy')}
-            </Button>
-          </div>
-        </div>
+        {content}
       </div>
     </div>
   )

@@ -1,8 +1,14 @@
 import '@testing-library/jest-dom/vitest'
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
+import { setLayout } from './layout'
 
 // jsdom implements no layout, so it ships no scrollIntoView.
 Element.prototype.scrollIntoView = vi.fn()
+
+// Every suite starts on the wide shell — the one the desktop window and all the
+// pre-existing tests assume. A compact test calls `setLayout('compact')` itself.
+setLayout('wide')
+beforeEach(() => setLayout('wide'))
 
 // The Rust backend is built in parallel; mock the whole command/event layer so
 // screens render without a live backend. Individual tests override as needed.
