@@ -5,11 +5,15 @@
     <!--
       `viewport-fit=cover` lets the shell paint under the notch and the home
       indicator; the safe-area insets it unlocks are what the compact chrome
-      pads itself with. No maximum-scale / user-scalable: pinch zoom stays.
+      pads itself with. `maximum-scale=1` pins the scale: iOS otherwise zooms
+      the page when a field whose text is under 16px is tapped (the 15px
+      passphrase and search fields) and never zooms back, leaving the shell
+      wider than the screen and shorter than it. The app is not a document, so
+      it has nothing to pinch into either.
     -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>Swifty</title>
     <!--
