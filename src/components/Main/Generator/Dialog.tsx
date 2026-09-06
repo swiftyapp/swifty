@@ -21,7 +21,7 @@ interface Props {
 export default function Dialog({ apply, ssh, onClose }: Props) {
   const { t } = useTranslation()
   const generator = useGeneratorDialog(apply, ssh, onClose)
-  const { mode, setMode, keys, key, regenerate, confirm, confirmLabel } = generator
+  const { mode, setMode, ready, regenerate, confirm, confirmLabel } = generator
   const cardRef = useRef<HTMLDivElement>(null)
   useDialogKeys(cardRef, confirm, onClose)
 
@@ -64,7 +64,7 @@ export default function Dialog({ apply, ssh, onClose }: Props) {
             testid="generator-use-button"
             kbd="⏎"
             onClick={confirm}
-            disabled={keys && !key.ready}
+            disabled={!ready}
           >
             {t(confirmLabel)}
           </Button>

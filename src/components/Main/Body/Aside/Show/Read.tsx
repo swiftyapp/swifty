@@ -1,12 +1,8 @@
-import { editEntry } from '@/store'
 import type { Entry, EntryMeta } from '@/lib/commands'
-import { FieldsProvider } from '@/components/elements/fields'
-import { kindOf } from '@/kinds'
 import Actions from './Actions'
-import DeleteError from './DeleteError'
+import Body from './Body'
 import Eyebrow from './Eyebrow'
 import Favorite from './Favorite'
-import Footer from './Footer'
 import Identity from './Identity'
 import { useDelete } from './useDelete'
 
@@ -17,7 +13,6 @@ interface Props {
 }
 
 export default function Read({ entry, revealed }: Props) {
-  const Fields = kindOf(entry.type).Fields
   const { error, remove } = useDelete(entry.id)
 
   return (
@@ -46,25 +41,7 @@ export default function Read({ entry, revealed }: Props) {
         className="mt-2 flex items-center gap-2.5"
       />
 
-      {revealed && (
-        <div className="mt-5">
-          {/* No writer: every field in the set renders its read face. */}
-          <FieldsProvider value={{ entry: { ...revealed }, set: null, attempted: false }}>
-            <Fields />
-          </FieldsProvider>
-        </div>
-      )}
-
-      {/* Tags are metadata, so the footer needs no reveal to render. */}
-      <Footer
-        tags={entry.tags}
-        onAdd={entry.deletedAt ? undefined : () => editEntry()}
-        createdAt={entry.createdAt}
-        updatedAt={entry.updatedAt}
-        deletedAt={entry.deletedAt}
-      />
-
-      <DeleteError error={error} />
+      <Body entry={entry} revealed={revealed} error={error} />
     </div>
   )
 }

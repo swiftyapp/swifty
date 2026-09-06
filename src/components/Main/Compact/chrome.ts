@@ -1,4 +1,11 @@
 /**
+ * iOS's minimum touch target, for the controls the desktop draws at 28-36px.
+ * Passed to them as classes rather than asked for by a flag: it is the same
+ * control, dressed for a finger.
+ */
+export const TOUCH = 'h-11 w-11'
+
+/**
  * The floating tab bar's geometry, in the one place both it and the screens it
  * hovers over can read it: a 64px pill, 12px off the safe-area bottom, inset
  * 20px a side.

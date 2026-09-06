@@ -65,20 +65,28 @@ already has:
 | State | Screen |
 |---|---|
 | `entries.new !== null` or `entries.edit` | Form (slide-up) |
-| `entries.current !== null` | Detail (pushed from the right) |
 | `ui.settings` | Settings tab root (a section pushes its pane) |
 | `generator.open` with no `apply`/`ssh` callback | Generator tab root |
+| `entries.current !== null` | Detail (pushed from the right) |
 | otherwise | List root for `ui.view` |
+
+The order is what makes an *open* land. Both roots can be opened while a row is
+selected (⌘G, ⌘, , the Settings row of a menu), so they come before the
+selection — behind it, `generator.open` would go true and nothing visible would
+happen. A draft still outranks all of it: it is the one screen with unsaved
+work on it. Tabs need no rule, because `setView` clears the selection anyway.
 
 The one exception is which settings pane is open: that is `useState` inside
 `Compact/Settings`, because `ui.settingsSection` is the *wide* modal's nav
 selection and persists, so a phone reading it would open Settings already
 inside a pane. It is one level deep and resets with the screen.
 
-Every row is its own screen: the detail as of slice 3 (`Compact/Detail/Read` —
-nav row, kind header, bottom primary action), the form as of slice 4
-(`Compact/Form` — Cancel/Save in the nav row over one `@container` scroller),
-and as of slice 5 the two remaining roots. The generator splits by *how it was
+Every row is its own screen — one screen, `Compact/Entry`, with two faces:
+`Detail/Read` (nav row, kind header, bottom primary action) and `Form/Editor`
+(Cancel/Save in the nav row over one `@container` scroller). One component for
+both, the way the desktop's `Aside/Show` is one pane for both, because the
+decrypt has to be shared. As of slice 5 there are also the two remaining roots.
+The generator splits by *how it was
 opened*, not by shell: standalone it is `Compact/Generator` (large title, mode
 switch, `Generator/Panel`, a bottom Use & copy), and opened from a password row
 it is `Generator/Attached` — the same `Dialog` the wide shell mounts, framed as
@@ -86,12 +94,35 @@ a page sheet. Both take `useGeneratorDialog`, so the two shells generate the
 same way. Settings is a root list of rows over the desktop's own `Section`
 panes, and carries the lock control the vanished top bar used to.
 
-Both screens compose parts the desktop's `Aside/Show` also composes —
-`Identity`, `Eyebrow`, `Edit/Title`, `Edit/Body`, `Footer`, `MoreMenu`, and the
-`useDraft` / `usePrimaryAction` / `useShown` / `useDelete` hooks. Neither shell
-passes the other a layout flag; each only decides where the parts go. The form
-holds its frame behind `useShown().held` exactly as `Show` does: an editor
-seeded from a reveal that has not landed would discard whatever is typed first.
+The three pushed headers — the entry's, the form's, a settings pane's — are one
+`Compact/NavBar` (leading · title · trailing) with `Compact/BackButton` in the
+leading slot. Everything they measure themselves against lives in
+`Compact/chrome.ts`, including the 44px `TOUCH` tier the desktop's 28px
+controls are dressed in through their `className`.
+
+The list root is the only pane there is, so it also carries what the wide shell
+puts in its detail pane: the whole-view empty heroes, and on the audit view the
+score panel under the groups (`Body/Aside/Audit`, the same call `Body/Aside`
+makes). Both travel as `ListColumn`'s `footer`, which sits in the scroller but
+*outside* the `role="listbox"` — a hero's buttons are not options.
+
+Both faces compose parts the desktop's `Aside/Show` also composes —
+`Identity`, `Eyebrow`, `Show/Body`, `Edit/Title`, `Edit/Body`, `MoreMenu`, and
+the `useDraft` / `usePrimaryAction` / `useShown` / `useDelete` hooks. Neither
+shell passes the other a layout flag; each only decides where the parts go.
+`useShown` is called once, by the screen rather than by either face, so
+stepping into edit decrypts nothing again. It still holds the form's frame
+behind `held` exactly as `Show` does — an editor seeded from a reveal that has
+not landed would discard whatever is typed first — but that can now only happen
+for an edit asked for before the *first* reveal landed, and the held frame
+(`Form/Held`) carries a working Cancel so a reveal that never arrives is not a
+dead end.
+
+Overlays are not screens and do not live in the shell div. That div carries
+`viewportStyle`'s translate, which makes it the containing block of anything
+`fixed` inside it, so a sheet mounted there would take the keyboard offset
+twice. `Generator/Attached`, and every fixed overlay after it, is a sibling of
+the shell.
 
 Before any of that there is the lock, which is not a screen of the vault but a
 flow of its own: `App` renders `Auth/LockScreen` on compact and `Auth` on wide,
@@ -175,12 +206,6 @@ palettes. Prototype-only colours map to existing tokens (`--list` → `bg-list`,
 
 What the six slices deliberately left behind, smallest first:
 
-- **Archive's nav-row buttons are the desktop's 28px tier.** Restore and Delete
-  on a pushed archive detail still draw at control size; they want the 44px
-  touch tier the rest of the nav row has.
-- **`SyncIndicator` does not deep-link on compact.** On the desktop the chip
-  opens Settings → Sync; the compact settings root has no equivalent entry
-  point yet, so the state is visible but not actionable.
 - **Generator controls have no touch tier.** The length slider and the toggle
   rows are the desktop's sizes inside `Generator/Panel`, which both shells
   share; giving them a touch tier means sizing them through the panel rather
