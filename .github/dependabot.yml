@@ -19,6 +19,11 @@ updates:
       tauri-js:
         patterns:
           - '@tauri-apps/*'
+    ignore:
+      # plugin-react 6 requires vite ^8 (it imports `vite/internal`, which
+      # vite 7 does not export). Lift together with a vite 7 -> 8 bump.
+      - dependency-name: '@vitejs/plugin-react'
+        versions: ['>=6']
 
   # Rust backend — src-tauri/Cargo.toml + Cargo.lock.
   - package-ecosystem: cargo
