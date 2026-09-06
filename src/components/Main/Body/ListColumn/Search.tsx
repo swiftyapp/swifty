@@ -7,7 +7,9 @@ import { CloseGlyph, SearchGlyph } from '../../icons'
 // the column. Esc clears the query, then blurs — the accelerators that act on
 // the rows (↑/↓, ⏎, ⌘⏎) belong to the whole column, so they live one level up
 // in useListKeys and reach this field by bubbling.
-export default function Search() {
+// `className` is the box's own styling, not a layout flag: the field is 28px
+// where a mouse points at it and the compact root swaps in the 44px touch one.
+export default function Search({ className }: { className?: string }) {
   const { t } = useTranslation()
   const query = useStore(state => state.filters.query)
 
@@ -18,7 +20,12 @@ export default function Search() {
   }
 
   return (
-    <div className="mt-3 flex h-7 items-center gap-2.5 rounded-sm border border-line2 bg-field pl-[11px] pr-2 text-text3 transition-colors focus-within:border-accent-line">
+    <div
+      className={
+        className ??
+        'mt-3 flex h-7 items-center gap-2.5 rounded-sm border border-line2 bg-field pl-[11px] pr-2 text-text3 transition-colors focus-within:border-accent-line'
+      }
+    >
       <SearchGlyph className="flex-none" />
       <input
         type="search"

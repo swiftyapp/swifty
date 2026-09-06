@@ -13,7 +13,7 @@ desktop app, which stays the source of truth.
 | Slice | Scope | State |
 |---|---|---|
 | 1 | Foundations: `Frame` context, layout branches lifted out of leaves, glass token, rise keyframe, touch-visible copy buttons | ✅ |
-| 2 | Compact shell as screens: derived screen selection, floating tab bar, large-title list root, top bar removed | ❌ |
+| 2 | Compact shell as screens: derived screen selection, floating tab bar, large-title list root, top bar removed | ✅ |
 | 3 | Detail read screen: nav row, kind header, container-query row geometry, tap-to-copy rows, bottom primary action | ❌ |
 | 4 | Form screen: `Edit` split into `useDraft` + `EditBody`, slide-up form with Save/Cancel in the nav row, add picker as a bottom sheet | ❌ |
 | 5 | Generator and Settings as tab roots; Archive reachable from Settings | ❌ |
@@ -56,6 +56,11 @@ already has:
 | `ui.settings` | Settings tab root (a section pushes its pane) |
 | `generator.open` with no `apply`/`ssh` callback | Generator tab root |
 | otherwise | List root for `ui.view` |
+
+As of slice 2 the standalone generator is not yet a screen: it is still the
+sheet `Main` mounts, and the Generator tab only opens it and lights up while it
+is open. Slice 5 finishes it. The form and detail rows render one interim
+screen (the wide detail pane with a back control) until slices 3 and 4.
 
 Overlays that stay overlays on a phone: the add picker (bottom sheet) and the
 generator opened from a password row (sheet). Both go through `Frame`.

@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { cx } from '@/utils/cx'
 
-// One destination in the bottom bar. 56px tall before the safe-area inset, so
-// the tap target clears 44px even with the label under the glyph.
+// One destination in the tab bar: 56px tall inside the 64px pill, so the tap
+// target clears 44px even with the 10px label under the glyph. Selected is an
+// accent pill of its own — a lit ink alone is too quiet on a glass surface.
 export default function Tab({
   label,
   testid,
@@ -24,8 +25,8 @@ export default function Tab({
       data-testid={testid}
       onClick={onClick}
       className={cx(
-        'flex h-14 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 px-1 transition-colors',
-        selected ? 'text-accent' : 'text-text3'
+        'flex h-14 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-full px-1 transition-colors',
+        selected ? 'bg-accent-soft text-accent' : 'text-text3'
       )}
     >
       {children}
