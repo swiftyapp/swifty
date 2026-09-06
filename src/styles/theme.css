@@ -329,7 +329,8 @@
  *             xs 11px mono micro (labels/meta/counts/kbd)
  *             base 13px everything readable — hierarchy via weight + ink
  *             md 15px the passphrase field and its mask
- *             lg 16 / xl 20 / 2xl 24 display tiers · 3xl 34 the vault score
+ *             lg 16 / xl 20 / 2xl 24 display tiers · title 32 the phone shell's
+ *             large title · 3xl 34 the vault score
  *   Tracking  label .12em (mono uppercase) · display −.02em (16px and up)
  *             secret .08em (revealed secrets, card numbers, TOTP)
  *   Radius    xs 4 chips & inlays · sm 8 controls · lg 12 tiles & cards · xl 14 overlays
@@ -356,6 +357,8 @@
   --text-xl--line-height: 1.25;
   --text-2xl: 24px;
   --text-2xl--line-height: 1.2;
+  --text-title: 32px;
+  --text-title--line-height: 1.1;
   --text-3xl: 34px;
   --text-3xl--line-height: 1.15;
 

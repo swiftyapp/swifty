@@ -25,7 +25,7 @@ const BADGE: Partial<Record<SyncTone, string>> = {
 // changes are on this disk and nowhere else" is a standing property of the
 // vault worth a permanent slot, not noise. Clicking goes where the state is
 // owned: Settings > Sync & devices, which holds Connect and Sync now.
-export default function SyncIndicator() {
+export default function SyncIndicator({ className }: { className?: string }) {
   // The hook, not the bare `t` -- only it re-renders the chip when the language
   // changes, and the chip can sit untouched in the chrome for a whole session.
   const { t } = useTranslation()
@@ -46,7 +46,10 @@ export default function SyncIndicator() {
         data-tone={tone}
         aria-label={label}
         onClick={() => openSettings('sync')}
-        className="relative grid h-7 w-7 flex-none cursor-pointer place-items-center rounded-full text-text2 transition-colors hover:bg-hover hover:text-text"
+        className={cx(
+          'relative grid h-7 w-7 flex-none cursor-pointer place-items-center rounded-full text-text2 transition-colors hover:bg-hover hover:text-text',
+          className
+        )}
       >
         {/* The orbiting ring. Three sides at a quarter strength and one at full
             reads as a comet rather than a rotating circle -- the same trick the

@@ -12,7 +12,7 @@ import { LockGlyph } from '../icons'
 // like the sync chip beside it: the native tooltip is OS-styled, ignores the
 // theme and lags by its own delay. `label` carries the accessible name that
 // `title` used to supply, since the panel itself is aria-hidden.
-export default function LockButton() {
+export default function LockButton({ className }: { className?: string }) {
   const { t } = useTranslation()
   const onLock = () => {
     void lockVault()
@@ -24,6 +24,7 @@ export default function LockButton() {
         testid="lock-vault-button"
         onClick={onLock}
         label={t('Lock vault')}
+        className={className}
       >
         <LockGlyph />
       </IconButton>
