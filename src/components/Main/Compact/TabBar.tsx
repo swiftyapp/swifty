@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   useStore,
@@ -69,6 +70,13 @@ export default function TabBar() {
       : view === 'items' || view === 'favorites'
         ? SLOT[view]
         : null
+  // Where the lens was last lit. With no tab selected it fades out *there*;
+  // falling back to the first slot would send it sliding home as it faded,
+  // since the transform transitions along with the opacity. Adjusted during
+  // render rather than in an effect so the lit position never lags a frame.
+  const [parked, setParked] = useState(slot ?? SLOT.items)
+  if (slot !== null && slot !== parked) setParked(slot)
+  const at = slot ?? parked
 
   return (
     <>
@@ -88,7 +96,7 @@ export default function TabBar() {
         <span
           aria-hidden
           data-testid="tab-lens"
-          style={{ transform: `translateX(${(slot ?? 0) * 100}%)` }}
+          style={{ transform: `translateX(${at * 100}%)` }}
           className={cx(
             'absolute inset-y-1 left-1.5 w-[calc((100%-12px)/5)] rounded-full bg-accent-soft transition-[transform,opacity] duration-300 ease-spring',
             slot === null && 'opacity-0'

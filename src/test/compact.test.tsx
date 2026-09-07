@@ -263,12 +263,18 @@ describe('compact shell', () => {
     await userEvent.click(screen.getByTestId('tab-settings'))
     expect(lens.style.transform).toBe('translateX(400%)')
 
-    // The archive is a list with no tab: the lens fades where it stands
-    // instead of jumping to a tab that is not selected.
+    // The archive is a list with no tab: the lens fades where it stands —
+    // still under Settings — instead of sliding to a tab that is not selected
+    // while it goes.
     await userEvent.click(screen.getByTestId('settings-archive'))
-    expect(lens.style.transform).toBe('translateX(0%)')
+    expect(lens.style.transform).toBe('translateX(400%)')
     expect(lens.className).toContain('opacity-0')
     expect(screen.getByTestId('tab-items')).toHaveAttribute('aria-pressed', 'false')
+
+    // Picking a tab again lights it from where the lens was parked.
+    await userEvent.click(screen.getByTestId('tab-items'))
+    expect(lens.style.transform).toBe('translateX(0%)')
+    expect(lens.className).not.toContain('opacity-0')
   })
 
   it('carries four tabs and keeps the archive in settings', async () => {
