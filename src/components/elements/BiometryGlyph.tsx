@@ -1,5 +1,5 @@
 import type { BiometryType } from '@/lib/commands'
-import { FingerprintGlyph, ScanFaceGlyph } from '@/components/Main/icons'
+import { FingerprintGlyph, FaceIdGlyph } from '@/components/Main/icons'
 
 /**
  * The glyph for the biometric gate this device has — the pair to
@@ -18,5 +18,5 @@ export default function BiometryGlyph({
   type: BiometryType
   size?: number
 }) {
-  return type === 'face' ? <ScanFaceGlyph size={size} /> : <FingerprintGlyph size={size} />
+  return type === 'face' ? <FaceIdGlyph size={size} /> : <FingerprintGlyph size={size} />
 }
