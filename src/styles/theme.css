@@ -185,6 +185,20 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /*
+   * The iOS webview hands the page the whole screen (window.rs turns UIKit's
+   * automatic safe-area insets off), and the compact shell pads its own edges
+   * with env(safe-area-inset-*). The wide shell — an iPad — has no such chrome,
+   * so it takes the insets here, on the root, at the same 768px cut the shell
+   * switches on (`useLayout`, Tailwind's `md:`). Zero everywhere else.
+   */
+  @media (min-width: 48rem) {
+    #root {
+      padding: env(safe-area-inset-top) env(safe-area-inset-right)
+        env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+  }
+
   body {
     margin: 0;
     background: var(--c-app);
