@@ -26,7 +26,7 @@ export default function Pane({ section, onBack }: { section: Key; onBack: () => 
       <div className={cx('min-h-0 flex-1 overflow-y-auto px-4 pt-1', TAB_BAR_CLEARANCE)}>
         {/* The pane names itself the way a root does — there is no room for a
             centred nav title beside a back control that already carries one. */}
-        <h1 className="mb-5 truncate text-title font-semibold tracking-display text-text">
+        <h1 className="mb-5 truncate text-2xl font-semibold tracking-display text-text">
           {titleOf(section)}
         </h1>
         <Section section={section} />

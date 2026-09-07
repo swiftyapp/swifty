@@ -52,7 +52,12 @@ export default function Fields() {
           Its gradient, hex inks, 16/4px radii, unleaded type sizes and the
           number's wide letter-spacing imitate a real card, so they are exempt
           from the type/radius/tracking scales. */}
-      <div className="relative flex h-[288px] w-[460px] max-w-full flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 font-mono text-[#EDEEF0] shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+      {/* A real card's proportions — ISO 7810 ID-1, 85.60 × 53.98 mm — from the
+          width, whatever the width is: 460px on the desktop, the screen's
+          gutters on a phone. A fixed height gave a squat 1.24:1 slab wherever
+          the width was squeezed. The height is a floor, not a cap: with more
+          rows than the face has room for, it grows rather than clipping. */}
+      <div className="relative flex aspect-[1.586] w-[460px] max-w-full flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 font-mono text-[#EDEEF0] shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
         <div className="absolute -right-10 -top-16 h-[240px] w-[240px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.07),transparent_70%)]" />
 
         <div className="relative flex items-start justify-between gap-4">

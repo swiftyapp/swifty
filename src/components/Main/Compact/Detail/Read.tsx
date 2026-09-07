@@ -2,9 +2,10 @@ import type { Entry, EntryMeta } from '@/lib/commands'
 import { cx } from '@/utils/cx'
 import Body from '../../Body/Aside/Show/Body'
 import Eyebrow from '../../Body/Aside/Show/Eyebrow'
+import Favorite from '../../Body/Aside/Show/Favorite'
 import Identity from '../../Body/Aside/Show/Identity'
 import { useDelete } from '../../Body/Aside/Show/useDelete'
-import { PRIMARY_CLEARANCE } from '../chrome'
+import { PRIMARY_CLEARANCE, TOUCH } from '../chrome'
 import NavRow from './NavRow'
 import PrimaryAction from './PrimaryAction'
 
@@ -42,19 +43,25 @@ export default function Read({ entry, revealed }: Props) {
         )}
       >
         {/* The screen has no title bar, so the entry names itself here — a
-            60px tile beside the title, with the eyebrow over it. */}
-        <Identity
-          entry={entry}
-          tile="h-[60px] w-[60px]"
-          glyph={28}
-          className="flex items-center gap-3.5"
-        >
-          <Eyebrow
+            60px tile beside the title, with the eyebrow over it — and the star
+            sits at the row's far end: it is about this entry, so it belongs
+            beside the entry's name rather than up among the screen's controls.
+            A tombstone has no star to set. */}
+        <div className="flex items-center gap-2">
+          <Identity
             entry={entry}
-            revealed={revealed}
-            className="mb-1 flex items-center gap-2 truncate whitespace-nowrap"
-          />
-        </Identity>
+            tile="h-[60px] w-[60px]"
+            glyph={28}
+            className="flex min-w-0 flex-1 items-center gap-3.5"
+          >
+            <Eyebrow
+              entry={entry}
+              revealed={revealed}
+              className="mb-1 flex items-center gap-2 truncate whitespace-nowrap"
+            />
+          </Identity>
+          {!entry.deletedAt && <Favorite entry={entry} className={`${TOUCH} flex-none`} />}
+        </div>
 
         <Body entry={entry} revealed={revealed} error={error} />
       </div>
