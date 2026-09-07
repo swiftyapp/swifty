@@ -146,7 +146,7 @@ pub fn unpack(bytes: &[u8]) -> Result<Unpacked> {
     if snapshot.is_empty() {
         return Err(PackError::EmptySnapshot);
     }
-    if snapshot.len() % SQLITE_MIN_PAGE != 0 {
+    if !snapshot.len().is_multiple_of(SQLITE_MIN_PAGE) {
         return Err(PackError::Truncated);
     }
 
@@ -340,7 +340,8 @@ mod tests {
 
         for len in 0..full.len() {
             let result = unpack(&full[..len]);
-            let page_aligned_body = len > body_start && (len - body_start) % SQLITE_MIN_PAGE == 0;
+            let page_aligned_body =
+                len > body_start && (len - body_start).is_multiple_of(SQLITE_MIN_PAGE);
             assert_eq!(
                 result.is_err(),
                 !page_aligned_body,

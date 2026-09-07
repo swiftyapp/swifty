@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useState } from 'react'
 import type { Entry, EntryMeta, EntryType } from '@/lib/commands'
 import { useRevealed } from '@/hooks/useRevealed'
 
@@ -31,12 +31,18 @@ export function useShown(entry?: EntryMeta, type?: EntryType): Shown {
   // Once an entry's secrets have been served, the editor owns the draft: a
   // later reveal (the refetch an `updatedAt` change triggers, e.g. a sync merge
   // landing mid-edit) must not take the editor away and the draft with it.
-  const served = useRef<string | undefined>(undefined)
-  if (current) served.current = current.id
+  //
+  // State adjusted during render rather than a ref, which is what a render pass
+  // React throws away (StrictMode, a concurrent re-render) would leave stamped
+  // with an entry that was never shown. `held` is only read when there is no
+  // `current`, and only written when there is one, so the extra pass this
+  // schedules never changes what the same render returns.
+  const [served, setServed] = useState<string | undefined>(undefined)
+  if (current && served !== current.id) setServed(current.id)
 
   return {
     kindType: type ?? entry?.type,
     current,
-    held: !!entry && !current && served.current !== entry.id
+    held: !!entry && !current && served !== entry.id
   }
 }

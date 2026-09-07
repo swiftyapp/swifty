@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import type { BiometryType } from '@/lib/commands'
-import { biometryLabel, biometryGlyph } from '@/lib/biometry'
+import { biometryLabel } from '@/lib/biometry'
+import BiometryGlyph from '@/components/elements/BiometryGlyph'
 
 interface Props {
   /** Which gate this device has, so the caption is the OS's own word for it. */
@@ -16,7 +17,6 @@ interface Props {
 export default function BiometricTile({ biometry, onUnlock }: Props) {
   const { t } = useTranslation()
   const label = t(biometryLabel(biometry))
-  const Glyph = biometryGlyph(biometry)
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -27,7 +27,7 @@ export default function BiometricTile({ biometry, onUnlock }: Props) {
         onClick={onUnlock}
         className="flex h-22 w-22 cursor-pointer items-center justify-center rounded-2xl border border-line2 bg-card text-touchid shadow-float transition-transform active:scale-95"
       >
-        <Glyph size={40} />
+        <BiometryGlyph type={biometry} size={40} />
       </button>
       <span className="text-base text-text2">{label}</span>
     </div>

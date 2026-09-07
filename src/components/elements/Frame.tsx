@@ -51,5 +51,10 @@ export const FrameProvider = ({
  */
 export default function Frame(props: FrameProps) {
   const Implementation = useContext(FrameContext)
+  // `react-hooks/static-components` cannot tell a component *chosen* from a
+  // fixed pair (Modal / Sheet, both module-level) from one *defined* during
+  // render. Choosing it here is the entire point of this file, and the shell
+  // decides once in `Main` rather than per render, so nothing remounts.
+  // eslint-disable-next-line react-hooks/static-components
   return <Implementation {...props} />
 }

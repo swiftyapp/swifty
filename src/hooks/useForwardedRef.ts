@@ -16,6 +16,11 @@ export function useForwardedRef<T>(
   const attach = (node: T | null) => {
     local.current = node
     if (typeof forwarded === 'function') forwarded(node)
+    // Filling a caller's ref object IS ref forwarding — it is what React itself
+    // does for a `ref` prop, and it runs from a callback ref (after commit),
+    // not during render. `react-hooks/immutability` only sees a hook argument
+    // being written to.
+    // eslint-disable-next-line react-hooks/immutability
     else if (forwarded) forwarded.current = node
   }
 
