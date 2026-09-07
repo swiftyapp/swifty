@@ -57,5 +57,16 @@
 			<string>Default</string>
 		</dict>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.YOUR_IOS_CLIENT_ID</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.googleusercontent.apps.YOUR_IOS_CLIENT_ID</string>
+		</dict>
+	</array>
 </dict>
 </plist>
