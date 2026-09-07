@@ -5,8 +5,7 @@ import Audit from '../../Body/Aside/Audit'
 import { DetailEmpty } from '../../Body/Empty'
 import { useVariant, isWholeView } from '../../Body/Empty/variant'
 import Tags from '../../Sidebar/Tags'
-import Add from '../../Sidebar/Add'
-import { TAB_BAR_CLEARANCE, TOUCH } from '../chrome'
+import { ROOT_HEADER, TAB_BAR_CLEARANCE, TOUCH } from '../chrome'
 import Heading from '../Heading'
 
 // The 44px search field. Passed as classes rather than asked for by a flag:
@@ -18,9 +17,9 @@ const SEARCH =
  * The list root — the screen the tab bar comes home to.
  *
  * The shared list column, with the phone's chrome around it: a large title
- * where the desktop has a 20px one, the rail's add and tag tiles in the title
- * row (there is no rail), and room at the bottom of the scroller for the
- * floating bar the rows slide under.
+ * where the desktop has a 20px one, the rail's sort and tag tiles in the title
+ * row (there is no rail; the rail's Add went to the tab bar's centre), and room
+ * at the bottom of the scroller for the floating bar the rows slide under.
  */
 export default function Vault() {
   // The list is the only pane here, so it also carries whatever the wide shell
@@ -46,13 +45,13 @@ export default function Vault() {
     <div className="flex min-h-0 flex-1 flex-col bg-list pt-[env(safe-area-inset-top)]">
       <ListColumn
         heading={<Heading title={title} testid="list-title" />}
+        header={ROOT_HEADER}
         actions={
           <>
             <SortMenu className={TOUCH} />
             {/* The tag tile hangs off the list header rather than a rail, so
                 its menu drops below the trigger instead of out to a side. */}
             <Tags className={TOUCH} menu="right-0 top-full mt-2" />
-            <Add className={TOUCH} />
           </>
         }
         search={SEARCH}

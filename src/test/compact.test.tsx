@@ -45,6 +45,12 @@ const audit: Audit = {
 const titleInput = () => document.querySelector<HTMLInputElement>('input[name="title"]')!
 const field = (name: string) => document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
 
+// Edit is under the read screen's one menu, not a button of its own.
+const openEdit = async () => {
+  await userEvent.click(screen.getByTestId('more-actions-button'))
+  await userEvent.click(screen.getByTestId('edit-entry-button'))
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(generatePassword).mockResolvedValue('Generated123!')
@@ -52,13 +58,19 @@ beforeEach(() => {
 })
 
 describe('compact shell', () => {
-  it('replaces the rail with a tab bar and puts add and tags in the list header', () => {
+  it('replaces the rail with a tab bar, puts add in its centre and tags in the list header', () => {
     renderWithStore(<Main />, { store: seed() })
 
     expect(screen.getByTestId('compact-shell')).toBeInTheDocument()
     expect(screen.getByTestId('tab-bar')).toBeInTheDocument()
     expect(screen.queryByTestId('view-items')).not.toBeInTheDocument()
+    // The verb rests in the bar's notch, in the thumb's spot — beside the bar
+    // in the tree, since the bar is masked around it. The header keeps only
+    // the controls that narrow the list under it.
     expect(screen.getByTestId('add-entry-button')).toBeInTheDocument()
+    expect(screen.getByTestId('tab-bar')).not.toContainElement(
+      screen.getByTestId('add-entry-button')
+    )
     expect(screen.getByTestId('tags-button')).toBeInTheDocument()
   })
 
@@ -77,6 +89,13 @@ describe('compact shell', () => {
     // One screen at a time: the list and the tab bar are gone while it is up.
     expect(screen.queryByTestId('entry-item')).not.toBeInTheDocument()
     expect(screen.queryByTestId('tab-bar')).not.toBeInTheDocument()
+    // The corner holds one control: the star sits by the entry's name, and
+    // Edit waits under the menu.
+    expect(screen.getByTestId('favorite-toggle')).toBeInTheDocument()
+    expect(screen.queryByTestId('edit-entry-button')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('more-actions-button'))
+    expect(screen.getByTestId('edit-entry-button')).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
 
     await userEvent.click(screen.getByTestId('compact-back'))
     expect(useStore.getState().entries.current).toBeNull()
@@ -139,7 +158,7 @@ describe('compact shell', () => {
     renderWithStore(<Main />, { store: seed() })
 
     await userEvent.click(screen.getByText('Google'))
-    await userEvent.click(screen.getByTestId('edit-entry-button'))
+    await openEdit()
 
     expect(useStore.getState().entries.edit).toBe(true)
     // The entry names its own form, and the draft holds the decrypted values:
@@ -166,7 +185,7 @@ describe('compact shell', () => {
     await userEvent.click(screen.getByText('Google'))
     expect(revealEntry).toHaveBeenCalledTimes(1)
 
-    await userEvent.click(screen.getByTestId('edit-entry-button'))
+    await openEdit()
     expect(revealEntry).toHaveBeenCalledTimes(1)
     // Seeded from the reveal the read screen already had, with no held frame
     // in between.
@@ -180,7 +199,7 @@ describe('compact shell', () => {
     renderWithStore(<Main />, { store: seed() })
 
     await userEvent.click(screen.getByText('Google'))
-    await userEvent.click(screen.getByTestId('edit-entry-button'))
+    await openEdit()
 
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
     await userEvent.click(screen.getByTestId('cancel-entry-button'))
@@ -230,6 +249,32 @@ describe('compact shell', () => {
 
     await userEvent.click(screen.getByTestId('tab-items'))
     expect(useStore.getState().ui.view).toBe('items')
+  })
+
+  it('slides one lens to the selected tab and parks it for a view with no tab', async () => {
+    renderWithStore(<Main />, { store: seed() })
+    const lens = screen.getByTestId('tab-lens')
+
+    // Five slots, the third empty under the Add disc: the lens is moved by
+    // whole slots, so favorites is one over and settings four.
+    expect(lens.style.transform).toBe('translateX(0%)')
+    await userEvent.click(screen.getByTestId('tab-favorites'))
+    expect(lens.style.transform).toBe('translateX(100%)')
+    await userEvent.click(screen.getByTestId('tab-settings'))
+    expect(lens.style.transform).toBe('translateX(400%)')
+
+    // The archive is a list with no tab: the lens fades where it stands —
+    // still under Settings — instead of sliding to a tab that is not selected
+    // while it goes.
+    await userEvent.click(screen.getByTestId('settings-archive'))
+    expect(lens.style.transform).toBe('translateX(400%)')
+    expect(lens.className).toContain('opacity-0')
+    expect(screen.getByTestId('tab-items')).toHaveAttribute('aria-pressed', 'false')
+
+    // Picking a tab again lights it from where the lens was parked.
+    await userEvent.click(screen.getByTestId('tab-items'))
+    expect(lens.style.transform).toBe('translateX(0%)')
+    expect(lens.className).not.toContain('opacity-0')
   })
 
   it('carries four tabs and keeps the archive in settings', async () => {

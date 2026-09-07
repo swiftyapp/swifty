@@ -157,12 +157,21 @@ right, `animate-rise` slides up, `animate-fade` for roots). No exit animations.
 
 - Touch targets ≥ 44×44pt. Rows ≥ 44pt tall; list rows in the design are 64pt.
 - Safe areas: `env(safe-area-inset-top/bottom)` on anything touching an edge.
-- Large title on tab roots (mono eyebrow above, 32px semibold title), no top
-  bar. Pushed screens get a nav row: a back control that carries the previous
-  screen's title, trailing text/icon actions.
+- A 24px semibold title on tab roots, centred with its 44px actions on a 56px
+  row flush against the safe area (`ROOT_HEADER`), no top bar and no app-name
+  eyebrow (the home screen icon already said whose vault it is). Pushed screens
+  get a nav row on the same 56px footing: a back control that carries the
+  previous screen's title, trailing text/icon actions. Root and pushed headers
+  share one top edge, so nothing jumps when a screen is pushed or popped.
 - Tab bar: floating pill, glass surface (`bg-glass` + `backdrop-blur`), icon
-  over a 10px label, selected tab in accent on an accent-soft wash. Content
-  scrolls underneath (the scroller reserves bottom padding).
+  over a 10px label, resting in the secondary ink (≥ 4.5:1 on the glass, for
+  the label's sake). The selected tab is marked by one accent-soft lens that
+  slides between tabs with a spring (`ease-spring`), as the system bar's does.
+  The centre slot is a notch (a radial `mask` on the pill) with the vault's one
+  action, Add, resting in it: a 56px accent disc standing half above the glass
+  with a ring of ground around it — a verb placed on the bar, not a fifth tab.
+  Content scrolls underneath (the scroller reserves bottom padding; see
+  `chrome.ts` for the geometry every piece of bottom chrome is measured from).
 - Bottom sheets carry a grabber and dismiss on scrim tap; full-screen forms
   put Cancel on the left and Save on the right of the nav row.
 - The primary action of a detail screen is a bottom, thumb-reachable button.

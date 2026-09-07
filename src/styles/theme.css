@@ -343,8 +343,8 @@
  *             xs 11px mono micro (labels/meta/counts/kbd)
  *             base 13px everything readable — hierarchy via weight + ink
  *             md 15px the passphrase field and its mask
- *             lg 16 / xl 20 / 2xl 24 display tiers · title 32 the phone shell's
- *             large title · 3xl 34 the vault score
+ *             lg 16 / xl 20 / 2xl 24 display tiers (2xl is also the phone
+ *             shell's screen title) · 3xl 34 the vault score
  *   Tracking  label .12em (mono uppercase) · display −.02em (16px and up)
  *             secret .08em (revealed secrets, card numbers, TOTP)
  *   Radius    xs 4 chips & inlays · sm 8 controls · lg 12 tiles & cards
@@ -354,7 +354,9 @@
  *             entry detail column) — on top of Tailwind's rem container scale
  *   Motion    one duration (160ms) — plus a 300ms slow tier for sweeps that
  *             should be seen moving (the lock field, a progress bar) —
- *             one easing (ease-swift), four shapes (fade/pop/sheet/rise)
+ *             one easing (ease-swift) — plus ease-spring, which overshoots,
+ *             for the one thing that slides to a new place (the tab bar's
+ *             lens) — four shapes (fade/pop/sheet/rise)
  */
 @theme {
   --text-*: initial;
@@ -372,8 +374,6 @@
   --text-xl--line-height: 1.25;
   --text-2xl: 24px;
   --text-2xl--line-height: 1.2;
-  --text-title: 32px;
-  --text-title--line-height: 1.1;
   --text-3xl: 34px;
   --text-3xl--line-height: 1.15;
 
@@ -395,6 +395,8 @@
   --container-sheet: 860px;
 
   --ease-swift: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Overshoots and settles: the tab bar's lens sliding to the tapped tab. */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
   --default-transition-duration: 160ms;
   --default-transition-timing-function: var(--ease-swift);
 

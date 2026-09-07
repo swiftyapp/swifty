@@ -6,7 +6,7 @@ import Panel from '../../Generator/Panel'
 import Tabs from '../../Generator/Tabs'
 import { useGeneratorDialog } from '../../Generator/useGeneratorDialog'
 import { RefreshGlyph } from '../../icons'
-import { ACTION_BUTTON, ROOT_ACTION, ROOT_CLEARANCE } from '../chrome'
+import { ACTION_BUTTON, ROOT_ACTION, ROOT_CLEARANCE, ROOT_HEADER } from '../chrome'
 import Heading from '../Heading'
 
 /**
@@ -33,7 +33,7 @@ export default function Generator() {
       data-testid="generator-screen"
       className="relative flex min-h-0 flex-1 flex-col animate-fade bg-list pt-[env(safe-area-inset-top)]"
     >
-      <div className="flex flex-none items-end gap-2.5 px-4 pt-4">
+      <div className={`${ROOT_HEADER} px-4`}>
         <Heading title={t('Generator')} />
         {/* 44px, not the card's 36px: this one is aimed at with a finger. */}
         <IconButton

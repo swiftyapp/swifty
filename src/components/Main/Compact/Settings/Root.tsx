@@ -7,7 +7,7 @@ import { SECTIONS } from '../../Sidebar/Settings/sections'
 import Footer from '../../Sidebar/Settings/Footer'
 import SyncIndicator from '../../Header/SyncIndicator'
 import { LockGlyph } from '../../icons'
-import { TAB_BAR_CLEARANCE, TOUCH } from '../chrome'
+import { ROOT_HEADER, TAB_BAR_CLEARANCE, TOUCH } from '../chrome'
 import Heading from '../Heading'
 import Row from './Row'
 import ArchiveRow from './ArchiveRow'
@@ -25,7 +25,7 @@ export default function Root({ onSelect }: { onSelect: (section: Section) => voi
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-list pt-[env(safe-area-inset-top)]">
-      <div className="flex flex-none items-end gap-2.5 px-4 pt-4">
+      <div className={`${ROOT_HEADER} px-4`}>
         <Heading title={t('Settings')} />
         {/* The chip deep-links here too, but through this screen's own
             navigation: the wide modal's section state is not what a pushed

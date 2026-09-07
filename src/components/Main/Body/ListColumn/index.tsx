@@ -23,6 +23,14 @@ interface Props {
    */
   heading?: ReactNode
   /**
+   * The title row's own classes — alignment and height, not side padding, which
+   * the box around the row, the search and the chips gives all three. Absent,
+   * the desktop's: 16px under the top of the column, the controls sat on the
+   * title's baseline. The compact root sends its 56px nav-height row
+   * (`ROOT_HEADER`).
+   */
+  header?: string
+  /**
    * The search box's own classes. Absent, it keeps the 28px desktop field; the
    * compact root sends the 44px touch one.
    */
@@ -37,7 +45,14 @@ interface Props {
   footer?: ReactNode
 }
 
-export default function ListColumn({ actions, heading, search, scroller, footer }: Props) {
+export default function ListColumn({
+  actions,
+  heading,
+  header = 'flex items-end gap-2.5 pt-4',
+  search,
+  scroller,
+  footer
+}: Props) {
   const view = useStore(state => state.ui.view)
   const health = view === 'health'
   const onKeyDown = useListKeys()
@@ -53,8 +68,8 @@ export default function ListColumn({ actions, heading, search, scroller, footer 
       // the whole phone screen on compact.
       className="flex min-h-0 min-w-0 flex-1 flex-col bg-list"
     >
-      <div className="flex-none px-4 pt-4 pb-2.5">
-        <div className="flex items-end gap-2.5">
+      <div className="flex-none px-4 pb-2.5">
+        <div className={header}>
           {heading ?? (
             <div className="min-w-0 flex-1">
               <div
