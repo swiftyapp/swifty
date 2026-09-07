@@ -40,7 +40,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  ScanFace,
   ScanLine,
   Search,
   Settings,
@@ -53,8 +52,27 @@ import {
   TriangleAlert,
   User,
   X,
+  createLucideIcon,
+  type IconNode,
   type LucideIcon
 } from 'lucide-react'
+
+// Apple's Face ID mark, traced onto lucide's 24-unit grid: bracketed corners,
+// two eye ticks, a nose hooking left, a short smile. The webview cannot draw
+// the `faceid` SF Symbol itself, and lucide's ScanFace (dot eyes, no nose) does
+// not read as Face ID next to the system's own prompt. Built with lucide's
+// factory so it takes the same size/stroke/class handling as the rest of the set.
+const faceIdNode: IconNode = [
+  ['path', { d: 'M3 8.5V6a3 3 0 0 1 3-3h2.5' }],
+  ['path', { d: 'M15.5 3H18a3 3 0 0 1 3 3v2.5' }],
+  ['path', { d: 'M21 15.5V18a3 3 0 0 1-3 3h-2.5' }],
+  ['path', { d: 'M8.5 21H6a3 3 0 0 1-3-3v-2.5' }],
+  ['path', { d: 'M8.25 9.25v1.5' }],
+  ['path', { d: 'M15.25 9.25v1.5' }],
+  ['path', { d: 'M12.1 9.25v2.9a1 1 0 0 1-1 1h-.35' }],
+  ['path', { d: 'M9.25 14.75a3.25 3.25 0 0 0 5.5 0' }]
+]
+const FaceId = createLucideIcon('face-id', faceIdNode)
 
 interface IconProps {
   size?: number
@@ -97,7 +115,7 @@ export const ChevronDownGlyph = glyph(ChevronDown, 14)
 export const FingerprintGlyph = glyph(Fingerprint, 14)
 // The other biometry: Face ID. Which of the two is shown comes from the device
 // (`biometry_type`) through `lib/biometry` — never a per-call-site guess.
-export const ScanFaceGlyph = glyph(ScanFace, 14)
+export const FaceIdGlyph = glyph(FaceId, 14)
 export const SortGlyph = glyph(ArrowDownWideNarrow, 14)
 export const ExternalGlyph = glyph(ExternalLink, 14)
 export const AtGlyph = glyph(AtSign, 14)
