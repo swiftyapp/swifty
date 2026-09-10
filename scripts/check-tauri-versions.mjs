@@ -36,19 +36,35 @@ for (const [, name, version] of cargoLock.matchAll(
   crates.get(name).push(version)
 }
 
+// Fail closed: every Tauri app has `@tauri-apps/api` and the `tauri` crate, so
+// if either is missing the lockfile format has changed and the regexes above
+// no longer see anything. Do not let that pass as "0 packages agree".
+const fail = (msg) => {
+  console.error(msg)
+  process.exit(1)
+}
+if (!npm.has('api')) fail('check-tauri-versions: no @tauri-apps/api entry found in bun.lock (format changed?)')
+if (!crates.has('tauri')) fail('check-tauri-versions: no `tauri` package found in src-tauri/Cargo.lock (format changed?)')
+
 const majorMinor = (v) => v.split('.').slice(0, 2).join('.')
 
 const mismatched = []
+let compared = 0
 for (const [npmName, npmVersion] of npm) {
   const crateName = npmName === 'api' ? 'tauri' : `tauri-${npmName}`
   const crateVersions = crates.get(crateName)
+  // The CLI only compares pairs installed on both sides; an npm plugin with
+  // no crate is a project-shape question, not a version mismatch.
   if (!crateVersions) continue
+  compared++
   if (!crateVersions.some((v) => majorMinor(v) === majorMinor(npmVersion))) {
     mismatched.push(
       `${crateName} (v${crateVersions.join(', v')}) : @tauri-apps/${npmName} (v${npmVersion})`,
     )
   }
 }
+
+if (compared === 0) fail('check-tauri-versions: no npm/crate pairs were compared')
 
 if (mismatched.length > 0) {
   console.error(
@@ -61,4 +77,4 @@ if (mismatched.length > 0) {
   process.exit(1)
 }
 
-console.log(`Tauri npm/crate versions agree (${npm.size} packages checked).`)
+console.log(`Tauri npm/crate versions agree (${compared} npm/crate pairs checked).`)

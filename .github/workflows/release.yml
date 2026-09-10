@@ -124,14 +124,21 @@ jobs:
 
       # Replace the placeholder release body with GitHub's auto-generated
       # release notes (the same "What's Changed" list the UI button produces),
-      # built from PRs/commits since the previous release. Runs once, on Linux;
-      # the draft can still be edited by hand before publishing.
+      # built from PRs/commits since the previous release. Runs once, on Linux,
+      # and only while the body is still the placeholder above: a re-run
+      # against an existing draft leaves hand-edited notes alone.
       - name: Generate release notes
         if: matrix.platform == 'ubuntu-latest'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PLACEHOLDER: See the assets below to download and install this version.
         run: |
           TAG="v$(jq -r .version src-tauri/tauri.conf.json)"
+          CURRENT=$(gh release view "$TAG" --json body --jq .body)
+          if [ "$CURRENT" != "$PLACEHOLDER" ]; then
+            echo "Release body already customised; leaving it untouched."
+            exit 0
+          fi
           NOTES=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
             -f tag_name="$TAG" --jq .body)
           if [ -n "$NOTES" ] && [ "$NOTES" != "null" ]; then
