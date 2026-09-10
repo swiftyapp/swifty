@@ -1,7 +1,8 @@
-import type { KeyboardEvent } from 'react'
+import { useRef, type KeyboardEvent } from 'react'
 import { useStore, setFilterQuery } from '@/store'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
+import { chord } from '@/utils/platform'
 import Kbd from '@/components/elements/Kbd'
 import { CloseGlyph, SearchGlyph } from '../../icons'
 
@@ -21,6 +22,15 @@ export default function Search({ className = DESKTOP }: { className?: string }) 
   const { t } = useTranslation()
   const query = useStore(state => state.filters.query)
   const empty = query === ''
+  const input = useRef<HTMLInputElement>(null)
+
+  // Clearing hands the caret back to the field: the button that was clicked
+  // is about to fade out and leave the tab order, and a focus left on it would
+  // strand the next keystroke on an invisible control.
+  const clear = () => {
+    setFilterQuery('')
+    input.current?.focus()
+  }
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Escape') return
@@ -50,6 +60,7 @@ export default function Search({ className = DESKTOP }: { className?: string }) 
           accent while the field is listening. */}
       <SearchGlyph className="flex-none transition-colors duration-300 group-hover:text-text2 group-focus-within:text-accent" />
       <input
+        ref={input}
         type="search"
         name="search"
         data-testid="search-input"
@@ -74,14 +85,14 @@ export default function Search({ className = DESKTOP }: { className?: string }) 
             !empty && 'translate-x-1 opacity-0'
           )}
         >
-          <Kbd>⌘F</Kbd>
+          <Kbd>{chord('F')}</Kbd>
         </span>
         {/* Always mounted so it can ease in: a query fades and grows it from
             a dot to a button, clearing does the reverse. Out of reach and out
             of the tab order while there is nothing to clear. */}
         <button
           type="button"
-          onClick={() => setFilterQuery('')}
+          onClick={clear}
           aria-label={t('Clear')}
           aria-hidden={empty}
           tabIndex={empty ? -1 : 0}

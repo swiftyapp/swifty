@@ -10,6 +10,7 @@ import {
   syncFailed
 } from '@/store'
 import { kindOf } from '@/kinds'
+import { chord } from '@/utils/platform'
 import { useTranslation } from 'react-i18next'
 import Logo from '@/assets/images/logo.svg?react'
 import EmptyState from '@/components/elements/EmptyState'
@@ -62,8 +63,8 @@ export function VaultEmpty() {
             { label: t('Import from another app'), onClick: () => openSettings('import') }
       }
       hints={[
-        { keys: '⌘N', label: t('add') },
-        { keys: '⌘K', label: t('commands') }
+        { keys: chord('N'), label: t('add') },
+        { keys: chord('K'), label: t('commands') }
       ]}
     />
   )
@@ -84,9 +85,9 @@ export function SelectEmpty() {
       hints={[
         { keys: '↑↓', label: t('browse') },
         { keys: '⏎', label: t('copy') },
-        { keys: '⌘F', label: t('search') },
-        { keys: '⌘N', label: t('add') },
-        { keys: '⌘K', label: t('commands') }
+        { keys: chord('F'), label: t('search') },
+        { keys: chord('N'), label: t('add') },
+        { keys: chord('K'), label: t('commands') }
       ]}
     />
   )
