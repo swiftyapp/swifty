@@ -268,8 +268,10 @@
   /*
    * Native system stacks — no bundled webfonts. On macOS (Tauri/WebKit) these
    * resolve to SF Pro and SF Mono; on Windows to Segoe UI and Consolas; on
-   * Linux to the desktop's configured fonts. The mono tier stays monospaced
-   * on purpose: labels, counts and revealed secrets rely on it.
+   * Linux to the desktop's configured fonts. The UI is set in the sans tier
+   * throughout — labels, counts and timestamps included, with tabular figures
+   * where a number has to hold its width. The mono tier is reserved for raw
+   * key material (an SSH key's body), which is code and wraps like it.
    */
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
     Arial, sans-serif;
@@ -340,12 +342,12 @@
  * simply doesn't compile, which keeps the system honest.
  *
  *   Type      2xs 10px footer chrome (a tier below content)
- *             xs 11px mono micro (labels/meta/counts/kbd)
+ *             xs 11px micro (labels/meta/counts/kbd)
  *             base 13px everything readable — hierarchy via weight + ink
  *             md 15px the passphrase field and its mask
  *             lg 16 / xl 20 / 2xl 24 display tiers (2xl is also the phone
  *             shell's screen title) · 3xl 34 the vault score
- *   Tracking  label .12em (mono uppercase) · display −.02em (16px and up)
+ *   Tracking  label .12em (uppercase micro) · display −.02em (16px and up)
  *             secret .08em (revealed secrets, card numbers, TOTP)
  *   Radius    xs 4 chips & inlays · sm 8 controls · lg 12 tiles & cards
  *             xl 14 overlays · 2xl 28 sheets (a bottom sheet's top corners)

@@ -6,7 +6,7 @@ import type { TKey } from '@/i18n'
 import { EyeGlyph, EyeOffGlyph } from '../../Main/icons'
 import CopyButton from '../CopyButton'
 import IconButton from '../IconButton'
-import { HOVER_ONLY } from '../tokens'
+import { HOVER_ONLY, VALUE_LINE } from '../tokens'
 import { useField } from './context'
 import { requiredError } from './formats'
 import FieldRow from './Row'
@@ -54,7 +54,7 @@ const MASK = { WebkitTextSecurity: 'disc' } as CSSProperties
 const DOTS = '•'.repeat(12)
 
 // One field, both modes. Reading, it is the detail row it has always been:
-// mono value, reveal toggle, copy button, hidden when empty. Editing, the same
+// the value, reveal toggle, copy button, hidden when empty. Editing, the same
 // row with the value swapped for an underlined borderless input. Every
 // type-aware field in this folder is a thin wrapper around it.
 export default function Field({
@@ -95,10 +95,7 @@ export default function Field({
   const masked = secure && !show
   const mask = masked ? MASK : undefined
   // The headline treatment is for a secret being read, not for its mask.
-  const ink = cx(
-    'block h-6 min-w-0 truncate font-mono leading-6',
-    big && !masked ? 'text-xl tracking-secret' : 'text-base'
-  )
+  const ink = cx(VALUE_LINE, big && !masked ? 'text-xl tracking-secret' : 'text-base')
   // Nothing to gloss about a mask, and nothing to gloss while typing.
   const gloss = !editing && !masked ? suffix?.(value) : undefined
 
@@ -171,7 +168,7 @@ export default function Field({
               {masked ? DOTS : shown}
             </button>
             {gloss && (
-              <span className="min-w-0 flex-none truncate font-mono text-base leading-6 text-text3">
+              <span className="min-w-0 flex-none truncate text-base leading-6 text-text3">
                 · {gloss}
               </span>
             )}

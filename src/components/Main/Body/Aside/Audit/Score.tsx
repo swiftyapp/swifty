@@ -1,7 +1,7 @@
 import type { Audit } from '@/lib/commands'
 import { useTranslation } from 'react-i18next'
 import { vaultScore } from '@/utils/vaultScore'
-import { MONO_LABEL } from '@/components/elements/tokens'
+import { LABEL } from '@/components/elements/tokens'
 
 interface Props {
   audit: Audit
@@ -48,7 +48,7 @@ export default function Score({ audit }: Props) {
         >
           {score.toFixed(1)}
         </div>
-        <div className={MONO_LABEL}>
+        <div className={LABEL}>
           {t('Overall Score')}
         </div>
       </div>

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { cx } from '@/utils/cx'
 import Button from './Button'
 import Kbd from './Kbd'
-import { MONO_META } from './tokens'
+import { META } from './tokens'
 
 interface Action {
   label: string
@@ -126,7 +126,7 @@ export default function EmptyState({
             {hints.map(hint => (
               <span key={hint.keys} className="flex items-center gap-1.5">
                 <Kbd>{hint.keys}</Kbd>
-                <span className={MONO_META}>{hint.label}</span>
+                <span className={META}>{hint.label}</span>
               </span>
             ))}
           </div>

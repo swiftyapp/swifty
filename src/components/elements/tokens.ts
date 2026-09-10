@@ -18,13 +18,27 @@ export const HOVER_ONLY =
 export const TOAST =
   'animate-pop fixed z-[1000] max-w-[340px] rounded-xl border border-line bg-detail text-text shadow-float'
 
-// The mono micro-label face, without an ink. Take this when the label needs a
-// different colour (the accent "EDITING ·" eyebrow) and MONO_LABEL otherwise.
-export const MONO_TYPE = 'font-mono text-xs uppercase tracking-label'
+// The micro-label face, without an ink: 11px, uppercase, tracked, regular
+// weight — a label is the secondary line, and the value it captions carries the
+// weight. Take this when the label needs a different colour (the accent
+// "EDITING ·" eyebrow) and LABEL otherwise.
+export const LABEL_TYPE = 'text-xs uppercase tracking-label'
 
-export const MONO_LABEL = `${MONO_TYPE} text-text3`
+export const LABEL = `${LABEL_TYPE} text-text3`
 
-// The mono meta face: counts, timestamps, hints, shortcuts — the same 11px mono
-// as the label tier, muted, but set as ordinary text rather than a tracked
-// uppercase eyebrow.
-export const MONO_META = 'font-mono text-xs text-text3'
+// The meta face, without an ink: counts, timestamps, hints, shortcuts, chips —
+// the same 11px as the label tier, set as ordinary text rather than a tracked
+// uppercase eyebrow. Tabular figures, so a count or a countdown holds its width
+// as it changes instead of nudging what sits beside it. Take this when the ink
+// is the caller's (a count inheriting its chip's colour, an error in `text-bad`)
+// and META otherwise.
+export const META_TYPE = 'text-xs tabular-nums'
+
+export const META = `${META_TYPE} text-text3`
+
+// The detail row's value line: one line high, never wrapping, the ink the
+// caller's. VALUE_LINE leaves the size open for the one row that sets its own
+// (the headline secret, at text-xl); everything else takes VALUE.
+export const VALUE_LINE = 'block h-6 min-w-0 truncate leading-6'
+
+export const VALUE = `${VALUE_LINE} text-base`

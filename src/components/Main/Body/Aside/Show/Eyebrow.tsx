@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import type { Entry, EntryMeta } from '@/lib/commands'
 import { kindOf } from '@/kinds'
-import { MONO_LABEL } from '@/components/elements/tokens'
+import { LABEL } from '@/components/elements/tokens'
 
 interface Props {
   entry: EntryMeta
@@ -11,7 +11,7 @@ interface Props {
   className?: string
 }
 
-// What the entry is, in one mono line: the kind, and — once it can say so — the
+// What the entry is, in one micro line: the kind, and — once it can say so — the
 // host it belongs to, or, for a document whose type is encrypted, what kind of
 // document it is. Both shells draw it; only its place in the header differs.
 export default function Eyebrow({ entry, revealed, className }: Props) {
@@ -25,7 +25,7 @@ export default function Eyebrow({ entry, revealed, className }: Props) {
     fromKind ?? (entry.urlHost ? { text: entry.urlHost } : null)
 
   return (
-    <div className={`${className} ${MONO_LABEL}`}>
+    <div className={`${className} ${LABEL}`}>
       <span className="text-text2">{t(kind.label)}</span>
       {segment && (
         <>

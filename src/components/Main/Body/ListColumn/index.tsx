@@ -19,7 +19,7 @@ interface Props {
   actions?: ReactNode
   /**
    * Replaces the 20px title block. The compact root sends its large title —
-   * same words (`useListTitle`), a mono eyebrow above them.
+   * same words (`useListTitle`), a micro eyebrow above them.
    */
   heading?: ReactNode
   /**

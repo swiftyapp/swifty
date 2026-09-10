@@ -2,14 +2,14 @@ import type { EntryMeta } from '@/lib/commands'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
 import Item from './Item'
-import { MONO_LABEL, MONO_META } from '@/components/elements/tokens'
+import { LABEL, META } from '@/components/elements/tokens'
 
 interface Props {
   title: TKey
   entries: EntryMeta[]
 }
 
-// A labelled run of entries in the audit list — one severity ("Weak"). A mono
+// A labelled run of entries in the audit list — one severity ("Weak"). A muted
 // header (label + hairline rule + count) over its rows; rendered only when the
 // group has members. The entry list itself is flat, so this is the only caller.
 export default function Group({ title, entries }: Props) {
@@ -19,11 +19,11 @@ export default function Group({ title, entries }: Props) {
   return (
     <div>
       <div className="flex items-center gap-2 px-4 pb-1.5 pt-3">
-        <span className={MONO_LABEL}>
+        <span className={LABEL}>
           {t(title)}
         </span>
         <span className="h-px flex-1 bg-line" />
-        <span className={MONO_META}>{entries.length}</span>
+        <span className={META}>{entries.length}</span>
       </div>
       {entries.map(entry => (
         <Item entry={entry} key={entry.id} />

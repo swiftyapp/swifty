@@ -1,5 +1,6 @@
 import { cx } from '@/utils/cx'
 import { CloseGlyph } from '../../icons'
+import { META_TYPE } from '@/components/elements/tokens'
 
 interface Props {
   label: string
@@ -14,7 +15,7 @@ interface Props {
   title?: string
 }
 
-// A single filter chip: a token-bordered pill with a label and a mono count.
+// A single filter chip: a token-bordered pill with a label and a muted count.
 // Selected chips switch to the accent palette.
 export default function Chip({ label, count, selected, onClick, testid, dismiss, title }: Props) {
   return (
@@ -25,7 +26,7 @@ export default function Chip({ label, count, selected, onClick, testid, dismiss,
       title={title}
       onClick={onClick}
       className={cx(
-        'flex h-6 flex-none items-center gap-1.5 rounded-sm border px-[9px] text-xs whitespace-nowrap',
+        `flex h-6 flex-none items-center gap-1.5 rounded-sm border px-[9px] ${META_TYPE} whitespace-nowrap`,
         selected
           ? 'border-accent-line bg-accent-soft text-accent'
           : 'border-line bg-transparent text-text2 hover:border-line2'
@@ -39,7 +40,7 @@ export default function Chip({ label, count, selected, onClick, testid, dismiss,
       ) : (
         <span
           data-testid={testid ? `${testid}-count` : undefined}
-          className="font-mono text-xs opacity-60"
+          className={`${META_TYPE} opacity-60`}
         >
           {count}
         </span>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { isMobile } from '@/lib/platform'
 import { pickImportFile } from '@/lib/commands'
 import { DownloadGlyph } from '../../../../icons'
+import { META_TYPE } from '@/components/elements/tokens'
 
 interface Props {
   onDrop: (path: string) => void
@@ -56,7 +57,7 @@ export default function DropZone({ onDrop }: Props) {
         <div className="text-base text-text2">
           {isMobile ? t('Or choose an export file') : t('Or drop an export file here')}
         </div>
-        <div className="font-mono text-xs">
+        <div className={META_TYPE}>
           {t('csv, json — parsed locally, never uploaded')}
         </div>
       </div>

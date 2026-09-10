@@ -6,7 +6,7 @@ import SettingsRow from '@/components/elements/SettingsRow'
 import Toggle from '@/components/elements/Toggle'
 import Button from '@/components/elements/Button'
 import ScoreRing from '@/components/elements/ScoreRing'
-import { ROW_HAIRLINE } from '@/components/elements/tokens'
+import { META_TYPE, ROW_HAIRLINE } from '@/components/elements/tokens'
 
 export default function Audit() {
   const { t } = useTranslation()
@@ -55,7 +55,7 @@ export default function Audit() {
           </div>
           <div
             data-testid="settings-audit-counts"
-            className="min-w-0 flex-1 font-mono text-xs text-text2"
+            className={`min-w-0 flex-1 ${META_TYPE} text-text2`}
           >
             {counts.weak} {t('weak')} · {counts.reused} {t('reused')} · {counts.breached}{' '}
             {t('breached')}

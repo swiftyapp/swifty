@@ -57,7 +57,7 @@ export default function Fields() {
           gutters on a phone. A fixed height gave a squat 1.24:1 slab wherever
           the width was squeezed. The height is a floor, not a cap: with more
           rows than the face has room for, it grows rather than clipping. */}
-      <div className="relative flex aspect-[1.586] w-[460px] max-w-full flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 font-mono text-[#EDEEF0] shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+      <div className="relative flex aspect-[1.586] w-[460px] max-w-full flex-col overflow-hidden rounded-[16px] border border-line2 bg-[linear-gradient(150deg,#2A2D33,#14161A_62%)] p-6 text-[#EDEEF0] tabular-nums shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
         <div className="absolute -right-10 -top-16 h-[240px] w-[240px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.07),transparent_70%)]" />
 
         <div className="relative flex items-start justify-between gap-4">
@@ -70,7 +70,7 @@ export default function Fields() {
             testid="entry-value-name"
             placeholder="Cardholder"
             maxLength={40}
-            ink="text-[13px] uppercase tracking-label opacity-90"
+            ink="text-base uppercase tracking-label opacity-90"
             zone="top"
             className="-mx-1.5 flex-1"
           />
@@ -126,10 +126,10 @@ export default function Fields() {
             // and `isValid` wants both — so the box has to say so itself.
             invalid={attempted && !(month.value && year.value)}
             maxLength={5}
-            ink="text-[13px]"
+            ink="text-base"
             flag={
               expired && (
-                <span className="flex-none text-[10px] uppercase tracking-label text-[#FF8A8A]">
+                <span className="flex-none text-2xs uppercase tracking-label text-[#FF8A8A]">
                   {t('Expired')}
                 </span>
               )
@@ -147,7 +147,7 @@ export default function Fields() {
             placeholder="•••"
             required
             maxLength={4}
-            ink="text-[13px]"
+            ink="text-base"
           />
           <Value
             name="pin"
@@ -160,7 +160,7 @@ export default function Fields() {
             // Mask, not real catalog copy — falls through to itself.
             placeholder="••••"
             maxLength={6}
-            ink="text-[13px]"
+            ink="text-base"
           />
           {!editing && (
             <button

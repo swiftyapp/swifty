@@ -4,6 +4,7 @@ import Meter from '@/components/elements/Meter'
 import { LEVEL_INK } from '@/components/elements/levels'
 import { ENTROPY_LABELS } from '@/services/generator'
 import { wellClass } from '@/components/elements/formStyles'
+import { META_TYPE } from '@/components/elements/tokens'
 
 interface Props {
   value: string
@@ -18,13 +19,13 @@ export default function Output({ value, bits, level }: Props) {
     <>
       <div
         data-testid="generator-output"
-        className={`min-h-14 ${wellClass} p-4 font-mono text-lg leading-relaxed break-all`}
+        className={`min-h-14 ${wellClass} p-4 text-lg leading-relaxed tracking-secret break-all`}
       >
         {value}
       </div>
       <div className="mt-3 flex items-center gap-2.5">
         <Meter level={level} />
-        <span className={cx('font-mono text-xs', LEVEL_INK[level])}>
+        <span className={cx(META_TYPE, LEVEL_INK[level])}>
           {t(ENTROPY_LABELS[level])} · {bits} {t('bits')}
         </span>
       </div>

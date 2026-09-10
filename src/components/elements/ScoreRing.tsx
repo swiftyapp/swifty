@@ -39,8 +39,8 @@ export default function ScoreRing({ score, size = 30, testid }: Props) {
         x="18"
         y="21.5"
         textAnchor="middle"
-        fontFamily="var(--font-mono)"
         fontSize="9"
+        fontWeight="600"
         fill="currentColor"
       >
         {score === null ? '—' : score}

@@ -1,5 +1,5 @@
 import { pct } from './useProgress'
-import { MONO_META } from '@/components/elements/tokens'
+import { META } from '@/components/elements/tokens'
 
 interface Props {
   done: number
@@ -16,7 +16,7 @@ export default function Progress({ done, total }: Props) {
           style={{ width: `${pct(done, total)}%` }}
         />
       </div>
-      <span className={MONO_META}>
+      <span className={META}>
         {done} / {total}
       </span>
     </div>

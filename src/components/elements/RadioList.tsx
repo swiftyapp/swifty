@@ -1,6 +1,6 @@
 import { cx } from '@/utils/cx'
 import { useRadioNav } from '@/hooks/useRadioNav'
-import { CARD, MONO_META, ROW_HAIRLINE } from './tokens'
+import { CARD, META, ROW_HAIRLINE } from './tokens'
 
 interface Props {
   options: { value: string; label: string; meta?: string }[]
@@ -11,7 +11,7 @@ interface Props {
 }
 
 // A single-choice list on the card surface — the long-form alternative to
-// Segmented, when options need room or a mono value on the right (languages,
+// Segmented, when options need room or a meta value on the right (languages,
 // timeouts, sort orders).
 export default function RadioList({
   options,
@@ -66,7 +66,7 @@ export default function RadioList({
             </span>
             <span className="min-w-0 flex-1 truncate text-base text-text">{option.label}</span>
             {option.meta && (
-              <span className={`flex-none ${MONO_META}`}>{option.meta}</span>
+              <span className={`flex-none ${META}`}>{option.meta}</span>
             )}
           </button>
         )

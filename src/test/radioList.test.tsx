@@ -11,7 +11,7 @@ const OPTIONS = [
 ]
 
 describe('RadioList', () => {
-  it('renders one radio per option with its mono meta', () => {
+  it('renders one radio per option with its meta', () => {
     render(<RadioList options={OPTIONS} value="60" onChange={vi.fn()} testidPrefix="lock" />)
 
     expect(screen.getAllByRole('radio')).toHaveLength(3)

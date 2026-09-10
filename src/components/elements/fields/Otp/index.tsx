@@ -3,7 +3,7 @@ import type { TKey } from '@/i18n'
 import { copy } from '@/services/copy'
 import { useOtp } from '@/hooks/useOtp'
 import Panel from '../../Panel'
-import { MONO_LABEL } from '../../tokens'
+import { LABEL } from '../../tokens'
 import { useField } from '../context'
 import Dial from './Dial'
 import { otpSecret } from './secret'
@@ -35,7 +35,7 @@ export default function OtpField({
 
   return (
     <Panel className="flex flex-col items-center p-3.5">
-      <div className={`self-stretch ${MONO_LABEL}`}>{t(label)}</div>
+      <div className={`self-stretch ${LABEL}`}>{t(label)}</div>
 
       {editing && (
         <input
@@ -53,7 +53,7 @@ export default function OtpField({
           // A pasted otpauth:// link collapses to the secret it carries, so the
           // vault only ever stores the thing the generator needs.
           onBlur={() => set(parsed || value.trim())}
-          className={`mt-2.5 h-6 w-full self-stretch truncate border-b bg-transparent text-center font-mono text-base text-text outline-none transition-colors placeholder:text-text3 ${
+          className={`mt-2.5 h-6 w-full self-stretch truncate border-b bg-transparent text-center text-base text-text outline-none transition-colors placeholder:text-text3 ${
             value && !parsed ? 'border-bad' : 'border-line2 focus:border-accent-line'
           }`}
         />

@@ -1,7 +1,7 @@
 import type { Entry, EntryType } from '@/lib/commands'
 import { kindOf } from '@/kinds'
 import { useTranslation } from 'react-i18next'
-import { MONO_TYPE } from '@/components/elements/tokens'
+import { LABEL_TYPE } from '@/components/elements/tokens'
 import Actions from './Actions'
 import Body from './Body'
 import Title from './Title'
@@ -40,7 +40,7 @@ export default function Edit({ type, revealed }: Props) {
             runs the full content width and its underline ends where the rows do. */}
         <div className="flex items-center justify-between gap-4">
           <div
-            className={`flex min-w-0 flex-1 items-center gap-2 truncate whitespace-nowrap ${MONO_TYPE} text-accent`}
+            className={`flex min-w-0 flex-1 items-center gap-2 truncate whitespace-nowrap ${LABEL_TYPE} text-accent`}
           >
             <span>{t('Editing')}</span>
             <span>·</span>
