@@ -10,6 +10,9 @@ import { ArchiveRailGlyph, GridRailGlyph, StarRailGlyph } from '../icons'
 // The 56px icon rail: brand mark · new-secret · all-items · favorites · archive ·
 // tags · spacer · generator · settings. Rail tiles are 36px with 20px glyphs —
 // one step up from the in-pane tiers so the rail reads as primary navigation.
+// Tags is a view like the three above it, not a filter over them: its menu
+// lists the vault's tags, and a picked tag gathers its items from across the
+// vault under the Tags tile.
 // The Vault Health tile is parked, not removed: `VaultHealth.tsx` and the
 // `health` view stay, reachable from Settings › Audit.
 export default function Sidebar() {
@@ -29,7 +32,6 @@ export default function Sidebar() {
       <ViewButton view="archive" label={t('Archive')} testid="view-archive">
         <ArchiveRailGlyph />
       </ViewButton>
-      <div className="h-1.5" />
       <Tags />
       <div className="flex-1" />
       <Generator />

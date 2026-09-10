@@ -5,19 +5,20 @@ import RailButton from '@/components/elements/RailButton'
 import { TagsRailGlyph } from '../../icons'
 import Menu from './Menu'
 
-// The rail's one filter tile. A tag narrows whatever view is open rather than
-// replacing it, so the tile is lit by an active tag — not by an open menu:
-// what it reports is that the list in front of you is being narrowed.
+// The Tags tile: a view of the rail like the three above it, reached through
+// its menu — the tile opens the list of tags, and picking one lands in the
+// Tags view with that tag's items. So it is lit like any view tile, by the
+// view being open, not by the menu.
 export default function Tags({ className, menu }: { className?: string; menu?: string }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const tag = useStore(state => state.filters.tag)
+  const selected = useStore(state => state.ui.view === 'tags')
 
   return (
     <div className="relative flex-none">
       <RailButton
         label={t('Tags')}
-        selected={tag !== null}
+        selected={selected}
         onClick={() => setOpen(value => !value)}
         testid="tags-button"
         className={className}

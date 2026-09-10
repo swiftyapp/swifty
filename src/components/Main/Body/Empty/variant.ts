@@ -37,8 +37,9 @@ export const useVariant = (): Variant | null => {
   if (view === 'health') return audit && Object.keys(audit).length === 0 ? 'health' : null
 
   // Nothing to filter means the view itself is empty, and each view says so in
-  // its own words — "no favorites yet" is not "your vault is empty".
-  if (rows.length === 0) return view === 'items' ? 'vault' : view
+  // its own words — "no favorites yet" is not "your vault is empty". The Tags
+  // view reads the whole vault, so its rows are empty only when the vault is.
+  if (rows.length === 0) return view === 'items' || view === 'tags' ? 'vault' : view
   if (visible.length > 0) return 'select'
   return query.trim() ? 'search' : 'kind'
 }

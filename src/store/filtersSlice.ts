@@ -6,8 +6,10 @@ export interface FiltersSlice {
   // `type: null` is "All Items" — the list shows every kind. The type filter is
   // a filter and nothing else: it no longer doubles as navigation or as the
   // kind of a new entry.
-  // `tag: null` is "every tag". A tag is a filter on the same footing, never a
-  // view: it composes with whichever view is open and with the kind filter.
+  // `tag` is what the Tags view shows: the items carrying it, from across the
+  // vault. Only that view holds one — `showTag` sets it with the view and
+  // `setView` clears it — and it still composes with the kind filter and the
+  // query.
   filters: { type: EntryType | null; tag: string | null; query: string }
   setFilterQuery: (query: string) => void
   setFilterType: (type: EntryType | null) => void

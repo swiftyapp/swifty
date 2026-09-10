@@ -1,7 +1,9 @@
 import type { StateCreator } from 'zustand'
 import type { StoreState } from './index'
 
-export type View = 'items' | 'favorites' | 'health' | 'archive'
+// `tags` is the vault by one tag (`filters.tag`): every item carrying it, from
+// across the vault, with the Tags tile lit. Entered through `showTag`.
+export type View = 'items' | 'favorites' | 'health' | 'archive' | 'tags'
 
 // The Settings sections, in nav order.
 export type Section = 'sync' | 'security' | 'audit' | 'import' | 'language'
@@ -36,6 +38,7 @@ export interface UiSlice {
   openAddPicker: () => void
   closeAddPicker: () => void
   setView: (view: View) => void
+  showTag: (tag: string) => void
 }
 
 export const createUiSlice: StateCreator<StoreState, [], [], UiSlice> = (set, get) => ({
@@ -74,11 +77,22 @@ export const createUiSlice: StateCreator<StoreState, [], [], UiSlice> = (set, ge
   setView: view => {
     set(s => ({
       ui: { ...s.ui, view },
+      // A tag belongs to the Tags view alone, so moving between views drops it.
+      filters: { ...s.filters, tag: null },
       entries: { ...s.entries, new: null, edit: false, current: null, prefill: null }
     }))
     // Tombstones are not part of the unlock payload, so the Archive reads them
     // when it is opened. Refetching on every visit is also what keeps it honest
     // after a sync merged a peer's deletes.
     if (view === 'archive') void get().loadArchive()
-  }
+  },
+  // The one way into the Tags view: the view and its tag change together, so
+  // there is never a frame of the Tags view showing the whole vault. The
+  // selection goes the way it does on any view change (see `setView`).
+  showTag: tag =>
+    set(s => ({
+      ui: { ...s.ui, view: 'tags' },
+      filters: { ...s.filters, tag },
+      entries: { ...s.entries, new: null, edit: false, current: null, prefill: null }
+    }))
 })

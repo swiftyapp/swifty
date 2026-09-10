@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useStore, setFilterTag } from '@/store'
+import { useStore, showTag } from '@/store'
 import { cx } from '@/utils/cx'
 import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
 import { CheckGlyph } from '../../icons'
@@ -16,13 +16,14 @@ export default function Menu({
   className?: string
 }) {
   const { t } = useTranslation()
-  const active = useStore(state => state.filters.tag)
+  // The tag the Tags view is showing, if that is the open view.
+  const active = useStore(state => (state.ui.view === 'tags' ? state.filters.tag : null))
   const tags = useTagCounts()
 
-  // A second pick on the active tag is how the filter is cleared, so the row
-  // that turned it on also turns it off.
+  // Picking a tag is navigation: it opens the Tags view on that tag's items,
+  // wherever the menu was opened from.
   const pick = (tag: string) => {
-    setFilterTag(tag === active ? null : tag)
+    showTag(tag)
     onClose()
   }
 
