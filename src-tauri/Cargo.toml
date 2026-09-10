@@ -83,7 +83,7 @@ tauri-plugin-process = "2"
 tauri-plugin-webdriver = "0.2"
 # Only the legacy-Electron vault migration needs it, and that only ever ran on
 # desktop (see `storage::ensure_migrated`).
-dirs = "6"
+dirs = "7"
 
 # Frameworks that exist on both macOS and iOS: Foundation, LocalAuthentication,
 # Vision and the Keychain.
