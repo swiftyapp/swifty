@@ -1,17 +1,16 @@
 import { useMemo } from 'react'
-import { useRows } from '../../Body/List/useVisibleEntries'
+import { useRows } from '../useVisibleEntries'
 
 export interface TagCount {
   tag: string
   count: number
 }
 
-// The tags of the current view's rows, with how many rows carry each.
+// Every tag in the vault, with how many items carry each.
 //
-// Counted off `useRows` — the view before any filter — for two reasons: the
-// counts stay truthful inside Favorites and the Archive, and picking a tag never
-// shrinks the menu that offered it (counting the filtered list would leave the
-// chosen tag as the only row left).
+// Counted off `useRows` — the Tags view's rows are the whole vault — rather than
+// the filtered list: a tag gathers items from across the vault, so its count
+// says how many it will show, whatever kind chip or query is on.
 export const useTagCounts = (): TagCount[] => {
   const rows = useRows()
 
@@ -20,7 +19,7 @@ export const useTagCounts = (): TagCount[] => {
     for (const row of rows)
       for (const tag of row.tags) totals.set(tag, (totals.get(tag) ?? 0) + 1)
 
-    // Busiest first, ties alphabetical, so the menu has a stable order.
+    // Busiest first, ties alphabetical, so the list has a stable order.
     return [...totals]
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))

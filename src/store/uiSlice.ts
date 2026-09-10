@@ -1,7 +1,9 @@
 import type { StateCreator } from 'zustand'
 import type { StoreState } from './index'
 
-export type View = 'items' | 'favorites' | 'health' | 'archive'
+// `tags` is the vault by tag: the list of tags until one is picked, then every
+// item carrying it (`filters.tag`), with the Tags tile lit throughout.
+export type View = 'items' | 'favorites' | 'health' | 'archive' | 'tags'
 
 // The Settings sections, in nav order.
 export type Section = 'sync' | 'security' | 'audit' | 'import' | 'language'
@@ -74,6 +76,9 @@ export const createUiSlice: StateCreator<StoreState, [], [], UiSlice> = (set, ge
   setView: view => {
     set(s => ({
       ui: { ...s.ui, view },
+      // A tag belongs to the Tags view alone, so moving between views drops it
+      // — and re-picking Tags with one active is the way back to the tag list.
+      filters: { ...s.filters, tag: null },
       entries: { ...s.entries, new: null, edit: false, current: null, prefill: null }
     }))
     // Tombstones are not part of the unlock payload, so the Archive reads them

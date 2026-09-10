@@ -54,7 +54,12 @@ export default function ListColumn({
   footer
 }: Props) {
   const view = useStore(state => state.ui.view)
+  const tag = useStore(state => state.filters.tag)
   const health = view === 'health'
+  // The Tags view's tag list is not an entry list: nothing in it to search,
+  // narrow by kind, sort or walk with the arrows. Once a tag is picked the
+  // column shows entries again and all of that comes back.
+  const tagList = view === 'tags' && !tag
   const onKeyDown = useListKeys()
   const title = useListTitle()
 
@@ -63,7 +68,7 @@ export default function ListColumn({
       // One keydown for the whole column, so ↑/↓ reach the list from the search
       // field as well as from a row. The audit list has no roving selection to
       // walk, so it is left off there.
-      onKeyDown={health ? undefined : onKeyDown}
+      onKeyDown={health || tagList ? undefined : onKeyDown}
       // The column fills whatever its caller gives it: 348px of the wide shell,
       // the whole phone screen on compact.
       className="flex min-h-0 min-w-0 flex-1 flex-col bg-list"
@@ -85,8 +90,8 @@ export default function ListColumn({
           {!health && actions}
         </div>
         {/* The audit is not a filtered view of the vault, so neither the query
-            nor the chips apply to it. */}
-        {!health && (
+            nor the chips apply to it — nor to a list of tags. */}
+        {!health && !tagList && (
           <>
             <Search className={search} />
             <KindChips />
