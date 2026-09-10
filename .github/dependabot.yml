@@ -16,6 +16,11 @@ updates:
       - javascript
     groups:
       # Batch the Tauri JS plugins so they bump together with the Rust side.
+      # Dependabot cannot group across ecosystems, so the npm and cargo Tauri
+      # PRs still arrive separately; `tauri build` requires each npm package
+      # and its crate to share a major.minor, and CI's supply-chain job
+      # (scripts/check-tauri-versions.mjs) fails when they drift. Merge the
+      # two Tauri PRs together, or bump the lagging side in the same PR.
       tauri-js:
         patterns:
           - '@tauri-apps/*'

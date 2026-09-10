@@ -78,6 +78,7 @@ jobs:
               - 'src-tauri/Cargo.toml'
               - 'src-tauri/Cargo.lock'
               - 'src-tauri/deny.toml'
+              - 'scripts/check-tauri-versions.mjs'
 
   frontend:
     name: Frontend (build + lint)
@@ -247,6 +248,14 @@ jobs:
         with:
           bun-version: 1.3.3
       - run: bun install --frozen-lockfile
+
+      # `tauri build` refuses to compile when a Tauri npm package and its Rust
+      # crate are on different major.minor releases. Dependabot bumps the two
+      # sides in separate PRs (npm vs cargo), so catch the drift here rather
+      # than in the release workflow.
+      - name: Tauri npm/crate versions agree
+        run: bun scripts/check-tauri-versions.mjs
+
       - name: bun audit (production deps — blocking)
         run: bun audit --audit-level=high --production
 
