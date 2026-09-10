@@ -35,8 +35,8 @@ const SLOT: Record<'items' | 'favorites' | 'generator' | 'settings', number> = {
  * thumb's spot, rather than the far top corner it had in the list header. The
  * Archive is not a destination: it is where deleted things go, not somewhere
  * you spend a thumb, so it moved into Settings. The Tags view is not here
- * either — the bar has no slot left for it — so its tile lives in the list
- * header, and like the Archive it lights no tab.
+ * either — the bar has no slot left for it — so its tile and menu live in the
+ * list header, and like the Archive it lights no tab.
  *
  * The selected tab is marked by one lens — an accent-soft pill — that slides
  * from the old tab to the new one and settles with a little overshoot, the way

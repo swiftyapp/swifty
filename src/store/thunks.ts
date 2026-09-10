@@ -103,10 +103,11 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       // A save always lands somewhere the user can see it: a filter that would
       // hide the row just written is dropped rather than silently swallowing it
       // (the editor no longer takes its kind from the filter, so the two can
-      // legitimately disagree, and an edit can drop the tag being filtered on).
+      // legitimately disagree). An edit that drops the tag the Tags view is
+      // showing leaves the view too — it is nothing without its tag.
       const { type, tag } = get().filters
       if (type && type !== meta.type) get().setFilterType(null)
-      if (tag && !meta.tags.includes(tag)) get().setFilterTag(null)
+      if (tag && !meta.tags.includes(tag)) get().setView('items')
       get().setCurrentEntry(meta.id)
       scheduleSync()
       refreshAudit()

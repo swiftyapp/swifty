@@ -10,26 +10,17 @@ export default function ViewButton({
   view,
   label,
   testid,
-  className,
   children
 }: {
   view: View
   label: string
   testid: string
-  // The compact list header dresses its tile for a finger (`TOUCH`).
-  className?: string
   children: ReactNode
 }) {
   const selected = useStore(state => state.ui.view === view)
 
   return (
-    <RailButton
-      label={label}
-      selected={selected}
-      onClick={() => setView(view)}
-      testid={testid}
-      className={className}
-    >
+    <RailButton label={label} selected={selected} onClick={() => setView(view)} testid={testid}>
       {children}
     </RailButton>
   )

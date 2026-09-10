@@ -5,9 +5,9 @@ import { kindOf } from '@/kinds'
 import type { TKey } from '@/i18n'
 
 // The column is titled after the view, except in All Items, where a kind chip
-// renames it to what it is now showing ("Logins"), and in Tags, where the
-// picked tag does ("#work"). The other views keep their own name: "Logins"
-// would lose the fact that you are looking at the Archive.
+// renames it to what it is now showing ("Logins"), and in Tags, where the tag
+// does ("#work"). The other views keep their own name: "Logins" would lose the
+// fact that you are looking at the Archive.
 const TITLES: Record<View, TKey> = {
   items: 'All Items',
   favorites: 'Favorites',
