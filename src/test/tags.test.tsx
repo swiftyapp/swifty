@@ -86,6 +86,20 @@ describe('the tags view', () => {
     expect(titles()).toHaveLength(2)
   })
 
+  it('picks a tag from the keyboard', async () => {
+    seed()
+    await openTags()
+
+    // Each row is its own tab stop: Tab off the rail lands on the first one.
+    screen.getByTestId('tag-row-money').focus()
+    await userEvent.tab()
+    expect(screen.getByTestId('tag-row-work')).toHaveFocus()
+
+    await userEvent.keyboard('{Enter}')
+    expect(useStore.getState().filters.tag).toBe('work')
+    expect(titles()).toHaveLength(2)
+  })
+
   it('returns to the tag list from the chip', async () => {
     seed()
     await openTags()
