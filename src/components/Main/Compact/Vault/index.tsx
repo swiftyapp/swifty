@@ -8,10 +8,10 @@ import Tags from '../../Sidebar/Tags'
 import { ROOT_HEADER, TAB_BAR_CLEARANCE, TOUCH } from '../chrome'
 import Heading from '../Heading'
 
-// The 44px search field. Passed as classes rather than asked for by a flag:
-// the box is the same field, dressed for a finger.
-const SEARCH =
-  'mt-4 flex h-11 items-center gap-2.5 rounded-lg border border-line bg-field pl-3.5 pr-2.5 text-text3 transition-colors focus-within:border-accent-line [&_input]:text-md'
+// The 44px search field's measure. Passed as classes rather than asked for by
+// a flag: the box is the same field, dressed for a finger — its surface,
+// states and motion are the field's own (`ListColumn/Search`).
+const SEARCH = 'mt-4 h-11 gap-2.5 rounded-lg pl-3.5 pr-2.5 [&_input]:text-md'
 
 /**
  * The list root — the screen the tab bar comes home to.

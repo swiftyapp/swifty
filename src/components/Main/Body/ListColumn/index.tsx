@@ -31,8 +31,8 @@ interface Props {
    */
   header?: string
   /**
-   * The search box's own classes. Absent, it keeps the 28px desktop field; the
-   * compact root sends the 44px touch one.
+   * The search box's measure — height, radius, padding. Absent, it keeps the
+   * 32px desktop field; the compact root sends the 44px touch one.
    */
   search?: string
   /** Extra classes for the scroller, so a shell can reserve room under it. */
