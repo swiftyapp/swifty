@@ -8,6 +8,7 @@ type Mask = '•••' | '••••' | '••/••' | '•••• •�
 import { useCopied } from '@/hooks/useCopied'
 import { useFields } from '@/components/elements/fields'
 import { CheckGlyph, CopyGlyph } from '@/components/Main/icons'
+import { LABEL_TYPE, META_TYPE } from '@/components/elements/tokens'
 
 // Opaque version of the hover wash (white/10 composited over the card's
 // ground), so a click doesn't visibly shift the ground but the value is fully
@@ -88,7 +89,7 @@ export default function Value({
   const { copied, copy } = useCopied()
 
   const caption = label && (
-    <span className="block text-[11px] uppercase tracking-label opacity-50">{t(label)}</span>
+    <span className={`block ${LABEL_TYPE} opacity-50`}>{t(label)}</span>
   )
 
   if (set) {
@@ -116,7 +117,7 @@ export default function Value({
           )}
         />
         {invalid && (
-          <span className="mt-1 block text-[11px] text-[#FF8A8A]">{t('Required')}</span>
+          <span className={`mt-1 block ${META_TYPE} text-[#FF8A8A]`}>{t('Required')}</span>
         )}
       </label>
     )

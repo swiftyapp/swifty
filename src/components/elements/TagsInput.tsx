@@ -1,5 +1,6 @@
 import { useState, type KeyboardEvent } from 'react'
 import { TAG_CHIP } from './fields/chip'
+import { META_TYPE } from './tokens'
 
 interface Props {
   value: string[]
@@ -47,7 +48,7 @@ export default function TagsInput({ value, onChange, placeholder }: Props) {
         // The one input in the entry editor with no `name` — specs address it here.
         data-testid="tags-input"
         placeholder={placeholder}
-        className="h-6 min-w-[110px] flex-1 border-b border-line2 bg-transparent font-mono text-xs text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line"
+        className={`h-6 min-w-[110px] flex-1 border-b border-line2 bg-transparent ${META_TYPE} text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line`}
         value={input}
         onChange={e => setInput(e.target.value)}
         onKeyDown={handleKeyDown}

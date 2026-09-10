@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { OTP_PERIOD } from '@/hooks/useOtp'
-import { MONO_META } from '../../tokens'
+import { META } from '../../tokens'
 
 const R = 48
 const CIRCUMFERENCE = 2 * Math.PI * R // ≈ 301
@@ -30,11 +30,11 @@ export default function Dial({ code, time }: { code: string; time: number }) {
             strokeDasharray={`${(time / OTP_PERIOD) * CIRCUMFERENCE} ${CIRCUMFERENCE}`}
           />
         </svg>
-        <div className="font-mono text-xl tracking-secret text-text">
+        <div className="text-xl tracking-secret tabular-nums text-text">
           {`${code.slice(0, 3)} ${code.slice(3)}`}
         </div>
       </div>
-      <div className={MONO_META}>
+      <div className={META}>
         {t('refreshes in {{n}}s', { n: time })}
       </div>
     </>

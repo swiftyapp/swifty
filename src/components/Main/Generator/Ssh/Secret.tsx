@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import CopyButton from '@/components/elements/CopyButton'
 import IconButton from '@/components/elements/IconButton'
-import { MONO_LABEL } from '@/components/elements/tokens'
+import { LABEL } from '@/components/elements/tokens'
 import { wellClass } from '@/components/elements/formStyles'
 import { EyeGlyph, EyeOffGlyph } from '../../icons'
 
@@ -16,7 +16,7 @@ export default function Secret({ value }: { value: string }) {
 
   return (
     <div>
-      <div className={MONO_LABEL}>{t('Private key')}</div>
+      <div className={LABEL}>{t('Private key')}</div>
       <div className="mt-1 flex items-start gap-1.5">
         <div
           data-testid="generator-ssh-private"

@@ -4,6 +4,7 @@ import { cx } from '@/utils/cx'
 import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
 import { CheckGlyph } from '../../icons'
 import { useTagCounts } from './useTagCounts'
+import { META, META_TYPE } from '@/components/elements/tokens'
 
 // Hangs off the right edge of the 36px rail tile, floating over the list column
 // — the rail itself is too narrow to hold a menu. `className` is where it is
@@ -32,7 +33,7 @@ export default function Menu({
         {tags.length === 0 ? (
           <div className="px-3.5 py-2.5" data-testid="tags-empty">
             <div className="text-base text-text2">{t('No tags yet')}</div>
-            <div className="mt-1 text-xs text-text3">
+            <div className={`mt-1 ${META}`}>
               {t('Add tags to an entry and they show up here.')}
             </div>
           </div>
@@ -46,7 +47,7 @@ export default function Menu({
                 <span className="min-w-0 flex-1 truncate">{tag}</span>
                 <span
                   data-testid={`tag-option-${tag}-count`}
-                  className="flex-none font-mono text-xs opacity-60"
+                  className={`flex-none ${META_TYPE} opacity-60`}
                 >
                   {count}
                 </span>

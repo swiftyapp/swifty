@@ -6,7 +6,7 @@ import { LENGTH_RANGE } from '@/services/generator'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Toggle from '@/components/elements/Toggle'
-import { MONO_META } from '@/components/elements/tokens'
+import { META } from '@/components/elements/tokens'
 
 // The seed values for every new password, shared with the ⌘G generator dialog.
 // `uppercase` stays out of the UI — the dialog always draws from both cases —
@@ -37,7 +37,7 @@ export default function GeneratorGroup() {
               data-testid="settings-generator-length"
               onChange={e => update({ length: Number(e.target.value) })}
             />
-            <span className={`w-[68px] flex-none text-right ${MONO_META}`}>
+            <span className={`w-[68px] flex-none text-right ${META}`}>
               {options.length} {t('chars')}
             </span>
           </div>

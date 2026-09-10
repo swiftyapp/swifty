@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { MONO_LABEL } from '@/components/elements/tokens'
+import { LABEL } from '@/components/elements/tokens'
 import { useImport } from './useImport'
 import Tiles from './Tiles'
 import DropZone from './DropZone'
@@ -17,7 +17,7 @@ export default function Import() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className={MONO_LABEL}>{t('Bring secrets from')}</div>
+      <div className={LABEL}>{t('Bring secrets from')}</div>
       <Tiles
         active={active}
         disabled={flow.running}

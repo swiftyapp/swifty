@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import type { SshKeyPair } from '@/lib/commands'
 import Button from '@/components/elements/Button'
-import { MONO_LABEL } from '@/components/elements/tokens'
+import { LABEL, META_TYPE } from '@/components/elements/tokens'
 import { inputClass, wellClass } from '@/components/elements/formStyles'
 import { cx } from '@/utils/cx'
 import Line from './Line'
@@ -31,7 +31,7 @@ export default function Ssh({ pair, pending, error, onRetry, comment, onComment 
           data-testid="generator-ssh-error"
           className={`flex items-center gap-3 ${wellClass} px-3 py-2.5`}
         >
-          <div className="flex-1 font-mono text-xs tracking-label text-bad">
+          <div className={`flex-1 ${META_TYPE} tracking-label text-bad`}>
             {t('Could not generate a key.')}
           </div>
           <Button size="md" variant="ghost" testid="generator-ssh-retry" onClick={onRetry}>
@@ -56,7 +56,7 @@ export default function Ssh({ pair, pending, error, onRetry, comment, onComment 
         </div>
       )}
       <div>
-        <label htmlFor="generator-ssh-comment" className={MONO_LABEL}>
+        <label htmlFor="generator-ssh-comment" className={LABEL}>
           {t('Comment')}
         </label>
         <input
@@ -69,7 +69,7 @@ export default function Ssh({ pair, pending, error, onRetry, comment, onComment 
           placeholder="alice@laptop"
           data-testid="generator-ssh-comment"
           onChange={event => onComment(event.target.value)}
-          className={`mt-1 block font-mono ${inputClass}`}
+          className={`mt-1 block ${inputClass}`}
         />
       </div>
     </div>

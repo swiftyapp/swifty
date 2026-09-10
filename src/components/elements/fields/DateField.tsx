@@ -3,6 +3,7 @@ import type { TKey } from '@/i18n'
 import { getFormat } from '@/defaults/dateFormat'
 import { cx } from '@/utils/cx'
 import { daysUntil, formatDate, relativeFuture, toIsoDate } from '@/utils/time'
+import { META_TYPE } from '../tokens'
 import { useField } from './context'
 import Field from './Field'
 
@@ -29,7 +30,7 @@ export default function DateField({
   const days = expiry && !editing ? daysUntil(value) : null
   const stamp =
     days === null ? undefined : (
-      <span className={cx('font-mono text-xs', days < 0 ? 'text-bad' : 'text-text3')}>
+      <span className={cx(META_TYPE, days < 0 ? 'text-bad' : 'text-text3')}>
         {days < 0 ? t('Expired') : t('Expires {{when}}', { when: relativeFuture(value) })}
       </span>
     )

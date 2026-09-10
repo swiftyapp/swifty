@@ -5,7 +5,7 @@ import { setFilterQuery } from '@/store'
 import { PlusGlyph } from '@/components/Main/icons'
 import TagsInput from '@/components/elements/TagsInput'
 import { TAG_CHIP } from '@/components/elements/fields/chip'
-import { MONO_LABEL, MONO_META } from '@/components/elements/tokens'
+import { LABEL, META, META_TYPE } from '@/components/elements/tokens'
 import { dateTime, relativeLong, shortDate, toTime } from '@/utils/time'
 
 interface Props {
@@ -39,7 +39,8 @@ const stamp = (label: TKey, iso: string | undefined, spell: Stamp[2]): Stamp | n
 // the content, a small label over each value — but structured, so it never
 // reads as a sentence tacked on under the rows. Tags take the left, where the
 // title sits in the header; the timestamps hold the right, under the header's
-// actions, and stay there whether or not there are tags.
+// actions, and stay there whether or not there are tags. Every cell has the
+// same two lines, so the labels share one baseline and the values another.
 export default function Footer({
   tags,
   onTags,
@@ -80,7 +81,7 @@ export default function Footer({
               type="button"
               data-testid="add-tag-button"
               onClick={onAdd}
-              className={`flex h-6 cursor-pointer items-center gap-1 ${MONO_META} transition-colors hover:text-text`}
+              className={`flex h-6 cursor-pointer items-center gap-1 ${META} transition-colors hover:text-text`}
             >
               <PlusGlyph size={12} />
               {t('Add tag')}
@@ -106,7 +107,18 @@ export default function Footer({
         <div className="ml-auto flex flex-none gap-10 @max-[420px]:ml-0 @max-[420px]:gap-6">
           {stamps.map(([label, iso, spell]) => (
             <Cell key={label} label={label} className="text-right @max-[420px]:text-left">
-              <span title={dateTime(iso)}>{spell(iso)}</span>
+              {/* Chip-height like the tags beside it, so the value sits on the
+                  same line as the chip text and the cells end together. A step
+                  up from the label in ink and weight, but still short of the
+                  content's full ink: within the footer the value is the
+                  information and the label only says what it is a value of,
+                  yet the footer as a whole stays meta to the rows above it. */}
+              <span
+                className={`flex h-6 items-center justify-end ${META_TYPE} font-medium text-text2 @max-[420px]:justify-start`}
+                title={dateTime(iso)}
+              >
+                {spell(iso)}
+              </span>
             </Cell>
           ))}
         </div>
@@ -115,11 +127,12 @@ export default function Footer({
   )
 }
 
-// One footer cell: the mono micro-label over the value, the way the rows pair
-// theirs — only stacked, since the footer is a strip rather than a column. The
-// value is a tier up from the label (base over xs, as in the rows): uppercase
-// and tracking make an 11px label read larger than it is, so at the same size
-// it was the label that drew the eye. Secondary stays a matter of ink.
+// One footer cell: the micro-label over the value, the way the rows pair theirs
+// — only stacked, since the footer is a strip rather than a column, and flush:
+// the value's own line height is all the air the pair needs. Every cell is
+// built the same, so a row of them lines up twice: labels with labels, values
+// with values. What sits under the label is the caller's (chips, an input, a
+// date) and stays a tier down from the content above.
 function Cell({
   label,
   className,
@@ -132,8 +145,8 @@ function Cell({
   const { t } = useTranslation()
   return (
     <div className={className}>
-      <div className={MONO_LABEL}>{t(label)}</div>
-      <div className="mt-1 font-mono text-base text-text2">{children}</div>
+      <div className={LABEL}>{t(label)}</div>
+      <div>{children}</div>
     </div>
   )
 }

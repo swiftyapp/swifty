@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
 import { MIN_LENGTH } from '@/services/strength'
 import { useStrength } from '@/hooks/useStrength'
-import { MONO_META } from './tokens'
+import { META } from './tokens'
 
 const LABELS: TKey[] = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']
 
@@ -43,7 +43,7 @@ export default function PasswordStrength({ password }: Props) {
           />
         ))}
       </div>
-      <div className={`mt-1.5 flex justify-between gap-2 ${MONO_META}`}>
+      <div className={`mt-1.5 flex justify-between gap-2 ${META}`}>
         <span data-testid="password-strength-label">
           {score !== null ? t(LABELS[score]) : ''}
         </span>

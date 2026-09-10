@@ -9,7 +9,7 @@ import { StarGlyph } from '../../../icons'
 import { stampOf } from '../order'
 import Flag from './Flag'
 import { flagOf } from './audit'
-import { MONO_META } from '@/components/elements/tokens'
+import { META } from '@/components/elements/tokens'
 
 interface Props {
   entry: EntryMeta
@@ -72,7 +72,7 @@ export default function Item({ entry }: Props) {
         </span>
       )}
       {meta && (
-        <span className={`flex-none ${MONO_META}`}>{meta}</span>
+        <span className={`flex-none ${META}`}>{meta}</span>
       )}
     </div>
   )

@@ -371,7 +371,7 @@ describe('Settings › language & region', () => {
     await waitFor(() => expect(i18n.resolvedLanguage).toBe('de-DE'))
   })
 
-  // The mono labels are uppercased by CSS, and `text-transform` follows the
+  // The micro labels are uppercased by CSS, and `text-transform` follows the
   // document language: under `lang="en"` Turkish "i" becomes "I" rather than
   // "İ", misspelling every label in the Turkish UI.
   it('tells the document what language it is in', async () => {

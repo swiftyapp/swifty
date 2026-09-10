@@ -8,8 +8,7 @@ import { applyTheme, getTheme } from './theme'
 import { i18nReady } from './i18n'
 import './shortcuts'
 // Design tokens + base (Tailwind v4). Sole stylesheet now the SASS is gone.
-// Type comes from the OS system stacks (see --font-sans/--font-mono) — no
-// bundled webfonts.
+// Type comes from the OS system stack (see --font-sans) — no bundled webfonts.
 import './styles/theme.css'
 
 applyPlatform()

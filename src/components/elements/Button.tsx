@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { cx } from '@/utils/cx'
+import { META_TYPE } from './tokens'
 
 type Variant = 'primary' | 'ghost' | 'pale' | 'danger'
 // Two control heights, per the design system: md 28px (inline actions, pairs
@@ -9,7 +10,7 @@ type Size = 'md' | 'lg'
 interface Props {
   variant?: Variant
   size?: Size
-  // Full-width auth call-to-action treatment (taller, mono uppercase) used by the
+  // Full-width auth call-to-action treatment (taller, tracked uppercase) used by the
   // lock/setup/restore flows. Overrides `size`.
   block?: boolean
   // Borderless keyboard hint rendered after the label (e.g. '⏎', '⌘⏎').
@@ -30,7 +31,7 @@ const sizes: Record<Size, string> = {
   lg: 'h-9 px-4'
 }
 
-const blockStyle = 'w-full px-5 py-3 font-mono uppercase tracking-label'
+const blockStyle = 'w-full px-5 py-3 uppercase tracking-label'
 
 // The solid-fill treatment: light ink, a 1px top highlight, and a hover that
 // brightens the fill itself since there is no border or ground to swap.
@@ -77,7 +78,9 @@ export default function Button({
       {/* A chip rather than dimmed text: on an accent fill, opacity is the one
           thing that makes the hint disappear. */}
       {kbd && (
-        <span className="flex-none rounded-xs bg-[color-mix(in_srgb,currentColor_14%,transparent)] px-1 font-mono text-xs leading-4">
+        <span
+          className={`flex-none rounded-xs bg-[color-mix(in_srgb,currentColor_14%,transparent)] px-1 ${META_TYPE} leading-4`}
+        >
           {kbd}
         </span>
       )}

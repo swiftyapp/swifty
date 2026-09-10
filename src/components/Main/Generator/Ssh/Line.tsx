@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import CopyButton from '@/components/elements/CopyButton'
-import { MONO_LABEL } from '@/components/elements/tokens'
+import { LABEL } from '@/components/elements/tokens'
 import { wellClass } from '@/components/elements/formStyles'
 import type { TKey } from '@/i18n'
 
@@ -16,7 +16,7 @@ export default function Line({ label, value, testid }: Props) {
   const { t } = useTranslation()
   return (
     <div>
-      <div className={MONO_LABEL}>{t(label)}</div>
+      <div className={LABEL}>{t(label)}</div>
       <div className="mt-1 flex items-start gap-1.5">
         <div
           data-testid={testid}

@@ -5,8 +5,6 @@ interface Props<T extends string> {
   options: { value: T; label: string }[]
   value: T
   onChange: (value: T) => void
-  // Mono labels, for numeric/unit values like "10 m".
-  mono?: boolean
   // Names the radiogroup for screen readers — usually the row's own label,
   // which is otherwise only visually associated with the control.
   name?: string
@@ -21,7 +19,6 @@ export default function Segmented<T extends string>({
   options,
   value,
   onChange,
-  mono,
   name,
   testidPrefix,
   className
@@ -54,8 +51,7 @@ export default function Segmented<T extends string>({
             data-testid={testidPrefix && `${testidPrefix}-${option.value}`}
             onClick={() => onChange(option.value)}
             className={cx(
-              'cursor-pointer rounded-sm px-2.5 py-[3px] text-base transition-colors',
-              mono && 'font-mono',
+              'cursor-pointer rounded-sm px-2.5 py-[3px] text-base tabular-nums transition-colors',
               active ? 'bg-accent-soft text-text' : 'text-text3 hover:text-text'
             )}
           >

@@ -125,7 +125,7 @@ describe('Main', () => {
     renderWithStore(<Main />, { store: seed() })
 
     const count = (testid: string) =>
-      screen.getByTestId(testid).querySelector('.font-mono')?.textContent
+      screen.getByTestId(`${testid}-count`).textContent
 
     expect(count('filter-all')).toBe('3')
     expect(count('filter-login')).toBe('1')

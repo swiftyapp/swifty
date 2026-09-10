@@ -3,7 +3,7 @@ import type { EntryMeta } from '@/lib/commands'
 import type { Kind } from '@/kinds/types'
 import { KIND_TINT } from '@/kinds/tint'
 import { cx } from '@/utils/cx'
-import { MONO_META } from '@/components/elements/tokens'
+import { META } from '@/components/elements/tokens'
 
 // What every kind's list row component is handed (see src/kinds/*/ListRow).
 export interface ContentProps {
@@ -23,7 +23,7 @@ interface Props {
 }
 
 // Shared inner layout for every list item, whatever its kind: a rounded glyph
-// tile, the title (with an optional audit flag beside it), and an optional mono
+// tile, the title (with an optional audit flag beside it), and an optional muted
 // secondary line. The kind-specific bits (which glyph, which secondary text)
 // live in src/kinds so this stays a single source of truth for spacing and
 // typography.
@@ -50,7 +50,7 @@ export default function Row({ glyph, title, sub, flag, tint }: Props) {
           {flag}
         </div>
         {sub && (
-          <div className={`mt-0.5 truncate ${MONO_META}`}>
+          <div className={`mt-0.5 truncate ${META}`}>
             {sub}
           </div>
         )}

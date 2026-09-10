@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import type { ExtraField } from '@/lib/commands'
 import { PlusGlyph } from '../../../Main/icons'
 import Panel from '../../Panel'
-import { MONO_LABEL } from '../../tokens'
+import { LABEL } from '../../tokens'
 import { useFields } from '../context'
 import { isBlank, rowsOf } from './extras'
 import CustomFieldRow from './Row'
@@ -31,7 +31,7 @@ export default function CustomFields({ name = 'extra' }) {
 
   return (
     <div className="mt-4">
-      <span className={`mb-1.5 block ${MONO_LABEL}`}>{t('Custom fields')}</span>
+      <span className={`mb-1.5 block ${LABEL}`}>{t('Custom fields')}</span>
       {shown.length > 0 && (
         <Panel>
           {shown.map((field, index) => (

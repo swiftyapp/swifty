@@ -2,7 +2,7 @@ import { useId, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
 import type { TKey } from '@/i18n'
-import { MONO_LABEL, ROW_HAIRLINE } from '../tokens'
+import { LABEL, ROW_HAIRLINE } from '../tokens'
 import { useFields } from './context'
 
 interface Props {
@@ -47,7 +47,7 @@ const STACK_SIGIL = '@max-[420px]:hidden'
 const STACK_RAIL =
   '@max-[420px]:w-auto @max-[420px]:any-pointer-coarse:[&_button]:h-11 @max-[420px]:any-pointer-coarse:[&_button]:w-11'
 
-// THE detail-row geometry: a w-32 mono label column, the value, trailing
+// THE detail-row geometry: a w-32 micro-label column, the value, trailing
 // controls, then anything that belongs under the value. Read values and their
 // editors both render through it, so switching modes never moves a row.
 export default function FieldRow({ label, prefix, actions, below, error, children }: Props) {
@@ -69,7 +69,7 @@ export default function FieldRow({ label, prefix, actions, below, error, childre
                 catalog, rather than folded onto a second line. */}
             <label
               htmlFor={id}
-              className={`w-32 flex-none whitespace-nowrap ${MONO_LABEL} ${STACK_LABEL}`}
+              className={`w-32 flex-none whitespace-nowrap ${LABEL} ${STACK_LABEL}`}
             >
               {t(label)}
             </label>

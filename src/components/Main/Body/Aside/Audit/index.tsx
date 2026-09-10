@@ -3,7 +3,7 @@ import type { Audit, AuditItem } from '@/lib/commands'
 import { useTranslation } from 'react-i18next'
 import Score from './Score'
 import Panel from '@/components/elements/Panel'
-import { MONO_LABEL, ROW_HAIRLINE } from '@/components/elements/tokens'
+import { LABEL, ROW_HAIRLINE } from '@/components/elements/tokens'
 
 const count = (audit: Audit, property: keyof AuditItem) =>
   Object.values(audit).filter(item => item[property]).length
@@ -44,7 +44,7 @@ export default function Audit() {
 
   return (
     <div className="mx-auto flex max-w-[420px] flex-col items-center py-4">
-      <div className={MONO_LABEL}>{t('Password Audit')}</div>
+      <div className={LABEL}>{t('Password Audit')}</div>
       <div className="mt-6">
         <Score audit={audit} />
       </div>
@@ -59,7 +59,7 @@ export default function Audit() {
             >
               <span className={`h-1.5 w-1.5 flex-none rounded-full ${s.dot}`} />
               <span className="flex-1 text-base text-text2">{s.label}</span>
-              <span data-testid="audit-stat-value" className="font-mono text-base text-text">
+              <span data-testid="audit-stat-value" className="text-base tabular-nums text-text">
                 {s.value}
               </span>
             </div>

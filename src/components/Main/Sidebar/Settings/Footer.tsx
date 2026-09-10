@@ -3,10 +3,12 @@ import { useStore } from '@/store'
 import { APP_NAME } from '@/lib/app'
 import { isMobile } from '@/lib/platform'
 import { useVaultMeta, vaultHome } from '@/hooks/useAuthMeta'
-import { MONO_META } from '@/components/elements/tokens'
+import { META } from '@/components/elements/tokens'
 
 // Version and update state, pinned under the nav. The status line doubles as the
 // "check for updates" control — there is no separate Updates section any more.
+// Two lines of the meta tier: the app and its version a shade up, since that is
+// the line someone came here to read, the status muted beneath it.
 export default function Footer() {
   const { t } = useTranslation()
   const meta = useVaultMeta()
@@ -24,8 +26,8 @@ export default function Footer() {
   const home = meta ? vaultHome(meta.configured) : null
 
   return (
-    <div className={`mt-4 flex flex-col items-start gap-0.5 ${MONO_META}`}>
-      <div data-testid="settings-version">
+    <div className={`mt-4 flex flex-col items-start gap-0.5 ${META}`}>
+      <div data-testid="settings-version" className="text-text2">
         {meta?.version ? `${APP_NAME} ${meta.version}` : APP_NAME}
       </div>
       {isMobile ? (
@@ -38,7 +40,7 @@ export default function Footer() {
           title={t('Check for updates')}
           data-testid="settings-update-status"
           onClick={() => runUpdateCheck()}
-          className="cursor-pointer text-left transition-colors hover:text-text2"
+          className="cursor-pointer text-left transition-colors hover:text-text"
         >
           {status}
           {home && ` · ${home}`}

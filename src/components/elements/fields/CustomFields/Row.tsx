@@ -5,7 +5,7 @@ import { cx } from '@/utils/cx'
 import { TrashGlyph } from '../../../Main/icons'
 import CopyButton from '../../CopyButton'
 import IconButton from '../../IconButton'
-import { HOVER_ONLY, MONO_LABEL, MONO_TYPE, ROW_HAIRLINE } from '../../tokens'
+import { HOVER_ONLY, LABEL, LABEL_TYPE, ROW_HAIRLINE, VALUE } from '../../tokens'
 
 interface Props {
   field: ExtraField
@@ -19,12 +19,12 @@ interface Props {
 }
 
 // The same value column in both modes, so switching does not move the row.
-const INK = 'block h-6 w-full min-w-0 truncate font-mono text-base leading-6 text-text'
+const INK = `${VALUE} w-full text-text`
 const BOX =
   'border-b border-line2 bg-transparent outline-none transition-colors placeholder:text-text3 focus:border-accent-line'
 
 // One label/value pair, in the detail row's geometry: the label takes the w-32
-// mono column the fixed rows use, the value the rest. Reading, the value gets a
+// label column the fixed rows use, the value the rest. Reading, the value gets a
 // copy button like any other; editing, the label is typed too — it is the user's
 // word for this field, not a translated one — and the row can be dropped.
 export default function CustomFieldRow({
@@ -59,12 +59,12 @@ export default function CustomFieldRow({
           autoComplete="off"
           spellCheck={false}
           onChange={event => onChange({ ...field, label: event.target.value })}
-          className={cx('w-32 flex-none text-text', MONO_TYPE, BOX)}
+          className={cx('w-32 flex-none text-text', LABEL_TYPE, BOX)}
         />
       ) : (
         <span
           data-testid={`entry-extra-label-${index}`}
-          className={cx('w-32 flex-none truncate', MONO_LABEL)}
+          className={cx('w-32 flex-none truncate', LABEL)}
         >
           {field.label}
         </span>

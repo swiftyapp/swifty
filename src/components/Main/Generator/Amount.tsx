@@ -4,7 +4,7 @@ import {
   WORDS_RANGE,
   type GeneratorSettings
 } from '@/services/generator'
-import { MONO_LABEL } from '@/components/elements/tokens'
+import { LABEL } from '@/components/elements/tokens'
 
 interface Props {
   settings: GeneratorSettings
@@ -21,7 +21,7 @@ export default function Amount({ settings, onChange }: Props) {
 
   return (
     <div className="mt-5 flex items-center gap-3.5">
-      <span className={`w-[66px] flex-none ${MONO_LABEL}`}>
+      <span className={`w-[66px] flex-none ${LABEL}`}>
         {t(byWords ? 'Words' : 'Length')}
       </span>
       <input
@@ -37,7 +37,7 @@ export default function Amount({ settings, onChange }: Props) {
         }}
         className="h-1.5 flex-1 accent-accent"
       />
-      <span className="w-[58px] flex-none text-right font-mono text-base text-text2">
+      <span className="w-[58px] flex-none text-right text-base tabular-nums text-text2">
         {value} {t(byWords ? 'words' : 'chars')}
       </span>
     </div>

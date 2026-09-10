@@ -52,7 +52,6 @@ export default function SessionGroup() {
         description={t('Idle time before the vault seals itself')}
         control={
           <Segmented
-            mono
             name={lockLabel}
             options={LOCK_OPTIONS}
             value={lock}
@@ -66,7 +65,6 @@ export default function SessionGroup() {
         description={t('Copied secrets are wiped after this delay')}
         control={
           <Segmented
-            mono
             name={clipboardLabel}
             options={clipboardOptions(t)}
             value={clipboard}

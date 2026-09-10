@@ -8,7 +8,7 @@ import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Segmented from '@/components/elements/Segmented'
 import RadioList from '@/components/elements/RadioList'
-import { MONO_LABEL } from '@/components/elements/tokens'
+import { LABEL } from '@/components/elements/tokens'
 
 const THEMES: { value: ThemePreference; label: TKey }[] = [
   { value: 'light', label: 'Light' },
@@ -33,7 +33,7 @@ export default function Language() {
   return (
     <>
       <section className="mb-7">
-        <div className={`${MONO_LABEL} mb-2`}>{t('Language')}</div>
+        <div className={`${LABEL} mb-2`}>{t('Language')}</div>
         <RadioList
           name="locale"
           value={i18n.resolvedLanguage ?? ''}
@@ -52,7 +52,6 @@ export default function Language() {
           label={formatLabel}
           control={
             <Segmented
-              mono
               name={formatLabel}
               options={DATE_FORMATS.map(value => ({ value, label: value }))}
               value={format}

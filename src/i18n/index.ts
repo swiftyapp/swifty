@@ -96,9 +96,9 @@ export const i18nReady = resolveInitial().then(lng =>
 // document what language it is in. Registered once, rather than wrapping
 // `changeLanguage`, so a change from anywhere is picked up.
 //
-// `lang` is not decoration: the mono labels are uppercased by CSS
-// (`text-transform`, see MONO_TYPE), and casing is language-dependent. Under
-// `lang="en"` Turkish "i" uppercases to "I" instead of "İ", so every mono label
+// `lang` is not decoration: the micro labels are uppercased by CSS
+// (`text-transform`, see LABEL_TYPE), and casing is language-dependent. Under
+// `lang="en"` Turkish "i" uppercases to "I" instead of "İ", so every micro label
 // in the Turkish UI is misspelled. It also drives screen-reader pronunciation
 // and line breaking.
 i18n.on('languageChanged', locale => {
