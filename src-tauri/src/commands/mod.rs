@@ -66,13 +66,18 @@ pub fn open_with_key(app: &AppHandle, key: &VaultKey) -> Result<(SqliteStore, Ve
 // — so an unflagged login is re-checked on each unlock. That is the same set of
 // payloads the post-unlock audit unseals anyway, and it is self-healing: a row
 // arriving from a peer still on an older build gets corrected here too.
+//
+// An env row's `file_name` and `var_count` follow the `card_brand` shape: the
+// count is `Some` for every stamped env entry, so a NULL count is the marker,
+// and a file that simply has no name stays NULL there without re-running.
 fn backfill_derived_columns(store: &SqliteStore, key: &VaultKey) {
     let Ok(metas) = store.list() else { return };
     let cipher = key.payload_cipher();
     for meta in metas {
         let brand_missing = meta.kind == "card" && meta.card_brand.is_none();
         let passkey_unflagged = meta.kind == "login" && !meta.has_passkey;
-        if !brand_missing && !passkey_unflagged {
+        let env_unstamped = meta.kind == "env" && meta.var_count.is_none();
+        if !brand_missing && !passkey_unflagged && !env_unstamped {
             continue;
         }
         let Ok(Some(record)) = store.get(&meta.id) else {
@@ -90,6 +95,12 @@ fn backfill_derived_columns(store: &SqliteStore, key: &VaultKey) {
         // `upsert` recomputes the flag from the payload it is writing.
         if passkey_unflagged && crate::store::migrate::derived_has_passkey(&entry) {
             let _ = store.set_has_passkey(&meta.id, true);
+        }
+        if env_unstamped {
+            if let Some(count) = crate::store::migrate::derived_var_count(&entry) {
+                let name = crate::store::migrate::derived_file_name(&entry);
+                let _ = store.set_env_meta(&meta.id, name.as_deref(), count);
+            }
         }
     }
 }

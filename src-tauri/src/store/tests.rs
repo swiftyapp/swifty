@@ -68,6 +68,8 @@ fn rec(id: &str, payload: &[u8]) -> Record {
         card_brand: None,
         favorite: false,
         has_passkey: false,
+        file_name: None,
+        var_count: None,
     }
 }
 
@@ -371,6 +373,55 @@ fn build_record_flags_an_entry_that_holds_a_passkey() {
 
     let with_key = migrate::build_record(&passkey_entry(), b"sealed".to_vec()).unwrap();
     assert!(with_key.has_passkey);
+}
+
+fn env_entry(file_name: Option<&str>, body: &str) -> Entry {
+    let mut value = serde_json::json!({
+        "id": "e1", "type": "env", "title": "api · production", "body": body
+    });
+    if let Some(name) = file_name {
+        value["fileName"] = serde_json::Value::String(name.into());
+    }
+    serde_json::from_value(value).unwrap()
+}
+
+// The list subtitle is `fileName · N vars`, drawn from columns so the row needs
+// no reveal — so both have to come off the plaintext at save time, and a name
+// the file never had has to stay absent rather than read as an empty string.
+#[test]
+fn build_record_stamps_an_env_files_name_and_variable_count() {
+    let body = "# Database\nDATABASE_URL=postgres://x\nexport DB_POOL=10\n\nPORT = 3000 # dev\n";
+    let named =
+        migrate::build_record(&env_entry(Some(".env.production"), body), b"s".to_vec()).unwrap();
+    assert_eq!(named.file_name.as_deref(), Some(".env.production"));
+    assert_eq!(named.var_count, Some(3));
+
+    let pasted = migrate::build_record(&env_entry(None, body), b"s".to_vec()).unwrap();
+    assert_eq!(pasted.file_name, None);
+    assert_eq!(pasted.var_count, Some(3));
+
+    // A blank name is no name.
+    let blank = migrate::build_record(&env_entry(Some("  "), body), b"s".to_vec()).unwrap();
+    assert_eq!(blank.file_name, None);
+
+    // Every other kind leaves both NULL, so the columns say nothing about it.
+    let login = migrate::build_record(&sample_entry(), b"s".to_vec()).unwrap();
+    assert_eq!((login.file_name, login.var_count), (None, None));
+}
+
+// What counts as a variable line, and what does not: comments, blank lines,
+// a bare word, a name starting with a digit, and `export` glued to `=`.
+#[test]
+fn env_var_count_reads_assignment_lines_only() {
+    let count = |body: &str| migrate::derived_var_count(&env_entry(None, body)).unwrap();
+    assert_eq!(count(""), 0);
+    assert_eq!(count("# only a comment\n\n"), 0);
+    assert_eq!(count("A=1\nB=\n_C = 3\n  export D=4\n"), 4);
+    assert_eq!(count("1A=1\nno equals\n=oops\nexport\n"), 0);
+    // `export=1` names a variable called `export`; `export  X=1` names `X`.
+    assert_eq!(count("export=1\nexport\tX=1\n"), 2);
+    // CRLF endings do not break the line walk.
+    assert_eq!(count("A=1\r\nB=2\r\n"), 2);
 }
 
 // An imported passkey-only login has no website, and the relying-party id is

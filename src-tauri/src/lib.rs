@@ -131,6 +131,7 @@ pub fn run() {
             commands::vault::import_backup,
             commands::vault::import_swftx,
             commands::vault::export_vault,
+            commands::vault::save_env_file,
             commands::import::pick_import_file,
             commands::import::import_entries,
             commands::import::export_entries,
