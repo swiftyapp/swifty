@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { cardBrandOf } from '@/utils/cardBrand'
+import { parseEnv, varsOf } from '@/kinds/env/parse'
 
 /**
  * Frozen command contract for the Swifty backend.
@@ -160,6 +161,12 @@ export interface EntryMeta {
   // save time so the list can mark the row without revealing anything. The
   // passkeys themselves only ever arrive via revealEntry.
   hasPasskey?: boolean
+  // What an env file was called (".env.production") and how many variables it
+  // defines, derived at save time like cardBrand so the list can subtitle the
+  // row without a reveal. Absent on other kinds, on env rows saved before the
+  // columns existed, and — for the name alone — on a pasted file.
+  fileName?: string
+  varCount?: number
   createdAt?: string
   updatedAt?: string
   // Present only on the tombstones listDeleted returns.
@@ -178,6 +185,8 @@ export const toEntryMeta = (entry: Entry): EntryMeta => ({
   cardBrand: entry.type === 'card' ? cardBrandOf(entry.number) : undefined,
   favorite: false,
   hasPasskey: entry.type === 'login' && (entry.passkeys?.length ?? 0) > 0,
+  fileName: entry.type === 'env' ? entry.fileName.trim() || undefined : undefined,
+  varCount: entry.type === 'env' ? varsOf(parseEnv(entry.body)).length : undefined,
   createdAt: entry.createdAt ?? entry.created_at,
   updatedAt: entry.updatedAt ?? entry.updated_at
 })
@@ -409,6 +418,16 @@ export const exportEntries = (
   path?: string
 ): Promise<string | null> =>
   invoke('export_entries', { path: path ?? null, format })
+
+// Write a revealed env file back to disk through the save dialog, defaulting
+// to the name it came in with (or ".env"). Resolves to the chosen path, or
+// null if the dialog was dismissed. Desktop only — the caller hides the action
+// on mobile.
+export const saveEnvFile = (
+  fileNameSuggestion: string,
+  body: string
+): Promise<string | null> =>
+  invoke('save_env_file', { fileNameSuggestion, body })
 
 // ---------------------------------------------------------------------------
 // Scanning

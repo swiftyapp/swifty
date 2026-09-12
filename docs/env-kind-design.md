@@ -78,7 +78,10 @@ brand is; the body stays encrypted.
 
 **Detail header.** Eyebrow reads `ENV FILE · .env.production` once the entry
 is revealed (the `Kind.eyebrow` hook). Primary button is **Copy .env**, which is
-what `⏎` and `⌘⏎` copy. The `⋯` menu gains **Save as file…**.
+what `⏎` and `⌘⏎` copy. **Save as file…** lives in the File tab's rail rather
+than the `⋯` menu: it is kind-local there, so the shared header needs no
+per-kind hook. Desktop only — the mobile picker copies the file itself and
+cannot be told to write it owner-readable.
 
 ## 4. Read view
 
@@ -147,9 +150,11 @@ plain is convenient, but a wrong guess (`DB_HOST=user:pass@…`) shows a secret
 on a shared screen. Guessing is a v2 experiment with an explicit per-row
 "plain" flag, not a v1 default.
 
-**File tab.** The raw text, masked as one block until revealed, with copy and
-reveal in the rail. This is the SSH private-key block, taller. Long files scroll
-inside a capped well rather than pushing the metadata line off screen.
+**File tab.** The raw text, masked as one block until revealed, with copy,
+**Save as file…** (desktop) and reveal in the rail. This is the SSH private-key
+block, taller. Long files scroll inside a capped well rather than pushing the
+metadata line off screen. Saving opens the OS dialog with the entry's file name
+(or `.env`) filled in and writes the body with mode 0600.
 
 ## 5. Edit view
 
@@ -288,6 +293,7 @@ editor pattern, the SSH private-key block, the import `DropZone` wiring, the
    window-level drop when idle, Add-picker link, mobile picker. Acceptance: one
    drop from Finder produces a saved entry in two clicks.
 3. **Polish.** List-row `fileName · N vars` metadata, eyebrow, `Save as file…`
-   in the `⋯` menu, inline-comment gloss, band captions from comments.
+   in the File tab rail (kind-local, so the shared header needs no per-kind
+   hook), inline-comment gloss, band captions from comments.
 
 Each PR is independently shippable; 2 and 3 do not depend on each other.

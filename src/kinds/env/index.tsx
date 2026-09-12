@@ -1,6 +1,6 @@
 import { EnvGlyph } from '@/components/Main/icons'
 import type { Kind } from '../types'
-import { defaults, isValid, listSubtitle, primarySecret } from './meta'
+import { defaults, eyebrow, isValid, listSubtitle, primarySecret } from './meta'
 import ListRow from './ListRow'
 import Fields from './Fields'
 
@@ -20,6 +20,7 @@ const env: Kind = {
   primarySecret,
   primaryActionLabel: 'Copy .env',
   listSubtitle,
+  eyebrow,
   ListRow,
   Fields
 }

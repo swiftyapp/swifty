@@ -178,6 +178,12 @@ pub struct EntryMetaDto {
     // Whether the entry holds a passkey. Derived metadata, so the list can mark
     // the row without revealing anything; the passkeys themselves stay sealed.
     pub has_passkey: bool,
+    // An env file's name and variable count, derived at save time like
+    // `card_brand`; absent on every other kind and on rows not yet stamped.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub var_count: Option<i64>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
     // Set only on the tombstones the Trash lists; absent for live entries.
@@ -201,6 +207,8 @@ impl From<&crate::store::EntryMeta> for EntryMetaDto {
             card_brand: m.card_brand.clone().filter(|b| b != "none"),
             favorite: m.favorite,
             has_passkey: m.has_passkey,
+            file_name: m.file_name.clone(),
+            var_count: m.var_count,
             created_at: iso(m.created_at),
             updated_at: iso(m.updated_at),
             deleted_at: m.deleted_at.and_then(iso),
@@ -414,6 +422,8 @@ mod tests {
             card_brand: None,
             favorite: false,
             has_passkey,
+            file_name: None,
+            var_count: None,
         }
     }
 
@@ -427,5 +437,26 @@ mod tests {
 
         let plain = serde_json::to_value(EntryMetaDto::from(&meta(false))).unwrap();
         assert_eq!(plain["hasPasskey"], false);
+    }
+
+    // The env subtitle is drawn from these two alone, so they reach the UI in
+    // camelCase when stamped and are left out — not nulled — when they are not,
+    // matching `cardBrand` and the optional TS fields the frontend declares.
+    #[test]
+    fn meta_dto_carries_the_env_file_name_and_var_count_only_when_stamped() {
+        let stamped = crate::store::EntryMeta {
+            kind: "env".into(),
+            file_name: Some(".env.production".into()),
+            var_count: Some(14),
+            ..meta(false)
+        };
+        let out = serde_json::to_value(EntryMetaDto::from(&stamped)).unwrap();
+        assert_eq!(out["fileName"], ".env.production");
+        assert_eq!(out["varCount"], 14);
+        assert!(out.get("body").is_none());
+
+        let bare = serde_json::to_value(EntryMetaDto::from(&meta(false))).unwrap();
+        assert!(bare.get("fileName").is_none());
+        assert!(bare.get("varCount").is_none());
     }
 }

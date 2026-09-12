@@ -71,6 +71,10 @@ pub fn record_hash(r: &Record) -> [u8; 32] {
     // stale flag beside the winner's payload. Appended last so the field order
     // keeps tracking the column order.
     h.update([r.has_passkey as u8]);
+    // Columns too, for the same reason again: a peer that has not run the env
+    // backfill holds the same payload under NULLs, and the merge must see that.
+    opt_field(&mut h, r.file_name.as_deref());
+    opt_i64(&mut h, r.var_count);
     h.finalize().into()
 }
 

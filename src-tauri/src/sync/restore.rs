@@ -183,6 +183,8 @@ mod tests {
             card_brand: None,
             favorite: false,
             has_passkey: false,
+            file_name: None,
+            var_count: None,
         }
     }
 

@@ -57,6 +57,7 @@ vi.mock('@/lib/commands', () => ({
     .fn()
     .mockResolvedValue({ total: 0, imported: 0, skipped: 0, dryRun: true, errors: [] }),
   exportEntries: vi.fn().mockResolvedValue(null),
+  saveEnvFile: vi.fn().mockResolvedValue(null),
   setAutolockTimeout: vi.fn().mockResolvedValue(undefined),
   importBackup: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
   importSwftx: vi.fn().mockResolvedValue(0),

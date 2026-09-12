@@ -6,6 +6,7 @@ import { FieldsProvider } from '@/components/elements/fields'
 import { BLOCK_DOTS, MASK_DOTS } from '@/components/elements/tokens'
 import type { DraftValue, EntryDraft } from '@/defaults/entries'
 import { copy } from '@/services/copy'
+import { saveEnvFile } from '@/lib/commands'
 import Fields from '@/kinds/env/Fields'
 import { parseEnv, removeLine, setKey, setValue, varsOf } from '@/kinds/env/parse'
 
@@ -41,7 +42,13 @@ const LONG = [
 
 const DOTS = MASK_DOTS
 
-const draft = (body: string): EntryDraft => ({ type: 'env', title: 'api · production', body, note: '' })
+const draft = (body: string, fileName = ''): EntryDraft => ({
+  type: 'env',
+  title: 'api · production',
+  body,
+  fileName,
+  note: ''
+})
 
 // The line index of a key, so no test hardcodes the parser's numbering.
 const indexOf = (body: string, key: string) =>
@@ -54,9 +61,9 @@ const keyInput = (index: number | string) =>
 const valueBox = (index: number | string) =>
   document.querySelector<HTMLTextAreaElement>(`textarea[name="env-value-${index}"]`)
 
-const renderRead = (body = BODY) =>
+const renderRead = (body = BODY, fileName = '') =>
   render(
-    <FieldsProvider value={{ entry: draft(body), set: null, attempted: false }}>
+    <FieldsProvider value={{ entry: draft(body, fileName), set: null, attempted: false }}>
       <Fields />
     </FieldsProvider>
   )
@@ -157,6 +164,26 @@ describe('Env fields, reading', () => {
 
     await userEvent.click(screen.getByTestId('reveal-body'))
     expect(screen.getByTestId('entry-value-body').textContent).toBe(BODY)
+  })
+
+  // The file goes back to disk under the name it came in with, whether or not
+  // it has been revealed on screen — the button hands the backend the true body.
+  it('saves the file under its own name from the File tab rail', async () => {
+    renderRead(BODY, '.env.production')
+    await userEvent.click(screen.getByTestId('env-tab-file'))
+    await userEvent.click(screen.getByTestId('env-save-file'))
+
+    expect(saveEnvFile).toHaveBeenCalledWith('.env.production', BODY)
+  })
+
+  // A pasted file has no name; the backend falls back to `.env`, so the
+  // suggestion goes through empty rather than invented here.
+  it('passes an empty suggestion for a file without a name', async () => {
+    renderRead()
+    await userEvent.click(screen.getByTestId('env-tab-file'))
+    await userEvent.click(screen.getByTestId('env-save-file'))
+
+    expect(saveEnvFile).toHaveBeenCalledWith('', BODY)
   })
 })
 

@@ -233,3 +233,33 @@ pub async fn export_vault(
     .await?;
     Ok(dest.map(|p| p.to_string_lossy().into_owned()))
 }
+
+// "Save as file…" on an env entry: hand the revealed `.env` back to disk under
+// the name it came in with (or `.env`), owner-readable only. The body arrives
+// from the frontend, which already holds it revealed, so nothing is unsealed
+// here — and nothing is logged: the body is the entry's one secret. Desktop
+// only; the frontend hides the action on mobile, where the picker cannot be
+// told what permissions to write with.
+#[tauri::command]
+pub async fn save_env_file(
+    file_name_suggestion: String,
+    body: String,
+    app: AppHandle,
+) -> Result<Option<String>> {
+    let suggestion = file_name_suggestion.trim();
+    let file_name = if suggestion.is_empty() {
+        ".env"
+    } else {
+        suggestion
+    };
+    #[cfg(desktop)]
+    {
+        let dest = save::save_private_text(&app, file_name, body).await?;
+        Ok(dest.map(|p| p.to_string_lossy().into_owned()))
+    }
+    #[cfg(mobile)]
+    {
+        let _ = (file_name, body, app);
+        Err(Error::Other("saving a file is a desktop action".into()))
+    }
+}
