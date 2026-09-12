@@ -14,24 +14,41 @@ interface Props {
   doc: Doc
 }
 
-// A passport's data page is ID-3; everything else in a wallet is ID-1, the
-// credit card's own shape.
-const ASPECT: Record<DocType, string> = {
-  passport: 'aspect-[1.42]',
-  id_card: 'aspect-[1.586]',
-  driver_license: 'aspect-[1.586]',
-  residence_permit: 'aspect-[1.586]',
-  other: 'aspect-[1.586]'
+/*
+ * What each document measures, in millimetres, as ISO/IEC 7810 and ICAO 9303
+ * have it. A passport's data page is ID-3 and noticeably squarer than the ID-1
+ * card a licence, an ID card and a permit all share — which is the credit card's
+ * own shape, because a credit card is an ID-1 card.
+ *
+ * These are the fixed dimension of a face: the document is this shape, and the
+ * printing is arranged to fit inside it. `other` has no physical form to be
+ * honest about, so it takes the wallet-sized default.
+ */
+const FORMAT: Record<DocType, string> = {
+  passport: '125 / 88',
+  id_card: '85.6 / 53.98',
+  driver_license: '85.6 / 53.98',
+  residence_permit: '85.6 / 53.98',
+  other: '85.6 / 53.98'
 }
 
-// The document's details, beside the portrait: three across, two once the pane
-// is phone-narrow so no caption has to be cut.
-const GRID =
-  'grid min-w-0 flex-1 grid-cols-3 content-start gap-x-3 gap-y-2 @max-[420px]:grid-cols-2'
+// The printed fields, flowing beside the portrait and on under it — each as wide
+// as its own caption needs and no wider, the way a document sets them. Not
+// columns: a fixed column count is a decision about the page that the page has
+// not asked for, and on a narrow pane it is the thing that starts dictating how
+// tall the document has to be.
+//
+// The flow sizes itself and the data area takes its height from that. It must
+// not be handed a height to fit into — a wrapping flex container asked to fit a
+// box shorter than its lines lays them out anyway and spills over whatever is
+// below, and its intrinsic height does not travel back up through a `flex-1`
+// parent to stop that happening. So nothing above it stretches, and the slack on
+// a document with room to spare is collected above the number instead.
+const FIELDS = 'flex min-w-0 flex-1 flex-wrap content-start gap-x-5 gap-y-2.5'
 
 // The strip along the bottom edge, running the full width of the paper the way
 // it is printed — under the printed area rather than inside its margins.
-const BAND = 'border-t border-(--face-rule) bg-(--face-tail) px-5 py-2.5'
+const BAND = 'border-t border-(--face-rule) bg-(--face-tail) px-5 py-2'
 
 // The status pill's three tones. Fixed hex like the rest of the face: the paper
 // stays light when the app goes dark, so `text-bad` would invert underneath it.
@@ -124,9 +141,9 @@ export default function Document({ docType, doc }: Props) {
   const place = countryName(country) ?? country
 
   return (
-    <Frame aspect={ASPECT[docType]} docType={docType}>
-      <div className="flex min-w-0 flex-1 flex-col px-5 pb-4 pt-3.5">
-        <header className="flex items-center justify-between gap-3 text-(--face-ink2)">
+    <Frame ratio={FORMAT[docType]} docType={docType}>
+      <div className="relative flex min-w-0 flex-1 flex-col px-5 pb-3 pt-3">
+        <header className="flex flex-none items-center justify-between gap-3 text-(--face-ink2)">
           <span className={`truncate ${LABEL_TYPE}`}>
             {t(DOC_TYPE_LABELS[docType])}
             {place && ` · ${place}`}
@@ -140,16 +157,19 @@ export default function Document({ docType, doc }: Props) {
           />
         </header>
 
-        <div className="mt-3.5 flex flex-1 gap-4">
+        {/* The data area, as tall as the printing in it — never told a height,
+            so a pane too narrow to set these fields pushes the face taller
+            rather than hiding the overflow under the frame's rounded corner. */}
+        <div className="mt-3 flex items-start gap-4">
           <Portrait />
-          <div className={GRID}>
+          <div className={FIELDS}>
             <DocCell
               doc={doc}
               name="name"
               label="Holder"
               ink="text-lg font-medium uppercase tracking-[0.03em]"
               wrap
-              className="col-span-full"
+              className="w-full"
             />
             <DocCell doc={doc} name="nationality" />
             <DocCell doc={doc} name="birth_date" />
@@ -162,8 +182,10 @@ export default function Document({ docType, doc }: Props) {
         </div>
 
         {/* The number the document is known by, set large along the foot the
-            way a document prints it, with its validity in the margin. */}
-        <div className="mt-4 flex items-end gap-2.5">
+            way a document prints it, with its validity in the margin. `mt-auto`
+            puts every bit of the document's spare height above this line, so the
+            number sits on the foot rather than floating under the fields. */}
+        <div className="mt-auto flex flex-none items-end gap-2.5 pt-3">
           <DocCell
             doc={doc}
             name="number"

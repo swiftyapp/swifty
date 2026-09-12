@@ -5,8 +5,9 @@ import { useCopied } from '@/hooks/useCopied'
 import { CheckGlyph, CopyGlyph } from '@/components/Main/icons'
 
 // A face is a miniature, so its captions sit one step under the detail rows'
-// 11px label tier and are tracked a little tighter: "NATIONALITY" and
-// "PERSONAL NO." have to fit a third of the holder's column.
+// 11px label tier and are tracked a little tighter. A caption is also what makes
+// a field as wide as it is — "PERSONAL NO." is wider than any number under it —
+// so this size is what decides how many fields fit across a document.
 export const CAPTION = 'text-2xs uppercase tracking-[0.1em]'
 
 interface Props {
@@ -46,7 +47,7 @@ export default function Cell({
       title={t('Copy')}
       aria-label={label ? `${t(label)} · ${t('Copy')}` : t('Copy')}
       className={cx(
-        'group relative -mx-1.5 min-w-0 cursor-pointer rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-(--face-hover)',
+        'group relative -mx-1.5 -my-0.5 min-w-0 cursor-pointer rounded-sm px-1.5 py-0.5 text-left transition-colors hover:bg-(--face-hover)',
         className
       )}
     >
@@ -54,7 +55,7 @@ export default function Cell({
         <span className={`block truncate ${CAPTION} text-(--face-ink2)`}>{t(label)}</span>
       )}
       <span
-        className={cx('block min-w-0 leading-6', wrap ? 'break-all' : 'truncate', label && 'mt-0.5', ink)}
+        className={cx('block min-w-0 leading-tight', wrap ? 'break-all' : 'truncate', ink)}
         data-testid={`entry-value-${name}`}
       >
         {display}

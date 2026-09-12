@@ -2,8 +2,11 @@ import type { CSSProperties, ReactNode } from 'react'
 import { cx } from '@/utils/cx'
 
 interface Props {
-  /** The document's proportions: ID-3 for a passport page, ID-1 for a card. */
-  aspect: string
+  /**
+   * The document's real proportions, as `width / height` in millimetres — the
+   * shape of the thing in your hand, and the one fixed dimension of a face.
+   */
+  ratio: string
   /** Which document this is, for the e2e suite and for anyone styling one. */
   docType: string
   children: ReactNode
@@ -19,10 +22,9 @@ interface Props {
  * so they are one object on the page.
  *
  * Light, where the credit card face is graphite: a card is black plastic and an
- * ID document is paper or white polycarbonate, and the two read as coming from
- * one wallet by sharing a width, a radius and a shadow rather than a colour.
- * Fixed hex for the same reason the card's are — a face stands for a physical
- * thing, so it keeps its own paper when the app goes dark.
+ * ID document is paper or white polycarbonate. Fixed hex for the same reason the
+ * card's are — a face stands for a physical thing, so it keeps its own paper
+ * when the app goes dark.
  */
 const INK = '#1B1D21'
 const INK2 = '#6C6F77'
@@ -35,14 +37,26 @@ const HOVER = 'rgba(20, 22, 26, 0.055)'
 // surface held at an angle rather than as a rectangle of colour.
 const SHEEN = 'radial-gradient(120% 90% at 88% -12%, #FFFFFF 0%, rgba(255, 255, 255, 0) 62%)'
 
-// The inks go down as CSS variables so the cells, the reveal and the
-// machine-readable band colour themselves without being handed a palette.
-//
-// The proportions are a floor, not a cage. The sheen layer is the one that
-// carries the aspect ratio, and it shares its grid cell with the printed area,
-// so the face is as tall as the real document — or as tall as its rows need
-// when a phone-narrow pane folds them, rather than clipping its band.
-export default function Frame({ aspect, docType, children }: Props) {
+/**
+ * The ratio sizes the face, so a document is the shape it really is: a passport
+ * page is squarer than a licence because a passport page *is* squarer, and
+ * neither is whatever height its contents happened to add up to. A ratio rather
+ * than a fixed height, so it is the same object at any pane width.
+ *
+ * It is carried by a spacer sharing one grid cell with the printing, rather than
+ * by `aspect-ratio` on the face itself, and the difference is the whole safety
+ * of this. A ratio on the face fixes its height outright, and `overflow-hidden`
+ * then swallows anything that does not fit — on a phone-narrow pane the foot of
+ * the document went under the rounded corner. (`min-height: auto` does not save
+ * it: that only resolves to the content size for a flex or grid *item*, and a
+ * face is neither everywhere it is used. Nor does `min-height: fit-content`.)
+ * One grid cell holding both takes the taller of the two, which is exactly the
+ * rule wanted: the ratio decides the height while the printing fits, and the
+ * printing decides it when it does not. In a password manager a value you cannot
+ * see is worse than a document half a centimetre too tall — and the layout's job
+ * is to keep that the rare case rather than to rely on it.
+ */
+export default function Frame({ ratio, docType, children }: Props) {
   return (
     <div
       data-testid="identity-face"
@@ -56,12 +70,22 @@ export default function Frame({ aspect, docType, children }: Props) {
           '--face-hover': HOVER
         } as CSSProperties
       }
-      className="grid w-[460px] max-w-full overflow-hidden rounded-[16px] border border-[rgba(20,22,26,0.1)] bg-[linear-gradient(160deg,#FBFBFC,#ECEEF2_58%,#F4F5F8)] text-(--face-ink) tabular-nums shadow-[0_12px_28px_rgba(24,26,30,0.14),inset_0_1px_0_rgba(255,255,255,0.9)]"
+      className={cx(
+        'relative grid w-[460px] max-w-full overflow-hidden rounded-[16px]',
+        'border border-[rgba(20,22,26,0.1)] bg-[linear-gradient(160deg,#FBFBFC,#ECEEF2_58%,#F4F5F8)]',
+        'text-(--face-ink) tabular-nums',
+        'shadow-[0_12px_28px_rgba(24,26,30,0.14),inset_0_1px_0_rgba(255,255,255,0.9)]'
+      )}
     >
       <div
         aria-hidden
-        className={cx('pointer-events-none col-start-1 row-start-1 w-full self-start', aspect)}
+        className="pointer-events-none absolute inset-0 z-10"
         style={{ backgroundImage: SHEEN }}
+      />
+      <div
+        aria-hidden
+        className="col-start-1 row-start-1 w-full self-start"
+        style={{ aspectRatio: ratio }}
       />
       <div className="col-start-1 row-start-1 flex min-w-0 flex-col">{children}</div>
     </div>
