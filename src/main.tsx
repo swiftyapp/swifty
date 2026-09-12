@@ -6,17 +6,23 @@ import { runStartupUpdateCheck } from './services/autoUpdate'
 import { applyPlatform } from './utils/platform'
 import { applyTheme, getTheme } from './theme'
 import { i18nReady } from './i18n'
+import { runSplash } from './lib/splash'
 import './shortcuts'
 // Design tokens + base (Tailwind v4). Sole stylesheet now the SASS is gone.
 // Type comes from the OS system stack (see --font-sans) — no bundled webfonts.
 import './styles/theme.css'
 
 applyPlatform()
+// Theme first: the splash in index.html recolors off `data-theme` the moment
+// it is set, before its animation starts.
 applyTheme(getTheme())
+const splashSettled = runSplash()
 
 // Awaiting the catalog before the first paint means no flash of English on a
 // non-default language, and no Suspense boundary threaded through the tree.
-void i18nReady.then(() =>
+// Awaiting the splash means the lock screen takes over from the mascot at rest
+// (same pixels), so the swap reads as one continuous scene.
+void Promise.all([i18nReady, splashSettled]).then(() =>
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <App />
