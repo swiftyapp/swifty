@@ -41,6 +41,31 @@ describe('the document face', () => {
     }
   })
 
+  /*
+   * The one part of the geometry a unit test can hold: that each document asks
+   * to be its real shape. jsdom implements no layout — every `offsetHeight` here
+   * is 0 — so whether the printing then *fits* that shape is not observable in
+   * this suite, and clipping or overlap would have to be caught in a browser.
+   * What this does catch is a document being handed the wrong format.
+   */
+  it('asks to be the shape the real document is', () => {
+    const ratio = (docType: DocType) => {
+      show(docType)
+      const spacer = face().querySelector<HTMLElement>('[style*="aspect-ratio"]')!
+      const [w, h] = spacer.style.aspectRatio.split('/').map(Number)
+      cleanup()
+      return w / h
+    }
+
+    // ID-3, the passport data page: 125 × 88mm, and squarer than a card.
+    expect(ratio('passport')).toBeCloseTo(1.42, 2)
+    // ID-1, the wallet card the other four share: 85.6 × 53.98mm.
+    for (const docType of DOC_TYPES.filter(type => type !== 'passport')) {
+      expect(ratio(docType)).toBeCloseTo(1.586, 2)
+    }
+    expect(ratio('passport')).toBeLessThan(ratio('id_card'))
+  })
+
   it('prints no row the document has no place for', () => {
     // A licence template carries no nationality; the value is there to be read
     // and the face still has to leave it off.

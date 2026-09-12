@@ -5,10 +5,15 @@ import { checkDigit, mrz } from './mrz'
 
 // The specimen holder ICAO 9303 uses throughout its own examples, so the bands
 // below can be compared against the printed standard character for character.
+//
+// ICAO's own specimen issues from `UTO`, a fictional state, which this prints as
+// filler like any other non-code (see "the state columns"). A real code is
+// substituted so the rest of the line can still be compared byte for byte — the
+// check digits do not cover either state column, so nothing else moves.
 const ANNA: Partial<Record<IdentityKey, string>> = {
   name: 'ERIKSSON ANNA MARIA',
-  country: 'UTO',
-  nationality: 'UTO',
+  country: 'GBR',
+  nationality: 'GBR',
   birth_date: '1974-08-12',
   sex: 'F',
   expiry_date: '2012-04-15'
@@ -39,8 +44,8 @@ describe('mrz', () => {
     const lines = mrz('passport', doc({ ...ANNA, number: 'L898902C3', personal_number: 'ZE184226B' }))
 
     expect(lines).toEqual([
-      'P<UTOERIKSSON<ANNA<MARIA<<<<<<<<<<<<<<<<<<<<',
-      'L898902C36UTO7408122F1204159ZE184226B<<<<<10'
+      'P<GBRERIKSSON<ANNA<MARIA<<<<<<<<<<<<<<<<<<<<',
+      'L898902C36GBR7408122F1204159ZE184226B<<<<<10'
     ])
   })
 
@@ -48,8 +53,8 @@ describe('mrz', () => {
     const lines = mrz('id_card', doc({ ...ANNA, number: 'D23145890' }))
 
     expect(lines).toEqual([
-      'I<UTOD231458907<<<<<<<<<<<<<<<',
-      '7408122F1204159UTO<<<<<<<<<<<6',
+      'I<GBRD231458907<<<<<<<<<<<<<<<',
+      '7408122F1204159GBR<<<<<<<<<<<6',
       'ERIKSSON<ANNA<MARIA<<<<<<<<<<<'
     ])
   })
@@ -79,9 +84,48 @@ describe('mrz', () => {
     expect(lines?.[2]).toBe('ZOE<MULLER<VOSS<<<<<<<<<<<<<<<')
   })
 
+  /*
+   * A letter that is not a base letter with a mark on it has nothing to
+   * decompose, so it needs ICAO's substitution or it falls through to the filler
+   * and the name silently loses it.
+   */
+  it('substitutes the letters that do not decompose rather than dropping them', () => {
+    const name = (value: string) =>
+      mrz('id_card', doc({ ...ANNA, name: value, number: 'D23145890' }))?.[2]
+
+    expect(name('Łukasz')).toBe('LUKASZ<<<<<<<<<<<<<<<<<<<<<<<<')
+    expect(name('Ørsted')).toBe('OERSTED<<<<<<<<<<<<<<<<<<<<<<<')
+    expect(name('Æblerød')).toBe('AEBLEROED<<<<<<<<<<<<<<<<<<<<<')
+    expect(name('Þórsdóttir')).toBe('THORSDOTTIR<<<<<<<<<<<<<<<<<<<')
+    // A decomposed paste is the same letter and has to read as one.
+    expect(name('Ł'.normalize('NFD'))).toBe(name('Ł'))
+  })
+
   it('lends the issuing country as the nationality when there is none', () => {
     const lines = mrz('passport', doc({ ...ANNA, nationality: '', number: 'L898902C3' }))
-    expect(lines?.[1].slice(10, 13)).toBe('UTO')
+    expect(lines?.[1].slice(10, 13)).toBe('GBR')
+  })
+
+  /*
+   * The country fields are free text. A value that is not an ISO 3166-1 alpha-3
+   * code has to print as filler rather than be cut down to three characters: a
+   * band that claims `UNI` is wrong in a way a band that says `<<<` is not.
+   */
+  describe('the state columns', () => {
+    it('prints filler for a country that is not a code', () => {
+      const lines = mrz('passport', doc({ ...ANNA, country: 'United Kingdom', number: 'L898902C3' }))
+      expect(lines?.[0].slice(2, 5)).toBe('<<<')
+    })
+
+    it('takes a real code however it was typed', () => {
+      const lines = mrz('passport', doc({ ...ANNA, country: ' gbr ', number: 'L898902C3' }))
+      expect(lines?.[0].slice(2, 5)).toBe('GBR')
+    })
+
+    it('falls back to the issuer rather than to a mistyped nationality', () => {
+      const lines = mrz('passport', doc({ ...ANNA, country: 'GBR', nationality: 'British', number: 'L898902C3' }))
+      expect(lines?.[1].slice(10, 13)).toBe('GBR')
+    })
   })
 
   it('has no band for a licence or an unclassified document', () => {
@@ -102,7 +146,7 @@ describe('mrz', () => {
       const [, line] = mrz('passport', doc({ ...ANNA, ...secrets }, false)) ?? []
       const open = mrz('passport', doc({ ...ANNA, ...secrets }))?.[1] ?? ''
 
-      expect(line).toBe('••••••••••UTO7408122F1204159••••••••••••••••')
+      expect(line).toBe('••••••••••GBR7408122F1204159••••••••••••••••')
       // Whatever is still legible is legible on the revealed band too: the mask
       // only ever covers, it never rewrites what it leaves showing.
       expect(line).toHaveLength(open.length)
@@ -113,8 +157,8 @@ describe('mrz', () => {
       const lines = mrz('id_card', doc({ ...ANNA, ...secrets, number: 'D23145890' }, false))
 
       expect(lines).toEqual([
-        'I<UTO•••••••••••••••••••••••••',
-        '7408122F1204159UTO<<<<<<<<<<<•',
+        'I<GBR•••••••••••••••••••••••••',
+        '7408122F1204159GBR<<<<<<<<<<<•',
         'ERIKSSON<ANNA<MARIA<<<<<<<<<<<'
       ])
     })

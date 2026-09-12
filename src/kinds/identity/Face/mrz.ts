@@ -1,3 +1,4 @@
+import { countryCode } from '@/utils/countries'
 import type { DocType } from '../templates'
 import type { Doc } from './DocCell'
 
@@ -36,15 +37,40 @@ const WEIGHTS = [7, 3, 1]
 export const checkDigit = (field: string): string =>
   String([...field].reduce((sum, ch, i) => sum + charValue(ch) * WEIGHTS[i % 3], 0) % 10)
 
-// The Latin subset the band is printed in. Decomposing first drops the accents
-// onto their base letters, and everything the subset has no room for — spaces,
-// hyphens, apostrophes — becomes the filler. Which is what a real document does
-// to a name too: the band is the machine's reading of it, not the printed one.
+/*
+ * ICAO 9303 fixes a substitution for each Latin letter that is not a base letter
+ * with a mark on it. Decomposition cannot touch those — there is nothing to take
+ * off — so without this table they fall through to the filler and the name
+ * quietly loses a letter: `ŁUKASZ` would print as `<UKASZ`, and a Danish or
+ * Norwegian name would lose every `Ø`.
+ */
+const SUBSTITUTIONS: Record<string, string> = {
+  Æ: 'AE',
+  Ð: 'D',
+  Ø: 'OE',
+  Þ: 'TH',
+  Đ: 'D',
+  Ħ: 'H',
+  Ĳ: 'IJ',
+  Ł: 'L',
+  Ŋ: 'N',
+  Œ: 'OE',
+  Ə: 'E'
+}
+
+// The Latin subset the band is printed in. The letters above are substituted
+// whole; every other accented letter decomposes and drops its marks (`Ä` to `A`,
+// which is ICAO's default reading); and everything the subset has no room for —
+// spaces, hyphens, apostrophes — becomes the filler. Which is what a real
+// document does to a name too: the band is the machine's reading of it, not the
+// printed one. Composing to NFC first so a decomposed paste still matches the
+// table, and upper-casing before it so `ß` has already become `SS`.
 const transliterate = (text: string): string =>
-  text
+  [...text.normalize('NFC').toUpperCase()]
+    .map(ch => SUBSTITUTIONS[ch] ?? ch)
+    .join('')
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
-    .toUpperCase()
     .replace(/[^A-Z0-9]+/g, FILLER)
 
 // A field cut or padded to the width its column has.
@@ -81,10 +107,21 @@ const DOT = '•'
 const blank = (line: string, from: number, to: number): string =>
   line.slice(0, from) + DOT.repeat(to - from) + line.slice(to)
 
+/*
+ * The two state columns take an ISO 3166-1 alpha-3 code and nothing else.
+ *
+ * Both fields are free text — the form asks for a code and takes whatever is
+ * typed — so anything that is not one prints as filler. Cutting it to three
+ * characters instead would turn "United Kingdom" into `UNI`, which is not a
+ * country: a wrong code in a machine-readable zone is worse than an obviously
+ * absent one, because only the absent one admits it does not know.
+ */
+const state = (value: string): string => countryCode(value) ?? FILLER.repeat(3)
+
 // TD3 — the passport data page. Line 1 is the document code, the issuing state
 // and the name; line 2 is every other field in fixed columns, each followed by
 // its check digit, and a composite digit over the lot.
-const td3 = (doc: Doc, state: string, nationality: string): string[] => {
+const td3 = (doc: Doc, issuer: string, nationality: string): string[] => {
   const number = fit(doc.value('number'), 9)
   const dob = yymmdd(doc.value('birth_date'))
   const expiry = yymmdd(doc.value('expiry_date'))
@@ -108,20 +145,20 @@ const td3 = (doc: Doc, state: string, nationality: string): string[] => {
   const line = fields + composite
 
   return [
-    `P${FILLER}${state}${fit(doc.value('name'), 39)}`,
+    `P${FILLER}${issuer}${fit(doc.value('name'), 39)}`,
     doc.shown ? line : blank(blank(line, 28, 44), 0, 10)
   ]
 }
 
 // TD1 — the ID-1 card. The same fields over three shorter lines: the number and
 // the optional data on the first, the dates on the second, the name on the third.
-const td1 = (doc: Doc, docType: DocType, state: string, nationality: string): string[] => {
+const td1 = (doc: Doc, docType: DocType, issuer: string, nationality: string): string[] => {
   const number = fit(doc.value('number'), 9)
   const dob = yymmdd(doc.value('birth_date'))
   const expiry = yymmdd(doc.value('expiry_date'))
 
   const code = docType === 'residence_permit' ? 'IR' : `I${FILLER}`
-  const first = code + state + number + checkDigit(number) + fit(doc.value('personal_number'), 15)
+  const first = code + issuer + number + checkDigit(number) + fit(doc.value('personal_number'), 15)
   const second =
     dob +
     checkDigit(dob) +
@@ -143,13 +180,13 @@ const td1 = (doc: Doc, docType: DocType, state: string, nationality: string): st
 
 /** The band this document prints, or `null` where it has none to print. */
 export const mrz = (docType: DocType, doc: Doc): string[] | null => {
-  const state = fit(doc.value('country'), 3)
+  const issuer = state(doc.value('country'))
   // The band always names a nationality; a document that only says where it was
   // issued lends that, which is true of every document that omits the field.
-  const nationality = fit(doc.value('nationality') || doc.value('country'), 3)
+  const nationality = countryCode(doc.value('nationality')) ?? issuer
 
-  if (docType === 'passport') return td3(doc, state, nationality)
+  if (docType === 'passport') return td3(doc, issuer, nationality)
   if (docType === 'id_card' || docType === 'residence_permit')
-    return td1(doc, docType, state, nationality)
+    return td1(doc, docType, issuer, nationality)
   return null
 }
