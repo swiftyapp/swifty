@@ -1,4 +1,10 @@
-import { entryItems, resetPristine, waitFor, waitForAppReady } from "../helpers";
+import {
+  entryItems,
+  reload,
+  resetPristine,
+  waitFor,
+  waitForAppReady,
+} from "../helpers";
 
 // First-run setup: the two gates that stand between a fresh install and a
 // vault (strength, confirmation) plus the back/forward navigation around them.
@@ -62,7 +68,7 @@ describe("first-run setup", () => {
 
     // Nothing was written: a reload re-runs `is_initialized` against disk, and
     // the app offers first-run setup again rather than an unlock screen.
-    await browser.refresh();
+    await reload();
     await waitFor("start-setup-button");
     await expect($('[data-testid="unlock-password-input"]')).not.toBeDisplayed();
   });

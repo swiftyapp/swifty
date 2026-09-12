@@ -1,4 +1,4 @@
-import { waitFor } from "./app";
+import { reload, waitFor } from "./app";
 
 /**
  * Per-spec state isolation.
@@ -82,7 +82,7 @@ async function reset(mode: ResetMode, password?: string): Promise<void> {
     localStorage.setItem("locale", "en-US");
   });
 
-  await browser.refresh();
+  await reload();
 }
 
 /** No vault on disk: the app lands on the first-run setup choice screen. */

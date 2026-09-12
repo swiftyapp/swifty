@@ -21,8 +21,10 @@
       themed instead of a white flash (matters on reload and on the startup
       fallback path in window.rs). Values mirror `--c-app` in styles/theme.css;
       they have to be literal here because this paints before any CSS loads.
-      Keyed off the OS rather than the stored preference — reading localStorage
-      would need an inline script, which the CSP rightly forbids.
+      Keyed off the OS until the bundle runs — reading localStorage would need
+      an inline script, which the CSP rightly forbids — then off `data-theme`,
+      which main.tsx sets synchronously before anything else (the app defaults
+      to light, not to the OS, so the two can disagree).
     -->
     <style>
       html {
@@ -33,10 +35,256 @@
           background: #0f1011;
         }
       }
+      html[data-theme='light'] {
+        background: #e7e8ea;
+      }
+      html[data-theme='dark'] {
+        background: #0f1011;
+      }
+    </style>
+    <!--
+      Startup splash: the mascot waking up, in the spot the lock screen then
+      draws it. Static markup inside #root, so it is on screen from the first
+      frame and React's first commit replaces it (createRoot clears the
+      container) — no teardown code. Everything here is a literal copy of what
+      the app computes: the body is AsteriskBody (asteriskGeometry.ts — spike
+      path, hub, soften filter), the face is Mascot.tsx (eye ellipses, blink),
+      the ground glow and the column are AuthShell + Auth / LockScreen. Change
+      those, mirror here.
+
+      The base styles are the resting pose, complete; the choreography only
+      applies once main.tsx adds `splash-live` to <html>. So it starts when
+      the bundle is live — which is also when window.rs reveals the window —
+      rather than playing unseen behind a hidden one, and main.tsx holds the
+      first React frame until the last animation ends (see lib/splash.ts), so
+      the lock screen takes over from the resting pose, not mid-motion. If the
+      bundle never runs (dev server down, a throwing script) window.rs's
+      fallback timer reveals this resting frame, a whole mascot rather than a
+      blank window; reduced-motion users get the same frame straight away.
+    -->
+    <style>
+      .splash {
+        /* Brand ink / eye paper / ground glow — `--c-brand`, `--c-brand-eye`,
+           `--topglow` in theme.css. Same OS-then-data-theme keying as above. */
+        --ink: #34373e;
+        --eye: #ffffff;
+        --glow: rgba(255, 255, 255, 0.7);
+        --ease-swift: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      @media (prefers-color-scheme: dark) {
+        .splash {
+          --ink: #d6d8dc;
+          --eye: #15161a;
+          --glow: rgba(255, 255, 255, 0.06);
+        }
+      }
+      html[data-theme='light'] .splash {
+        --ink: #34373e;
+        --eye: #ffffff;
+        --glow: rgba(255, 255, 255, 0.7);
+      }
+      html[data-theme='dark'] .splash {
+        --ink: #d6d8dc;
+        --eye: #15161a;
+        --glow: rgba(255, 255, 255, 0.06);
+      }
+      /* The compact (phone) shell — the same 767px cut as useLayout / the md:
+         breakpoint — pads past the notch and reserves the bottom chrome
+         (AuthShell), which moves where the column centers; mirror it exactly
+         so the mascot lands where LockScreen draws it. */
+      @media (max-width: 767px) {
+        .splash {
+          padding: env(safe-area-inset-top) 1.25rem calc(env(safe-area-inset-bottom) + 7rem);
+        }
+      }
+
+      /* AuthShell's soft radial glow behind the column. */
+      .splash-glow {
+        position: absolute;
+        left: 50%;
+        top: 44%;
+        width: 1200px;
+        height: 700px;
+        transform: translate(-50%, -50%);
+        background: radial-gradient(closest-side, var(--glow), transparent 70%);
+      }
+
+      /* The lock screen's centered column (`my-auto`), with the mascot at its
+         top: 96 mascot + 28 gap + 15 eyebrow (11px × 1.35) + 32 gap + 48
+         field. Sizes from Auth.tsx / Eyebrow / Masterpass (lock variant). The
+         phone's LockScreen has the same first frame: it renders the card until
+         the biometric probe answers, which is after React mounts. */
+      .splash-col {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        height: 219px;
+        width: 560px;
+        max-width: 100%;
+        margin: auto 0;
+      }
+      .splash-mascot {
+        display: block;
+        width: 96px;
+        height: 96px;
+      }
+
+      /* Resting pose. Transform origins are set here, once, for the moves
+         below; the idle blink is part of the pose (the lock screen's mascot
+         blinks the same way), so it runs regardless. */
+      .splash-body,
+      .splash-hub,
+      .splash-spike path {
+        transform-origin: 32px 32px;
+      }
+      .splash-ink {
+        fill: var(--ink);
+      }
+      .splash-blink,
+      .splash-eyes {
+        transform-origin: 32px 27px;
+      }
+      .splash-blink {
+        animation: blink 6.8s ease-in-out infinite;
+      }
+      .splash-eyes {
+        fill: var(--eye);
+      }
+
+      /* The choreography, live only once the bundle is (see the note above). */
+      html.splash-live .splash-glow {
+        animation: splash-glow 900ms ease-out both;
+      }
+      /* The whole body winds into place like a key turning: over-rotated and
+         small, springing back to rest while the spikes grow out of the hub. */
+      html.splash-live .splash-body {
+        animation: splash-wind 760ms var(--ease-spring) both;
+      }
+      html.splash-live .splash-hub {
+        animation: splash-hub 460ms var(--ease-spring) both;
+      }
+      /* Each spike extends from the hub along its own axis; the wrapping <g>
+         carries the rotation, so scaleY here is always "outward". Staggered
+         clockwise from the top, so the growth sweeps around the hub. */
+      html.splash-live .splash-spike path {
+        animation: splash-spike 400ms var(--ease-spring) both;
+      }
+      html.splash-live .splash-spike:nth-of-type(1) path { animation-delay: 100ms; }
+      html.splash-live .splash-spike:nth-of-type(2) path { animation-delay: 140ms; }
+      html.splash-live .splash-spike:nth-of-type(3) path { animation-delay: 180ms; }
+      html.splash-live .splash-spike:nth-of-type(4) path { animation-delay: 220ms; }
+      html.splash-live .splash-spike:nth-of-type(5) path { animation-delay: 260ms; }
+      html.splash-live .splash-spike:nth-of-type(6) path { animation-delay: 300ms; }
+
+      /* The face, last: eyes open once the body has settled, glance around
+         the room, and come to rest looking straight ahead — the lock screen's
+         idle pose (gaze 0, ry 5, blink every 6.8s). Mascot.tsx nests them the
+         same way: gaze translate → blink scale → eyes. */
+      html.splash-live .splash-gaze {
+        animation: splash-glance 480ms var(--ease-swift) 900ms both;
+      }
+      html.splash-live .splash-eyes {
+        animation: splash-wake 240ms var(--ease-spring) 660ms both;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .splash * {
+          animation: none !important;
+        }
+      }
+
+      @keyframes splash-glow {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes splash-wind {
+        from { transform: rotate(-60deg) scale(0.72); }
+        to { transform: rotate(0deg) scale(1); }
+      }
+      @keyframes splash-hub {
+        from { transform: scale(0); }
+        to { transform: scale(1); }
+      }
+      @keyframes splash-spike {
+        from { transform: scaleY(0); }
+        to { transform: scaleY(1); }
+      }
+      @keyframes splash-wake {
+        from { transform: scaleY(0); }
+        to { transform: scaleY(1); }
+      }
+      @keyframes splash-glance {
+        0% { transform: translateX(0); }
+        30% { transform: translateX(3px); }
+        70% { transform: translateX(-3px); }
+        100% { transform: translateX(0); }
+      }
+      /* Verbatim from theme.css, so the idle blink is the same blink. */
+      @keyframes blink {
+        0%, 93%, 100% { transform: scaleY(1); }
+        96%, 97.5% { transform: scaleY(0.06); }
+      }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="splash" aria-hidden="true">
+        <div class="splash-glow"></div>
+        <div class="splash-col">
+          <svg class="splash-mascot" viewBox="0 0 64 64">
+            <defs>
+              <filter id="splash-soften" x="-15%" y="-15%" width="130%" height="130%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="b" />
+                <feColorMatrix
+                  in="b"
+                  type="matrix"
+                  values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 30 -13"
+                />
+              </filter>
+            </defs>
+            <g class="splash-body">
+              <g class="splash-ink" filter="url(#splash-soften)">
+                <g class="splash-spike" transform="rotate(0 32 32)">
+                  <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" />
+                </g>
+                <g class="splash-spike" transform="rotate(60 32 32)">
+                  <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" />
+                </g>
+                <g class="splash-spike" transform="rotate(120 32 32)">
+                  <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" />
+                </g>
+                <g class="splash-spike" transform="rotate(180 32 32)">
+                  <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" />
+                </g>
+                <g class="splash-spike" transform="rotate(240 32 32)">
+                  <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" />
+                </g>
+                <g class="splash-spike" transform="rotate(300 32 32)">
+                  <path d="M26 24 L24 7 Q23.5 3 27.5 3 L36.5 3 Q40.5 3 40 7 L38 24 Z" />
+                </g>
+                <circle class="splash-hub" cx="32" cy="32" r="14" />
+              </g>
+              <g class="splash-gaze" data-splash-last>
+                <g class="splash-blink">
+                  <g class="splash-eyes">
+                    <ellipse cx="27.6" cy="27.4" rx="3.5" ry="5" />
+                    <ellipse cx="37.2" cy="26.8" rx="3.5" ry="5" />
+                  </g>
+                </g>
+              </g>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
