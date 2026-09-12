@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   appendVar,
+  appendVars,
   bandsOf,
-  duplicateKeys,
   isValidKey,
   looksLikeEnv,
   parseEnv,
@@ -151,7 +151,7 @@ describe('serializeEnv', () => {
   })
 })
 
-describe('varsOf and duplicateKeys', () => {
+describe('varsOf', () => {
   it('lists vars with their logical index', () => {
     const vars = varsOf(parseEnv(REALISTIC))
     expect(vars.map((v) => [v.index, v.key])).toEqual([
@@ -166,7 +166,6 @@ describe('varsOf and duplicateKeys', () => {
       [14, 'ESC']
     ])
     expect(vars[1].comment).toBe('default')
-    expect(duplicateKeys(vars)).toEqual(new Set(['DB_HOST']))
   })
 })
 
@@ -334,5 +333,38 @@ describe('edits leave every other line untouched', () => {
         })
       }
     })
+  })
+})
+
+describe('removeLine keeps the BOM', () => {
+  it('moves the byte order mark onto the new first line', () => {
+    expect(removeLine('\uFEFFA=1\nB=2\n', 0)).toBe('\uFEFFB=2\n')
+    // Nothing left to carry it: the file is empty.
+    expect(removeLine('\uFEFFA=1', 0)).toBe('')
+  })
+})
+
+describe('appendVars', () => {
+  it('inserts a whole block after a line in one edit', () => {
+    const vars = [
+      { key: 'X', value: '1' },
+      { key: 'Y', value: 'a b' },
+      { key: 'Z', value: 'has # hash' }
+    ]
+    expect(appendVars('A=1\n\nB=2\n', vars, 0)).toBe('A=1\nX=1\nY=a b\nZ="has # hash"\n\nB=2\n')
+    expect(appendVars('A=1\r\nB=2\r\n', vars.slice(0, 2), 1)).toBe(
+      'A=1\r\nB=2\r\nX=1\r\nY=a b\r\n'
+    )
+  })
+
+  it('appends at the end, adding the missing newline first', () => {
+    const vars = [
+      { key: 'X', value: '1' },
+      { key: 'Y', value: '2' }
+    ]
+    expect(appendVars('', vars)).toBe('X=1\nY=2\n')
+    expect(appendVars('A=1', vars)).toBe('A=1\nX=1\nY=2\n')
+    expect(appendVars('A=1\r\n', vars)).toBe('A=1\r\nX=1\r\nY=2\r\n')
+    expect(appendVars('A=1\n', [])).toBe('A=1\n')
   })
 })

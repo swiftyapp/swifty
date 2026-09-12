@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Panel from '@/components/elements/Panel'
 import Segmented from '@/components/elements/Segmented'
@@ -22,8 +22,16 @@ export default function Fields() {
   const { value: note } = useField('note')
   const [tab, setTab] = useState<Tab>('variables')
   const [showAll, setShowAll] = useState(false)
-  const count = varsOf(parseEnv(body)).length
+  const count = useMemo(() => varsOf(parseEnv(body)).length, [body])
   const variables = tab === 'variables'
+
+  // Leaving the Variables face takes its eye off screen, so a reveal-all left
+  // on would still be on when the face came back with nothing to say so. The
+  // File tab masks itself afresh on each visit; this face does the same.
+  const switchTo = (next: Tab) => {
+    setShowAll(false)
+    setTab(next)
+  }
 
   return (
     <>
@@ -36,7 +44,7 @@ export default function Fields() {
             { value: 'file', label: t('File') }
           ]}
           value={tab}
-          onChange={setTab}
+          onChange={switchTo}
           testidPrefix="env-tab"
         />
         <div className="flex items-center gap-2 @max-[420px]:w-full @max-[420px]:justify-end">
@@ -56,11 +64,10 @@ export default function Fields() {
         </div>
       </div>
 
-      {/* Keyed on the mode so the table's session state — which rows are
-          revealed, the filter, a row being added — starts clean on each
-          switch. Reading after an edit re-masks everything, which is the safe
-          way round. */}
-      {variables ? <Table key={editing ? 'edit' : 'read'} revealAll={showAll} /> : <FileTab />}
+      {/* Read and edit are different subtrees (see Show), so the table — and
+          with it which rows are revealed — is mounted fresh on every mode
+          switch, as every other kind's field set is. */}
+      {variables ? <Table revealAll={showAll} /> : <FileTab />}
 
       {/* Reading, an empty note is no panel at all — like the card's aside. */}
       {(editing || note !== '') && (

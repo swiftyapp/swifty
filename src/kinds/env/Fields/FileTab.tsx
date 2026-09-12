@@ -4,10 +4,11 @@ import { cx } from '@/utils/cx'
 import CopyButton from '@/components/elements/CopyButton'
 import IconButton from '@/components/elements/IconButton'
 import Panel from '@/components/elements/Panel'
-import { useField } from '@/components/elements/fields'
+import { RAIL, grow, useField } from '@/components/elements/fields'
 import { requiredError } from '@/components/elements/fields/formats'
+import { BLOCK_DOTS } from '@/components/elements/tokens'
 import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
-import { BOX, BOX_LINE, FILE_DOTS, RAIL, grow } from './styles'
+import { BOX, BOX_LINE } from './styles'
 
 // Long files scroll inside the well rather than pushing the metadata line off
 // the screen; the same cap holds the editor, which grows to it and then scrolls.
@@ -58,7 +59,7 @@ export default function FileTab() {
                 show ? 'whitespace-pre-wrap text-text' : 'text-text2'
               )}
             >
-              {show ? value : FILE_DOTS}
+              {show ? value : BLOCK_DOTS}
             </div>
           </div>
           <div className={RAIL}>

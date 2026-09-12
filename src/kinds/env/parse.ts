@@ -259,43 +259,52 @@ const quoteFor = (current: Quote, value: string): Quote => {
 const encode = (value: string, quote: Quote): string =>
   quote === '"' ? encodeDouble(value) : quote === "'" ? `'${value}'` : value
 
-const replaceRaw = (body: string, index: number, raw: string): string => {
-  const raws = parseEnv(body).map((l) => l.raw)
-  raws[index] = raw
+/**
+ * One edit to the file: parse once, let `fn` rework the raw lines in place,
+ * join them back (`serializeEnv`'s rule). Every line-level edit below is a
+ * splice or a swap on that array, so this is the only place the body is parsed
+ * and re-joined on the way to a write.
+ */
+const edit = (body: string, fn: (raws: string[], lines: EnvLine[]) => void): string => {
+  const lines = parseEnv(body)
+  const raws = lines.map((l) => l.raw)
+  fn(raws, lines)
   return raws.join('\n')
 }
 
 /** The var at `index`, split into spans, or null when the line is not a var. */
-const spansAt = (body: string, index: number): VarSpans | null => {
-  const line = parseEnv(body)[index]
-  return line?.kind === 'var' ? readVar(line.raw) : null
-}
+const spansOf = (line: EnvLine | undefined): VarSpans | null =>
+  line?.kind === 'var' ? readVar(line.raw) : null
 
 /** Rewrite one line's value, keeping its quote style unless the value needs one. */
-export const setValue = (body: string, index: number, value: string): string => {
-  const s = spansAt(body, index)
-  if (!s) return body
-  const valueText = encode(value, quoteFor(s.line.quote, value))
-  // `KEY= #c` parses with an empty value and the `#` right after the `=`;
-  // writing a value there needs a space back or the comment joins the value.
-  const gap = valueText && s.tail.startsWith('#') ? ' ' : ''
-  return replaceRaw(body, index, s.head + s.key + s.eq + valueText + gap + s.tail)
-}
+export const setValue = (body: string, index: number, value: string): string =>
+  edit(body, (raws, lines) => {
+    const s = spansOf(lines[index])
+    if (!s) return
+    const valueText = encode(value, quoteFor(s.line.quote, value))
+    // `KEY= #c` parses with an empty value and the `#` right after the `=`;
+    // writing a value there needs a space back or the comment joins the value.
+    const gap = valueText && s.tail.startsWith('#') ? ' ' : ''
+    raws[index] = s.head + s.key + s.eq + valueText + gap + s.tail
+  })
 
-export const setKey = (body: string, index: number, key: string): string => {
-  const s = spansAt(body, index)
-  if (!s || !isValidKey(key)) return body
-  return replaceRaw(body, index, s.head + key + s.eq + s.valueText + s.tail)
-}
+export const setKey = (body: string, index: number, key: string): string =>
+  edit(body, (raws, lines) => {
+    const s = spansOf(lines[index])
+    if (!s || !isValidKey(key)) return
+    raws[index] = s.head + key + s.eq + s.valueText + s.tail
+  })
 
-export const removeLine = (body: string, index: number): string => {
-  const raws = parseEnv(body).map((l) => l.raw)
-  if (index < 0 || index >= raws.length) return body
-  // Dropping the element drops one `\n` from the join with it — the one after
-  // the line, or the one before it when it was last.
-  raws.splice(index, 1)
-  return raws.join('\n')
-}
+export const removeLine = (body: string, index: number): string =>
+  edit(body, (raws) => {
+    if (index < 0 || index >= raws.length) return
+    // Dropping the element drops one `\n` from the join with it — the one after
+    // the line, or the one before it when it was last.
+    const [gone] = raws.splice(index, 1)
+    // The BOM rides on the first line's raw; removing that line must not take
+    // the file's byte order mark with it.
+    if (index === 0 && gone.startsWith('\uFEFF') && raws.length > 0) raws[0] = `\uFEFF${raws[0]}`
+  })
 
 /** The line ending the file uses, judged by its first one. */
 const eolOf = (body: string): string => {
@@ -304,39 +313,41 @@ const eolOf = (body: string): string => {
 }
 
 /**
- * Insert `KEY=value` after line `afterIndex`, or at the end of the file when
- * omitted. A file with no trailing newline gets one before the appended line.
+ * Insert `KEY=value` lines, in order, after line `afterIndex`, or at the end of
+ * the file when omitted. A file with no trailing newline gets one before the
+ * appended lines. One parse for the whole block: a pasted file of thousands of
+ * lines is one splice, not one re-parse per line.
  */
-export const appendVar = (
+export const appendVars = (
   body: string,
-  key: string,
-  value: string,
+  vars: readonly { key: string; value: string }[],
   afterIndex?: number
 ): string => {
+  if (vars.length === 0) return body
   const eol = eolOf(body)
-  const text = `${key}=${needsQuotes(value) ? encodeDouble(value) : value}`
-  const raws = parseEnv(body).map((l) => l.raw)
-  if (afterIndex !== undefined && afterIndex >= 0 && afterIndex < raws.length) {
-    raws.splice(afterIndex + 1, 0, eol === '\r\n' ? `${text}\r` : text)
-    return raws.join('\n')
+  const texts = vars.map(
+    ({ key, value }) => `${key}=${needsQuotes(value) ? encodeDouble(value) : value}`
+  )
+  if (afterIndex !== undefined && afterIndex >= 0) {
+    const spliced = edit(body, (raws) => {
+      if (afterIndex < raws.length)
+        raws.splice(afterIndex + 1, 0, ...texts.map((t) => (eol === '\r\n' ? `${t}\r` : t)))
+    })
+    // Out of range, nothing was spliced and the round-trip is byte-identical,
+    // so the rows are appended at the end as they always have been.
+    if (spliced !== body) return spliced
   }
-  if (body === '') return text + eol
-  return body + (body.endsWith('\n') ? '' : eol) + text + eol
+  const block = texts.join(eol) + eol
+  if (body === '') return block
+  return body + (body.endsWith('\n') ? '' : eol) + block
 }
+
+/** One `KEY=value` line; see `appendVars`. */
+export const appendVar = (body: string, key: string, value: string, afterIndex?: number): string =>
+  appendVars(body, [{ key, value }], afterIndex)
 
 /** `[A-Za-z_][A-Za-z0-9_]*` */
 export const isValidKey = (key: string): boolean => KEY.test(key)
-
-/** Keys that appear more than once. */
-export const duplicateKeys = (vars: EnvVar[]): Set<string> => {
-  const seen = new Set<string>()
-  const dupes = new Set<string>()
-  for (const { key } of vars) {
-    if (seen.has(key)) dupes.add(key)
-    seen.add(key)
-  }
-  return dupes
-}
 
 /**
  * Whether pasted text is a block of variables rather than one value: more than

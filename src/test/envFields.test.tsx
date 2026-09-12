@@ -6,7 +6,7 @@ import { FieldsProvider } from '@/components/elements/fields'
 import type { DraftValue, EntryDraft } from '@/defaults/entries'
 import { copy } from '@/services/copy'
 import Fields from '@/kinds/env/Fields'
-import { parseEnv, removeLine, setValue, varsOf } from '@/kinds/env/parse'
+import { parseEnv, removeLine, setKey, setValue, varsOf } from '@/kinds/env/parse'
 
 vi.mock('@/services/copy', () => ({ copy: vi.fn() }))
 
@@ -302,5 +302,79 @@ describe('Env fields, editing', () => {
     expect(box.value).toBe(BODY)
     await userEvent.type(box, 'X=1')
     expect(onSet).toHaveBeenLastCalledWith('body', `${BODY}X=1`)
+  })
+})
+
+describe('Env fields, review regressions', () => {
+  it('drops a reveal-all when the face is left, so it is not still on when it returns', async () => {
+    renderRead()
+    await userEvent.click(screen.getByTestId('env-reveal-all'))
+    expect(value(BODY, 'STRIPE_KEY')).toHaveTextContent('sk_live_1')
+
+    await userEvent.click(screen.getByTestId('env-tab-file'))
+    await userEvent.click(screen.getByTestId('env-tab-variables'))
+    expect(value(BODY, 'STRIPE_KEY')).toHaveTextContent(DOTS)
+  })
+
+  // The editor hears Escape on `document` as Cancel; clearing a filter must not
+  // throw the edit away with it.
+  it('keeps an Escape that cleared the filter away from the document', async () => {
+    const seen = vi.fn()
+    document.addEventListener('keydown', seen)
+    render(<Editor body={LONG} />)
+    await userEvent.type(screen.getByTestId('env-filter'), 'stripe')
+    seen.mockClear()
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByTestId('env-filter')).toHaveValue('')
+    expect(seen).not.toHaveBeenCalled()
+
+    // Already clear, Escape is the editor's again.
+    await userEvent.keyboard('{Escape}')
+    expect(seen).toHaveBeenCalledTimes(1)
+    document.removeEventListener('keydown', seen)
+  })
+
+  it('keeps a row being added on screen when the filter hides its band', async () => {
+    render(<Editor body={LONG} />)
+    // Band 1 is Stripe.
+    await userEvent.click(screen.getByTestId('add-env-var-1'))
+    // Half-filled: a blank row let go of is meant to disappear.
+    await userEvent.type(valueBox('new')!, 'whsec_2')
+
+    await userEvent.type(screen.getByTestId('env-filter'), 'port')
+    expect(screen.queryByDisplayValue('STRIPE_KEY')).not.toBeInTheDocument()
+    expect(keyInput('new')).toBeInTheDocument()
+  })
+
+  it('lets go of a row being added once another line moves under it', async () => {
+    render(<Editor body={BODY} />)
+    await userEvent.click(screen.getByTestId('add-env-var-1'))
+    expect(keyInput('new')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId(`remove-env-${indexOf(BODY, 'DATABASE_URL')}`))
+    expect(keyInput('new')).toBeNull()
+  })
+
+  it('holds a half-typed key in the box with a complaint, and puts the file’s back on leaving', async () => {
+    const onSet = vi.fn()
+    render(<Editor body={BODY} onSet={onSet} />)
+    const index = indexOf(BODY, 'DB_POOL')
+
+    await userEvent.type(keyInput(index)!, '-')
+    expect(keyInput(index)).toHaveValue('DB_POOL-')
+    expect(screen.getByText('Not a valid name')).toBeInTheDocument()
+    expect(onSet).not.toHaveBeenCalled()
+
+    await userEvent.clear(keyInput(index)!)
+    expect(keyInput(index)).toHaveValue('')
+
+    // Out of the row altogether — a tab would only reach its value box.
+    await userEvent.click(document.body)
+    expect(keyInput(index)).toHaveValue('DB_POOL')
+    expect(screen.queryByText('Not a valid name')).not.toBeInTheDocument()
+
+    await userEvent.type(keyInput(index)!, '_SIZE')
+    expect(onSet).toHaveBeenLastCalledWith('body', setKey(BODY, index, 'DB_POOL_SIZE'))
   })
 })

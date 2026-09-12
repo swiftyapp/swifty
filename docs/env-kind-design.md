@@ -1,6 +1,6 @@
 # Env files as a kind — UI design
 
-Status: proposal, no code yet.
+Status: PR 1 (kind, parser, table, filter, File tab) is #425; ingest and list metadata follow as stacked PRs.
 
 A `.env` file is the container; each variable inside it is a value you can read,
 copy and change on its own. This document designs that as a sixth `Kind`,
@@ -278,7 +278,7 @@ editor pattern, the SSH private-key block, the import `DropZone` wiring, the
 
 ## 11. Suggested PR slicing
 
-1. **Kind + parser + read/edit table + filter + File tab.** Model changes,
+1. **Kind + parser + read/edit table + filter + File tab** — #425. Model changes,
    parser with round-trip tests, the two faces, the filter, validation. Usable
    end to end by pasting a file into the File tab. Acceptance: drop-in text
    round-trips byte-identical after editing one value; every row copies its

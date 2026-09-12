@@ -4,7 +4,7 @@ use std::collections::HashMap;
 // A vault entry. Kept as a single flat struct (rather than an enum) so it
 // round-trips the untyped legacy object shape; `kind` discriminates
 // login/note/card/identity.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Entry {
     pub id: String,
     #[serde(rename = "type")]

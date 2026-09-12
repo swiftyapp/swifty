@@ -3,10 +3,11 @@ import { cx } from '@/utils/cx'
 import { copy } from '@/services/copy'
 import CopyButton from '@/components/elements/CopyButton'
 import IconButton from '@/components/elements/IconButton'
-import { HOVER_ONLY, ROW_HAIRLINE, VALUE } from '@/components/elements/tokens'
+import { RAIL, STACK, STACK_LABEL, STACK_RAIL } from '@/components/elements/fields'
+import { HOVER_ONLY, MASK_DOTS, ROW_HAIRLINE, VALUE } from '@/components/elements/tokens'
 import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
 import type { EnvVar } from '../parse'
-import { DOTS, KEY_COL, RAIL, STACK, STACK_KEY, STACK_RAIL, STACK_VALUE } from './styles'
+import { KEY_COL, STACK_VALUE } from './styles'
 
 interface Props {
   v: EnvVar
@@ -27,7 +28,7 @@ export default function Row({ v, revealed, onReveal }: Props) {
     <div className={cx('group flex items-center gap-3 px-3.5 py-3', ROW_HAIRLINE, STACK)}>
       <span
         data-testid={`env-key-${v.index}`}
-        className={cx(KEY_COL, 'truncate text-text2', STACK_KEY)}
+        className={cx(KEY_COL, 'truncate text-text2', STACK_LABEL)}
       >
         {v.key}
       </span>
@@ -48,7 +49,7 @@ export default function Row({ v, revealed, onReveal }: Props) {
               STACK_VALUE
             )}
           >
-            {masked ? DOTS : v.value}
+            {masked ? MASK_DOTS : v.value}
           </button>
           {/* The trailing `# …` on the line. Unlike Field's gloss it is not
               derived from the value — it is the file's own annotation and says

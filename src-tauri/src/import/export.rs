@@ -16,11 +16,12 @@ use crate::app::APP_NAME;
 /// The exporter's relying-party id in a CXF document: the project's domain.
 pub const EXPORTER_RP_ID: &str = "getswifty.pro";
 
-/// Bitwarden `type` codes.
+/// Bitwarden `type` codes. Bitwarden has no item for a `.env` file, so one goes
+/// out as a secure note carrying the file text — never as an empty login.
 fn bw_type(kind: EntryKind) -> u8 {
     match kind {
         EntryKind::Login => 1,
-        EntryKind::Note => 2,
+        EntryKind::Note | EntryKind::Env => 2,
         EntryKind::Card => 3,
         EntryKind::Identity => 4,
         EntryKind::Ssh => 5,
@@ -35,6 +36,12 @@ pub const PASSPHRASE_LABEL: &str = "Passphrase";
 /// same custom-fields credential under these labels.
 pub const PUBLIC_KEY_LABEL: &str = "Public key";
 pub const FINGERPRINT_LABEL: &str = "Fingerprint";
+/// An `.env` entry exports as a note whose text is the file; the file's name
+/// has no member in either format and rides as a custom field under this label.
+/// The entry's own note would otherwise collide with the body in `notes`, so it
+/// travels the same way.
+pub const FILE_NAME_LABEL: &str = "file_name";
+pub const NOTE_LABEL: &str = "Note";
 
 /// Serialize to Bitwarden's unencrypted JSON export shape.
 pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8>> {
@@ -105,15 +112,21 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
                     // Bitwarden's SSH item has no passphrase member, so it goes
                     // in a hidden custom field rather than nowhere.
                     if let Some(passphrase) = &e.ssh_passphrase {
-                        let field = json!({
-                            "name": PASSPHRASE_LABEL,
-                            "value": passphrase,
-                            "type": FIELD_HIDDEN,
-                        });
-                        match item["fields"].as_array_mut() {
-                            Some(fields) => fields.push(field),
-                            None => item["fields"] = json!([field]),
-                        }
+                        push_field(&mut item, PASSPHRASE_LABEL, passphrase, FIELD_HIDDEN);
+                    }
+                }
+                EntryKind::Env => {
+                    // The file text is the secret, so it takes the note's
+                    // body; the entry's own note and the file name have no
+                    // member of their own and follow as custom fields. One-way:
+                    // the importer reads a type-2 item back as a note, since
+                    // nothing marks it as having been a file.
+                    item["notes"] = json!(e.env_body);
+                    if let Some(note) = &e.notes {
+                        push_field(&mut item, NOTE_LABEL, note, FIELD_TEXT);
+                    }
+                    if let Some(name) = &e.env_file_name {
+                        push_field(&mut item, FILE_NAME_LABEL, name, FIELD_TEXT);
                     }
                 }
                 EntryKind::Note => {}
@@ -133,6 +146,16 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
         folders: vec![],
         items,
     })
+}
+
+/// Append one custom field to a Bitwarden item, starting the list if the extras
+/// did not already.
+fn push_field(item: &mut Value, name: &str, value: &str, field_type: u8) {
+    let field = json!({ "name": name, "value": value, "type": field_type });
+    match item["fields"].as_array_mut() {
+        Some(fields) => fields.push(field),
+        None => item["fields"] = json!([field]),
+    }
 }
 
 /// Which of Bitwarden's two document-number members carries this document.
@@ -288,6 +311,25 @@ fn cxf_item(e: &ImportedEntry) -> Value {
                 }));
             }
         }
+        EntryKind::Env => {
+            // CXF has no credential for a file, so the text goes out as a
+            // `note` — first, so an importer that keeps one note per item
+            // keeps the file. One-way, as with Bitwarden: it comes back as a
+            // note. The file name rides in a custom-fields credential beside
+            // it, the way the ssh-key's extra parts do.
+            if let Some(body) = &e.env_body {
+                credentials
+                    .push(json!({ "type": "note", "content": editable_value("string", body) }));
+            }
+            if let Some(name) = &e.env_file_name {
+                credentials.push(json!({
+                    "type": "custom-fields",
+                    "id": random_id(),
+                    "label": "Env file",
+                    "fields": [{ "fieldType": "string", "label": FILE_NAME_LABEL, "value": name }],
+                }));
+            }
+        }
         // CXF has purpose-built `passport`/`drivers-license`/`identity-document`
         // credentials, but nothing that covers all five document types the app
         // holds; until they are mapped one by one, an identity exports as its
@@ -415,6 +457,8 @@ const COLUMNS: &[&str] = &[
     "ssh_public_key",
     "ssh_fingerprint",
     "ssh_passphrase",
+    "body",
+    "file_name",
     "tags",
 ];
 
@@ -444,6 +488,8 @@ pub fn to_generic_csv(entries: &[ImportedEntry]) -> csv::Result<Vec<u8>> {
             e.ssh_public_key.clone().unwrap_or_default(),
             e.ssh_fingerprint.clone().unwrap_or_default(),
             e.ssh_passphrase.clone().unwrap_or_default(),
+            e.env_body.clone().unwrap_or_default(),
+            e.env_file_name.clone().unwrap_or_default(),
             e.tags.join(";"),
         ];
         wtr.write_record(row.iter().map(|c| sanitize_cell(c)))?;

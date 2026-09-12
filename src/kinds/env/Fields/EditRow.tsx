@@ -1,25 +1,18 @@
-import type { ClipboardEvent, FocusEvent, KeyboardEvent } from 'react'
+import { useState, type ClipboardEvent, type FocusEvent, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
 import IconButton from '@/components/elements/IconButton'
+import { RAIL, STACK, STACK_LABEL, STACK_RAIL, grow, useFields } from '@/components/elements/fields'
+import { requiredError } from '@/components/elements/fields/formats'
 import { TrashGlyph } from '@/components/Main/icons'
-import { looksLikeEnv } from '../parse'
-import {
-  BOX,
-  BOX_LINE,
-  KEY_COL,
-  RAIL,
-  STACK,
-  STACK_KEY,
-  STACK_RAIL,
-  focusEnd,
-  grow
-} from './styles'
+import { isValidKey, looksLikeEnv } from '../parse'
+import { BOX, BOX_LINE, KEY_COL, focusEnd } from './styles'
 
 interface Props {
   /** The line's index, or `new` for a row the file does not have yet. */
   name: string
   row: { key: string; value: string }
+  /** Called with identifiers only; what is typed in between stays in the box. */
   onKey: (key: string) => void
   onValue: (value: string) => void
   onRemove: () => void
@@ -29,6 +22,7 @@ interface Props {
   onPaste: (text: string) => void
   /** Focus left the row altogether. */
   onLeave?: () => void
+  /** The table's own complaint about this row — a duplicate key. */
   error?: string
   autoFocus?: boolean
 }
@@ -50,7 +44,23 @@ export default function EditRow({
   autoFocus
 }: Props) {
   const { t } = useTranslation()
-  const line = error ? 'border-bad' : BOX_LINE
+  const { attempted } = useFields()
+  // A key that is not (yet) an identifier cannot be written into the file — the
+  // line would stop being a variable and the row would vanish. So the box holds
+  // it here, with the complaint under it, until it is one or the caret leaves;
+  // the file only ever learns identifiers. Null: the box shows the file's key.
+  const [typed, setTyped] = useState<string | null>(null)
+  const key = typed ?? row.key
+  const keyError =
+    key === '' ? requiredError('', true, attempted) : isValidKey(key) ? '' : t('Not a valid name')
+  const complaint = error || keyError
+  const line = complaint ? 'border-bad' : BOX_LINE
+
+  const type = (next: string) => {
+    if (!isValidKey(next)) return setTyped(next)
+    setTyped(null)
+    onKey(next)
+  }
 
   // Enter is inert in the editor (only ⌘⏎ saves), and a value is one line far
   // more often than not, so plain Enter goes to the next row like CustomFields'
@@ -70,8 +80,12 @@ export default function EditRow({
     onPaste(text)
   }
 
+  // Leaving the row with a half-typed key puts the file's key back: nothing
+  // was written, so nothing is lost, and the row does not sit there in red.
   const leave = (event: FocusEvent<HTMLDivElement>) => {
-    if (onLeave && !event.currentTarget.contains(event.relatedTarget as Node | null)) onLeave()
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+    setTyped(null)
+    onLeave?.()
   }
 
   return (
@@ -79,15 +93,15 @@ export default function EditRow({
       <div className={cx('flex items-center gap-3', STACK)}>
         <input
           name={`env-key-${name}`}
-          value={row.key}
+          value={key}
           aria-label={t('Name')}
           placeholder={t('Name')}
           autoComplete="off"
           spellCheck={false}
           ref={autoFocus ? focusEnd : undefined}
-          onChange={event => onKey(event.target.value)}
+          onChange={event => type(event.target.value)}
           onPaste={paste}
-          className={cx(KEY_COL, 'text-text', BOX, line, STACK_KEY)}
+          className={cx(KEY_COL, 'text-text', BOX, line, STACK_LABEL)}
         />
         <div className="min-w-0 flex-1">
           <textarea
@@ -116,7 +130,7 @@ export default function EditRow({
           </IconButton>
         </div>
       </div>
-      {error && <div className="mt-1.5 text-base text-bad">{error}</div>}
+      {complaint && <div className="mt-1.5 text-base text-bad">{complaint}</div>}
     </div>
   )
 }

@@ -38,6 +38,10 @@ const OTP: &[&str] = &[
     "otp secret",
     "totp secret",
 ];
+// Swifty's own columns (see `export::COLUMNS`): no foreign sheet has them.
+const TYPE: &[&str] = &["type"];
+const BODY: &[&str] = &["body"];
+const FILE_NAME: &[&str] = &["file_name"];
 
 // A parsed sheet: header names (normalized) and the data rows.
 struct Rows {
@@ -81,6 +85,17 @@ fn get(headers: &[String], rec: &StringRecord, aliases: &[&str]) -> Option<Strin
     })
 }
 
+// The same lookup, untrimmed: a `.env` file's leading indent and trailing
+// newline are part of the file, and the entry promises to hand it back verbatim.
+fn get_verbatim(headers: &[String], rec: &StringRecord, aliases: &[&str]) -> Option<String> {
+    headers.iter().enumerate().find_map(|(idx, h)| {
+        if !aliases.contains(&h.as_str()) {
+            return None;
+        }
+        rec.get(idx).filter(|v| !v.is_empty()).map(String::from)
+    })
+}
+
 fn tag_vec(group: Option<String>) -> Vec<String> {
     group
         .map(|g| g.trim_start_matches("Root/").trim().to_string())
@@ -109,6 +124,21 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
             result.push_err(i + 2, "empty row");
             continue;
         };
+        // Every row of a foreign sheet is a login, and so is every row of our
+        // own that has a login's shape. An `env` row has none — no login column
+        // names the file — so it is the one kind the `type` column is read for,
+        // or the file would be dropped on the way back in.
+        if get(&rows.headers, rec, TYPE).as_deref() == Some(EntryKind::Env.as_str()) {
+            result.entries.push(ImportedEntry {
+                kind: EntryKind::Env,
+                title,
+                notes: get(&rows.headers, rec, NOTES),
+                env_body: get_verbatim(&rows.headers, rec, BODY),
+                env_file_name: get(&rows.headers, rec, FILE_NAME),
+                ..Default::default()
+            });
+            continue;
+        }
         result.entries.push(ImportedEntry {
             kind: EntryKind::Login,
             title,

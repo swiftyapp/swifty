@@ -2,15 +2,8 @@ import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
 import { useField } from './context'
 import { requiredError } from './formats'
+import { grow } from './grow'
 import FieldRow from './Row'
-
-// Set to its own content height, so a twenty-line note is never read through a
-// two-line window.
-const grow = (el: HTMLTextAreaElement | null) => {
-  if (!el) return
-  el.style.height = 'auto'
-  if (el.scrollHeight) el.style.height = `${el.scrollHeight}px`
-}
 
 export default function NoteField({
   name = 'note',

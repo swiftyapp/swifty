@@ -42,3 +42,8 @@ export const META = `${META_TYPE} text-text3`
 export const VALUE_LINE = 'block h-6 min-w-0 truncate leading-6'
 
 export const VALUE = `${VALUE_LINE} text-base`
+
+// What a masked secret is read as. Fixed, so the mask says nothing about the
+// secret's length: twelve dots for a value line, twenty-four for a block.
+export const MASK_DOTS = '•'.repeat(12)
+export const BLOCK_DOTS = '•'.repeat(24)

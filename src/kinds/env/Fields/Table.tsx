@@ -1,12 +1,13 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import AddAction from '@/components/elements/AddAction'
 import Panel from '@/components/elements/Panel'
 import { useField } from '@/components/elements/fields'
 import { requiredError } from '@/components/elements/fields/formats'
 import {
   appendVar,
+  appendVars,
   bandsOf,
-  duplicateKeys,
   isValidKey,
   parseEnv,
   removeLine,
@@ -15,7 +16,7 @@ import {
   varsOf,
   type EnvVar
 } from '../parse'
-import Band, { AddVariable } from './Band'
+import Band from './Band'
 import EditRow from './EditRow'
 import Filter from './Filter'
 import Row from './Row'
@@ -36,8 +37,10 @@ const FILTER_FROM = 6
  * reaches the file that the parser cannot read back.
  */
 interface Pending {
-  band: number
-  /** The line to insert after; undefined appends at the end of the file. */
+  /**
+   * The line to insert after — a band's last, which is also what places the
+   * row under that band; undefined appends at the end of a file with no bands.
+   */
   after: number | undefined
   key: string
   value: string
@@ -50,10 +53,12 @@ interface Pending {
 export default function Table({ revealAll }: { revealAll: boolean }) {
   const { t } = useTranslation()
   const { value: body, set, editing, attempted } = useField('body')
-  const lines = parseEnv(body)
-  const vars = varsOf(lines)
-  const bands = bandsOf(lines)
-  const dupes = duplicateKeys(vars)
+  // Parsed once per body, not once per reveal, filter keystroke or pending-row
+  // keystroke — none of which change the file.
+  const { vars, bands } = useMemo(() => {
+    const lines = parseEnv(body)
+    return { vars: varsOf(lines), bands: bandsOf(lines) }
+  }, [body])
 
   const [revealed, setRevealed] = useState<Set<number>>(new Set())
   const [query, setQuery] = useState('')
@@ -69,9 +74,12 @@ export default function Table({ revealAll }: { revealAll: boolean }) {
       return next
     })
 
+  // Every write to the file drops the row being added: its `after` is a line
+  // index, and a removal above it would leave it pointing at the wrong line.
   const write = (next: string) => {
     set(next)
     setFocus(null)
+    setPending(null)
   }
 
   // Keys and captions only. Values are masked, and a filter that matched them
@@ -79,57 +87,45 @@ export default function Table({ revealAll }: { revealAll: boolean }) {
   const filtering = vars.length > FILTER_FROM
   const needle = filtering ? query.trim().toLowerCase() : ''
   const matches = (text: string | null) => text !== null && text.toLowerCase().includes(needle)
+  // `last` is the band's whole last row, filtered or not: it is where a new row
+  // goes and which row spends Enter on one. A band holding the row being added
+  // stays on screen whatever the filter says, or the half-typed row would be
+  // lost behind it.
   const shown = bands
     .map((band, index) => ({
       index,
       caption: band.caption,
+      last: band.vars[band.vars.length - 1]?.index,
       vars: !needle || matches(band.caption) ? band.vars : band.vars.filter(v => matches(v.key))
     }))
-    .filter(band => band.vars.length > 0)
+    .filter(band => band.vars.length > 0 || pending?.after === band.last)
 
   // dotenv tolerates a duplicate (last wins), so this warns rather than blocks,
-  // and on the later occurrence — the first is the one that was there.
+  // and on the later occurrence — the first is the one that was there. A key
+  // whose first occurrence is some other line is a duplicate by construction.
   const firstOf = new Map<string, number>()
   for (const v of vars) if (!firstOf.has(v.key)) firstOf.set(v.key, v.index)
-  const errorOf = (v: EnvVar) =>
-    dupes.has(v.key) && firstOf.get(v.key) !== v.index ? t('Duplicate key') : ''
+  const errorOf = (v: EnvVar) => (firstOf.get(v.key) !== v.index ? t('Duplicate key') : '')
 
-  const start = (band: number, after: number | undefined) =>
-    setPending({ band, after, key: '', value: '' })
+  const start = (after: number | undefined) => setPending({ after, key: '', value: '' })
 
   const update = (next: Pending) => {
     if (!isValidKey(next.key)) return setPending(next)
     const written = appendVar(body, next.key, next.value, next.after)
     write(written)
-    setPending(null)
     // Appended at the end of the file, the new line is its last variable.
     const added = varsOf(parseEnv(written))
     setFocus(next.after === undefined ? (added[added.length - 1]?.index ?? null) : next.after + 1)
   }
 
-  // A pasted block goes in as rows, in order, each after the one before it.
-  const paste = (after: number | undefined, text: string) => {
-    const pasted = varsOf(parseEnv(text))
-    write(
-      pasted.reduce(
-        (acc, v, i) => appendVar(acc, v.key, v.value, after === undefined ? undefined : after + i),
-        body
-      )
-    )
-    setPending(null)
-  }
-
-  const pendingError = pending
-    ? pending.key === ''
-      ? requiredError('', true, attempted)
-      : t('Not a valid name')
-    : ''
+  // A pasted block goes in as rows, in order, after this one.
+  const paste = (after: number | undefined, text: string) =>
+    write(appendVars(body, varsOf(parseEnv(text)), after))
 
   const pendingRow = pending && (
     <EditRow
       name="new"
       row={pending}
-      error={pendingError}
       autoFocus
       onKey={key => update({ ...pending, key })}
       onValue={value => update({ ...pending, value })}
@@ -152,55 +148,55 @@ export default function Table({ revealAll }: { revealAll: boolean }) {
             </div>
           )}
 
-          {shown.map((band, i) => {
-            const rows = bands[band.index].vars
-            const last = rows[rows.length - 1]?.index
-            return (
-              <Fragment key={band.index}>
-                {/* A gutter cut through the panel, as the identity kind does:
-                    the bands read apart without a heading over each of them. */}
-                {i > 0 && <div className="h-2 bg-app" />}
-                <Band
-                  caption={band.caption}
-                  index={band.index}
-                  onAdd={editing ? () => start(band.index, last) : undefined}
-                  pending={pending?.band === band.index ? pendingRow : null}
-                >
-                  {band.vars.map(v =>
-                    editing ? (
-                      <EditRow
-                        key={v.index}
-                        name={String(v.index)}
-                        row={v}
-                        error={errorOf(v)}
-                        autoFocus={focus === v.index}
-                        onKey={key => write(setKey(body, v.index, key))}
-                        onValue={value => write(setValue(body, v.index, value))}
-                        onRemove={() => write(removeLine(body, v.index))}
-                        onAppend={v.index === last ? () => start(band.index, last) : undefined}
-                        onPaste={text => paste(v.index, text)}
-                      />
-                    ) : (
-                      <Row
-                        key={v.index}
-                        v={v}
-                        revealed={revealAll || revealed.has(v.index)}
-                        onReveal={() => toggle(v.index)}
-                      />
-                    )
-                  )}
-                </Band>
-              </Fragment>
-            )
-          })}
+          {shown.map((band, i) => (
+            <Fragment key={band.index}>
+              {/* A gutter cut through the panel, as the identity kind does:
+                  the bands read apart without a heading over each of them. */}
+              {i > 0 && <div className="h-2 bg-app" />}
+              <Band
+                caption={band.caption}
+                index={band.index}
+                onAdd={editing ? () => start(band.last) : undefined}
+              >
+                {band.vars.map(v =>
+                  editing ? (
+                    <EditRow
+                      key={v.index}
+                      name={String(v.index)}
+                      row={v}
+                      error={errorOf(v)}
+                      autoFocus={focus === v.index}
+                      onKey={key => write(setKey(body, v.index, key))}
+                      onValue={value => write(setValue(body, v.index, value))}
+                      onRemove={() => write(removeLine(body, v.index))}
+                      onAppend={v.index === band.last ? () => start(band.last) : undefined}
+                      onPaste={text => paste(v.index, text)}
+                    />
+                  ) : (
+                    <Row
+                      key={v.index}
+                      v={v}
+                      revealed={revealAll || revealed.has(v.index)}
+                      onReveal={() => toggle(v.index)}
+                    />
+                  )
+                )}
+                {pending?.after === band.last && pendingRow}
+              </Band>
+            </Fragment>
+          ))}
 
           {/* No bands to add into, so one button for the whole file. */}
           {editing && bands.length === 0 && (
             <div>
-              {pendingRow}
+              {pending?.after === undefined && pendingRow}
               <div className="flex items-center justify-between gap-3 px-3.5 py-3">
                 <span className="text-base text-bad">{requiredError(body, true, attempted)}</span>
-                <AddVariable testid="add-env-var-0" onClick={() => start(0, undefined)} />
+                <AddAction
+                  label={t('Add variable')}
+                  testid="add-env-var-0"
+                  onClick={() => start(undefined)}
+                />
               </div>
             </div>
           )}
