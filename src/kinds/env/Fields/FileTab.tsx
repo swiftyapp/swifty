@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
+import { isMobile } from '@/lib/platform'
+import { saveEnvFile } from '@/lib/commands'
 import CopyButton from '@/components/elements/CopyButton'
 import IconButton from '@/components/elements/IconButton'
 import Panel from '@/components/elements/Panel'
-import { RAIL, grow, useField } from '@/components/elements/fields'
+import { grow, useField } from '@/components/elements/fields'
 import { requiredError } from '@/components/elements/fields/formats'
 import { BLOCK_DOTS } from '@/components/elements/tokens'
-import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
+import { DownloadGlyph, EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
 import { BOX, BOX_LINE } from './styles'
 
 // Long files scroll inside the well rather than pushing the metadata line off
@@ -18,11 +20,25 @@ const WELL = 'max-h-[60vh] overflow-y-auto'
 // block until the rail's eye is pressed, with copy always at hand. Editing, a
 // plain textarea over the same string — power users fix quoting or comments
 // here, and the table is never out of date because there is only one source.
+//
+// "Save as file…" sits in this rail rather than the header's ⋯ menu: it is the
+// file tab's own action, and keeping it kind-local means the shared header
+// needs no per-kind hook. Desktop only — the mobile picker copies the file
+// itself and cannot be told what permissions to give a plaintext secret.
 export default function FileTab() {
   const { t } = useTranslation()
   const { value, set, editing, attempted } = useField('body')
+  const { value: fileName } = useField('fileName')
   const [show, setShow] = useState(false)
-  const error = requiredError(value, true, attempted)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const validationError = requiredError(value, true, attempted)
+
+  // A dismissal is not an error. A failed commit stays beside the action that
+  // initiated it, so the user never has to infer success from a closed dialog.
+  const save = () => {
+    setSaveError(null)
+    saveEnvFile(fileName, value).catch(e => setSaveError(String(e)))
+  }
 
   return (
     <Panel>
@@ -44,13 +60,13 @@ export default function FileTab() {
               'block min-h-6 w-full resize-none font-mono text-base leading-relaxed text-text',
               WELL,
               BOX,
-              error ? 'border-bad' : BOX_LINE
+              validationError ? 'border-bad' : BOX_LINE
             )}
           />
-          {error && <div className="mt-1.5 text-base text-bad">{error}</div>}
+          {validationError && <div className="mt-1.5 text-base text-bad">{validationError}</div>}
         </div>
       ) : (
-        <div className="flex items-start gap-3 px-3.5 py-3">
+        <div className="flex flex-wrap items-start gap-3 px-3.5 py-3">
           <div className={cx('min-w-0 flex-1', WELL)}>
             <div
               data-testid="entry-value-body"
@@ -62,8 +78,15 @@ export default function FileTab() {
               {show ? value : BLOCK_DOTS}
             </div>
           </div>
-          <div className={RAIL}>
+          {/* Three controls, not the detail rows' two: this block lines up with
+              no row, so the rail sizes to what it holds. */}
+          <div className="flex flex-none items-center gap-1">
             <CopyButton value={value} title={t('Copy')} />
+            {!isMobile && (
+              <IconButton title={t('Save as file…')} testid="env-save-file" onClick={save}>
+                <DownloadGlyph />
+              </IconButton>
+            )}
             <IconButton
               title={show ? t('Hide') : t('Reveal')}
               active={show}
@@ -73,6 +96,11 @@ export default function FileTab() {
               {show ? <EyeOffGlyph /> : <EyeGlyph />}
             </IconButton>
           </div>
+          {saveError && (
+            <div data-testid="env-save-error" className="basis-full text-base text-bad">
+              {saveError}
+            </div>
+          )}
         </div>
       )}
     </Panel>

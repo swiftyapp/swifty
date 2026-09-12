@@ -40,6 +40,8 @@ pub fn build_record(entry: &Entry, payload: Vec<u8>) -> Result<Record> {
         // and every entry it brings in is an insert on a fresh vault.
         favorite: entry.favorite,
         has_passkey: derived_has_passkey(entry),
+        file_name: derived_file_name(entry),
+        var_count: derived_var_count(entry),
     })
 }
 
@@ -62,6 +64,57 @@ pub fn derived_card_brand(entry: &Entry) -> Option<String> {
             .unwrap_or("none")
             .to_string()
     })
+}
+
+/// The stored name of an env entry's file (`.env.production`), or `None` when
+/// the file was pasted in and never had one — the list then shows the count
+/// alone. Not a secret: it is what the file was called on disk, and the row's
+/// title usually says more.
+pub fn derived_file_name(entry: &Entry) -> Option<String> {
+    (entry.kind == "env")
+        .then(|| entry.file_name.as_deref().unwrap_or_default().trim())
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+}
+
+/// How many variables an env entry's file defines: `Some` for every env entry
+/// (so a stamped row is distinguishable from a pre-column NULL), `None` for
+/// every other kind.
+pub fn derived_var_count(entry: &Entry) -> Option<i64> {
+    (entry.kind == "env").then(|| count_env_vars(entry.body.as_deref().unwrap_or_default()))
+}
+
+/// Lines that look like an assignment: `^\s*(export\s+)?[A-Za-z_][A-Za-z0-9_]*\s*=`.
+///
+/// An approximation, deliberately: a multi-line quoted value whose continuation
+/// line happens to read `KEY=…` is counted as a variable here, where the
+/// frontend's parser (which tracks quoting) would not. The count is a list
+/// subtitle, not a contract, and exactness is the TS parser's job — the two
+/// only disagree on a file that is already unusual.
+fn count_env_vars(body: &str) -> i64 {
+    body.lines().filter(|line| is_assignment(line)).count() as i64
+}
+
+fn is_assignment(line: &str) -> bool {
+    let rest = line.trim_start();
+    // An `export` prefix only counts as one when whitespace follows it;
+    // `export=1` is a variable called `export`.
+    let rest = match rest.strip_prefix("export") {
+        Some(after) if after.starts_with(char::is_whitespace) => after.trim_start(),
+        _ => rest,
+    };
+    let mut chars = rest.char_indices();
+    let Some((_, first)) = chars.next() else {
+        return false;
+    };
+    if !(first.is_ascii_alphabetic() || first == '_') {
+        return false;
+    }
+    let end = chars
+        .find(|(_, c)| !(c.is_ascii_alphanumeric() || *c == '_'))
+        .map(|(i, _)| i)
+        .unwrap_or(rest.len());
+    rest[end..].trim_start().starts_with('=')
 }
 
 /// Whether the entry holds any passkey — the plaintext flag a listing reads

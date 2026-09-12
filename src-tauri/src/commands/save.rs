@@ -65,6 +65,36 @@ pub async fn save_export(
     }
 }
 
+/// Ask where a plaintext `.env` should go and write `text` there, readable by
+/// its owner alone (0600 on unix). Desktop only: the mobile picker copies the
+/// file itself and so cannot be told what mode to give it.
+///
+/// Unlike [`save_export`] this applies no file-type filter — `.env` has no
+/// extension in the dialog's sense, `.env.production` has the wrong one — and
+/// does not force one onto the chosen name for the same reason.
+#[cfg(desktop)]
+pub async fn save_private_text(
+    app: &AppHandle,
+    file_name: &str,
+    text: String,
+) -> Result<Option<PathBuf>> {
+    let Some(dest) = ask(app, file_name, "", "").await? else {
+        return Ok(None);
+    };
+    write_private(&dest, text.into_bytes())?;
+    Ok(Some(dest))
+}
+
+// Commit through the shared durable writer: the owner-only temp sibling is
+// complete and fsynced before it atomically replaces the destination, so a
+// failed overwrite leaves the old file whole. Scrub the plaintext on every exit.
+#[cfg(desktop)]
+fn write_private(dest: &Path, mut bytes: Vec<u8>) -> Result<()> {
+    let result = crate::storage::atomic_write_private(dest, &bytes);
+    bytes.zeroize();
+    result
+}
+
 /// Where one export stages inside `dir`, and the name to ask the dialog for so
 /// that it exports exactly that: a directory of its own, plus `file_name`
 /// prefixed with it.
@@ -134,7 +164,8 @@ impl Drop for Staged {
 }
 
 // Present the save dialog off the main thread; blocking on it there would
-// deadlock the very event loop the dialog needs.
+// deadlock the very event loop the dialog needs. An empty `filter` asks for no
+// file-type filter at all.
 async fn ask(
     app: &AppHandle,
     file_name: &str,
@@ -146,11 +177,13 @@ async fn ask(
     let filter = filter.to_string();
     let extension = extension.to_string();
     let chosen = tauri::async_runtime::spawn_blocking(move || {
-        app.dialog()
-            .file()
-            .set_file_name(file_name)
-            .add_filter(filter, &[extension.as_str()])
-            .blocking_save_file()
+        let dialog = app.dialog().file().set_file_name(file_name);
+        let dialog = if filter.is_empty() {
+            dialog
+        } else {
+            dialog.add_filter(filter, &[extension.as_str()])
+        };
+        dialog.blocking_save_file()
     })
     .await
     .map_err(|e| Error::Other(e.to_string()))?;
@@ -176,6 +209,37 @@ fn write_and_scrub(dest: &Path, mut bytes: Vec<u8>) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // A `.env` on disk is a plaintext secret; whatever the umask says, nobody
+    // but the owner gets to read it — including when the user picked a file
+    // that already existed with looser permissions.
+    #[cfg(all(desktop, unix))]
+    #[test]
+    fn write_private_leaves_the_file_owner_readable_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!("swifty-env-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let dest = dir.join(".env.production");
+
+        write_private(&dest, b"KEY=value\n".to_vec()).unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), b"KEY=value\n");
+        assert_eq!(
+            std::fs::metadata(&dest).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+
+        // Overwriting a looser file tightens it.
+        std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o644)).unwrap();
+        write_private(&dest, b"KEY=other\n".to_vec()).unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), b"KEY=other\n");
+        assert_eq!(
+            std::fs::metadata(&dest).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
 
     // What iOS requires: the file the picker is about to export must already
     // hold the export by the time the dialog runs, and must be gone after it.

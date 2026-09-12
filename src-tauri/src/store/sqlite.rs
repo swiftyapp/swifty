@@ -58,12 +58,21 @@ fn migration_list() -> Vec<M<'static>> {
         // there is no NULL here to mark the derivation as pending, since 0 is
         // also the truth for every entry that simply has no passkey.
         M::up("ALTER TABLE entries ADD COLUMN has_passkey INTEGER NOT NULL DEFAULT 0;"),
+        // An env file's name and variable count, derived from the payload at
+        // save time so the list can subtitle the row without unsealing it. Both
+        // nullable like `card_brand`: NULL `var_count` = not yet derived
+        // (backfilled once on unlock). NULL `file_name` is also simply the truth
+        // for a pasted file, so the count is the marker the backfill reads.
+        M::up(
+            "ALTER TABLE entries ADD COLUMN file_name TEXT;
+             ALTER TABLE entries ADD COLUMN var_count INTEGER;",
+        ),
     ]
 }
 
 // New columns are appended last so pre-existing column indexes stay put.
-const COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, payload, card_brand, favorite, has_passkey";
-const META_COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, card_brand, favorite, has_passkey";
+const COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, payload, card_brand, favorite, has_passkey, file_name, var_count";
+const META_COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, card_brand, favorite, has_passkey, file_name, var_count";
 
 const META_UPSERT: &str = "INSERT INTO meta (key, value) VALUES (?1, ?2)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value";
@@ -202,6 +211,17 @@ impl SqliteStore {
         self.lock().execute(
             "UPDATE entries SET has_passkey = ?1 WHERE id = ?2",
             params![has_passkey, id],
+        )?;
+        Ok(())
+    }
+
+    /// Stamp an env row's derived file name and variable count without touching
+    /// `updated_at`, for the same reason [`SqliteStore::set_card_brand`] does
+    /// not: the payload already holds them, this only writes them down.
+    pub fn set_env_meta(&self, id: &str, file_name: Option<&str>, var_count: i64) -> Result<()> {
+        self.lock().execute(
+            "UPDATE entries SET file_name = ?1, var_count = ?2 WHERE id = ?3",
+            params![file_name, var_count, id],
         )?;
         Ok(())
     }
@@ -365,12 +385,13 @@ impl VaultStore for SqliteStore {
         // written, so a save that drops the last passkey has to clear it.
         conn.execute(
             &format!(
-                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)
+                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)
                  ON CONFLICT(id) DO UPDATE SET
                    kind=excluded.kind, title=excluded.title, tags=excluded.tags,
                    url_host=excluded.url_host, updated_at=excluded.updated_at,
                    deleted_at=excluded.deleted_at, payload=excluded.payload,
-                   card_brand=excluded.card_brand, has_passkey=excluded.has_passkey"
+                   card_brand=excluded.card_brand, has_passkey=excluded.has_passkey,
+                   file_name=excluded.file_name, var_count=excluded.var_count"
             ),
             params![
                 rec.id,
@@ -389,6 +410,8 @@ impl VaultStore for SqliteStore {
                 rec.card_brand,
                 rec.favorite,
                 rec.has_passkey,
+                rec.file_name,
+                rec.var_count,
             ],
         )?;
         Ok(())
@@ -434,6 +457,7 @@ impl VaultStore for SqliteStore {
             "UPDATE entries
              SET payload = x'', title = '', tags = '[]', url_host = '',
                  card_brand = NULL, favorite = 0, has_passkey = 0,
+                 file_name = NULL, var_count = NULL,
                  updated_at = ?1
              WHERE id = ?2 AND deleted_at IS NOT NULL",
             params![now, id],
@@ -486,13 +510,14 @@ impl VaultStore for SqliteStore {
 // sync-in paths (import, merge_records) need.
 fn verbatim_upsert() -> String {
     format!(
-        "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)
+        "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)
          ON CONFLICT(id) DO UPDATE SET
            kind=excluded.kind, title=excluded.title, tags=excluded.tags,
            url_host=excluded.url_host, created_at=excluded.created_at,
            updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
            payload=excluded.payload, card_brand=excluded.card_brand,
-           favorite=excluded.favorite, has_passkey=excluded.has_passkey"
+           favorite=excluded.favorite, has_passkey=excluded.has_passkey,
+           file_name=excluded.file_name, var_count=excluded.var_count"
     )
 }
 
@@ -517,6 +542,8 @@ fn exec_record(stmt: &mut Statement, r: &Record) -> rusqlite::Result<usize> {
         r.card_brand,
         r.favorite,
         r.has_passkey,
+        r.file_name,
+        r.var_count,
     ])
 }
 
@@ -534,6 +561,8 @@ fn row_to_record(row: &Row) -> rusqlite::Result<Record> {
         card_brand: row.get(9)?,
         favorite: row.get(10)?,
         has_passkey: row.get(11)?,
+        file_name: row.get(12)?,
+        var_count: row.get(13)?,
     })
 }
 
@@ -550,6 +579,8 @@ fn row_to_meta(row: &Row) -> rusqlite::Result<EntryMeta> {
         card_brand: row.get(8)?,
         favorite: row.get(9)?,
         has_passkey: row.get(10)?,
+        file_name: row.get(11)?,
+        var_count: row.get(12)?,
     })
 }
 

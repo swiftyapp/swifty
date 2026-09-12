@@ -67,6 +67,13 @@ pub struct Record {
     /// the row without unsealing it. Unlike `favorite` this is not user state:
     /// it is a projection of the payload, so every write recomputes it.
     pub has_passkey: bool,
+    /// What an `env` entry's file was called (`.env.production`) and how many
+    /// variables it holds, both derived from the payload at save time so the
+    /// list can subtitle the row without unsealing it. `None` on every other
+    /// kind, on env rows saved before the columns existed, and — for the name
+    /// alone — on a pasted file that never had one.
+    pub file_name: Option<String>,
+    pub var_count: Option<i64>,
 }
 
 /// A row's metadata without its payload (what listings need).
@@ -83,6 +90,8 @@ pub struct EntryMeta {
     pub card_brand: Option<String>,
     pub favorite: bool,
     pub has_passkey: bool,
+    pub file_name: Option<String>,
+    pub var_count: Option<i64>,
 }
 
 /// The swappable storage contract. Any backend behind this interface is a drop-in.

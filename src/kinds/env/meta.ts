@@ -1,3 +1,4 @@
+import { t } from '@/i18n'
 import type { Entry, EntryMeta } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
 import { filled } from '@/components/elements/fields/formats'
@@ -20,7 +21,23 @@ export const isValid = (draft: EntryDraft): boolean =>
 export const primarySecret = (entry: Entry): string =>
   entry.type === 'env' ? entry.body : ''
 
-// The body is in the payload, so until the file name and variable count are
-// stamped into the metadata at save time (a later PR, the way the card brand
-// is) the tags are the only secondary line the list can draw without a reveal.
-export const listSubtitle = (entry: EntryMeta): string => entry.tags.join(' · ')
+// The file name is not a secret, but it is in the encrypted payload — so it can
+// only be named once the entry is revealed, and then it belongs next to the
+// kind, the way an identity's document type does: `ENV FILE · .env.production`.
+// (`fileName` is optional on the wire — a peer's entry may not carry the key.)
+export const eyebrow = (entry: Entry) => {
+  const name = entry.type === 'env' ? (entry.fileName ?? '').trim() : ''
+  return name ? { text: name, testid: 'entry-value-fileName' } : null
+}
+
+// `.env.production · 14 vars`, from the metadata stamped at save time (the way
+// the card brand is), each part only when known: a pasted file has no name, and
+// a row saved before the columns existed has neither until the unlock backfill
+// reaches it. With nothing stamped the tags are the only non-secret line left.
+export const listSubtitle = (entry: EntryMeta): string => {
+  const parts = [
+    entry.fileName,
+    entry.varCount === undefined ? '' : t('{{count}} vars', { count: entry.varCount })
+  ].filter(Boolean)
+  return parts.length ? parts.join(' · ') : entry.tags.join(' · ')
+}
