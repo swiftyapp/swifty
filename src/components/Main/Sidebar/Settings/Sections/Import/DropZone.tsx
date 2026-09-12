@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { isMobile } from '@/lib/platform'
 import { pickImportFile } from '@/lib/commands'
+import { useFileDrop } from '@/hooks/useFileDrop'
 import { DownloadGlyph } from '../../../../icons'
 import { META_TYPE } from '@/components/elements/tokens'
 
@@ -15,33 +15,9 @@ interface Props {
 // picker is `pick_import_file`, the very one the tiles above already use.
 export default function DropZone({ onDrop }: Props) {
   const { t } = useTranslation()
-  useEffect(() => {
-    if (isMobile) return
-    let alive = true
-    let unlisten: (() => void) | undefined
-
-    // Files dropped onto the window arrive as OS paths through the webview,
-    // not as a browser DataTransfer. The API is imported lazily so a non-Tauri
-    // host (the vitest jsdom run) simply never wires the listener up.
-    import('@tauri-apps/api/webview')
-      .then(({ getCurrentWebview }) =>
-        getCurrentWebview().onDragDropEvent(event => {
-          if (event.payload.type !== 'drop') return
-          const [path] = event.payload.paths
-          if (path) onDrop(path)
-        })
-      )
-      .then(stop => {
-        if (alive) unlisten = stop
-        else stop()
-      })
-      .catch(() => {})
-
-    return () => {
-      alive = false
-      unlisten?.()
-    }
-  }, [onDrop])
+  useFileDrop(([path]) => {
+    if (path) onDrop(path)
+  })
 
   const pick = () =>
     pickImportFile()

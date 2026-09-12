@@ -383,6 +383,20 @@ export interface ImportReport {
 export const pickImportFile = (): Promise<string | null> =>
   invoke('pick_import_file')
 
+// A `.env` file read whole as text, for the env kind's drop zone and picker.
+// The backend refuses anything over 1 MiB or not UTF-8; the body is the secret,
+// so it is handed straight to a draft and never logged.
+export interface EnvFile {
+  fileName: string
+  body: string
+}
+
+export const readEnvFile = (path: string): Promise<EnvFile> =>
+  invoke('read_env_file', { path })
+
+// No extension filter: a `.env` has none, and `.env.production` is not `.production`.
+export const pickEnvFile = (): Promise<string | null> => invoke('pick_env_file')
+
 export const importEntries = (
   path: string,
   format: ImportFormat,

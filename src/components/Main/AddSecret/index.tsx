@@ -6,6 +6,7 @@ import { KINDS } from '@/kinds'
 import Frame from '@/components/elements/Frame'
 import KindTile from './KindTile'
 import ScanAction from './ScanAction'
+import EnvAction from './EnvAction'
 
 const TITLE_ID = 'add-secret-title'
 
@@ -94,6 +95,7 @@ export default function AddSecret() {
           </div>
 
           <ScanAction />
+          <EnvAction />
         </div>
       </div>
     </Frame>
