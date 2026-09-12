@@ -6,6 +6,7 @@ import card from './card'
 import note from './note'
 import identity from './identity'
 import ssh from './ssh'
+import env from './env'
 
 export type { Kind, Glyph } from './types'
 
@@ -14,9 +15,9 @@ export type { Kind, Glyph } from './types'
  * chips, the rail). This list plus one `Kind` object is the whole contract:
  * nothing else in the app enumerates the types.
  */
-export const KINDS: Kind[] = [login, card, note, identity, ssh]
+export const KINDS: Kind[] = [login, card, note, identity, ssh, env]
 
-const BY_TYPE: Record<EntryType, Kind> = { login, card, note, identity, ssh }
+const BY_TYPE: Record<EntryType, Kind> = { login, card, note, identity, ssh, env }
 
 export const kindOf = (type: EntryType): Kind => BY_TYPE[type]
 

@@ -76,10 +76,10 @@ describe('command palette', () => {
     renderWithStore(<Main />, { store: seed() })
     await open()
     // Commands: new login · new credit card · new secure note · new identity ·
-    // new SSH key · add a secret · lock vault · toggle theme · settings —
-    // eight moves down from the first.
+    // new SSH key · new env file · add a secret · lock vault · toggle theme ·
+    // settings — nine moves down from the first.
     await userEvent.keyboard(
-      '{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{Enter}'
+      '{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{Enter}'
     )
 
     expect(useStore.getState().ui.settings).toBe(true)

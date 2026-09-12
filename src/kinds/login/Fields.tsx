@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import AddAction from '@/components/elements/AddAction'
 import Panel from '@/components/elements/Panel'
 import {
   EmailField,
@@ -12,7 +13,6 @@ import {
   UsernameField,
   useFields
 } from '@/components/elements/fields'
-import { PlusGlyph } from '@/components/Main/icons'
 import { hasPasskey } from './meta'
 
 export default function Fields() {
@@ -52,16 +52,15 @@ export default function Fields() {
           {editing && !otp && (
             <FieldRow label="OTP">
               {id => (
-                <button
+                // The value line's height, so the row does not shift when the
+                // dial's field takes its place.
+                <AddAction
                   id={id}
-                  type="button"
-                  data-testid="add-otp-button"
+                  label={t('Add one-time code')}
+                  testid="add-otp-button"
                   onClick={() => setOpened(true)}
-                  className="flex h-6 cursor-pointer items-center gap-1.5 text-base text-accent hover:brightness-110"
-                >
-                  <PlusGlyph size={14} />
-                  {t('Add one-time code')}
-                </button>
+                  className="h-6"
+                />
               )}
             </FieldRow>
           )}

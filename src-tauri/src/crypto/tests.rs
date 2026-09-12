@@ -146,6 +146,27 @@ fn identity_keeps_unchanged_ciphertext_on_save() {
     assert_eq!(exposed.personal_number.as_deref(), Some("00-2024"));
 }
 
+// An env entry's whole file is its secret; the file's name is not. The body
+// has to come back byte-exact, or "Save as .env" hands back a different file.
+#[test]
+fn env_obscures_the_body_but_not_the_file_name() {
+    let cryptor = Cryptor::new(&hash_secret("master-pw"));
+    let body = "# api\nexport API_KEY='abc'\n\nURL=${HOST}/v1\n";
+    let entry: Entry = serde_json::from_value(serde_json::json!({
+        "id": "1", "type": "env", "title": "api", "fileName": ".env.production",
+        "body": body
+    }))
+    .unwrap();
+
+    let obscured = cryptor.obscure(&entry).unwrap();
+    assert_ne!(obscured.body.as_deref(), Some(body));
+    assert!(obscured.body.as_ref().unwrap().len() > 32);
+    assert_eq!(obscured.file_name.as_deref(), Some(".env.production"));
+
+    let exposed = cryptor.expose(&obscured).unwrap();
+    assert_eq!(exposed.body.as_deref(), Some(body));
+}
+
 #[test]
 fn empty_sensitive_fields_stay_empty() {
     let cryptor = Cryptor::new(&hash_secret("master-pw"));

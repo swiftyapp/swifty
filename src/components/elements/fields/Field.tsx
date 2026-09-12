@@ -6,7 +6,7 @@ import type { TKey } from '@/i18n'
 import { EyeGlyph, EyeOffGlyph } from '../../Main/icons'
 import CopyButton from '../CopyButton'
 import IconButton from '../IconButton'
-import { HOVER_ONLY, VALUE_LINE } from '../tokens'
+import { HOVER_ONLY, MASK_DOTS, VALUE_LINE } from '../tokens'
 import { useField } from './context'
 import { requiredError } from './formats'
 import FieldRow from './Row'
@@ -48,10 +48,8 @@ export interface FieldProps {
 }
 
 // An input cannot fake dots, so the editor hides its own text; a read value is
-// plain text and gets a fixed-length mask instead — one that says nothing about
-// how long the secret is.
+// plain text and gets the fixed mask (MASK_DOTS) instead.
 const MASK = { WebkitTextSecurity: 'disc' } as CSSProperties
-const DOTS = '•'.repeat(12)
 
 // One field, both modes. Reading, it is the detail row it has always been:
 // the value, reveal toggle, copy button, hidden when empty. Editing, the same
@@ -165,7 +163,7 @@ export default function Field({
               className={cx(ink, 'cursor-pointer text-left', masked ? 'text-text2' : 'text-text')}
               data-testid={`entry-value-${name}`}
             >
-              {masked ? DOTS : shown}
+              {masked ? MASK_DOTS : shown}
             </button>
             {gloss && (
               <span className="min-w-0 flex-none truncate text-base leading-6 text-text3">

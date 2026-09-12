@@ -35,17 +35,24 @@ const VALUE_START = 'pl-[168px] @max-[420px]:pl-0'
  * sigil goes with the column it was aligning to, and value + actions keep the
  * next line to themselves. No render branch — every kind's rows inherit it from
  * whichever surface declares itself a `@container` (see Show/Read).
+ *
+ * Exported for the rows that share this geometry without rendering through it
+ * (CustomFields, the env table), so a change to the fold is one change.
  */
-const STACK = '@max-[420px]:flex-wrap @max-[420px]:gap-y-1.5'
-const STACK_LABEL = '@max-[420px]:w-full'
+export const STACK = '@max-[420px]:flex-wrap @max-[420px]:gap-y-1.5'
+export const STACK_LABEL = '@max-[420px]:w-full'
 const STACK_SIGIL = '@max-[420px]:hidden'
 // The rail no longer has a fixed column to fit, so where a finger is one of the
 // pointers its controls grow to the 44px target. Both conditions: an iPad
 // running the wide shell keeps the 60px rail, which only holds two 28px
 // buttons. `any-pointer-coarse` rather than `pointer-coarse` so a hybrid — an
 // iPad with a trackpad, a touch laptop — is sized for the finger it also has.
-const STACK_RAIL =
+export const STACK_RAIL =
   '@max-[420px]:w-auto @max-[420px]:any-pointer-coarse:[&_button]:h-11 @max-[420px]:any-pointer-coarse:[&_button]:w-11'
+
+// The rail: two 28px controls wide (28 + gap 4 + 28), held open so every value
+// — and every editor's underline — ends at one x too.
+export const RAIL = 'flex w-[60px] flex-none items-center justify-end gap-1'
 
 // THE detail-row geometry: a w-32 micro-label column, the value, trailing
 // controls, then anything that belongs under the value. Read values and their
@@ -80,12 +87,8 @@ export default function FieldRow({ label, prefix, actions, below, error, childre
           </>
         )}
         <div className="min-w-0 flex-1">{children(id)}</div>
-        {/* Two 28px controls wide (28 + gap 4 + 28), held open so every value —
-            and every editor's underline — ends at one x too. */}
         {labelled ? (
-          <div className={`flex w-[60px] flex-none items-center justify-end gap-1 ${STACK_RAIL}`}>
-            {actions}
-          </div>
+          <div className={`${RAIL} ${STACK_RAIL}`}>{actions}</div>
         ) : (
           actions
         )}

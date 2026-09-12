@@ -6,6 +6,7 @@ import { TrashGlyph } from '../../../Main/icons'
 import CopyButton from '../../CopyButton'
 import IconButton from '../../IconButton'
 import { HOVER_ONLY, LABEL, LABEL_TYPE, ROW_HAIRLINE, VALUE } from '../../tokens'
+import { RAIL } from '../Row'
 
 interface Props {
   field: ExtraField
@@ -93,7 +94,7 @@ export default function CustomFieldRow({
         )}
       </div>
 
-      <div className="flex w-[60px] flex-none items-center justify-end gap-1">
+      <div className={RAIL}>
         {editing ? (
           <IconButton
             title={t('Remove field')}

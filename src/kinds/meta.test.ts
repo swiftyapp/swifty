@@ -52,6 +52,14 @@ const ssh = (overrides: Partial<EntryDraft> = {}): EntryDraft => ({
   ...overrides
 })
 
+const env = (overrides: Partial<EntryDraft> = {}): EntryDraft => ({
+  type: 'env',
+  title: 'api · production',
+  body: '# Database\nDATABASE_URL=postgres://localhost/api\nPORT=3000\n',
+  fileName: '.env.production',
+  ...overrides
+})
+
 // The registry is the whole contract: a kind that is not in `KINDS` reaches no
 // picker, chip or palette command.
 describe('KINDS', () => {
@@ -61,7 +69,8 @@ describe('KINDS', () => {
       'card',
       'note',
       'identity',
-      'ssh'
+      'ssh',
+      'env'
     ])
     for (const kind of KINDS) expect(kindOf(kind.type)).toBe(kind)
   })
@@ -74,6 +83,15 @@ describe('isValid', () => {
     expect(kindOf('note').isValid(note())).toBe(true)
     expect(kindOf('identity').isValid(identity())).toBe(true)
     expect(kindOf('ssh').isValid(ssh())).toBe(true)
+    expect(kindOf('env').isValid(env())).toBe(true)
+  })
+
+  // The file is the entry; the name it came in under is a nicety a pasted file
+  // never has.
+  it('holds an env file to its title and its body', () => {
+    expect(kindOf('env').isValid(env({ body: '' }))).toBe(false)
+    expect(kindOf('env').isValid(env({ title: '' }))).toBe(false)
+    expect(kindOf('env').isValid(env({ fileName: '' }))).toBe(true)
   })
 
   // Everything but the private key is optional: a pasted key routinely has no
@@ -128,6 +146,7 @@ describe('isValid', () => {
     expect(kindOf('identity').isValid(identity({ name: ' ' }))).toBe(false)
     expect(kindOf('identity').isValid(identity({ number: '\t' }))).toBe(false)
     expect(kindOf('ssh').isValid(ssh({ privateKey: '  ' }))).toBe(false)
+    expect(kindOf('env').isValid(env({ body: ' \n\t ' }))).toBe(false)
   })
 
   // Extra fields are free-form, so no kind can require one: a document with a

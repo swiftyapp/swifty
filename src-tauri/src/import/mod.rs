@@ -25,6 +25,7 @@ pub enum EntryKind {
     Card,
     Identity,
     Ssh,
+    Env,
 }
 
 impl EntryKind {
@@ -35,6 +36,7 @@ impl EntryKind {
             EntryKind::Card => "card",
             EntryKind::Identity => "identity",
             EntryKind::Ssh => "ssh",
+            EntryKind::Env => "env",
         }
     }
 }
@@ -72,6 +74,12 @@ pub struct ImportedEntry {
     pub ssh_public_key: Option<String>,
     pub ssh_fingerprint: Option<String>,
     pub ssh_passphrase: Option<String>,
+    // `.env` file fields (only meaningful when kind == Env). The body is the
+    // file, verbatim — it is the secret and the canonical form, so it must
+    // cross a format byte for byte or not at all. The file name is not secret
+    // and only rides along so the file can come back under its own name.
+    pub env_body: Option<String>,
+    pub env_file_name: Option<String>,
     // WebAuthn passkeys (only meaningful when kind == Login). Empty when the
     // source format carries none, which is the case for every CSV dialect.
     pub passkeys: Vec<ImportedPasskey>,

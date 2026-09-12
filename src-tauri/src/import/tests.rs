@@ -1,4 +1,6 @@
-use super::export::{sanitize_cell, to_bitwarden_json, to_cxf_json, to_generic_csv};
+use super::export::{
+    sanitize_cell, to_bitwarden_json, to_cxf_json, to_generic_csv, unsanitize_cell, CSV_VERSION,
+};
 use super::{detect, EntryKind, Format, ImportedEntry, ImportedPasskey, Importer};
 
 fn parse(fmt: Format, bytes: &[u8]) -> super::ImportResult {
@@ -327,8 +329,12 @@ fn sanitize_neutralizes_formula_cells() {
     assert_eq!(sanitize_cell("-1"), "'-1");
     assert_eq!(sanitize_cell("@x"), "'@x");
     assert_eq!(sanitize_cell("\treally"), "'\treally");
+    assert_eq!(sanitize_cell("'literal"), "''literal");
     assert_eq!(sanitize_cell("safe"), "safe");
     assert_eq!(sanitize_cell(""), "");
+    for cell in ["=x", "+x", "-x", "@x", "\tx", "\rx", "'=x", "''x"] {
+        assert_eq!(unsanitize_cell(&sanitize_cell(cell)), cell);
+    }
 }
 
 #[test]
@@ -349,12 +355,12 @@ fn csv_export_sanitizes_injection() {
 fn round_trip_generic_csv() {
     let entries = vec![ImportedEntry {
         kind: EntryKind::Login,
-        title: "Acme".into(),
-        username: Some("neo".into()),
-        password: Some("trinity".into()),
+        title: "=Acme".into(),
+        username: Some("+neo".into()),
+        password: Some("'=trinity".into()),
         url: Some("https://acme.test".into()),
-        notes: Some("hi".into()),
-        otp: Some("SEED".into()),
+        notes: Some("'@hi".into()),
+        otp: Some("-SEED".into()),
         ..Default::default()
     }];
     let bytes = to_generic_csv(&entries).unwrap();
@@ -362,10 +368,11 @@ fn round_trip_generic_csv() {
     assert!(back.errors.is_empty());
     assert_eq!(back.entries.len(), 1);
     let e = &back.entries[0];
-    assert_eq!(e.title, "Acme");
-    assert_eq!(e.username.as_deref(), Some("neo"));
-    assert_eq!(e.password.as_deref(), Some("trinity"));
-    assert_eq!(e.otp.as_deref(), Some("SEED"));
+    assert_eq!(e.title, "=Acme");
+    assert_eq!(e.username.as_deref(), Some("+neo"));
+    assert_eq!(e.password.as_deref(), Some("'=trinity"));
+    assert_eq!(e.notes.as_deref(), Some("'@hi"));
+    assert_eq!(e.otp.as_deref(), Some("-SEED"));
 }
 
 #[test]
@@ -833,4 +840,149 @@ fn generic_csv_carries_ssh_fields() {
     assert!(row.contains("BEGIN OPENSSH PRIVATE KEY"));
     assert!(row.contains("SHA256:abc"));
     assert!(row.contains("hunter2"));
+}
+
+// A file with everything a CSV cell could trip on: a comment, an indented line,
+// a blank line, a quoted value spanning a newline, one CRLF line ending, and a
+// trailing newline that trimming would eat.
+const ENV_BODY: &str =
+    "# api\n  export API_KEY='abc' # inline\n\nCERT=\"line one\nline two\"\r\nURL=${HOST}/v1\n";
+
+fn env_entry() -> ImportedEntry {
+    ImportedEntry {
+        kind: EntryKind::Env,
+        title: "api · production".into(),
+        notes: Some("rotated quarterly".into()),
+        env_body: Some(ENV_BODY.into()),
+        env_file_name: Some(".env.production".into()),
+        ..Default::default()
+    }
+}
+
+// The generic CSV is our own, so the file goes in a column of its own and comes
+// back byte for byte — the writer quotes a cell with newlines in it, and the
+// reader gives it back untrimmed.
+#[test]
+fn round_trip_generic_csv_env() {
+    let bytes = to_generic_csv(&[env_entry()]).unwrap();
+    let out = String::from_utf8(bytes.clone()).unwrap();
+    let header = out.lines().next().unwrap();
+    assert!(header.contains(",body,file_name,tags"));
+    assert!(header.ends_with("_swifty_csv_version"));
+    assert!(out.trim_end().ends_with(CSV_VERSION));
+    assert!(out.contains("\nenv,api · production,"));
+    assert!(
+        out.contains("\"# api\n"),
+        "body is quoted, not split across rows"
+    );
+
+    let back = super::csv::GenericCsv.parse(&bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, vec![env_entry()]);
+    assert_eq!(back.entries[0].env_body.as_deref(), Some(ENV_BODY));
+}
+
+// Formula-looking bodies are guarded and genuine apostrophes are escaped, so
+// every ambiguous prefix round-trips under the versioned Swifty dialect.
+#[test]
+fn round_trip_generic_csv_env_with_a_formula_looking_first_line() {
+    for body in [
+        "=A\n",
+        "+A\n",
+        "-A\n",
+        "@A\n",
+        "\tA=1\n",
+        "\rA=1\n",
+        "'=A\n",
+        "'+A\n",
+        "'-A\n",
+        "'@A\n",
+        "'\tA\n",
+        "'\rA\n",
+        "''quoted\n",
+    ] {
+        let mut e = env_entry();
+        e.env_body = Some(body.into());
+        let bytes = to_generic_csv(&[e.clone()]).unwrap();
+        let back = super::csv::GenericCsv.parse(&bytes);
+        assert_eq!(back.entries, vec![e], "{body:?}");
+    }
+}
+
+// A generic sheet has no provenance marker, so an apostrophe that resembles
+// Swifty's spreadsheet guard remains literal rather than being guessed away.
+#[test]
+fn unversioned_generic_csv_keeps_a_literal_apostrophe_in_an_env_body() {
+    let bytes = b"type,title,body,file_name\nenv,Literal,\"'=VALUE\nA=1\",.env\n";
+    let back = super::csv::GenericCsv.parse(bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries[0].env_body.as_deref(), Some("'=VALUE\nA=1"));
+}
+
+// Bitwarden has no item for a file, so an env entry goes out as a secure note
+// whose text is the file; the name and the entry's own note ride as custom
+// fields. One-way: it comes back as the note it looks like.
+#[test]
+fn bitwarden_exports_env_as_a_secure_note() {
+    let bytes = to_bitwarden_json(&[env_entry()]).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let item = &out["items"][0];
+    assert_eq!(item["type"], 2);
+    assert_eq!(item["name"], "api · production");
+    assert_eq!(item["notes"], ENV_BODY);
+    assert!(item.get("login").is_none());
+    assert_eq!(item["fields"][0]["name"], "Note");
+    assert_eq!(item["fields"][0]["value"], "rotated quarterly");
+    assert_eq!(item["fields"][1]["name"], "file_name");
+    assert_eq!(item["fields"][1]["value"], ".env.production");
+    assert_eq!(item["fields"][1]["type"], 0);
+
+    let back = parse(Format::Bitwarden, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries[0].kind, EntryKind::Note);
+    assert_eq!(back.entries[0].notes.as_deref(), Some(ENV_BODY));
+}
+
+// CXF likewise: the file is the item's first `note` credential, the name a
+// custom field beside it, the entry's own note after. Read back, it is a note.
+#[test]
+fn cxf_exports_env_as_a_note() {
+    let bytes = to_cxf_json(&[env_entry()]).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let creds = &out["accounts"][0]["items"][0]["credentials"];
+    assert_eq!(creds[0]["type"], "note");
+    assert_eq!(creds[0]["content"]["value"], ENV_BODY);
+    assert_eq!(creds[1]["type"], "custom-fields");
+    assert_eq!(creds[1]["fields"][0]["label"], "file_name");
+    assert_eq!(creds[1]["fields"][0]["value"], ".env.production");
+    assert_eq!(creds[2]["type"], "note");
+    assert_eq!(creds[2]["content"]["value"], "rotated quarterly");
+    assert!(creds.as_array().unwrap().len() == 3);
+
+    let back = parse(Format::Cxf, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries[0].kind, EntryKind::Note);
+    assert_eq!(back.entries[0].notes.as_deref(), Some(ENV_BODY));
+}
+
+// The bug this guards against: an unknown kind used to fall through to "login"
+// and export as an empty one, taking the file with it.
+#[test]
+fn env_never_exports_as_a_login() {
+    let entries = [env_entry()];
+    let csv = String::from_utf8(to_generic_csv(&entries).unwrap()).unwrap();
+    assert!(!csv.contains("\nlogin,"));
+
+    let bw: serde_json::Value =
+        serde_json::from_slice(&to_bitwarden_json(&entries).unwrap()).unwrap();
+    assert_ne!(bw["items"][0]["type"], 1);
+
+    let cxf: serde_json::Value = serde_json::from_slice(&to_cxf_json(&entries).unwrap()).unwrap();
+    let kinds: Vec<&str> = cxf["accounts"][0]["items"][0]["credentials"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["type"].as_str().unwrap())
+        .collect();
+    assert!(!kinds.contains(&"basic-auth"), "{kinds:?}");
 }

@@ -200,40 +200,14 @@ pub async fn export_entries(
 // ImportedEntry -> a plaintext models::Entry, ready to be obscured + sealed.
 fn imported_to_entry(imp: &ImportedEntry) -> Entry {
     let now = chrono::Utc::now().to_rfc3339();
+    // The kind's own fields are set in the match below; everything else stays
+    // at its default (None, so a field the kind does not own never serializes).
     let mut e = Entry {
         id: migrate::new_entry_id(),
         kind: imp.kind.as_str().to_string(),
         title: imp.title.clone(),
-        username: None,
-        password: None,
-        website: None,
-        email: None,
-        otp: None,
         note: imp.notes.clone(),
-        number: None,
-        month: None,
-        year: None,
-        cvc: None,
-        pin: None,
-        name: None,
-        doc_type: None,
-        country: None,
-        nationality: None,
-        birth_date: None,
-        sex: None,
-        issue_date: None,
-        expiry_date: None,
-        authority: None,
-        personal_number: None,
-        // Set below for ssh entries only.
-        private_key: None,
-        public_key: None,
-        fingerprint: None,
-        passphrase: None,
         tags: (!imp.tags.is_empty()).then(|| imp.tags.clone()),
-        // Set below for logins only; stays None so a passkey-less entry
-        // serializes exactly as it did before passkeys existed.
-        passkeys: None,
         // Extras belong to no kind, so they are mapped here rather than in the
         // match below. None when there are none, for the same reason.
         extra: (!imp.extra.is_empty()).then(|| {
@@ -245,11 +219,9 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
                 })
                 .collect()
         }),
-        // No third-party format carries a star.
-        favorite: false,
         created_at: Some(now.clone()),
         updated_at: Some(now),
-        password_updated_at: None,
+        ..Default::default()
     };
     match imp.kind {
         EntryKind::Login => {
@@ -279,6 +251,10 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
             e.fingerprint = imp.ssh_fingerprint.clone();
             e.passphrase = imp.ssh_passphrase.clone();
         }
+        EntryKind::Env => {
+            e.body = imp.env_body.clone();
+            e.file_name = imp.env_file_name.clone();
+        }
         EntryKind::Note => {}
     }
     e
@@ -291,6 +267,7 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
         "card" => EntryKind::Card,
         "identity" => EntryKind::Identity,
         "ssh" => EntryKind::Ssh,
+        "env" => EntryKind::Env,
         _ => EntryKind::Login,
     };
     // `number` and `name` are shared slots, so they are only read into the
@@ -318,6 +295,8 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
         ssh_public_key: e.public_key.clone(),
         ssh_fingerprint: e.fingerprint.clone(),
         ssh_passphrase: e.passphrase.clone(),
+        env_body: e.body.clone(),
+        env_file_name: e.file_name.clone(),
         passkeys: e
             .passkeys
             .as_deref()

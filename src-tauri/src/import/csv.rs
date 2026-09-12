@@ -38,6 +38,11 @@ const OTP: &[&str] = &[
     "otp secret",
     "totp secret",
 ];
+// Swifty's own columns (see `export::COLUMNS`): no foreign sheet has them.
+const TYPE: &[&str] = &["type"];
+const BODY: &[&str] = &["body"];
+const FILE_NAME: &[&str] = &["file_name"];
+const CSV_VERSION: &[&str] = &[super::export::CSV_VERSION_HEADER];
 
 // A parsed sheet: header names (normalized) and the data rows.
 struct Rows {
@@ -68,17 +73,46 @@ fn read_rows(bytes: &[u8], result: &mut ImportResult) -> Option<Rows> {
     Some(Rows { headers, records })
 }
 
-// First non-empty cell whose header matches one of `aliases`.
-fn get(headers: &[String], rec: &StringRecord, aliases: &[&str]) -> Option<String> {
+// First non-empty cell whose header matches one of `aliases`, untrimmed: a
+// `.env` file's leading indent and trailing newline are part of the file, and
+// the entry promises to hand it back verbatim.
+fn get_verbatim(headers: &[String], rec: &StringRecord, aliases: &[&str]) -> Option<String> {
     headers.iter().enumerate().find_map(|(idx, h)| {
         if !aliases.contains(&h.as_str()) {
             return None;
         }
-        rec.get(idx)
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .map(String::from)
+        rec.get(idx).filter(|v| !v.is_empty()).map(String::from)
     })
+}
+
+// The same cell, trimmed — what every column but the file wants.
+fn get(headers: &[String], rec: &StringRecord, aliases: &[&str]) -> Option<String> {
+    get_verbatim(headers, rec, aliases)
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+// Reverse spreadsheet escaping only for a row carrying Swifty's explicit
+// format marker. A generic sheet's leading apostrophe is always literal data.
+fn decoded(value: Option<String>, swifty: bool) -> Option<String> {
+    value.map(|v| {
+        if swifty {
+            super::export::unsanitize_cell(&v)
+        } else {
+            v
+        }
+    })
+}
+
+fn get_decoded(
+    headers: &[String],
+    rec: &StringRecord,
+    aliases: &[&str],
+    swifty: bool,
+) -> Option<String> {
+    decoded(get_verbatim(headers, rec, aliases), swifty)
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
 }
 
 fn tag_vec(group: Option<String>) -> Vec<String> {
@@ -102,21 +136,37 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
         return result;
     };
     for (i, rec) in rows.records.iter().enumerate() {
-        let title = get(&rows.headers, rec, TITLE)
-            .or_else(|| get(&rows.headers, rec, URL))
-            .or_else(|| get(&rows.headers, rec, USERNAME));
+        let swifty =
+            get(&rows.headers, rec, CSV_VERSION).as_deref() == Some(super::export::CSV_VERSION);
+        let cell = |aliases| get_decoded(&rows.headers, rec, aliases, swifty);
+        let title = cell(TITLE).or_else(|| cell(URL)).or_else(|| cell(USERNAME));
         let Some(title) = title else {
             result.push_err(i + 2, "empty row");
             continue;
         };
+        // Every row of a foreign sheet is a login, and so is every row of our
+        // own that has a login's shape. An `env` row has none — no login column
+        // names the file — so it is the one kind the `type` column is read for,
+        // or the file would be dropped on the way back in.
+        if cell(TYPE).as_deref() == Some(EntryKind::Env.as_str()) {
+            result.entries.push(ImportedEntry {
+                kind: EntryKind::Env,
+                title,
+                notes: cell(NOTES),
+                env_body: decoded(get_verbatim(&rows.headers, rec, BODY), swifty),
+                env_file_name: cell(FILE_NAME),
+                ..Default::default()
+            });
+            continue;
+        }
         result.entries.push(ImportedEntry {
             kind: EntryKind::Login,
             title,
-            username: get(&rows.headers, rec, USERNAME),
-            password: get(&rows.headers, rec, PASSWORD),
-            url: get(&rows.headers, rec, URL),
-            notes: get(&rows.headers, rec, NOTES),
-            otp: get(&rows.headers, rec, OTP),
+            username: cell(USERNAME),
+            password: cell(PASSWORD),
+            url: cell(URL),
+            notes: cell(NOTES),
+            otp: cell(OTP),
             ..Default::default()
         });
     }

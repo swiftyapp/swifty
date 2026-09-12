@@ -4,7 +4,7 @@ use std::collections::HashMap;
 // A vault entry. Kept as a single flat struct (rather than an enum) so it
 // round-trips the untyped legacy object shape; `kind` discriminates
 // login/note/card/identity.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Entry {
     pub id: String,
     #[serde(rename = "type")]
@@ -75,6 +75,18 @@ pub struct Entry {
     pub fingerprint: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub passphrase: Option<String>,
+    /// `.env` file fields (`env` entries). `body` is the file text, verbatim —
+    /// the entry's one secret, stored whole rather than as parsed rows so that
+    /// comments, blank lines, `export` prefixes, quoting style and `${VAR}`
+    /// references round-trip byte-exact; the variables table is a view over it,
+    /// never the source of truth. `file_name` is what the dropped file was
+    /// called (`.env.production`), not a secret. camelCase on the wire like
+    /// `privateKey`. Both `None` on every other kind, so existing vault JSON,
+    /// `.swftx` backups and fixtures serialize byte-identically to before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    #[serde(rename = "fileName", default, skip_serializing_if = "Option::is_none")]
+    pub file_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
     /// WebAuthn passkeys stored on a login entry. `None` when the entry has
@@ -334,6 +346,34 @@ mod tests {
             out,
             r#"{"id":"1","type":"login","title":"Site","password":"pw"}"#
         );
+    }
+
+    // The file rides through untouched — every byte of it, including the
+    // comment and the blank line — and its name is camelCase on the wire, the
+    // key the editor's draft writes. A legacy login carries neither key.
+    #[test]
+    fn env_fields_round_trip_camel_case_and_stay_absent_on_other_kinds() {
+        let body = "# api\nexport API_KEY='abc' # inline\n\nURL=${HOST}/v1\n";
+        let entry: Entry = serde_json::from_value(serde_json::json!({
+            "id": "1", "type": "env", "title": "api · production",
+            "fileName": ".env.production", "body": body
+        }))
+        .unwrap();
+        assert_eq!(entry.body.as_deref(), Some(body));
+        assert_eq!(entry.file_name.as_deref(), Some(".env.production"));
+
+        let out = serde_json::to_value(&entry).unwrap();
+        assert_eq!(out["fileName"], ".env.production");
+        assert_eq!(out["body"], body);
+        assert!(out.get("file_name").is_none());
+
+        let legacy: Entry =
+            serde_json::from_str(r#"{"id":"1","type":"login","title":"Site","password":"pw"}"#)
+                .unwrap();
+        assert!(legacy.body.is_none());
+        assert!(legacy.file_name.is_none());
+        let out = serde_json::to_string(&legacy).unwrap();
+        assert!(!out.contains("body") && !out.contains("fileName"), "{out}");
     }
 
     // Extras are ordered and kind-agnostic, and an entry without them carries

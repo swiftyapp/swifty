@@ -225,21 +225,20 @@ impl Cryptor {
     /// ciphertext. Unchanged fields keep their ciphertext (no extra derivation),
     /// so saving one edited entry never re-encrypts the whole vault.
     pub fn obscure_changed(&self, new: &Entry, old: Option<&Entry>) -> Result<Entry> {
-        let old_vals = old.map(sensitive_values).unwrap_or_default();
+        // Old and new both go through `secret_slots`, so the two sides line up
+        // by construction rather than by two tables kept in step by hand. The
+        // clone of `old` exists only because the table hands out `&mut`.
+        let mut old = old.cloned();
+        let old_vals: Vec<Option<String>> = old
+            .as_mut()
+            .map(|o| secret_slots(o).into_iter().map(Option::take).collect())
+            .unwrap_or_default();
         let mut e = new.clone();
-        let slots: Vec<&mut Option<String>> = match e.kind.as_str() {
-            "login" => vec![&mut e.password, &mut e.otp],
-            "note" => vec![&mut e.note],
-            "card" => vec![&mut e.pin],
-            "identity" => vec![&mut e.number, &mut e.personal_number],
-            "ssh" => vec![&mut e.private_key, &mut e.passphrase],
-            _ => vec![],
-        };
-        for (i, slot) in slots.into_iter().enumerate() {
+        for (i, slot) in secret_slots(&mut e).into_iter().enumerate() {
             let value = slot.take().unwrap_or_default();
             *slot = Some(if value.is_empty() {
                 String::new()
-            } else if old_vals.get(i).copied().flatten() == Some(value.as_str()) {
+            } else if old_vals.get(i).and_then(|o| o.as_deref()) == Some(value.as_str()) {
                 value
             } else {
                 self.encrypt(&value)?
@@ -250,15 +249,7 @@ impl Cryptor {
 
     fn transform(&self, entry: &Entry, f: impl Fn(&str) -> Result<String>) -> Result<Entry> {
         let mut e = entry.clone();
-        let slots: Vec<&mut Option<String>> = match e.kind.as_str() {
-            "login" => vec![&mut e.password, &mut e.otp],
-            "note" => vec![&mut e.note],
-            "card" => vec![&mut e.pin],
-            "identity" => vec![&mut e.number, &mut e.personal_number],
-            "ssh" => vec![&mut e.private_key, &mut e.passphrase],
-            _ => vec![],
-        };
-        for slot in slots {
+        for slot in secret_slots(&mut e) {
             let value = slot.take().unwrap_or_default();
             // Empty/absent fields stay "".
             *slot = Some(if value.is_empty() {
@@ -271,14 +262,18 @@ impl Cryptor {
     }
 }
 
-// The sensitive field values of an entry, in the same order `transform` visits them.
-fn sensitive_values(entry: &Entry) -> Vec<Option<&str>> {
-    match entry.kind.as_str() {
-        "login" => vec![entry.password.as_deref(), entry.otp.as_deref()],
-        "note" => vec![entry.note.as_deref()],
-        "card" => vec![entry.pin.as_deref()],
-        "identity" => vec![entry.number.as_deref(), entry.personal_number.as_deref()],
-        "ssh" => vec![entry.private_key.as_deref(), entry.passphrase.as_deref()],
+// The per-kind secret fields, the one place that says which they are. Every
+// caller walks the same list in the same order, so "changed since last save"
+// can be decided slot by slot without a second table to keep in step.
+fn secret_slots(e: &mut Entry) -> Vec<&mut Option<String>> {
+    match e.kind.as_str() {
+        "login" => vec![&mut e.password, &mut e.otp],
+        "note" => vec![&mut e.note],
+        "card" => vec![&mut e.pin],
+        "identity" => vec![&mut e.number, &mut e.personal_number],
+        "ssh" => vec![&mut e.private_key, &mut e.passphrase],
+        // The whole file is the secret; its name is not.
+        "env" => vec![&mut e.body],
         _ => vec![],
     }
 }

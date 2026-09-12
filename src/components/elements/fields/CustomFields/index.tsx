@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { ExtraField } from '@/lib/commands'
-import { PlusGlyph } from '../../../Main/icons'
+import AddAction from '../../AddAction'
 import Panel from '../../Panel'
 import { LABEL } from '../../tokens'
 import { useFields } from '../context'
@@ -53,15 +53,12 @@ export default function CustomFields({ name = 'extra' }) {
         </Panel>
       )}
       {set && (
-        <button
-          type="button"
-          data-testid="add-extra-field"
+        <AddAction
+          label={t('Add field')}
+          testid="add-extra-field"
           onClick={append}
-          className="mt-1.5 flex cursor-pointer items-center gap-1.5 text-base text-accent hover:brightness-110"
-        >
-          <PlusGlyph size={13} />
-          <span>{t('Add field')}</span>
-        </button>
+          className="mt-1.5"
+        />
       )}
     </div>
   )
