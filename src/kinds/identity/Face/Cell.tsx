@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
 import { cx } from '@/utils/cx'
@@ -19,8 +18,6 @@ interface Props {
   value: string
   /** What is shown, when that differs: a date in the user's pattern, a mask. */
   display?: string
-  /** A small line under the value: how long a document has left. */
-  hint?: ReactNode
   /** The value line's type. The name and the number are the big ones. */
   ink?: string
   /** Wrap rather than truncate: a document number is never worth clipping. */
@@ -35,7 +32,6 @@ export default function Cell({
   label,
   value,
   display = value,
-  hint,
   ink = 'text-base',
   wrap,
   className
@@ -63,7 +59,6 @@ export default function Cell({
       >
         {display}
       </span>
-      {hint}
       <span className="pointer-events-none absolute right-1 top-1 opacity-0 transition-opacity group-hover:opacity-50">
         <CopyGlyph size={12} />
       </span>

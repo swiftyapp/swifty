@@ -1,0 +1,182 @@
+import { useTranslation } from 'react-i18next'
+import { LABEL_TYPE } from '@/components/elements/tokens'
+import { countryName } from '@/utils/countries'
+import { daysUntil, relativeFuture } from '@/utils/time'
+import { DOC_TYPE_LABELS, type DocType } from '../templates'
+import DocCell, { type Doc } from './DocCell'
+import Frame from './Frame'
+import Portrait from './Portrait'
+import Reveal from './Reveal'
+import { mrz } from './mrz'
+
+interface Props {
+  docType: DocType
+  doc: Doc
+}
+
+// A passport's data page is ID-3; everything else in a wallet is ID-1, the
+// credit card's own shape.
+const ASPECT: Record<DocType, string> = {
+  passport: 'aspect-[1.42]',
+  id_card: 'aspect-[1.586]',
+  driver_license: 'aspect-[1.586]',
+  residence_permit: 'aspect-[1.586]',
+  other: 'aspect-[1.586]'
+}
+
+// The document's details, beside the portrait: three across, two once the pane
+// is phone-narrow so no caption has to be cut.
+const GRID =
+  'grid min-w-0 flex-1 grid-cols-3 content-start gap-x-3 gap-y-2 @max-[420px]:grid-cols-2'
+
+// The strip along the bottom edge, running the full width of the paper the way
+// it is printed — under the printed area rather than inside its margins.
+const BAND = 'border-t border-(--face-rule) bg-(--face-tail) px-5 py-2.5'
+
+// The status pill's three tones. Fixed hex like the rest of the face: the paper
+// stays light when the app goes dark, so `text-bad` would invert underneath it.
+const EXPIRED = '#B3261E'
+const SOON = '#8A5A00'
+const VALID = '#1E7A55'
+
+// Half a year out is where "expires" starts to mean something: most countries
+// want six months left on a document before they will let you travel on it.
+const SOON_DAYS = 180
+
+/*
+ * Whether the document is still good, said once and where a document says it —
+ * beside the number, in the margin. Every date cell used to carry its own
+ * countdown, which stated the same fact twice on any document that printed both
+ * an issue and an expiry date. A document with no expiry says nothing.
+ */
+function Status({ iso }: { iso: string }) {
+  const { t } = useTranslation()
+  const days = daysUntil(iso)
+  if (days === null) return null
+
+  const ink = days < 0 ? EXPIRED : days <= SOON_DAYS ? SOON : VALID
+
+  return (
+    <span
+      style={{ color: ink, borderColor: ink }}
+      className={`flex h-5 flex-none items-center gap-1.5 rounded-xs border px-1.5 ${LABEL_TYPE}`}
+    >
+      <span aria-hidden className="h-1 w-1 rounded-full bg-current" />
+      {days < 0 ? t('Expired') : relativeFuture(iso)}
+    </span>
+  )
+}
+
+// The bars of a driving licence's barcode. Decoration, like the portrait's
+// silhouette: the vault holds no barcode, and what the code would carry is
+// printed above it in full.
+const BARS =
+  'repeating-linear-gradient(90deg, #1B1D21 0 2px, transparent 2px 4px, #1B1D21 4px 5px, transparent 5px 9px, #1B1D21 9px 12px, transparent 12px 14px)'
+
+/*
+ * What a machine reads off the document.
+ *
+ * The MRZ a passport, an ID card and a residence permit all carry, generated
+ * from the fields themselves — check digits and all, see `mrz.ts` — and the
+ * barcode a driving licence has in its place. This is the one thing on the face
+ * set in the mono tier, because it is the one thing on it that is machine text
+ * rather than something a person reads.
+ */
+function MachineZone({ docType, doc }: Props) {
+  const lines = mrz(docType, doc)
+
+  if (lines)
+    return (
+      <div className={`${BAND} overflow-hidden`}>
+        {lines.map((line, row) => (
+          <div
+            key={row}
+            className="whitespace-pre font-mono text-2xs leading-[1.6] tracking-[0.1em]"
+          >
+            {line}
+          </div>
+        ))}
+      </div>
+    )
+
+  if (docType !== 'driver_license') return null
+
+  return (
+    <div className={BAND}>
+      <div aria-hidden className="h-6 opacity-55" style={{ backgroundImage: BARS }} />
+    </div>
+  )
+}
+
+/**
+ * An identity document as an object: what it is across the head, the holder
+ * beside the portrait with everything the document prints about them, its own
+ * number along the foot with how long it has left, and the machine-readable
+ * band under all of it.
+ *
+ * One layout for every type. Which rows appear is the template's business and
+ * a cell with nothing in it prints nothing, so a passport and a licence differ
+ * here only in their proportions and in what a machine reads off the bottom.
+ */
+export default function Document({ docType, doc }: Props) {
+  const { t } = useTranslation()
+  const country = doc.value('country')
+  const place = countryName(country) ?? country
+
+  return (
+    <Frame aspect={ASPECT[docType]} docType={docType}>
+      <div className="flex min-w-0 flex-1 flex-col px-5 pb-4 pt-3.5">
+        <header className="flex items-center justify-between gap-3 text-(--face-ink2)">
+          <span className={`truncate ${LABEL_TYPE}`}>
+            {t(DOC_TYPE_LABELS[docType])}
+            {place && ` · ${place}`}
+          </span>
+          <DocCell
+            doc={doc}
+            name="country"
+            bare
+            ink={`${LABEL_TYPE} font-medium text-(--face-ink)`}
+            className="flex-none"
+          />
+        </header>
+
+        <div className="mt-3.5 flex flex-1 gap-4">
+          <Portrait />
+          <div className={GRID}>
+            <DocCell
+              doc={doc}
+              name="name"
+              label="Holder"
+              ink="text-lg font-medium uppercase tracking-[0.03em]"
+              wrap
+              className="col-span-full"
+            />
+            <DocCell doc={doc} name="nationality" />
+            <DocCell doc={doc} name="birth_date" />
+            <DocCell doc={doc} name="sex" />
+            <DocCell doc={doc} name="issue_date" />
+            <DocCell doc={doc} name="expiry_date" />
+            <DocCell doc={doc} name="authority" />
+            <DocCell doc={doc} name="personal_number" />
+          </div>
+        </div>
+
+        {/* The number the document is known by, set large along the foot the
+            way a document prints it, with its validity in the margin. */}
+        <div className="mt-4 flex items-end gap-2.5">
+          <DocCell
+            doc={doc}
+            name="number"
+            ink="text-xl tracking-secret"
+            wrap
+            className="min-w-0 flex-1"
+          />
+          <Status iso={doc.value('expiry_date')} />
+          <Reveal shown={doc.shown} onToggle={doc.toggle} className="mb-0.5" />
+        </div>
+      </div>
+
+      <MachineZone docType={docType} doc={doc} />
+    </Frame>
+  )
+}
