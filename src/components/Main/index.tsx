@@ -8,6 +8,7 @@ import Compact from './Compact'
 import Palette from './Palette'
 import AddSecret from './AddSecret'
 import Scan from './Scan'
+import EnvDrop from './EnvDrop'
 import { useShortcuts } from './useShortcuts'
 
 // Two shells, one set of overlays. `Wide` is the three-pane desktop/iPad layout
@@ -34,6 +35,7 @@ export function Main() {
         {!compact && <Palette />}
         <AddSecret />
         <Scan />
+        <EnvDrop />
       </FrameProvider>
       {/* `copied-notification` + `hidden` are toggled by services/copy.ts; the
           display flip is what replays `animate-pop`. App-level so copies from

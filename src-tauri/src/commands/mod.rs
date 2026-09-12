@@ -5,6 +5,7 @@ pub mod clipboard;
 // the full gating rationale); the registration in lib.rs carries the same cfg.
 #[cfg(debug_assertions)]
 pub mod e2e;
+pub mod env;
 pub mod generator;
 pub mod import;
 pub mod save;

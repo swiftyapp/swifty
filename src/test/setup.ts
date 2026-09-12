@@ -51,6 +51,8 @@ vi.mock('@/lib/commands', () => ({
   ),
   pickBackup: vi.fn().mockResolvedValue(null),
   pickImportFile: vi.fn().mockResolvedValue(null),
+  pickEnvFile: vi.fn().mockResolvedValue(null),
+  readEnvFile: vi.fn().mockRejectedValue('file is not UTF-8 text'),
   importEntries: vi
     .fn()
     .mockResolvedValue({ total: 0, imported: 0, skipped: 0, dryRun: true, errors: [] }),

@@ -134,6 +134,8 @@ pub fn run() {
             commands::import::pick_import_file,
             commands::import::import_entries,
             commands::import::export_entries,
+            commands::env::read_env_file,
+            commands::env::pick_env_file,
             commands::generator::generate_password,
             commands::generator::generate_ssh_key,
             commands::generator::generate_otp,

@@ -7,6 +7,7 @@ import { NoteField, useField } from '@/components/elements/fields'
 import { META } from '@/components/elements/tokens'
 import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
 import { bandsOf, parseEnv, varsOf } from '../parse'
+import DropTarget from './DropTarget'
 import FileTab from './FileTab'
 import Table from './Table'
 
@@ -75,6 +76,9 @@ export default function Fields() {
           with it which rows are revealed — is mounted fresh on every mode
           switch, as every other kind's field set is. */}
       {variables ? <Table vars={vars} bands={bands} revealAll={showAll} /> : <FileTab />}
+
+      {/* Renders nothing outside edit mode; it writes the same `body`. */}
+      <DropTarget />
 
       {/* Reading, an empty note is no panel at all — like the card's aside. */}
       {(editing || note !== '') && (

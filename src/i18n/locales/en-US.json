@@ -404,5 +404,13 @@
   "A photo or screenshot, read on this device.": "A photo or screenshot, read on this device.",
   "Scan a photo…": "Scan a photo…",
   "A card or document from your photo library, read on this device.": "A card or document from your photo library, read on this device.",
-  "Images": "Images"
+  "Images": "Images",
+  "Drop a .env file here, or paste KEY=VALUE lines into any row": "Drop a .env file here, or paste KEY=VALUE lines into any row",
+  "Choose a .env file": "Choose a .env file",
+  "Drop a .env file": "Drop a .env file",
+  "Replace everything with {{name}}, or add only the keys not already here?": "Replace everything with {{name}}, or add only the keys not already here?",
+  "Replace": "Replace",
+  "Merge new keys": "Merge new keys",
+  "Kept whole, read as a table of variables.": "Kept whole, read as a table of variables.",
+  "Anywhere on this window. Kept whole, read as a table of variables.": "Anywhere on this window. Kept whole, read as a table of variables."
 }
