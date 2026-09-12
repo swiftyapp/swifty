@@ -87,11 +87,13 @@ export default function Table({ vars, bands, revealAll }: Props) {
     setPending(null)
   }
 
-  // Keys and captions only. Values are masked, and a filter that matched them
-  // would let anyone narrow a secret down by typing prefixes at it.
+  // A masked filter sees keys only. Captions come from the secret body too, so
+  // matching one while hiding it would still disclose it as a search oracle.
+  // Editing and reveal-all make captions visible and therefore searchable.
   const filtering = vars.length > FILTER_FROM
   const needle = filtering ? query.trim().toLowerCase() : ''
   const matches = (text: string | null) => text !== null && text.toLowerCase().includes(needle)
+  const captionsVisible = editing || revealAll
   // `last` is the band's whole last row, filtered or not: it is where a new row
   // goes and which row spends Enter on one. A band holding the row being added
   // stays on screen whatever the filter says, or the half-typed row would be
@@ -101,7 +103,10 @@ export default function Table({ vars, bands, revealAll }: Props) {
       index,
       caption: band.caption,
       last: band.vars[band.vars.length - 1]?.index,
-      vars: !needle || matches(band.caption) ? band.vars : band.vars.filter(v => matches(v.key))
+      vars:
+        !needle || (captionsVisible && matches(band.caption))
+          ? band.vars
+          : band.vars.filter(v => matches(v.key))
     }))
     .filter(band => band.vars.length > 0 || pending?.after === band.last)
 
@@ -115,7 +120,7 @@ export default function Table({ vars, bands, revealAll }: Props) {
   // One row at a time: a second press while one is being filled would throw
   // away what was typed, so it goes to the row already there.
   const start = (after: number | undefined) => {
-    if (pending?.value) return
+    if (pending) return
     setPending({ after, key: '', value: '' })
   }
 
@@ -164,7 +169,7 @@ export default function Table({ vars, bands, revealAll }: Props) {
                   the bands read apart without a heading over each of them. */}
               {i > 0 && <div className="h-2 bg-app" />}
               <Band
-                caption={band.caption}
+                caption={captionsVisible ? band.caption : null}
                 index={band.index}
                 onAdd={editing ? () => start(band.last) : undefined}
               >

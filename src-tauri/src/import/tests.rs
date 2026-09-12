@@ -1,4 +1,6 @@
-use super::export::{sanitize_cell, to_bitwarden_json, to_cxf_json, to_generic_csv};
+use super::export::{
+    sanitize_cell, to_bitwarden_json, to_cxf_json, to_generic_csv, unsanitize_cell, CSV_VERSION,
+};
 use super::{detect, EntryKind, Format, ImportedEntry, ImportedPasskey, Importer};
 
 fn parse(fmt: Format, bytes: &[u8]) -> super::ImportResult {
@@ -327,8 +329,12 @@ fn sanitize_neutralizes_formula_cells() {
     assert_eq!(sanitize_cell("-1"), "'-1");
     assert_eq!(sanitize_cell("@x"), "'@x");
     assert_eq!(sanitize_cell("\treally"), "'\treally");
+    assert_eq!(sanitize_cell("'literal"), "''literal");
     assert_eq!(sanitize_cell("safe"), "safe");
     assert_eq!(sanitize_cell(""), "");
+    for cell in ["=x", "+x", "-x", "@x", "\tx", "\rx", "'=x", "''x"] {
+        assert_eq!(unsanitize_cell(&sanitize_cell(cell)), cell);
+    }
 }
 
 #[test]
@@ -349,12 +355,12 @@ fn csv_export_sanitizes_injection() {
 fn round_trip_generic_csv() {
     let entries = vec![ImportedEntry {
         kind: EntryKind::Login,
-        title: "Acme".into(),
-        username: Some("neo".into()),
-        password: Some("trinity".into()),
+        title: "=Acme".into(),
+        username: Some("+neo".into()),
+        password: Some("'=trinity".into()),
         url: Some("https://acme.test".into()),
-        notes: Some("hi".into()),
-        otp: Some("SEED".into()),
+        notes: Some("'@hi".into()),
+        otp: Some("-SEED".into()),
         ..Default::default()
     }];
     let bytes = to_generic_csv(&entries).unwrap();
@@ -362,10 +368,11 @@ fn round_trip_generic_csv() {
     assert!(back.errors.is_empty());
     assert_eq!(back.entries.len(), 1);
     let e = &back.entries[0];
-    assert_eq!(e.title, "Acme");
-    assert_eq!(e.username.as_deref(), Some("neo"));
-    assert_eq!(e.password.as_deref(), Some("trinity"));
-    assert_eq!(e.otp.as_deref(), Some("SEED"));
+    assert_eq!(e.title, "=Acme");
+    assert_eq!(e.username.as_deref(), Some("+neo"));
+    assert_eq!(e.password.as_deref(), Some("'=trinity"));
+    assert_eq!(e.notes.as_deref(), Some("'@hi"));
+    assert_eq!(e.otp.as_deref(), Some("-SEED"));
 }
 
 #[test]
@@ -861,6 +868,8 @@ fn round_trip_generic_csv_env() {
     let out = String::from_utf8(bytes.clone()).unwrap();
     let header = out.lines().next().unwrap();
     assert!(header.contains(",body,file_name,tags"));
+    assert!(header.ends_with("_swifty_csv_version"));
+    assert!(out.trim_end().ends_with(CSV_VERSION));
     assert!(out.contains("\nenv,api · production,"));
     assert!(
         out.contains("\"# api\n"),
@@ -873,19 +882,41 @@ fn round_trip_generic_csv_env() {
     assert_eq!(back.entries[0].env_body.as_deref(), Some(ENV_BODY));
 }
 
-// A body whose first byte looks like a spreadsheet formula (an indented first
-// line, a `-`) is guarded on the way out and unguarded on the way back, so it
-// still round-trips byte for byte; a body that genuinely starts with `'` does
-// not lose it.
+// Formula-looking bodies are guarded and genuine apostrophes are escaped, so
+// every ambiguous prefix round-trips under the versioned Swifty dialect.
 #[test]
 fn round_trip_generic_csv_env_with_a_formula_looking_first_line() {
-    for body in ["\tA=1\nB=2\n", "-----\nA=1\n", "'quoted'=x\nA=1\n"] {
+    for body in [
+        "=A\n",
+        "+A\n",
+        "-A\n",
+        "@A\n",
+        "\tA=1\n",
+        "\rA=1\n",
+        "'=A\n",
+        "'+A\n",
+        "'-A\n",
+        "'@A\n",
+        "'\tA\n",
+        "'\rA\n",
+        "''quoted\n",
+    ] {
         let mut e = env_entry();
         e.env_body = Some(body.into());
         let bytes = to_generic_csv(&[e.clone()]).unwrap();
         let back = super::csv::GenericCsv.parse(&bytes);
         assert_eq!(back.entries, vec![e], "{body:?}");
     }
+}
+
+// A generic sheet has no provenance marker, so an apostrophe that resembles
+// Swifty's spreadsheet guard remains literal rather than being guessed away.
+#[test]
+fn unversioned_generic_csv_keeps_a_literal_apostrophe_in_an_env_body() {
+    let bytes = b"type,title,body,file_name\nenv,Literal,\"'=VALUE\nA=1\",.env\n";
+    let back = super::csv::GenericCsv.parse(bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries[0].env_body.as_deref(), Some("'=VALUE\nA=1"));
 }
 
 // Bitwarden has no item for a file, so an env entry goes out as a secure note

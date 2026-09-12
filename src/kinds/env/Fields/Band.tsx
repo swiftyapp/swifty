@@ -15,9 +15,10 @@ interface Props {
 
 // One run of variables under the comment that captioned it. A well-kept file
 // lays itself out this way with no effort from the user, so the caption is
-// shown as written (the label face does the uppercasing) and never edited here
-// — it is a comment, and the File tab is where comments are. The add button is
-// once per band so a new row lands in the band it was asked for.
+// shown as written (the label face does the uppercasing) and never edited here.
+// The caller withholds it from a masked read view because it came from the same
+// secret body as the values. The add button is once per band so a new row lands
+// in the band it was asked for.
 export default function Band({ caption, index, onAdd, children }: Props) {
   const { t } = useTranslation()
 

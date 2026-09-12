@@ -42,6 +42,7 @@ const OTP: &[&str] = &[
 const TYPE: &[&str] = &["type"];
 const BODY: &[&str] = &["body"];
 const FILE_NAME: &[&str] = &["file_name"];
+const CSV_VERSION: &[&str] = &[super::export::CSV_VERSION_HEADER];
 
 // A parsed sheet: header names (normalized) and the data rows.
 struct Rows {
@@ -91,6 +92,29 @@ fn get(headers: &[String], rec: &StringRecord, aliases: &[&str]) -> Option<Strin
         .filter(|v| !v.is_empty())
 }
 
+// Reverse spreadsheet escaping only for a row carrying Swifty's explicit
+// format marker. A generic sheet's leading apostrophe is always literal data.
+fn decoded(value: Option<String>, swifty: bool) -> Option<String> {
+    value.map(|v| {
+        if swifty {
+            super::export::unsanitize_cell(&v)
+        } else {
+            v
+        }
+    })
+}
+
+fn get_decoded(
+    headers: &[String],
+    rec: &StringRecord,
+    aliases: &[&str],
+    swifty: bool,
+) -> Option<String> {
+    decoded(get_verbatim(headers, rec, aliases), swifty)
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
 fn tag_vec(group: Option<String>) -> Vec<String> {
     group
         .map(|g| g.trim_start_matches("Root/").trim().to_string())
@@ -112,9 +136,10 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
         return result;
     };
     for (i, rec) in rows.records.iter().enumerate() {
-        let title = get(&rows.headers, rec, TITLE)
-            .or_else(|| get(&rows.headers, rec, URL))
-            .or_else(|| get(&rows.headers, rec, USERNAME));
+        let swifty =
+            get(&rows.headers, rec, CSV_VERSION).as_deref() == Some(super::export::CSV_VERSION);
+        let cell = |aliases| get_decoded(&rows.headers, rec, aliases, swifty);
+        let title = cell(TITLE).or_else(|| cell(URL)).or_else(|| cell(USERNAME));
         let Some(title) = title else {
             result.push_err(i + 2, "empty row");
             continue;
@@ -123,16 +148,13 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
         // own that has a login's shape. An `env` row has none — no login column
         // names the file — so it is the one kind the `type` column is read for,
         // or the file would be dropped on the way back in.
-        if get(&rows.headers, rec, TYPE).as_deref() == Some(EntryKind::Env.as_str()) {
+        if cell(TYPE).as_deref() == Some(EntryKind::Env.as_str()) {
             result.entries.push(ImportedEntry {
                 kind: EntryKind::Env,
                 title,
-                notes: get(&rows.headers, rec, NOTES),
-                // The exporter guards spreadsheets against a cell that starts
-                // like a formula; the file is not a cell, so the guard comes off.
-                env_body: get_verbatim(&rows.headers, rec, BODY)
-                    .map(|b| super::export::unsanitize_cell(&b)),
-                env_file_name: get(&rows.headers, rec, FILE_NAME),
+                notes: cell(NOTES),
+                env_body: decoded(get_verbatim(&rows.headers, rec, BODY), swifty),
+                env_file_name: cell(FILE_NAME),
                 ..Default::default()
             });
             continue;
@@ -140,11 +162,11 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
         result.entries.push(ImportedEntry {
             kind: EntryKind::Login,
             title,
-            username: get(&rows.headers, rec, USERNAME),
-            password: get(&rows.headers, rec, PASSWORD),
-            url: get(&rows.headers, rec, URL),
-            notes: get(&rows.headers, rec, NOTES),
-            otp: get(&rows.headers, rec, OTP),
+            username: cell(USERNAME),
+            password: cell(PASSWORD),
+            url: cell(URL),
+            notes: cell(NOTES),
+            otp: cell(OTP),
             ..Default::default()
         });
     }

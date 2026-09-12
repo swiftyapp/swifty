@@ -87,11 +87,12 @@ function Editor({
 beforeEach(() => vi.clearAllMocks())
 
 describe('Env fields, reading', () => {
-  it('lays the file out as captioned bands with every value masked', () => {
+  it('masks values and all comment-derived text', () => {
     renderRead()
 
-    expect(screen.getByText('Database')).toBeInTheDocument()
-    expect(screen.getByText('Stripe')).toBeInTheDocument()
+    expect(screen.queryByText('Database')).not.toBeInTheDocument()
+    expect(screen.queryByText('Stripe')).not.toBeInTheDocument()
+    expect(screen.queryByText('· dev')).not.toBeInTheDocument()
     expect(screen.getByText('4 variables')).toBeInTheDocument()
     for (const key of ['DATABASE_URL', 'DB_POOL', 'STRIPE_KEY', 'PORT']) {
       expect(screen.getByText(key)).toBeInTheDocument()
@@ -103,10 +104,13 @@ describe('Env fields, reading', () => {
 
   it('reveals one value with its row eye and leaves the others masked', async () => {
     renderRead()
-    await userEvent.click(screen.getByTestId(`reveal-env-${indexOf(BODY, 'STRIPE_KEY')}`))
+    await userEvent.click(screen.getByTestId(`reveal-env-${indexOf(BODY, 'PORT')}`))
 
-    expect(value(BODY, 'STRIPE_KEY')).toHaveTextContent('sk_live_1')
+    expect(value(BODY, 'PORT')).toHaveTextContent('3000')
+    expect(screen.getByText('· dev')).toBeInTheDocument()
     expect(value(BODY, 'DATABASE_URL')).toHaveTextContent(DOTS)
+    // A band caption is not owned by the one row that happened to be revealed.
+    expect(screen.queryByText('Stripe')).not.toBeInTheDocument()
   })
 
   it('reveals every value with the panel eye', async () => {
@@ -117,6 +121,9 @@ describe('Env fields, reading', () => {
     expect(value(BODY, 'DB_POOL')).toHaveTextContent('10')
     expect(value(BODY, 'STRIPE_KEY')).toHaveTextContent('sk_live_1')
     expect(value(BODY, 'PORT')).toHaveTextContent('3000')
+    expect(screen.getByText('Database')).toBeInTheDocument()
+    expect(screen.getByText('Stripe')).toBeInTheDocument()
+    expect(screen.getByText('· dev')).toBeInTheDocument()
   })
 
   it('copies the true value when a masked value is pressed', async () => {
@@ -124,11 +131,6 @@ describe('Env fields, reading', () => {
     await userEvent.click(screen.getByLabelText('STRIPE_KEY · Copy'))
 
     expect(copy).toHaveBeenCalledWith('sk_live_1')
-  })
-
-  it('shows a trailing inline comment as a gloss after the value', () => {
-    renderRead()
-    expect(screen.getByText('· dev')).toBeInTheDocument()
   })
 
   it('shows the note in a panel of its own only when there is one', () => {
@@ -170,6 +172,7 @@ describe('Env fields, filtering', () => {
 
   it('narrows to the bands and keys that match, case-insensitively', async () => {
     renderRead(LONG)
+    await userEvent.click(screen.getByTestId('env-reveal-all'))
     await userEvent.type(screen.getByTestId('env-filter'), 'stripe')
 
     // The caption matched, so the whole band stays.
@@ -184,6 +187,18 @@ describe('Env fields, filtering', () => {
     // A key matched inside a band without a caption: only that row.
     expect(screen.getByText('PORT')).toBeInTheDocument()
     expect(screen.queryByText('HOST')).not.toBeInTheDocument()
+  })
+
+  it('does not expose a masked caption through filtering', async () => {
+    const captioned = ['# private tenant', 'A=1', 'B=2', 'C=3', 'D=4', 'E=5', 'F=6', 'G=7'].join(
+      '\n'
+    )
+    renderRead(captioned)
+    await userEvent.type(screen.getByTestId('env-filter'), 'private')
+
+    expect(screen.getByText('No variables match')).toBeInTheDocument()
+    expect(screen.queryByText('private tenant')).not.toBeInTheDocument()
+    expect(screen.queryByText('A')).not.toBeInTheDocument()
   })
 
   // Values are masked; a filter that saw them would let anyone narrow a secret
@@ -307,6 +322,17 @@ describe('Env fields, editing', () => {
 })
 
 describe('Env fields, review regressions', () => {
+  it('does not replace a pending row that holds an invalid key draft', async () => {
+    render(<Editor body={BODY} />)
+    await userEvent.click(screen.getByTestId('add-env-var-0'))
+    await userEvent.type(keyInput('new')!, '1partial')
+
+    await userEvent.click(screen.getByTestId('add-env-var-1'))
+
+    expect(keyInput('new')).toHaveValue('1partial')
+    expect(screen.getAllByDisplayValue('1partial')).toHaveLength(1)
+  })
+
   it('drops a reveal-all when the face is left, so it is not still on when it returns', async () => {
     renderRead()
     await userEvent.click(screen.getByTestId('env-reveal-all'))

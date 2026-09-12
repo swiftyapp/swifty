@@ -460,7 +460,13 @@ const COLUMNS: &[&str] = &[
     "body",
     "file_name",
     "tags",
+    CSV_VERSION_HEADER,
 ];
+
+/// Marks rows produced by Swifty so the importer may reverse spreadsheet
+/// escaping without guessing whether a leading apostrophe was user data.
+pub const CSV_VERSION_HEADER: &str = "_swifty_csv_version";
+pub const CSV_VERSION: &str = "2";
 
 /// Serialize to a generic CSV. Every cell is passed through [`sanitize_cell`].
 pub fn to_generic_csv(entries: &[ImportedEntry]) -> csv::Result<Vec<u8>> {
@@ -491,6 +497,7 @@ pub fn to_generic_csv(entries: &[ImportedEntry]) -> csv::Result<Vec<u8>> {
             e.env_body.clone().unwrap_or_default(),
             e.env_file_name.clone().unwrap_or_default(),
             e.tags.join(";"),
+            CSV_VERSION.to_string(),
         ];
         wtr.write_record(row.iter().map(|c| sanitize_cell(c)))?;
     }
@@ -499,26 +506,21 @@ pub fn to_generic_csv(entries: &[ImportedEntry]) -> csv::Result<Vec<u8>> {
         .map_err(|e| csv::Error::from(std::io::Error::other(e.to_string())))
 }
 
-/// Neutralize spreadsheet formula injection: a cell whose first character can
-/// start a formula (`= + - @`) or a leading tab/CR is prefixed with a single
-/// quote so a spreadsheet treats it as text. See OWASP "CSV Injection".
+/// Neutralize spreadsheet formula injection with a reversible encoding. A
+/// formula-looking cell gains a leading apostrophe; an apostrophe already in
+/// the data is doubled so decoding a versioned Swifty row is unambiguous.
 pub fn sanitize_cell(cell: &str) -> String {
-    if starts_like_a_formula(cell) {
+    if cell.starts_with('\'') || starts_like_a_formula(cell) {
         format!("'{cell}")
     } else {
         cell.to_string()
     }
 }
 
-/// The inverse, for the one column read back verbatim (an env file's body):
-/// the apostrophe `sanitize_cell` put in front of a formula-looking first
-/// character comes off again, and only that one — a body that really starts
-/// with `'` is left alone, since `'=` could only have come from the guard.
+/// The inverse for a row explicitly marked with [`CSV_VERSION`]. Unversioned
+/// generic CSV never passes through this function: its apostrophes are data.
 pub fn unsanitize_cell(cell: &str) -> String {
-    match cell.strip_prefix('\'') {
-        Some(rest) if starts_like_a_formula(rest) => rest.to_string(),
-        _ => cell.to_string(),
-    }
+    cell.strip_prefix('\'').unwrap_or(cell).to_string()
 }
 
 fn starts_like_a_formula(cell: &str) -> bool {

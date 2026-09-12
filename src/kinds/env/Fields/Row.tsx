@@ -51,10 +51,9 @@ export default function Row({ v, revealed, onReveal }: Props) {
           >
             {masked ? MASK_DOTS : v.value}
           </button>
-          {/* The trailing `# …` on the line. Unlike Field's gloss it is not
-              derived from the value — it is the file's own annotation and says
-              nothing about the secret — so it stays while the value is masked. */}
-          {v.comment && (
+          {/* Comments come from the same encrypted body as the value and may
+              themselves contain secrets, so the row's eye governs both. */}
+          {revealed && v.comment && (
             <span className="min-w-0 flex-none truncate text-base leading-6 text-text3">
               · {v.comment}
             </span>
