@@ -24,10 +24,11 @@ export const primarySecret = (entry: Entry): string =>
 // The file name is not a secret, but it is in the encrypted payload — so it can
 // only be named once the entry is revealed, and then it belongs next to the
 // kind, the way an identity's document type does: `ENV FILE · .env.production`.
-export const eyebrow = (entry: Entry) =>
-  entry.type === 'env' && entry.fileName.trim()
-    ? { text: entry.fileName.trim(), testid: 'entry-value-fileName' }
-    : null
+// (`fileName` is optional on the wire — a peer's entry may not carry the key.)
+export const eyebrow = (entry: Entry) => {
+  const name = entry.type === 'env' ? (entry.fileName ?? '').trim() : ''
+  return name ? { text: name, testid: 'entry-value-fileName' } : null
+}
 
 // `.env.production · 14 vars`, from the metadata stamped at save time (the way
 // the card brand is), each part only when known: a pasted file has no name, and
