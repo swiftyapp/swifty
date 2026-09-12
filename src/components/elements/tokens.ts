@@ -2,6 +2,15 @@ export const CARD = 'overflow-hidden rounded-lg border border-line bg-card'
 
 export const ROW_HAIRLINE = 'inset-shadow-hairline last:inset-shadow-none'
 
+// A 460px face (a credit card, an ID document) with its note panel: stacked,
+// and side by side once the *pane* is wide enough for both — 460 plus a note
+// column worth reading. A container breakpoint rather than a viewport one:
+// the detail pane can be far narrower than the window (a split view, an iPad
+// half), and the faces themselves fold by container width, so the two must
+// agree on what "wide" means.
+export const FACE_ASIDE =
+  'grid grid-cols-1 items-start gap-3 @min-[720px]:grid-cols-[460px_minmax(0,1fr)]'
+
 // A trailing control that stays out of the way until the row is asked about —
 // hovered, or holding the keyboard. Pairs with a `group` on the row itself.
 // Opacity only: the control keeps its place in the layout and in the tab order.

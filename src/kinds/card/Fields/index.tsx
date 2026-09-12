@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { cardBrandOf, cardDigits, groupCardNumber, hasBrandMark } from '@/utils/cardBrand'
 import CardBrandMark from '@/components/elements/CardBrandMark'
 import Panel from '@/components/elements/Panel'
+import { FACE_ASIDE } from '@/components/elements/tokens'
 import { NoteField, useField, useFields } from '@/components/elements/fields'
 import { useTranslation } from 'react-i18next'
 import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
@@ -41,13 +42,7 @@ export default function Fields() {
   }
 
   return (
-    <div
-      // Compact has no room for the art and the rest of the fields side by
-      // side, so below 768px the pair stacks instead.
-      className={
-        aside ? 'grid grid-cols-1 items-start gap-3 md:grid-cols-[460px_minmax(0,1fr)]' : undefined
-      }
-    >
+    <div className={aside ? FACE_ASIDE : undefined}>
       {/* Card art: an always-dark plastic-card visual, deliberately off-system.
           Its gradient, hex inks, 16/4px radii, unleaded type sizes and the
           number's wide letter-spacing imitate a real card, so they are exempt
