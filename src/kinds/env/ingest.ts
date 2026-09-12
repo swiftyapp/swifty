@@ -1,4 +1,5 @@
 import { readEnvFile, type EnvFile } from '@/lib/commands'
+import { isImagePath } from '@/lib/fileTypes'
 import { appendVars, looksLikeEnv, parseEnv, varsOf } from './parse'
 
 /**
@@ -60,4 +61,15 @@ export interface IngestedEnv extends EnvFile {
 export const ingestEnvFile = async (path: string): Promise<IngestedEnv> => {
   const file = await readEnvFile(path)
   return { ...file, title: proposeTitle(path) }
+}
+
+/**
+ * Claim a window drop only when it belongs to env ingestion. Images are rejected
+ * before the text reader so the scanner remains their sole owner; other files
+ * are read once and claimed only when either their name or contents are env-like.
+ */
+export const ingestDroppedEnvFile = async (path: string): Promise<IngestedEnv | null> => {
+  if (isImagePath(path)) return null
+  const file = await ingestEnvFile(path)
+  return isEnvDrop(fileNameOf(path), file.body) ? file : null
 }

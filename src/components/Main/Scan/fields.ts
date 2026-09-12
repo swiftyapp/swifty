@@ -1,4 +1,7 @@
 import type { EntryDraft } from '@/defaults/entries'
+import { isImagePath } from '@/lib/fileTypes'
+
+export { IMAGE_EXTENSIONS, isImagePath } from '@/lib/fileTypes'
 
 /**
  * Turning what a scan read into what a draft holds.
@@ -9,27 +12,6 @@ import type { EntryDraft } from '@/defaults/entries'
  * they are printed. So there is no reformatting here: only which values are
  * worth carrying, and which of the draft's own values may be overwritten.
  */
-
-// What the OS recognizers can open, and what the file dialog filters to.
-// Anything else dropped on the window is somebody else's business — the Import
-// drop zone still wants its .csv.
-export const IMAGE_EXTENSIONS = [
-  'png',
-  'jpg',
-  'jpeg',
-  'heic',
-  'heif',
-  'webp',
-  'tiff',
-  'tif',
-  'bmp',
-  'gif'
-]
-
-export const isImagePath = (path: string): boolean => {
-  const extension = /\.([^.\\/]+)$/.exec(path)?.[1]
-  return !!extension && IMAGE_EXTENSIONS.includes(extension.toLowerCase())
-}
 
 /** The first image among dropped paths — a drop can carry more than one file. */
 export const firstImage = (paths: string[]): string | undefined =>

@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { isMobile } from '@/lib/platform'
-import { pickEnvFile } from '@/lib/commands'
-import { ingestEnvFile } from '@/kinds/env/ingest'
+import { useEnvIngest } from '@/kinds/env/useIngest'
 import { openEnvDraft } from '../EnvDrop/open'
 import { EnvGlyph } from '../icons'
 
@@ -18,15 +17,10 @@ import { EnvGlyph } from '../icons'
 export default function EnvAction() {
   const { t } = useTranslation()
   const scan = useStore(state => state.ui.scan.supported)
+  const { pick, error } = useEnvIngest(openEnvDraft)
 
   // A cancelled dialog leaves the picker as it was; a chosen file hands the
   // window over to the editor, which `openEnvDraft` closes the picker for.
-  const pick = () =>
-    pickEnvFile()
-      .then(async path => {
-        if (path) openEnvDraft(await ingestEnvFile(path))
-      })
-      .catch(() => {})
 
   const row = 'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-base text-text2'
 
@@ -53,6 +47,11 @@ export default function EnvAction() {
           ? t('Kept whole, read as a table of variables.')
           : t('Anywhere on this window. Kept whole, read as a table of variables.')}
       </p>
+      {error && (
+        <p data-testid="add-env-error" className="mt-1 pl-[30px] text-base text-bad">
+          {error}
+        </p>
+      )}
     </div>
   )
 }

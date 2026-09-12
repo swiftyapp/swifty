@@ -1,7 +1,6 @@
 import { useStore, startEntry, closeAddPicker } from '@/store'
 import { dialogOpen } from '@/utils/dialogOpen'
-import { fileNameOf, ingestEnvFile, isEnvDrop, type IngestedEnv } from '@/kinds/env/ingest'
-import { isImagePath } from '../Scan/fields'
+import { ingestDroppedEnvFile, type IngestedEnv } from '@/kinds/env/ingest'
 
 /**
  * Open the env editor as a new draft with the file already in it — the same
@@ -11,6 +10,14 @@ import { isImagePath } from '../Scan/fields'
 export const openEnvDraft = ({ body, fileName, title }: IngestedEnv) => {
   closeAddPicker()
   startEntry('env', { body, fileName, title })
+}
+
+/** The exact idle surface that owned a drop, used as a lease across the read. */
+const idleDropContext = (): boolean | null => {
+  const { entries, ui } = useStore.getState()
+  if (entries.new || entries.edit) return null
+  if (dialogOpen() && !ui.addPicker) return null
+  return ui.addPicker
 }
 
 /**
@@ -26,11 +33,12 @@ export const openEnvDraft = ({ body, fileName, title }: IngestedEnv) => {
  * neither does nothing, as today.
  */
 export const dropIdle = async (paths: string[]): Promise<void> => {
-  const { entries, ui } = useStore.getState()
-  if (entries.new || entries.edit) return
-  if (dialogOpen() && !ui.addPicker) return
+  const context = idleDropContext()
+  if (context === null) return
   const [path] = paths
-  if (!path || isImagePath(path)) return
-  const file = await ingestEnvFile(path).catch(() => null)
-  if (file && isEnvDrop(fileNameOf(path), file.body)) openEnvDraft(file)
+  if (!path) return
+  const file = await ingestDroppedEnvFile(path).catch(() => null)
+  // Reading crosses an async boundary: only the same still-idle surface may
+  // consume its result. Opening/closing the picker also changes ownership.
+  if (file && idleDropContext() === context) openEnvDraft(file)
 }

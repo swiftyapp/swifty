@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FieldsProvider } from '@/components/elements/fields'
 import type { DraftValue, EntryDraft } from '@/defaults/entries'
-import { readEnvFile } from '@/lib/commands'
+import { pickEnvFile, readEnvFile } from '@/lib/commands'
 import Fields from '@/kinds/env/Fields'
+import { useEnvIngest } from '@/kinds/env/useIngest'
 import Main from '@/components/Main'
 import { makeStore, useStore, startEntry, openAddPicker } from '@/store'
 import { renderWithStore, withEntries, loginMeta } from './utils'
@@ -39,6 +40,14 @@ const MINE = ['# Database', 'DATABASE_URL=postgres://mine', 'DB_POOL=10', ''].jo
 const THEIRS = ['DB_POOL=99', 'STRIPE_KEY=sk_live_1', ''].join('\n')
 const FILE = { fileName: '.env.production', body: THEIRS }
 
+const deferred = <T,>() => {
+  let resolve: (value: T) => void = () => {}
+  const promise = new Promise<T>(done => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
 const keyInputs = () =>
   Array.from(document.querySelectorAll<HTMLInputElement>('input[name^="env-key-"]')).map(
     el => el.value
@@ -63,6 +72,7 @@ function Editor({
   return (
     <FieldsProvider value={{ entry, set, attempted: false }}>
       <Fields />
+      <button data-testid="edit-env-body" onClick={() => set('body', 'LOCAL=mine\n')} />
     </FieldsProvider>
   )
 }
@@ -107,6 +117,23 @@ describe('the editor drop zone', () => {
 
     await waitFor(() => expect(onSet).toHaveBeenCalledWith('body', THEIRS))
     expect(onSet).not.toHaveBeenCalledWith('title', expect.anything())
+  })
+
+  it('rechecks the live draft after a pending read instead of replacing newer typing', async () => {
+    const reading = deferred<typeof FILE>()
+    vi.mocked(readEnvFile).mockReturnValue(reading.promise)
+    const onSet = vi.fn()
+    render(<Editor body="" onSet={onSet} />)
+
+    await drop('/Users/me/code/api/.env')
+    await userEvent.click(screen.getByTestId('edit-env-body'))
+    onSet.mockClear()
+
+    await act(async () => reading.resolve(FILE))
+
+    expect(await screen.findByTestId('env-drop-prompt')).toBeInTheDocument()
+    expect(onSet).not.toHaveBeenCalled()
+    expect(keyInputs()).toEqual(['LOCAL'])
   })
 
   it('asks before touching a draft that has variables, and replaces on request', async () => {
@@ -155,7 +182,7 @@ describe('the editor drop zone', () => {
     expect(screen.queryByTestId('env-drop-prompt')).not.toBeInTheDocument()
 
     await drop('/Users/me/code/api/.env.production')
-    screen.getByTestId('env-drop-replace').focus()
+    expect(screen.getByTestId('env-drop-replace')).toHaveFocus()
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByTestId('env-drop-prompt')).not.toBeInTheDocument()
 
@@ -173,6 +200,60 @@ describe('the editor drop zone', () => {
 
     expect(await screen.findByTestId('env-drop-error')).toHaveTextContent('1 MiB')
     expect(onSet).not.toHaveBeenCalled()
+  })
+
+  it('declines image and unrelated-text drops so their owning surfaces can handle them', async () => {
+    vi.mocked(readEnvFile).mockResolvedValue({ fileName: 'notes.txt', body: 'hello\nworld\n' })
+    const onSet = vi.fn()
+    render(<Editor body={MINE} onSet={onSet} />)
+
+    await drop('/Users/me/notes.txt')
+    await waitFor(() => expect(readEnvFile).toHaveBeenCalledWith('/Users/me/notes.txt'))
+    await drop('/Users/me/card.png')
+
+    expect(readEnvFile).not.toHaveBeenCalledWith('/Users/me/card.png')
+    expect(screen.queryByTestId('env-drop-prompt')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('env-drop-error')).not.toBeInTheDocument()
+    expect(onSet).not.toHaveBeenCalled()
+  })
+})
+
+describe('interactive env ingestion', () => {
+  it('surfaces picker failures through the shared request lifecycle', async () => {
+    vi.mocked(pickEnvFile).mockRejectedValue('file is larger than 1 MiB')
+    const consume = vi.fn()
+    const { result } = renderHook(() => useEnvIngest(consume))
+
+    await act(() => result.current.pick())
+
+    expect(result.current.error).toContain('1 MiB')
+    expect(consume).not.toHaveBeenCalled()
+  })
+
+  it('lets only the newest read publish a result', async () => {
+    const first = deferred<typeof FILE>()
+    const second = deferred<typeof FILE>()
+    vi.mocked(readEnvFile).mockImplementation(path =>
+      path.endsWith('first.env') ? first.promise : second.promise
+    )
+    const consume = vi.fn()
+    const { result } = renderHook(() => useEnvIngest(consume))
+
+    let firstRun: Promise<void>
+    let secondRun: Promise<void>
+    act(() => {
+      firstRun = result.current.drop('/tmp/first.env')
+      secondRun = result.current.drop('/tmp/second.env')
+    })
+    await act(async () => {
+      second.resolve({ fileName: 'second.env', body: 'SECOND=2\n' })
+      await secondRun
+      first.resolve({ fileName: 'first.env', body: 'FIRST=1\n' })
+      await firstRun
+    })
+
+    expect(consume).toHaveBeenCalledTimes(1)
+    expect(consume.mock.calls[0][0]).toMatchObject({ fileName: 'second.env', body: 'SECOND=2\n' })
   })
 })
 
@@ -225,6 +306,19 @@ describe('a .env dropped on the idle window', () => {
 
     expect(useStore.getState().entries.new).toBe('login')
     expect(readEnvFile).not.toHaveBeenCalled()
+  })
+
+  it('does not replace an editor opened while the file is still being read', async () => {
+    const reading = deferred<typeof FILE>()
+    vi.mocked(readEnvFile).mockReturnValue(reading.promise)
+    const store = seed()
+    renderWithStore(<Main />, { store })
+
+    await drop('/Users/me/code/api/.env')
+    act(() => startEntry('login'))
+    await act(async () => reading.resolve(FILE))
+
+    expect(useStore.getState().entries.new).toBe('login')
   })
 
   it('answers the Add picker and closes it', async () => {
