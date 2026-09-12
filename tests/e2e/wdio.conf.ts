@@ -23,6 +23,8 @@ const APP_BINARY =
   process.env.SWIFTY_APP_BINARY ??
   path.join(ROOT, "src-tauri", "target", "debug", "swifty");
 
+const VITE_PORT = process.env.E2E_VITE_PORT ?? "1420";
+
 const TEST_DB_DIR = path.join(os.tmpdir(), `swifty-e2e-${Date.now()}`);
 
 const SPECS_DIR = path.join(__dirname, "specs");
@@ -90,15 +92,19 @@ async function waitForPort(
     if (exitCode !== null) {
       throw new Error(`[e2e] ${label} process exited with code ${exitCode} before port ${port} opened`);
     }
-    const open = await new Promise<boolean>((resolve) => {
-      const s = net.connect(port, "127.0.0.1");
-      s.once("connect", () => { s.destroy(); resolve(true); });
-      s.once("error", () => { s.destroy(); resolve(false); });
-    });
-    if (open) return;
+    if (await portOpen(port)) return;
     await new Promise<void>((r) => setTimeout(r, 250));
   }
   throw new Error(`[e2e] ${label} did not open port ${port} within ${timeoutMs}ms`);
+}
+
+/** One TCP connect attempt: is something listening on `port` right now? */
+function portOpen(port: number): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const s = net.connect(port, "127.0.0.1");
+    s.once("connect", () => { s.destroy(); resolve(true); });
+    s.once("error", () => { s.destroy(); resolve(false); });
+  });
 }
 
 export const config: WebdriverIO.Config = {
@@ -138,12 +144,15 @@ export const config: WebdriverIO.Config = {
     fs.mkdirSync(TEST_DB_DIR, { recursive: true });
 
     // Start the Vite dev server — the debug binary loads the frontend from
-    // http://localhost:1420 (baked in at compile time by tauri-build).
+    // http://localhost:1420 (baked in at compile time by tauri-build; a binary
+    // built with another `build.devUrl` needs E2E_VITE_PORT to match). Strict:
+    // if the port is taken, fail here rather than let Vite drift to the next
+    // one while the app, and this readiness probe, talk to whatever holds it.
     console.log("[e2e] Starting Vite dev server...");
     // Invoke the vite binary directly — avoids relying on `bun` being in PATH
     // when wdio is running under Node.js.
     const viteBin = path.join(ROOT, "node_modules", ".bin", "vite");
-    viteProcess = spawn(viteBin, ["--port", "1420"], {
+    viteProcess = spawn(viteBin, ["--port", VITE_PORT, "--strictPort"], {
       cwd: ROOT,
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env },
@@ -160,11 +169,20 @@ export const config: WebdriverIO.Config = {
       }
     });
     // Use HTTP polling — avoids IPv4/IPv6 mismatch that TCP connect can hit
-    await waitForHttp("http://localhost:1420", 30_000, "Vite");
-    console.log("[e2e] Vite ready on :1420");
+    await waitForHttp(`http://localhost:${VITE_PORT}`, 30_000, "Vite");
+    console.log(`[e2e] Vite ready on :${VITE_PORT}`);
 
     // Start the app binary — it loads the frontend from Vite and starts
-    // the WebDriver server on :4445.
+    // the WebDriver server on :4445. That port must be ours to open: another
+    // debug Swifty already running (a second checkout's dev app, say) holds
+    // it, the single-instance plugin quietly exits the binary we spawn, and
+    // the whole suite then drives the wrong app. Seen locally; every reset
+    // was refused by the SWIFTY_E2E gate, but nothing else would have been.
+    if (await portOpen(4445)) {
+      throw new Error(
+        "[e2e] port 4445 is already in use — is another Swifty instance running? Quit it first.",
+      );
+    }
     console.log(`[e2e] Starting app (${APP_BINARY})`);
     appProcess = spawn(APP_BINARY, [], {
       cwd: ROOT,
