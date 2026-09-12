@@ -185,6 +185,15 @@ describe('Env fields, reading', () => {
 
     expect(saveEnvFile).toHaveBeenCalledWith('', BODY)
   })
+
+  it('shows a failed file commit beside the Save as file action', async () => {
+    vi.mocked(saveEnvFile).mockRejectedValue('disk is full')
+    renderRead(BODY, '.env.production')
+    await userEvent.click(screen.getByTestId('env-tab-file'))
+    await userEvent.click(screen.getByTestId('env-save-file'))
+
+    expect(await screen.findByTestId('env-save-error')).toHaveTextContent('disk is full')
+  })
 })
 
 describe('Env fields, filtering', () => {

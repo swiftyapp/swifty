@@ -51,6 +51,7 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "for
 rustls = { version = "0.23", default-features = false, features = ["ring", "tls12"] }
 url = "2"
 zeroize = "1.8.2"
+tempfile = "3"
 argon2 = "0.6"
 sys-locale = "0.3"
 # WebAuthn authenticator core (1Password's passkey-rs, MIT OR Apache-2.0). Kept

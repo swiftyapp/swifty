@@ -85,31 +85,14 @@ pub async fn save_private_text(
     Ok(Some(dest))
 }
 
-// Create the file owner-only from the start — not write then chmod, which
-// leaves a window where the secret sits world-readable — and, should the user
-// have chosen an existing file, tighten that one too, since `mode` only applies
-// on creation. The plaintext is scrubbed on the way out like the CSV export's.
+// Commit through the shared durable writer: the owner-only temp sibling is
+// complete and fsynced before it atomically replaces the destination, so a
+// failed overwrite leaves the old file whole. Scrub the plaintext on every exit.
 #[cfg(desktop)]
 fn write_private(dest: &Path, mut bytes: Vec<u8>) -> Result<()> {
-    use std::io::Write;
-
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create(true).truncate(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let result = options.open(dest).and_then(|mut file| {
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
-        }
-        file.write_all(&bytes)
-    });
+    let result = crate::storage::atomic_write_private(dest, &bytes);
     bytes.zeroize();
-    Ok(result?)
+    result
 }
 
 /// Where one export stages inside `dir`, and the name to ask the dialog for so

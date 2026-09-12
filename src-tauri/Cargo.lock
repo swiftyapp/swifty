@@ -5200,6 +5200,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tauri-plugin-webdriver",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
  "totp-rs",

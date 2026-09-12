@@ -30,12 +30,14 @@ export default function FileTab() {
   const { value, set, editing, attempted } = useField('body')
   const { value: fileName } = useField('fileName')
   const [show, setShow] = useState(false)
-  const error = requiredError(value, true, attempted)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const validationError = requiredError(value, true, attempted)
 
-  // A dismissed dialog resolves to null and needs no reaction; a failed write
-  // is the OS's message, which there is no better place to put than the log.
+  // A dismissal is not an error. A failed commit stays beside the action that
+  // initiated it, so the user never has to infer success from a closed dialog.
   const save = () => {
-    saveEnvFile(fileName, value).catch(e => console.error(e))
+    setSaveError(null)
+    saveEnvFile(fileName, value).catch(e => setSaveError(String(e)))
   }
 
   return (
@@ -58,13 +60,13 @@ export default function FileTab() {
               'block min-h-6 w-full resize-none font-mono text-base leading-relaxed text-text',
               WELL,
               BOX,
-              error ? 'border-bad' : BOX_LINE
+              validationError ? 'border-bad' : BOX_LINE
             )}
           />
-          {error && <div className="mt-1.5 text-base text-bad">{error}</div>}
+          {validationError && <div className="mt-1.5 text-base text-bad">{validationError}</div>}
         </div>
       ) : (
-        <div className="flex items-start gap-3 px-3.5 py-3">
+        <div className="flex flex-wrap items-start gap-3 px-3.5 py-3">
           <div className={cx('min-w-0 flex-1', WELL)}>
             <div
               data-testid="entry-value-body"
@@ -94,6 +96,11 @@ export default function FileTab() {
               {show ? <EyeOffGlyph /> : <EyeGlyph />}
             </IconButton>
           </div>
+          {saveError && (
+            <div data-testid="env-save-error" className="basis-full text-base text-bad">
+              {saveError}
+            </div>
+          )}
         </div>
       )}
     </Panel>

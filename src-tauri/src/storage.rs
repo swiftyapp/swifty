@@ -151,27 +151,33 @@ pub fn write_lockout_sidecar(app: &AppHandle, json: &str) -> Result<()> {
     atomic_write_file(&lockout_sidecar_path(app)?, json)
 }
 
-// Durably overwrite `path`: write a temp sibling, fsync it, atomically rename it
-// over the target, then fsync the directory. The target ends up as either the
-// complete old bytes or the complete new bytes — never a truncated/empty file.
-// A leftover `<path>.tmp` (from a crash before the rename) is ignored by readers,
-// which only ever open the target path.
-pub fn atomic_write_file(path: &Path, data: &str) -> Result<()> {
+// Durably replace `path`: build a uniquely named temp sibling, fsync it,
+// atomically persist it over the target, then fsync the directory. The target
+// ends up as either the complete old bytes or the complete new bytes — never a
+// truncated/empty file. `write` is injected so failure after a partial temp
+// write is testable; dropping NamedTempFile removes that partial sibling.
+fn atomic_replace_with<F>(path: &Path, private: bool, write: F) -> Result<()>
+where
+    F: FnOnce(&mut fs::File) -> std::io::Result<()>,
+{
     let parent = path
         .parent()
-        .ok_or_else(|| Error::Other("sidecar path has no parent directory".into()))?;
+        .ok_or_else(|| Error::Other("destination has no parent directory".into()))?;
     fs::create_dir_all(parent)?;
 
-    let mut tmp = path.as_os_str().to_owned();
-    tmp.push(".tmp");
-    let tmp = PathBuf::from(tmp);
+    let mut temp = tempfile::NamedTempFile::new_in(parent)?;
+    #[cfg(unix)]
+    if private {
+        use std::os::unix::fs::PermissionsExt;
+        temp.as_file()
+            .set_permissions(fs::Permissions::from_mode(0o600))?;
+    }
+    #[cfg(not(unix))]
+    let _ = private;
 
-    let mut file = fs::File::create(&tmp)?;
-    file.write_all(data.as_bytes())?;
-    file.sync_all()?;
-    drop(file);
-
-    fs::rename(&tmp, path)?;
+    write(temp.as_file_mut())?;
+    temp.as_file().sync_all()?;
+    temp.persist(path).map_err(|e| e.error)?;
 
     // Persist the directory entry for the rename where the platform supports it
     // (opening a directory as a file fails on Windows — best-effort there).
@@ -179,6 +185,16 @@ pub fn atomic_write_file(path: &Path, data: &str) -> Result<()> {
         let _ = dir.sync_all();
     }
     Ok(())
+}
+
+/// Atomically write the UTF-8 sidecars that gate vault opening and lockout.
+pub fn atomic_write_file(path: &Path, data: &str) -> Result<()> {
+    atomic_replace_with(path, false, |file| file.write_all(data.as_bytes()))
+}
+
+/// Atomically replace a plaintext secret, owner-readable only on Unix.
+pub fn atomic_write_private(path: &Path, data: &[u8]) -> Result<()> {
+    atomic_replace_with(path, true, |file| file.write_all(data))
 }
 
 // Read a file as utf8, returning "" when it doesn't exist (legacy ensure-file).
@@ -299,8 +315,9 @@ pub fn ensure_migrated(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::atomic_write_file;
+    use super::{atomic_replace_with, atomic_write_file};
     use std::fs;
+    use std::io::{self, Write};
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -357,5 +374,20 @@ mod tests {
 
         // Reading the sidecar (the target path) is unaffected by the temp file.
         assert_eq!(fs::read_to_string(&path).unwrap(), "real");
+    }
+
+    #[test]
+    fn a_failed_replacement_keeps_the_complete_old_file() {
+        let path = tmp_sidecar();
+        fs::write(&path, "complete old bytes").unwrap();
+
+        let result = atomic_replace_with(&path, true, |temp| {
+            temp.write_all(b"partial new bytes")?;
+            Err(io::Error::new(io::ErrorKind::StorageFull, "disk full"))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "complete old bytes");
+        assert_eq!(fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
     }
 }
