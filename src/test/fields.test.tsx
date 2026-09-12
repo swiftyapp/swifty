@@ -618,11 +618,13 @@ describe('Identity read view', () => {
     expect(await screen.findByTestId('entry-value-doc_type')).toHaveTextContent('Passport')
   })
 
+  // The face captions the date "Expires", so the time left stands on its own
+  // line under it rather than repeating the word.
   it('says how long the document has left', async () => {
     vi.mocked(revealEntry).mockResolvedValue(document_(away(400)))
     renderWithStore(<Show entry={identityMeta()} />)
 
-    expect(await screen.findByText(/Expires in 1 year/)).toBeInTheDocument()
+    expect(await screen.findByText('in 1 year')).toBeInTheDocument()
   })
 
   it('says so once it has run out', async () => {
@@ -632,13 +634,13 @@ describe('Identity read view', () => {
     expect(await screen.findByText('Expired')).toBeInTheDocument()
   })
 
-  // The code is what the document prints and what the copy button hands over;
-  // the name beside it is decoration.
+  // The code is what the document prints and what a click copies; the face's
+  // header names the country in full beside the document's type.
   it('names the country beside its alpha-3 code', async () => {
     vi.mocked(revealEntry).mockResolvedValue(identityEntry())
     renderWithStore(<Show entry={identityMeta()} />)
 
     expect(await screen.findByTestId('entry-value-country')).toHaveTextContent('GBR')
-    expect(screen.getByText('· United Kingdom')).toBeInTheDocument()
+    expect(screen.getByText(/Passport · United Kingdom/)).toBeInTheDocument()
   })
 })

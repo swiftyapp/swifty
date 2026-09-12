@@ -7,6 +7,7 @@ import {
   NoteField,
   useFields
 } from '@/components/elements/fields'
+import { filled } from '@/components/elements/fields/formats'
 import { countryName } from '@/utils/countries'
 import {
   docTypeOf,
@@ -16,6 +17,7 @@ import {
   type DocType,
   type Row
 } from '../templates'
+import Face from '../Face'
 import DocTypeRow from './DocType'
 
 // The template's rows cut into bands wherever the group changes — holder,
@@ -46,11 +48,32 @@ export default function Fields() {
     for (const key of droppedKeys(docType, next)) set(key, '')
   }
 
-  // Reading, an empty field renders nothing at all — so a band with nothing in
-  // it must not leave its gutter and an empty block behind.
-  const rows = editing
-    ? TEMPLATES[docType]
-    : TEMPLATES[docType].filter(({ key }) => (entry[key] ?? '') !== '')
+  // Reading, the document is an object (see `Face`); the note it carries and
+  // any custom fields keep their rows beside and below it, as on a credit card.
+  if (!editing) {
+    const aside = filled(entry.note)
+    return (
+      <>
+        <div
+          className={
+            aside
+              ? 'grid grid-cols-1 items-start gap-3 md:grid-cols-[460px_minmax(0,1fr)]'
+              : undefined
+          }
+        >
+          <Face />
+          {aside && (
+            <Panel>
+              <NoteField label="Note" />
+            </Panel>
+          )}
+        </div>
+        <CustomFieldsField />
+      </>
+    )
+  }
+
+  const rows = TEMPLATES[docType]
 
   const row = ({ key, required }: Row) => {
     const spec = specOf(key)
@@ -83,13 +106,9 @@ export default function Fields() {
 
   return (
     <>
-      {/* Reading, the type is in the eyebrow (see Show/Read) — a line of its
-          own here would only say it twice. */}
-      {editing && (
-        <div className="mb-3">
-          <DocTypeRow value={docType} onChange={switchTo} />
-        </div>
-      )}
+      <div className="mb-3">
+        <DocTypeRow value={docType} onChange={switchTo} />
+      </div>
       <Panel>
         {bands(rows).map((band, index) => (
           <Fragment key={specOf(band[0].key).group}>
