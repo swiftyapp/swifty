@@ -8,6 +8,7 @@ import {
   useFields
 } from '@/components/elements/fields'
 import { filled } from '@/components/elements/fields/formats'
+import { FACE_ASIDE } from '@/components/elements/tokens'
 import { countryName } from '@/utils/countries'
 import {
   docTypeOf,
@@ -54,13 +55,7 @@ export default function Fields() {
     const aside = filled(entry.note)
     return (
       <>
-        <div
-          className={
-            aside
-              ? 'grid grid-cols-1 items-start gap-3 md:grid-cols-[460px_minmax(0,1fr)]'
-              : undefined
-          }
-        >
+        <div className={aside ? FACE_ASIDE : undefined}>
           <Face />
           {aside && (
             <Panel>
