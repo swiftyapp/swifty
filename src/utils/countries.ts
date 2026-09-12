@@ -50,6 +50,16 @@ const displayNames = (locale: string): Intl.DisplayNames | undefined => {
 }
 
 /**
+ * The ISO 3166-1 alpha-3 code this value *is*, normalized, or undefined when it
+ * is not one. The country fields are free text — "United Kingdom", a half-typed
+ * "GB", anything — so a caller that needs a real code has to be able to tell.
+ */
+export const countryCode = (value: string): string | undefined => {
+  const code = value.trim().toUpperCase()
+  return code in ALPHA2 ? code : undefined
+}
+
+/**
  * The localized country name for an alpha-3 code, or undefined for anything
  * that is not one — the field is free text, so most of what it holds is not a
  * code at all and gets no decoration.

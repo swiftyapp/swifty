@@ -1,7 +1,6 @@
-import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
-import { META_TYPE } from '@/components/elements/tokens'
-import { daysUntil, formatDate, relativeFuture } from '@/utils/time'
+import type { TKey } from '@/i18n'
+import { formatDate } from '@/utils/time'
 import { specOf, type IdentityKey } from '../templates'
 import Cell from './Cell'
 
@@ -18,6 +17,8 @@ interface Props {
   name: IdentityKey
   /** Drop the caption: the header prints the country code on its own. */
   bare?: boolean
+  /** A caption other than the field's own — the name reads as "Holder" here. */
+  label?: TKey
   ink?: string
   wrap?: boolean
   className?: string
@@ -26,36 +27,23 @@ interface Props {
 const DOTS = '•'.repeat(10)
 
 // One row of the template, printed on the face. The template's spec says what
-// the value is — a date, a secret, a date the document dies on — and this turns
-// that into how it shows, the same way the form's rows do for the editor.
-export default function DocCell({ doc, name, bare, ink, wrap, className }: Props) {
-  const { t } = useTranslation()
+// the value is — a date, a secret — and this turns that into how it shows, the
+// same way the form's rows do for the editor. How long the document has left is
+// not a cell: it belongs to the document rather than to any one of its dates,
+// so the face states it once, in the status beside the number.
+export default function DocCell({ doc, name, bare, label, ink, wrap, className }: Props) {
   const spec = specOf(name)
   const value = doc.value(name)
   if (!value) return null
 
   const masked = spec.secret && !doc.shown
-  const days = spec.expiry ? daysUntil(value) : null
-  const hint =
-    days === null ? undefined : (
-      <span
-        className={cx(
-          'mt-0.5 block',
-          META_TYPE,
-          days < 0 ? 'text-[#B3261E]' : 'text-(--face-ink2)'
-        )}
-      >
-        {days < 0 ? t('Expired') : relativeFuture(value)}
-      </span>
-    )
 
   return (
     <Cell
       name={name}
-      label={bare ? undefined : spec.label}
+      label={bare ? undefined : (label ?? spec.label)}
       value={value}
       display={masked ? DOTS : spec.date ? formatDate(value) : value}
-      hint={hint}
       ink={cx(ink ?? 'text-base', masked && 'text-(--face-ink2)')}
       wrap={wrap && !masked}
       className={className}

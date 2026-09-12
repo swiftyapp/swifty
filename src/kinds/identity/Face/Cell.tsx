@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
 import { cx } from '@/utils/cx'
@@ -6,8 +5,9 @@ import { useCopied } from '@/hooks/useCopied'
 import { CheckGlyph, CopyGlyph } from '@/components/Main/icons'
 
 // A face is a miniature, so its captions sit one step under the detail rows'
-// 11px label tier and are tracked a little tighter: "NATIONALITY" and
-// "PERSONAL NO." have to fit a third of the holder's column.
+// 11px label tier and are tracked a little tighter. A caption is also what makes
+// a field as wide as it is — "PERSONAL NO." is wider than any number under it —
+// so this size is what decides how many fields fit across a document.
 export const CAPTION = 'text-2xs uppercase tracking-[0.1em]'
 
 interface Props {
@@ -19,8 +19,6 @@ interface Props {
   value: string
   /** What is shown, when that differs: a date in the user's pattern, a mask. */
   display?: string
-  /** A small line under the value: how long a document has left. */
-  hint?: ReactNode
   /** The value line's type. The name and the number are the big ones. */
   ink?: string
   /** Wrap rather than truncate: a document number is never worth clipping. */
@@ -35,7 +33,6 @@ export default function Cell({
   label,
   value,
   display = value,
-  hint,
   ink = 'text-base',
   wrap,
   className
@@ -50,7 +47,7 @@ export default function Cell({
       title={t('Copy')}
       aria-label={label ? `${t(label)} · ${t('Copy')}` : t('Copy')}
       className={cx(
-        'group relative -mx-1.5 min-w-0 cursor-pointer rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-(--face-hover)',
+        'group relative -mx-1.5 -my-0.5 min-w-0 cursor-pointer rounded-sm px-1.5 py-0.5 text-left transition-colors hover:bg-(--face-hover)',
         className
       )}
     >
@@ -58,12 +55,11 @@ export default function Cell({
         <span className={`block truncate ${CAPTION} text-(--face-ink2)`}>{t(label)}</span>
       )}
       <span
-        className={cx('block min-w-0 leading-6', wrap ? 'break-all' : 'truncate', label && 'mt-0.5', ink)}
+        className={cx('block min-w-0 leading-tight', wrap ? 'break-all' : 'truncate', ink)}
         data-testid={`entry-value-${name}`}
       >
         {display}
       </span>
-      {hint}
       <span className="pointer-events-none absolute right-1 top-1 opacity-0 transition-opacity group-hover:opacity-50">
         <CopyGlyph size={12} />
       </span>
