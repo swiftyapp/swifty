@@ -15,6 +15,7 @@ import {
   ArchiveRestore,
   ArrowDownWideNarrow,
   AtSign,
+  Braces,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -140,6 +141,10 @@ export const IdentityGlyph = glyph(IdCard, 16)
 // An SSH key. A shell prompt rather than a key: the key glyph is already the
 // passkey's, and the login's is the globe — this has to read as neither.
 export const SshGlyph = glyph(Terminal, 16)
+// An env file. Braces rather than a document: the note already owns the page
+// glyph and the SSH key the prompt, and `{ }` is what a file of KEY=VALUE
+// lines is to the people who keep them — config, as code.
+export const EnvGlyph = glyph(Braces, 16)
 export const ScanGlyph = glyph(ScanLine, 16)
 export const ShieldGlyph = glyph(ShieldCheck, 16)
 export const GlobeGlyph = glyph(Globe, 16)

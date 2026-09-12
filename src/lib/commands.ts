@@ -12,7 +12,7 @@ import { cardBrandOf } from '@/utils/cardBrand'
 // Shared types
 // ---------------------------------------------------------------------------
 
-export type EntryType = 'login' | 'note' | 'card' | 'identity' | 'ssh'
+export type EntryType = 'login' | 'note' | 'card' | 'identity' | 'ssh' | 'env'
 
 // One free-form field on an entry: a label the user wrote and its value.
 export interface ExtraField {
@@ -116,7 +116,27 @@ export interface SshEntry extends BaseEntry {
   note: string
 }
 
-export type Entry = LoginEntry | NoteEntry | CardEntry | IdentityEntry | SshEntry
+// A `.env` file. The file text is the one secret and the canonical form; the
+// variables table the detail view shows is parsed from it at render time and
+// written back into it, so there is never a second copy to keep in step and
+// comments, blank lines and quoting round-trip untouched. `fileName` is the
+// name of the file that was dropped in (`.env.production`), empty when the
+// body was typed or pasted — it is not secret and is only kept so the file
+// can be handed back out under its own name.
+export interface EnvEntry extends BaseEntry {
+  type: 'env'
+  body: string // the file, verbatim
+  fileName: string
+  note: string
+}
+
+export type Entry =
+  | LoginEntry
+  | NoteEntry
+  | CardEntry
+  | IdentityEntry
+  | SshEntry
+  | EnvEntry
 
 export interface VaultData {
   entries: Entry[]

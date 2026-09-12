@@ -207,6 +207,8 @@ fn new_login(passkey: &Passkey) -> Entry {
         public_key: None,
         fingerprint: None,
         passphrase: None,
+        body: None,
+        file_name: None,
         tags: None,
         passkeys: Some(vec![passkey.clone()]),
         extra: None,

@@ -233,6 +233,7 @@ impl Cryptor {
             "card" => vec![&mut e.pin],
             "identity" => vec![&mut e.number, &mut e.personal_number],
             "ssh" => vec![&mut e.private_key, &mut e.passphrase],
+            "env" => vec![&mut e.body],
             _ => vec![],
         };
         for (i, slot) in slots.into_iter().enumerate() {
@@ -256,6 +257,8 @@ impl Cryptor {
             "card" => vec![&mut e.pin],
             "identity" => vec![&mut e.number, &mut e.personal_number],
             "ssh" => vec![&mut e.private_key, &mut e.passphrase],
+            // The whole file is the secret; its name is not.
+            "env" => vec![&mut e.body],
             _ => vec![],
         };
         for slot in slots {
@@ -279,6 +282,7 @@ fn sensitive_values(entry: &Entry) -> Vec<Option<&str>> {
         "card" => vec![entry.pin.as_deref()],
         "identity" => vec![entry.number.as_deref(), entry.personal_number.as_deref()],
         "ssh" => vec![entry.private_key.as_deref(), entry.passphrase.as_deref()],
+        "env" => vec![entry.body.as_deref()],
         _ => vec![],
     }
 }

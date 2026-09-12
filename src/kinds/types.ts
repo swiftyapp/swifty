@@ -34,7 +34,7 @@ export interface Kind {
   noMatchesLabel: TKey
   Glyph: Glyph
   /** Key into the `--color-kind-*` tokens (see styles/theme.css). */
-  tint: 'login' | 'card' | 'note' | 'identity' | 'ssh'
+  tint: 'login' | 'card' | 'note' | 'identity' | 'ssh' | 'env'
   /** The empty draft a new entry of this kind starts from. */
   defaults: EntryDraft
   /** Whether a draft carries the fields this kind requires to be saved. */
