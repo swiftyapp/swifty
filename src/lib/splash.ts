@@ -1,9 +1,12 @@
-// The startup splash lives as static markup in index.html (the mascot waking
-// up where the lock screen will draw it). Its animations are authored paused
-// so they start when the bundle is live — which is also when window.rs reveals
-// the window — instead of running unseen behind a hidden window. This starts
-// them and reports when the last one has ended, so the first React frame can
-// take over from the resting pose rather than mid-motion.
+// The startup splash lives as static markup in index.html: the mascot at rest
+// where the lock screen will draw it, with a wake-up choreography that only
+// applies once `splash-live` is on <html>. Gating it on the bundle means it
+// starts when the bundle is live — which is also when window.rs reveals the
+// window — instead of running unseen behind a hidden one, and that a bundle
+// which never runs leaves a whole mascot for window.rs's fallback reveal, not
+// a blank frame. This flips the gate and reports when the last animation has
+// ended, so the first React frame can take over from the resting pose rather
+// than mid-motion.
 
 const LAST = '[data-splash-last]'
 // The choreography ends around 1.4s; past this the app renders regardless, so

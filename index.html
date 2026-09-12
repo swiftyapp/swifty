@@ -52,12 +52,15 @@
       the ground glow and the column are AuthShell + Auth / LockScreen. Change
       those, mirror here.
 
-      The choreography is paused until main.tsx adds `splash-live` to <html>,
-      so it starts when the window is revealed rather than while it is still
-      hidden loading the bundle; main.tsx also holds the first React frame
-      until the last animation ends (see lib/splash.ts), so the lock screen
-      takes over from the resting pose, not mid-motion. Base styles are the
-      resting pose, which is what reduced-motion shows straight away.
+      The base styles are the resting pose, complete; the choreography only
+      applies once main.tsx adds `splash-live` to <html>. So it starts when
+      the bundle is live — which is also when window.rs reveals the window —
+      rather than playing unseen behind a hidden one, and main.tsx holds the
+      first React frame until the last animation ends (see lib/splash.ts), so
+      the lock screen takes over from the resting pose, not mid-motion. If the
+      bundle never runs (dev server down, a throwing script) window.rs's
+      fallback timer reveals this resting frame, a whole mascot rather than a
+      blank window; reduced-motion users get the same frame straight away.
     -->
     <style>
       .splash {
@@ -112,7 +115,6 @@
         height: 700px;
         transform: translate(-50%, -50%);
         background: radial-gradient(closest-side, var(--glow), transparent 70%);
-        animation: splash-glow 900ms ease-out both;
       }
 
       /* The lock screen's centered column (`my-auto`), with the mascot at its
@@ -135,57 +137,64 @@
         height: 96px;
       }
 
-      /* The whole body winds into place like a key turning: over-rotated and
-         small, springing back to rest while the spikes grow out of the hub. */
-      .splash-body {
+      /* Resting pose. Transform origins are set here, once, for the moves
+         below; the idle blink is part of the pose (the lock screen's mascot
+         blinks the same way), so it runs regardless. */
+      .splash-body,
+      .splash-hub,
+      .splash-spike path {
         transform-origin: 32px 32px;
-        animation: splash-wind 760ms var(--ease-spring) both;
       }
       .splash-ink {
         fill: var(--ink);
       }
-      .splash-hub {
-        transform-origin: 32px 32px;
+      .splash-blink,
+      .splash-eyes {
+        transform-origin: 32px 27px;
+      }
+      .splash-blink {
+        animation: blink 6.8s ease-in-out infinite;
+      }
+      .splash-eyes {
+        fill: var(--eye);
+      }
+
+      /* The choreography, live only once the bundle is (see the note above). */
+      html.splash-live .splash-glow {
+        animation: splash-glow 900ms ease-out both;
+      }
+      /* The whole body winds into place like a key turning: over-rotated and
+         small, springing back to rest while the spikes grow out of the hub. */
+      html.splash-live .splash-body {
+        animation: splash-wind 760ms var(--ease-spring) both;
+      }
+      html.splash-live .splash-hub {
         animation: splash-hub 460ms var(--ease-spring) both;
       }
       /* Each spike extends from the hub along its own axis; the wrapping <g>
          carries the rotation, so scaleY here is always "outward". Staggered
          clockwise from the top, so the growth sweeps around the hub. */
-      .splash-spike path {
-        transform-origin: 32px 32px;
+      html.splash-live .splash-spike path {
         animation: splash-spike 400ms var(--ease-spring) both;
       }
-      .splash-spike:nth-of-type(1) path { animation-delay: 100ms; }
-      .splash-spike:nth-of-type(2) path { animation-delay: 140ms; }
-      .splash-spike:nth-of-type(3) path { animation-delay: 180ms; }
-      .splash-spike:nth-of-type(4) path { animation-delay: 220ms; }
-      .splash-spike:nth-of-type(5) path { animation-delay: 260ms; }
-      .splash-spike:nth-of-type(6) path { animation-delay: 300ms; }
+      html.splash-live .splash-spike:nth-of-type(1) path { animation-delay: 100ms; }
+      html.splash-live .splash-spike:nth-of-type(2) path { animation-delay: 140ms; }
+      html.splash-live .splash-spike:nth-of-type(3) path { animation-delay: 180ms; }
+      html.splash-live .splash-spike:nth-of-type(4) path { animation-delay: 220ms; }
+      html.splash-live .splash-spike:nth-of-type(5) path { animation-delay: 260ms; }
+      html.splash-live .splash-spike:nth-of-type(6) path { animation-delay: 300ms; }
 
       /* The face, last: eyes open once the body has settled, glance around
          the room, and come to rest looking straight ahead — the lock screen's
          idle pose (gaze 0, ry 5, blink every 6.8s). Mascot.tsx nests them the
          same way: gaze translate → blink scale → eyes. */
-      .splash-gaze {
+      html.splash-live .splash-gaze {
         animation: splash-glance 480ms var(--ease-swift) 900ms both;
       }
-      .splash-blink {
-        transform-origin: 32px 27px;
-        animation: blink 6.8s ease-in-out infinite;
-      }
-      .splash-eyes {
-        fill: var(--eye);
-        transform-origin: 32px 27px;
+      html.splash-live .splash-eyes {
         animation: splash-wake 240ms var(--ease-spring) 660ms both;
       }
 
-      /* Held at the first frame until the bundle is live (see the note above). */
-      .splash * {
-        animation-play-state: paused;
-      }
-      html.splash-live .splash * {
-        animation-play-state: running;
-      }
       @media (prefers-reduced-motion: reduce) {
         .splash * {
           animation: none !important;
