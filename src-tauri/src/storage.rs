@@ -193,6 +193,7 @@ pub fn atomic_write_file(path: &Path, data: &str) -> Result<()> {
 }
 
 /// Atomically replace a plaintext secret, owner-readable only on Unix.
+#[cfg(desktop)]
 pub fn atomic_write_private(path: &Path, data: &[u8]) -> Result<()> {
     atomic_replace_with(path, true, |file| file.write_all(data))
 }
