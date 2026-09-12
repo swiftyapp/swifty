@@ -873,6 +873,21 @@ fn round_trip_generic_csv_env() {
     assert_eq!(back.entries[0].env_body.as_deref(), Some(ENV_BODY));
 }
 
+// A body whose first byte looks like a spreadsheet formula (an indented first
+// line, a `-`) is guarded on the way out and unguarded on the way back, so it
+// still round-trips byte for byte; a body that genuinely starts with `'` does
+// not lose it.
+#[test]
+fn round_trip_generic_csv_env_with_a_formula_looking_first_line() {
+    for body in ["\tA=1\nB=2\n", "-----\nA=1\n", "'quoted'=x\nA=1\n"] {
+        let mut e = env_entry();
+        e.env_body = Some(body.into());
+        let bytes = to_generic_csv(&[e.clone()]).unwrap();
+        let back = super::csv::GenericCsv.parse(&bytes);
+        assert_eq!(back.entries, vec![e], "{body:?}");
+    }
+}
+
 // Bitwarden has no item for a file, so an env entry goes out as a secure note
 // whose text is the file; the name and the entry's own note ride as custom
 // fields. One-way: it comes back as the note it looks like.

@@ -328,15 +328,22 @@ export const appendVars = (
   const texts = vars.map(
     ({ key, value }) => `${key}=${needsQuotes(value) ? encodeDouble(value) : value}`
   )
-  if (afterIndex !== undefined && afterIndex >= 0) {
-    const spliced = edit(body, (raws) => {
-      if (afterIndex < raws.length)
-        raws.splice(afterIndex + 1, 0, ...texts.map((t) => (eol === '\r\n' ? `${t}\r` : t)))
-    })
-    // Out of range, nothing was spliced and the round-trip is byte-identical,
-    // so the rows are appended at the end as they always have been.
-    if (spliced !== body) return spliced
+  const lines = parseEnv(body)
+  if (afterIndex !== undefined && afterIndex >= 0 && afterIndex < lines.length) {
+    const raws = lines.map((l) => l.raw)
+    const cr = eol === '\r\n'
+    const block = cr ? texts.map((t) => `${t}\r`) : [...texts]
+    // Inserting after the last line of a file with no final newline: the line
+    // before gains the `\r` its new `\n` needs, and the last new line goes
+    // without one, so the file keeps CRLF throughout and still no final newline.
+    if (cr && afterIndex === raws.length - 1) {
+      raws[afterIndex] += '\r'
+      block[block.length - 1] = texts[texts.length - 1]
+    }
+    raws.splice(afterIndex + 1, 0, ...block)
+    return raws.join('\n')
   }
+  // Out of range, or no index: at the end, as always.
   const block = texts.join(eol) + eol
   if (body === '') return block
   return body + (body.endsWith('\n') ? '' : eol) + block

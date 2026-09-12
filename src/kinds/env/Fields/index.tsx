@@ -6,7 +6,7 @@ import IconButton from '@/components/elements/IconButton'
 import { NoteField, useField } from '@/components/elements/fields'
 import { META } from '@/components/elements/tokens'
 import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
-import { parseEnv, varsOf } from '../parse'
+import { bandsOf, parseEnv, varsOf } from '../parse'
 import FileTab from './FileTab'
 import Table from './Table'
 
@@ -22,7 +22,14 @@ export default function Fields() {
   const { value: note } = useField('note')
   const [tab, setTab] = useState<Tab>('variables')
   const [showAll, setShowAll] = useState(false)
-  const count = useMemo(() => varsOf(parseEnv(body)).length, [body])
+  // Parsed once per body, here, for the count and the table both — not once
+  // per reveal, filter keystroke or pending-row keystroke, none of which
+  // change the file.
+  const { vars, bands } = useMemo(() => {
+    const lines = parseEnv(body)
+    return { vars: varsOf(lines), bands: bandsOf(lines) }
+  }, [body])
+  const count = vars.length
   const variables = tab === 'variables'
 
   // Leaving the Variables face takes its eye off screen, so a reveal-all left
@@ -67,7 +74,7 @@ export default function Fields() {
       {/* Read and edit are different subtrees (see Show), so the table — and
           with it which rows are revealed — is mounted fresh on every mode
           switch, as every other kind's field set is. */}
-      {variables ? <Table revealAll={showAll} /> : <FileTab />}
+      {variables ? <Table vars={vars} bands={bands} revealAll={showAll} /> : <FileTab />}
 
       {/* Reading, an empty note is no panel at all — like the card's aside. */}
       {(editing || note !== '') && (

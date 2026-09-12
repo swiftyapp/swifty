@@ -49,7 +49,12 @@ export default function EditRow({
   // line would stop being a variable and the row would vanish. So the box holds
   // it here, with the complaint under it, until it is one or the caret leaves;
   // the file only ever learns identifiers. Null: the box shows the file's key.
-  const [typed, setTyped] = useState<string | null>(null)
+  // Remembered against the key it was typed over: rows are keyed by line index,
+  // so when a removal above shifts the lines this row may be handed the next
+  // variable, and a draft typed over the old one must not be shown over it.
+  const [draft, setDraft] = useState<{ over: string; text: string } | null>(null)
+  const typed = draft?.over === row.key ? draft.text : null
+  const setTyped = (text: string | null) => setDraft(text === null ? null : { over: row.key, text })
   const key = typed ?? row.key
   const keyError =
     key === '' ? requiredError('', true, attempted) : isValidKey(key) ? '' : t('Not a valid name')
@@ -64,9 +69,10 @@ export default function EditRow({
 
   // Enter is inert in the editor (only ⌘⏎ saves), and a value is one line far
   // more often than not, so plain Enter goes to the next row like CustomFields'
-  // does; a newline inside a value is Shift+Enter.
+  // does; a newline inside a value is Shift+Enter. ⌘⏎ / Ctrl+⏎ is the save
+  // chord, heard on the document, and passes through untouched.
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== 'Enter' || event.shiftKey) return
+    if (event.key !== 'Enter' || event.shiftKey || event.metaKey || event.ctrlKey) return
     event.preventDefault()
     onAppend?.()
   }
@@ -80,10 +86,13 @@ export default function EditRow({
     onPaste(text)
   }
 
-  // Leaving the row with a half-typed key puts the file's key back: nothing
-  // was written, so nothing is lost, and the row does not sit there in red.
+  // Leaving a stored row with a half-typed key puts the file's key back: nothing
+  // was written, so nothing is lost, and the row does not sit there in red. A
+  // row the file does not have yet has no key to fall back on, so its draft
+  // stays put — dropping it would throw away the only copy of what was typed.
   const leave = (event: FocusEvent<HTMLDivElement>) => {
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+    if (row.key === '' && typed) return
     setTyped(null)
     onLeave?.()
   }

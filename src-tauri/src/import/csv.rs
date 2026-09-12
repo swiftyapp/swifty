@@ -72,21 +72,9 @@ fn read_rows(bytes: &[u8], result: &mut ImportResult) -> Option<Rows> {
     Some(Rows { headers, records })
 }
 
-// First non-empty cell whose header matches one of `aliases`.
-fn get(headers: &[String], rec: &StringRecord, aliases: &[&str]) -> Option<String> {
-    headers.iter().enumerate().find_map(|(idx, h)| {
-        if !aliases.contains(&h.as_str()) {
-            return None;
-        }
-        rec.get(idx)
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .map(String::from)
-    })
-}
-
-// The same lookup, untrimmed: a `.env` file's leading indent and trailing
-// newline are part of the file, and the entry promises to hand it back verbatim.
+// First non-empty cell whose header matches one of `aliases`, untrimmed: a
+// `.env` file's leading indent and trailing newline are part of the file, and
+// the entry promises to hand it back verbatim.
 fn get_verbatim(headers: &[String], rec: &StringRecord, aliases: &[&str]) -> Option<String> {
     headers.iter().enumerate().find_map(|(idx, h)| {
         if !aliases.contains(&h.as_str()) {
@@ -94,6 +82,13 @@ fn get_verbatim(headers: &[String], rec: &StringRecord, aliases: &[&str]) -> Opt
         }
         rec.get(idx).filter(|v| !v.is_empty()).map(String::from)
     })
+}
+
+// The same cell, trimmed — what every column but the file wants.
+fn get(headers: &[String], rec: &StringRecord, aliases: &[&str]) -> Option<String> {
+    get_verbatim(headers, rec, aliases)
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
 }
 
 fn tag_vec(group: Option<String>) -> Vec<String> {
@@ -133,7 +128,10 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
                 kind: EntryKind::Env,
                 title,
                 notes: get(&rows.headers, rec, NOTES),
-                env_body: get_verbatim(&rows.headers, rec, BODY),
+                // The exporter guards spreadsheets against a cell that starts
+                // like a formula; the file is not a cell, so the guard comes off.
+                env_body: get_verbatim(&rows.headers, rec, BODY)
+                    .map(|b| super::export::unsanitize_cell(&b)),
                 env_file_name: get(&rows.headers, rec, FILE_NAME),
                 ..Default::default()
             });

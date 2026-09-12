@@ -367,4 +367,20 @@ describe('appendVars', () => {
     expect(appendVars('A=1\r\n', vars)).toBe('A=1\r\nX=1\r\nY=2\r\n')
     expect(appendVars('A=1\n', [])).toBe('A=1\n')
   })
+
+  it('keeps CRLF throughout when inserting after the last line of an unterminated file', () => {
+    expect(appendVar('A=1\r\nB=2', 'X', 'y', 1)).toBe('A=1\r\nB=2\r\nX=y')
+    expect(
+      appendVars(
+        'A=1\r\nB=2',
+        [
+          { key: 'X', value: 'y' },
+          { key: 'Z', value: 'w' }
+        ],
+        1
+      )
+    ).toBe('A=1\r\nB=2\r\nX=y\r\nZ=w')
+    // With a final newline the last raw is the blank, so nothing special happens.
+    expect(appendVar('A=1\r\nB=2\r\n', 'X', 'y', 1)).toBe('A=1\r\nB=2\r\nX=y\r\n')
+  })
 })

@@ -503,10 +503,27 @@ pub fn to_generic_csv(entries: &[ImportedEntry]) -> csv::Result<Vec<u8>> {
 /// start a formula (`= + - @`) or a leading tab/CR is prefixed with a single
 /// quote so a spreadsheet treats it as text. See OWASP "CSV Injection".
 pub fn sanitize_cell(cell: &str) -> String {
-    match cell.chars().next() {
-        Some('=') | Some('+') | Some('-') | Some('@') | Some('\t') | Some('\r') => {
-            format!("'{cell}")
-        }
+    if starts_like_a_formula(cell) {
+        format!("'{cell}")
+    } else {
+        cell.to_string()
+    }
+}
+
+/// The inverse, for the one column read back verbatim (an env file's body):
+/// the apostrophe `sanitize_cell` put in front of a formula-looking first
+/// character comes off again, and only that one — a body that really starts
+/// with `'` is left alone, since `'=` could only have come from the guard.
+pub fn unsanitize_cell(cell: &str) -> String {
+    match cell.strip_prefix('\'') {
+        Some(rest) if starts_like_a_formula(rest) => rest.to_string(),
         _ => cell.to_string(),
     }
+}
+
+fn starts_like_a_formula(cell: &str) -> bool {
+    matches!(
+        cell.chars().next(),
+        Some('=') | Some('+') | Some('-') | Some('@') | Some('\t') | Some('\r')
+    )
 }

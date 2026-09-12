@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FieldsProvider } from '@/components/elements/fields'
+import { BLOCK_DOTS, MASK_DOTS } from '@/components/elements/tokens'
 import type { DraftValue, EntryDraft } from '@/defaults/entries'
 import { copy } from '@/services/copy'
 import Fields from '@/kinds/env/Fields'
@@ -38,7 +39,7 @@ const LONG = [
   ''
 ].join('\n')
 
-const DOTS = '•'.repeat(12)
+const DOTS = MASK_DOTS
 
 const draft = (body: string): EntryDraft => ({ type: 'env', title: 'api · production', body, note: '' })
 
@@ -149,7 +150,7 @@ describe('Env fields, reading', () => {
     renderRead()
     await userEvent.click(screen.getByTestId('env-tab-file'))
 
-    expect(screen.getByTestId('entry-value-body')).toHaveTextContent('•'.repeat(24))
+    expect(screen.getByTestId('entry-value-body')).toHaveTextContent(BLOCK_DOTS)
     expect(screen.queryByTestId('env-reveal-all')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('reveal-body'))

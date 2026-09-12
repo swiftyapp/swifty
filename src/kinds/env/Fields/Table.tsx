@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import AddAction from '@/components/elements/AddAction'
 import Panel from '@/components/elements/Panel'
@@ -7,13 +7,12 @@ import { requiredError } from '@/components/elements/fields/formats'
 import {
   appendVar,
   appendVars,
-  bandsOf,
-  isValidKey,
   parseEnv,
   removeLine,
   setKey,
   setValue,
   varsOf,
+  type EnvBand,
   type EnvVar
 } from '../parse'
 import Band from './Band'
@@ -50,22 +49,28 @@ interface Pending {
 // Reading, a row is masked until its eye (or the panel's) is pressed and the
 // value is a click-to-copy target; editing, the pair is two boxes and every
 // keystroke rewrites just that line of the file.
-export default function Table({ revealAll }: { revealAll: boolean }) {
+interface Props {
+  /** Parsed by `Fields` once per body; the table is a view over them. */
+  vars: EnvVar[]
+  bands: EnvBand[]
+  revealAll: boolean
+}
+
+export default function Table({ vars, bands, revealAll }: Props) {
   const { t } = useTranslation()
   const { value: body, set, editing, attempted } = useField('body')
-  // Parsed once per body, not once per reveal, filter keystroke or pending-row
-  // keystroke — none of which change the file.
-  const { vars, bands } = useMemo(() => {
-    const lines = parseEnv(body)
-    return { vars: varsOf(lines), bands: bandsOf(lines) }
-  }, [body])
 
   const [revealed, setRevealed] = useState<Set<number>>(new Set())
   const [query, setQuery] = useState('')
   const [pending, setPending] = useState<Pending | null>(null)
-  // The row that should hold the caret after the next render: the one a
-  // pending row just became, so typing carries straight on into it.
+  // The row that should hold the caret on the next render: the one a pending
+  // row just became, so typing carries straight on into it. Spent as soon as
+  // it has been rendered, or a filter re-mounting that row later would pull
+  // the caret back into it.
   const [focus, setFocus] = useState<number | null>(null)
+  useEffect(() => {
+    if (focus !== null) setFocus(null)
+  }, [focus])
 
   const toggle = (index: number) =>
     setRevealed(prev => {
@@ -76,9 +81,9 @@ export default function Table({ revealAll }: { revealAll: boolean }) {
 
   // Every write to the file drops the row being added: its `after` is a line
   // index, and a removal above it would leave it pointing at the wrong line.
-  const write = (next: string) => {
+  const write = (next: string, focusAt: number | null = null) => {
     set(next)
-    setFocus(null)
+    setFocus(focusAt)
     setPending(null)
   }
 
@@ -107,15 +112,20 @@ export default function Table({ revealAll }: { revealAll: boolean }) {
   for (const v of vars) if (!firstOf.has(v.key)) firstOf.set(v.key, v.index)
   const errorOf = (v: EnvVar) => (firstOf.get(v.key) !== v.index ? t('Duplicate key') : '')
 
-  const start = (after: number | undefined) => setPending({ after, key: '', value: '' })
+  // One row at a time: a second press while one is being filled would throw
+  // away what was typed, so it goes to the row already there.
+  const start = (after: number | undefined) => {
+    if (pending?.value) return
+    setPending({ after, key: '', value: '' })
+  }
 
+  // `EditRow` hands over identifiers only, so a key here is either '' or one.
   const update = (next: Pending) => {
-    if (!isValidKey(next.key)) return setPending(next)
+    if (next.key === '') return setPending(next)
     const written = appendVar(body, next.key, next.value, next.after)
-    write(written)
     // Appended at the end of the file, the new line is its last variable.
     const added = varsOf(parseEnv(written))
-    setFocus(next.after === undefined ? (added[added.length - 1]?.index ?? null) : next.after + 1)
+    write(written, next.after === undefined ? (added[added.length - 1]?.index ?? null) : next.after + 1)
   }
 
   // A pasted block goes in as rows, in order, after this one.
