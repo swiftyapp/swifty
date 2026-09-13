@@ -222,6 +222,30 @@ describe('restoring from Google Drive', () => {
     await waitFor(() => expect(store.getState().flow.name).toBe('main'))
   })
 
+  // Once the unlock is running, the account it runs against is spoken for:
+  // switching it, or leaving for a file, is not offered until it settles.
+  it('withdraws account switching while the unlock is running', async () => {
+    let finish: (result: { entries: never[]; syncConfigured: boolean }) => void = () => {}
+    vi.mocked(setupRestoreFromDrive).mockImplementationOnce(
+      () => new Promise(resolve => {
+        finish = resolve
+      })
+    )
+    const { store } = renderWithStore(<Start />)
+    await openDrive()
+    await act(async () => setupDriveProbed(REMOTE))
+    expect(screen.getByTestId('drive-switch-account')).toBeInTheDocument()
+
+    await userEvent.type(screen.getByTestId('drive-password-input'), STRONG)
+    await userEvent.click(screen.getByTestId('drive-unlock-button'))
+
+    expect(screen.queryByTestId('drive-switch-account')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('drive-use-file')).not.toBeInTheDocument()
+
+    await act(async () => finish({ entries: [], syncConfigured: true }))
+    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+  })
+
   it('names the password as the problem when the pack will not open', async () => {
     vi.mocked(setupRestoreFromDrive).mockRejectedValueOnce('invalid master password')
     const { store } = renderWithStore(<Start />)

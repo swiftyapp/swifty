@@ -58,7 +58,10 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
       })
   }
 
-  const links = (
+  // Withdrawn while the unlock runs: the restore has already taken the account
+  // it is restoring from, and the backend would refuse a switch anyway — so the
+  // offer is not made, rather than made and then declined.
+  const links = busy ? null : (
     <div className={`${FOOTNOTE} flex items-center justify-center gap-4`}>
       <TextLink testid="drive-switch-account" onClick={switchDriveAccount}>
         {t('Switch account')}

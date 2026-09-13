@@ -228,6 +228,14 @@ pub fn write_gdrive(app: &AppHandle, data: &str) -> Result<()> {
     write_file(&gdrive_path(app)?, data)
 }
 
+// Remove the token file, whatever state a failed write left it in. Absent is
+// fine: this is the rollback of a first-run setup, where "no file" is the goal.
+pub fn remove_gdrive(app: &AppHandle) {
+    if let Ok(path) = gdrive_path(app) {
+        let _ = fs::remove_file(path);
+    }
+}
+
 // The recorded gate marker, or `None` when biometric unlock is not enabled.
 // Enrollment decides the gate once; every later retrieval reads it back from
 // here rather than re-probing what the platform would do today.

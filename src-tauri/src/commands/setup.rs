@@ -50,6 +50,7 @@ const SETUP_BUSY: &str = "another setup step is still running";
 #[tauri::command]
 pub async fn setup_drive_connect(app: AppHandle) -> Result<()> {
     guard_no_vault(&app)?;
+    ensure_idle(&app.state::<AppState>())?;
     let attempt = begin_attempt(&app.state::<AppState>());
     let _ = app.emit(PENDING_EVENT, ());
 
@@ -74,6 +75,7 @@ pub async fn setup_drive_connect(app: AppHandle) -> Result<()> {
 #[tauri::command]
 pub fn setup_drive_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     guard_no_vault(&app)?;
+    ensure_idle(&state)?;
     begin_attempt(&state);
     crate::commands::sync::start_consent(&app, &state, crate::state::AuthPurpose::Setup)
 }
@@ -101,6 +103,7 @@ pub(crate) async fn on_consent(app: &AppHandle, code: &str, verifier: &str) {
 /// would land in `pending_drive` after the user had already moved on.
 #[tauri::command]
 pub fn setup_drive_disconnect(state: State<'_, AppState>) -> Result<()> {
+    ensure_idle(&state)?;
     take_pending(&state);
     abandon_attempt(&state);
     // On mobile the half-finished consent is a record, not a thread: dropping
@@ -321,7 +324,9 @@ fn adopt(
 /// Undo `create_vault` / `restore_from_pack`: remove the database (with its
 /// WAL siblings) and the KDF sidecar, in that order — a sidecar without a
 /// database is harmless, a database without its sidecar reads as "wrong
-/// password" forever.
+/// password" forever. The token file goes too: the write that failed may have
+/// left part of one behind, sealed under a key that no longer exists, and a
+/// non-empty file there is what `sync_configured` reads as "syncing".
 fn discard_fresh_vault(app: &AppHandle) {
     if let Ok(path) = storage::db_path(app) {
         storage::remove_db_files(&path);
@@ -329,6 +334,21 @@ fn discard_fresh_vault(app: &AppHandle) {
     if let Ok(path) = storage::kdf_sidecar_path(app) {
         let _ = std::fs::remove_file(path);
     }
+    storage::remove_gdrive(app);
+}
+
+/// Refuse to touch the pending account while a create or restore is using it.
+///
+/// A restore clones the tokens before its network and Argon2 work, so a
+/// disconnect (or a fresh connect) landing mid-way could not stop it — it
+/// would finish and seal the vault to the account the user had just left.
+/// The step already excludes other steps; this excludes the account changing
+/// under one.
+fn ensure_idle(state: &AppState) -> Result<()> {
+    if state.setup_busy.load(Ordering::SeqCst) {
+        return Err(Error::Other(SETUP_BUSY.into()));
+    }
+    Ok(())
 }
 
 /// Hold `setup_busy` for the length of one create or restore.
@@ -466,6 +486,24 @@ mod tests {
         }
         drop(step);
         assert!(begin_step(&state).is_ok());
+    }
+
+    // While a create or restore holds the account, nothing may swap it out
+    // from under it — a disconnect then would not stop the restore, only make
+    // it finish against an account the user thought they had left.
+    #[test]
+    fn the_account_cannot_change_while_a_step_is_using_it() {
+        let state = AppState::default();
+        assert!(ensure_idle(&state).is_ok());
+
+        let step = begin_step(&state).unwrap();
+        match ensure_idle(&state) {
+            Err(Error::Other(why)) => assert_eq!(why, SETUP_BUSY),
+            other => panic!("{other:?}"),
+        }
+
+        drop(step);
+        assert!(ensure_idle(&state).is_ok());
     }
 
     // A consent the user backed out of comes back stale: `report` compares the
