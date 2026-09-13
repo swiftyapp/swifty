@@ -26,11 +26,11 @@ use crate::models::Entry;
 use envelope::{Link, ShareKey, SHARE_TTL_MS};
 use remote::{
     DriveShareRemote, PublicFetch, ShareFile, ShareRemote, PROP_ENTRY_ID, PROP_EXPIRES_AT,
-    PROP_KIND,
+    PROP_KIND, PROP_SHARE, PROP_SHARE_VALUE,
 };
 
 /// A freshly published share, as the send dialog needs it.
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Created {
     /// The whole share in one pasteable token. Never persisted anywhere.
@@ -54,17 +54,20 @@ pub struct ActiveShare {
 
 /// Seal `entry` and publish it, returning the link that opens it.
 pub fn create(remote: &impl ShareRemote, entry: &Entry, now_ms: i64) -> Result<Created> {
+    envelope::check_shareable(entry)?;
     let key = ShareKey::generate();
-    let sealed = envelope::seal(&key, entry)?;
+    let expires_ms = envelope::expires_at(now_ms);
+    let sealed = envelope::seal(&key, entry, expires_ms)?;
 
     // Read off the caller's entry, not the sealed copy: `seal` sanitizes the id
     // away, and this property is precisely what lets the sender's own list name
-    // a share that carries no title.
-    let expires_ms = envelope::expires_at(now_ms);
+    // a share that carries no title. The marker property is how every share is
+    // found again, whichever folder it landed in.
     let file_id = remote.upload(
         &file_name(),
         &sealed,
         &[
+            (PROP_SHARE, PROP_SHARE_VALUE),
             (PROP_ENTRY_ID, entry.id.as_str()),
             (PROP_KIND, entry.kind.as_str()),
             (PROP_EXPIRES_AT, &expires_ms.to_string()),
@@ -90,11 +93,13 @@ pub fn create(remote: &impl ShareRemote, entry: &Entry, now_ms: i64) -> Result<C
     })
 }
 
-/// Turn a link into the entry it carries. The recipient's whole side of this.
-pub fn open(fetch: &impl PublicFetch, link: &str) -> Result<Entry> {
+/// Turn a link into the entry it carries. The recipient's whole side of this:
+/// the result is already sanitized and checked against `now_ms`, so the
+/// frontend can hand it straight to the ordinary new-entry save.
+pub fn open(fetch: &impl PublicFetch, link: &str, now_ms: i64) -> Result<Entry> {
     let link = Link::parse(link)?;
     let sealed = fetch.download(&link.file_id)?;
-    envelope::unseal(&link.key, &sealed)
+    envelope::unseal(&link.key, &sealed, now_ms)
 }
 
 /// Delete one share now, whatever its expiry. The link stops working.

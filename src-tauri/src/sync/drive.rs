@@ -61,18 +61,44 @@ async fn check(resp: reqwest::Response) -> Result<Value> {
 
 // Run a files.list query and return *every* match.
 async fn find_all(client: &Client, token: &str, q: &str) -> Result<Vec<DriveFile>> {
-    let resp = client
-        .get(FILES)
-        .bearer_auth(token)
-        .query(&[("q", q), ("fields", LIST_FIELDS)])
-        .send()
-        .await
-        .map_err(other)?;
-    let data = check(resp).await?;
-    Ok(data["files"]
+    // Drive pages the listing whenever it likes, not only past `pageSize`, so
+    // one request is never the whole answer: a share left on a later page would
+    // be invisible to both the sweep and the revoke list.
+    let mut files = Vec::new();
+    let mut page_token: Option<String> = None;
+    loop {
+        let mut query = vec![("q", q), ("fields", LIST_FIELDS), ("pageSize", "100")];
+        if let Some(token) = &page_token {
+            query.push(("pageToken", token));
+        }
+        let resp = client
+            .get(FILES)
+            .bearer_auth(token)
+            .query(&query)
+            .send()
+            .await
+            .map_err(other)?;
+        let (page, next) = parse_listing(&check(resp).await?);
+        files.extend(page);
+        match next {
+            Some(next) => page_token = Some(next),
+            None => return Ok(files),
+        }
+    }
+}
+
+/// One page of a `files.list` response: its files and the token for the next
+/// page, if Drive says there is one.
+fn parse_listing(data: &Value) -> (Vec<DriveFile>, Option<String>) {
+    let files = data["files"]
         .as_array()
         .map(|files| files.iter().filter_map(parse_file).collect())
-        .unwrap_or_default())
+        .unwrap_or_default();
+    let next = data["nextPageToken"]
+        .as_str()
+        .filter(|t| !t.is_empty())
+        .map(String::from);
+    (files, next)
 }
 
 fn parse_file(value: &Value) -> Option<DriveFile> {
@@ -144,9 +170,21 @@ pub async fn folder_id_in(
     Ok(oldest(find_all(client, token, &q).await?).map(|f| f.id))
 }
 
-/// Every non-trashed file directly under `parent`.
-pub async fn list_children(client: &Client, token: &str, parent: &str) -> Result<Vec<DriveFile>> {
-    let q = format!("'{}' in parents and trashed = false", escape(parent));
+/// Every non-trashed file this app can see that carries `key = value` in its
+/// `appProperties`, wherever it sits. Addressing by marker rather than by
+/// folder is what makes a listing complete when two devices raced to create
+/// the same folder and each uploaded into its own.
+pub async fn find_by_app_property(
+    client: &Client,
+    token: &str,
+    key: &str,
+    value: &str,
+) -> Result<Vec<DriveFile>> {
+    let q = format!(
+        "appProperties has {{ key='{}' and value='{}' }} and trashed = false",
+        escape(key),
+        escape(value)
+    );
     find_all(client, token, &q).await
 }
 
@@ -314,15 +352,28 @@ pub(crate) const SHARE_GONE: &str = "this share has expired or was revoked";
 /// Download a link-shared file with only an API key — the recipient side, which
 /// has no Google account and therefore no bearer token. The key identifies the
 /// calling project for quota; it grants nothing on its own.
-pub async fn download_public(client: &Client, api_key: &str, id: &str) -> Result<Vec<u8>> {
-    let resp = client
+pub(crate) const SHARE_TOO_LARGE: &str = "this share is larger than Swifty allows";
+
+/// Fetch a link-shared file with no account, refusing anything over
+/// `max_bytes`.
+///
+/// The id comes out of a pasted link, so it can name any public Drive file at
+/// all — the cap is checked against the declared length first and then
+/// enforced while streaming, so a body that lies about its size still cannot
+/// be buffered whole before the ciphertext is even looked at.
+pub async fn download_public(
+    client: &Client,
+    api_key: &str,
+    id: &str,
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
+    let mut resp = client
         .get(format!("{FILES}/{id}"))
         .query(&[("alt", "media"), ("key", api_key)])
         .send()
         .await
         .map_err(other)?;
     let status = resp.status();
-    let body = resp.bytes().await.map_err(other)?;
     if status == reqwest::StatusCode::NOT_FOUND {
         // The only two ways a share the recipient was given disappears, and
         // Drive cannot tell them apart — nor could the recipient act on the
@@ -330,12 +381,30 @@ pub async fn download_public(client: &Client, api_key: &str, id: &str) -> Result
         return Err(Error::Other(SHARE_GONE.into()));
     }
     if !status.is_success() {
+        let body = read_capped(&mut resp, max_bytes).await.unwrap_or_default();
         return Err(Error::Other(format!(
             "Drive API {status}: {}",
             String::from_utf8_lossy(&body)
         )));
     }
-    Ok(body.to_vec())
+    if resp
+        .content_length()
+        .is_some_and(|len| len > max_bytes as u64)
+    {
+        return Err(Error::Other(SHARE_TOO_LARGE.into()));
+    }
+    read_capped(&mut resp, max_bytes).await
+}
+
+async fn read_capped(resp: &mut reqwest::Response, max_bytes: usize) -> Result<Vec<u8>> {
+    let mut body = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(other)? {
+        if body.len() + chunk.len() > max_bytes {
+            return Err(Error::Other(SHARE_TOO_LARGE.into()));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
 }
 
 /// Overwrite a file's content, returning its new head revision.
@@ -363,7 +432,9 @@ pub async fn update_file(
 
 #[cfg(test)]
 mod tests {
-    use super::{escape, multipart_body, oldest, parse_file, parse_properties, DriveFile};
+    use super::{
+        escape, multipart_body, oldest, parse_file, parse_listing, parse_properties, DriveFile,
+    };
     use serde_json::json;
 
     #[test]
@@ -400,6 +471,24 @@ mod tests {
         let b = file("bbb", "2024-01-01T00:00:00.000Z");
         assert_eq!(oldest(vec![b.clone(), a.clone()]), Some(a.clone()));
         assert_eq!(oldest(vec![a, b]).unwrap().id, "aaa");
+    }
+
+    #[test]
+    fn a_listing_page_yields_its_files_and_the_next_token() {
+        let (files, next) = parse_listing(&serde_json::json!({
+            "nextPageToken": "page-2",
+            "files": [{"id": "a", "createdTime": "2024-01-01T00:00:00.000Z"}]
+        }));
+        assert_eq!(files.len(), 1);
+        assert_eq!(next.as_deref(), Some("page-2"));
+
+        let (files, next) = parse_listing(&serde_json::json!({"files": []}));
+        assert!(files.is_empty());
+        assert_eq!(next, None);
+
+        // An empty token is Drive's way of saying "last page" too.
+        let (_, next) = parse_listing(&serde_json::json!({"nextPageToken": "", "files": []}));
+        assert_eq!(next, None);
     }
 
     #[test]

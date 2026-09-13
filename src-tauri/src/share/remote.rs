@@ -28,6 +28,19 @@ pub const SHARES_FOLDER: &str = "Shares";
 pub const PROP_ENTRY_ID: &str = "entryId";
 pub const PROP_KIND: &str = "kind";
 pub const PROP_EXPIRES_AT: &str = "expiresAt";
+/// The marker every share carries, and the only thing a listing selects on:
+/// shares are found by it wherever they sit, so a duplicate `Shares` folder
+/// created by a racing device hides nothing from the sweep or the revoke list.
+pub const PROP_SHARE: &str = "swiftyShare";
+pub const PROP_SHARE_VALUE: &str = "1";
+
+/// The most a share file may be. An entry is a few kilobytes; an `.env` file
+/// a few hundred at the outside. The id in a pasted link can name any public
+/// file on Drive, so the recipient never buffers more than this.
+pub const MAX_SHARE_BYTES: usize = 2 * 1024 * 1024;
+
+/// How long the recipient waits on Drive before giving up.
+const FETCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// One outstanding share, as the sender's UI sees it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -171,10 +184,8 @@ impl ShareRemote for DriveShareRemote {
         block_on(async {
             let client = http_client();
             let token = self.token(&client).await?;
-            let Some(folder) = self.find_folder(&client, &token).await? else {
-                return Ok(Vec::new());
-            };
-            let files = drive::list_children(&client, &token, &folder).await?;
+            let files =
+                drive::find_by_app_property(&client, &token, PROP_SHARE, PROP_SHARE_VALUE).await?;
             Ok(files.iter().map(parse_share_file).collect())
         })
     }
@@ -188,8 +199,14 @@ impl PublicFetch for DrivePublicFetch {
     fn download(&self, file_id: &str) -> Result<Vec<u8>> {
         let key = api_key()?;
         block_on(async {
-            let client = http_client();
-            drive::download_public(&client, &key, file_id).await
+            // Not the shared client: this request is made on a stranger's
+            // say-so, so it gets a deadline the account-bound calls do not.
+            crate::sync::install_crypto_provider();
+            let client = Client::builder()
+                .timeout(FETCH_TIMEOUT)
+                .build()
+                .map_err(|e| Error::Other(e.to_string()))?;
+            drive::download_public(&client, &key, file_id, MAX_SHARE_BYTES).await
         })
     }
 }
@@ -302,12 +319,17 @@ impl ShareRemote for FakeShareRemote {
         Ok(())
     }
 
+    // Selects on the marker exactly as the real listing does, so a caller that
+    // forgets to set it finds out here.
     fn list(&self) -> Result<Vec<ShareFile>> {
         Ok(self
             .files
             .lock()
             .unwrap()
             .iter()
+            .filter(|(_, file)| {
+                file.properties.get(PROP_SHARE).map(String::as_str) == Some(PROP_SHARE_VALUE)
+            })
             .map(|(id, file)| ShareFile {
                 id: id.clone(),
                 entry_id: file.properties.get(PROP_ENTRY_ID).cloned(),
@@ -394,16 +416,23 @@ mod tests {
             .upload(
                 "share.swshare",
                 b"sealed",
-                &[(PROP_ENTRY_ID, "entry-1"), (PROP_KIND, "login")],
+                &[
+                    (PROP_SHARE, PROP_SHARE_VALUE),
+                    (PROP_ENTRY_ID, "entry-1"),
+                    (PROP_KIND, "login"),
+                ],
             )
             .unwrap();
+        // Uploaded without the marker: present, but not a share to the listing.
+        remote.upload("stray.bin", b"x", &[]).unwrap();
 
         let listed = remote.list().unwrap();
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].id, id);
         assert_eq!(listed[0].entry_id.as_deref(), Some("entry-1"));
         assert_eq!(listed[0].kind.as_deref(), Some("login"));
-        assert_eq!(remote.ids(), vec![id]);
+        // Both files are held; only one is a share.
+        assert_eq!(remote.ids().len(), 2);
     }
 
     #[test]
