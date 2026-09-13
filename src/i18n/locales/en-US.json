@@ -436,7 +436,7 @@
   "{{count}} secret field included_one": "{{count}} secret field included",
   "{{count}} secret field included_other": "{{count}} secret fields included",
   "Shared links": "Shared links",
-  "One-time links you have sent out": "One-time links you have sent out",
+  "Links you have sent out, until they expire or you revoke them": "Links you have sent out, until they expire or you revoke them",
   "Show": "Show",
   "No active links": "No active links",
   "Deleted entry": "Deleted entry",

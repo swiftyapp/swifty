@@ -95,7 +95,7 @@ export default function SharesRow() {
   return (
     <ExpandableRow
       label={t('Shared links')}
-      description={t('One-time links you have sent out')}
+      description={t('Links you have sent out, until they expire or you revoke them')}
       action={t('Show')}
       testid="settings-shares-row"
     >

@@ -519,7 +519,7 @@ export const syncStatus = (): Promise<SyncStatus> => invoke('sync_status')
 // ---------------------------------------------------------------------------
 
 /**
- * One-time credential sharing. The entry is sealed here and uploaded to the
+ * Credential sharing. The entry is sealed here and uploaded to the
  * sender's own Drive; the key travels in the link and never reaches Google, so
  * the file is ciphertext to everyone but whoever holds the link.
  */

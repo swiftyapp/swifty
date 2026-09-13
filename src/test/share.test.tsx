@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { act } from 'react'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
@@ -16,11 +17,20 @@ import {
   shareRevoke,
   shareList,
   copyToClipboard,
-  saveEntry
+  saveEntry,
+  type Entry,
+  type ShareCreated
 } from '@/lib/commands'
-import { renderWithStore, withEntries, loginMeta } from './utils'
+import { DEFAULT_CLIPBOARD_TIMEOUT } from '@/defaults/clipboard'
+import { renderWithStore, withEntries, loginMeta, deferred } from './utils'
 
 const LINK = 'swifty://share#v1.file-1.a2V5LTFrZXktMWtleS0xa2V5LTFrZXktMWtleS0xa2V5'
+
+const created = (fileId: string): ShareCreated => ({
+  link: `swifty://share#v1.${fileId}.a2V5`,
+  fileId,
+  expiresAt: '2024-01-02T00:00:00.000Z'
+})
 
 const seed = ({ connected = true } = {}) => {
   const store = makeStore()
@@ -63,17 +73,39 @@ describe('sharing an entry', () => {
     expect(screen.getByText('Expires in 24 hours')).toBeInTheDocument()
   })
 
-  it('copies the link without arming the clipboard auto-clear', async () => {
+  it('copies the link under the clipboard timeout the user chose', async () => {
     renderWithStore(<Main />, { store: seed() })
     openSend('l1')
     await screen.findByTestId('share-link')
 
     await userEvent.click(screen.getByTestId('share-copy-button'))
 
-    // One argument: a link is copied to be pasted into a messenger, so unlike a
-    // secret it must not be wiped out from under the user.
-    expect(copyToClipboard).toHaveBeenCalledWith(LINK)
+    // The link opens the entry for anyone holding it, so it leaves the
+    // clipboard on the same timer as the secrets it stands in for.
+    expect(copyToClipboard).toHaveBeenCalledWith(LINK, DEFAULT_CLIPBOARD_TIMEOUT)
     expect(screen.getByTestId('share-copy-button')).toHaveTextContent('Copied')
+  })
+
+  it('shows the link of the entry being shared, and takes back the one nobody saw', async () => {
+    const first = deferred<ShareCreated>()
+    const second = deferred<ShareCreated>()
+    vi.mocked(shareCreate)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+    renderWithStore(<Main />, { store: seed() })
+
+    openSend('l1')
+    await screen.findByTestId('share-send-loading')
+    act(() => openSend('l2'))
+    await act(async () => second.resolve(created('file-b')))
+    // The first seal lands last, on a dialog that has moved to another entry.
+    await act(async () => first.resolve(created('file-a')))
+
+    expect(screen.getByTestId('share-link')).toHaveValue(created('file-b').link)
+    // Its link was never on screen and never will be, so the file it points at
+    // must not be left sitting in the sender's Drive for 24 hours.
+    await vi.waitFor(() => expect(shareRevoke).toHaveBeenCalledWith('file-a'))
+    expect(shareRevoke).toHaveBeenCalledTimes(1)
   })
 
   it('revokes the link and closes', async () => {
@@ -99,6 +131,39 @@ describe('sharing an entry', () => {
     )
     await userEvent.click(screen.getByTestId('share-retry-button'))
     expect(await screen.findByTestId('share-link')).toHaveValue(LINK)
+  })
+
+  it('says why a passkey-only login cannot be shared, and offers the way out', async () => {
+    const refusal = 'a login whose only secret is a passkey cannot be shared'
+    vi.mocked(shareCreate).mockRejectedValueOnce(refusal)
+    renderWithStore(<Main />, { store: seed() })
+
+    openSend('l1')
+
+    expect(await screen.findByTestId('share-send-error')).toHaveTextContent(refusal)
+    expect(screen.getByTestId('share-close-button')).toBeInTheDocument()
+    expect(screen.queryByTestId('share-link')).not.toBeInTheDocument()
+  })
+
+  it('retries the revoke that failed rather than sealing a second link', async () => {
+    vi.mocked(shareRevoke).mockRejectedValueOnce('drive is unreachable')
+    renderWithStore(<Main />, { store: seed() })
+    openSend('l1')
+    await screen.findByTestId('share-link')
+
+    await userEvent.click(screen.getByTestId('share-revoke-button'))
+    expect(await screen.findByTestId('share-send-error')).toHaveTextContent('drive is unreachable')
+    // The link is still live, so it is still on screen — with the way to take
+    // it back still under it.
+    expect(screen.getByTestId('share-link')).toHaveValue(LINK)
+
+    await userEvent.click(screen.getByTestId('share-revoke-button'))
+
+    expect(shareRevoke).toHaveBeenCalledTimes(2)
+    // A second seal would have published a second link while the first was
+    // still out there.
+    expect(shareCreate).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('share-send-modal')).not.toBeInTheDocument()
   })
 
   it('is offered from the detail header of a live entry', async () => {
@@ -181,6 +246,57 @@ describe('receiving a shared entry', () => {
       expect(useStore.getState().share.receiveOpen).toBe(false)
       expect(useStore.getState().entries.current?.title).toBe('Shared Netflix')
     })
+  })
+
+  it('keeps nothing of the last link once the dialog is closed', async () => {
+    renderWithStore(<Main />, { store: seed() })
+    await paste()
+    await screen.findByTestId('share-preview')
+
+    await userEvent.click(screen.getByTestId('share-cancel-button'))
+    act(() => openReceive())
+
+    // Someone else's secret does not sit in memory behind a closed dialog, and
+    // reopening asks the one question this dialog is for.
+    const input = await screen.findByTestId('share-link-input')
+    expect(input).toHaveValue('')
+    expect(screen.queryByTestId('share-preview')).not.toBeInTheDocument()
+    expect(screen.getByTestId('share-open-button')).toBeInTheDocument()
+  })
+
+  it('takes the secret and none of the sender claims about it', async () => {
+    vi.mocked(shareOpen).mockResolvedValueOnce({
+      id: 'existing-id',
+      type: 'login',
+      title: 'Shared Netflix',
+      website: 'https://netflix.com',
+      username: 'shared@example.com',
+      password: 'from-a-friend',
+      email: '',
+      note: '',
+      otp: '',
+      createdAt: '2019-01-01T00:00:00.000Z',
+      updatedAt: '2019-01-01T00:00:00.000Z',
+      password_updated_at: '2019-01-01T00:00:00.000Z',
+      favorite: true,
+      passkeys: [{ id: 'pk1', rpId: 'netflix.com' }]
+    } as unknown as Entry)
+    renderWithStore(<Main />, { store: seed() })
+    await paste()
+    await screen.findByTestId('share-preview')
+
+    await userEvent.click(screen.getByTestId('share-add-button'))
+
+    const saved = vi.mocked(saveEntry).mock.calls[0][0] as unknown as Record<string, unknown>
+    expect(saved.password).toBe('from-a-friend')
+    // An id chosen by the sender is an id that could name a row already here.
+    expect(saved.id).toEqual(expect.any(String))
+    expect(saved.id).not.toBe('existing-id')
+    expect(saved.id).not.toBe('')
+    expect(saved.favorite).toBeFalsy()
+    expect(saved).not.toHaveProperty('passkeys')
+    expect(saved).not.toHaveProperty('password_updated_at')
+    expect(saved.createdAt).not.toBe('2019-01-01T00:00:00.000Z')
   })
 })
 

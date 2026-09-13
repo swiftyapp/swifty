@@ -9,11 +9,14 @@ import type { Send } from './useSend'
 export default function LinkPanel({ send }: { send: Send }) {
   const { t } = useTranslation()
 
-  if (send.error)
+  // Nothing was published, so there is nothing to show but the reason and the
+  // two ways out of it. Retrying here is retrying the seal, which is the only
+  // thing that failed.
+  if (send.failed?.op === 'create')
     return (
       <div className="mt-5">
         <p data-testid="share-send-error" className="text-base text-bad">
-          {send.error}
+          {send.failed.message}
         </p>
         <div className="mt-5 flex items-center gap-2">
           <Button size="md" loading={send.busy} onClick={send.create} testid="share-retry-button">
@@ -83,6 +86,14 @@ export default function LinkPanel({ send }: { send: Send }) {
           {t('Close')}
         </Button>
       </div>
+
+      {/* A revoke that failed leaves the link live, so the link stays on screen
+          and the button that failed is the button that tries again. */}
+      {send.failed?.op === 'revoke' && (
+        <p data-testid="share-send-error" className="mt-2 text-base text-bad">
+          {send.failed.message}
+        </p>
+      )}
     </div>
   )
 }
