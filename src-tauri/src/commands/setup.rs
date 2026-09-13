@@ -11,6 +11,8 @@
 //! frontend can render "waiting for the browser" while the flow is out. Exactly
 //! one of [`PROBED_EVENT`] / [`ERROR_EVENT`] follows every [`PENDING_EVENT`].
 
+use std::sync::atomic::Ordering;
+
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -34,6 +36,7 @@ const ERROR_EVENT: &str = "setup:drive:error";
 const NOT_CONNECTED: &str = "connect a Google account first";
 const NO_REMOTE_VAULT: &str = "this Google account has no Swifty data to restore";
 const ALREADY_SET_UP: &str = "this device is already set up";
+const SETUP_BUSY: &str = "another setup step is still running";
 
 // --- connect ---------------------------------------------------------------
 
@@ -47,6 +50,7 @@ const ALREADY_SET_UP: &str = "this device is already set up";
 #[tauri::command]
 pub async fn setup_drive_connect(app: AppHandle) -> Result<()> {
     guard_no_vault(&app)?;
+    let attempt = begin_attempt(&app.state::<AppState>());
     let _ = app.emit(PENDING_EVENT, ());
 
     let handle = app.clone();
@@ -60,7 +64,7 @@ pub async fn setup_drive_connect(app: AppHandle) -> Result<()> {
     .await
     .map_err(|e| Error::Other(e.to_string()))?;
 
-    report(&app, probed);
+    report(&app, attempt, probed);
     Ok(())
 }
 
@@ -70,13 +74,17 @@ pub async fn setup_drive_connect(app: AppHandle) -> Result<()> {
 #[tauri::command]
 pub fn setup_drive_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     guard_no_vault(&app)?;
+    begin_attempt(&state);
     crate::commands::sync::start_consent(&app, &state, crate::state::AuthPurpose::Setup)
 }
 
 /// Mobile, second half: redeem the code the deep-link handler accepted, then
-/// probe — reported through the same two events as desktop.
+/// probe — reported through the same two events as desktop. The redirect was
+/// matched against `pending_auth`, which a disconnect clears, so an attempt
+/// that gets this far is still the current one.
 #[cfg(mobile)]
 pub(crate) async fn on_consent(app: &AppHandle, code: &str, verifier: &str) {
+    let attempt = current_attempt(&app.state::<AppState>());
     let probed = match sync::exchange_for_tokens(app, code, verifier).await {
         Ok(mut tokens) => {
             let file = probe(app, &mut tokens).await;
@@ -84,14 +92,29 @@ pub(crate) async fn on_consent(app: &AppHandle, code: &str, verifier: &str) {
         }
         Err(e) => Err(e),
     };
-    report(app, probed);
+    report(app, attempt, probed);
 }
 
 /// Forget the connected account. "Go back" and "switch account" are the same
-/// thing to the backend: nothing was written, so nothing needs undoing.
+/// thing to the backend: nothing was written, so nothing needs undoing — but a
+/// consent still out with the browser has to be disowned too, or its tokens
+/// would land in `pending_drive` after the user had already moved on.
 #[tauri::command]
 pub fn setup_drive_disconnect(state: State<'_, AppState>) -> Result<()> {
     take_pending(&state);
+    abandon_attempt(&state);
+    // On mobile the half-finished consent is a record, not a thread: dropping
+    // it makes the redirect, if it ever comes, a stranger the handler ignores.
+    #[cfg(mobile)]
+    {
+        let mut pending = state.pending_auth.lock().unwrap();
+        if pending
+            .as_ref()
+            .is_some_and(|p| p.purpose == crate::state::AuthPurpose::Setup)
+        {
+            *pending = None;
+        }
+    }
     Ok(())
 }
 
@@ -108,7 +131,15 @@ async fn probe(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Option<Pack
 
 /// The one ending for a connect attempt, so the frontend always hears exactly
 /// one answer and the pending tokens only ever survive a success.
-fn report(app: &AppHandle, probed: Result<(sync::Tokens, Option<PackInfo>)>) {
+///
+/// An attempt the user has since backed out of (or replaced) hears nothing
+/// and keeps nothing: adopting its account now would silently connect a
+/// fresh vault to a sign-in the user thought they had cancelled.
+fn report(app: &AppHandle, attempt: u64, probed: Result<(sync::Tokens, Option<PackInfo>)>) {
+    if current_attempt(&app.state::<AppState>()) != attempt {
+        log::info!("drive setup: dropping a consent the user already abandoned");
+        return;
+    }
     match probed {
         Ok((tokens, file)) => {
             *app.state::<AppState>().pending_drive.lock().unwrap() = Some(tokens);
@@ -145,6 +176,7 @@ pub async fn setup_restore_from_drive(
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
     guard_no_vault(&app)?;
+    let _step = begin_step(&state)?;
     let mut tokens = peek_pending(&state)?;
 
     let bytes = download(&app, &mut tokens).await?;
@@ -153,18 +185,7 @@ pub async fn setup_restore_from_drive(
     *state.pending_drive.lock().unwrap() = Some(tokens.clone());
 
     let (key, store) = restore_off_thread(&app, bytes, password).await?;
-
-    // Only now is there a key to seal the credentials under — the whole reason
-    // they were carried in memory to this point.
-    sync::persist_tokens(&app, &key.cryptor(), &tokens)?;
-    let entries = list_metas(&store)?;
-    state.session.lock().unwrap().set(key, store, true);
-    take_pending(&state);
-
-    Ok(UnlockResult {
-        entries,
-        sync_configured: true,
-    })
+    adopt(&app, &state, key, store, Some(&tokens))
 }
 
 /// Fetch the account's pack, re-locating it rather than trusting the id the
@@ -211,6 +232,7 @@ pub async fn setup_create(
     // `create_vault` writes a fresh KDF sidecar before it opens the database,
     // so running it over an existing vault would leave that vault unopenable.
     guard_no_vault(&app)?;
+    let _step = begin_step(&state)?;
     let mut tokens = state.pending_drive.lock().unwrap().clone();
 
     // Before the vault is created, not after: if Drive refuses, the user is
@@ -223,24 +245,7 @@ pub async fn setup_create(
     }
 
     let (key, store) = create_off_thread(&app, password).await?;
-    let sync_configured = match &tokens {
-        Some(tokens) => {
-            sync::persist_tokens(&app, &key.cryptor(), tokens)?;
-            true
-        }
-        None => false,
-    };
-    state
-        .session
-        .lock()
-        .unwrap()
-        .set(key, store, sync_configured);
-    take_pending(&state);
-
-    Ok(UnlockResult {
-        entries: Vec::new(),
-        sync_configured,
-    })
+    adopt(&app, &state, key, store, tokens.as_ref())
 }
 
 /// Move the account's existing pack aside, if it has one. Nothing up there is
@@ -263,6 +268,104 @@ async fn create_off_thread(app: &AppHandle, password: String) -> Result<(VaultKe
 }
 
 // --- shared ----------------------------------------------------------------
+
+/// Make a vault that has just landed on disk this device's: seal the pending
+/// account under its key, open the session, forget the pending copy.
+///
+/// All or nothing. The vault is already committed when this runs, so a failure
+/// here — the token file not writing, the store not listing — would otherwise
+/// leave a vault on disk with no session behind it and `guard_no_vault`
+/// refusing every retry: an install the user can neither finish nor start
+/// over. Removing what was just written puts them back on a fresh install,
+/// where the retry is one press away. (The remote pack an archive already
+/// renamed stays renamed; nothing about that is lost.)
+fn adopt(
+    app: &AppHandle,
+    state: &AppState,
+    key: VaultKey,
+    store: SqliteStore,
+    tokens: Option<&sync::Tokens>,
+) -> Result<UnlockResult> {
+    // Metadata first, tokens last: nothing else is written until the one read
+    // that could fail has succeeded, so a failure here leaves no token file
+    // sealed under a key that is about to be discarded.
+    let installed = list_metas(&store).and_then(|entries| {
+        if let Some(tokens) = tokens {
+            sync::persist_tokens(app, &key.cryptor(), tokens)?;
+        }
+        Ok(entries)
+    });
+    match installed {
+        Ok(entries) => {
+            let sync_configured = tokens.is_some();
+            state
+                .session
+                .lock()
+                .unwrap()
+                .set(key, store, sync_configured);
+            take_pending(state);
+            Ok(UnlockResult {
+                entries,
+                sync_configured,
+            })
+        }
+        Err(e) => {
+            // The connection has to close before its files can go.
+            drop(store);
+            discard_fresh_vault(app);
+            Err(e)
+        }
+    }
+}
+
+/// Undo `create_vault` / `restore_from_pack`: remove the database (with its
+/// WAL siblings) and the KDF sidecar, in that order — a sidecar without a
+/// database is harmless, a database without its sidecar reads as "wrong
+/// password" forever.
+fn discard_fresh_vault(app: &AppHandle) {
+    if let Ok(path) = storage::db_path(app) {
+        storage::remove_db_files(&path);
+    }
+    if let Ok(path) = storage::kdf_sidecar_path(app) {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+/// Hold `setup_busy` for the length of one create or restore.
+///
+/// `guard_no_vault` looks before the write; this makes sure nothing else
+/// writes in between. Two overlapping requests would each write their own
+/// KDF sidecar and database, and whichever finished second would pair a
+/// database with the other's descriptor — a vault nobody's password opens.
+struct SetupStep<'a>(&'a AppState);
+
+fn begin_step(state: &AppState) -> Result<SetupStep<'_>> {
+    state
+        .setup_busy
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .map_err(|_| Error::Other(SETUP_BUSY.into()))?;
+    Ok(SetupStep(state))
+}
+
+impl Drop for SetupStep<'_> {
+    fn drop(&mut self) {
+        self.0.setup_busy.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Start a connect attempt; the number identifies it to [`report`].
+fn begin_attempt(state: &AppState) -> u64 {
+    state.setup_attempt.fetch_add(1, Ordering::SeqCst) + 1
+}
+
+/// Disown whatever attempt is in flight: its `report` will find itself stale.
+fn abandon_attempt(state: &AppState) {
+    state.setup_attempt.fetch_add(1, Ordering::SeqCst);
+}
+
+fn current_attempt(state: &AppState) -> u64 {
+    state.setup_attempt.load(Ordering::SeqCst)
+}
 
 /// Onboarding only. A device that already holds a vault has other routes to
 /// Drive (`sync_connect`, `sync_import`), and every one of them merges rather
@@ -348,6 +451,38 @@ mod tests {
             take_pending(&state).unwrap().access_token.as_deref(),
             Some("second")
         );
+    }
+
+    // Two creates (or a create and a restore) cannot both be writing the vault:
+    // the second is turned away, and the way is clear again once the first is
+    // done — however it ended.
+    #[test]
+    fn only_one_setup_step_writes_at_a_time() {
+        let state = AppState::default();
+        let step = begin_step(&state).unwrap();
+        match begin_step(&state) {
+            Err(Error::Other(why)) => assert_eq!(why, SETUP_BUSY),
+            other => panic!("{:?}", other.map(|_| ())),
+        }
+        drop(step);
+        assert!(begin_step(&state).is_ok());
+    }
+
+    // A consent the user backed out of comes back stale: `report` compares the
+    // number it was started with against the current one.
+    #[test]
+    fn backing_out_disowns_the_attempt_in_flight() {
+        let state = AppState::default();
+        let attempt = begin_attempt(&state);
+        assert_eq!(current_attempt(&state), attempt);
+
+        abandon_attempt(&state);
+        assert_ne!(current_attempt(&state), attempt);
+
+        // ...and the next connect is its own attempt, distinct from both.
+        let next = begin_attempt(&state);
+        assert_ne!(next, attempt);
+        assert_eq!(current_attempt(&state), next);
     }
 
     // The event names are the frontend's contract, and a probe always names the

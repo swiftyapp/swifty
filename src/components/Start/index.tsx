@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import {
   biometryType,
-  isBiometricAvailable,
+  canEnrollBiometric,
   type BiometryType,
   type UnlockResult
 } from '@/lib/commands'
@@ -63,11 +63,13 @@ export function Start() {
   /**
    * An open session, and one question left. Asking for biometrics costs two
    * probes, so it is only asked where it can be offered; everywhere else this
-   * is simply the way in.
+   * is simply the way in. "Can be offered" is whether enrolling would work —
+   * not `isBiometricAvailable`, which also asks whether it already *has* been,
+   * and so is false on every fresh install by definition.
    */
   const finish = useCallback(async (unlocked: UnlockResult) => {
     const [available, type] = await Promise.all([
-      isBiometricAvailable().catch(() => false),
+      canEnrollBiometric().catch(() => false),
       biometryType().catch(() => 'touch' as const)
     ])
     if (!available) return enterMain(unlocked)
@@ -139,7 +141,13 @@ export function Start() {
             setDriveLinked(true)
             go('password')
           }}
-          onUseFile={() => go('file')}
+          onUseFile={() => {
+            // Restoring from a file is leaving this account behind: the tokens
+            // it holds would otherwise outlive the flow in the backend's memory.
+            forgetDrive()
+            setDriveLinked(false)
+            go('file')
+          }}
           onRestored={finish}
         />
       )

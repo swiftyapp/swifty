@@ -115,6 +115,7 @@ pub fn run() {
             commands::auth::lock,
             commands::auth::unlock_biometric,
             commands::auth::is_biometric_available,
+            commands::auth::can_enroll_biometric,
             commands::auth::biometry_type,
             commands::auth::biometric_status,
             commands::auth::enable_biometric,

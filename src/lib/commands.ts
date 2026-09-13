@@ -271,6 +271,12 @@ export const unlockBiometric = (): Promise<UnlockResult> =>
 export const isBiometricAvailable = (): Promise<boolean> =>
   invoke('is_biometric_available')
 
+// Whether enrolling would work on this device (gated store + hardware), before
+// anyone has enrolled. `isBiometricAvailable` also demands an enrollment, so on
+// a fresh install it can only ever say no — this is the question onboarding asks.
+export const canEnrollBiometric = (): Promise<boolean> =>
+  invoke('can_enroll_biometric')
+
 // Which biometry this device gates with, straight from the OS (Apple reads
 // `LAContext.biometryType`; everywhere else a fingerprint is the only kind
 // there has ever been). The platform alone cannot answer it — iPhones and Touch

@@ -1,4 +1,4 @@
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Mutex;
 
 use crate::crypto::{Cryptor, PayloadCipher, VaultKey};
@@ -124,6 +124,16 @@ pub struct AppState {
     /// produces a key to write them under (or the user backs out, which drops
     /// them). Outside `session` because there is no session to put them in.
     pub pending_drive: Mutex<Option<crate::sync::Tokens>>,
+    /// A first-run create or restore is writing the vault. Same shape as
+    /// `syncing`: the check for "no vault yet" and the writes that follow it
+    /// are not one step, so two overlapping requests could both pass the check
+    /// and interleave a database with the other's KDF sidecar.
+    pub setup_busy: AtomicBool,
+    /// Which first-run Drive connect is current. Bumped when one starts and
+    /// again when the user backs out, so a consent that completes after it was
+    /// abandoned can tell it is stale and drop its tokens instead of adopting
+    /// an account the user already walked away from.
+    pub setup_attempt: AtomicU64,
     #[cfg(mobile)]
     pub pending_auth: Mutex<Option<PendingAuth>>,
 }

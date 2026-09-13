@@ -263,6 +263,15 @@ pub fn is_biometric_available(app: AppHandle) -> Result<bool> {
         && storage::biometric_enrolled(&app))
 }
 
+// Whether `enable_biometric` could succeed here: the platform has a gated
+// store and the hardware is present. Enrollment is deliberately not part of
+// it — this is what first-run onboarding asks before *offering* enrollment,
+// where `is_biometric_available` would always say no.
+#[tauri::command]
+pub fn can_enroll_biometric() -> Result<bool> {
+    Ok(secure_store::is_supported() && biometrics::is_available())
+}
+
 // Which biometry this device gates with — "face", "touch" or "none" — so the UI
 // can name it instead of guessing from the platform (a Touch ID iPad is not
 // Face ID). Hardware only: `is_biometric_available` still says whether the user

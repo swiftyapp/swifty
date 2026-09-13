@@ -7,7 +7,7 @@ import {
   setupDriveConnect,
   setupDriveDisconnect,
   setupRestoreFromDrive,
-  isBiometricAvailable,
+  canEnrollBiometric,
   enableBiometric,
   pickBackup,
   importBackup,
@@ -223,6 +223,33 @@ describe('restoring from Google Drive', () => {
     expect(store.getState().setup.drive).toEqual({ status: 'idle', file: null, error: null })
     expect(screen.getByTestId('start-setup-button')).toBeInTheDocument()
   })
+
+  // Switching to a backup file is leaving the account behind too — the tokens
+  // must not sit in the backend for a flow that will never use them.
+  it('forgets the account when the user switches to a backup file', async () => {
+    renderWithStore(<Start />)
+    await openDrive()
+    await act(async () => setupDriveProbed(REMOTE))
+
+    await userEvent.click(screen.getByTestId('drive-use-file'))
+
+    expect(setupDriveDisconnect).toHaveBeenCalledOnce()
+    expect(screen.getByTestId('restore-dropzone')).toBeInTheDocument()
+  })
+
+  // Only the backend's own verdict blames the password; a failure before the
+  // password was ever checked is shown as what it was.
+  it('shows a non-password failure as itself', async () => {
+    vi.mocked(setupRestoreFromDrive).mockRejectedValueOnce('sync file is truncated')
+    renderWithStore(<Start />)
+    await openDrive()
+    await act(async () => setupDriveProbed(REMOTE))
+
+    await userEvent.type(screen.getByTestId('drive-password-input'), STRONG)
+    await userEvent.click(screen.getByTestId('drive-unlock-button'))
+
+    expect(await screen.findByText('sync file is truncated')).toBeInTheDocument()
+  })
 })
 
 describe('restoring from a backup file', () => {
@@ -247,7 +274,7 @@ describe('restoring from a backup file', () => {
 
 describe('the biometric step', () => {
   const reachBiometric = async () => {
-    vi.mocked(isBiometricAvailable).mockResolvedValue(true)
+    vi.mocked(canEnrollBiometric).mockResolvedValue(true)
     const rendered = renderWithStore(<Start />)
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
@@ -256,7 +283,7 @@ describe('the biometric step', () => {
   }
 
   it('is only offered where the device has a gate to offer', async () => {
-    vi.mocked(isBiometricAvailable).mockResolvedValue(false)
+    vi.mocked(canEnrollBiometric).mockResolvedValue(false)
     const { store } = renderWithStore(<Start />)
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
