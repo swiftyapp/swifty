@@ -31,10 +31,12 @@ dependencies, and tools contained in the `swiftyapp/swifty` repository.
   $ git remote add upstream https://github.com/swiftyapp/swifty.git
   $ git fetch upstream
   ```
+  * Install dependencies with:
+  `bun install`
   * Start app in development with:
-  `bozon start`
+  `bun run tauri:dev`
   * Run Tests with:
-  `yarn test`
+  `bun run test`
   * To keep your development environment organized, create local branches to hold your work. These should be branched directly off of the master branch.
   ```
   $ git checkout -b my-branch -t upstream/master
@@ -49,7 +51,8 @@ dependencies, and tools contained in the `swiftyapp/swifty` repository.
   ```
   * Before submitting your changes in a pull request, always run the full test suite. To run the tests:
   ```
-  yarn test
+  bun run test
+  cd src-tauri && cargo test
   ```
 
   * If a change starts something in one call and finishes it in another (a browser hand-off, a staged file, a background run), treat the in-between as a value with a lifecycle, not a flag: give it an identity that the finishing side has to prove, a way to expire, and a teardown that runs on *every* exit, ideally a `Drop`. The backend owns it and announces each transition; the frontend mirrors, never guesses. List the states and every way out of each in the PR description, and give each exit a test — "happy path plus cancel" is where these bugs hide.

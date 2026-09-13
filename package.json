@@ -23,6 +23,7 @@
     "icons": "bun run scripts/icons.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
+    "tauri:dev:fresh": "SWIFTY_DB_DIR=\"${SWIFTY_DB_DIR:-${TMPDIR:-/tmp}/swifty-fresh-$$}\" tauri dev",
     "tauri:build": "tauri build"
   },
   "dependencies": {

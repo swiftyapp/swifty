@@ -76,8 +76,10 @@ Swifty is built with [Tauri 2](https://v2.tauri.app) (Rust backend + TypeScript/
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org) 22 (what `.nvmrc` and CI pin; 20.19 or newer also
-  works — ESLint 10 requires `^20.19.0 || ^22.13.0 || >=24`)
+- [Bun](https://bun.sh) 1.3.3 or newer (what CI pins) — the package manager and
+  script runner for this repo; `bun.lock` is the committed lockfile
+- [Node.js](https://nodejs.org) 22 (what `.nvmrc` and CI pin) — only the E2E
+  suite needs it, since WebdriverIO runs under Node
 - [Rust](https://rustup.rs) (stable toolchain)
 - Platform build dependencies for Tauri — see the
   [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/)
@@ -88,15 +90,29 @@ Swifty is built with [Tauri 2](https://v2.tauri.app) (Rust backend + TypeScript/
 ```bash
 git clone git@github.com:swiftyapp/swifty.git
 cd swifty
-npm install
+bun install
 
-npm run tauri:dev     # run the app in development
-npm run tauri:build   # produce a signed, packaged build for the current OS
+bun run tauri:dev     # run the app in development
+bun run tauri:build   # produce a signed, packaged build for the current OS
 
-npm run build         # build the frontend only (tsc + vite)
-npm test              # frontend unit tests (Vitest)
+bun run tauri:dev:fresh   # same, against a throwaway data dir (first-run flows)
+
+bun run build         # build the frontend only (tsc + vite)
+bun run test          # frontend unit tests (Vitest)
 cd src-tauri && cargo test   # backend tests
 ```
+
+Run the scripts with `bun run <name>`, not `bun <name>`: bare `bun test` starts
+Bun's own test runner instead of the Vitest suite this repo is written against.
+
+`tauri:dev:fresh` points `SWIFTY_DB_DIR` at a **new** temp directory each run, so
+the app finds no vault there and starts at the setup/restore screen every time.
+Your real dev vault is left untouched — `bun run tauri:dev` goes back to it.
+
+Setting `SWIFTY_DB_DIR` yourself overrides that and keeps the same directory
+across runs, which is how you set a throwaway vault up once and then relaunch
+into its unlock screen. Nothing here ever deletes a data directory; to start
+that one over, remove it yourself.
 
 ## Configuration
 
@@ -169,7 +185,7 @@ Release builds are signed for `tauri-plugin-updater`. The public key lives in
 `src-tauri/tauri.conf.json`; the matching **private key is never committed** and
 is provided to CI via the `TAURI_SIGNING_PRIVATE_KEY` (and
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) secrets. Generate a keypair with
-`npm run tauri signer generate -- -w ~/.swifty/updater.key`.
+`bun run tauri signer generate -w ~/.swifty/updater.key`.
 
 ## Security
 
