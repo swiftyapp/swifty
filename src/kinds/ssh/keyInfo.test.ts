@@ -70,6 +70,11 @@ describe('privateKeyFormat', () => {
   it('reads the format off the BEGIN line', () => {
     expect(privateKeyFormat('-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END')).toBe('OPENSSH')
     expect(privateKeyFormat('-----BEGIN RSA PRIVATE KEY-----')).toBe('RSA')
+    expect(privateKeyFormat('\n  -----BEGIN EC PRIVATE KEY-----\n')).toBe('EC')
     expect(privateKeyFormat('not a key')).toBe('')
+  })
+
+  it('names no format for armor that is not on the first line', () => {
+    expect(privateKeyFormat('my key:\n-----BEGIN OPENSSH PRIVATE KEY-----')).toBe('')
   })
 })

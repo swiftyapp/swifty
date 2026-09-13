@@ -85,6 +85,10 @@ export const parsePublicKey = (line: string): PublicKeyInfo => {
 export const keyLabel = ({ type, bits }: PublicKeyInfo, separator = ' '): string =>
   [type, bits].filter(Boolean).join(separator)
 
-/** What sits between BEGIN and PRIVATE KEY — "OPENSSH", "RSA", "EC" — or ''. */
+/**
+ * What sits between BEGIN and PRIVATE KEY — "OPENSSH", "RSA", "EC" — or ''.
+ * Anchored to the first line, the same test the sealed block applies before it
+ * treats the value as armored, so the two never disagree about one key.
+ */
 export const privateKeyFormat = (block: string): string =>
-  /-----BEGIN (.+?) PRIVATE KEY-----/.exec(block)?.[1] ?? ''
+  /^-----BEGIN (.+?) PRIVATE KEY-----/.exec(block.trim())?.[1] ?? ''

@@ -22,10 +22,22 @@ const decode = (base64: string): Uint8Array | null => {
   }
 }
 
-// `+--[title]--+`: the title centred on the 17-wide board, as ssh-keygen sets it.
+// The bracketed title, made to fit the board the way ssh-keygen does: a
+// "[type size]" too wide for it falls back to "[type]" — "[ED25519-CERT 256]"
+// becomes "[ED25519-CERT]" — and a name too long even for that is cut to the
+// board, which is all the border was ever going to say.
+const fit = (title: string): string => {
+  if (!title) return ''
+  const full = `[${title}]`
+  if (full.length <= WIDTH) return full
+  const short = `[${title.split(' ')[0]}]`
+  return short.length <= WIDTH ? short : short.slice(0, WIDTH)
+}
+
+// `+--[title]--+`: a title no wider than the board, centred on it.
 const border = (title: string): string => {
   const lead = Math.floor((WIDTH - title.length) / 2)
-  return `+${'-'.repeat(lead)}${title}${'-'.repeat(Math.max(WIDTH - lead - title.length, 0))}+`
+  return `+${'-'.repeat(lead)}${title}${'-'.repeat(WIDTH - lead - title.length)}+`
 }
 
 /**
@@ -57,7 +69,7 @@ export const randomart = (fingerprint: string, title: string): string[] | null =
   field[y][x] = END
 
   return [
-    border(title ? `[${title}]` : ''),
+    border(fit(title)),
     ...field.map(row => `|${row.map(count => GLYPHS[count]).join('')}|`),
     border(`[${hash}]`)
   ]

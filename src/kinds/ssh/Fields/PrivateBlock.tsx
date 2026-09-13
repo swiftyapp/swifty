@@ -30,7 +30,10 @@ export default function PrivateBlock() {
   const head = armored ? lines[0] : null
   const foot = armored ? lines[lines.length - 1] : null
   const body = armored ? lines.slice(1, -1) : lines
-  const weight = [privateKeyFormat(value), t('{{size}} bytes', { size: value.length })]
+  // Bytes as the file would weigh, not code units: a pasted key can carry a
+  // non-ASCII comment.
+  const size = new TextEncoder().encode(value).length
+  const weight = [privateKeyFormat(value), t('{{size}} bytes', { size })]
     .filter(Boolean)
     .join(' · ')
 

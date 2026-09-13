@@ -40,6 +40,16 @@ describe('randomart', () => {
     expect(art?.[0]).toBe('+-----------------+')
   })
 
+  it('drops the size, then cuts, when the title is wider than the board', () => {
+    const top = (title: string) =>
+      randomart('SHA256:yq4WhqtjhSWoWZW2bkgxK9fflZopigYMOa/Xsyu5PxE', title)?.[0]
+    // ssh-keygen's own fallback for a certificate key.
+    expect(top('ED25519-CERT 256')).toBe('+-[ED25519-CERT]--+')
+    // Nothing sensible fits, so it is cut rather than thrown.
+    expect(top('ED25519-CERT-V01@OPENSSH.COM 256')).toBe('+[ED25519-CERT-V01+')
+    expect(top('ED25519-CERT-V01@OPENSSH.COM 256')).toHaveLength(19)
+  })
+
   it('draws nothing for a fingerprint it cannot read', () => {
     expect(randomart('MD5:16:27:ac:a5:76:28:2d:36', '')).toBeNull()
     expect(randomart('SHA256:GeneratedFingerprint', '')).toBeNull()
