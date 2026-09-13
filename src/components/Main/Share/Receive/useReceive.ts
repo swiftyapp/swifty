@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { shareOpen, type Entry } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
 import { saveEntry, closeReceive } from '@/store'
+import { useLatestRequest } from '@/hooks/useLatestRequest'
 
 export interface Receive {
   link: string
@@ -58,29 +59,24 @@ export function useReceive(): Receive {
 
   // A fetch and an unseal are both slow enough to outlive the dialog that asked
   // for them; whatever they answer after that is nobody's answer.
-  const alive = useRef(true)
-  useEffect(() => {
-    alive.current = true
-    return () => {
-      alive.current = false
-    }
-  }, [])
+  const begin = useLatestRequest()
 
   const open = () => {
     const value = link.trim()
     if (!value || busy) return
+    const current = begin()
     setBusy(true)
     setError(null)
     shareOpen(value)
       .then(opened => {
-        if (!alive.current) return
+        if (!current()) return
         setEntry(opened)
         setBusy(false)
       })
       // Verbatim: the backend already says which of the three it is ("this is
       // not a Swifty share link", expired, revoked), and only it can tell.
       .catch(reason => {
-        if (!alive.current) return
+        if (!current()) return
         setError(String(reason))
         setBusy(false)
       })
@@ -88,11 +84,12 @@ export function useReceive(): Receive {
 
   const add = () => {
     if (!entry || busy) return
+    const current = begin()
     setBusy(true)
     saveEntry(asReceivedDraft(entry))
-      .then(() => alive.current && closeReceive())
+      .then(() => current() && closeReceive())
       .catch(reason => {
-        if (!alive.current) return
+        if (!current()) return
         setError(String(reason))
         setBusy(false)
       })

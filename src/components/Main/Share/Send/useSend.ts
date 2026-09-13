@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { shareCreate, shareRevoke, type ShareCreated } from '@/lib/commands'
 import { useStore, closeSend, queueOrphan, revokeOrphans } from '@/store'
 import { useCopied } from '@/hooks/useCopied'
+import { useLatestRequest } from '@/hooks/useLatestRequest'
 
 /**
  * Which operation failed, not just what it said. "Try again" has to retry the
@@ -43,23 +44,19 @@ export function useSend(entryId: string): Send {
   const [busy, setBusy] = useState(false)
   const { copied, copy: copyValue } = useCopied()
 
-  // Each create is tagged, and only the newest tag may reach the screen: a seal
-  // is a network round trip, so a slow one can land after the dialog has moved
-  // on and put someone else's link under this title.
-  const request = useRef(0)
-  const alive = useRef(true)
+  // Only the newest request may reach the screen: a seal is a network round
+  // trip, so a slow one can land after the dialog has moved on and put someone
+  // else's link under this title.
+  const begin = useLatestRequest()
+
+  // A share an earlier dialog could not take back is tried again here, on the
+  // way into the next one.
   useEffect(() => {
-    alive.current = true
-    // A share an earlier dialog could not take back is tried again here, on
-    // the way into the next one.
     void revokeOrphans()
-    return () => {
-      alive.current = false
-    }
   }, [])
 
   const create = useCallback(() => {
-    const tag = ++request.current
+    const current = begin()
     setBusy(true)
     setFailed(null)
     shareCreate(entryId)
@@ -68,7 +65,7 @@ export function useSend(entryId: string): Send {
         // in the sender's Drive with 24 hours to live. Take it back — and if
         // that fails too, remember it, so the next share surface tries again
         // rather than the share quietly outliving everyone who knew about it.
-        if (!alive.current || tag !== request.current) {
+        if (!current()) {
           queueOrphan(created.fileId)
           void revokeOrphans()
           return
@@ -80,11 +77,11 @@ export function useSend(entryId: string): Send {
       // passkey cannot be shared"), so they are shown as they arrive rather
       // than mapped to copy of our own.
       .catch(reason => {
-        if (!alive.current || tag !== request.current) return
+        if (!current()) return
         setFailed({ op: 'create', message: String(reason) })
         setBusy(false)
       })
-  }, [entryId])
+  }, [entryId, begin])
 
   useEffect(() => {
     if (connected) create()
@@ -96,18 +93,19 @@ export function useSend(entryId: string): Send {
 
   const revoke = useCallback(() => {
     if (!share || busy) return
+    const current = begin()
     setBusy(true)
     setFailed(null)
     shareRevoke(share.fileId)
-      .then(() => alive.current && closeSend())
+      .then(() => current() && closeSend())
       .catch(reason => {
-        if (!alive.current) return
+        if (!current()) return
         // The link is still live, so it stays on screen with the complaint
         // under it — the only honest thing to show after a failed revoke.
         setFailed({ op: 'revoke', message: String(reason) })
         setBusy(false)
       })
-  }, [share, busy])
+  }, [share, busy, begin])
 
   return { connected, share, failed, busy, copied, copy, create, revoke }
 }

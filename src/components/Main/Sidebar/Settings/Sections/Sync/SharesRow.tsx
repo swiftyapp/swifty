@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { shareList, shareRevoke, type ActiveShare } from '@/lib/commands'
 import { useStore, revokeOrphans } from '@/store'
 import { kindOf } from '@/kinds'
 import { useNow } from '@/hooks/useNow'
+import { useLatestRequest } from '@/hooks/useLatestRequest'
 import { relativeUntil } from '@/utils/time'
 import Button from '@/components/elements/Button'
 import ExpandableRow from '../ExpandableRow'
@@ -20,26 +21,25 @@ function Shares() {
   const [error, setError] = useState<string | null>(null)
   const now = useNow(TICK_MS)
 
-  const alive = useRef(true)
-  useEffect(() => {
-    alive.current = true
-    return () => {
-      alive.current = false
-    }
-  }, [])
-
   // The one way the list is read, first time and every time after: what comes
   // back replaces what is shown, and a failure is shown in its place rather
-  // than left behind a list that is no longer true.
-  const load = useCallback((read: () => Promise<ActiveShare[]>) => {
-    read()
-      .then(list => {
-        if (!alive.current) return
-        setShares(list)
-        setError(null)
-      })
-      .catch(reason => alive.current && setError(String(reason)))
-  }, [])
+  // than left behind a list that is no longer true. Reads can overlap — a slow
+  // one from the last tick and a fresh one from this — so only the newest may
+  // answer, or a stale page would undo a sweep the later one already saw.
+  const begin = useLatestRequest()
+  const load = useCallback(
+    (read: () => Promise<ActiveShare[]>) => {
+      const current = begin()
+      read()
+        .then(list => {
+          if (!current()) return
+          setShares(list)
+          setError(null)
+        })
+        .catch(reason => current() && setError(String(reason)))
+    },
+    [begin]
+  )
 
   // Shares an earlier dialog could not take back go first, so the list that
   // follows does not show a link that is about to be revoked anyway.

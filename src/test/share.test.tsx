@@ -18,6 +18,7 @@ import {
   shareList,
   copyToClipboard,
   saveEntry,
+  type ActiveShare,
   type Entry,
   type ShareCreated
 } from '@/lib/commands'
@@ -485,6 +486,56 @@ describe('Settings › Shared links', () => {
       expect(await screen.findByTestId('settings-shares-empty')).toBeInTheDocument()
       expect(screen.queryByTestId('settings-shares-error')).not.toBeInTheDocument()
       expect(shareList).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('lets only the newest of overlapping refreshes answer', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const share = {
+        fileId: 'f1',
+        entryId: 'l1',
+        kind: 'login' as const,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        expiresAt: new Date(Date.now() + 90_000).toISOString()
+      }
+      // Listed, then two refreshes in flight at once: the first tick's, which
+      // hangs, and the next tick's, which comes back promptly and swept.
+      const slow = deferred<ActiveShare[]>()
+      const fast = deferred<ActiveShare[]>()
+      vi.mocked(shareList)
+        .mockResolvedValueOnce([share])
+        .mockReturnValueOnce(slow.promise)
+        .mockReturnValueOnce(fast.promise)
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      renderWithStore(<Settings />, { store: seed() })
+      useStore.getState().openSettings('sync')
+      const row = within(await screen.findByTestId('settings-shares-row'))
+      await user.click(row.getByRole('button', { name: 'Show' }))
+      expect(await screen.findByTestId('settings-share-f1')).toBeInTheDocument()
+
+      await act(async () => {
+        vi.advanceTimersByTime(120_000)
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(60_000)
+      })
+      expect(shareList).toHaveBeenCalledTimes(3)
+
+      await act(async () => {
+        fast.resolve([])
+      })
+      expect(await screen.findByTestId('settings-shares-empty')).toBeInTheDocument()
+
+      // The older answer arrives last, and is nobody's answer: the share it
+      // still lists was swept between the two requests.
+      await act(async () => {
+        slow.resolve([share])
+      })
+      expect(screen.getByTestId('settings-shares-empty')).toBeInTheDocument()
+      expect(screen.queryByTestId('settings-share-f1')).not.toBeInTheDocument()
     } finally {
       vi.useRealTimers()
     }
