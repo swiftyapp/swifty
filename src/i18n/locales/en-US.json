@@ -424,7 +424,7 @@
   "A shared entry is a sealed file in your own Drive.": "A shared entry is a sealed file in your own Drive.",
   "Sealing this entry…": "Sealing this entry…",
   "Share link": "Share link",
-  "Expires in 24 hours": "Expires in 24 hours",
+  "Swifty stops opening this link in 24 hours. Revoke it to delete the file now.": "Swifty stops opening this link in 24 hours. Revoke it to delete the file now.",
   "Anyone with this link can open it until then. Send it over a channel you trust.": "Anyone with this link can open it until then. Send it over a channel you trust.",
   "Revoke link": "Revoke link",
   "Receive a shared secret": "Receive a shared secret",

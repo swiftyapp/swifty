@@ -1,4 +1,4 @@
-//! One-time credential sharing: seal one entry, park it in the sender's own
+//! Credential sharing by link: seal one entry, park it in the sender's own
 //! Drive for a day, hand out a link that carries the key.
 //!
 //! [`envelope`] holds the crypto and the link format, [`remote`] the Drive

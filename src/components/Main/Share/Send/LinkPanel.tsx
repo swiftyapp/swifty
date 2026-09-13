@@ -66,7 +66,12 @@ export default function LinkPanel({ send }: { send: Send }) {
         </Button>
       </div>
 
-      <p className="mt-3 text-base text-text2">{t('Expires in 24 hours')}</p>
+      {/* Two different promises, kept apart on purpose: Swifty stops opening
+          the link at the expiry, but the file is only gone once revoked or
+          swept. "Expires" alone would claim the stronger one. */}
+      <p className="mt-3 text-base text-text2">
+        {t('Swifty stops opening this link in 24 hours. Revoke it to delete the file now.')}
+      </p>
       <p className="mt-1 text-base text-text3">
         {t('Anyone with this link can open it until then. Send it over a channel you trust.')}
       </p>

@@ -70,7 +70,9 @@ describe('sharing an entry', () => {
     expect(field).toHaveValue(LINK)
     expect(field).toHaveAttribute('readonly')
     expect(screen.getByTestId('share-send-modal')).toHaveAccessibleName('Share this entry')
-    expect(screen.getByText('Expires in 24 hours')).toBeInTheDocument()
+    expect(
+      screen.getByText('Swifty stops opening this link in 24 hours. Revoke it to delete the file now.')
+    ).toBeInTheDocument()
   })
 
   it('copies the link under the clipboard timeout the user chose', async () => {

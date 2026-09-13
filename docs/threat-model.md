@@ -212,10 +212,19 @@ fresh random 256-bit AES-GCM key and uploaded to the sender's own Drive as an
 - **Google** holds ciphertext, the file's creation time, the entry kind and the
   sender's opaque local entry id. It never holds the key and cannot read the
   entry. Neither the vault key nor the master passphrase is involved.
-- **The link is the secret.** Anyone who obtains it before it expires or is
-  revoked can open the share. Swifty cannot defend the channel the sender chose
-  to send it over; it limits the exposure to 24 hours and lets the sender revoke
-  earlier.
+- **The link is the secret.** Anyone who obtains it can open the share while
+  the file exists. Swifty cannot defend the channel the sender chose to send it
+  over. What bounds the exposure is two guarantees of different strength, and
+  they should not be read as one:
+  - **Swifty refuses to open a share after 24 hours.** The expiry is inside the
+    authenticated ciphertext, so every Swifty client honours it whether or not
+    the file is still on Drive.
+  - **Deleting the file is best effort.** Revoke deletes it at once. Otherwise
+    the sender's devices sweep expired shares after each successful sync and
+    whenever the shares list is opened, which needs a device to be on. Until
+    then the ciphertext is still downloadable, and a leaked link in the hands
+    of someone using their own AES-GCM code rather than Swifty decrypts it past
+    the 24 hours. The hard stop is deletion; revoke is the only immediate one.
 - **Integrity.** AES-GCM authentication means a modified or substituted file
   fails to open rather than yielding a tampered entry. The expiry is inside the
   ciphertext, so it is authenticated too, and the recipient enforces it even
@@ -225,7 +234,9 @@ fresh random 256-bit AES-GCM key and uploaded to the sender's own Drive as an
   sanitized again (id, timestamps, favorite, passkeys stripped), its kind is
   checked, and it is always saved as a fresh row, so a crafted envelope cannot
   overwrite an existing entry. Downloads are capped at 2 MiB and time-limited,
-  because a pasted link can name any public Drive file.
+  because a pasted link can name any public Drive file; the same cap is applied
+  to the sealed entry before upload, so a share nobody could open is never
+  published.
 - **The public API key** used to download shares is an identifier, not a
   credential: it grants no access to anything not already public.
 - **This is a bearer-link snapshot, not delivery to a person.** Nothing

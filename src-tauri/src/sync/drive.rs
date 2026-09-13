@@ -7,6 +7,7 @@
 //! through `String` would either corrupt it or fail to decode.
 
 use std::collections::BTreeMap;
+use std::future::Future;
 
 use reqwest::Client;
 use serde_json::{json, Value};
@@ -17,7 +18,12 @@ const FILES: &str = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD: &str = "https://www.googleapis.com/upload/drive/v3/files";
 // `createdTime` drives the deterministic pick below; `headRevisionId` is the
 // change token the engine uses to detect a push that landed under it.
-const LIST_FIELDS: &str = "files(id, name, createdTime, headRevisionId, appProperties)";
+// `nextPageToken` has to be named too: the mask filters the whole response, so
+// one that only asks for `files(...)` gets the files and no token back, which
+// silently turns every listing into its first page.
+const LIST_FIELDS: &str =
+    "nextPageToken, files(id, name, createdTime, headRevisionId, appProperties)";
+const PAGE_SIZE: &str = "100";
 const FILE_FIELDS: &str = "id, name, createdTime, headRevisionId, appProperties";
 const FILE_MIME: &str = "application/octet-stream";
 const FOLDER_MIME: &str = "application/vnd.google-apps.folder";
@@ -61,24 +67,43 @@ async fn check(resp: reqwest::Response) -> Result<Value> {
 
 // Run a files.list query and return *every* match.
 async fn find_all(client: &Client, token: &str, q: &str) -> Result<Vec<DriveFile>> {
-    // Drive pages the listing whenever it likes, not only past `pageSize`, so
-    // one request is never the whole answer: a share left on a later page would
-    // be invisible to both the sweep and the revoke list.
-    let mut files = Vec::new();
-    let mut page_token: Option<String> = None;
-    loop {
-        let mut query = vec![("q", q), ("fields", LIST_FIELDS), ("pageSize", "100")];
-        if let Some(token) = &page_token {
-            query.push(("pageToken", token));
-        }
+    collect_pages(|page_token| async move {
         let resp = client
             .get(FILES)
             .bearer_auth(token)
-            .query(&query)
+            .query(&list_query(q, page_token.as_deref()))
             .send()
             .await
             .map_err(other)?;
-        let (page, next) = parse_listing(&check(resp).await?);
+        check(resp).await
+    })
+    .await
+}
+
+// The query string of one `files.list` request: the first page without a
+// token, every later one with the token the page before handed back.
+fn list_query<'a>(q: &'a str, page_token: Option<&'a str>) -> Vec<(&'static str, &'a str)> {
+    let mut query = vec![("q", q), ("fields", LIST_FIELDS), ("pageSize", PAGE_SIZE)];
+    if let Some(token) = page_token {
+        query.push(("pageToken", token));
+    }
+    query
+}
+
+// Follow a listing to its last page. Drive pages whenever it likes, not only
+// past `pageSize`, so one request is never the whole answer: a share left on a
+// later page would be invisible to both the sweep and the revoke list. `fetch`
+// makes one request, given the page token to send, and returns the raw page;
+// keeping the transport out here is what lets the loop be tested end to end.
+async fn collect_pages<F, Fut>(mut fetch: F) -> Result<Vec<DriveFile>>
+where
+    F: FnMut(Option<String>) -> Fut,
+    Fut: Future<Output = Result<Value>>,
+{
+    let mut files = Vec::new();
+    let mut page_token: Option<String> = None;
+    loop {
+        let (page, next) = parse_listing(&fetch(page_token).await?);
         files.extend(page);
         match next {
             Some(next) => page_token = Some(next),
@@ -433,9 +458,11 @@ pub async fn update_file(
 #[cfg(test)]
 mod tests {
     use super::{
-        escape, multipart_body, oldest, parse_file, parse_listing, parse_properties, DriveFile,
+        collect_pages, escape, list_query, multipart_body, oldest, parse_file, parse_listing,
+        parse_properties, DriveFile,
     };
     use serde_json::json;
+    use std::cell::RefCell;
 
     #[test]
     fn escapes_quotes_and_backslashes() {
@@ -489,6 +516,48 @@ mod tests {
         // An empty token is Drive's way of saying "last page" too.
         let (_, next) = parse_listing(&serde_json::json!({"nextPageToken": "", "files": []}));
         assert_eq!(next, None);
+    }
+
+    #[test]
+    fn a_listing_asks_drive_for_the_next_page_token() {
+        // The field mask filters the whole response. A mask that leaves the
+        // token out gets no token back, and the loop below ends on page one
+        // believing it saw everything.
+        let first = list_query("q", None);
+        let (_, fields) = first.iter().find(|(key, _)| *key == "fields").unwrap();
+        assert!(fields
+            .split(',')
+            .map(str::trim)
+            .any(|f| f == "nextPageToken"));
+        assert!(!first.iter().any(|(key, _)| *key == "pageToken"));
+
+        let later = list_query("q", Some("page-2"));
+        assert!(later.contains(&("pageToken", "page-2")));
+    }
+
+    #[tokio::test]
+    async fn a_listing_follows_page_tokens_to_the_last_page() {
+        let asked = RefCell::new(Vec::new());
+        let files = collect_pages(|token| {
+            asked.borrow_mut().push(token.clone());
+            async move {
+                Ok(match token.as_deref() {
+                    None => json!({
+                        "nextPageToken": "page-2",
+                        "files": [{"id": "a"}]
+                    }),
+                    Some("page-2") => json!({ "files": [{"id": "b"}] }),
+                    Some(other) => panic!("asked for a page Drive never named: {other}"),
+                })
+            }
+        })
+        .await
+        .unwrap();
+
+        let ids: Vec<&str> = files.iter().map(|f| f.id.as_str()).collect();
+        assert_eq!(ids, ["a", "b"]);
+        // Sent exactly what each page handed back, and stopped when nothing was.
+        assert_eq!(*asked.borrow(), vec![None, Some("page-2".to_string())]);
     }
 
     #[test]

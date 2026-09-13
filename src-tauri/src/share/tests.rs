@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use super::envelope::SHARE_EXPIRED;
+use super::envelope::{MAX_SHARE_BYTES, SHARE_EXPIRED, SHARE_TOO_LARGE_TO_SEND};
 use super::remote::FakeShareRemote;
 use super::*;
 
@@ -56,6 +56,18 @@ fn a_created_share_is_published_ciphertext_with_its_bookkeeping() {
 
     let stored = remote.bytes(&created.file_id).unwrap();
     assert!(!stored.windows(7).any(|w| w == b"hunter2"));
+}
+
+#[test]
+fn an_entry_no_recipient_could_download_is_refused_before_upload() {
+    let remote = FakeShareRemote::new();
+    let mut huge = entry();
+    huge.note = Some("x".repeat(MAX_SHARE_BYTES));
+
+    let err = create(&remote, &huge, NOW).unwrap_err();
+    assert_eq!(err.to_string(), SHARE_TOO_LARGE_TO_SEND);
+    // Nothing went to Drive: the sender is told, not the recipient later.
+    assert!(remote.ids().is_empty());
 }
 
 #[test]

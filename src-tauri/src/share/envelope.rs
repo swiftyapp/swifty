@@ -27,6 +27,16 @@ pub fn expires_at(now_ms: i64) -> i64 {
 /// enforces the 24 hours on the receiving side.
 pub const SHARE_EXPIRED: &str = "this share has expired";
 
+/// The most a share file may be. An entry is a few kilobytes; an `.env` file
+/// a few hundred at the outside. The id in a pasted link can name any public
+/// file on Drive, so the recipient never buffers more than this — and the
+/// sender is told before upload, since a share over it could never be opened.
+pub const MAX_SHARE_BYTES: usize = 2 * 1024 * 1024;
+
+/// Shown to a sender whose entry seals to more than [`MAX_SHARE_BYTES`].
+pub const SHARE_TOO_LARGE_TO_SEND: &str =
+    "this entry is over 2 MiB and cannot be shared; shorten its note or fields";
+
 /// Every kind this build can store. A share carrying anything else is refused
 /// on receipt rather than saved as a row no view knows how to render.
 const KINDS: [&str; 6] = ["login", "note", "card", "identity", "ssh", "env"];
@@ -120,7 +130,14 @@ pub fn seal(key: &ShareKey, entry: &Entry, expires_ms: i64) -> Result<Vec<u8>> {
         expires_at: expires_ms,
         entry: &sanitize(entry),
     })?;
-    crate::crypto::seal_aead(key.as_ref(), &plaintext)
+    let sealed = crate::crypto::seal_aead(key.as_ref(), &plaintext)?;
+    // The recipient refuses anything over the cap, so a share this big would
+    // upload fine and then fail everyone it was sent to. Refuse it here, where
+    // the sender can still do something about it.
+    if sealed.len() > MAX_SHARE_BYTES {
+        return Err(Error::Other(SHARE_TOO_LARGE_TO_SEND.into()));
+    }
+    Ok(sealed)
 }
 
 /// Open a share as of `now_ms`. What comes back is safe to save as a new row:

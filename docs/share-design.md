@@ -31,9 +31,10 @@ AES-256-GCM under it, uploads the ciphertext to a `Swifty/Shares` folder in the
 sender's Drive, and marks that one file readable by anyone who knows its id.
 The link carries the file id and the key. Google holds ciphertext and sees that
 a share was made, but never the key. The recipient's app downloads the file with
-a public API key (no login) and unseals it locally. Whoever gets the link before
-it expires gets the credential, so the link must travel over a channel the
-sender already trusts, and it stops working after 24 hours or when revoked.
+a public API key (no login) and unseals it locally. Whoever gets the link gets
+the credential, so the link must travel over a channel the sender already
+trusts. Swifty refuses to open it after 24 hours or once revoked; the file
+itself is gone only once revoked or swept (section 5 has the difference).
 
 ## 3. Formats
 
@@ -91,9 +92,13 @@ without its key. Listings follow `nextPageToken` to the end.
 
 ## 5. Lifetime and control
 
-- Fixed 24-hour lifetime in v1, enforced where it can be: the recipient's app
-  refuses an envelope whose authenticated `expiresAt` has passed, whether or
-  not the file is still there. Deletion is the cleanup, not the enforcement.
+- Fixed 24-hour lifetime in v1, backed by two guarantees that are not the same
+  strength. **Swifty refuses to open** an envelope whose authenticated
+  `expiresAt` has passed, whether or not the file is still there; that holds
+  on every Swifty client. **Deletion is best effort**: until a revoke or sweep
+  removes the file, the ciphertext is still downloadable, and a leaked link
+  plus a client that ignores the expiry decrypts it past the 24 hours. Every
+  promise in the UI and in `docs/threat-model.md` is worded for that split.
 - **Revoke** deletes the file. From the send dialog right after creating the
   link, or later from Settings › Sync › Shared links.
 - **Sweep** lists every marked share and deletes anything past `expiresAt`. It
@@ -104,7 +109,8 @@ without its key. Listings follow `nextPageToken` to the end.
 - The recipient's app treats a missing file as "expired or revoked" and says so.
 - The recipient downloads at most 2 MiB, checked against the declared length
   and again while streaming, with a 30-second deadline: the id in a pasted link
-  can name any public file on Drive.
+  can name any public file on Drive. The sender is held to the same cap at seal
+  time, before anything is uploaded, and told which entry is too big.
 
 Burn-after-reading cannot be enforced without a server. Expiry plus revoke is
 the honest approximation, and the UI says "expires" and "revoke", not "one

@@ -16,6 +16,7 @@ use std::sync::Mutex;
 use reqwest::Client;
 use tauri::{async_runtime::block_on, AppHandle};
 
+use super::envelope::MAX_SHARE_BYTES;
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::sync::drive::{self, DriveFile};
@@ -33,11 +34,6 @@ pub const PROP_EXPIRES_AT: &str = "expiresAt";
 /// created by a racing device hides nothing from the sweep or the revoke list.
 pub const PROP_SHARE: &str = "swiftyShare";
 pub const PROP_SHARE_VALUE: &str = "1";
-
-/// The most a share file may be. An entry is a few kilobytes; an `.env` file
-/// a few hundred at the outside. The id in a pasted link can name any public
-/// file on Drive, so the recipient never buffers more than this.
-pub const MAX_SHARE_BYTES: usize = 2 * 1024 * 1024;
 
 /// How long the recipient waits on Drive before giving up.
 const FETCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
