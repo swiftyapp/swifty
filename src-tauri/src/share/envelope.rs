@@ -22,6 +22,15 @@ pub fn expires_at(now_ms: i64) -> i64 {
     now_ms + SHARE_TTL_MS
 }
 
+/// Shown to a recipient who opens a link past its expiry. Deleting the file is
+/// best effort (the sender may be offline), so this check is what actually
+/// enforces the 24 hours on the receiving side.
+pub const SHARE_EXPIRED: &str = "this share has expired";
+
+/// Every kind this build can store. A share carrying anything else is refused
+/// on receipt rather than saved as a row no view knows how to render.
+const KINDS: [&str; 6] = ["login", "note", "card", "identity", "ssh", "env"];
+
 const KEY_LEN: usize = 32;
 const VERSION: u8 = 1;
 const PREFIX: &str = "swifty://share#";
@@ -53,12 +62,32 @@ impl std::fmt::Debug for ShareKey {
     }
 }
 
+/// Refuse what sanitizing would silently hollow out. A login whose only secret
+/// is a passkey would arrive as a username and nothing else, and the sender
+/// would not know why; better to say so before a link exists.
+pub fn check_shareable(entry: &Entry) -> Result<()> {
+    let has_passkey = entry.passkeys.as_ref().is_some_and(|p| !p.is_empty());
+    let has_secret = [&entry.password, &entry.otp]
+        .iter()
+        .any(|v| v.as_deref().is_some_and(|s| !s.is_empty()));
+    if entry.kind == "login" && has_passkey && !has_secret {
+        return Err(Error::Other(
+            "this login holds only a passkey, and passkeys cannot be shared".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Strip everything the recipient's vault must decide for itself.
 ///
 /// The id is theirs to assign, the timestamps describe the sender's copy, the
 /// star is the sender's opinion, and a copied passkey would be a second
 /// authenticator the site never registered. Everything else — tags, extra
 /// fields, the secret itself — is the point of the share and travels intact.
+///
+/// Applied on both ends. Sending, so nothing leaves that should not; receiving,
+/// because the plaintext is whatever the link's author sealed, and a crafted
+/// envelope must not be able to name an existing row's id and replace it.
 pub fn sanitize(entry: &Entry) -> Entry {
     Entry {
         id: String::new(),
@@ -74,21 +103,30 @@ pub fn sanitize(entry: &Entry) -> Entry {
 /// The sealed plaintext. `entry` is generic so the reader can check the version
 /// before parsing it: a future format may shape the entry differently, and that
 /// has to read as "newer version", not as a parse failure.
+///
+/// The expiry rides inside the ciphertext, so it is authenticated by the same
+/// tag as the entry: nobody holding the file — Drive included — can extend it.
 #[derive(Serialize, Deserialize)]
 struct Envelope<E> {
     v: u8,
+    #[serde(rename = "expiresAt")]
+    expires_at: i64,
     entry: E,
 }
 
-pub fn seal(key: &ShareKey, entry: &Entry) -> Result<Vec<u8>> {
+pub fn seal(key: &ShareKey, entry: &Entry, expires_ms: i64) -> Result<Vec<u8>> {
     let plaintext = serde_json::to_vec(&Envelope {
         v: VERSION,
+        expires_at: expires_ms,
         entry: &sanitize(entry),
     })?;
     crate::crypto::seal_aead(key.as_ref(), &plaintext)
 }
 
-pub fn unseal(key: &ShareKey, blob: &[u8]) -> Result<Entry> {
+/// Open a share as of `now_ms`. What comes back is safe to save as a new row:
+/// expired, unknown-kind and sender-supplied identity are all refused or
+/// stripped here, before the frontend ever sees it.
+pub fn unseal(key: &ShareKey, blob: &[u8], now_ms: i64) -> Result<Entry> {
     // A wrong key and a tampered file are the same event to the user: the link
     // they have does not open this share. The AEAD error underneath says
     // nothing they can act on.
@@ -101,7 +139,17 @@ pub fn unseal(key: &ShareKey, blob: &[u8]) -> Result<Entry> {
             "this share was made by a newer version of Swifty".into(),
         ));
     }
-    Ok(serde_json::from_value(envelope.entry)?)
+    if envelope.expires_at <= now_ms {
+        return Err(Error::Other(SHARE_EXPIRED.into()));
+    }
+
+    let entry: Entry = serde_json::from_value(envelope.entry)?;
+    if !KINDS.contains(&entry.kind.as_str()) {
+        return Err(Error::Other(
+            "this share holds a kind of entry this version of Swifty does not know".into(),
+        ));
+    }
+    Ok(sanitize(&entry))
 }
 
 /// A whole share in one pasteable token: `swifty://share#v1.<fileId>.<key>`.
@@ -215,13 +263,19 @@ mod tests {
         .unwrap()
     }
 
+    const NOW: i64 = 1_700_000_000_000;
+
+    fn sealed(key: &ShareKey) -> Vec<u8> {
+        seal(key, &entry(), expires_at(NOW)).unwrap()
+    }
+
     #[test]
     fn seal_round_trips_the_entry_without_the_sender_s_copy() {
         let key = ShareKey::generate();
-        let blob = seal(&key, &entry()).unwrap();
+        let blob = sealed(&key);
         assert!(!blob.windows(6).any(|w| w == b"s3cret"));
 
-        let back = unseal(&key, &blob).unwrap();
+        let back = unseal(&key, &blob, NOW).unwrap();
         assert_eq!(back.title, "Site");
         assert_eq!(back.password.as_deref(), Some("s3cret"));
         assert_eq!(back.otp.as_deref(), Some("SEED"));
@@ -243,31 +297,101 @@ mod tests {
     #[test]
     fn tampered_ciphertext_does_not_open() {
         let key = ShareKey::generate();
-        let mut blob = seal(&key, &entry()).unwrap();
+        let mut blob = sealed(&key);
         let last = blob.len() - 1;
         blob[last] ^= 1;
         assert_eq!(
-            unseal(&key, &blob).unwrap_err().to_string(),
+            unseal(&key, &blob, NOW).unwrap_err().to_string(),
             "this link does not open the share"
         );
     }
 
     #[test]
     fn wrong_key_does_not_open() {
-        let blob = seal(&ShareKey::generate(), &entry()).unwrap();
-        assert!(unseal(&ShareKey::generate(), &blob).is_err());
+        let blob = sealed(&ShareKey::generate());
+        assert!(unseal(&ShareKey::generate(), &blob, NOW).is_err());
     }
 
     #[test]
     fn a_newer_envelope_version_is_refused() {
         let key = ShareKey::generate();
-        let plaintext =
-            serde_json::to_vec(&json!({"v": 2, "entry": {"shape": "unknown"}})).unwrap();
+        let plaintext = serde_json::to_vec(
+            &json!({"v": 2, "expiresAt": i64::MAX, "entry": {"shape": "unknown"}}),
+        )
+        .unwrap();
         let blob = crate::crypto::seal_aead(key.as_ref(), &plaintext).unwrap();
         assert_eq!(
-            unseal(&key, &blob).unwrap_err().to_string(),
+            unseal(&key, &blob, NOW).unwrap_err().to_string(),
             "this share was made by a newer version of Swifty"
         );
+    }
+
+    // The sender's device may never get to delete the file; the recipient's
+    // clock is what turns the link off.
+    #[test]
+    fn an_expired_envelope_is_refused_even_though_the_file_still_opens() {
+        let key = ShareKey::generate();
+        let blob = sealed(&key);
+        assert!(unseal(&key, &blob, NOW + SHARE_TTL_MS - 1).is_ok());
+        assert_eq!(
+            unseal(&key, &blob, NOW + SHARE_TTL_MS)
+                .unwrap_err()
+                .to_string(),
+            SHARE_EXPIRED
+        );
+    }
+
+    // Sealed by hand, the way an attacker would: the plaintext names an
+    // existing id and carries everything sanitizing normally strips.
+    fn crafted(key: &ShareKey, entry: serde_json::Value) -> Vec<u8> {
+        let plaintext =
+            serde_json::to_vec(&json!({"v": 1, "expiresAt": i64::MAX, "entry": entry})).unwrap();
+        crate::crypto::seal_aead(key.as_ref(), &plaintext).unwrap()
+    }
+
+    #[test]
+    fn a_crafted_envelope_cannot_smuggle_identity_or_passkeys_in() {
+        let key = ShareKey::generate();
+        let mut smuggled = serde_json::to_value(entry()).unwrap();
+        smuggled["id"] = json!("victim-row");
+        let back = unseal(&key, &crafted(&key, smuggled), NOW).unwrap();
+
+        assert_eq!(back.id, "");
+        assert!(back.created_at.is_none());
+        assert!(back.updated_at.is_none());
+        assert!(!back.favorite);
+        assert!(back.passkeys.is_none());
+        assert_eq!(back.password.as_deref(), Some("s3cret"));
+    }
+
+    #[test]
+    fn an_unknown_kind_is_refused_on_receipt() {
+        let key = ShareKey::generate();
+        let blob = crafted(&key, json!({"id": "", "type": "wallet", "title": "x"}));
+        assert_eq!(
+            unseal(&key, &blob, NOW).unwrap_err().to_string(),
+            "this share holds a kind of entry this version of Swifty does not know"
+        );
+    }
+
+    #[test]
+    fn a_passkey_only_login_cannot_be_shared_but_one_with_a_password_can() {
+        let with_password = entry();
+        assert!(check_shareable(&with_password).is_ok());
+
+        let mut passkey_only = entry();
+        passkey_only.password = None;
+        passkey_only.otp = Some(String::new());
+        assert_eq!(
+            check_shareable(&passkey_only).unwrap_err().to_string(),
+            "this login holds only a passkey, and passkeys cannot be shared"
+        );
+
+        let mut plain = entry();
+        plain.password = None;
+        plain.otp = None;
+        plain.passkeys = None;
+        assert!(check_shareable(&plain).is_ok());
     }
 
     #[test]

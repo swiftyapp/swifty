@@ -217,11 +217,22 @@ fresh random 256-bit AES-GCM key and uploaded to the sender's own Drive as an
   to send it over; it limits the exposure to 24 hours and lets the sender revoke
   earlier.
 - **Integrity.** AES-GCM authentication means a modified or substituted file
-  fails to open rather than yielding a tampered entry.
+  fails to open rather than yielding a tampered entry. The expiry is inside the
+  ciphertext, so it is authenticated too, and the recipient enforces it even
+  when the sender's device never got to delete the file.
+- **Sender-controlled content is not trusted.** Encryption proves the sender
+  held the key, not that the entry is well-formed. On receipt the entry is
+  sanitized again (id, timestamps, favorite, passkeys stripped), its kind is
+  checked, and it is always saved as a fresh row, so a crafted envelope cannot
+  overwrite an existing entry. Downloads are capped at 2 MiB and time-limited,
+  because a pasted link can name any public Drive file.
 - **The public API key** used to download shares is an identifier, not a
   credential: it grants no access to anything not already public.
-- **One-time is approximate.** Without a server nothing can count reads. A
-  share stays openable until it expires or is revoked.
+- **This is a bearer-link snapshot, not delivery to a person.** Nothing
+  authenticates the recipient, nothing propagates later edits, and without a
+  server nothing can count reads. A share stays openable until it expires or
+  is revoked; revoking stops future downloads but cannot retract a credential
+  already imported or erase a downloaded copy.
 
 ## What Swifty explicitly does NOT defend against
 

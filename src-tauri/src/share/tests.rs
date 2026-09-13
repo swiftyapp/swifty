@@ -1,5 +1,6 @@
 use serde_json::json;
 
+use super::envelope::SHARE_EXPIRED;
 use super::remote::FakeShareRemote;
 use super::*;
 
@@ -25,6 +26,16 @@ fn entry() -> Entry {
     .unwrap()
 }
 
+// A share as another writer would leave it: marked, dated, nothing else.
+fn upload_share(remote: &FakeShareRemote, name: &str, expires: Option<i64>) -> String {
+    let expires = expires.map(|e| e.to_string());
+    let mut properties = vec![(PROP_SHARE, PROP_SHARE_VALUE)];
+    if let Some(expires) = &expires {
+        properties.push((PROP_EXPIRES_AT, expires));
+    }
+    remote.upload(name, b"sealed", &properties).unwrap()
+}
+
 #[test]
 fn a_created_share_is_published_ciphertext_with_its_bookkeeping() {
     let remote = FakeShareRemote::new();
@@ -33,6 +44,8 @@ fn a_created_share_is_published_ciphertext_with_its_bookkeeping() {
     assert_eq!(remote.ids(), vec![created.file_id.clone()]);
     assert!(remote.is_public(&created.file_id));
 
+    // The fake lists on the marker like Drive does, so this also proves the
+    // marker was written.
     let listed = remote.list().unwrap();
     assert_eq!(listed[0].entry_id.as_deref(), Some("entry-1"));
     assert_eq!(listed[0].kind.as_deref(), Some("login"));
@@ -50,7 +63,7 @@ fn the_link_opens_the_entry_without_the_sender_s_copy() {
     let remote = FakeShareRemote::new();
     let created = create(&remote, &entry(), NOW).unwrap();
 
-    let opened = open(&remote, &created.link).unwrap();
+    let opened = open(&remote, &created.link, NOW).unwrap();
     assert_eq!(opened.title, "Router");
     assert_eq!(opened.password.as_deref(), Some("hunter2"));
     assert_eq!(opened.id, "");
@@ -58,6 +71,36 @@ fn the_link_opens_the_entry_without_the_sender_s_copy() {
     assert!(opened.updated_at.is_none());
     assert!(!opened.favorite);
     assert!(opened.passkeys.is_none());
+}
+
+// The file may well still be there — the sender's device is what deletes it,
+// and it may be off. The recipient's clock is what turns the link off.
+#[test]
+fn a_link_stops_opening_when_the_share_expires_even_if_the_file_remains() {
+    let remote = FakeShareRemote::new();
+    let created = create(&remote, &entry(), NOW).unwrap();
+
+    assert!(open(&remote, &created.link, NOW + SHARE_TTL_MS - 1).is_ok());
+    assert_eq!(
+        open(&remote, &created.link, NOW + SHARE_TTL_MS)
+            .unwrap_err()
+            .to_string(),
+        SHARE_EXPIRED
+    );
+    assert!(remote.is_public(&created.file_id));
+}
+
+#[test]
+fn a_passkey_only_login_is_refused_before_anything_is_uploaded() {
+    let remote = FakeShareRemote::new();
+    let mut passkey_only = entry();
+    passkey_only.password = None;
+
+    assert_eq!(
+        create(&remote, &passkey_only, NOW).unwrap_err().to_string(),
+        "this login holds only a passkey, and passkeys cannot be shared"
+    );
+    assert!(remote.ids().is_empty());
 }
 
 #[test]
@@ -71,7 +114,7 @@ fn a_link_carrying_the_wrong_key_does_not_open_the_share() {
     .format();
 
     assert_eq!(
-        open(&remote, &impostor).unwrap_err().to_string(),
+        open(&remote, &impostor, NOW).unwrap_err().to_string(),
         "this link does not open the share"
     );
 }
@@ -84,7 +127,7 @@ fn a_revoked_share_reads_as_gone() {
     revoke(&remote, &created.file_id).unwrap();
     assert!(remote.ids().is_empty());
     assert_eq!(
-        open(&remote, &created.link).unwrap_err().to_string(),
+        open(&remote, &created.link, NOW).unwrap_err().to_string(),
         crate::sync::drive::SHARE_GONE
     );
 }
@@ -94,7 +137,7 @@ fn a_revoked_share_reads_as_gone() {
 #[test]
 fn a_link_that_is_not_a_link_fails_before_anything_is_fetched() {
     assert_eq!(
-        open(&FakeShareRemote::new(), "https://example.com/share")
+        open(&FakeShareRemote::new(), "https://example.com/share", NOW)
             .unwrap_err()
             .to_string(),
         "this is not a Swifty share link"
@@ -104,14 +147,9 @@ fn a_link_that_is_not_a_link_fails_before_anything_is_fetched() {
 #[test]
 fn the_sweep_deletes_only_what_is_known_to_have_expired() {
     let remote = FakeShareRemote::new();
-    let (past, future) = ((NOW - 1).to_string(), (NOW + 1).to_string());
-    let expired = remote
-        .upload("a.swshare", b"a", &[(PROP_EXPIRES_AT, &past)])
-        .unwrap();
-    let live = remote
-        .upload("b.swshare", b"b", &[(PROP_EXPIRES_AT, &future)])
-        .unwrap();
-    let undated = remote.upload("c.swshare", b"c", &[]).unwrap();
+    let expired = upload_share(&remote, "a.swshare", Some(NOW - 1));
+    let live = upload_share(&remote, "b.swshare", Some(NOW + 1));
+    let undated = upload_share(&remote, "c.swshare", None);
 
     assert_eq!(sweep(&remote, NOW).unwrap(), 1);
     assert!(!remote.ids().contains(&expired));
@@ -127,7 +165,7 @@ fn the_sweep_deletes_only_what_is_known_to_have_expired() {
 #[test]
 fn a_share_with_no_readable_expiry_is_still_given_one_to_show() {
     let remote = FakeShareRemote::new();
-    remote.upload("a.swshare", b"a", &[]).unwrap();
+    upload_share(&remote, "a.swshare", None);
 
     let listed = list(&remote, NOW).unwrap();
     assert_eq!(listed[0].created_at, "1970-01-01T00:00:00.001Z");

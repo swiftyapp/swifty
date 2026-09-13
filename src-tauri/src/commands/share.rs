@@ -47,7 +47,7 @@ pub async fn share_create(
 /// recipient may not even have a vault yet.
 #[tauri::command]
 pub async fn share_open(link: String) -> Result<Entry> {
-    blocking(move || share::open(&DrivePublicFetch, &link)).await
+    blocking(move || share::open(&DrivePublicFetch, &link, share::now_ms())).await
 }
 
 #[tauri::command]
