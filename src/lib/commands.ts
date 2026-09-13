@@ -13,7 +13,7 @@ import { parseEnv, varsOf } from '@/kinds/env/parse'
 // Shared types
 // ---------------------------------------------------------------------------
 
-export type EntryType = 'login' | 'note' | 'card' | 'identity' | 'ssh' | 'env'
+export type EntryType = 'login' | 'note' | 'card' | 'identity' | 'ssh' | 'env' | 'apikey'
 
 // One free-form field on an entry: a label the user wrote and its value.
 export interface ExtraField {
@@ -131,6 +131,20 @@ export interface EnvEntry extends BaseEntry {
   note: string
 }
 
+// An API key. The token is the one secret; the rest says where it is sent and
+// what it may do there. `environment` is `test` or `production` (or empty),
+// `scopes` the granted scopes as typed — space- or comma-separated, split for
+// display — and the expiry rides in the identity's ISO date slot.
+export interface ApiKeyEntry extends BaseEntry {
+  type: 'apikey'
+  apiKey: string
+  environment: string
+  baseUrl: string
+  scopes: string
+  expiry_date: string
+  note: string
+}
+
 export type Entry =
   | LoginEntry
   | NoteEntry
@@ -138,6 +152,7 @@ export type Entry =
   | IdentityEntry
   | SshEntry
   | EnvEntry
+  | ApiKeyEntry
 
 export interface VaultData {
   entries: Entry[]

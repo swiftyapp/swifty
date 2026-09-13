@@ -26,8 +26,9 @@ interface Props extends HTMLAttributes<HTMLDivElement> {
 
 /*
  * The surface every object in the vault is set on: an ID document, the SSH
- * key's fingerprint plate. They are one kind of thing on the page, so they share
- * one face, whatever their size and what is printed on it — a 16px radius, a 1px
+ * key's fingerprint plate, an API key's card. They are one kind of thing on the
+ * page, so they share one face, whatever their size and what is printed on it —
+ * a 16px radius, a 1px
  * edge, a shadow just deep enough to lift it off the pane, and a sheen from the
  * top-right corner laid over the printing. Every other attribute — a test id, a
  * data attribute the e2e suite reads — passes through.

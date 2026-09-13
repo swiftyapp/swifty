@@ -2,7 +2,7 @@ import { cx } from '@/utils/cx'
 import type { TKey } from '@/i18n'
 import { formatDate } from '@/utils/time'
 import { specOf, type IdentityKey } from '../templates'
-import Cell from './Cell'
+import Cell from '@/components/elements/Face/Cell'
 
 /** What a face reads from: the document's values, and whether its secrets show. */
 export interface Doc {

@@ -335,6 +335,8 @@
   --color-kind-ssh-soft: var(--c-kind-ssh-soft);
   --color-kind-env: var(--c-kind-env);
   --color-kind-env-soft: var(--c-kind-env-soft);
+  --color-kind-apikey: var(--c-kind-apikey);
+  --color-kind-apikey-soft: var(--c-kind-apikey-soft);
 }
 
 /*
@@ -516,6 +518,8 @@
   --c-kind-ssh-soft: rgba(123, 94, 167, 0.12);
   --c-kind-env: #5b8c3a;
   --c-kind-env-soft: rgba(91, 140, 58, 0.12);
+  --c-kind-apikey: #2b7fc4;
+  --c-kind-apikey-soft: rgba(43, 127, 196, 0.12);
 
   /* Gradients, shadows and scrims; exposed as utilities via @theme above. */
   --card: linear-gradient(180deg, #ffffff, #fbfbfc);
@@ -615,6 +619,8 @@
   --c-kind-ssh-soft: rgba(167, 139, 218, 0.18);
   --c-kind-env: #7fb85a;
   --c-kind-env-soft: rgba(127, 184, 90, 0.18);
+  --c-kind-apikey: #5ea3e6;
+  --c-kind-apikey-soft: rgba(94, 163, 230, 0.18);
 
   --card: linear-gradient(
     180deg,

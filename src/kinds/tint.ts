@@ -10,5 +10,6 @@ export const KIND_TINT: Record<Kind['tint'], string> = {
   note: 'bg-kind-note-soft text-kind-note',
   identity: 'bg-kind-identity-soft text-kind-identity',
   ssh: 'bg-kind-ssh-soft text-kind-ssh',
-  env: 'bg-kind-env-soft text-kind-env'
+  env: 'bg-kind-env-soft text-kind-env',
+  apikey: 'bg-kind-apikey-soft text-kind-apikey'
 }

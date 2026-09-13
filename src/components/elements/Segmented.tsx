@@ -30,6 +30,9 @@ export default function Segmented<T extends string>({
     value,
     onChange
   )
+  // With no segment active — an unset row, a value the options do not name —
+  // the first one holds the tab stop, or the group could not be reached at all.
+  const selected = options.some(option => option.value === value)
 
   return (
     <div
@@ -39,7 +42,7 @@ export default function Segmented<T extends string>({
       onKeyDown={onKeyDown}
       className={cx('flex gap-0.5 rounded-sm border border-line2 p-0.5', className)}
     >
-      {options.map(option => {
+      {options.map((option, index) => {
         const active = option.value === value
         return (
           <button
@@ -47,7 +50,7 @@ export default function Segmented<T extends string>({
             type="button"
             role="radio"
             aria-checked={active}
-            tabIndex={active ? 0 : -1}
+            tabIndex={active || (!selected && index === 0) ? 0 : -1}
             data-testid={testidPrefix && `${testidPrefix}-${option.value}`}
             onClick={() => onChange(option.value)}
             className={cx(

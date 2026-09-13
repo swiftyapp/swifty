@@ -10,7 +10,9 @@
 //! reported — the format is meant to grow. A row is the 1-based item index
 //! counted across every account, which is the order they appear in the file.
 
-use super::export::{FINGERPRINT_LABEL, PASSPHRASE_LABEL, PUBLIC_KEY_LABEL};
+use super::export::{
+    ENVIRONMENT_LABEL, FINGERPRINT_LABEL, PASSPHRASE_LABEL, PUBLIC_KEY_LABEL, SCOPES_LABEL,
+};
 use super::{EntryKind, ImportResult, ImportedEntry, ImportedPasskey, Importer};
 use serde::Deserialize;
 use serde_json::Value;
@@ -76,8 +78,13 @@ struct Credential {
     user_display_name: Option<String>,
     #[serde(default, rename = "userHandle")]
     user_handle: Option<String>,
+    // A passkey's `key` is a bare base64url string; an `api-key`'s is an
+    // EditableField. One member, read through `text`, which takes either.
     #[serde(default)]
-    key: Option<String>,
+    key: Option<Value>,
+    // api-key
+    #[serde(default)]
+    url: Option<Value>,
     // totp
     #[serde(default)]
     secret: Option<String>,
@@ -140,6 +147,7 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
     let mut basic: Option<Credential> = None;
     let mut card: Option<Credential> = None;
     let mut ssh: Option<Credential> = None;
+    let mut api: Option<Credential> = None;
     let mut custom: Vec<Value> = Vec::new();
     let mut passkeys: Vec<ImportedPasskey> = Vec::new();
     let mut otp: Option<String> = None;
@@ -151,6 +159,8 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
             // The private key *is* the credential: an `ssh-key` without one has
             // nothing to restore and is left unmapped like any unknown type.
             "ssh-key" if text(&cred.private_key).is_some() => ssh = ssh.or(Some(cred)),
+            // Likewise the token: an `api-key` without one is nothing to keep.
+            "api-key" if text(&cred.key).is_some() => api = api.or(Some(cred)),
             // Only read for the labels the exporter writes beside an ssh-key;
             // anything else in there has no slot on an entry.
             "custom-fields" => custom.extend(cred.fields),
@@ -202,6 +212,21 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
             ssh_passphrase: custom_field(&custom, PASSPHRASE_LABEL),
             ..Default::default()
         });
+    } else if let Some(c) = api {
+        result.entries.push(ImportedEntry {
+            kind: EntryKind::ApiKey,
+            title,
+            notes,
+            tags,
+            api_key: text(&c.key),
+            // The credential names the API it is sent to; an item scoped to a
+            // site without one says the same thing one level up.
+            url: text(&c.url).or(url),
+            api_expires: text(&c.expiry_date),
+            api_environment: custom_field(&custom, ENVIRONMENT_LABEL),
+            api_scopes: custom_field(&custom, SCOPES_LABEL),
+            ..Default::default()
+        });
     } else if let Some(c) = card {
         let (month, year) = expiry(&c.expiry_date);
         result.entries.push(ImportedEntry {
@@ -241,7 +266,7 @@ fn passkey(c: &Credential, created_at: Option<String>) -> Option<ImportedPasskey
         user_handle: c.user_handle.clone().unwrap_or_default(),
         user_name: text(&c.username).unwrap_or_default(),
         user_display_name: c.user_display_name.clone().unwrap_or_default(),
-        private_key: non_empty(c.key.clone())?,
+        private_key: text(&c.key)?,
         counter: 0,
         created_at,
     })

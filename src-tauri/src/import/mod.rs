@@ -26,6 +26,7 @@ pub enum EntryKind {
     Identity,
     Ssh,
     Env,
+    ApiKey,
 }
 
 impl EntryKind {
@@ -37,6 +38,7 @@ impl EntryKind {
             EntryKind::Identity => "identity",
             EntryKind::Ssh => "ssh",
             EntryKind::Env => "env",
+            EntryKind::ApiKey => "apikey",
         }
     }
 }
@@ -80,6 +82,14 @@ pub struct ImportedEntry {
     // and only rides along so the file can come back under its own name.
     pub env_body: Option<String>,
     pub env_file_name: Option<String>,
+    // API key fields (only meaningful when kind == ApiKey). The token is the
+    // credential; the base URL it is sent to travels in `url`, the slot every
+    // format already has for a site. Environment, scopes and expiry are plain
+    // text and ride wherever a format has room for a labelled field.
+    pub api_key: Option<String>,
+    pub api_environment: Option<String>,
+    pub api_scopes: Option<String>,
+    pub api_expires: Option<String>,
     // WebAuthn passkeys (only meaningful when kind == Login). Empty when the
     // source format carries none, which is the case for every CSV dialect.
     pub passkeys: Vec<ImportedPasskey>,

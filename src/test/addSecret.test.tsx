@@ -41,6 +41,7 @@ describe('add a secret', () => {
     expect(dialog.getByTestId('add-kind-note')).toHaveTextContent('Secure note')
     expect(dialog.getByTestId('add-kind-identity')).toHaveTextContent('Identity')
     expect(dialog.getByTestId('add-kind-ssh')).toHaveTextContent('SSH key')
+    expect(dialog.getByTestId('add-kind-apikey')).toHaveTextContent('API key')
     expect(dialog.getByTestId('add-kind-env')).toHaveTextContent('Env file')
     // Each tile also carries the kind's one-line description.
     expect(dialog.getByTestId('add-kind-login')).toHaveTextContent('Passwords for apps & sites')
@@ -67,8 +68,11 @@ describe('add a secret', () => {
     // Two columns: down from the second tile lands on the fourth.
     await userEvent.keyboard('{ArrowDown}')
     expect(screen.getByTestId('add-kind-identity')).toHaveFocus()
-    // Down again lands on the last tile, the sixth.
+    // Down again lands on the sixth.
     await userEvent.keyboard('{ArrowDown}')
+    expect(screen.getByTestId('add-kind-apikey')).toHaveFocus()
+    // Right, on the last tile, the seventh.
+    await userEvent.keyboard('{ArrowRight}')
     expect(screen.getByTestId('add-kind-env')).toHaveFocus()
     // Past the last tile, the move wraps around to the first.
     await userEvent.keyboard('{ArrowRight}')

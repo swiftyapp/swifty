@@ -274,6 +274,8 @@ fn secret_slots(e: &mut Entry) -> Vec<&mut Option<String>> {
         "ssh" => vec![&mut e.private_key, &mut e.passphrase],
         // The whole file is the secret; its name is not.
         "env" => vec![&mut e.body],
+        // The token alone: where it is used, for what, and until when are not.
+        "apikey" => vec![&mut e.api_key],
         _ => vec![],
     }
 }
