@@ -107,6 +107,46 @@ describe('the backup step', () => {
     await waitFor(() => expect(store.getState().flow.name).toBe('main'))
   })
 
+  // A double-click must not ask the backend to create twice: while the first
+  // create is in flight both buttons are inert.
+  it('creates once however many times the button is pressed', async () => {
+    let finish: (result: { entries: never[]; syncConfigured: boolean }) => void = () => {}
+    vi.mocked(setupCreateCmd).mockImplementationOnce(
+      () => new Promise(resolve => {
+        finish = resolve
+      })
+    )
+    const { store } = renderWithStore(<Start />)
+    await choosePassword()
+
+    const skip = await screen.findByTestId('setup-skip-drive-button')
+    await userEvent.click(skip)
+    await userEvent.click(skip)
+    await userEvent.click(screen.getByTestId('setup-connect-drive-button'))
+
+    expect(setupCreateCmd).toHaveBeenCalledOnce()
+    expect(setupDriveConnect).not.toHaveBeenCalled()
+
+    await act(async () => finish({ entries: [], syncConfigured: false }))
+    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+  })
+
+  // Leaving while consent is still out with the browser disowns it: a late
+  // answer must not be waiting in the store the next time this step is shown.
+  it('abandons a consent in flight when the user backs out', async () => {
+    const { store } = renderWithStore(<Start />)
+    await choosePassword()
+
+    await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
+    expect(screen.getByTestId('setup-drive-spinner')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('go-back-button'))
+
+    expect(setupDriveDisconnect).toHaveBeenCalledOnce()
+    expect(store.getState().setup.drive).toEqual({ status: 'idle', file: null, error: null })
+    expect(screen.getByTestId('setup-password-input')).toBeInTheDocument()
+  })
+
   it('surfaces a failed connection and leaves the choice standing', async () => {
     renderWithStore(<Start />)
     await choosePassword()

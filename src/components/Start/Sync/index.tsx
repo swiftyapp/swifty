@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import AuthShell from '@/components/elements/AuthShell'
 import Button from '@/components/elements/Button'
@@ -26,6 +26,11 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
   const { t } = useTranslation()
   const drive = useStore(state => state.setup.drive)
   const [error, setError] = useState<string | null>(null)
+  // Creating is in flight. Both buttons go inert on it: a second press would
+  // ask the backend to create again, and while the backend now refuses the
+  // overlap, the refusal would land here as an error over a create that is
+  // about to succeed.
+  const [busy, setBusy] = useState(false)
   // The probe answers once. Without this the effect would re-fire on every
   // render the status outlives — and create the data twice.
   const settled = useRef(false)
@@ -35,15 +40,30 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
     setupDriveReset()
   }
 
+  // One entry point for both ways a create starts (a press, or the probe
+  // coming back empty), so neither can start one while the other is running.
+  const create = useCallback(
+    (onError: (message: string) => void) => {
+      if (busy) return
+      setBusy(true)
+      setError(null)
+      onCreate().catch((err: unknown) => {
+        setBusy(false)
+        onError(messageOf(err) || t('Something went wrong'))
+      })
+    },
+    [busy, onCreate, t]
+  )
+
   useEffect(() => {
     if (settled.current) return
 
     if (drive.status === 'empty') {
       // A bare account: nothing to weigh up, so this is the last step.
       settled.current = true
-      onCreate().catch((err: unknown) => {
+      create(message => {
         settled.current = false
-        fail(messageOf(err) || t('Something went wrong'))
+        fail(message)
       })
     } else if (drive.status === 'found') {
       settled.current = true
@@ -51,14 +71,10 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
     } else if (drive.status === 'error') {
       fail(drive.error || t('Something went wrong'))
     }
-  }, [drive.status, drive.error, onCreate, onConflict, t])
-
-  const create = () => {
-    setError(null)
-    onCreate().catch((err: unknown) => setError(messageOf(err) || t('Something went wrong')))
-  }
+  }, [drive.status, drive.error, create, onConflict, t])
 
   const connect = () => {
+    if (busy) return
     setError(null)
     connectDrive()
   }
@@ -101,10 +117,16 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
       </div>
 
       <div className={ACTIONS}>
-        <Button block testid="setup-connect-drive-button" onClick={connect}>
+        <Button block testid="setup-connect-drive-button" disabled={busy} onClick={connect}>
           {t('Connect Google Drive')}
         </Button>
-        <Button block variant="pale" testid="setup-skip-drive-button" onClick={create}>
+        <Button
+          block
+          variant="pale"
+          testid="setup-skip-drive-button"
+          loading={busy}
+          onClick={() => create(setError)}
+        >
           {t('Keep it on this device')}
         </Button>
       </div>

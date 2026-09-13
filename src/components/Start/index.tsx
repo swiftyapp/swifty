@@ -57,6 +57,11 @@ export function Start() {
     // the account goes with it — the backup step would otherwise re-read the
     // probe still sitting in the store and bounce straight back here.
     if (screen === 'conflict') forgetDrive()
+    // Backing out of the backup step abandons a consent that may still be out
+    // with the browser. Without this its late answer would sit in the store,
+    // and the next visit to this step would read "empty" and create at once,
+    // never having asked.
+    if (screen === 'sync') forgetDrive()
     setStack(current => (current.length > 1 ? current.slice(0, -1) : current))
   }
 
