@@ -105,10 +105,14 @@ cd src-tauri && cargo test   # backend tests
 Run the scripts with `bun run <name>`, not `bun <name>`: bare `bun test` starts
 Bun's own test runner instead of the Vitest suite this repo is written against.
 
-`tauri:dev:fresh` points `SWIFTY_DB_DIR` at a temp directory, so the app finds no
-vault there and starts at the setup/restore screen. Your real dev vault is left
-untouched — drop the variable (`bun run tauri:dev`) to go back to it, or set it
-yourself to keep several vaults side by side.
+`tauri:dev:fresh` points `SWIFTY_DB_DIR` at a **new** temp directory each run, so
+the app finds no vault there and starts at the setup/restore screen every time.
+Your real dev vault is left untouched — `bun run tauri:dev` goes back to it.
+
+Setting `SWIFTY_DB_DIR` yourself overrides that and keeps the same directory
+across runs, which is how you set a throwaway vault up once and then relaunch
+into its unlock screen. Nothing here ever deletes a data directory; to start
+that one over, remove it yourself.
 
 ## Configuration
 
