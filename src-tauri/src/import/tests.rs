@@ -939,8 +939,14 @@ fn bitwarden_exports_apikey_as_a_login() {
     let back = parse(Format::Bitwarden, &bytes);
     assert!(back.errors.is_empty(), "{:?}", back.errors);
     assert_eq!(back.entries[0].kind, EntryKind::Login);
-    assert_eq!(back.entries[0].password.as_deref(), Some("cpl_live_4f9a0b3c"));
-    assert_eq!(back.entries[0].url.as_deref(), Some("https://api.coupler.io/v1"));
+    assert_eq!(
+        back.entries[0].password.as_deref(),
+        Some("cpl_live_4f9a0b3c")
+    );
+    assert_eq!(
+        back.entries[0].url.as_deref(),
+        Some("https://api.coupler.io/v1")
+    );
 }
 
 // A file with everything a CSV cell could trip on: a comment, an indented line,
