@@ -1,5 +1,5 @@
 import type { EntryMeta } from '@/lib/commands'
-import { editEntry, setNoEntry } from '@/store'
+import { editEntry, openSend, setNoEntry } from '@/store'
 import Archived from '../../Body/Aside/Show/Archived'
 import MoreMenu from '../../Body/Aside/Show/MoreMenu'
 import { useListTitle } from '../../Body/ListColumn/useListTitle'
@@ -45,6 +45,7 @@ export default function NavRow({
           <MoreMenu
             onDelete={onDelete}
             onEdit={() => editEntry()}
+            onShare={() => openSend(entry.id)}
             className={TOUCH}
             menu="right-0 top-full mt-1"
           />

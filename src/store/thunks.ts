@@ -1,6 +1,7 @@
 import type { StateCreator } from 'zustand'
 import type { Entry, EntryMeta, UnlockResult } from '@/lib/commands'
 import {
+  shareRevoke,
   saveEntry as saveEntryCmd,
   deleteEntry as deleteEntryCmd,
   listDeleted,
@@ -20,6 +21,12 @@ import { getSecs } from '@/defaults/autolock'
 import type { StoreState } from './index'
 
 export interface AsyncSlice {
+  /**
+   * Take back every share in `share.orphans` that can be taken back now. One
+   * failing does not stop the rest, and whatever still fails stays queued for
+   * the next surface that calls this.
+   */
+  revokeOrphans: () => Promise<void>
   saveEntry: (draft: EntryDraft) => Promise<void>
   deleteEntry: (id: string) => Promise<void>
   loadArchive: () => Promise<void>
@@ -96,6 +103,15 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
 
   return {
     runAudit: refreshAudit,
+    revokeOrphans: async () => {
+      await Promise.all(
+        get().share.orphans.map(fileId =>
+          shareRevoke(fileId)
+            .then(() => get().dropOrphan(fileId))
+            .catch(() => {})
+        )
+      )
+    },
     saveEntry: async draft => {
       const entry = buildEntry(draft)
       const meta = await saveEntryCmd(entry)

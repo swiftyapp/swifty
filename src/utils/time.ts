@@ -52,6 +52,30 @@ export const relativeLong = (iso?: string, now: number = Date.now()): string => 
   return shortDate(at)
 }
 
+/**
+ * How far ahead a *timestamp* is, as a sentence fragment: "in 23 hours", "in 4
+ * minutes". '' once it is behind us, so the caller can say "Expired" instead.
+ *
+ * The twin of `relativeFuture`, which counts a stored `YYYY-MM-DD` in whole
+ * days. A deadline hours away — a share link — needs the units below a day, and
+ * a date-only value has none to give.
+ */
+export const relativeUntil = (iso?: string, now: number = Date.now()): string => {
+  const at = toTime(iso)
+  if (at === null) return ''
+
+  const left = at - now
+  if (left <= 0) return ''
+
+  const spell = new Intl.RelativeTimeFormat(getLocale(), { numeric: 'always' })
+  // Rounded down, so nothing ever claims more time than it has: 59 minutes left
+  // is "in 59 minutes", not "in 1 hour". The floor bottoms out at one, since
+  // "in 0 minutes" reads as expired while it is still usable.
+  if (left < HOUR) return spell.format(Math.max(1, Math.floor(left / MINUTE)), 'minute')
+  if (left < DAY) return spell.format(Math.floor(left / HOUR), 'hour')
+  return spell.format(Math.floor(left / DAY), 'day')
+}
+
 const pad = (value: string | number) => String(value).padStart(2, '0')
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/

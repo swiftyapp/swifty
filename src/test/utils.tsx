@@ -16,6 +16,18 @@ export const renderWithStore = (ui: ReactElement, { store = makeStore() }: Optio
 // Puts the (singleton) store into the unlocked "main" flow with the given entry
 // metadata. Acts on the store the bound actions already point at, so there is
 // nothing to hand it.
+// A promise a test settles by hand, for specs about what happens between the
+// call and the answer — two in flight at once, or one that lands too late.
+export const deferred = <T,>() => {
+  let resolve: (value: T) => void = () => {}
+  let reject: (reason: unknown) => void = () => {}
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done
+    reject = fail
+  })
+  return { promise, resolve, reject }
+}
+
 export const withEntries = (entries: EntryMeta[], audit?: Audit) => {
   setEntries(entries)
   flowMain()

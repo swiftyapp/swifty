@@ -9,7 +9,7 @@ import Fields from '@/kinds/env/Fields'
 import { useEnvIngest } from '@/kinds/env/useIngest'
 import Main from '@/components/Main'
 import { makeStore, useStore, startEntry, openAddPicker } from '@/store'
-import { renderWithStore, withEntries, loginMeta } from './utils'
+import { renderWithStore, withEntries, loginMeta, deferred } from './utils'
 
 // The webview's drag-drop stream, replaced by a hand that can drop a file. The
 // hook subscribes after a lazy import, so a test waits for the listener before
@@ -39,14 +39,6 @@ const drop = async (path: string) => {
 const MINE = ['# Database', 'DATABASE_URL=postgres://mine', 'DB_POOL=10', ''].join('\n')
 const THEIRS = ['DB_POOL=99', 'STRIPE_KEY=sk_live_1', ''].join('\n')
 const FILE = { fileName: '.env.production', body: THEIRS }
-
-const deferred = <T,>() => {
-  let resolve: (value: T) => void = () => {}
-  const promise = new Promise<T>(done => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
 
 const keyInputs = () =>
   Array.from(document.querySelectorAll<HTMLInputElement>('input[name^="env-key-"]')).map(

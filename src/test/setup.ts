@@ -78,6 +78,27 @@ vi.mock('@/lib/commands', () => ({
   syncNow: vi.fn().mockResolvedValue(undefined),
   syncImport: vi.fn().mockResolvedValue(undefined),
   syncStatus: vi.fn().mockResolvedValue({ configured: false, pending: false }),
+  // Sharing. The link is the shape the backend hands back — file id plus key —
+  // and `shareOpen` resolves a plain login, so a suite only overrides the one
+  // call it is about.
+  shareCreate: vi.fn().mockResolvedValue({
+    link: 'swifty://share#v1.file-1.a2V5LTFrZXktMWtleS0xa2V5LTFrZXktMWtleS0xa2V5',
+    fileId: 'file-1',
+    expiresAt: '2024-01-02T00:00:00.000Z'
+  }),
+  shareOpen: vi.fn().mockResolvedValue({
+    id: '',
+    type: 'login',
+    title: 'Shared Netflix',
+    website: 'https://netflix.com',
+    username: 'shared@example.com',
+    password: 'from-a-friend',
+    email: '',
+    note: '',
+    otp: ''
+  }),
+  shareRevoke: vi.fn().mockResolvedValue(undefined),
+  shareList: vi.fn().mockResolvedValue([]),
   // Off by default, so no suite sees a scan affordance it did not ask for.
   scanSupported: vi.fn().mockResolvedValue(false),
   scanImage: vi.fn().mockRejectedValue('nothing recognized'),

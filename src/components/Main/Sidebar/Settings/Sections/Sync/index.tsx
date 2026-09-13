@@ -6,6 +6,7 @@ import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
 import BackupRow from './BackupRow'
 import ExportRow from './ExportRow'
+import SharesRow from './SharesRow'
 
 const ErrorNote = ({ message }: { message: string }) => (
   <div data-testid="settings-sync-error" className="px-4 py-3 text-base text-bad">
@@ -92,6 +93,7 @@ export default function Sync() {
             }
           />
           {sync.error && <ErrorNote message={sync.error} />}
+          <SharesRow />
         </SettingsGroup>
       )}
 

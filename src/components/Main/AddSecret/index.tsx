@@ -7,6 +7,7 @@ import Frame from '@/components/elements/Frame'
 import KindTile from './KindTile'
 import ScanAction from './ScanAction'
 import EnvAction from './EnvAction'
+import ReceiveAction from './ReceiveAction'
 
 const TITLE_ID = 'add-secret-title'
 
@@ -96,6 +97,7 @@ export default function AddSecret() {
 
           <ScanAction />
           <EnvAction />
+          <ReceiveAction />
         </div>
       </div>
     </Frame>
