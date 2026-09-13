@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { shareList, shareRevoke, type ActiveShare } from '@/lib/commands'
 import { useStore, revokeOrphans } from '@/store'
@@ -20,32 +20,39 @@ function Shares() {
   const [error, setError] = useState<string | null>(null)
   const now = useNow(TICK_MS)
 
+  const alive = useRef(true)
   useEffect(() => {
-    let live = true
-    // Shares an earlier dialog could not take back go first, so the list that
-    // follows does not show a link that is about to be revoked anyway.
-    revokeOrphans()
-      .then(shareList)
-      .then(list => live && setShares(list))
-      .catch(reason => live && setError(String(reason)))
+    alive.current = true
     return () => {
-      live = false
+      alive.current = false
     }
   }, [])
 
+  // The one way the list is read, first time and every time after: what comes
+  // back replaces what is shown, and a failure is shown in its place rather
+  // than left behind a list that is no longer true.
+  const load = useCallback((read: () => Promise<ActiveShare[]>) => {
+    read()
+      .then(list => {
+        if (!alive.current) return
+        setShares(list)
+        setError(null)
+      })
+      .catch(reason => alive.current && setError(String(reason)))
+  }, [])
+
+  // Shares an earlier dialog could not take back go first, so the list that
+  // follows does not show a link that is about to be revoked anyway.
+  useEffect(() => load(() => revokeOrphans().then(shareList)), [load])
+
   // A countdown that has run out while the row sat open: ask again rather
   // than show "Expired" for a file the backend's own sweep has since deleted.
+  // While the read keeps failing this asks once per tick, and shows the
+  // failure meanwhile; the first read that succeeds puts the list back.
   const expired = shares?.some(share => new Date(share.expiresAt).getTime() <= now) ?? false
   useEffect(() => {
-    if (!expired) return
-    let live = true
-    shareList()
-      .then(list => live && setShares(list))
-      .catch(() => {})
-    return () => {
-      live = false
-    }
-  }, [expired, now])
+    if (expired) load(shareList)
+  }, [expired, now, load])
 
   // A share outlives the entry it was cut from: it is a copy, and deleting the
   // original neither revokes it nor gives it a title back.

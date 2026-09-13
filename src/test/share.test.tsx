@@ -447,4 +447,46 @@ describe('Settings › Shared links', () => {
       vi.useRealTimers()
     }
   })
+
+  it('shows a refresh that failed instead of a stale "Expired" row, and recovers', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const share = {
+        fileId: 'f1',
+        entryId: 'l1',
+        kind: 'login' as const,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        expiresAt: new Date(Date.now() + 90_000).toISOString()
+      }
+      // Listed, then Drive is unreachable when the countdown runs out, then
+      // back a minute later with the swept, empty list.
+      vi.mocked(shareList)
+        .mockResolvedValueOnce([share])
+        .mockRejectedValueOnce('Drive API 503')
+        .mockResolvedValueOnce([])
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      renderWithStore(<Settings />, { store: seed() })
+      useStore.getState().openSettings('sync')
+      const row = within(await screen.findByTestId('settings-shares-row'))
+      await user.click(row.getByRole('button', { name: 'Show' }))
+      expect(await screen.findByTestId('settings-share-f1')).toBeInTheDocument()
+
+      await act(async () => {
+        vi.advanceTimersByTime(120_000)
+      })
+      // The failure is what is shown — not a row claiming "Expired" about a
+      // file nobody could confirm anything about.
+      expect(await screen.findByTestId('settings-shares-error')).toHaveTextContent('Drive API 503')
+      expect(screen.queryByTestId('settings-share-f1')).not.toBeInTheDocument()
+
+      await act(async () => {
+        vi.advanceTimersByTime(60_000)
+      })
+      expect(await screen.findByTestId('settings-shares-empty')).toBeInTheDocument()
+      expect(screen.queryByTestId('settings-shares-error')).not.toBeInTheDocument()
+      expect(shareList).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
