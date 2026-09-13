@@ -26,6 +26,14 @@ vi.mock('@/lib/commands', () => ({
   enableBiometric: vi.fn().mockResolvedValue('protected'),
   disableBiometric: vi.fn().mockResolvedValue(undefined),
   changeMasterPassword: vi.fn().mockResolvedValue(undefined),
+  // First run. The probe's result never comes back through these promises —
+  // it arrives as `setup:drive:*`, which a spec drives through the store.
+  setupDriveConnect: vi.fn().mockResolvedValue(undefined),
+  setupDriveDisconnect: vi.fn().mockResolvedValue(undefined),
+  setupCreate: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
+  setupRestoreFromDrive: vi
+    .fn()
+    .mockResolvedValue({ entries: [], syncConfigured: true }),
   readVault: vi.fn().mockResolvedValue([]),
   revealEntry: vi.fn().mockImplementation((id: string) =>
     Promise.resolve({ id, type: 'login', title: '' })

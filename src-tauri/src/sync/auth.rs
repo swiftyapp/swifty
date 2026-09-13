@@ -224,7 +224,12 @@ pub fn read_tokens(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
     serde_json::from_str(&json).ok()
 }
 
-fn write_tokens(app: &AppHandle, cryptor: &Cryptor, tokens: &Tokens) -> Result<()> {
+/// Seal the tokens under `cryptor` and write them.
+///
+/// Crate-visible because first-run onboarding holds tokens in memory long
+/// before a vault key exists to seal them with, and persists them only once the
+/// restore or create it is driving has produced one.
+pub fn write_tokens(app: &AppHandle, cryptor: &Cryptor, tokens: &Tokens) -> Result<()> {
     let json = serde_json::to_string(tokens)?;
     storage::write_gdrive(app, &cryptor.encrypt(&json)?)
 }
@@ -271,17 +276,27 @@ fn open_consent(app: &AppHandle, credentials: &Credentials) -> Result<Started> {
 /// redirects to it, then exchange the code.
 #[cfg(desktop)]
 pub fn authenticate(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
+    write_tokens(app, cryptor, &obtain_tokens(app)?)
+}
+
+/// The consent round trip on its own, handing the tokens back rather than
+/// writing them.
+///
+/// Split out of [`authenticate`] for onboarding, which connects Drive *before*
+/// there is a vault — and so before there is any key to seal a token file
+/// under. Blocking (the loopback listener): call it off the main thread.
+#[cfg(desktop)]
+pub fn obtain_tokens(app: &AppHandle) -> Result<Tokens> {
     let credentials = Credentials::resolve(app)?;
     let started = open_consent(app, &credentials)?;
     let code = listen_for_code(&started.state)?;
     let client = super::http_client();
-    let tokens = tauri::async_runtime::block_on(exchange_code(
+    tauri::async_runtime::block_on(exchange_code(
         &client,
         &credentials,
         &code,
         &started.verifier,
-    ))?;
-    write_tokens(app, cryptor, &tokens)
+    ))
 }
 
 /// Mobile, first half: open the consent page and hand back what the caller
@@ -300,9 +315,19 @@ pub async fn complete(
     code: &str,
     verifier: &str,
 ) -> Result<()> {
+    write_tokens(
+        app,
+        cryptor,
+        &exchange_for_tokens(app, code, verifier).await?,
+    )
+}
+
+/// [`complete`] without the writing — the mobile twin of [`obtain_tokens`], for
+/// an onboarding flow that has no key to seal a token file with yet.
+#[cfg(mobile)]
+pub async fn exchange_for_tokens(app: &AppHandle, code: &str, verifier: &str) -> Result<Tokens> {
     let credentials = Credentials::resolve(app)?;
-    let tokens = exchange_code(&super::http_client(), &credentials, code, verifier).await?;
-    write_tokens(app, cryptor, &tokens)
+    exchange_code(&super::http_client(), &credentials, code, verifier).await
 }
 
 /// Read a redirect URL as the answer to the request identified by `state`.
@@ -336,7 +361,29 @@ pub fn parse_redirect(url: &Url, state: &str) -> Redirect {
 // Return a valid access token, refreshing it if expired.
 pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -> Result<String> {
     let mut tokens = read_tokens(app, cryptor).ok_or(Error::SyncNotConfigured)?;
-    if needs_refresh(&tokens) {
+    // Asked before the call, because that is what says whether the file on
+    // disk is now out of date — afterwards the tokens look fresh either way.
+    let refreshing = needs_refresh(&tokens);
+    let token = fresh_access_token(client, app, &mut tokens).await?;
+    if refreshing {
+        write_tokens(app, cryptor, &tokens)?;
+    }
+    Ok(token)
+}
+
+/// A valid access token for `tokens`, refreshing them *in place* if the one
+/// they hold has expired.
+///
+/// Where they came from and whether they are ever written back is the caller's
+/// business: [`access_token`] reads and rewrites the encrypted token file,
+/// while onboarding holds the only copy in memory and has nowhere to write it
+/// until a vault exists.
+pub async fn fresh_access_token(
+    client: &Client,
+    app: &AppHandle,
+    tokens: &mut Tokens,
+) -> Result<String> {
+    if needs_refresh(tokens) {
         let refresh_token = tokens
             .refresh_token
             .clone()
@@ -344,12 +391,13 @@ pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -
         let fresh = refresh(client, &Credentials::resolve(app)?, &refresh_token).await?;
         tokens.access_token = fresh.access_token;
         tokens.expires_at = fresh.expires_at;
+        // Google only re-issues a refresh token sometimes; keeping the old one
+        // otherwise is what stops a refresh from disconnecting the account.
         if fresh.refresh_token.is_some() {
             tokens.refresh_token = fresh.refresh_token;
         }
-        write_tokens(app, cryptor, &tokens)?;
     }
-    tokens.access_token.ok_or(Error::SyncNotConfigured)
+    tokens.access_token.clone().ok_or(Error::SyncNotConfigured)
 }
 
 fn needs_refresh(tokens: &Tokens) -> bool {

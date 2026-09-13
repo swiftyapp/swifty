@@ -2,12 +2,15 @@ import {
   entryItems,
   reload,
   resetPristine,
+  skipBiometricIfOffered,
   waitFor,
   waitForAppReady,
 } from "../helpers";
 
-// First-run setup: the two gates that stand between a fresh install and a
-// vault (strength, confirmation) plus the back/forward navigation around them.
+// First-run setup: the two gates that stand between a fresh install and an
+// unlocked app (strength, confirmation) plus the back/forward navigation around
+// them. Both fields live on one screen now, so Continue is the click that has
+// to hold them — and the backup question after it is what actually writes.
 // Every test starts from `resetPristine()`, so none of them depends on what a
 // previous one left on disk.
 
@@ -27,6 +30,9 @@ describe("first-run setup", () => {
     await startSetup();
 
     await $('[data-testid="setup-password-input"]').setValue(WEAK_PASSWORD);
+    await $('[data-testid="setup-confirm-password-input"]').setValue(
+      WEAK_PASSWORD,
+    );
 
     // The meter scores off a deferred macrotask, so the label fills in a beat
     // after the keystrokes — wait for the verdict rather than the element.
@@ -41,9 +47,9 @@ describe("first-run setup", () => {
     await expect($('[data-testid="form-error"]')).toHaveText(
       "Choose a stronger master password",
     );
-    // Still on step one: the confirm field was never reached.
+    // Still on step one: the backup question was never reached.
     await expect(
-      $('[data-testid="setup-confirm-password-input"]'),
+      $('[data-testid="setup-skip-drive-button"]'),
     ).not.toBeDisplayed();
   });
 
@@ -52,13 +58,10 @@ describe("first-run setup", () => {
     await startSetup();
 
     await $('[data-testid="setup-password-input"]').setValue(MASTER_PASSWORD);
-    await $('[data-testid="setup-continue-button"]').click();
-
-    await waitFor("setup-confirm-password-input");
     await $('[data-testid="setup-confirm-password-input"]').setValue(
       `${MASTER_PASSWORD}-typo`,
     );
-    await $('[data-testid="setup-finish-button"]').click();
+    await $('[data-testid="setup-continue-button"]').click();
 
     await waitFor("form-error");
     await expect($('[data-testid="form-error"]')).toHaveText(
@@ -73,7 +76,7 @@ describe("first-run setup", () => {
     await expect($('[data-testid="unlock-password-input"]')).not.toBeDisplayed();
   });
 
-  it("goes back to the choice screen and completes setup on the second run", async () => {
+  it("goes back to the welcome screen and completes setup on the second run", async () => {
     await resetPristine();
     await startSetup();
     await $('[data-testid="setup-password-input"]').setValue(WEAK_PASSWORD);
@@ -88,16 +91,28 @@ describe("first-run setup", () => {
     await expect($('[data-testid="setup-password-input"]')).toHaveValue("");
 
     await $('[data-testid="setup-password-input"]').setValue(MASTER_PASSWORD);
-    await $('[data-testid="setup-continue-button"]').click();
-    await waitFor("setup-confirm-password-input");
     await $('[data-testid="setup-confirm-password-input"]').setValue(
       MASTER_PASSWORD,
     );
-    await $('[data-testid="setup-finish-button"]').click();
+    await $('[data-testid="setup-continue-button"]').click();
+
+    // Step two: where the backup lives. Declining it is what creates the vault.
+    await waitFor("setup-skip-drive-button");
+    await $('[data-testid="setup-skip-drive-button"]').click();
 
     // Setup lands straight in an unlocked, empty vault — no extra unlock step.
+    // The biometric question in between only appears on hardware that has one.
+    await skipBiometricIfOffered();
     await waitForAppReady();
     await expect($('[data-testid="lock-vault-button"]')).toBeDisplayed();
     expect(await entryItems()).toHaveLength(0);
+  });
+
+  it("offers both ways back into data that already exists", async () => {
+    await resetPristine();
+    await waitFor("start-setup-button");
+
+    await expect($('[data-testid="start-drive-button"]')).toBeDisplayed();
+    await expect($('[data-testid="start-restore-button"]')).toBeDisplayed();
   });
 });

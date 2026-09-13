@@ -1,68 +1,286 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Start from '@/components/Start'
-import { setup, readVault, pickBackup } from '@/lib/commands'
+import {
+  setupCreate as setupCreateCmd,
+  setupDriveConnect,
+  setupDriveDisconnect,
+  setupRestoreFromDrive,
+  isBiometricAvailable,
+  enableBiometric,
+  pickBackup,
+  importBackup,
+  type SetupDriveFile
+} from '@/lib/commands'
+import { setupDriveProbed, setupDriveFailed } from '@/store'
 import { renderWithStore } from './utils'
 
 // Must satisfy the setup strength gate (>= 12 chars, zxcvbn score >= 2).
 const STRONG = 'my-strong-vault-passphrase-2026'
 
+const REMOTE: SetupDriveFile = {
+  name: 'vault.swsync',
+  size: 1_258_291,
+  modifiedTime: '2024-01-01T00:00:00.000Z'
+}
+
 beforeEach(() => vi.clearAllMocks())
 
-describe('Start', () => {
-  it('offers setup and restore choices', () => {
+// Welcome -> the merged password screen, filled in and submitted.
+const choosePassword = async (password = STRONG, confirmation = password) => {
+  await userEvent.click(screen.getByTestId('start-setup-button'))
+  await userEvent.type(screen.getByTestId('setup-password-input'), password)
+  await userEvent.type(screen.getByTestId('setup-confirm-password-input'), confirmation)
+  await userEvent.click(screen.getByTestId('setup-continue-button'))
+}
+
+describe('welcome', () => {
+  it('offers a fresh start and both ways back into existing data', () => {
     renderWithStore(<Start />)
-    expect(screen.getByText('Setup Master Password')).toBeInTheDocument()
-    expect(screen.getByText('Restore from Backup')).toBeInTheDocument()
+
+    expect(screen.getByText('Keep your secrets to yourself.')).toBeInTheDocument()
+    expect(screen.getByTestId('start-setup-button')).toBeInTheDocument()
+    expect(screen.getByTestId('start-drive-button')).toBeInTheDocument()
+    expect(screen.getByTestId('start-restore-button')).toBeInTheDocument()
   })
 
-  it('completes setup when passwords match', async () => {
-    vi.mocked(setup).mockResolvedValue(undefined)
-    vi.mocked(readVault).mockResolvedValue([])
+  // A phone has no file system to hand a `.swftx` export from, so the option
+  // that depends on one is not drawn there at all.
+  it('hides the backup-file option on mobile', async () => {
+    vi.resetModules()
+    vi.doMock('@/lib/platform', () => ({ isIOS: true, isAndroid: false, isMobile: true }))
+    try {
+      const { default: Welcome } = await import('@/components/Start/Welcome')
+      render(<Welcome onFresh={() => {}} onDrive={() => {}} onFile={() => {}} />)
+
+      expect(screen.getByTestId('start-drive-button')).toBeInTheDocument()
+      expect(screen.queryByTestId('start-restore-button')).not.toBeInTheDocument()
+    } finally {
+      vi.doUnmock('@/lib/platform')
+      vi.resetModules()
+    }
+  })
+})
+
+describe('choosing a master password', () => {
+  it('blocks a weak password without reaching the next step', async () => {
+    renderWithStore(<Start />)
+    await choosePassword('secret')
+
+    expect((await screen.findAllByText(/Use at least/)).length).toBeGreaterThan(0)
+    expect(screen.getByTestId('setup-password-input')).toBeInTheDocument()
+    expect(screen.queryByTestId('setup-skip-drive-button')).not.toBeInTheDocument()
+  })
+
+  it('refuses a confirmation that does not match', async () => {
+    renderWithStore(<Start />)
+    await choosePassword(STRONG, 'something-else-entirely')
+
+    expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
+    expect(setupCreateCmd).not.toHaveBeenCalled()
+  })
+})
+
+describe('the backup step', () => {
+  it('creates local-only data when the backup is declined', async () => {
     const { store } = renderWithStore(<Start />)
+    await choosePassword()
 
-    await userEvent.click(screen.getByText('Setup Master Password'))
-    await userEvent.type(screen.getByPlaceholderText('Set Master Password'), STRONG)
-    await userEvent.click(screen.getByText('Continue'))
-    await userEvent.type(screen.getByPlaceholderText('Confirm Master Password'), STRONG)
-    await userEvent.click(screen.getByText('Finish'))
+    await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
 
-    expect(setup).toHaveBeenCalledWith(STRONG)
+    expect(setupCreateCmd).toHaveBeenCalledWith(STRONG, false)
     await waitFor(() => expect(store.getState().flow.name).toBe('main'))
   })
 
-  it('blocks a short/weak master password with feedback', async () => {
-    renderWithStore(<Start />)
-    await userEvent.click(screen.getByText('Setup Master Password'))
-    await userEvent.type(screen.getByPlaceholderText('Set Master Password'), 'secret')
-    await userEvent.click(screen.getByText('Continue'))
+  it('creates with sync on once the probe finds the account bare', async () => {
+    const { store } = renderWithStore(<Start />)
+    await choosePassword()
 
-    // Stays on the setup step (never reaches Confirm) and shows guidance.
-    expect(screen.queryByPlaceholderText('Confirm Master Password')).not.toBeInTheDocument()
-    expect((await screen.findAllByText(/Use at least/)).length).toBeGreaterThan(0)
+    await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
+    expect(setupDriveConnect).toHaveBeenCalledOnce()
+    expect(screen.getByTestId('setup-drive-spinner')).toBeInTheDocument()
+
+    await act(async () => setupDriveProbed(null))
+
+    expect(setupCreateCmd).toHaveBeenCalledWith(STRONG, false)
+    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
   })
 
-  it('warns when setup passwords do not match', async () => {
+  it('surfaces a failed connection and leaves the choice standing', async () => {
     renderWithStore(<Start />)
-    await userEvent.click(screen.getByText('Setup Master Password'))
-    await userEvent.type(screen.getByPlaceholderText('Set Master Password'), STRONG)
-    await userEvent.click(screen.getByText('Continue'))
-    await userEvent.type(screen.getByPlaceholderText('Confirm Master Password'), 'other')
-    await userEvent.click(screen.getByText('Finish'))
+    await choosePassword()
 
-    expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
-    expect(setup).not.toHaveBeenCalled()
+    await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
+    await act(async () => setupDriveFailed('no oauth client configured'))
+
+    expect(await screen.findByTestId('setup-drive-error')).toHaveTextContent(
+      'no oauth client configured'
+    )
+    expect(screen.getByTestId('setup-connect-drive-button')).toBeInTheDocument()
+    expect(setupCreateCmd).not.toHaveBeenCalled()
+  })
+})
+
+describe('a Drive that already holds data', () => {
+  const reachConflict = async () => {
+    await choosePassword()
+    await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
+    await act(async () => setupDriveProbed(REMOTE))
+  }
+
+  it('stops to ask rather than writing over the existing pack', async () => {
+    renderWithStore(<Start />)
+    await reachConflict()
+
+    expect(await screen.findByText('This Drive already has Swifty data')).toBeInTheDocument()
+    expect(screen.getByTestId('setup-conflict-file')).toHaveTextContent('vault.swsync')
+    expect(setupCreateCmd).not.toHaveBeenCalled()
   })
 
-  it('picks a backup file on restore', async () => {
-    vi.mocked(pickBackup).mockResolvedValue('/tmp/vault.swftx')
+  it('archives the old one when the new password is kept', async () => {
+    const { store } = renderWithStore(<Start />)
+    await reachConflict()
+
+    await userEvent.click(await screen.findByTestId('setup-archive-button'))
+
+    expect(setupCreateCmd).toHaveBeenCalledWith(STRONG, true)
+    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+  })
+
+  it('hands over to the restore screen without asking Google again', async () => {
     renderWithStore(<Start />)
+    await reachConflict()
 
-    await userEvent.click(screen.getByText('Restore from Backup'))
-    await userEvent.click(screen.getByText('Choose backup File'))
+    await userEvent.click(await screen.findByTestId('setup-unlock-existing-button'))
 
-    expect(pickBackup).toHaveBeenCalledOnce()
-    expect(await screen.findByPlaceholderText('Enter Master Password')).toBeInTheDocument()
+    expect(await screen.findByTestId('drive-password-input')).toBeInTheDocument()
+    // One connect for the whole flow: the found file is already in hand.
+    expect(setupDriveConnect).toHaveBeenCalledOnce()
+  })
+})
+
+describe('restoring from Google Drive', () => {
+  const openDrive = async () => {
+    await userEvent.click(screen.getByTestId('start-drive-button'))
+  }
+
+  it('waits on consent, then unlocks the pack the probe found', async () => {
+    const { store } = renderWithStore(<Start />)
+    await openDrive()
+
+    expect(setupDriveConnect).toHaveBeenCalledOnce()
+    expect(screen.getByTestId('drive-spinner')).toBeInTheDocument()
+
+    await act(async () => setupDriveProbed(REMOTE))
+    expect(screen.getByTestId('drive-found-file')).toHaveTextContent('vault.swsync')
+
+    await userEvent.type(screen.getByTestId('drive-password-input'), STRONG)
+    await userEvent.click(screen.getByTestId('drive-unlock-button'))
+
+    expect(setupRestoreFromDrive).toHaveBeenCalledWith(STRONG)
+    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+  })
+
+  it('names the password as the problem when the pack will not open', async () => {
+    vi.mocked(setupRestoreFromDrive).mockRejectedValueOnce('invalid master password')
+    const { store } = renderWithStore(<Start />)
+    await openDrive()
+    await act(async () => setupDriveProbed(REMOTE))
+
+    await userEvent.type(screen.getByTestId('drive-password-input'), 'wrong-password')
+    await userEvent.click(screen.getByTestId('drive-unlock-button'))
+
+    expect(await screen.findByText(/isn't the password this was sealed with/)).toBeInTheDocument()
+    expect(store.getState().flow.name).not.toBe('main')
+  })
+
+  it('sends a bare account back to the create flow, keeping the connection', async () => {
+    const { store } = renderWithStore(<Start />)
+    await openDrive()
+    await act(async () => setupDriveProbed(null))
+
+    expect(screen.getByText('Nothing here yet')).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('drive-start-fresh-button'))
+
+    // The sync step is skipped: Drive has already been agreed to.
+    await userEvent.type(screen.getByTestId('setup-password-input'), STRONG)
+    await userEvent.type(screen.getByTestId('setup-confirm-password-input'), STRONG)
+    await userEvent.click(screen.getByTestId('setup-continue-button'))
+
+    expect(setupCreateCmd).toHaveBeenCalledWith(STRONG, false)
+    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+  })
+
+  it('gives the pending tokens back when the user walks away', async () => {
+    const { store } = renderWithStore(<Start />)
+    await openDrive()
+    await act(async () => setupDriveProbed(REMOTE))
+
+    await userEvent.click(screen.getByTestId('go-back-button'))
+
+    expect(setupDriveDisconnect).toHaveBeenCalledOnce()
+    expect(store.getState().setup.drive).toEqual({ status: 'idle', file: null, error: null })
+    expect(screen.getByTestId('start-setup-button')).toBeInTheDocument()
+  })
+})
+
+describe('restoring from a backup file', () => {
+  it('picks a file, then unseals it with its own password', async () => {
+    vi.mocked(pickBackup).mockResolvedValue('/tmp/swifty-backup.swftx')
+    const { store } = renderWithStore(<Start />)
+
+    await userEvent.click(screen.getByTestId('start-restore-button'))
+    await userEvent.click(screen.getByTestId('restore-dropzone'))
+
+    expect(await screen.findByTestId('restore-found-file')).toHaveTextContent(
+      'swifty-backup.swftx'
+    )
+
+    await userEvent.type(screen.getByTestId('restore-password-input'), STRONG)
+    await userEvent.click(screen.getByTestId('restore-confirm-button'))
+
+    expect(importBackup).toHaveBeenCalledWith('/tmp/swifty-backup.swftx', STRONG)
+    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+  })
+})
+
+describe('the biometric step', () => {
+  const reachBiometric = async () => {
+    vi.mocked(isBiometricAvailable).mockResolvedValue(true)
+    const rendered = renderWithStore(<Start />)
+    await choosePassword()
+    await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
+    await screen.findByTestId('setup-enable-biometric-button')
+    return rendered
+  }
+
+  it('is only offered where the device has a gate to offer', async () => {
+    vi.mocked(isBiometricAvailable).mockResolvedValue(false)
+    const { store } = renderWithStore(<Start />)
+    await choosePassword()
+    await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
+
+    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    expect(screen.queryByTestId('setup-enable-biometric-button')).not.toBeInTheDocument()
+  })
+
+  it('enrolls and then opens the app', async () => {
+    const { store } = await reachBiometric()
+
+    expect(store.getState().flow.name).not.toBe('main')
+    await userEvent.click(screen.getByTestId('setup-enable-biometric-button'))
+
+    expect(enableBiometric).toHaveBeenCalledOnce()
+    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+  })
+
+  it('opens the app just the same when it is declined', async () => {
+    const { store } = await reachBiometric()
+
+    await userEvent.click(screen.getByTestId('setup-skip-biometric-button'))
+
+    expect(enableBiometric).not.toHaveBeenCalled()
+    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
   })
 })

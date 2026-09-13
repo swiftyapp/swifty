@@ -11,6 +11,7 @@ import { createThemeSlice, type ThemeSlice } from './themeSlice'
 import { createUpdateSlice, type UpdateSlice } from './updateSlice'
 import { createUiSlice, type UiSlice } from './uiSlice'
 import { createShareSlice, type ShareSlice } from './shareSlice'
+import { createSetupSlice, type SetupSlice } from './setupSlice'
 import { createAsyncSlice, cancelScheduledSync, type AsyncSlice } from './thunks'
 
 export type StoreState = FlowSlice &
@@ -24,6 +25,7 @@ export type StoreState = FlowSlice &
   UpdateSlice &
   UiSlice &
   ShareSlice &
+  SetupSlice &
   AsyncSlice
 
 export const useStore = create<StoreState>()((...a) => ({
@@ -38,6 +40,7 @@ export const useStore = create<StoreState>()((...a) => ({
   ...createUpdateSlice(...a),
   ...createUiSlice(...a),
   ...createShareSlice(...a),
+  ...createSetupSlice(...a),
   ...createAsyncSlice(...a)
 }))
 
@@ -52,6 +55,7 @@ const pickData = (s: StoreState) => ({
   update: s.update,
   ui: s.ui,
   share: s.share,
+  setup: s.setup,
   // Both read a persisted preference at slice creation, so a test that changes
   // one has to have it put back like everything else.
   sort: s.sort,
@@ -141,8 +145,13 @@ export const {
   purgeEntry,
   toggleFavorite,
   enterMain,
-  completeSetup,
-  restoreBackup
+  setupCreate,
+  restoreFromDrive,
+  restoreBackup,
+  setupDrivePending,
+  setupDriveProbed,
+  setupDriveFailed,
+  setupDriveReset
 } = useStore.getState()
 
 // Starts a new entry of `type` from anywhere (kind picker, palette command,

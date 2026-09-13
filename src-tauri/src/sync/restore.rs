@@ -5,14 +5,11 @@
 //! merges instead (the sync engine); replacing an existing DB with a remote
 //! snapshot would silently discard whatever had not been pushed yet.
 
-// Not yet reachable from the UI. Adopting a remote vault onto a *fresh* install
-// needs two things this build cannot supply at that moment: the master password
-// (there is no onboarding screen that asks for it before a vault exists) and the
-// Drive credentials, which are sealed under the vault key and so do not exist
-// until a vault does. Kept wired and tested because it is the only correct
-// answer once a "Restore from Drive" onboarding step lands — the alternative,
-// overwriting a local vault with a remote one, is what this PR deleted.
-#![allow(dead_code)]
+// Reached from onboarding's `setup_restore_from_drive`, which is what supplies
+// the two things this path needs and no other caller can: the master password
+// (asked for on a screen that runs before a vault exists) and Drive credentials
+// held in memory, since the token file is sealed under a vault key that does not
+// exist until this function has produced one.
 
 use std::fs;
 use std::path::Path;

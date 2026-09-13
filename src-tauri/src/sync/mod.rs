@@ -13,6 +13,9 @@ pub(crate) mod drive;
 pub mod engine;
 pub mod pack;
 pub mod restore;
+// First-run onboarding's keyless view of the account. Named for the flow, not
+// for `setup` below — modules and functions live in separate namespaces.
+pub mod setup;
 
 use std::sync::Mutex;
 
@@ -35,6 +38,38 @@ pub(crate) async fn access_token(
 ) -> Result<String> {
     auth::access_token(client, app, cryptor).await
 }
+
+/// The OAuth tokens for one account, as onboarding holds them: in memory, for
+/// the stretch between the user approving consent and a vault key existing to
+/// seal them under.
+pub(crate) use auth::Tokens;
+
+/// Seal `tokens` under `cryptor` and write them where a later unlock will find
+/// them — the step [`setup`] does for itself and onboarding defers.
+pub(crate) fn persist_tokens(app: &AppHandle, cryptor: &Cryptor, tokens: &Tokens) -> Result<()> {
+    auth::write_tokens(app, cryptor, tokens)
+}
+
+/// A valid access token for in-memory `tokens`, refreshed in place if expired.
+pub(crate) async fn fresh_access_token(
+    client: &Client,
+    app: &AppHandle,
+    tokens: &mut Tokens,
+) -> Result<String> {
+    auth::fresh_access_token(client, app, tokens).await
+}
+
+/// The desktop consent flow without the persisting: onboarding's half of
+/// [`setup`], for an install that has no vault key yet.
+#[cfg(desktop)]
+pub(crate) fn obtain_tokens(app: &AppHandle) -> Result<Tokens> {
+    auth::obtain_tokens(app)
+}
+
+/// The mobile twin of [`obtain_tokens`]: redeem a code the deep-link handler
+/// accepted, and hand the tokens back rather than writing them.
+#[cfg(mobile)]
+pub(crate) use auth::exchange_for_tokens;
 
 /// Install the ring rustls provider, once per process.
 ///

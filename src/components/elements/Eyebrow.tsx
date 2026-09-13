@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react'
 import { LABEL_TYPE } from './tokens'
 
-type Tone = 'muted' | 'bad'
+type Tone = 'muted' | 'warn' | 'bad'
+
+const TONES: Record<Tone, string> = {
+  muted: 'text-text3',
+  warn: 'text-warn',
+  bad: 'text-bad'
+}
 
 interface Props {
   children: ReactNode
@@ -19,7 +25,7 @@ export default function Eyebrow({
   busy,
   testid
 }: Props) {
-  const text = tone === 'bad' ? 'text-bad' : 'text-text3'
+  const text = TONES[tone]
 
   return (
     <div className={`flex items-center justify-center ${LABEL_TYPE}`}>

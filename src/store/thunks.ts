@@ -10,9 +10,9 @@ import {
   setFavorite,
   getAudit,
   syncNow,
-  setup,
-  readVault,
   importBackup,
+  setupCreate as setupCreateCmd,
+  setupRestoreFromDrive,
   setAutolockTimeout,
   scanSupported
 } from '@/lib/commands'
@@ -34,8 +34,14 @@ export interface AsyncSlice {
   purgeEntry: (id: string) => Promise<void>
   toggleFavorite: (id: string) => Promise<void>
   enterMain: (result: UnlockResult) => Promise<void>
-  completeSetup: (password: string) => Promise<void>
-  restoreBackup: (path: string, password: string) => Promise<void>
+  /**
+   * The three ways a first run ends with an unlocked session. None of them
+   * enters main: the setup flow has one more question to ask (biometrics)
+   * before the app takes over, so it is the caller that decides when.
+   */
+  setupCreate: (password: string, archiveRemote: boolean) => Promise<UnlockResult>
+  restoreFromDrive: (password: string) => Promise<UnlockResult>
+  restoreBackup: (path: string, password: string) => Promise<UnlockResult>
   runAudit: () => Promise<void>
 }
 
@@ -186,14 +192,8 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       if (result.syncConfigured) syncNow().catch(() => {})
       refreshAudit()
     },
-    completeSetup: async password => {
-      await setup(password)
-      const entries = await readVault()
-      await get().enterMain({ entries, syncConfigured: false })
-    },
-    restoreBackup: async (path, password) => {
-      const result = await importBackup(path, password)
-      await get().enterMain(result)
-    }
+    setupCreate: (password, archiveRemote) => setupCreateCmd(password, archiveRemote),
+    restoreFromDrive: password => setupRestoreFromDrive(password),
+    restoreBackup: (path, password) => importBackup(path, password)
   }
 }

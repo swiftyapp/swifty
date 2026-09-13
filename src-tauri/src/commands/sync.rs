@@ -18,6 +18,8 @@ use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::models::{EntryMetaDto, SyncStatus};
 use crate::state::AppState;
+#[cfg(mobile)]
+use crate::state::AuthPurpose;
 use crate::sync;
 
 /// Connect a sync provider (OAuth), then publish/adopt straight away so the
@@ -46,7 +48,7 @@ pub async fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    start_consent(&app, &state, false)
+    start_consent(&app, &state, AuthPurpose::Connect)
 }
 
 // Disconnect the sync provider (keeps the refresh token, per legacy).
@@ -100,7 +102,7 @@ pub async fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<(
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    start_consent(&app, &state, true)
+    start_consent(&app, &state, AuthPurpose::Import)
 }
 
 /// Take on whatever the account holds, reporting through `vault:pull:*`.
@@ -147,19 +149,39 @@ const RESUME_GRACE: Duration = Duration::from_secs(3);
 /// delivers the redirect on a later turn of the same (main) run loop, so this
 /// call has long returned by then. A flow already pending is simply replaced —
 /// its nonce dies with it, so its redirect, if one ever comes, is foreign.
+///
+/// Crate-visible: onboarding's `setup_drive_connect` is the same flow with a
+/// different purpose, and must not fork the bookkeeping.
 #[cfg(mobile)]
-fn start_consent(app: &AppHandle, state: &AppState, import: bool) -> Result<()> {
-    let cryptor = state.session.lock().unwrap().cryptor()?;
+pub(crate) fn start_consent(app: &AppHandle, state: &AppState, purpose: AuthPurpose) -> Result<()> {
+    // Setup runs before any vault exists, so there is no session to take a
+    // cryptor from — and nothing to seal the tokens with until the restore or
+    // create that follows makes a key.
+    let cryptor = match purpose {
+        AuthPurpose::Setup => None,
+        _ => Some(state.session.lock().unwrap().cryptor()?),
+    };
     let started = sync::begin(app)?;
     *state.pending_auth.lock().unwrap() = Some(crate::state::PendingAuth {
         verifier: started.verifier,
         state: started.state,
         cryptor,
-        import,
+        purpose,
         started: std::time::Instant::now(),
     });
-    let _ = app.emit("sync:pending", ());
+    let _ = app.emit(pending_event(purpose), ());
     Ok(())
+}
+
+/// Which "the browser is out" event a flow announces itself with. Onboarding
+/// has its own `setup:drive:*` family because it runs on a screen that knows
+/// nothing about sync settings.
+#[cfg(mobile)]
+fn pending_event(purpose: AuthPurpose) -> &'static str {
+    match purpose {
+        AuthPurpose::Setup => crate::commands::setup::PENDING_EVENT,
+        _ => "sync:pending",
+    }
 }
 
 /// iOS reopened the app with a URL. If it is Google's answer to the consent
@@ -180,6 +202,7 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
     };
     // Judge the URL against the pending request *before* consuming it, so a URL
     // that is not the answer costs the real answer nothing.
+    let purpose = pending.purpose;
     let code = match sync::parse_redirect(url, &pending.state) {
         sync::Redirect::Foreign => {
             log::warn!("ignoring a redirect that does not answer the pending sign-in");
@@ -188,7 +211,7 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
         sync::Redirect::Denied(why) => {
             slot.take();
             drop(slot);
-            fail(app, why);
+            fail(app, purpose, why);
             return;
         }
         sync::Redirect::Code(code) => code,
@@ -196,22 +219,37 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
     let pending = slot.take().expect("checked above");
     drop(slot);
     if pending.started.elapsed() > CONSENT_TTL {
-        fail(app, "Google sign-in took too long; try again".into());
+        fail(
+            app,
+            purpose,
+            "Google sign-in took too long; try again".into(),
+        );
         return;
     }
 
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        match sync::complete(&app, &pending.cryptor, &code, &pending.verifier).await {
+        // Onboarding has nowhere to write tokens yet and a different story to
+        // tell the frontend, so it finishes the exchange for itself.
+        if purpose == AuthPurpose::Setup {
+            crate::commands::setup::on_consent(&app, &code, &pending.verifier).await;
+            return;
+        }
+        // Unreachable: every other purpose is started from an unlocked session.
+        let Some(cryptor) = pending.cryptor else {
+            fail(&app, purpose, "the vault was locked during sign-in".into());
+            return;
+        };
+        match sync::complete(&app, &cryptor, &code, &pending.verifier).await {
             Ok(()) => {
                 connected(&app);
-                if pending.import {
-                    let _ = pull(&app, pending.cryptor).await;
+                if purpose == AuthPurpose::Import {
+                    let _ = pull(&app, cryptor).await;
                 } else {
                     start_run(&app);
                 }
             }
-            Err(e) => fail(&app, e.to_string()),
+            Err(e) => fail(&app, purpose, e.to_string()),
         }
     });
 }
@@ -248,17 +286,25 @@ pub fn on_resume(app: &AppHandle) {
                 _ => None,
             }
         };
-        if abandoned.is_some() {
-            fail(&app, "Google sign-in was cancelled".into());
+        if let Some(abandoned) = abandoned {
+            fail(
+                &app,
+                abandoned.purpose,
+                "Google sign-in was cancelled".into(),
+            );
         }
     });
 }
 
 /// The consent flow ended without a connection. One place, so every ending
-/// reports the same way.
+/// reports the same way — on whichever event family the flow was started under.
 #[cfg(mobile)]
-fn fail(app: &AppHandle, why: String) {
+fn fail(app: &AppHandle, purpose: AuthPurpose, why: String) {
     log::warn!("sync connect failed: {why}");
+    if purpose == AuthPurpose::Setup {
+        crate::commands::setup::emit_error(app, &why);
+        return;
+    }
     let _ = app.emit("sync:error", json!({ "error": why }));
 }
 

@@ -14,6 +14,9 @@ import {
   syncConnected,
   syncFailed,
   syncDisconnected,
+  setupDrivePending,
+  setupDriveProbed,
+  setupDriveFailed,
   resetVaultData
 } from './index'
 
@@ -48,6 +51,11 @@ export const subscribeToEvents = (): (() => void) => {
       refreshOpenArchive()
     }),
     on(EVENTS.auditDone, payload => auditDone(payload.data)),
+    // The first run's own consent flow: the same pending/result/error trio as
+    // sync, against an account there is no vault behind yet.
+    on(EVENTS.setupDrivePending, () => setupDrivePending()),
+    on(EVENTS.setupDriveProbed, payload => setupDriveProbed(payload.file)),
+    on(EVENTS.setupDriveError, payload => setupDriveFailed(payload.error)),
     // Ask, don't assume: hardcoding `false` here meant the Touch ID button only
     // ever appeared on a fresh boot (App.tsx runs the same check), never on an
     // in-session lock — including the very first lock after enabling it.
