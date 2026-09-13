@@ -203,6 +203,26 @@ convert it into the encrypted database.)
   user consents to restart (or the next time they quit and reopen). This replaces
   the earlier silent-on-launch install.
 
+## Sharing a secret
+
+A share (see `docs/share-design.md`) is one entry, sanitized, sealed under a
+fresh random 256-bit AES-GCM key and uploaded to the sender's own Drive as an
+"anyone with the link" file. The link carries the file id and the key.
+
+- **Google** holds ciphertext, the file's creation time, the entry kind and the
+  sender's opaque local entry id. It never holds the key and cannot read the
+  entry. Neither the vault key nor the master passphrase is involved.
+- **The link is the secret.** Anyone who obtains it before it expires or is
+  revoked can open the share. Swifty cannot defend the channel the sender chose
+  to send it over; it limits the exposure to 24 hours and lets the sender revoke
+  earlier.
+- **Integrity.** AES-GCM authentication means a modified or substituted file
+  fails to open rather than yielding a tampered entry.
+- **The public API key** used to download shares is an identifier, not a
+  credential: it grants no access to anything not already public.
+- **One-time is approximate.** Without a server nothing can count reads. A
+  share stays openable until it expires or is revoked.
+
 ## What Swifty explicitly does NOT defend against
 
 - **A compromised operating system.** Code running as the user — malware, a

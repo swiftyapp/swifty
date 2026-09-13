@@ -6,6 +6,8 @@
 //! `.swsync` pack — SQLCipher ciphertext with a binary header — and routing it
 //! through `String` would either corrupt it or fail to decode.
 
+use std::collections::BTreeMap;
+
 use reqwest::Client;
 use serde_json::{json, Value};
 
@@ -15,20 +17,25 @@ const FILES: &str = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD: &str = "https://www.googleapis.com/upload/drive/v3/files";
 // `createdTime` drives the deterministic pick below; `headRevisionId` is the
 // change token the engine uses to detect a push that landed under it.
-const LIST_FIELDS: &str = "files(id, name, createdTime, headRevisionId)";
-const FILE_FIELDS: &str = "id, createdTime, headRevisionId";
+const LIST_FIELDS: &str = "files(id, name, createdTime, headRevisionId, appProperties)";
+const FILE_FIELDS: &str = "id, name, createdTime, headRevisionId, appProperties";
 const FILE_MIME: &str = "application/octet-stream";
 const FOLDER_MIME: &str = "application/vnd.google-apps.folder";
 
-/// One Drive object, with the two fields selection and race detection need.
+/// One Drive object, with the fields selection and race detection need.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DriveFile {
     pub id: String,
+    pub name: String,
     pub created_time: String,
     /// Absent on folders, and on a file Drive has not yet assigned a revision
     /// to. The engine treats an absent revision as "unknown", which only costs
     /// it a race check, never correctness.
     pub head_revision: Option<String>,
+    /// `appProperties`: private per-file metadata, visible only to this OAuth
+    /// client. Sharing stores its bookkeeping (entry id, kind, expiry) here so
+    /// a listing alone answers what a share is, without downloading it.
+    pub app_properties: BTreeMap<String, String>,
 }
 
 fn other<E: std::fmt::Display>(e: E) -> Error {
@@ -71,9 +78,25 @@ async fn find_all(client: &Client, token: &str, q: &str) -> Result<Vec<DriveFile
 fn parse_file(value: &Value) -> Option<DriveFile> {
     Some(DriveFile {
         id: value["id"].as_str()?.to_string(),
+        name: value["name"].as_str().unwrap_or("").to_string(),
         created_time: value["createdTime"].as_str().unwrap_or("").to_string(),
         head_revision: value["headRevisionId"].as_str().map(String::from),
+        app_properties: parse_properties(&value["appProperties"]),
     })
+}
+
+// Drive declares appProperties as string->string, but a value that is not a
+// string is simply dropped rather than stringified: a caller reading one back
+// expects what it wrote, and `"1"` and `1` are not the same key to it.
+fn parse_properties(value: &Value) -> BTreeMap<String, String> {
+    value
+        .as_object()
+        .map(|map| {
+            map.iter()
+                .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string())))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// The oldest match, `id` breaking an exact tie.
@@ -103,6 +126,28 @@ pub async fn folder_id(client: &Client, token: &str, name: &str) -> Result<Optio
         escape(name)
     );
     Ok(oldest(find_all(client, token, &q).await?).map(|f| f.id))
+}
+
+/// [`folder_id`], scoped to one parent — the same oldest-wins rule, so two
+/// devices racing to create the same subfolder still settle on one.
+pub async fn folder_id_in(
+    client: &Client,
+    token: &str,
+    name: &str,
+    parent: &str,
+) -> Result<Option<String>> {
+    let q = format!(
+        "name = '{}' and mimeType = '{FOLDER_MIME}' and trashed = false and '{}' in parents",
+        escape(name),
+        escape(parent)
+    );
+    Ok(oldest(find_all(client, token, &q).await?).map(|f| f.id))
+}
+
+/// Every non-trashed file directly under `parent`.
+pub async fn list_children(client: &Client, token: &str, parent: &str) -> Result<Vec<DriveFile>> {
+    let q = format!("'{}' in parents and trashed = false", escape(parent));
+    find_all(client, token, &q).await
 }
 
 pub async fn find_file(
@@ -138,11 +183,26 @@ pub async fn read_file(client: &Client, token: &str, id: &str) -> Result<Vec<u8>
     Ok(body.to_vec())
 }
 
+/// A folder in the account root.
 pub async fn create_folder(client: &Client, token: &str, name: &str) -> Result<String> {
+    create_folder_in(client, token, name, None).await
+}
+
+/// A folder, optionally inside `parent`.
+pub async fn create_folder_in(
+    client: &Client,
+    token: &str,
+    name: &str,
+    parent: Option<&str>,
+) -> Result<String> {
+    let mut metadata = json!({ "name": name, "mimeType": FOLDER_MIME });
+    if let Some(parent) = parent {
+        metadata["parents"] = json!([parent]);
+    }
     let resp = client
         .post(FILES)
         .bearer_auth(token)
-        .json(&json!({ "name": name, "mimeType": FOLDER_MIME }))
+        .json(&metadata)
         .send()
         .await
         .map_err(other)?;
@@ -154,9 +214,6 @@ pub async fn create_folder(client: &Client, token: &str, name: &str) -> Result<S
 }
 
 /// multipart/related upload: a JSON metadata part, then the raw pack bytes.
-///
-/// The envelope is assembled by hand because the body is binary — it is spliced
-/// in between UTF-8 boundary lines rather than formatted into a `String`.
 pub async fn create_file(
     client: &Client,
     token: &str,
@@ -164,18 +221,27 @@ pub async fn create_file(
     parent: &str,
     content: &[u8],
 ) -> Result<DriveFile> {
-    let metadata = json!({ "name": name, "mimeType": FILE_MIME, "parents": [parent] });
-    let boundary = "swifty-boundary";
-    let head = format!(
-        "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n\
-         --{boundary}\r\nContent-Type: {FILE_MIME}\r\n\r\n"
-    );
-    let tail = format!("\r\n--{boundary}--");
+    create_file_with_properties(client, token, name, parent, content, &[]).await
+}
 
-    let mut body = Vec::with_capacity(head.len() + content.len() + tail.len());
-    body.extend_from_slice(head.as_bytes());
-    body.extend_from_slice(content);
-    body.extend_from_slice(tail.as_bytes());
+/// [`create_file`] plus `appProperties` — private metadata the listing carries
+/// back, so a caller can tell its files apart without downloading them.
+pub async fn create_file_with_properties(
+    client: &Client,
+    token: &str,
+    name: &str,
+    parent: &str,
+    content: &[u8],
+    properties: &[(&str, &str)],
+) -> Result<DriveFile> {
+    let mut metadata = json!({ "name": name, "mimeType": FILE_MIME, "parents": [parent] });
+    if !properties.is_empty() {
+        metadata["appProperties"] = properties
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), Value::from(*v)))
+            .collect::<serde_json::Map<_, _>>()
+            .into();
+    }
 
     let resp = client
         .post(UPLOAD)
@@ -183,13 +249,93 @@ pub async fn create_file(
         .query(&[("uploadType", "multipart"), ("fields", FILE_FIELDS)])
         .header(
             reqwest::header::CONTENT_TYPE,
-            format!("multipart/related; boundary={boundary}"),
+            format!("multipart/related; boundary={BOUNDARY}"),
         )
-        .body(body)
+        .body(multipart_body(&metadata, content))
         .send()
         .await
         .map_err(other)?;
     parse_file(&check(resp).await?).ok_or_else(|| Error::Other("Drive API returned no id".into()))
+}
+
+const BOUNDARY: &str = "swifty-boundary";
+
+/// The envelope is assembled by hand because the body is binary — it is spliced
+/// in between UTF-8 boundary lines rather than formatted into a `String`.
+fn multipart_body(metadata: &Value, content: &[u8]) -> Vec<u8> {
+    let head = format!(
+        "--{BOUNDARY}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n\
+         --{BOUNDARY}\r\nContent-Type: {FILE_MIME}\r\n\r\n"
+    );
+    let tail = format!("\r\n--{BOUNDARY}--");
+
+    let mut body = Vec::with_capacity(head.len() + content.len() + tail.len());
+    body.extend_from_slice(head.as_bytes());
+    body.extend_from_slice(content);
+    body.extend_from_slice(tail.as_bytes());
+    body
+}
+
+/// Grant read access to anyone holding the file's id — what turns an uploaded
+/// share into a link the recipient can fetch without a Google account.
+///
+/// The bytes are sealed before they are uploaded, so "anyone with the link" is
+/// only as open as the key the sender hands over out of band.
+pub async fn share_with_anyone(client: &Client, token: &str, id: &str) -> Result<()> {
+    let resp = client
+        .post(format!("{FILES}/{id}/permissions"))
+        .bearer_auth(token)
+        .json(&json!({ "type": "anyone", "role": "reader" }))
+        .send()
+        .await
+        .map_err(other)?;
+    check(resp).await.map(|_| ())
+}
+
+/// Delete a file. Already gone counts as deleted — that is the state the caller
+/// asked for, and revoke/sweep both race other devices doing the same thing.
+pub async fn delete_file(client: &Client, token: &str, id: &str) -> Result<()> {
+    let resp = client
+        .delete(format!("{FILES}/{id}"))
+        .bearer_auth(token)
+        .send()
+        .await
+        .map_err(other)?;
+    if resp.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(());
+    }
+    check(resp).await.map(|_| ())
+}
+
+/// What a recipient is told when the file behind their link is gone. Shared so
+/// the test doubles in `share::remote` fail the same way the real client does.
+pub(crate) const SHARE_GONE: &str = "this share has expired or was revoked";
+
+/// Download a link-shared file with only an API key — the recipient side, which
+/// has no Google account and therefore no bearer token. The key identifies the
+/// calling project for quota; it grants nothing on its own.
+pub async fn download_public(client: &Client, api_key: &str, id: &str) -> Result<Vec<u8>> {
+    let resp = client
+        .get(format!("{FILES}/{id}"))
+        .query(&[("alt", "media"), ("key", api_key)])
+        .send()
+        .await
+        .map_err(other)?;
+    let status = resp.status();
+    let body = resp.bytes().await.map_err(other)?;
+    if status == reqwest::StatusCode::NOT_FOUND {
+        // The only two ways a share the recipient was given disappears, and
+        // Drive cannot tell them apart — nor could the recipient act on the
+        // difference.
+        return Err(Error::Other(SHARE_GONE.into()));
+    }
+    if !status.is_success() {
+        return Err(Error::Other(format!(
+            "Drive API {status}: {}",
+            String::from_utf8_lossy(&body)
+        )));
+    }
+    Ok(body.to_vec())
 }
 
 /// Overwrite a file's content, returning its new head revision.
@@ -217,7 +363,8 @@ pub async fn update_file(
 
 #[cfg(test)]
 mod tests {
-    use super::{escape, oldest, DriveFile};
+    use super::{escape, multipart_body, oldest, parse_file, parse_properties, DriveFile};
+    use serde_json::json;
 
     #[test]
     fn escapes_quotes_and_backslashes() {
@@ -231,8 +378,10 @@ mod tests {
     fn file(id: &str, created: &str) -> DriveFile {
         DriveFile {
             id: id.into(),
+            name: String::new(),
             created_time: created.into(),
             head_revision: None,
+            app_properties: Default::default(),
         }
     }
 
@@ -256,5 +405,58 @@ mod tests {
     #[test]
     fn no_matches_selects_nothing() {
         assert_eq!(oldest(vec![]), None);
+    }
+
+    #[test]
+    fn a_listed_file_carries_its_name_and_properties() {
+        let parsed = parse_file(&json!({
+            "id": "f1",
+            "name": "share-1.swshare",
+            "createdTime": "2024-01-01T00:00:00.000Z",
+            "headRevisionId": "r1",
+            "appProperties": { "kind": "login", "expiresAt": "1700000000000" },
+        }))
+        .unwrap();
+
+        assert_eq!(parsed.name, "share-1.swshare");
+        assert_eq!(parsed.app_properties["kind"], "login");
+        assert_eq!(parsed.app_properties["expiresAt"], "1700000000000");
+        assert_eq!(parsed.head_revision.as_deref(), Some("r1"));
+    }
+
+    // The sync engine selects neither field, so every existing caller still
+    // parses — it just reads them as empty.
+    #[test]
+    fn a_file_without_name_or_properties_still_parses() {
+        let parsed = parse_file(&json!({ "id": "f1" })).unwrap();
+        assert_eq!(parsed.name, "");
+        assert!(parsed.app_properties.is_empty());
+    }
+
+    #[test]
+    fn non_string_property_values_are_dropped() {
+        let props = parse_properties(&json!({ "kind": "login", "count": 3, "on": true }));
+        assert_eq!(props.len(), 1);
+        assert_eq!(props["kind"], "login");
+    }
+
+    #[test]
+    fn no_properties_object_is_no_properties() {
+        assert!(parse_properties(&json!(null)).is_empty());
+        assert!(parse_properties(&json!("nonsense")).is_empty());
+    }
+
+    // Binary content must survive the envelope byte for byte — the share is
+    // ciphertext, and a lossy round trip through `String` would corrupt it.
+    #[test]
+    fn the_upload_envelope_splices_raw_bytes_between_the_boundaries() {
+        let content = [0x00u8, 0xff, 0x1a, b'\r', b'\n'];
+        let body = multipart_body(&json!({ "name": "x" }), &content);
+
+        let text = String::from_utf8_lossy(&body);
+        assert!(text.starts_with("--swifty-boundary\r\n"));
+        assert!(text.contains("{\"name\":\"x\"}"));
+        assert!(body.ends_with(b"\r\n--swifty-boundary--"));
+        assert!(body.windows(content.len()).any(|w| w == content));
     }
 }
