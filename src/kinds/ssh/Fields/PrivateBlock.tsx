@@ -38,10 +38,14 @@ export default function PrivateBlock() {
     .join(' · ')
 
   return (
-    <Panel>
+    // A flex column that grows: beside a plate taller than the rows, the block
+    // takes the difference and its sealed body fills the panel (see `Read`).
+    <Panel className="flex flex-1 flex-col">
       <div className="flex items-center gap-2.5 px-3.5 py-3 inset-shadow-hairline">
         <span className={`flex-1 ${LABEL}`}>{t('Private key')}</span>
-        <span className={`${META} truncate font-mono`}>{weight}</span>
+        {/* `min-w-0`, or the flex item refuses to shrink and the header spills
+            beside a narrow plate. */}
+        <span className={`${META} min-w-0 truncate font-mono`}>{weight}</span>
         <IconButton
           title={shown ? t('Hide') : t('Reveal')}
           active={shown}
@@ -54,7 +58,7 @@ export default function PrivateBlock() {
       </div>
 
       <div
-        className="relative whitespace-pre-wrap break-all bg-field px-3.5 py-3 font-mono text-xs leading-[1.65] text-text2"
+        className="relative flex-1 whitespace-pre-wrap break-all bg-field px-3.5 py-3 font-mono text-xs leading-[1.65] text-text2"
         data-testid="entry-value-privateKey"
       >
         {head && <div>{head}</div>}

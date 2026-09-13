@@ -318,18 +318,6 @@
   --inset-shadow-hairline: inset 0 -1px 0 var(--c-line);
 
   /*
-   * The plate (see kinds/ssh/Face): a slab of slate that, unlike the card and
-   * the document, follows the theme — `bg-plate`, `text-plate-ink`,
-   * `border-plate-rule`, `shadow-plate`.
-   */
-  --background-image-plate: var(--plate);
-  --color-plate-ink: var(--plate-ink);
-  --color-plate-ink2: var(--plate-ink2);
-  --color-plate-rule: var(--plate-rule);
-  --color-plate-hover: var(--plate-hover);
-  --shadow-plate: var(--plate-shadow);
-
-  /*
    * Per-kind identity inks (see src/kinds). A solid for the glyph and a soft
    * wash for the tile behind it, so `text-kind-card` / `bg-kind-card-soft`
    * compile. One pair per kind in `KINDS` — a new kind adds a new pair here
@@ -554,19 +542,37 @@
     inset 0 2px 5px rgba(20, 22, 26, 0.13),
     0 1px 0 rgba(255, 255, 255, 0.75);
   /*
-   * The plate: on the light palette a light slate — the identity document's
-   * paper, so the two objects read as one family — never the prototype's black
-   * slab, which only the dark palette gets.
+   * The faces (see elements/Face): the stock an object in the vault is cut
+   * from. `paper` is the ID document's, and it is not overridden on the dark
+   * palette — a document stays light when the app goes dark. `slate` is the SSH
+   * fingerprint plate's: this same paper on the light palette, and on the dark
+   * one (below) a slab a shade off the pane.
    */
-  --plate: linear-gradient(160deg, #fbfbfc, #eceef2 58%, #f4f5f8);
-  --plate-ink: #1b1d21;
-  --plate-ink2: #6c6f77;
-  --plate-rule: rgba(20, 22, 26, 0.14);
-  --plate-hover: rgba(20, 22, 26, 0.055);
-  --plate-glow: rgba(255, 255, 255, 0.9);
-  --plate-shadow:
-    0 12px 28px rgba(24, 26, 30, 0.14),
+  --paper-bg: linear-gradient(160deg, #fbfbfc, #eceef2 58%, #f4f5f8);
+  --paper-sheen: radial-gradient(
+    120% 90% at 88% -12%,
+    #ffffff 0%,
+    rgba(255, 255, 255, 0) 62%
+  );
+  --paper-edge: rgba(20, 22, 26, 0.13);
+  --paper-shadow:
+    0 4px 14px rgba(24, 26, 30, 0.07),
+    0 1px 2px rgba(24, 26, 30, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --paper-ink: #1b1d21;
+  --paper-ink2: #6c6f77;
+  --paper-rule: rgba(20, 22, 26, 0.09);
+  --paper-tail: rgba(20, 22, 26, 0.035);
+  --paper-hover: rgba(20, 22, 26, 0.055);
+  --slate-bg: var(--paper-bg);
+  --slate-sheen: var(--paper-sheen);
+  --slate-edge: var(--paper-edge);
+  --slate-shadow: var(--paper-shadow);
+  --slate-ink: var(--paper-ink);
+  --slate-ink2: var(--paper-ink2);
+  --slate-rule: var(--paper-rule);
+  --slate-tail: var(--paper-tail);
+  --slate-hover: var(--paper-hover);
 }
 
 :root[data-theme='dark'] {
@@ -627,14 +633,21 @@
   --lockfield-shadow-deep:
     inset 0 2px 5px rgba(0, 0, 0, 0.65),
     0 1px 0 rgba(255, 255, 255, 0.05);
-  /* The prototype's slab, as drawn. */
-  --plate: linear-gradient(160deg, #2b2d33, #16171a 58%, #1d1e22);
-  --plate-ink: #ecedef;
-  --plate-ink2: rgba(236, 237, 239, 0.55);
-  --plate-rule: rgba(255, 255, 255, 0.18);
-  --plate-hover: rgba(255, 255, 255, 0.08);
-  --plate-glow: rgba(255, 255, 255, 0.07);
-  --plate-shadow:
-    0 22px 50px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  /* The slate in the dark: a step up from the detail pane (#1b1c1e), no more. */
+  --slate-bg: linear-gradient(160deg, #27282c, #1e1f22 58%, #232428);
+  --slate-sheen: radial-gradient(
+    120% 90% at 88% -12%,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0) 62%
+  );
+  --slate-edge: rgba(255, 255, 255, 0.1);
+  --slate-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --slate-ink: #ebeced;
+  --slate-ink2: rgba(235, 236, 237, 0.55);
+  --slate-rule: rgba(255, 255, 255, 0.14);
+  --slate-tail: rgba(255, 255, 255, 0.04);
+  --slate-hover: rgba(255, 255, 255, 0.07);
 }
