@@ -24,6 +24,9 @@
 #                               (src-tauri/src/sync/auth.rs). iOS OAuth clients have no
 #                               client secret, so GOOGLE_OAUTH_CLIENT_SECRET is
 #                               deliberately not set here.
+#   GOOGLE_API_KEY              Public Drive API key for receiving shared secrets
+#                               without a login, baked in at compile time
+#                               (src-tauri/src/share/remote.rs). Same key as desktop.
 #
 # Signing is fully automatic: the App Store Connect API key lets Xcode create
 # and download the Apple Distribution certificate and the App Store provisioning
@@ -131,6 +134,7 @@ jobs:
           # Google Drive sync OAuth client, read via option_env! at compile time.
           # iOS clients are public: there is no client secret to set.
           GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_IOS_CLIENT_ID }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           bun run tauri ios build --ci \
