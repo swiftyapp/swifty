@@ -1,9 +1,15 @@
 import Panel from '@/components/elements/Panel'
-import { Field, NoteField } from '@/components/elements/fields'
+import { Field, NoteField, useFields } from '@/components/elements/fields'
 import PrivateKey from './PrivateKey'
 import Fingerprint from './Fingerprint'
+import Read from './Read'
 
 export default function Fields() {
+  const { set } = useFields()
+
+  // Reading, the key is an object (see `Read`); the editor keeps its rows.
+  if (!set) return <Read />
+
   return (
     <Panel>
       <PrivateKey />
