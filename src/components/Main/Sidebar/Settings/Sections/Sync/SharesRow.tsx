@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { shareList, shareRevoke, type ActiveShare } from '@/lib/commands'
-import { useStore } from '@/store'
+import { useStore, revokeOrphans } from '@/store'
 import { kindOf } from '@/kinds'
+import { useNow } from '@/hooks/useNow'
 import { relativeUntil } from '@/utils/time'
 import Button from '@/components/elements/Button'
 import ExpandableRow from '../ExpandableRow'
+
+// How often the countdowns are re-read. A minute is the finest unit they show.
+const TICK_MS = 60_000
 
 // The list, mounted only while the row is unfolded — which is what makes the
 // fetch happen on expand rather than on every visit to this pane.
@@ -14,16 +18,34 @@ function Shares() {
   const entries = useStore(state => state.entries.items)
   const [shares, setShares] = useState<ActiveShare[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const now = useNow(TICK_MS)
 
   useEffect(() => {
     let live = true
-    shareList()
+    // Shares an earlier dialog could not take back go first, so the list that
+    // follows does not show a link that is about to be revoked anyway.
+    revokeOrphans()
+      .then(shareList)
       .then(list => live && setShares(list))
       .catch(reason => live && setError(String(reason)))
     return () => {
       live = false
     }
   }, [])
+
+  // A countdown that has run out while the row sat open: ask again rather
+  // than show "Expired" for a file the backend's own sweep has since deleted.
+  const expired = shares?.some(share => new Date(share.expiresAt).getTime() <= now) ?? false
+  useEffect(() => {
+    if (!expired) return
+    let live = true
+    shareList()
+      .then(list => live && setShares(list))
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [expired, now])
 
   // A share outlives the entry it was cut from: it is a copy, and deleting the
   // original neither revokes it nor gives it a title back.
@@ -56,7 +78,7 @@ function Shares() {
   return (
     <ul data-testid="settings-shares-list" className="flex flex-col gap-2">
       {shares.map(share => {
-        const left = relativeUntil(share.expiresAt)
+        const left = relativeUntil(share.expiresAt, now)
         return (
           <li
             key={share.fileId}

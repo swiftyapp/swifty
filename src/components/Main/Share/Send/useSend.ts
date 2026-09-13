@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { shareCreate, shareRevoke, type ShareCreated } from '@/lib/commands'
-import { useStore, closeSend } from '@/store'
+import { useStore, closeSend, queueOrphan, revokeOrphans } from '@/store'
 import { useCopied } from '@/hooks/useCopied'
 
 /**
@@ -50,6 +50,9 @@ export function useSend(entryId: string): Send {
   const alive = useRef(true)
   useEffect(() => {
     alive.current = true
+    // A share an earlier dialog could not take back is tried again here, on
+    // the way into the next one.
+    void revokeOrphans()
     return () => {
       alive.current = false
     }
@@ -62,10 +65,12 @@ export function useSend(entryId: string): Send {
     shareCreate(entryId)
       .then(created => {
         // Nobody will ever see this link, and the sealed file is already sitting
-        // in the sender's Drive with 24 hours to live. Take it back rather than
-        // leave a share out there that no one asked for and no one can revoke.
+        // in the sender's Drive with 24 hours to live. Take it back — and if
+        // that fails too, remember it, so the next share surface tries again
+        // rather than the share quietly outliving everyone who knew about it.
         if (!alive.current || tag !== request.current) {
-          shareRevoke(created.fileId).catch(() => {})
+          queueOrphan(created.fileId)
+          void revokeOrphans()
           return
         }
         setShare(created)

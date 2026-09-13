@@ -106,6 +106,35 @@ describe('sharing an entry', () => {
     // must not be left sitting in the sender's Drive for 24 hours.
     await vi.waitFor(() => expect(shareRevoke).toHaveBeenCalledWith('file-a'))
     expect(shareRevoke).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(useStore.getState().share.orphans).toEqual([]))
+  })
+
+  it('remembers a share it could not take back, and tries again on the next dialog', async () => {
+    const first = deferred<ShareCreated>()
+    vi.mocked(shareCreate)
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValueOnce(created('file-b'))
+    vi.mocked(shareRevoke).mockRejectedValueOnce('offline')
+    renderWithStore(<Main />, { store: seed() })
+
+    openSend('l1')
+    await screen.findByTestId('share-send-loading')
+    act(() => openSend('l2'))
+    await screen.findByTestId('share-link')
+    await act(async () => first.resolve(created('file-a')))
+
+    // The take-back failed, so the share is still live in Drive and this is the
+    // only record that it exists.
+    await vi.waitFor(() => expect(shareRevoke).toHaveBeenCalledWith('file-a'))
+    expect(useStore.getState().share.orphans).toEqual(['file-a'])
+
+    // Opening any share dialog is the next chance to make it right.
+    act(() => useStore.getState().closeSend())
+    act(() => openSend('l1'))
+
+    await vi.waitFor(() => expect(shareRevoke).toHaveBeenCalledTimes(2))
+    expect(shareRevoke).toHaveBeenLastCalledWith('file-a')
+    await vi.waitFor(() => expect(useStore.getState().share.orphans).toEqual([]))
   })
 
   it('revokes the link and closes', async () => {
@@ -373,5 +402,47 @@ describe('Settings › Shared links', () => {
 
     expect(await screen.findByTestId('settings-shares-empty')).toBeInTheDocument()
     expect(shareList).toHaveBeenCalled()
+  })
+
+  it('keeps the countdown honest while the row stays open', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const share = (expiresAt: string) => ({
+        fileId: 'f1',
+        entryId: 'l1',
+        kind: 'login' as const,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        expiresAt
+      })
+      // Two minutes and a half out, then — once the row has watched it run
+      // out — gone from the backend's own listing.
+      vi.mocked(shareList)
+        .mockResolvedValueOnce([share(new Date(Date.now() + 150_000).toISOString())])
+        .mockResolvedValueOnce([])
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      renderWithStore(<Settings />, { store: seed() })
+      useStore.getState().openSettings('sync')
+      const row = within(await screen.findByTestId('settings-shares-row'))
+      await user.click(row.getByRole('button', { name: 'Show' }))
+      expect(await screen.findByTestId('settings-share-f1')).toHaveTextContent(
+        'Expires in 2 minutes'
+      )
+
+      // Nothing else re-renders this row; only its own clock can.
+      await act(async () => {
+        vi.advanceTimersByTime(60_000)
+      })
+      expect(screen.getByTestId('settings-share-f1')).toHaveTextContent('Expires in 1 minute')
+
+      await act(async () => {
+        vi.advanceTimersByTime(120_000)
+      })
+      // Past the mark the row asks again instead of showing "Expired" for a
+      // file the sweep has already removed.
+      expect(await screen.findByTestId('settings-shares-empty')).toBeInTheDocument()
+      expect(shareList).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
