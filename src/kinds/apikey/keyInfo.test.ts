@@ -2,43 +2,42 @@ import { describe, expect, it } from 'vitest'
 import { hostPath, scopesOf, splitKey } from './keyInfo'
 
 describe('splitKey', () => {
-  it('reads the issuer prefix off the front of a key', () => {
-    expect(splitKey('sk_live_51Hqx9AbT3kLm2Np')).toEqual({
-      prefix: 'sk_live_',
-      body: '51Hqx9AbT3kLm2Np'
-    })
+  it('reads a known issuer prefix off the front of a key', () => {
+    expect(splitKey('sk_live_51Hqx9Ab')).toEqual({ prefix: 'sk_live_', body: '51Hqx9Ab' })
     expect(splitKey('ghp_16C7e42F292c6912E7710c838347Ae178B4a')).toEqual({
       prefix: 'ghp_',
       body: '16C7e42F292c6912E7710c838347Ae178B4a'
     })
-    expect(splitKey('sk-proj-abc123def456ghi789')).toEqual({
-      prefix: 'sk-proj-',
-      body: 'abc123def456ghi789'
+    expect(splitKey('xoxb-1234-5678-abcd')).toEqual({ prefix: 'xoxb-', body: '1234-5678-abcd' })
+    expect(splitKey('AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY')).toEqual({
+      prefix: 'AIza',
+      body: 'SyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY'
     })
   })
 
-  it('stops at the first word that is not a word', () => {
-    expect(splitKey('xoxb-1234-5678-abcdefghij')).toEqual({
-      prefix: 'xoxb-',
-      body: '1234-5678-abcdefghij'
-    })
+  // `sk-proj-` before `sk-ant-`, and never `abcd_` after `sk_live_`: the prefix
+  // is the one the issuer stamps, whole, and nothing past it.
+  it('takes the longest known prefix and nothing beyond it', () => {
+    expect(splitKey('sk-proj-abc123')).toEqual({ prefix: 'sk-proj-', body: 'abc123' })
+    expect(splitKey('sk-ant-api03-abc')).toEqual({ prefix: 'sk-ant-', body: 'api03-abc' })
+    expect(splitKey('sk_live_abcd_efgh')).toEqual({ prefix: 'sk_live_', body: 'abcd_efgh' })
   })
 
-  it('has no prefix for a key that has none', () => {
+  // Nothing is guessed from punctuation: a dash or underscore in an unknown
+  // format may sit inside the secret, so the whole key stays masked.
+  it('masks a key of an unknown format whole', () => {
+    expect(splitKey('deadbeef-1234-4abc-8def-123456789abc')).toEqual({
+      prefix: '',
+      body: 'deadbeef-1234-4abc-8def-123456789abc'
+    })
+    expect(splitKey('cpl_live_4f9a0b3c')).toEqual({ prefix: '', body: 'cpl_live_4f9a0b3c' })
+    expect(splitKey('alpha-beta-SECRET')).toEqual({ prefix: '', body: 'alpha-beta-SECRET' })
     expect(splitKey('AKIAIOSFODNN7EXAMPLE')).toEqual({ prefix: '', body: 'AKIAIOSFODNN7EXAMPLE' })
     expect(splitKey('')).toEqual({ prefix: '', body: '' })
   })
 
-  // What a prefix would leave to hide has to be a key's worth: a short key, or
-  // one that is all prefix, stays whole. So does a mixed-case front — issuers
-  // stamp lower-case, and capitals suggest the dash is inside the secret.
-  it('masks the whole key when the front could be part of the secret', () => {
-    expect(splitKey('sk_live_51Hqx9Ab')).toEqual({ prefix: '', body: 'sk_live_51Hqx9Ab' })
+  it('has no prefix for a key that is only a prefix', () => {
     expect(splitKey('sk_live_')).toEqual({ prefix: '', body: 'sk_live_' })
-    expect(splitKey('Alpha-Beta-SECRETSECRETSECRET')).toEqual({
-      prefix: '',
-      body: 'Alpha-Beta-SECRETSECRETSECRET'
-    })
   })
 })
 

@@ -1,18 +1,65 @@
 // What the read view makes of a key without knowing who issued it.
 
-// The issuer's prefix — `sk_live_`, `ghp_`, `cpl_live_`, `sk-proj-`: one or
-// more short lower-case words, each closed by `_` or `-`. It names the issuer
-// and the tier, not the secret, so the face prints it in plain sight and hides
-// only what follows. Lower-case only, and a word has to start with a letter:
-// issuers stamp their prefixes that way, and a run of random characters that
-// happens to hold a dash rarely does. `xoxb-123-` is a prefix and then digits
-// of the key, not two prefixes.
-const PREFIX = /^(?:[a-z][a-z0-9]{0,11}[_-])+/
-
-// What has to remain hidden for a prefix to be shown at all. Issued keys carry
-// far more than this after the prefix; a shorter remainder means the "prefix"
-// is more likely a slice of the secret itself, and the whole key stays masked.
-const MIN_BODY = 16
+// Issuer prefixes the face may print in plain sight — each one documented by
+// its issuer as the public stamp on every key of that tier, so showing it gives
+// away nothing the issuer does not. Nothing is guessed from punctuation: a key
+// whose front is not on this list is masked whole, since `deadbeef-` on an
+// unknown format may well be eight characters of the secret. Longest first, so
+// `sk-proj-` wins over `sk-` and `sk_live_` never leaves `abcd_` exposed.
+const ISSUER_PREFIXES = [
+  // Stripe
+  'sk_live_',
+  'sk_test_',
+  'pk_live_',
+  'pk_test_',
+  'rk_live_',
+  'rk_test_',
+  'whsec_',
+  // GitHub
+  'github_pat_',
+  'ghp_',
+  'gho_',
+  'ghu_',
+  'ghs_',
+  'ghr_',
+  // GitLab
+  'glpat-',
+  'glptt-',
+  'gldt-',
+  // Slack
+  'xoxb-',
+  'xoxp-',
+  'xoxa-',
+  'xoxr-',
+  'xapp-',
+  // OpenAI, Anthropic
+  'sk-proj-',
+  'sk-svcacct-',
+  'sk-admin-',
+  'sk-ant-',
+  // Package registries
+  'npm_',
+  'pypi-',
+  // Hugging Face
+  'hf_',
+  // DigitalOcean
+  'dop_v1_',
+  'doo_v1_',
+  // Shopify
+  'shpat_',
+  'shpca_',
+  'shppa_',
+  // SendGrid
+  'SG.',
+  // Google API keys
+  'AIza',
+  // Linear, Notion, Figma, Supabase, Postman
+  'lin_api_',
+  'ntn_',
+  'figd_',
+  'sbp_',
+  'PMAK-'
+].sort((a, b) => b.length - a.length)
 
 export interface KeyParts {
   prefix: string
@@ -20,9 +67,9 @@ export interface KeyParts {
 }
 
 export const splitKey = (key: string): KeyParts => {
-  const match = PREFIX.exec(key)
-  const prefix = match && key.length - match[0].length >= MIN_BODY ? match[0] : ''
-  return { prefix, body: key.slice(prefix.length) }
+  // A key that is only a prefix has nothing left to hide, so it has no prefix.
+  const prefix = ISSUER_PREFIXES.find(known => key.startsWith(known) && key.length > known.length)
+  return prefix ? { prefix, body: key.slice(prefix.length) } : { prefix: '', body: key }
 }
 
 // Scopes as they were typed — `read:user repo`, `read, write`, one per line —

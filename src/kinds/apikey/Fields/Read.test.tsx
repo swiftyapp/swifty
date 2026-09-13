@@ -10,7 +10,7 @@ const BODY = '4f9a0b3c7d2e1f6a8b9c0d1e2f3a4b5c'
 const KEY: EntryDraft = {
   type: 'apikey',
   title: 'Coupler.io',
-  apiKey: `cpl_live_${BODY}`,
+  apiKey: `sk_live_${BODY}`,
   environment: 'production',
   baseUrl: 'https://api.coupler.io/v1/',
   scopes: 'read:data write:data',
@@ -32,11 +32,11 @@ describe('an API key, read', () => {
     expect(face).toHaveTextContent('Secret key')
     expect(face).toHaveTextContent(`${KEY.apiKey?.length} chars`)
     const strip = screen.getByTestId('entry-value-apiKey')
-    expect(strip).toHaveTextContent('cpl_live_')
+    expect(strip).toHaveTextContent('sk_live_')
     expect(strip).not.toHaveTextContent(BODY)
 
     await userEvent.click(screen.getByTestId('reveal-apiKey'))
-    expect(strip).toHaveTextContent(`cpl_live_${BODY}`)
+    expect(strip).toHaveTextContent(`sk_live_${BODY}`)
 
     await userEvent.click(screen.getByTestId('reveal-apiKey'))
     expect(strip).not.toHaveTextContent(BODY)
@@ -69,10 +69,12 @@ describe('an API key, read', () => {
     expect(screen.queryByText('Expires')).toBeNull()
   })
 
-  it('shows a key with no issuer prefix as dots alone until revealed', () => {
-    read({ ...KEY, apiKey: 'AKIAIOSFODNN7EXAMPLE' })
+  // Only an issuer's documented stamp is printed; a format the list does not
+  // know is masked whole, dashes and all.
+  it('shows a key of an unknown format as dots alone until revealed', () => {
+    read({ ...KEY, apiKey: 'deadbeef-1234-4abc-8def-123456789abc' })
     const strip = screen.getByTestId('entry-value-apiKey')
-    expect(strip).not.toHaveTextContent('AKIA')
+    expect(strip).not.toHaveTextContent('deadbeef')
     expect(strip).toHaveTextContent('••••')
   })
 })
