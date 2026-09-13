@@ -17,6 +17,7 @@ mod passkey;
 // can drive the OCR backend without the app around it.
 pub mod scan;
 mod secure_store;
+mod share;
 mod state;
 mod storage;
 pub mod store;
@@ -153,6 +154,10 @@ pub fn run() {
             commands::sync::sync_now,
             commands::sync::sync_import,
             commands::sync::sync_status,
+            commands::share::share_create,
+            commands::share::share_open,
+            commands::share::share_revoke,
+            commands::share::share_list,
             // E2E-only vault reset. `generate_handler!` honours per-command
             // attributes, so in a release build the match arm — and with it the
             // only reference to the (also cfg'd-out) module — simply is not

@@ -10,6 +10,7 @@ import { createSyncSlice, type SyncSlice } from './syncSlice'
 import { createThemeSlice, type ThemeSlice } from './themeSlice'
 import { createUpdateSlice, type UpdateSlice } from './updateSlice'
 import { createUiSlice, type UiSlice } from './uiSlice'
+import { createShareSlice, type ShareSlice } from './shareSlice'
 import { createAsyncSlice, cancelScheduledSync, type AsyncSlice } from './thunks'
 
 export type StoreState = FlowSlice &
@@ -22,6 +23,7 @@ export type StoreState = FlowSlice &
   ThemeSlice &
   UpdateSlice &
   UiSlice &
+  ShareSlice &
   AsyncSlice
 
 export const useStore = create<StoreState>()((...a) => ({
@@ -35,6 +37,7 @@ export const useStore = create<StoreState>()((...a) => ({
   ...createThemeSlice(...a),
   ...createUpdateSlice(...a),
   ...createUiSlice(...a),
+  ...createShareSlice(...a),
   ...createAsyncSlice(...a)
 }))
 
@@ -48,6 +51,7 @@ const pickData = (s: StoreState) => ({
   sync: s.sync,
   update: s.update,
   ui: s.ui,
+  share: s.share,
   // Both read a persisted preference at slice creation, so a test that changes
   // one has to have it put back like everything else.
   sort: s.sort,
@@ -66,11 +70,13 @@ export const makeStore = () => {
 // Everything the unlocked session put in the store: the entry list and what is
 // selected in it, the surfaces open over it, and the audit of it. A lock has to
 // drop all of it — it outlives the session otherwise, and the next unlock (of
-// this or any other vault) opens onto the previous one's rows. Session-shaped
-// state (flow, sync, theme, locale, update) is deliberately kept.
+// this or any other vault) opens onto the previous one's rows. A share dialog
+// goes with them: its link is live credentials, and it would otherwise still be
+// on screen behind whoever unlocks next. Session-shaped state (flow, sync,
+// theme, locale, update) is deliberately kept.
 export const resetVaultData = () => {
-  const { entries, ui, filters, audit } = structuredClone(initialData)
-  useStore.setState({ entries, ui, filters, audit })
+  const { entries, ui, filters, audit, share } = structuredClone(initialData)
+  useStore.setState({ entries, ui, filters, audit, share })
   cancelScheduledSync()
 }
 
@@ -114,6 +120,13 @@ export const {
   setSettingsSection,
   openAddPicker,
   closeAddPicker,
+  openSend,
+  closeSend,
+  openReceive,
+  closeReceive,
+  queueOrphan,
+  dropOrphan,
+  revokeOrphans,
   setView,
   showTag,
   setScanSupported,

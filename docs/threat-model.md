@@ -203,6 +203,48 @@ convert it into the encrypted database.)
   user consents to restart (or the next time they quit and reopen). This replaces
   the earlier silent-on-launch install.
 
+## Sharing a secret
+
+A share (see `docs/share-design.md`) is one entry, sanitized, sealed under a
+fresh random 256-bit AES-GCM key and uploaded to the sender's own Drive as an
+"anyone with the link" file. The link carries the file id and the key.
+
+- **Google** holds ciphertext, the file's creation time, the entry kind and the
+  sender's opaque local entry id. It never holds the key and cannot read the
+  entry. Neither the vault key nor the master passphrase is involved.
+- **The link is the secret.** Anyone who obtains it can open the share while
+  the file exists. Swifty cannot defend the channel the sender chose to send it
+  over. What bounds the exposure is two guarantees of different strength, and
+  they should not be read as one:
+  - **Swifty refuses to open a share after 24 hours.** The expiry is inside the
+    authenticated ciphertext, so every Swifty client honours it whether or not
+    the file is still on Drive.
+  - **Deleting the file is best effort.** Revoke deletes it at once. Otherwise
+    the sender's devices sweep expired shares after each successful sync and
+    whenever the shares list is opened, which needs a device to be on. Until
+    then the ciphertext is still downloadable, and a leaked link in the hands
+    of someone using their own AES-GCM code rather than Swifty decrypts it past
+    the 24 hours. The hard stop is deletion; revoke is the only immediate one.
+- **Integrity.** AES-GCM authentication means a modified or substituted file
+  fails to open rather than yielding a tampered entry. The expiry is inside the
+  ciphertext, so it is authenticated too, and the recipient enforces it even
+  when the sender's device never got to delete the file.
+- **Sender-controlled content is not trusted.** Encryption proves the sender
+  held the key, not that the entry is well-formed. On receipt the entry is
+  sanitized again (id, timestamps, favorite, passkeys stripped), its kind is
+  checked, and it is always saved as a fresh row, so a crafted envelope cannot
+  overwrite an existing entry. Downloads are capped at 2 MiB and time-limited,
+  because a pasted link can name any public Drive file; the same cap is applied
+  to the sealed entry before upload, so a share nobody could open is never
+  published.
+- **The public API key** used to download shares is an identifier, not a
+  credential: it grants no access to anything not already public.
+- **This is a bearer-link snapshot, not delivery to a person.** Nothing
+  authenticates the recipient, nothing propagates later edits, and without a
+  server nothing can count reads. A share stays openable until it expires or
+  is revoked; revoking stops future downloads but cannot retract a credential
+  already imported or erase a downloaded copy.
+
 ## What Swifty explicitly does NOT defend against
 
 - **A compromised operating system.** Code running as the user — malware, a

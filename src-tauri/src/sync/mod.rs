@@ -8,7 +8,8 @@
 //! never on a command thread, and never on a runtime worker.
 
 mod auth;
-mod drive;
+// Crate-visible: `share::remote` drives the same Drive REST surface.
+pub(crate) mod drive;
 pub mod engine;
 pub mod pack;
 pub mod restore;
@@ -16,13 +17,24 @@ pub mod restore;
 use std::sync::Mutex;
 
 use reqwest::Client;
-use tauri::{async_runtime::block_on, AppHandle};
+use tauri::{async_runtime::block_on, AppHandle, Manager};
 
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
+use crate::state::AppState;
 use engine::{Remote, RemoteFile, SessionVault, SyncOutcome};
 
-const FOLDER_NAME: &str = "Swifty";
+pub(crate) const FOLDER_NAME: &str = "Swifty";
+
+/// A valid Drive access token for the connected account, refreshed if needed.
+/// Crate-visible so `share::remote` can act on the same account.
+pub(crate) async fn access_token(
+    client: &Client,
+    app: &AppHandle,
+    cryptor: &Cryptor,
+) -> Result<String> {
+    auth::access_token(client, app, cryptor).await
+}
 
 /// Install the ring rustls provider, once per process.
 ///
@@ -72,7 +84,24 @@ pub fn run(app: &AppHandle, cryptor: Cryptor) -> Result<SyncOutcome> {
     }
     let remote = DriveRemote::new(app.clone(), cryptor);
     let local = SessionVault::capture(app)?;
-    engine::sync(&remote, &local, now_ms())
+    let outcome = engine::sync(&remote, &local, now_ms())?;
+    sweep_shares(app);
+    Ok(outcome)
+}
+
+/// Drop expired one-time shares, riding along on a run that has just proved the
+/// account reachable. Best effort: a locked vault or a failed listing is not a
+/// sync failure, and the next run sweeps again.
+fn sweep_shares(app: &AppHandle) {
+    // `run` moved its own cryptor into the remote and `Cryptor` is not `Clone`,
+    // so take a second from the session — which is also how we notice the vault
+    // locked while the sync was in flight.
+    let Ok(cryptor) = app.state::<AppState>().session.lock().unwrap().cryptor() else {
+        return;
+    };
+    if let Err(e) = crate::share::sweep_drive(app, cryptor) {
+        log::warn!("share sweep failed: {e}");
+    }
 }
 
 fn now_ms() -> i64 {

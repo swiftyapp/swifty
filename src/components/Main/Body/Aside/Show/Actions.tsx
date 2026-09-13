@@ -1,5 +1,5 @@
 import type { Entry, EntryMeta } from '@/lib/commands'
-import { editEntry } from '@/store'
+import { editEntry, openSend } from '@/store'
 import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'
 import { CheckGlyph } from '../../../icons'
@@ -36,7 +36,7 @@ export default function Actions({ entry, revealed, onDelete }: Props) {
         {t('Edit')}
       </Button>
 
-      <MoreMenu onDelete={onDelete} />
+      <MoreMenu onDelete={onDelete} onShare={() => openSend(entry.id)} />
 
       <Button size="md" kbd="⏎" disabled={!secret} onClick={copy} testid="primary-action-button">
         {copied ? (

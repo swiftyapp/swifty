@@ -9,6 +9,7 @@ pub mod env;
 pub mod generator;
 pub mod import;
 pub mod save;
+pub mod share;
 pub mod sync;
 pub mod vault;
 
