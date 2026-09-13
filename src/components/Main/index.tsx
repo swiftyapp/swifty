@@ -7,6 +7,7 @@ import Wide from './Wide'
 import Compact from './Compact'
 import Palette from './Palette'
 import AddSecret from './AddSecret'
+import Share from './Share'
 import Scan from './Scan'
 import EnvDrop from './EnvDrop'
 import { useShortcuts } from './useShortcuts'
@@ -34,6 +35,7 @@ export function Main() {
             phone it is neither reachable nor the way anything is found. */}
         {!compact && <Palette />}
         <AddSecret />
+        <Share />
         <Scan />
         <EnvDrop />
       </FrameProvider>

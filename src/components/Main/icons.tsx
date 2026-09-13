@@ -44,6 +44,7 @@ import {
   ScanLine,
   Search,
   Settings,
+  Share2,
   ShieldCheck,
   Star,
   Sun,
@@ -130,6 +131,10 @@ export const CloudGlyph = glyph(Cloud, 14)
 export const AlertGlyph = glyph(TriangleAlert, 14)
 // A passkey, on a login's detail rows and as the list-row mark.
 export const KeyGlyph = glyph(KeyRound, 14)
+// Handing one entry to someone else. The share mark rather than a link one: the
+// link is how it travels, not what the action is, and `ExternalGlyph` already
+// owns the chain-and-arrow look for "opens elsewhere".
+export const ShareGlyph = glyph(Share2, 14)
 
 // Row / tile / rail tier
 export const PlusGlyph = glyph(Plus, 16)
