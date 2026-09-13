@@ -1,5 +1,5 @@
 import Panel from '@/components/elements/Panel'
-import { NoteField, UrlField, useFields } from '@/components/elements/fields'
+import { CustomFieldsField, NoteField, UrlField, useFields } from '@/components/elements/fields'
 import { filled } from '@/components/elements/fields/formats'
 import Face from '../Face'
 import Scopes from './Scopes'
@@ -15,19 +15,23 @@ export default function Read() {
   const rows = filled(entry.baseUrl) || filled(entry.scopes)
 
   return (
-    <div className="grid gap-3">
-      <Face />
-      {rows && (
-        <Panel>
-          <UrlField name="baseUrl" label="Base URL" />
-          <Scopes />
-        </Panel>
-      )}
-      {filled(entry.note) && (
-        <Panel>
-          <NoteField label="Note" />
-        </Panel>
-      )}
-    </div>
+    <>
+      <div className="grid gap-3">
+        <Face />
+        {rows && (
+          <Panel>
+            <UrlField name="baseUrl" label="Base URL" />
+            <Scopes />
+          </Panel>
+        )}
+        {filled(entry.note) && (
+          <Panel>
+            <NoteField label="Note" />
+          </Panel>
+        )}
+      </div>
+      {/* Custom fields, when the entry carries any, as on a document. */}
+      <CustomFieldsField />
+    </>
   )
 }

@@ -919,6 +919,30 @@ fn cxf_api_key_alone() {
     assert_eq!(back.entries, entries);
 }
 
+// An environment the switch has no segment for is neither dropped nor hidden:
+// it comes back as a custom field, in sight. A known one is taken in any case.
+#[test]
+fn imported_environment_lands_on_the_switch_or_in_the_extras() {
+    let mut staging = apikey_entry();
+    staging.api_environment = Some("staging".into());
+    let back = parse(Format::Cxf, &to_cxf_json(&[staging]).unwrap());
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries[0].api_environment, None);
+    assert_eq!(
+        back.entries[0].extra,
+        vec![("Environment".to_string(), "staging".to_string())]
+    );
+
+    let bytes = b"type,title,api_key,environment\napikey,Coupler.io,cpl_live_abc,Production\n";
+    let back = super::csv::GenericCsv.parse(bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(
+        back.entries[0].api_environment.as_deref(),
+        Some("production")
+    );
+    assert!(back.entries[0].extra.is_empty());
+}
+
 // Bitwarden has no item for an API key, so one goes out as a login with the
 // token for a password and the base URL for a site; the rest ride as custom
 // fields. One-way: it comes back as the login it looks like, token intact.

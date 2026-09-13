@@ -213,7 +213,7 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
             ..Default::default()
         });
     } else if let Some(c) = api {
-        result.entries.push(ImportedEntry {
+        let mut entry = ImportedEntry {
             kind: EntryKind::ApiKey,
             title,
             notes,
@@ -223,10 +223,11 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
             // site without one says the same thing one level up.
             url: text(&c.url).or(url),
             api_expires: text(&c.expiry_date),
-            api_environment: custom_field(&custom, ENVIRONMENT_LABEL),
             api_scopes: custom_field(&custom, SCOPES_LABEL),
             ..Default::default()
-        });
+        };
+        entry.set_environment(custom_field(&custom, ENVIRONMENT_LABEL));
+        result.entries.push(entry);
     } else if let Some(c) = card {
         let (month, year) = expiry(&c.expiry_date);
         result.entries.push(ImportedEntry {

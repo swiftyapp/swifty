@@ -167,17 +167,18 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
         // is told apart by the `type` column, or it would come back as a login
         // with an empty password.
         if cell(TYPE).as_deref() == Some(EntryKind::ApiKey.as_str()) {
-            result.entries.push(ImportedEntry {
+            let mut entry = ImportedEntry {
                 kind: EntryKind::ApiKey,
                 title,
                 url: cell(URL),
                 notes: cell(NOTES),
                 api_key: cell(API_KEY),
-                api_environment: cell(ENVIRONMENT),
                 api_scopes: cell(SCOPES),
                 api_expires: cell(EXPIRES),
                 ..Default::default()
-            });
+            };
+            entry.set_environment(cell(ENVIRONMENT));
+            result.entries.push(entry);
             continue;
         }
         result.entries.push(ImportedEntry {

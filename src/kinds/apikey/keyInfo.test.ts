@@ -3,22 +3,42 @@ import { hostPath, scopesOf, splitKey } from './keyInfo'
 
 describe('splitKey', () => {
   it('reads the issuer prefix off the front of a key', () => {
-    expect(splitKey('sk_live_51Hqx9Ab')).toEqual({ prefix: 'sk_live_', body: '51Hqx9Ab' })
+    expect(splitKey('sk_live_51Hqx9AbT3kLm2Np')).toEqual({
+      prefix: 'sk_live_',
+      body: '51Hqx9AbT3kLm2Np'
+    })
     expect(splitKey('ghp_16C7e42F292c6912E7710c838347Ae178B4a')).toEqual({
       prefix: 'ghp_',
       body: '16C7e42F292c6912E7710c838347Ae178B4a'
     })
-    expect(splitKey('sk-proj-abc123')).toEqual({ prefix: 'sk-proj-', body: 'abc123' })
+    expect(splitKey('sk-proj-abc123def456ghi789')).toEqual({
+      prefix: 'sk-proj-',
+      body: 'abc123def456ghi789'
+    })
   })
 
   it('stops at the first word that is not a word', () => {
-    expect(splitKey('xoxb-1234-5678-abcd')).toEqual({ prefix: 'xoxb-', body: '1234-5678-abcd' })
+    expect(splitKey('xoxb-1234-5678-abcdefghij')).toEqual({
+      prefix: 'xoxb-',
+      body: '1234-5678-abcdefghij'
+    })
   })
 
-  it('has no prefix for a key that has none, or that is all prefix', () => {
+  it('has no prefix for a key that has none', () => {
     expect(splitKey('AKIAIOSFODNN7EXAMPLE')).toEqual({ prefix: '', body: 'AKIAIOSFODNN7EXAMPLE' })
-    expect(splitKey('sk_live_')).toEqual({ prefix: '', body: 'sk_live_' })
     expect(splitKey('')).toEqual({ prefix: '', body: '' })
+  })
+
+  // What a prefix would leave to hide has to be a key's worth: a short key, or
+  // one that is all prefix, stays whole. So does a mixed-case front — issuers
+  // stamp lower-case, and capitals suggest the dash is inside the secret.
+  it('masks the whole key when the front could be part of the secret', () => {
+    expect(splitKey('sk_live_51Hqx9Ab')).toEqual({ prefix: '', body: 'sk_live_51Hqx9Ab' })
+    expect(splitKey('sk_live_')).toEqual({ prefix: '', body: 'sk_live_' })
+    expect(splitKey('Alpha-Beta-SECRETSECRETSECRET')).toEqual({
+      prefix: '',
+      body: 'Alpha-Beta-SECRETSECRETSECRET'
+    })
   })
 })
 

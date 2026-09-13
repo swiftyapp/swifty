@@ -99,6 +99,26 @@ pub struct ImportedEntry {
     pub extra: Vec<(String, String)>,
 }
 
+/// The two environments the app's switch has; anything else has no segment.
+pub const ENVIRONMENTS: [&str; 2] = ["test", "production"];
+
+impl ImportedEntry {
+    /// Where an imported environment goes: onto the switch when it is one of
+    /// the two the app knows (in any case), and otherwise into the extras under
+    /// the same label — so a `staging` stays in sight as a custom field rather
+    /// than in a slot no view shows and the next flick of the switch overwrites.
+    pub fn set_environment(&mut self, value: Option<String>) {
+        let Some(value) = value else { return };
+        let known = value.trim().to_lowercase();
+        if ENVIRONMENTS.contains(&known.as_str()) {
+            self.api_environment = Some(known);
+        } else {
+            self.extra
+                .push((export::ENVIRONMENT_LABEL.to_owned(), value));
+        }
+    }
+}
+
 /// A normalized, plaintext passkey — mirrors `models::Passkey` field for field.
 /// Base64url values are carried through verbatim; this module never re-encodes.
 #[derive(Debug, Clone, Default, PartialEq)]

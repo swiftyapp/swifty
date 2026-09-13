@@ -8,11 +8,17 @@ export function useRadioNav<T>(values: T[], value: T, onChange: (next: T) => voi
 
   const move = (step: number) => {
     if (values.length === 0) return
-    const from = values.indexOf(value)
+    const buttons = Array.from(ref.current?.querySelectorAll('button') ?? [])
+    // From the selection — or, with nothing selected (an unset group), from
+    // the button under focus, so the first arrow moves on rather than choosing
+    // the one already in hand.
+    const selected = values.indexOf(value)
+    const focused = buttons.indexOf(document.activeElement as HTMLButtonElement)
+    const from = selected >= 0 ? selected : focused
     const next = (from + step + values.length) % values.length
     onChange(values[next])
     // Selection follows focus, so pull focus along with it.
-    ref.current?.querySelectorAll('button')[next]?.focus()
+    buttons[next]?.focus()
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {

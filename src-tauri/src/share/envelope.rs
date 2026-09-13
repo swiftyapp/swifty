@@ -39,7 +39,7 @@ pub const SHARE_TOO_LARGE_TO_SEND: &str =
 
 /// Every kind this build can store. A share carrying anything else is refused
 /// on receipt rather than saved as a row no view knows how to render.
-const KINDS: [&str; 6] = ["login", "note", "card", "identity", "ssh", "env"];
+const KINDS: [&str; 7] = ["login", "note", "card", "identity", "ssh", "env", "apikey"];
 
 const KEY_LEN: usize = 32;
 const VERSION: u8 = 1;
