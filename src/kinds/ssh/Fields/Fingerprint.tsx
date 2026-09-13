@@ -3,8 +3,9 @@ import CopyButton from '@/components/elements/CopyButton'
 import { FieldRow, useField } from '@/components/elements/fields'
 import { VALUE } from '@/components/elements/tokens'
 
-// Derived, never typed: the generator stamps it with the key, so the row reads
-// the same in both modes and a key pasted in by hand simply has none to show.
+// Derived, never typed: the generator stamps it with the key, so the editor's
+// row is read-only, and a key pasted in by hand simply has none to show. The
+// read view sets it on the plate instead (see `Face`).
 export default function Fingerprint() {
   const { t } = useTranslation()
   const { value } = useField('fingerprint')

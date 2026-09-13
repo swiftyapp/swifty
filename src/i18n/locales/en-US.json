@@ -90,6 +90,8 @@
   "Fingerprint": "Fingerprint",
   "Passphrase": "Passphrase",
   "Comment": "Comment",
+  "Sealed · click to reveal": "Sealed · click to reveal",
+  "{{size}} bytes": "{{size}} bytes",
   "Email": "Email",
   "Note": "Note",
   "Website": "URL",

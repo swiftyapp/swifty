@@ -318,6 +318,18 @@
   --inset-shadow-hairline: inset 0 -1px 0 var(--c-line);
 
   /*
+   * The plate (see kinds/ssh/Face): a slab of slate that, unlike the card and
+   * the document, follows the theme — `bg-plate`, `text-plate-ink`,
+   * `border-plate-rule`, `shadow-plate`.
+   */
+  --background-image-plate: var(--plate);
+  --color-plate-ink: var(--plate-ink);
+  --color-plate-ink2: var(--plate-ink2);
+  --color-plate-rule: var(--plate-rule);
+  --color-plate-hover: var(--plate-hover);
+  --shadow-plate: var(--plate-shadow);
+
+  /*
    * Per-kind identity inks (see src/kinds). A solid for the glyph and a soft
    * wash for the tile behind it, so `text-kind-card` / `bg-kind-card-soft`
    * compile. One pair per kind in `KINDS` — a new kind adds a new pair here
@@ -541,6 +553,20 @@
   --lockfield-shadow-deep:
     inset 0 2px 5px rgba(20, 22, 26, 0.13),
     0 1px 0 rgba(255, 255, 255, 0.75);
+  /*
+   * The plate: on the light palette a light slate — the identity document's
+   * paper, so the two objects read as one family — never the prototype's black
+   * slab, which only the dark palette gets.
+   */
+  --plate: linear-gradient(160deg, #fbfbfc, #eceef2 58%, #f4f5f8);
+  --plate-ink: #1b1d21;
+  --plate-ink2: #6c6f77;
+  --plate-rule: rgba(20, 22, 26, 0.14);
+  --plate-hover: rgba(20, 22, 26, 0.055);
+  --plate-glow: rgba(255, 255, 255, 0.9);
+  --plate-shadow:
+    0 12px 28px rgba(24, 26, 30, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 :root[data-theme='dark'] {
@@ -601,4 +627,14 @@
   --lockfield-shadow-deep:
     inset 0 2px 5px rgba(0, 0, 0, 0.65),
     0 1px 0 rgba(255, 255, 255, 0.05);
+  /* The prototype's slab, as drawn. */
+  --plate: linear-gradient(160deg, #2b2d33, #16171a 58%, #1d1e22);
+  --plate-ink: #ecedef;
+  --plate-ink2: rgba(236, 237, 239, 0.55);
+  --plate-rule: rgba(255, 255, 255, 0.18);
+  --plate-hover: rgba(255, 255, 255, 0.08);
+  --plate-glow: rgba(255, 255, 255, 0.07);
+  --plate-shadow:
+    0 22px 50px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
