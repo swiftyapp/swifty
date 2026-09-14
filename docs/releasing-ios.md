@@ -42,9 +42,14 @@ bundle id has no app record.
 **Users and Access → Integrations → App Store Connect API → Team Keys →
 Generate API Key**:
 
-- Access: **App Manager** (needed both to sign — the key lets Xcode create the
-  Apple Distribution certificate and the App Store provisioning profile on the
-  CI runner — and to upload builds)
+- Access: **Admin**. Signing here is cloud signing: the key has Xcode create
+  the Apple Distribution certificate and the App Store provisioning profile.
+  Only Admin and Account Holder can use cloud-managed distribution
+  certificates by default, so an **App Manager key fails** with "Cloud signing
+  permission error — You haven't been given access to cloud-managed
+  distribution certificates", followed by "No profiles for `<bundle id>` were
+  found" because the profile cannot be built without the certificate. A key's
+  role cannot be changed after creation; generate a new one.
 - Download `AuthKey_<KEYID>.p8`. **It can only be downloaded once.** Keep a
   copy in a password manager.
 - Note the **Issuer ID** (a UUID, shown above the key list) and the **Key ID**.
@@ -240,6 +245,11 @@ no biometric data leaves the device or reaches the app.
   the release procedure.
 - **`src-tauri/gen/apple is missing`** — the Xcode project is committed to the
   repo; regenerate it locally with `bun run tauri ios init` and commit.
-- **Signing failures** — usually an API key without the App Manager role, or a
-  key that was revoked; generate a new one and update `APPLE_API_KEY`,
-  `APPLE_API_ISSUER` and `APPLE_API_KEY_P8` together.
+- **"Cloud signing permission error"** — the API key is not an **Admin** key;
+  see step 3. Note that `found cert "Apple Distribution: Tauri (unset)"` just
+  above it in the log is *not* the cause: that is a self-signed dummy the CLI
+  makes to preserve entitlements whenever it skips signing, which it does
+  precisely because the API key was found (`mobile/ios/build.rs`).
+- **Other signing failures** — usually a key that was revoked; generate a new
+  one and update `APPLE_API_KEY`, `APPLE_API_ISSUER` and `APPLE_API_KEY_P8`
+  together.
