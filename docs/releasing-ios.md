@@ -245,6 +245,19 @@ no biometric data leaves the device or reaches the app.
   the release procedure.
 - **`src-tauri/gen/apple is missing`** — the Xcode project is committed to the
   repo; regenerate it locally with `bun run tauri ios init` and commit.
+- **90158, "URL schemes found in your app are not in the correct format"** —
+  the deep-link scheme in `src-tauri/tauri.ios.conf.json` is still the
+  `YOUR_IOS_CLIENT_ID` placeholder, and it ships verbatim as
+  `CFBundleURLTypes`. Put the reversed iOS OAuth client id in (README, Drive
+  sync on iOS) or delete the `deep-link` block. The release script now refuses
+  to start on the placeholder.
+- **90737, "Missing Document Configuration"** — `bundle.fileAssociations`
+  declares `CFBundleDocumentTypes`, and iOS then wants
+  `UISupportsDocumentBrowser` or `LSSupportsOpeningDocumentsInPlace` as well.
+  `tauri.ios.conf.json` sets `bundle.fileAssociations` to `null`, which the
+  RFC 7396 merge treats as a delete, so the `.swftx` association is desktop-only:
+  nothing on iOS handles an opened file today. Declare it there (and add one of
+  those keys to `Info.ios.plist`) if that changes.
 - **"Cloud signing permission error"** — the API key is not an **Admin** key;
   see step 3. Note that `found cert "Apple Distribution: Tauri (unset)"` just
   above it in the log is *not* the cause: that is a self-signed dummy the CLI
