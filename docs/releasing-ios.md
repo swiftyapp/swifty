@@ -9,8 +9,8 @@ are a separate workflow (`.github/workflows/release.yml`).
 App identity: bundle id `app.rowel.mobile`, team `UFBL3F444A`, minimum iOS
 16.0.
 
-iOS has its **own** bundle id. `identifier` in `src-tauri/tauri.conf.json` stays
-`pro.getswifty.app` for desktop, and `src-tauri/tauri.ios.conf.json` overrides
+iOS has its **own** bundle id. `identifier` in `src-tauri/tauri.conf.json` is
+`app.rowel.desktop`, and `src-tauri/tauri.ios.conf.json` overrides
 it for iOS builds only — Tauri merges the platform config over the base one
 (RFC 7396), and `tauri ios build` writes the merged value into the Xcode
 project's `PRODUCT_BUNDLE_IDENTIFIER` on every build. Everything below that
