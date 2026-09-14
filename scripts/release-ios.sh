@@ -85,17 +85,9 @@ else
   echo "warning: GOOGLE_OAUTH_IOS_CLIENT_ID is not set — building without Drive sync." >&2
 fi
 
-# The scheme is shipped verbatim as CFBundleURLTypes, and App Store Connect
-# rejects the upload over it (90158: URL schemes must be alphanumerics, period,
-# hyphen or plus) — after a full build and a full upload. Stop here instead.
-if grep -q YOUR_IOS_CLIENT_ID src-tauri/tauri.ios.conf.json; then
-  echo "error: the deep-link scheme in src-tauri/tauri.ios.conf.json is still the" >&2
-  echo "       YOUR_IOS_CLIENT_ID placeholder. App Store Connect rejects it (90158)." >&2
-  echo "       Either put the reversed iOS OAuth client id in (README, 'Drive sync" >&2
-  echo "       on iOS'), or delete the whole \"deep-link\" block to ship without" >&2
-  echo "       Drive sign-in on iOS." >&2
-  exit 1
-fi
+# Deep-link schemes ship verbatim as CFBundleURLTypes and a malformed one is
+# rejected at upload (90158). The release workflow runs this same check.
+bun scripts/check-ios-url-schemes.mjs
 
 bun scripts/check-tauri-versions.mjs
 
