@@ -42,6 +42,10 @@ const OTP: &[&str] = &[
 const TYPE: &[&str] = &["type"];
 const BODY: &[&str] = &["body"];
 const FILE_NAME: &[&str] = &["file_name"];
+const API_KEY: &[&str] = &["api_key"];
+const ENVIRONMENT: &[&str] = &["environment"];
+const SCOPES: &[&str] = &["scopes"];
+const EXPIRES: &[&str] = &["expires"];
 const CSV_VERSION: &[&str] = &[super::export::CSV_VERSION_HEADER];
 
 // A parsed sheet: header names (normalized) and the data rows.
@@ -157,6 +161,24 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
                 env_file_name: cell(FILE_NAME),
                 ..Default::default()
             });
+            continue;
+        }
+        // An API key row has a login's shape — a URL, a secret — so it, too,
+        // is told apart by the `type` column, or it would come back as a login
+        // with an empty password.
+        if cell(TYPE).as_deref() == Some(EntryKind::ApiKey.as_str()) {
+            let mut entry = ImportedEntry {
+                kind: EntryKind::ApiKey,
+                title,
+                url: cell(URL),
+                notes: cell(NOTES),
+                api_key: cell(API_KEY),
+                api_scopes: cell(SCOPES),
+                api_expires: cell(EXPIRES),
+                ..Default::default()
+            };
+            entry.set_environment(cell(ENVIRONMENT));
+            result.entries.push(entry);
             continue;
         }
         result.entries.push(ImportedEntry {

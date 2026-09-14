@@ -87,6 +87,22 @@ pub struct Entry {
     pub body: Option<String>,
     #[serde(rename = "fileName", default, skip_serializing_if = "Option::is_none")]
     pub file_name: Option<String>,
+    /// API key fields (`apikey` entries). `api_key` is the token itself — the
+    /// entry's one secret. `environment` is `test` or `production`, `base_url`
+    /// the API's root, and `scopes` whatever the issuer granted, kept as the
+    /// text it was typed as (space- or comma-separated); none of the three is
+    /// secret. An expiry reuses `expiry_date`, the way an identity reuses
+    /// `number`. camelCase on the wire like `privateKey`. All `None` on every
+    /// other kind, so existing vault JSON, `.swftx` backups and fixtures
+    /// serialize byte-identically to before.
+    #[serde(rename = "apiKey", default, skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<String>,
+    #[serde(rename = "baseUrl", default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scopes: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
     /// WebAuthn passkeys stored on a login entry. `None` when the entry has
@@ -382,6 +398,38 @@ mod tests {
         assert!(legacy.file_name.is_none());
         let out = serde_json::to_string(&legacy).unwrap();
         assert!(!out.contains("body") && !out.contains("fileName"), "{out}");
+    }
+
+    // The token and its base URL are camelCase on the wire — the keys the
+    // editor's draft writes — and an expiry rides in the identity's date slot.
+    // A legacy login carries none of the keys.
+    #[test]
+    fn apikey_fields_round_trip_camel_case_and_stay_absent_on_other_kinds() {
+        let entry: Entry = serde_json::from_value(serde_json::json!({
+            "id": "1", "type": "apikey", "title": "Coupler.io",
+            "apiKey": "cpl_live_abc", "environment": "production",
+            "baseUrl": "https://api.coupler.io/v1", "scopes": "read write",
+            "expiry_date": "2027-01-01"
+        }))
+        .unwrap();
+        assert_eq!(entry.api_key.as_deref(), Some("cpl_live_abc"));
+        assert_eq!(entry.base_url.as_deref(), Some("https://api.coupler.io/v1"));
+        assert_eq!(entry.expiry_date.as_deref(), Some("2027-01-01"));
+
+        let out = serde_json::to_value(&entry).unwrap();
+        assert_eq!(out["apiKey"], "cpl_live_abc");
+        assert_eq!(out["baseUrl"], "https://api.coupler.io/v1");
+        assert_eq!(out["environment"], "production");
+        assert_eq!(out["scopes"], "read write");
+        assert!(out.get("api_key").is_none());
+        assert!(out.get("base_url").is_none());
+
+        let legacy: Entry =
+            serde_json::from_str(r#"{"id":"1","type":"login","title":"Site","password":"pw"}"#)
+                .unwrap();
+        assert!(legacy.api_key.is_none());
+        let out = serde_json::to_string(&legacy).unwrap();
+        assert!(!out.contains("apiKey") && !out.contains("scopes"), "{out}");
     }
 
     // Extras are ordered and kind-agnostic, and an entry without them carries

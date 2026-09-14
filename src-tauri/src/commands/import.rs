@@ -255,6 +255,13 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
             e.body = imp.env_body.clone();
             e.file_name = imp.env_file_name.clone();
         }
+        EntryKind::ApiKey => {
+            e.api_key = imp.api_key.clone();
+            e.base_url = imp.url.clone();
+            e.environment = imp.api_environment.clone();
+            e.scopes = imp.api_scopes.clone();
+            e.expiry_date = imp.api_expires.clone();
+        }
         EntryKind::Note => {}
     }
     e
@@ -268,17 +275,24 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
         "identity" => EntryKind::Identity,
         "ssh" => EntryKind::Ssh,
         "env" => EntryKind::Env,
+        "apikey" => EntryKind::ApiKey,
         _ => EntryKind::Login,
     };
     // `number` and `name` are shared slots, so they are only read into the
     // identity columns for an identity — a card must not export as one.
     let identity = kind == EntryKind::Identity;
+    let api_key = kind == EntryKind::ApiKey;
     ImportedEntry {
         kind,
         title: e.title.clone(),
         username: e.username.clone(),
         password: e.password.clone(),
-        url: e.website.clone(),
+        // An API key's site is the API it is sent to.
+        url: if api_key {
+            e.base_url.clone()
+        } else {
+            e.website.clone()
+        },
         notes: e.note.clone(),
         otp: e.otp.clone(),
         tags: e.tags.clone().unwrap_or_default(),
@@ -297,6 +311,12 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
         ssh_passphrase: e.passphrase.clone(),
         env_body: e.body.clone(),
         env_file_name: e.file_name.clone(),
+        api_key: e.api_key.clone(),
+        api_environment: e.environment.clone(),
+        api_scopes: e.scopes.clone(),
+        // `expiry_date` is shared with the identity, so it is only read here
+        // for an API key — a passport must not export with one.
+        api_expires: api_key.then(|| e.expiry_date.clone()).flatten(),
         passkeys: e
             .passkeys
             .as_deref()

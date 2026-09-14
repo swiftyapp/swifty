@@ -17,10 +17,12 @@ use crate::app::APP_NAME;
 pub const EXPORTER_RP_ID: &str = "getswifty.pro";
 
 /// Bitwarden `type` codes. Bitwarden has no item for a `.env` file, so one goes
-/// out as a secure note carrying the file text — never as an empty login.
+/// out as a secure note carrying the file text — never as an empty login. Nor
+/// for an API key, which goes out as the login it most resembles: the token as
+/// the password, the base URL as the site.
 fn bw_type(kind: EntryKind) -> u8 {
     match kind {
-        EntryKind::Login => 1,
+        EntryKind::Login | EntryKind::ApiKey => 1,
         EntryKind::Note | EntryKind::Env => 2,
         EntryKind::Card => 3,
         EntryKind::Identity => 4,
@@ -42,6 +44,11 @@ pub const FINGERPRINT_LABEL: &str = "Fingerprint";
 /// travels the same way.
 pub const FILE_NAME_LABEL: &str = "file_name";
 pub const NOTE_LABEL: &str = "Note";
+/// An API key's environment, scopes and expiry have no member in either format
+/// and ride as labelled fields; the CXF importer reads the first two back.
+pub const ENVIRONMENT_LABEL: &str = "Environment";
+pub const SCOPES_LABEL: &str = "Scopes";
+pub const EXPIRES_LABEL: &str = "Expires";
 
 /// Serialize to Bitwarden's unencrypted JSON export shape.
 pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8>> {
@@ -127,6 +134,27 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
                     }
                     if let Some(name) = &e.env_file_name {
                         push_field(&mut item, FILE_NAME_LABEL, name, FIELD_TEXT);
+                    }
+                }
+                EntryKind::ApiKey => {
+                    // The token as the password and the base URL as the site,
+                    // so Bitwarden fills it where the key is used; what has no
+                    // member follows as custom fields. One-way: it comes back
+                    // as the login it looks like.
+                    item["login"] = json!({
+                        "username": Value::Null,
+                        "password": e.api_key,
+                        "totp": Value::Null,
+                        "uris": e.url.as_ref().map(|u| vec![json!({ "uri": u })]).unwrap_or_default(),
+                    });
+                    for (label, value) in [
+                        (ENVIRONMENT_LABEL, &e.api_environment),
+                        (SCOPES_LABEL, &e.api_scopes),
+                        (EXPIRES_LABEL, &e.api_expires),
+                    ] {
+                        if let Some(value) = value {
+                            push_field(&mut item, label, value, FIELD_TEXT);
+                        }
                     }
                 }
                 EntryKind::Note => {}
@@ -330,6 +358,37 @@ fn cxf_item(e: &ImportedEntry) -> Value {
                 }));
             }
         }
+        EntryKind::ApiKey => {
+            // CXF has an `api-key` credential of its own: the token, the URL
+            // it is sent to and the date it lapses. Environment and scopes have
+            // no member there and travel in a custom-fields credential beside
+            // it, the way the ssh-key's extra parts do.
+            let mut key = json!({ "type": "api-key" });
+            put(&mut key, "key", editable("concealed-string", &e.api_key));
+            put(&mut key, "url", editable("string", &e.url));
+            put(&mut key, "expiryDate", editable("date", &e.api_expires));
+            credentials.push(key);
+
+            let fields: Vec<Value> = [
+                (ENVIRONMENT_LABEL, &e.api_environment),
+                (SCOPES_LABEL, &e.api_scopes),
+            ]
+            .into_iter()
+            .filter_map(|(label, value)| {
+                value
+                    .as_deref()
+                    .map(|v| json!({ "fieldType": "string", "label": label, "value": v }))
+            })
+            .collect();
+            if !fields.is_empty() {
+                credentials.push(json!({
+                    "type": "custom-fields",
+                    "id": random_id(),
+                    "label": "API key",
+                    "fields": fields,
+                }));
+            }
+        }
         // CXF has purpose-built `passport`/`drivers-license`/`identity-document`
         // credentials, but nothing that covers all five document types the app
         // holds; until they are mapped one by one, an identity exports as its
@@ -457,6 +516,10 @@ const COLUMNS: &[&str] = &[
     "ssh_public_key",
     "ssh_fingerprint",
     "ssh_passphrase",
+    "api_key",
+    "environment",
+    "scopes",
+    "expires",
     "body",
     "file_name",
     "tags",
@@ -494,6 +557,10 @@ pub fn to_generic_csv(entries: &[ImportedEntry]) -> csv::Result<Vec<u8>> {
             e.ssh_public_key.clone().unwrap_or_default(),
             e.ssh_fingerprint.clone().unwrap_or_default(),
             e.ssh_passphrase.clone().unwrap_or_default(),
+            e.api_key.clone().unwrap_or_default(),
+            e.api_environment.clone().unwrap_or_default(),
+            e.api_scopes.clone().unwrap_or_default(),
+            e.api_expires.clone().unwrap_or_default(),
             e.env_body.clone().unwrap_or_default(),
             e.env_file_name.clone().unwrap_or_default(),
             e.tags.join(";"),

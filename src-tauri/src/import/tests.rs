@@ -842,6 +842,137 @@ fn generic_csv_carries_ssh_fields() {
     assert!(row.contains("hunter2"));
 }
 
+fn apikey_entry() -> ImportedEntry {
+    ImportedEntry {
+        kind: EntryKind::ApiKey,
+        title: "Coupler.io".into(),
+        notes: Some("billing".into()),
+        url: Some("https://api.coupler.io/v1".into()),
+        api_key: Some("cpl_live_4f9a0b3c".into()),
+        api_environment: Some("production".into()),
+        api_scopes: Some("read:data write:data".into()),
+        api_expires: Some("2027-01-01".into()),
+        ..Default::default()
+    }
+}
+
+// The generic CSV is our own, so every API key field has a column and the row
+// comes back as the key it was — told apart from a login by the `type` column.
+#[test]
+fn round_trip_generic_csv_apikey() {
+    let bytes = to_generic_csv(&[apikey_entry()]).unwrap();
+    let out = String::from_utf8(bytes.clone()).unwrap();
+    let header = out.lines().next().unwrap();
+    assert!(header.contains("ssh_passphrase,api_key,environment,scopes,expires,body"));
+    assert!(out.contains("\napikey,Coupler.io,"));
+    assert!(out.contains("cpl_live_4f9a0b3c"));
+
+    let back = super::csv::GenericCsv.parse(&bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, vec![apikey_entry()]);
+}
+
+// CXF's `api-key` carries the token, the URL and the expiry; environment and
+// scopes travel in a custom-fields credential and are read back by label.
+#[test]
+fn round_trip_cxf_api_key() {
+    let entries = vec![apikey_entry()];
+    let bytes = to_cxf_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let creds = &out["accounts"][0]["items"][0]["credentials"];
+    assert_eq!(creds[0]["type"], "api-key");
+    assert_eq!(creds[0]["key"]["fieldType"], "concealed-string");
+    assert_eq!(creds[0]["key"]["value"], "cpl_live_4f9a0b3c");
+    assert_eq!(creds[0]["url"]["value"], "https://api.coupler.io/v1");
+    assert_eq!(creds[0]["expiryDate"]["fieldType"], "date");
+    assert_eq!(creds[0]["expiryDate"]["value"], "2027-01-01");
+    assert_eq!(creds[1]["type"], "custom-fields");
+    assert_eq!(creds[1]["fields"][0]["label"], "Environment");
+    assert_eq!(creds[1]["fields"][1]["label"], "Scopes");
+    assert_eq!(creds[2]["type"], "note");
+
+    let back = parse(Format::Cxf, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, entries);
+}
+
+// A token with nothing else known about it is still a key: no URL, no expiry,
+// and no custom-fields credential to carry nothing in.
+#[test]
+fn cxf_api_key_alone() {
+    let entries = vec![ImportedEntry {
+        url: None,
+        api_environment: None,
+        api_scopes: None,
+        api_expires: None,
+        notes: None,
+        ..apikey_entry()
+    }];
+    let bytes = to_cxf_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let creds = &out["accounts"][0]["items"][0]["credentials"];
+    assert_eq!(creds.as_array().unwrap().len(), 1);
+    assert!(creds[0].get("url").is_none());
+    assert!(creds[0].get("expiryDate").is_none());
+
+    let back = parse(Format::Cxf, &bytes);
+    assert_eq!(back.entries, entries);
+}
+
+// An environment the switch has no segment for is neither dropped nor hidden:
+// it comes back as a custom field, in sight. A known one is taken in any case.
+#[test]
+fn imported_environment_lands_on_the_switch_or_in_the_extras() {
+    let mut staging = apikey_entry();
+    staging.api_environment = Some("staging".into());
+    let back = parse(Format::Cxf, &to_cxf_json(&[staging]).unwrap());
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries[0].api_environment, None);
+    assert_eq!(
+        back.entries[0].extra,
+        vec![("Environment".to_string(), "staging".to_string())]
+    );
+
+    let bytes = b"type,title,api_key,environment\napikey,Coupler.io,cpl_live_abc,Production\n";
+    let back = super::csv::GenericCsv.parse(bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(
+        back.entries[0].api_environment.as_deref(),
+        Some("production")
+    );
+    assert!(back.entries[0].extra.is_empty());
+}
+
+// Bitwarden has no item for an API key, so one goes out as a login with the
+// token for a password and the base URL for a site; the rest ride as custom
+// fields. One-way: it comes back as the login it looks like, token intact.
+#[test]
+fn bitwarden_exports_apikey_as_a_login() {
+    let bytes = to_bitwarden_json(&[apikey_entry()]).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let item = &out["items"][0];
+    assert_eq!(item["type"], 1);
+    assert_eq!(item["login"]["password"], "cpl_live_4f9a0b3c");
+    assert_eq!(item["login"]["uris"][0]["uri"], "https://api.coupler.io/v1");
+    assert_eq!(item["fields"][0]["name"], "Environment");
+    assert_eq!(item["fields"][0]["value"], "production");
+    assert_eq!(item["fields"][1]["name"], "Scopes");
+    assert_eq!(item["fields"][2]["name"], "Expires");
+    assert_eq!(item["fields"][2]["value"], "2027-01-01");
+
+    let back = parse(Format::Bitwarden, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries[0].kind, EntryKind::Login);
+    assert_eq!(
+        back.entries[0].password.as_deref(),
+        Some("cpl_live_4f9a0b3c")
+    );
+    assert_eq!(
+        back.entries[0].url.as_deref(),
+        Some("https://api.coupler.io/v1")
+    );
+}
+
 // A file with everything a CSV cell could trip on: a comment, an indented line,
 // a blank line, a quoted value spanning a newline, one CRLF line ending, and a
 // trailing newline that trimming would eat.

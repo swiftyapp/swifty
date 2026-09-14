@@ -167,6 +167,33 @@ fn env_obscures_the_body_but_not_the_file_name() {
     assert_eq!(exposed.body.as_deref(), Some(body));
 }
 
+// An API key's token is its secret; the base URL, environment, scopes and
+// expiry it is used with are not.
+#[test]
+fn apikey_obscures_the_token_but_not_where_it_is_used() {
+    let cryptor = Cryptor::new(&hash_secret("master-pw"));
+    let entry: Entry = serde_json::from_value(serde_json::json!({
+        "id": "1", "type": "apikey", "title": "Coupler.io", "apiKey": "cpl_live_abc",
+        "environment": "production", "baseUrl": "https://api.coupler.io/v1",
+        "scopes": "read write", "expiry_date": "2027-01-01"
+    }))
+    .unwrap();
+
+    let obscured = cryptor.obscure(&entry).unwrap();
+    assert_ne!(obscured.api_key.as_deref(), Some("cpl_live_abc"));
+    assert!(obscured.api_key.as_ref().unwrap().len() > 32);
+    assert_eq!(obscured.environment.as_deref(), Some("production"));
+    assert_eq!(
+        obscured.base_url.as_deref(),
+        Some("https://api.coupler.io/v1")
+    );
+    assert_eq!(obscured.scopes.as_deref(), Some("read write"));
+    assert_eq!(obscured.expiry_date.as_deref(), Some("2027-01-01"));
+
+    let exposed = cryptor.expose(&obscured).unwrap();
+    assert_eq!(exposed.api_key.as_deref(), Some("cpl_live_abc"));
+}
+
 #[test]
 fn empty_sensitive_fields_stay_empty() {
     let cryptor = Cryptor::new(&hash_secret("master-pw"));

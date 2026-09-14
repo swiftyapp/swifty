@@ -47,4 +47,22 @@ describe('Segmented', () => {
     await userEvent.keyboard('{ArrowRight}')
     expect(screen.getByTestId('mode-random')).toBeChecked()
   })
+
+  // Nothing selected lights no segment, but the group stays reachable: the
+  // first segment holds the tab stop, and an arrow from it moves on rather than
+  // choosing the segment already under focus.
+  it('keeps an unset group reachable and moves off the first segment', async () => {
+    const Harness = () => {
+      const [value, setValue] = useState('')
+      return <Segmented options={OPTIONS} value={value} onChange={setValue} testidPrefix="mode" />
+    }
+    render(<Harness />)
+
+    expect(screen.getByTestId('mode-random')).not.toBeChecked()
+    await userEvent.tab()
+    expect(screen.getByTestId('mode-random')).toHaveFocus()
+
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByTestId('mode-memorable')).toBeChecked()
+  })
 })

@@ -60,6 +60,17 @@ const env = (overrides: Partial<EntryDraft> = {}): EntryDraft => ({
   ...overrides
 })
 
+const apikey = (overrides: Partial<EntryDraft> = {}): EntryDraft => ({
+  type: 'apikey',
+  title: 'Coupler.io',
+  apiKey: 'cpl_live_4f9a0b3c',
+  environment: 'production',
+  baseUrl: 'https://api.coupler.io/v1',
+  scopes: 'read:data write:data',
+  expiry_date: '2027-01-01',
+  ...overrides
+})
+
 // The registry is the whole contract: a kind that is not in `KINDS` reaches no
 // picker, chip or palette command.
 describe('KINDS', () => {
@@ -70,6 +81,7 @@ describe('KINDS', () => {
       'note',
       'identity',
       'ssh',
+      'apikey',
       'env'
     ])
     for (const kind of KINDS) expect(kindOf(kind.type)).toBe(kind)
@@ -83,7 +95,20 @@ describe('isValid', () => {
     expect(kindOf('note').isValid(note())).toBe(true)
     expect(kindOf('identity').isValid(identity())).toBe(true)
     expect(kindOf('ssh').isValid(ssh())).toBe(true)
+    expect(kindOf('apikey').isValid(apikey())).toBe(true)
     expect(kindOf('env').isValid(env())).toBe(true)
+  })
+
+  // The token is the entry; where it is sent, for what and until when are
+  // notes on it, and an issuer with one environment has none to name.
+  it('holds an API key to its title and its token', () => {
+    expect(kindOf('apikey').isValid(apikey({ apiKey: '' }))).toBe(false)
+    expect(kindOf('apikey').isValid(apikey({ title: '' }))).toBe(false)
+    expect(
+      kindOf('apikey').isValid(
+        apikey({ environment: '', baseUrl: '', scopes: '', expiry_date: '' })
+      )
+    ).toBe(true)
   })
 
   // The file is the entry; the name it came in under is a nicety a pasted file
@@ -146,6 +171,7 @@ describe('isValid', () => {
     expect(kindOf('identity').isValid(identity({ name: ' ' }))).toBe(false)
     expect(kindOf('identity').isValid(identity({ number: '\t' }))).toBe(false)
     expect(kindOf('ssh').isValid(ssh({ privateKey: '  ' }))).toBe(false)
+    expect(kindOf('apikey').isValid(apikey({ apiKey: ' ' }))).toBe(false)
     expect(kindOf('env').isValid(env({ body: ' \n\t ' }))).toBe(false)
   })
 

@@ -34,6 +34,7 @@ import {
   Globe,
   IdCard,
   KeyRound,
+  KeySquare,
   LayoutGrid,
   Lock,
   Moon,
@@ -150,6 +151,9 @@ export const SshGlyph = glyph(Terminal, 16)
 // glyph and the SSH key the prompt, and `{ }` is what a file of KEY=VALUE
 // lines is to the people who keep them — config, as code.
 export const EnvGlyph = glyph(Braces, 16)
+// An API key. A key on a tag rather than the round key the passkey mark wears:
+// a token is a key someone issued, with the issuer's name on it.
+export const ApiKeyGlyph = glyph(KeySquare, 16)
 export const ScanGlyph = glyph(ScanLine, 16)
 export const ShieldGlyph = glyph(ShieldCheck, 16)
 export const GlobeGlyph = glyph(Globe, 16)

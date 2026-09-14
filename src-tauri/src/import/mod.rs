@@ -26,6 +26,7 @@ pub enum EntryKind {
     Identity,
     Ssh,
     Env,
+    ApiKey,
 }
 
 impl EntryKind {
@@ -37,6 +38,7 @@ impl EntryKind {
             EntryKind::Identity => "identity",
             EntryKind::Ssh => "ssh",
             EntryKind::Env => "env",
+            EntryKind::ApiKey => "apikey",
         }
     }
 }
@@ -80,6 +82,14 @@ pub struct ImportedEntry {
     // and only rides along so the file can come back under its own name.
     pub env_body: Option<String>,
     pub env_file_name: Option<String>,
+    // API key fields (only meaningful when kind == ApiKey). The token is the
+    // credential; the base URL it is sent to travels in `url`, the slot every
+    // format already has for a site. Environment, scopes and expiry are plain
+    // text and ride wherever a format has room for a labelled field.
+    pub api_key: Option<String>,
+    pub api_environment: Option<String>,
+    pub api_scopes: Option<String>,
+    pub api_expires: Option<String>,
     // WebAuthn passkeys (only meaningful when kind == Login). Empty when the
     // source format carries none, which is the case for every CSV dialect.
     pub passkeys: Vec<ImportedPasskey>,
@@ -87,6 +97,26 @@ pub struct ImportedEntry {
     // Empty when the source carries none; only Bitwarden has somewhere to put
     // them (its custom `fields`), so CSV and CXF always leave this empty.
     pub extra: Vec<(String, String)>,
+}
+
+/// The two environments the app's switch has; anything else has no segment.
+pub const ENVIRONMENTS: [&str; 2] = ["test", "production"];
+
+impl ImportedEntry {
+    /// Where an imported environment goes: onto the switch when it is one of
+    /// the two the app knows (in any case), and otherwise into the extras under
+    /// the same label — so a `staging` stays in sight as a custom field rather
+    /// than in a slot no view shows and the next flick of the switch overwrites.
+    pub fn set_environment(&mut self, value: Option<String>) {
+        let Some(value) = value else { return };
+        let known = value.trim().to_lowercase();
+        if ENVIRONMENTS.contains(&known.as_str()) {
+            self.api_environment = Some(known);
+        } else {
+            self.extra
+                .push((export::ENVIRONMENT_LABEL.to_owned(), value));
+        }
+    }
 }
 
 /// A normalized, plaintext passkey — mirrors `models::Passkey` field for field.

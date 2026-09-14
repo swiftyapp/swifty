@@ -15,7 +15,8 @@ const SECRET_FIELDS: Record<EntryType, string[]> = {
   card: ['number', 'cvc', 'pin'],
   identity: ['number', 'personal_number'],
   ssh: ['privateKey', 'passphrase'],
-  env: ['body']
+  env: ['body'],
+  apikey: ['apiKey']
 }
 
 /**
