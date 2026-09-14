@@ -20,6 +20,20 @@ set -a
 source .env
 set +a
 
+# This script signs automatically, through the App Store Connect API key. These
+# three switch the Tauri CLI to *manual* signing with whatever certificate and
+# profile they name, and it then writes CODE_SIGN_STYLE=Manual,
+# CODE_SIGN_IDENTITY and PROVISIONING_PROFILE_SPECIFIER into the committed
+# project.pbxproj, where they persist long after the variable is gone. One left
+# over in .env or the shell — say from another Tauri app — fails the export with
+# a profile/bundle-id mismatch. Drop them for the duration of this build.
+for stale in IOS_CERTIFICATE IOS_CERTIFICATE_PASSWORD IOS_MOBILE_PROVISION; do
+  if [[ -n ${!stale:-} ]]; then
+    echo "warning: ignoring $stale — this script signs via the App Store Connect key." >&2
+    unset "$stale"
+  fi
+done
+
 require() {
   if [[ -z "${!1:-}" ]]; then
     echo "error: $1 is not set in .env — see docs/releasing-ios.md." >&2
@@ -71,12 +85,9 @@ else
   echo "warning: GOOGLE_OAUTH_IOS_CLIENT_ID is not set — building without Drive sync." >&2
 fi
 
-# The OAuth redirect comes back to the app through the reversed client id, so a
-# placeholder scheme here means the Drive login dead-ends on the device.
-if grep -q YOUR_IOS_CLIENT_ID src-tauri/tauri.ios.conf.json; then
-  echo "warning: the deep-link scheme in src-tauri/tauri.ios.conf.json is still a" >&2
-  echo "         placeholder; Drive sign-in will not return to the app." >&2
-fi
+# Deep-link schemes ship verbatim as CFBundleURLTypes and a malformed one is
+# rejected at upload (90158). The release workflow runs this same check.
+bun scripts/check-ios-url-schemes.mjs
 
 bun scripts/check-tauri-versions.mjs
 
@@ -84,6 +95,17 @@ rustup target add aarch64-apple-ios >/dev/null 2>&1 || true
 
 if [[ ! -d src-tauri/gen/apple ]]; then
   echo "error: src-tauri/gen/apple is missing; run 'bun run tauri ios init'." >&2
+  exit 1
+fi
+
+# A previous run with one of the variables above leaves manual-signing settings
+# behind in the project, and the CLI only ever writes them — it never resets
+# them once the variable is gone. Automatic signing cannot take over while they
+# are there, so refuse rather than fail later inside exportArchive.
+PBXPROJ=src-tauri/gen/apple/swifty.xcodeproj/project.pbxproj
+if grep -qE "CODE_SIGN_STYLE = Manual|PROVISIONING_PROFILE_SPECIFIER" "$PBXPROJ"; then
+  echo "error: $PBXPROJ carries manual-signing settings from an earlier build." >&2
+  echo "       Restore it and re-run:  git checkout -- $PBXPROJ" >&2
   exit 1
 fi
 

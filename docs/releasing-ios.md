@@ -42,9 +42,14 @@ bundle id has no app record.
 **Users and Access → Integrations → App Store Connect API → Team Keys →
 Generate API Key**:
 
-- Access: **App Manager** (needed both to sign — the key lets Xcode create the
-  Apple Distribution certificate and the App Store provisioning profile on the
-  CI runner — and to upload builds)
+- Access: **Admin**. Signing here is cloud signing: the key has Xcode create
+  the Apple Distribution certificate and the App Store provisioning profile.
+  Only Admin and Account Holder can use cloud-managed distribution
+  certificates by default, so an **App Manager key fails** with "Cloud signing
+  permission error — You haven't been given access to cloud-managed
+  distribution certificates", followed by "No profiles for `<bundle id>` were
+  found" because the profile cannot be built without the certificate. A key's
+  role cannot be changed after creation; generate a new one.
 - Download `AuthKey_<KEYID>.p8`. **It can only be downloaded once.** Keep a
   copy in a password manager.
 - Note the **Issuer ID** (a UUID, shown above the key list) and the **Key ID**.
@@ -225,12 +230,39 @@ no biometric data leaves the device or reaches the app.
 
 - **"No suitable application records were found"** — the App Store Connect app
   record for `app.rowel.mobile` does not exist yet (step 2).
+- **`exportArchive` says a provisioning profile "does not match the bundle ID"**
+  — `IOS_CERTIFICATE`, `IOS_CERTIFICATE_PASSWORD` or `IOS_MOBILE_PROVISION` is
+  set. Any of them switches the Tauri CLI to manual signing with the profile it
+  names, which is how another app's profile ends up signing this one. The
+  release script now unsets all three, but a run that got through before writes
+  `CODE_SIGN_STYLE = Manual`, `CODE_SIGN_IDENTITY` and
+  `PROVISIONING_PROFILE_SPECIFIER` into the *committed* `project.pbxproj` and
+  the CLI never resets them. Remove the variables from `.env`, then restore the
+  project: `git checkout -- src-tauri/gen/apple/swifty.xcodeproj/project.pbxproj`.
 - **ITMS-90060 / invalid `CFBundleVersion`** — the build version came out with
   more than three period-separated integers, which happens when the build
   number is appended to the app version instead of replacing it; see step 1 of
   the release procedure.
 - **`src-tauri/gen/apple is missing`** — the Xcode project is committed to the
   repo; regenerate it locally with `bun run tauri ios init` and commit.
-- **Signing failures** — usually an API key without the App Manager role, or a
-  key that was revoked; generate a new one and update `APPLE_API_KEY`,
-  `APPLE_API_ISSUER` and `APPLE_API_KEY_P8` together.
+- **90158, "URL schemes found in your app are not in the correct format"** —
+  the deep-link scheme in `src-tauri/tauri.ios.conf.json` is still the
+  `YOUR_IOS_CLIENT_ID` placeholder, and it ships verbatim as
+  `CFBundleURLTypes`. Put the reversed iOS OAuth client id in (README, Drive
+  sync on iOS) or delete the `deep-link` block. The release script now refuses
+  to start on the placeholder.
+- **90737, "Missing Document Configuration"** — `bundle.fileAssociations`
+  declares `CFBundleDocumentTypes`, and iOS then wants
+  `UISupportsDocumentBrowser` or `LSSupportsOpeningDocumentsInPlace` as well.
+  `tauri.ios.conf.json` sets `bundle.fileAssociations` to `null`, which the
+  RFC 7396 merge treats as a delete, so the `.swftx` association is desktop-only:
+  nothing on iOS handles an opened file today. Declare it there (and add one of
+  those keys to `Info.ios.plist`) if that changes.
+- **"Cloud signing permission error"** — the API key is not an **Admin** key;
+  see step 3. Note that `found cert "Apple Distribution: Tauri (unset)"` just
+  above it in the log is *not* the cause: that is a self-signed dummy the CLI
+  makes to preserve entitlements whenever it skips signing, which it does
+  precisely because the API key was found (`mobile/ios/build.rs`).
+- **Other signing failures** — usually a key that was revoked; generate a new
+  one and update `APPLE_API_KEY`, `APPLE_API_ISSUER` and `APPLE_API_KEY_P8`
+  together.

@@ -1,6 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "app.rowel.mobile",
+  "bundle": {
+    "fileAssociations": null
+  },
   "app": {
     "windows": [
       {

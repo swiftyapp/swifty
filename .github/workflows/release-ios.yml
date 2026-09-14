@@ -126,6 +126,12 @@ jobs:
       # ever increases for this workflow — so re-running a release (or shipping
       # a rebuild of the same version) never collides.
       #
+      # Deep-link schemes ship verbatim as CFBundleURLTypes, and App Store
+      # Connect rejects a malformed one with 90158 — at the end of the upload,
+      # after the whole build. `bun run release:ios` runs this same check.
+      - name: Check the iOS URL schemes
+        run: bun scripts/check-ios-url-schemes.mjs
+
       # Set through --config rather than with --build-number: that flag appends
       # to the app version, so `1.0.0-alpha.1` plus run 7 would come out as
       # CFBundleVersion `1.0.0.1.7`, and App Store Connect rejects anything
