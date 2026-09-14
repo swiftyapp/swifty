@@ -154,7 +154,10 @@ that URL scheme, and the client id is derived from it.
 2. Take the client id it gives you — `123456-abcdef.apps.googleusercontent.com`
    — and reverse it into a scheme: `com.googleusercontent.apps.123456-abcdef`.
    (Google shows this as the "iOS URL scheme" on the credential page.)
-3. Replace the placeholder in `src-tauri/tauri.ios.conf.json`:
+3. Add the scheme to `src-tauri/tauri.ios.conf.json` (there is no `plugins`
+   block there until you do — a placeholder scheme is not a legal URL scheme
+   and App Store Connect rejects the upload over it, so the file ships without
+   one):
 
    ```json
    "plugins": {
