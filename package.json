@@ -24,7 +24,11 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:dev:fresh": "SWIFTY_DB_DIR=\"${SWIFTY_DB_DIR:-${TMPDIR:-/tmp}/swifty-fresh-$$}\" tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "ios:init": "tauri ios init",
+    "ios:dev": "tauri ios dev",
+    "release:ios": "bash scripts/release-ios.sh",
+    "release:local": "bash scripts/release-local.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
