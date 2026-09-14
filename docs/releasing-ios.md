@@ -6,8 +6,15 @@ is no updater plugin on iOS: the App Store is the update channel, so this
 workflow produces no `latest.json` and no updater artifacts. Desktop releases
 are a separate workflow (`.github/workflows/release.yml`).
 
-App identity: bundle id `pro.getswifty.app`, team `UFBL3F444A`, minimum iOS
+App identity: bundle id `app.rowel.mobile`, team `UFBL3F444A`, minimum iOS
 16.0.
+
+iOS has its **own** bundle id. `identifier` in `src-tauri/tauri.conf.json` is
+`app.rowel.desktop`, and `src-tauri/tauri.ios.conf.json` overrides
+it for iOS builds only — Tauri merges the platform config over the base one
+(RFC 7396), and `tauri ios build` writes the merged value into the Xcode
+project's `PRODUCT_BUNDLE_IDENTIFIER` on every build. Everything below that
+names a bundle id means the iOS one.
 
 ## One-time setup
 
@@ -22,7 +29,7 @@ for macOS notarization.
 In App Store Connect, **Apps → +  → New App**:
 
 - Platform: iOS
-- Bundle ID: `pro.getswifty.app` (register the App ID in the Developer portal
+- Bundle ID: `app.rowel.mobile` (register the App ID in the Developer portal
   first if it is not offered; no special capabilities are needed — Face ID
   requires only the usage string, not an entitlement)
 - Name, primary language, SKU: free choice
@@ -49,7 +56,7 @@ Because signing is automatic, no `.p12` certificate and no
 
 In the Google Cloud console for the existing Swifty project, **APIs & Services
 → Credentials → Create credentials → OAuth client ID → iOS**, with bundle id
-`pro.getswifty.app`. iOS OAuth clients are public: there is **no client
+`app.rowel.mobile`. iOS OAuth clients are public: there is **no client
 secret**, and none must be set in CI. Copy the client id into the
 `GOOGLE_OAUTH_IOS_CLIENT_ID` secret; the build maps it to the
 `GOOGLE_OAUTH_CLIENT_ID` env var that `src-tauri/src/sync/auth.rs` reads at
@@ -217,7 +224,7 @@ no biometric data leaves the device or reaches the app.
 ## Troubleshooting
 
 - **"No suitable application records were found"** — the App Store Connect app
-  record for `pro.getswifty.app` does not exist yet (step 2).
+  record for `app.rowel.mobile` does not exist yet (step 2).
 - **ITMS-90060 / invalid `CFBundleVersion`** — the build version came out with
   more than three period-separated integers, which happens when the build
   number is appended to the app version instead of replacing it; see step 1 of

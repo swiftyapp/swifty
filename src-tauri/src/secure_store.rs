@@ -36,7 +36,7 @@ use zeroize::Zeroizing;
 // Used only by the Apple/Windows key-store impls; absent on the unsupported
 // fallback (Linux), so gate them to avoid a dead_code error there.
 #[cfg(any(target_vendor = "apple", target_os = "windows"))]
-const SERVICE: &str = "pro.getswifty.app.vault";
+const SERVICE: &str = "app.rowel.desktop.vault";
 #[cfg(any(target_vendor = "apple", target_os = "windows"))]
 const ACCOUNT: &str = "master-key";
 // Separate account for the verify-then-read item on Apple platforms. The two
@@ -493,7 +493,7 @@ mod tests {
             PasswordOptions,
         };
 
-        const PROBE_SERVICE: &str = "pro.getswifty.app.probe";
+        const PROBE_SERVICE: &str = "app.rowel.desktop.probe";
 
         #[test]
         #[ignore = "touches the real keychain"]

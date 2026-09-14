@@ -149,7 +149,8 @@ its redirect URI is its own client id reversed. So the one thing to configure is
 that URL scheme, and the client id is derived from it.
 
 1. In the same project create a second OAuth 2.0 Client ID, of type **iOS**,
-   with the bundle id from `src-tauri/tauri.conf.json` (`pro.getswifty.app`).
+   with the **iOS** bundle id from `src-tauri/tauri.ios.conf.json`
+   (`app.rowel.mobile` — not the desktop one in `tauri.conf.json`).
 2. Take the client id it gives you — `123456-abcdef.apps.googleusercontent.com`
    — and reverse it into a scheme: `com.googleusercontent.apps.123456-abcdef`.
    (Google shows this as the "iOS URL scheme" on the credential page.)
