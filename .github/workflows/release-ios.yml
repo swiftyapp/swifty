@@ -120,11 +120,18 @@ jobs:
           chmod 600 "$KEY_PATH" "$HOME/private_keys/AuthKey_$APPLE_API_KEY.p8"
           echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-      # --build-number sets CFBundleVersion. App Store Connect rejects an
-      # upload whose build number is not strictly greater than every previous
-      # upload of the same version string, and github.run_number only ever
-      # increases for this workflow — so re-running a release (or shipping a
-      # rebuild of the same version) never collides.
+      # bundle.iOS.bundleVersion sets CFBundleVersion. App Store Connect
+      # rejects an upload whose build number is not strictly greater than every
+      # previous upload of the same version string, and github.run_number only
+      # ever increases for this workflow — so re-running a release (or shipping
+      # a rebuild of the same version) never collides.
+      #
+      # Set through --config rather than with --build-number: that flag appends
+      # to the app version, so `1.0.0-alpha.1` plus run 7 would come out as
+      # CFBundleVersion `1.0.0.1.7`, and App Store Connect rejects anything
+      # longer than three period-separated integers (ITMS-90060).
+      # CFBundleShortVersionString is unaffected — it is derived from the
+      # config version, with the prerelease tag stripped by the CLI.
       - name: Build the App Store IPA
         env:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
@@ -139,7 +146,7 @@ jobs:
         run: |
           bun run tauri ios build --ci \
             --export-method app-store-connect \
-            --build-number "$BUILD_NUMBER"
+            --config "{\"bundle\":{\"iOS\":{\"bundleVersion\":\"$BUILD_NUMBER\"}}}"
 
       # Path is src-tauri/gen/apple/build/<arch>/<productName>.ipa; resolved by
       # glob so it does not have to be kept in sync with productName.

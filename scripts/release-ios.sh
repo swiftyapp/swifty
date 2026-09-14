@@ -37,21 +37,27 @@ if [[ ! -f $APPLE_API_KEY_PATH ]]; then
   exit 1
 fi
 
-# App Store Connect only accepts up to three dot-separated integers as
-# CFBundleShortVersionString, so a pre-release version is rejected on upload —
-# after a full release build. Fail in the first second instead.
+# The marketing version (CFBundleShortVersionString) is derived from the config
+# version by the Tauri CLI, which strips any prerelease tag and keeps exactly
+# three integers — so the desktop's `1.0.0-alpha.1` ships to TestFlight as
+# `1.0.0` with no iOS-specific config. Mirror that here for the log line only.
 VERSION=$(bun -e 'console.log(require("./src-tauri/tauri.conf.json").version)')
-if [[ ! $VERSION =~ ^[0-9]+(\.[0-9]+){0,2}$ ]]; then
-  echo "error: version $VERSION is not MAJOR.MINOR.PATCH; App Store Connect" >&2
-  echo "       rejects pre-release versions. Bump src-tauri/tauri.conf.json," >&2
-  echo "       package.json and src-tauri/Cargo.toml first." >&2
-  exit 1
-fi
+SHORT_VERSION=$(bun -e 'const v = require("./src-tauri/tauri.conf.json").version
+const m = /^(\d+)\.(\d+)\.(\d+)/.exec(v)
+console.log(m ? `${m[1]}.${m[2]}.${m[3]}` : v)')
 
 # CFBundleVersion has to be strictly greater than every previous upload of this
-# version string. Minutes since the epoch is monotonic, needs no state, and
-# stays well inside the 32-bit component limit. Override for a specific number.
+# marketing version. Minutes since the epoch is monotonic, needs no state, and
+# stays inside u32. Override for a specific number.
 BUILD_NUMBER="${BUILD_NUMBER:-$(( $(date -u +%s) / 60 ))}"
+
+# Set as the config value rather than with `tauri ios build --build-number`:
+# that flag *appends* to the app version, producing a CFBundleVersion like
+# `1.0.0.1.29822658`, and App Store Connect rejects anything longer than three
+# period-separated integers (ITMS-90060). Setting it outright makes
+# CFBundleVersion exactly the build number, which is a single integer.
+BUNDLE_VERSION_CONFIG=$(bun -e "console.log(JSON.stringify(
+  { bundle: { iOS: { bundleVersion: process.argv[1] } } }))" "$BUILD_NUMBER")
 
 export APPLE_DEVELOPMENT_TEAM="${APPLE_TEAM_ID:-UFBL3F444A}"
 export APPLE_API_KEY_PATH
@@ -81,10 +87,10 @@ if [[ ! -d src-tauri/gen/apple ]]; then
   exit 1
 fi
 
-echo "Building Swifty $VERSION ($BUILD_NUMBER) for the App Store…"
+echo "Building Swifty $SHORT_VERSION build $BUILD_NUMBER (config version $VERSION)…"
 bun run tauri ios build --ci \
   --export-method app-store-connect \
-  --build-number "$BUILD_NUMBER"
+  --config "$BUNDLE_VERSION_CONFIG"
 
 shopt -s nullglob
 ipas=(src-tauri/gen/apple/build/*.ipa src-tauri/gen/apple/build/*/*.ipa)
@@ -110,6 +116,6 @@ API_PRIVATE_KEYS_DIR="$KEY_DIR/private_keys" \
   --apiKey "$APPLE_API_KEY" --apiIssuer "$APPLE_API_ISSUER"
 
 echo
-echo "Done. Build $BUILD_NUMBER of $VERSION is processing; it shows up under"
+echo "Done. Build $BUILD_NUMBER of $SHORT_VERSION is processing; it shows up under"
 echo "TestFlight → iOS builds in roughly 5–30 minutes."
 echo "  IPA: $IPA"

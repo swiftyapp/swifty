@@ -105,11 +105,16 @@ Then put the same values CI uses into `.env` (see `.env.example`):
 bun run release:ios
 ```
 
-The script refuses to start on a pre-release version (App Store Connect would
-reject the upload after a full build), derives `CFBundleVersion` from the
-clock — minutes since the epoch, so it always increases — and stages the API
-key in a temp directory that is deleted on exit. Pass `BUILD_NUMBER=<n>` to set
-the build number yourself.
+The script derives `CFBundleVersion` from the clock — minutes since the epoch,
+so it always increases — and stages the API key in a temp directory that is
+deleted on exit. Pass `BUILD_NUMBER=<n>` to set the build number yourself.
+
+It sets the build number through `--config bundle.iOS.bundleVersion` rather
+than through `tauri ios build --build-number`, because that flag *appends* to
+the app version: with the version below it would produce a `CFBundleVersion` of
+`1.0.0.1.29822658`, and App Store Connect rejects anything longer than three
+period-separated integers (ITMS-90060). Set outright, `CFBundleVersion` is just
+the build number.
 
 Local and CI build numbers come from different sequences: the workflow uses the
 GitHub run number, which is much smaller than a timestamp. Once a local build
@@ -127,10 +132,14 @@ you want the app on a connected device.
    `src-tauri/Cargo.toml` (they must stay in sync; the tag and the release name
    are derived from `tauri.conf.json`).
 
-   App Store Connect requires `CFBundleShortVersionString` to be at most three
-   dot-separated non-negative integers. A pre-release version such as
-   `1.0.0-alpha.1` is fine for desktop but **will be rejected on upload**, so
-   iOS releases must be cut from a plain `MAJOR.MINOR.PATCH` version.
+   A pre-release version needs no special handling: App Store Connect requires
+   `CFBundleShortVersionString` to be exactly three dot-separated non-negative
+   integers, and the Tauri CLI already strips the prerelease tag on the way
+   into the Xcode project (with a warning). The desktop's `1.0.0-alpha.1` ships
+   to TestFlight as marketing version `1.0.0`, so desktop and iOS can stay on
+   one version string. What distinguishes successive alpha uploads under that
+   one marketing version is `CFBundleVersion`, which the release script sets
+   per build.
 
 2. **Tag and push**: `git tag v<version> && git push origin v<version>`. This
    triggers both `Release` (desktop) and `Release iOS`. The iOS workflow can
@@ -138,8 +147,9 @@ you want the app on a connected device.
    only offers that for workflows on the default branch.
 
 3. **Watch the run.** `CFBundleVersion` is set to the workflow run number
-   (`--build-number`), which is strictly increasing, so re-running the workflow
-   for the same version always produces an acceptable new build.
+   (through `--config bundle.iOS.bundleVersion`, for the ITMS-90060 reason
+   above), which is strictly increasing, so re-running the workflow for the
+   same version always produces an acceptable new build.
 
 4. **TestFlight processing** takes roughly 5–30 minutes after the upload step
    succeeds. The build then appears under **TestFlight → iOS builds**. The IPA
@@ -208,8 +218,10 @@ no biometric data leaves the device or reaches the app.
 
 - **"No suitable application records were found"** — the App Store Connect app
   record for `pro.getswifty.app` does not exist yet (step 2).
-- **Invalid `CFBundleShortVersionString`** — the version has a pre-release
-  suffix; see step 1 of the release procedure.
+- **ITMS-90060 / invalid `CFBundleVersion`** — the build version came out with
+  more than three period-separated integers, which happens when the build
+  number is appended to the app version instead of replacing it; see step 1 of
+  the release procedure.
 - **`src-tauri/gen/apple is missing`** — the Xcode project is committed to the
   repo; regenerate it locally with `bun run tauri ios init` and commit.
 - **Signing failures** — usually an API key without the App Manager role, or a
