@@ -1,6 +1,6 @@
 name: swifty
 options:
-  bundleIdPrefix: pro.getswifty.app
+  bundleIdPrefix: app.rowel.mobile
   deploymentTarget:
     iOS: 16.0
 fileGroups: [../../src]
@@ -11,7 +11,7 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: Swifty
-      PRODUCT_BUNDLE_IDENTIFIER: pro.getswifty.app
+      PRODUCT_BUNDLE_IDENTIFIER: app.rowel.mobile
       DEVELOPMENT_TEAM: UFBL3F444A
 targetTemplates:
   app:
