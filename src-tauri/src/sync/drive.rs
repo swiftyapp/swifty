@@ -21,10 +21,13 @@ const UPLOAD: &str = "https://www.googleapis.com/upload/drive/v3/files";
 // `nextPageToken` has to be named too: the mask filters the whole response, so
 // one that only asks for `files(...)` gets the files and no token back, which
 // silently turns every listing into its first page.
+// `size` and `modifiedTime` are what first-run onboarding shows the user about
+// a remote vault it has not downloaded yet ("2.1 MB, last changed yesterday").
 const LIST_FIELDS: &str =
-    "nextPageToken, files(id, name, createdTime, headRevisionId, appProperties)";
+    "nextPageToken, files(id, name, createdTime, modifiedTime, size, headRevisionId, appProperties)";
 const PAGE_SIZE: &str = "100";
-const FILE_FIELDS: &str = "id, name, createdTime, headRevisionId, appProperties";
+const FILE_FIELDS: &str =
+    "id, name, createdTime, modifiedTime, size, headRevisionId, appProperties";
 const FILE_MIME: &str = "application/octet-stream";
 const FOLDER_MIME: &str = "application/vnd.google-apps.folder";
 
@@ -34,6 +37,12 @@ pub struct DriveFile {
     pub id: String,
     pub name: String,
     pub created_time: String,
+    /// Last content change, RFC 3339 UTC. Empty when the caller's field mask
+    /// did not ask for it.
+    pub modified_time: String,
+    /// Byte length. Drive only reports one for blob files (a folder or a Google
+    /// Docs file has none), and sends it as a *string* — see [`parse_size`].
+    pub size: Option<u64>,
     /// Absent on folders, and on a file Drive has not yet assigned a revision
     /// to. The engine treats an absent revision as "unknown", which only costs
     /// it a race check, never correctness.
@@ -131,9 +140,22 @@ fn parse_file(value: &Value) -> Option<DriveFile> {
         id: value["id"].as_str()?.to_string(),
         name: value["name"].as_str().unwrap_or("").to_string(),
         created_time: value["createdTime"].as_str().unwrap_or("").to_string(),
+        modified_time: value["modifiedTime"].as_str().unwrap_or("").to_string(),
+        size: parse_size(&value["size"]),
         head_revision: value["headRevisionId"].as_str().map(String::from),
         app_properties: parse_properties(&value["appProperties"]),
     })
+}
+
+/// Drive sends `size` as a decimal *string* (int64 does not survive JSON
+/// numbers intact), so reading it as a number gets `None` for every real
+/// response. A number is still accepted, because nothing about the caller
+/// changes if Drive ever sends one.
+fn parse_size(value: &Value) -> Option<u64> {
+    match value {
+        Value::String(s) => s.parse().ok(),
+        other => other.as_u64(),
+    }
 }
 
 // Drive declares appProperties as string->string, but a value that is not a
@@ -432,6 +454,28 @@ async fn read_capped(resp: &mut reqwest::Response, max_bytes: usize) -> Result<V
     Ok(body)
 }
 
+/// Rename a file, leaving its id, content and parents alone.
+///
+/// A rename rather than a copy-and-delete: onboarding uses this to move a
+/// pre-existing remote vault aside, and the user's own Drive should keep the
+/// same object (revision history included) under its new name.
+pub async fn rename_file(client: &Client, token: &str, id: &str, name: &str) -> Result<()> {
+    let resp = client
+        .patch(format!("{FILES}/{id}"))
+        .bearer_auth(token)
+        .query(&[("fields", FILE_FIELDS)])
+        .json(&rename_body(name))
+        .send()
+        .await
+        .map_err(other)?;
+    check(resp).await.map(|_| ())
+}
+
+// `files.patch` merges: naming only `name` leaves every other field as it was.
+fn rename_body(name: &str) -> Value {
+    json!({ "name": name })
+}
+
 /// Overwrite a file's content, returning its new head revision.
 pub async fn update_file(
     client: &Client,
@@ -459,7 +503,7 @@ pub async fn update_file(
 mod tests {
     use super::{
         collect_pages, escape, list_query, multipart_body, oldest, parse_file, parse_listing,
-        parse_properties, DriveFile,
+        parse_properties, parse_size, rename_body, DriveFile, FILE_FIELDS, LIST_FIELDS,
     };
     use serde_json::json;
     use std::cell::RefCell;
@@ -478,6 +522,8 @@ mod tests {
             id: id.into(),
             name: String::new(),
             created_time: created.into(),
+            modified_time: String::new(),
+            size: None,
             head_revision: None,
             app_properties: Default::default(),
         }
@@ -602,6 +648,52 @@ mod tests {
     fn no_properties_object_is_no_properties() {
         assert!(parse_properties(&json!(null)).is_empty());
         assert!(parse_properties(&json!("nonsense")).is_empty());
+    }
+
+    // What onboarding shows about a remote vault before downloading it. Drive
+    // sends the length as a string, which is the whole reason `parse_size`
+    // exists — reading it as a JSON number would report every pack as unsized.
+    #[test]
+    fn a_listed_file_carries_its_size_and_modified_time() {
+        let parsed = parse_file(&json!({
+            "id": "f1",
+            "name": "vault.swsync",
+            "modifiedTime": "2024-05-04T10:11:12.000Z",
+            "size": "2097152",
+        }))
+        .unwrap();
+
+        assert_eq!(parsed.size, Some(2_097_152));
+        assert_eq!(parsed.modified_time, "2024-05-04T10:11:12.000Z");
+    }
+
+    #[test]
+    fn a_file_drive_reports_no_size_for_has_none() {
+        // Folders and Google-native files simply have no `size`, and a garbled
+        // one is no better than a missing one.
+        assert_eq!(parse_size(&json!(null)), None);
+        assert_eq!(parse_size(&json!("not a number")), None);
+        // A plain number still reads, in case Drive ever sends one.
+        assert_eq!(parse_size(&json!(17)), Some(17));
+    }
+
+    // Both masks filter the whole response, so a field left out of them is
+    // absent from the parse no matter what the file actually has.
+    #[test]
+    fn both_field_masks_ask_for_size_and_modified_time() {
+        for mask in [LIST_FIELDS, FILE_FIELDS] {
+            assert!(mask.contains("size"), "{mask}");
+            assert!(mask.contains("modifiedTime"), "{mask}");
+        }
+    }
+
+    // A rename must not disturb anything else about the file — `files.patch`
+    // merges, so the body naming only `name` is what keeps parents and content
+    // where they are.
+    #[test]
+    fn a_rename_patches_only_the_name() {
+        let body = rename_body("vault-archived-2024-05-04.swsync");
+        assert_eq!(body, json!({ "name": "vault-archived-2024-05-04.swsync" }));
     }
 
     // Binary content must survive the envelope byte for byte — the share is

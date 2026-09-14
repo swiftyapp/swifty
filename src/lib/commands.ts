@@ -271,6 +271,12 @@ export const unlockBiometric = (): Promise<UnlockResult> =>
 export const isBiometricAvailable = (): Promise<boolean> =>
   invoke('is_biometric_available')
 
+// Whether enrolling would work on this device (gated store + hardware), before
+// anyone has enrolled. `isBiometricAvailable` also demands an enrollment, so on
+// a fresh install it can only ever say no — this is the question onboarding asks.
+export const canEnrollBiometric = (): Promise<boolean> =>
+  invoke('can_enroll_biometric')
+
 // Which biometry this device gates with, straight from the OS (Apple reads
 // `LAContext.biometryType`; everywhere else a fingerprint is the only kind
 // there has ever been). The platform alone cannot answer it — iPhones and Touch
@@ -305,6 +311,49 @@ export const changeMasterPassword = (
   current: string,
   next: string
 ): Promise<void> => invoke('change_master_password', { current, new: next })
+
+// ---------------------------------------------------------------------------
+// First run
+// ---------------------------------------------------------------------------
+
+/**
+ * The sealed pack this Google account already holds, as the setup probe reports
+ * it. `size` is bytes; `modifiedTime` is RFC3339.
+ */
+export interface SetupDriveFile {
+  name: string
+  size: number
+  modifiedTime: string
+}
+
+/**
+ * Start the Google consent flow *before* there is anything on disk, so the
+ * first run can look for data to restore. Like `sync_connect`, the outcome
+ * never arrives through this promise: it comes back as `setup:drive:pending`
+ * and then exactly one of `setup:drive:probed` / `setup:drive:error`. A
+ * rejection here is an immediate failure (no OAuth client configured) and is
+ * shown the same way an error event is.
+ */
+export const setupDriveConnect = (): Promise<void> => invoke('setup_drive_connect')
+
+/** Forget the tokens `setup_drive_connect` left pending (Go back, Switch account). */
+export const setupDriveDisconnect = (): Promise<void> =>
+  invoke('setup_drive_disconnect')
+
+/** Pull the pack the probe found and unseal it here. Resolves `syncConfigured: true`. */
+export const setupRestoreFromDrive = (password: string): Promise<UnlockResult> =>
+  invoke('setup_restore_from_drive', { password })
+
+/**
+ * Create the local data under `password`. Any tokens left pending by
+ * `setup_drive_connect` are adopted, so the result reports sync as configured;
+ * `archiveRemote` renames the pack already in that Drive folder first, rather
+ * than writing over it.
+ */
+export const setupCreate = (
+  password: string,
+  archiveRemote: boolean
+): Promise<UnlockResult> => invoke('setup_create', { password, archiveRemote })
 
 // ---------------------------------------------------------------------------
 // Vault

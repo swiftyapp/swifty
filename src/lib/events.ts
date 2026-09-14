@@ -1,5 +1,5 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { Audit, EntryMeta } from './commands'
+import type { Audit, EntryMeta, SetupDriveFile } from './commands'
 
 /**
  * Frozen event catalog. The backend `emit`s these; the frontend `listen`s.
@@ -20,7 +20,10 @@ export const EVENTS = {
   auditDone: 'audit:done',
   vaultLocked: 'vault:locked',
   importProgress: 'import:progress',
-  importDone: 'import:done'
+  importDone: 'import:done',
+  setupDrivePending: 'setup:drive:pending',
+  setupDriveProbed: 'setup:drive:probed',
+  setupDriveError: 'setup:drive:error'
 } as const
 
 export interface SyncStoppedPayload {
@@ -68,6 +71,17 @@ export interface ImportDonePayload {
   count: number
 }
 
+/**
+ * The first-run Drive probe answered. `file: null` is a Google account with no
+ * Swifty data in it yet — a fact, not a failure, so it is not an error event.
+ * Mirrors the `sync:pending` / `sync:connected` / `sync:error` trio: the
+ * backend opens the browser and hears back from it, so the frontend follows
+ * these rather than guessing from the command's promise.
+ */
+export interface SetupDriveProbedPayload {
+  file: SetupDriveFile | null
+}
+
 // Maps each event to its payload type (void = no payload).
 export interface EventPayloads {
   'sync:started': void
@@ -83,6 +97,9 @@ export interface EventPayloads {
   'vault:locked': void
   'import:progress': ImportProgressPayload
   'import:done': ImportDonePayload
+  'setup:drive:pending': void
+  'setup:drive:probed': SetupDriveProbedPayload
+  'setup:drive:error': SyncErrorPayload
 }
 
 export type EventName = keyof EventPayloads

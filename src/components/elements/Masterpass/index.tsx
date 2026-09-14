@@ -29,6 +29,9 @@ interface Props {
   disabled?: boolean
   placeholder?: string
   testid?: string
+  // The field takes focus on mount, which is right for every screen that draws
+  // one. The setup screen draws two, and only the first of them should.
+  autoFocus?: boolean
   // `lock` is the signature card presentation of the lock screen; `compact`
   // (default) is the plain centered field used by setup / restore.
   variant?: 'compact' | 'lock'
@@ -67,6 +70,7 @@ export default function Masterpass({
   disabled,
   placeholder,
   testid,
+  autoFocus = true,
   variant = 'compact',
   invalid,
   success,
@@ -151,7 +155,7 @@ export default function Masterpass({
       placeholder={placeholder || t('Master Password')}
       disabled={inert}
       data-testid={testid}
-      autoFocus
+      autoFocus={autoFocus}
       value={value}
       onChange={handleChange}
       onKeyDown={handleKeyDown}

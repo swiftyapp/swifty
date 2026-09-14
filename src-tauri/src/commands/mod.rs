@@ -9,6 +9,8 @@ pub mod env;
 pub mod generator;
 pub mod import;
 pub mod save;
+// First-run onboarding (connect Drive before a vault exists).
+pub mod setup;
 pub mod share;
 pub mod sync;
 pub mod vault;

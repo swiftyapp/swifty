@@ -363,6 +363,8 @@ mod tests {
             id: "f1".into(),
             name: "share.swshare".into(),
             created_time: created.into(),
+            modified_time: String::new(),
+            size: None,
             head_revision: None,
             app_properties: properties
                 .iter()

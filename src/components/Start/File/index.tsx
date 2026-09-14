@@ -1,0 +1,103 @@
+import { useState, type ChangeEvent } from 'react'
+import { useTranslation } from 'react-i18next'
+import AuthShell from '@/components/elements/AuthShell'
+import Masterpass from '@/components/elements/Masterpass'
+import Button from '@/components/elements/Button'
+import type { UnlockResult } from '@/lib/commands'
+import { restoreBackup } from '@/store'
+import StepHeader from '../shared/StepHeader'
+import DropZone from '../shared/DropZone'
+import FoundFileCard from '../shared/FoundFileCard'
+import TextLink from '../shared/TextLink'
+import { COLUMN, FOOTNOTE } from '../shared/layout'
+import { unsealError } from '../shared/errors'
+import { fileNameOf } from '../shared/describe'
+
+interface Props {
+  onBack: () => void
+  onRestored: (result: UnlockResult) => Promise<void>
+}
+
+// Restoring from a `.swftx` export: pick the file, then unseal it. Desktop
+// only — a phone has nowhere to drag a file from, and the export it would need
+// was written on a machine that does.
+export default function File({ onBack, onRestored }: Props) {
+  const { t } = useTranslation()
+  const [path, setPath] = useState<string | null>(null)
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const change = (event: ChangeEvent<HTMLInputElement>) => {
+    setError(null)
+    setPassword(event.currentTarget.value)
+  }
+
+  const restore = () => {
+    if (busy || !path || !password) return
+    setBusy(true)
+    setError(null)
+    restoreBackup(path, password)
+      .then(onRestored)
+      .catch((err: unknown) => {
+        setBusy(false)
+        setError(unsealError(t, err, t('Invalid password for backup')))
+      })
+  }
+
+  if (path === null)
+    return (
+      <AuthShell onBack={onBack}>
+        <StepHeader
+          eyebrow={t('Restore · Backup file')}
+          title={t('Pick your backup')}
+          body={t('Exported from Settings on another device.')}
+        />
+        <div className={`${COLUMN} mt-9`}>
+          <DropZone onPick={setPath} />
+        </div>
+      </AuthShell>
+    )
+
+  return (
+    <AuthShell onBack={onBack}>
+      <StepHeader
+        eyebrow={t('Restore · Backup file')}
+        title={t('Unlock your backup')}
+        body={t('Use the master password you had when this backup was made.')}
+      />
+
+      <div className={`${COLUMN} mt-9`}>
+        <FoundFileCard
+          where="disk"
+          testid="restore-found-file"
+          name={fileNameOf(path)}
+          encrypted
+        />
+
+        <div className="mt-6">
+          <Masterpass
+            placeholder={t('Master password')}
+            testid="restore-password-input"
+            error={error}
+            disabled={busy}
+            onEnter={restore}
+            onChange={change}
+          />
+        </div>
+
+        <div className="mt-8">
+          <Button block testid="restore-confirm-button" loading={busy} onClick={restore}>
+            {t('Restore')}
+          </Button>
+        </div>
+      </div>
+
+      <div className={`${FOOTNOTE} flex justify-center`}>
+        <TextLink testid="restore-change-file" onClick={() => setPath(null)}>
+          {t('Pick another file')}
+        </TextLink>
+      </div>
+    </AuthShell>
+  )
+}

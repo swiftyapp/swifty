@@ -2,27 +2,12 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { unlock, unlockBiometric, type UnlockResult } from '@/lib/commands'
+import { isTooManyAttempts, isVaultTooNew } from '@/lib/authErrors'
 import { enterMain } from '@/store'
 import type { MascotState } from '@/components/elements/Mascot'
 
 // How long the mascot gets to celebrate before the vault fades in.
 const SUCCESS_HOLD_MS = 650
-
-// Rust's `Error::TooManyAttempts` serializes as this shape (see error.rs);
-// every other backend error is a plain string.
-interface TooManyAttemptsError {
-  retryAfterSecs: number
-}
-
-const isTooManyAttempts = (error: unknown): error is TooManyAttemptsError =>
-  typeof error === 'object' &&
-  error !== null &&
-  typeof (error as TooManyAttemptsError).retryAfterSecs === 'number'
-
-// Rust's `Error::VaultTooNew` (see error.rs) — the vault's schema is ahead of
-// this build. Shown as its own message: blaming the password would be wrong.
-const isVaultTooNew = (error: unknown): boolean =>
-  error === 'vault requires a newer version of the app'
 
 const unlockError = (t: TFunction, error: unknown): string =>
   isVaultTooNew(error)
