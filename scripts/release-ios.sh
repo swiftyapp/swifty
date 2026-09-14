@@ -87,15 +87,29 @@ if [[ ! -d src-tauri/gen/apple ]]; then
   exit 1
 fi
 
+shopt -s nullglob
+
+# Unlike the CI runner, this build directory survives between runs, so an IPA
+# left by an earlier build — a previous productName, another target — would be
+# a candidate below and could be uploaded in place of the build just made.
+# Everything under build/ is generated and gitignored, so clearing it is free.
+rm -f src-tauri/gen/apple/build/*.ipa src-tauri/gen/apple/build/*/*.ipa
+
 echo "Building Swifty $SHORT_VERSION build $BUILD_NUMBER (config version $VERSION)…"
 bun run tauri ios build --ci \
   --export-method app-store-connect \
   --config "$BUNDLE_VERSION_CONFIG"
 
-shopt -s nullglob
 ipas=(src-tauri/gen/apple/build/*.ipa src-tauri/gen/apple/build/*/*.ipa)
 if [[ ${#ipas[@]} -eq 0 ]]; then
   echo "error: no .ipa under src-tauri/gen/apple/build." >&2
+  exit 1
+fi
+# One target means one IPA. Several is ambiguous, and guessing risks uploading
+# the wrong one, so say which were found instead of picking.
+if [[ ${#ipas[@]} -gt 1 ]]; then
+  echo "error: more than one .ipa after the build; not guessing which to upload:" >&2
+  printf '  %s\n' "${ipas[@]}" >&2
   exit 1
 fi
 IPA="$PWD/${ipas[0]}"
