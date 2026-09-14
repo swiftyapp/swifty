@@ -19,7 +19,7 @@
   <dict>
     <key>keychain-access-groups</key>
     <array>
-      <string>$(AppIdentifierPrefix)pro.getswifty.app</string>
+      <string>$(AppIdentifierPrefix)app.rowel.desktop</string>
     </array>
   </dict>
 </plist>
