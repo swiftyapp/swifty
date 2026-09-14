@@ -85,11 +85,16 @@ else
   echo "warning: GOOGLE_OAUTH_IOS_CLIENT_ID is not set — building without Drive sync." >&2
 fi
 
-# The OAuth redirect comes back to the app through the reversed client id, so a
-# placeholder scheme here means the Drive login dead-ends on the device.
+# The scheme is shipped verbatim as CFBundleURLTypes, and App Store Connect
+# rejects the upload over it (90158: URL schemes must be alphanumerics, period,
+# hyphen or plus) — after a full build and a full upload. Stop here instead.
 if grep -q YOUR_IOS_CLIENT_ID src-tauri/tauri.ios.conf.json; then
-  echo "warning: the deep-link scheme in src-tauri/tauri.ios.conf.json is still a" >&2
-  echo "         placeholder; Drive sign-in will not return to the app." >&2
+  echo "error: the deep-link scheme in src-tauri/tauri.ios.conf.json is still the" >&2
+  echo "       YOUR_IOS_CLIENT_ID placeholder. App Store Connect rejects it (90158)." >&2
+  echo "       Either put the reversed iOS OAuth client id in (README, 'Drive sync" >&2
+  echo "       on iOS'), or delete the whole \"deep-link\" block to ship without" >&2
+  echo "       Drive sign-in on iOS." >&2
+  exit 1
 fi
 
 bun scripts/check-tauri-versions.mjs
