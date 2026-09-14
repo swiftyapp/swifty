@@ -225,6 +225,15 @@ no biometric data leaves the device or reaches the app.
 
 - **"No suitable application records were found"** — the App Store Connect app
   record for `app.rowel.mobile` does not exist yet (step 2).
+- **`exportArchive` says a provisioning profile "does not match the bundle ID"**
+  — `IOS_CERTIFICATE`, `IOS_CERTIFICATE_PASSWORD` or `IOS_MOBILE_PROVISION` is
+  set. Any of them switches the Tauri CLI to manual signing with the profile it
+  names, which is how another app's profile ends up signing this one. The
+  release script now unsets all three, but a run that got through before writes
+  `CODE_SIGN_STYLE = Manual`, `CODE_SIGN_IDENTITY` and
+  `PROVISIONING_PROFILE_SPECIFIER` into the *committed* `project.pbxproj` and
+  the CLI never resets them. Remove the variables from `.env`, then restore the
+  project: `git checkout -- src-tauri/gen/apple/swifty.xcodeproj/project.pbxproj`.
 - **ITMS-90060 / invalid `CFBundleVersion`** — the build version came out with
   more than three period-separated integers, which happens when the build
   number is appended to the app version instead of replacing it; see step 1 of
