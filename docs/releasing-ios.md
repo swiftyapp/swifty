@@ -78,6 +78,49 @@ it. If `APPLE_TEAM_ID` is ever removed, the workflow falls back to the literal
 `UFBL3F444A`, which matches `bundle.iOS.developmentTeam` in
 `src-tauri/tauri.conf.json`.
 
+## Releasing from your Mac
+
+`bun run release:ios` (`scripts/release-ios.sh`) does the whole thing in one
+command: it builds the App Store IPA and uploads it to App Store Connect, where
+it becomes a TestFlight build. It is the local twin of the workflow above and
+uses the same App Store Connect API key, so signing is automatic and there is
+no Apple ID password and no Xcode account involved.
+
+One-time, per machine:
+
+```sh
+xcode-select --install                 # or a full Xcode from the App Store
+sudo xcodebuild -license accept
+rustup target add aarch64-apple-ios
+brew install cocoapods                 # `tauri ios build` runs `pod install`
+bun install
+```
+
+Then put the same values CI uses into `.env` (see `.env.example`):
+`APPLE_API_ISSUER`, `APPLE_API_KEY`, `APPLE_API_KEY_PATH` (path to your
+`AuthKey_<KEYID>.p8`, kept outside the repo) and `GOOGLE_OAUTH_IOS_CLIENT_ID`.
+`APPLE_TEAM_ID` is already there for desktop notarization and is reused.
+
+```sh
+bun run release:ios
+```
+
+The script refuses to start on a pre-release version (App Store Connect would
+reject the upload after a full build), derives `CFBundleVersion` from the
+clock — minutes since the epoch, so it always increases — and stages the API
+key in a temp directory that is deleted on exit. Pass `BUILD_NUMBER=<n>` to set
+the build number yourself.
+
+Local and CI build numbers come from different sequences: the workflow uses the
+GitHub run number, which is much smaller than a timestamp. Once a local build
+of a version has been uploaded, CI cannot upload that same version any more
+(its build number would not be strictly greater). Use one or the other per
+version, or pass `BUILD_NUMBER` explicitly.
+
+`bun run ios:init` and `bun run ios:dev` wrap `tauri ios init` / `tauri ios dev`
+for the rare case where the committed Xcode project has to be regenerated or
+you want the app on a connected device.
+
 ## Per-release procedure
 
 1. **Bump the version** in `src-tauri/tauri.conf.json`, `package.json` and
