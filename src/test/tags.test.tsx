@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Sidebar from '@/components/Main/Sidebar'
 import ListColumn from '@/components/Main/Body/ListColumn'
-import { makeStore, useStore, setView, setFilterTag } from '@/store'
-import { renderWithStore, withEntries, loginMeta } from './utils'
+import { useUi, setView, setFilterTag } from '@/store'
+import { withEntries, loginMeta } from './utils'
 
 const entries = [
   loginMeta({ id: 'a', title: 'Google', tags: ['work', 'mail'] }),
@@ -19,15 +19,13 @@ const options = () => screen.getAllByRole('menuitem').map(item => item.textConte
 // The rail and the column it drives: Tags is a view, so it is read across the
 // tile that lights, the title, and what the column lists.
 const seed = (rows = entries, prepare?: () => void) => {
-  const store = makeStore()
   withEntries(rows)
   prepare?.()
-  return renderWithStore(
+  return render(
     <>
       <Sidebar />
       <ListColumn />
-    </>,
-    { store }
+    </>
   )
 }
 
@@ -43,7 +41,7 @@ describe('the tags menu', () => {
 
     expect(options()).toEqual(['money2', 'work2', 'mail1'])
     // Opening the menu is not yet navigating.
-    expect(useStore.getState().ui.view).toBe('items')
+    expect(useUi.getState().view).toBe('items')
     expect(screen.getByTestId('tags-button')).toHaveAttribute('aria-pressed', 'false')
   })
 
@@ -82,8 +80,8 @@ describe('the tags view', () => {
     await open()
     await pick('work')
 
-    expect(useStore.getState().ui.view).toBe('tags')
-    expect(useStore.getState().filters.tag).toBe('work')
+    expect(useUi.getState().view).toBe('tags')
+    expect(useUi.getState().filterTag).toBe('work')
     expect(screen.getByTestId('tags-button')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('view-favorites')).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByTestId('view-items')).toHaveAttribute('aria-pressed', 'false')
@@ -114,7 +112,7 @@ describe('the tags view', () => {
     )
     await pick('money')
 
-    expect(useStore.getState().filters.tag).toBe('money')
+    expect(useUi.getState().filterTag).toBe('money')
     expect(titles()).toEqual(expect.arrayContaining(['Monzo', 'Visa']))
     expect(titles()).toHaveLength(2)
   })
@@ -125,8 +123,8 @@ describe('the tags view', () => {
     await pick('work')
     await userEvent.click(screen.getByTestId('active-tag'))
 
-    expect(useStore.getState().ui.view).toBe('items')
-    expect(useStore.getState().filters.tag).toBeNull()
+    expect(useUi.getState().view).toBe('items')
+    expect(useUi.getState().filterTag).toBeNull()
     expect(screen.queryByTestId('active-tag')).not.toBeInTheDocument()
     expect(titles()).toHaveLength(4)
   })
@@ -137,7 +135,7 @@ describe('the tags view', () => {
     await pick('work')
     await userEvent.click(screen.getByTestId('view-favorites'))
 
-    expect(useStore.getState().filters.tag).toBeNull()
+    expect(useUi.getState().filterTag).toBeNull()
     expect(screen.getByTestId('tags-button')).toHaveAttribute('aria-pressed', 'false')
     expect(titles()).toEqual(['Airbnb'])
   })

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { open } from '@tauri-apps/plugin-dialog'
 import Main from '@/components/Main'
 import { scanImage } from '@/lib/commands'
-import { makeStore, useStore, setScanSupported, startEntry } from '@/store'
+import { useUi, useVault, setScanSupported, startEntry } from '@/store'
 import {
   cleanFields,
   firstImage,
@@ -12,7 +12,7 @@ import {
   mergeFields
 } from '@/components/Main/Scan/fields'
 import { runScan } from '@/components/Main/Scan/run'
-import { renderWithStore, withEntries, loginMeta } from './utils'
+import { withEntries, loginMeta } from './utils'
 
 const CARD = { number: '4242424242424242', month: '04', year: '27', name: 'ADA LOVELACE' }
 
@@ -28,11 +28,7 @@ const PASSPORT = {
   personal_number: 'ZE184226B'
 }
 
-const seed = () => {
-  const store = makeStore()
-  withEntries([loginMeta({ id: 'l1', title: 'Google' })])
-  return store
-}
+const seed = () => withEntries([loginMeta({ id: 'l1', title: 'Google' })])
 
 const scan = (path: string) => act(async () => void (await runScan(path)))
 
@@ -102,9 +98,9 @@ describe('scan routing', () => {
 
     await scan('/Users/me/card.png')
 
-    expect(useStore.getState().entries.new).toBe('card')
-    expect(useStore.getState().entries.prefill).toEqual(CARD)
-    expect(useStore.getState().ui.scan.busy).toBe(false)
+    expect(useVault.getState().creating).toBe('card')
+    expect(useVault.getState().prefill).toEqual(CARD)
+    expect(useUi.getState().scanBusy).toBe(false)
   })
 
   it('fills the editor already open for that kind instead of opening another', async () => {
@@ -114,8 +110,8 @@ describe('scan routing', () => {
 
     await scan('/Users/me/passport.jpg')
 
-    expect(useStore.getState().entries.new).toBe('identity')
-    expect(useStore.getState().entries.prefill).toEqual(PASSPORT)
+    expect(useVault.getState().creating).toBe('identity')
+    expect(useVault.getState().prefill).toEqual(PASSPORT)
   })
 
   it('reports why nothing came back', async () => {
@@ -124,17 +120,17 @@ describe('scan routing', () => {
 
     await scan('/Users/me/wall.png')
 
-    expect(useStore.getState().entries.new).toBeNull()
-    expect(useStore.getState().ui.scan).toMatchObject({ busy: false, error: 'unreadable' })
+    expect(useVault.getState().creating).toBeNull()
+    expect(useUi.getState()).toMatchObject({ scanBusy: false, scanError: 'unreadable' })
   })
 })
 
 describe('a scanned draft', () => {
   it('opens the editor with the fields already in it', async () => {
-    const store = seed()
+    seed()
     setScanSupported(true)
     vi.mocked(scanImage).mockResolvedValue({ kind: 'identity', fields: PASSPORT })
-    renderWithStore(<Main />, { store })
+    render(<Main />)
 
     await scan('/Users/me/passport.jpg')
 
@@ -143,14 +139,14 @@ describe('a scanned draft', () => {
     )
     expect(document.querySelector('input[name="name"]')).toHaveValue('ANNA MARIA ERIKSSON')
     // Consumed: nothing is left to seed the next entry with.
-    expect(useStore.getState().entries.prefill).toBeNull()
+    expect(useVault.getState().prefill).toBeNull()
   })
 
   it('fills the blanks of an editor that is already open', async () => {
-    const store = seed()
+    seed()
     setScanSupported(true)
     startEntry('identity')
-    renderWithStore(<Main />, { store })
+    render(<Main />)
 
     const name = document.querySelector('input[name="name"]') as HTMLInputElement
     await userEvent.type(name, 'MY OWN NAME')
@@ -169,16 +165,17 @@ describe('scanning from the picker', () => {
   const openFromRail = () => userEvent.click(screen.getByTestId('add-entry-button'))
 
   it('offers nothing where the platform cannot scan', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await openFromRail()
 
     expect(screen.queryByTestId('add-scan-image')).not.toBeInTheDocument()
   })
 
   it('offers the action where it can', async () => {
-    const store = seed()
+    seed()
     setScanSupported(true)
-    renderWithStore(<Main />, { store })
+    render(<Main />)
     await openFromRail()
 
     const action = within(screen.getByTestId('add-secret-modal')).getByTestId('add-scan-image')
@@ -186,25 +183,25 @@ describe('scanning from the picker', () => {
   })
 
   it('routes a picked file like a drop', async () => {
-    const store = seed()
+    seed()
     setScanSupported(true)
     vi.mocked(open).mockResolvedValue('/Users/me/card.png')
     vi.mocked(scanImage).mockResolvedValue({ kind: 'card', fields: CARD })
-    renderWithStore(<Main />, { store })
+    render(<Main />)
     await openFromRail()
 
     await userEvent.click(screen.getByTestId('add-scan-image'))
 
-    await waitFor(() => expect(useStore.getState().entries.new).toBe('card'))
-    expect(useStore.getState().ui.addPicker).toBe(false)
+    await waitFor(() => expect(useVault.getState().creating).toBe('card'))
+    expect(useUi.getState().addPicker).toBe(false)
     expect(vi.mocked(scanImage)).toHaveBeenCalledWith('/Users/me/card.png')
   })
 
   it('leaves the picker alone when the dialog is cancelled', async () => {
-    const store = seed()
+    seed()
     setScanSupported(true)
     vi.mocked(open).mockResolvedValue(null)
-    renderWithStore(<Main />, { store })
+    render(<Main />)
     await openFromRail()
 
     await userEvent.click(screen.getByTestId('add-scan-image'))
@@ -214,13 +211,13 @@ describe('scanning from the picker', () => {
   })
 
   it('keeps the tiles answering to the digits', async () => {
-    const store = seed()
+    seed()
     setScanSupported(true)
-    renderWithStore(<Main />, { store })
+    render(<Main />)
     await openFromRail()
 
     await userEvent.keyboard('2')
 
-    expect(useStore.getState().entries.new).toBe('card')
+    expect(useVault.getState().creating).toBe('card')
   })
 })

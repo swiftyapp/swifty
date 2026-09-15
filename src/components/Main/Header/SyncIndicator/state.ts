@@ -1,5 +1,5 @@
 import type { TKey } from '@/i18n'
-import type { StoreState } from '@/store'
+import type { SyncState } from '@/store'
 
 export type SyncTone = 'local' | 'idle' | 'loading' | 'good' | 'bad'
 
@@ -23,7 +23,7 @@ export interface SyncView {
 }
 
 /**
- * The chip's five states, in priority order, from the sync slice.
+ * The chip's five states, in priority order, from the sync state.
  *
  * Ordering matters: a run in flight outranks the previous run's verdict, so a
  * retry after a failure reads as "syncing" rather than staying red until it
@@ -31,7 +31,7 @@ export interface SyncView {
  * "good": `success` starts optimistically true, so a vault connected a second
  * ago would otherwise claim to be up to date before a single run.
  */
-export const syncView = (sync: StoreState['sync']): SyncView => {
+export const syncView = (sync: SyncState): SyncView => {
   if (!sync.enabled)
     return { tone: 'local', message: 'Changes are saved on this device only' }
   if (sync.inProgress) return { tone: 'loading', message: 'Syncing…' }

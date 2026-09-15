@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { lockVault } from '@/store'
-import type { Section } from '@/store/uiSlice'
+import { lockVault, type Section } from '@/store'
 import { CARD } from '@/components/elements/tokens'
 import { cx } from '@/utils/cx'
 import { SECTIONS } from '../../Sidebar/Settings/sections'

@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { beforeEach, vi } from 'vitest'
-import { usePrefs, DEFAULT_PREFS } from '@/store/prefs'
 import { setLayout } from './layout'
+import { resetStores } from './utils'
 
 // jsdom implements no layout, so it ships no scrollIntoView.
 Element.prototype.scrollIntoView = vi.fn()
@@ -12,7 +12,7 @@ setLayout('wide')
 beforeEach(() => {
   setLayout('wide')
   localStorage.clear()
-  usePrefs.setState(DEFAULT_PREFS)
+  resetStores()
 })
 
 // The Rust backend is built in parallel; mock the whole command/event layer so
@@ -153,6 +153,12 @@ vi.mock('@tauri-apps/api/dpi', () => ({
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn().mockResolvedValue(undefined)
 }))
+
+// The updater is reached through the app store (`runUpdateCheck`), so its
+// plugins are mocked here rather than in the one suite that drives them —
+// a suite-level mock would land after the store has already imported them.
+vi.mock('@tauri-apps/plugin-updater', () => ({ check: vi.fn() }))
+vi.mock('@tauri-apps/plugin-process', () => ({ relaunch: vi.fn() }))
 
 // The file dialog: nothing picked unless a test says otherwise.
 vi.mock('@tauri-apps/plugin-dialog', () => ({

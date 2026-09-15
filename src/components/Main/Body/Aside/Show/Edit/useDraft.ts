@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useStore, setCurrentEntry, setNoEntry, saveEntry, clearPrefill } from '@/store'
+import { useVault, setCurrentEntry, setNoEntry, saveEntry, clearPrefill } from '@/store'
 import { kindOf } from '@/kinds'
 import { pruneExtra } from '@/components/elements/fields'
 import { mergeFields } from '@/components/Main/Scan/fields'
@@ -40,7 +40,7 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
   // entry's are in the store before this mounts, so they are part of the
   // initial draft — the editor opens already filled in, and nothing about it
   // reads as unsaved typing.
-  const [seed] = useState(() => useStore.getState().entries.prefill)
+  const [seed] = useState(() => useVault.getState().prefill)
   const initial = (): EntryDraft => mergeFields({ ...(revealed ?? kind.defaults) }, seed ?? {})
 
   const [attempted, setAttempted] = useState(false)
@@ -60,7 +60,7 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
   // A scan of what is already being edited arrives after the mount: it fills
   // this draft's blanks in place rather than opening a second one. Consumed
   // either way, so the prefill can never seed a later entry.
-  const prefill = useStore(state => state.entries.prefill)
+  const prefill = useVault(state => state.prefill)
   useEffect(() => {
     if (!prefill) return
     if (prefill !== seed) setModel(current => mergeFields(current, prefill))

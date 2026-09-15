@@ -1,7 +1,7 @@
 import type { EntryType } from '@/lib/commands'
 import { syncImport } from '@/lib/commands'
 import {
-  useStore,
+  useApp,
   openAddPicker,
   openSettings,
   startEntry,
@@ -28,7 +28,7 @@ const Mark = ({ size }: { size: number }) => (
 // thing on screen worth looking at and it gets the full treatment.
 export function VaultEmpty() {
   const { t } = useTranslation()
-  const sync = useStore(state => state.sync)
+  const sync = useApp(state => state.sync)
 
   // The spinner runs off the store, not off the promise: the backend reports
   // `sync:pending` when the consent page opens and `sync:connected`/`sync:error`

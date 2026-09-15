@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { Section as Key } from '@/store/uiSlice'
+import type { Section as Key } from '@/store'
 import { cx } from '@/utils/cx'
 import Section from '../../Sidebar/Settings/Section'
 import { titleOf } from '../../Sidebar/Settings/sections'

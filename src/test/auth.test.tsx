@@ -1,32 +1,32 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Auth from '@/components/Auth'
 import { unlock, unlockBiometric } from '@/lib/commands'
-import { renderWithStore } from './utils'
+import { useApp } from '@/store'
 
 beforeEach(() => vi.clearAllMocks())
 
 describe('Auth', () => {
   it('renders the lock screen', () => {
-    renderWithStore(<Auth touchID={false} />)
+    render(<Auth touchID={false} />)
     expect(screen.getByPlaceholderText('Master Password')).toBeInTheDocument()
   })
 
   it('footers the version and where the vault lives', async () => {
-    renderWithStore(<Auth touchID={false} />)
+    render(<Auth touchID={false} />)
     expect(
       await screen.findByText('Rowel 1.0.0 · Vault on this device')
     ).toBeInTheDocument()
   })
 
   it('has no unlock button — Enter is the only way to submit', () => {
-    renderWithStore(<Auth touchID />)
+    render(<Auth touchID />)
     expect(screen.queryByLabelText('Unseal')).not.toBeInTheDocument()
   })
 
   it('keeps Touch ID in the field and reveals the eye only once typing starts', async () => {
-    renderWithStore(<Auth touchID />)
+    render(<Auth touchID />)
 
     expect(screen.getByLabelText('Touch ID')).toBeInTheDocument()
     expect(screen.queryByLabelText('Reveal passphrase')).not.toBeInTheDocument()
@@ -37,7 +37,7 @@ describe('Auth', () => {
   })
 
   it('puts the caret where you click so backspace edits mid-passphrase', async () => {
-    renderWithStore(<Auth touchID={false} />)
+    render(<Auth touchID={false} />)
     const input = screen.getByPlaceholderText<HTMLInputElement>('Master Password')
 
     await userEvent.type(input, 'abcd')
@@ -57,7 +57,7 @@ describe('Auth', () => {
   it('acknowledges Enter immediately with a verifying state', async () => {
     // Never resolves: we're asserting the in-flight presentation.
     vi.mocked(unlock).mockReturnValue(new Promise(() => {}))
-    renderWithStore(<Auth touchID={false} />)
+    render(<Auth touchID={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'pw{Enter}')
 
@@ -70,7 +70,7 @@ describe('Auth', () => {
     vi.mocked(unlock)
       .mockRejectedValueOnce(new Error('nope'))
       .mockResolvedValueOnce({ entries: [], syncConfigured: false })
-    const { store } = renderWithStore(<Auth touchID={false} />)
+    render(<Auth touchID={false} />)
     const mascot = () => screen.getByTestId('lock-mascot')
     const input = screen.getByPlaceholderText('Master Password')
 
@@ -88,23 +88,23 @@ describe('Auth', () => {
       expect(mascot()).toHaveAttribute('data-state', 'success')
     )
     // The vault entry is held back briefly so the celebration can play.
-    expect(store.getState().flow.name).not.toBe('main')
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    expect(useApp.getState().flow).not.toBe('main')
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   it('unlocks the vault on Enter', async () => {
     vi.mocked(unlock).mockResolvedValue({ entries: [], syncConfigured: false })
-    const { store } = renderWithStore(<Auth touchID={false} />)
+    render(<Auth touchID={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'hunter2{Enter}')
 
     expect(unlock).toHaveBeenCalledWith('hunter2')
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   it('shows an error on a wrong password', async () => {
     vi.mocked(unlock).mockRejectedValue(new Error('nope'))
-    renderWithStore(<Auth touchID={false} />)
+    render(<Auth touchID={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'bad{Enter}')
 
@@ -114,7 +114,7 @@ describe('Auth', () => {
   it('names the real problem when the vault schema is newer than the app', async () => {
     // Rust's Error::VaultTooNew serializes as this exact string (error.rs).
     vi.mocked(unlock).mockRejectedValue('vault requires a newer version of the app')
-    renderWithStore(<Auth touchID={false} />)
+    render(<Auth touchID={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'right{Enter}')
 
@@ -124,7 +124,7 @@ describe('Auth', () => {
 
   it('disables the input and shows a countdown on too many attempts', async () => {
     vi.mocked(unlock).mockRejectedValue({ retryAfterSecs: 2 })
-    renderWithStore(<Auth touchID={false} />)
+    render(<Auth touchID={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'bad{Enter}')
 
@@ -134,11 +134,11 @@ describe('Auth', () => {
 
   it('unlocks with biometrics', async () => {
     vi.mocked(unlockBiometric).mockResolvedValue({ entries: [], syncConfigured: false })
-    const { store } = renderWithStore(<Auth touchID />)
+    render(<Auth touchID />)
 
     await userEvent.click(screen.getByLabelText('Touch ID'))
 
     expect(unlockBiometric).toHaveBeenCalledOnce()
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 })

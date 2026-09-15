@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next'
 import AuthShell from '@/components/elements/AuthShell'
 import Masterpass from '@/components/elements/Masterpass'
 import Button from '@/components/elements/Button'
-import type { UnlockResult } from '@/lib/commands'
-import { restoreBackup } from '@/store'
+import { setupRestoreFromFile, type UnlockResult } from '@/lib/commands'
 import StepHeader from '../shared/StepHeader'
 import DropZone from '../shared/DropZone'
 import FoundFileCard from '../shared/FoundFileCard'
@@ -38,7 +37,7 @@ export default function File({ onBack, onRestored }: Props) {
     if (busy || !path || !password) return
     setBusy(true)
     setError(null)
-    restoreBackup(path, password)
+    setupRestoreFromFile(path, password)
       .then(onRestored)
       .catch((err: unknown) => {
         setBusy(false)

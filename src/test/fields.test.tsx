@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Show from '@/components/Main/Body/Aside/Show'
 import { saveEntry, revealEntry, generateOtp, toEntryMeta } from '@/lib/commands'
 import type { Entry, ExtraField, LoginEntry, Passkey } from '@/lib/commands'
-import { renderWithStore, loginEntry, loginMeta } from './utils'
+import { loginEntry, loginMeta } from './utils'
 
 const input = (name: string) =>
   document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
@@ -20,7 +20,7 @@ describe('Type-aware fields', () => {
   // Every editor input is reachable by the name the row shows, so a screen
   // reader (and a test) can name what it is typing into.
   it('names its inputs after their labels', async () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
 
     expect(screen.getByLabelText('Password')).toBe(input('password'))
     expect(screen.getByLabelText('Username')).toBe(input('username'))
@@ -38,7 +38,7 @@ describe('Type-aware fields', () => {
   // editing: the dial's column is opened by the user, not by the mode switch.
   it('offers to add a one-time code instead of an empty dial', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry())
-    renderWithStore(<Show entry={loginMeta()} editing />)
+    render(<Show entry={loginMeta()} editing />)
 
     // The editor mounts once the reveal lands.
     await waitFor(() => expect(input('username')).not.toBeNull())
@@ -49,7 +49,7 @@ describe('Type-aware fields', () => {
   })
 
   it('names a full-bleed note body, which has no label column', () => {
-    renderWithStore(<Show type="note" editing />)
+    render(<Show type="note" editing />)
 
     expect(screen.getByLabelText('Note')).toBe(
       document.querySelector('textarea[name="note"]')
@@ -57,7 +57,7 @@ describe('Type-aware fields', () => {
   })
 
   it('gives a URL the scheme the user left out', async () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     await userEvent.type(input('website'), 'example.com')
     // Normalization lands on blur, so the caret is never fighting the cursor.
     expect(input('website').value).toBe('example.com')
@@ -67,14 +67,14 @@ describe('Type-aware fields', () => {
   })
 
   it('leaves a URL that already has a scheme alone', async () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     await userEvent.type(input('website'), 'http://intranet')
     await userEvent.tab()
     expect(input('website').value).toBe('http://intranet')
   })
 
   it('says so inline when an email is not one', async () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     await userEvent.type(input('email'), 'me@example')
     expect(screen.getByText('Not an email address')).toBeInTheDocument()
 
@@ -83,7 +83,7 @@ describe('Type-aware fields', () => {
   })
 
   it('refuses to save a login whose email is not one', async () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     await userEvent.type(input('title'), 'Acme')
     await userEvent.type(input('username'), 'octocat')
     await userEvent.type(input('password'), 'hunter2')
@@ -96,7 +96,7 @@ describe('Type-aware fields', () => {
   })
 
   it('groups a card number as it is typed and names the network', async () => {
-    renderWithStore(<Show type="card" editing />)
+    render(<Show type="card" editing />)
     await userEvent.type(input('number'), '4111111111111111')
 
     expect(input('number').value).toBe('4111 1111 1111 1111')
@@ -104,7 +104,7 @@ describe('Type-aware fields', () => {
   })
 
   it('splits the one MM/YY box back into the month and year the vault stores', async () => {
-    renderWithStore(<Show type="card" editing />)
+    render(<Show type="card" editing />)
     await userEvent.type(input('title'), 'Visa')
     await userEvent.type(input('number'), '4111111111111111')
     await userEvent.type(input('expiry'), '1230')
@@ -119,7 +119,7 @@ describe('Type-aware fields', () => {
   })
 
   it('says so when only half of the MM/YY box has been typed', async () => {
-    renderWithStore(<Show type="card" editing />)
+    render(<Show type="card" editing />)
     await userEvent.type(input('title'), 'Visa')
     await userEvent.type(input('number'), '4111111111111111')
     await userEvent.type(input('cvc'), '123')
@@ -136,7 +136,7 @@ describe('Type-aware fields', () => {
   // The identity form is cut from its document's template, so the rows on
   // screen are the document's — and switching the document swaps them.
   it('renders the rows the chosen document has, and only those', async () => {
-    renderWithStore(<Show type="identity" editing />)
+    render(<Show type="identity" editing />)
 
     expect(screen.getByLabelText('Full name')).toBe(input('name'))
     expect(screen.getByLabelText('Number')).toBe(input('number'))
@@ -152,7 +152,7 @@ describe('Type-aware fields', () => {
   })
 
   it('clears what the new document type has no room for', async () => {
-    renderWithStore(<Show type="identity" editing />)
+    render(<Show type="identity" editing />)
     await userEvent.type(input('title'), 'Ada')
     await userEvent.type(input('name'), 'ADA LOVELACE')
     await userEvent.type(input('number'), 'X1234567')
@@ -176,7 +176,7 @@ describe('Type-aware fields', () => {
   })
 
   it('stores a date as ISO and reads it back in the user’s pattern', async () => {
-    renderWithStore(<Show type="identity" editing />)
+    render(<Show type="identity" editing />)
     await userEvent.type(input('title'), 'Ada')
     await userEvent.type(input('name'), 'ADA LOVELACE')
     await userEvent.type(input('number'), 'X1234567')
@@ -194,7 +194,7 @@ describe('Type-aware fields', () => {
   })
 
   it('takes an otpauth:// link and keeps only the secret inside it', async () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     await userEvent.click(screen.getByTestId('add-otp-button'))
     await userEvent.click(input('otp'))
     await userEvent.paste('otpauth://totp/Acme:me@acme.io?secret=JBSWY3DPEHPK3PXP&issuer=Acme')
@@ -206,7 +206,7 @@ describe('Type-aware fields', () => {
   })
 
   it('refuses an OTP secret it cannot read', async () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     await userEvent.click(screen.getByTestId('add-otp-button'))
     await userEvent.type(input('otp'), 'not-a-secret')
 
@@ -218,7 +218,7 @@ describe('Type-aware fields', () => {
   // backend would reject it too, so there is no code to offer and no panel.
   it('shows no dial for a stored secret it cannot read', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ otp: 'legacy-garbage' }))
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
 
     await waitFor(() => expect(screen.getByTestId('entry-value-username')).toBeInTheDocument())
     expect(screen.queryByText('Copy code')).not.toBeInTheDocument()
@@ -228,7 +228,7 @@ describe('Type-aware fields', () => {
   it('previews the live code for a secret that is already saved', async () => {
     vi.mocked(generateOtp).mockResolvedValue({ code: '123456', time: 25 })
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ otp: 'JBSWY3DPEHPK3PXP' }))
-    renderWithStore(<Show entry={loginMeta()} editing />)
+    render(<Show entry={loginMeta()} editing />)
 
     await waitFor(() => expect(input('otp').value).toBe('JBSWY3DPEHPK3PXP'))
     expect(await screen.findByText('123 456')).toBeInTheDocument()
@@ -244,7 +244,7 @@ describe('Type-aware fields', () => {
         resolveReveal = resolve
       })
     )
-    renderWithStore(<Show entry={loginMeta()} editing />)
+    render(<Show entry={loginMeta()} editing />)
 
     expect(document.querySelector('input[name="title"]')).toBeNull()
 
@@ -258,7 +258,7 @@ describe('Type-aware fields', () => {
   // The e2e suite opens the generator through this link; a testid survives a
   // rewording of the label, which matching on its text did not.
   it('marks the generator link with a testid', () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     expect(screen.getByTestId('generate-password-link')).toBeInTheDocument()
   })
 
@@ -267,7 +267,7 @@ describe('Type-aware fields', () => {
     vi.mocked(revealEntry).mockResolvedValue(
       loginEntry({ password_updated_at: threeHoursAgo })
     )
-    renderWithStore(<Show entry={loginMeta()} editing />)
+    render(<Show entry={loginMeta()} editing />)
 
     expect(await screen.findByText('Changed 3h ago')).toBeInTheDocument()
   })
@@ -277,14 +277,14 @@ describe('Type-aware fields', () => {
   it('names the date once the rotation is older than a week', async () => {
     const longAgo = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString()
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password_updated_at: longAgo }))
-    renderWithStore(<Show entry={loginMeta()} editing />)
+    render(<Show entry={loginMeta()} editing />)
 
     const stamp = await screen.findByText(/^Changed /)
     expect(stamp.textContent).toMatch(/^Changed on /)
   })
 
   it('rates the password being typed and stamps when it changed', async () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     await userEvent.type(input('title'), 'Acme')
     await userEvent.type(input('username'), 'octocat')
     await userEvent.type(input('password'), 'correct horse battery staple')
@@ -301,7 +301,7 @@ describe('Type-aware fields', () => {
   it('leaves the rotation stamp alone when the password ends up unchanged', async () => {
     const stamp = '2024-01-01T00:00:00.000Z'
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password_updated_at: stamp }))
-    renderWithStore(<Show entry={loginMeta()} editing />)
+    render(<Show entry={loginMeta()} editing />)
 
     await waitFor(() => expect(input('password').value).toBe('secret'))
     // Typed and taken back: the password never moved.
@@ -317,7 +317,7 @@ describe('Type-aware fields', () => {
   it('moves the rotation stamp when the password really changed', async () => {
     const stamp = '2024-01-01T00:00:00.000Z'
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password_updated_at: stamp }))
-    renderWithStore(<Show entry={loginMeta()} editing />)
+    render(<Show entry={loginMeta()} editing />)
 
     await waitFor(() => expect(input('password').value).toBe('secret'))
     await userEvent.type(input('password'), '2')
@@ -348,7 +348,7 @@ const passkeyLogin = (passkeys: Passkey[] = [PASSKEY]) =>
 describe('Passkeys on a login', () => {
   it('identifies each passkey by its site and account', async () => {
     vi.mocked(revealEntry).mockResolvedValue(passkeyLogin())
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
 
     expect(await screen.findByText('Passkeys')).toBeInTheDocument()
     // The site's own name, not the bare rpId, when it has one.
@@ -360,7 +360,7 @@ describe('Passkeys on a login', () => {
     vi.mocked(revealEntry).mockResolvedValue(
       passkeyLogin([{ ...PASSKEY, rpName: undefined }])
     )
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
 
     expect(await screen.findByText('acme.test')).toBeInTheDocument()
   })
@@ -370,7 +370,7 @@ describe('Passkeys on a login', () => {
   // on screen — or on a clipboard, so no row offers a copy button either.
   it('never puts the private key, user handle or credential id on screen', async () => {
     vi.mocked(revealEntry).mockResolvedValue(passkeyLogin())
-    const { container } = renderWithStore(<Show entry={loginMeta()} />)
+    const { container } = render(<Show entry={loginMeta()} />)
 
     await screen.findByText('Passkeys')
     const rendered = container.textContent ?? ''
@@ -381,7 +381,7 @@ describe('Passkeys on a login', () => {
 
   it('shows nothing at all for a login with no passkeys', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry())
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
 
     await screen.findByTestId('entry-value-username')
     expect(screen.queryByText('Passkeys')).not.toBeInTheDocument()
@@ -390,7 +390,7 @@ describe('Passkeys on a login', () => {
   it('drops one from the draft when its remove button is pressed', async () => {
     const other = { ...PASSKEY, credentialId: 'Y3JlZDI', rpName: 'Beta' }
     vi.mocked(revealEntry).mockResolvedValue(passkeyLogin([PASSKEY, other]))
-    renderWithStore(<Show entry={loginMeta()} editing />)
+    render(<Show entry={loginMeta()} editing />)
 
     await screen.findByText('Acme')
     await userEvent.click(screen.getAllByTitle('Remove passkey')[0])
@@ -405,7 +405,7 @@ describe('Passkeys on a login', () => {
 
   it('offers no remove button while reading', async () => {
     vi.mocked(revealEntry).mockResolvedValue(passkeyLogin())
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
 
     await screen.findByText('Passkeys')
     expect(screen.queryByTitle('Remove passkey')).not.toBeInTheDocument()
@@ -417,7 +417,7 @@ describe('Passkeys on a login', () => {
     vi.mocked(revealEntry).mockResolvedValue(
       passkeyLogin() as LoginEntry & { password: string }
     )
-    renderWithStore(<Show entry={loginMeta()} editing />)
+    render(<Show entry={loginMeta()} editing />)
 
     await screen.findByText('Acme')
     await userEvent.clear(input('password'))
@@ -464,7 +464,7 @@ describe('Custom fields', () => {
         { label: 'Blood type', value: 'O+' }
       ])
     )
-    renderWithStore(<Show entry={identityMeta()} />)
+    render(<Show entry={identityMeta()} />)
 
     expect(await screen.findByText('Custom fields')).toBeInTheDocument()
     expect(screen.getByTestId('entry-extra-label-0')).toHaveTextContent('Categories')
@@ -476,7 +476,7 @@ describe('Custom fields', () => {
 
   it('shows nothing at all when the entry has no extra fields', async () => {
     vi.mocked(revealEntry).mockResolvedValue(identityEntry())
-    renderWithStore(<Show entry={identityMeta()} />)
+    render(<Show entry={identityMeta()} />)
 
     await screen.findByTestId('entry-value-name')
     expect(screen.queryByText('Custom fields')).not.toBeInTheDocument()
@@ -491,7 +491,7 @@ describe('Custom fields', () => {
         { label: 'Blood type', value: 'O+' }
       ])
     )
-    renderWithStore(<Show entry={identityMeta()} />)
+    render(<Show entry={identityMeta()} />)
 
     await screen.findByText('Custom fields')
     expect(screen.getByTestId('entry-extra-label-0')).toHaveTextContent('Blood type')
@@ -500,7 +500,7 @@ describe('Custom fields', () => {
 
   it('appends a row, takes a label and a value, and saves the pair', async () => {
     vi.mocked(revealEntry).mockResolvedValue(identityEntry())
-    renderWithStore(<Show entry={identityMeta()} editing />)
+    render(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('name').value).toBe('ADA LOVELACE'))
     await userEvent.click(screen.getByTestId('add-extra-field'))
@@ -520,7 +520,7 @@ describe('Custom fields', () => {
         { label: 'Blood type', value: 'O+' }
       ])
     )
-    renderWithStore(<Show entry={identityMeta()} editing />)
+    render(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('extra-value-0').value).toBe('B, BE'))
     await userEvent.click(screen.getByTestId('remove-extra-0'))
@@ -538,7 +538,7 @@ describe('Custom fields', () => {
     vi.mocked(revealEntry).mockResolvedValue(
       identityEntry([{ label: 'Blood type', value: 'O+' }])
     )
-    renderWithStore(<Show entry={identityMeta()} editing />)
+    render(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('extra-value-0').value).toBe('O+'))
     await userEvent.clear(input('extra-value-0'))
@@ -556,7 +556,7 @@ describe('Custom fields', () => {
     vi.mocked(revealEntry).mockResolvedValue(
       identityEntry([{ label: 'Categories', value: 'B, BE' }])
     )
-    renderWithStore(<Show entry={identityMeta()} editing />)
+    render(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('extra-value-0').value).toBe('B, BE'))
     await userEvent.type(input('extra-value-0'), '{Enter}')
@@ -571,7 +571,7 @@ describe('Custom fields', () => {
   // row that was added and left alone is not something the vault ever sees.
   it('sends no extra key when every row is blank', async () => {
     vi.mocked(revealEntry).mockResolvedValue(identityEntry())
-    renderWithStore(<Show entry={identityMeta()} editing />)
+    render(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('name').value).toBe('ADA LOVELACE'))
     await userEvent.click(screen.getByTestId('add-extra-field'))
@@ -583,7 +583,7 @@ describe('Custom fields', () => {
 
   it('keeps the rows that say something and drops the blank ones', async () => {
     vi.mocked(revealEntry).mockResolvedValue(identityEntry())
-    renderWithStore(<Show entry={identityMeta()} editing />)
+    render(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('name').value).toBe('ADA LOVELACE'))
     await userEvent.click(screen.getByTestId('add-extra-field'))
@@ -613,7 +613,7 @@ describe('Identity read view', () => {
 
   it('names the document in the eyebrow instead of a line of its own', async () => {
     vi.mocked(revealEntry).mockResolvedValue(identityEntry())
-    renderWithStore(<Show entry={identityMeta()} />)
+    render(<Show entry={identityMeta()} />)
 
     expect(await screen.findByTestId('entry-value-doc_type')).toHaveTextContent('Passport')
   })
@@ -622,14 +622,14 @@ describe('Identity read view', () => {
   // line under it rather than repeating the word.
   it('says how long the document has left', async () => {
     vi.mocked(revealEntry).mockResolvedValue(document_(away(400)))
-    renderWithStore(<Show entry={identityMeta()} />)
+    render(<Show entry={identityMeta()} />)
 
     expect(await screen.findByText('in 1 year')).toBeInTheDocument()
   })
 
   it('says so once it has run out', async () => {
     vi.mocked(revealEntry).mockResolvedValue(document_(away(-1)))
-    renderWithStore(<Show entry={identityMeta()} />)
+    render(<Show entry={identityMeta()} />)
 
     expect(await screen.findByText('Expired')).toBeInTheDocument()
   })
@@ -638,7 +638,7 @@ describe('Identity read view', () => {
   // header names the country in full beside the document's type.
   it('names the country beside its alpha-3 code', async () => {
     vi.mocked(revealEntry).mockResolvedValue(identityEntry())
-    renderWithStore(<Show entry={identityMeta()} />)
+    render(<Show entry={identityMeta()} />)
 
     expect(await screen.findByTestId('entry-value-country')).toHaveTextContent('GBR')
     expect(screen.getByText(/Passport · United Kingdom/)).toBeInTheDocument()

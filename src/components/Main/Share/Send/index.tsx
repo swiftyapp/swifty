@@ -1,4 +1,4 @@
-import { useStore } from '@/store'
+import { useUi } from '@/store'
 import SendDialog from './SendDialog'
 
 /**
@@ -9,7 +9,7 @@ import SendDialog from './SendDialog'
  * reason.
  */
 export default function Send() {
-  const entryId = useStore(state => state.share.sendFor)
+  const entryId = useUi(state => state.sendFor)
 
   return entryId ? <SendDialog key={entryId} entryId={entryId} /> : null
 }

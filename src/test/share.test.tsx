@@ -1,14 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act } from 'react'
-import { screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
 import Settings from '@/components/Main/Sidebar/Settings'
 import {
-  makeStore,
-  useStore,
+  useUi,
+  useVault,
+  selectCurrent,
   openSend,
   openReceive,
+  openSettings,
+  closeSend,
   syncInit,
   DEFAULT_PREFS
 } from '@/store'
@@ -23,7 +26,7 @@ import {
   type Entry,
   type ShareCreated
 } from '@/lib/commands'
-import { renderWithStore, withEntries, loginMeta, deferred } from './utils'
+import { withEntries, loginMeta, deferred } from './utils'
 
 const LINK = 'rowel://share#v1.file-1.a2V5LTFrZXktMWtleS0xa2V5LTFrZXktMWtleS0xa2V5'
 
@@ -34,10 +37,8 @@ const created = (fileId: string): ShareCreated => ({
 })
 
 const seed = ({ connected = true } = {}) => {
-  const store = makeStore()
   withEntries([loginMeta({ id: 'l1', title: 'Google' })])
   if (connected) syncInit(true)
-  return store
 }
 
 // A share still N hours out. Half an hour past the mark so the floor in
@@ -49,7 +50,8 @@ beforeEach(() => vi.clearAllMocks())
 
 describe('sharing an entry', () => {
   it('asks for Drive rather than offering a link it cannot make', async () => {
-    renderWithStore(<Main />, { store: seed({ connected: false }) })
+    seed({ connected: false })
+    render(<Main />)
 
     openSend('l1')
 
@@ -62,7 +64,8 @@ describe('sharing an entry', () => {
   })
 
   it('seals on open and shows the link', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     openSend('l1')
 
@@ -77,7 +80,8 @@ describe('sharing an entry', () => {
   })
 
   it('copies the link under the clipboard timeout the user chose', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     openSend('l1')
     await screen.findByTestId('share-link')
 
@@ -95,7 +99,8 @@ describe('sharing an entry', () => {
     vi.mocked(shareCreate)
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise)
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     openSend('l1')
     await screen.findByTestId('share-send-loading')
@@ -109,7 +114,7 @@ describe('sharing an entry', () => {
     // must not be left sitting in the sender's Drive for 24 hours.
     await vi.waitFor(() => expect(shareRevoke).toHaveBeenCalledWith('file-a'))
     expect(shareRevoke).toHaveBeenCalledTimes(1)
-    await vi.waitFor(() => expect(useStore.getState().share.orphans).toEqual([]))
+    await vi.waitFor(() => expect(useUi.getState().orphans).toEqual([]))
   })
 
   it('remembers a share it could not take back, and tries again on the next dialog', async () => {
@@ -118,7 +123,8 @@ describe('sharing an entry', () => {
       .mockReturnValueOnce(first.promise)
       .mockResolvedValueOnce(created('file-b'))
     vi.mocked(shareRevoke).mockRejectedValueOnce('offline')
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     openSend('l1')
     await screen.findByTestId('share-send-loading')
@@ -129,19 +135,20 @@ describe('sharing an entry', () => {
     // The take-back failed, so the share is still live in Drive and this is the
     // only record that it exists.
     await vi.waitFor(() => expect(shareRevoke).toHaveBeenCalledWith('file-a'))
-    expect(useStore.getState().share.orphans).toEqual(['file-a'])
+    expect(useUi.getState().orphans).toEqual(['file-a'])
 
     // Opening any share dialog is the next chance to make it right.
-    act(() => useStore.getState().closeSend())
+    act(() => closeSend())
     act(() => openSend('l1'))
 
     await vi.waitFor(() => expect(shareRevoke).toHaveBeenCalledTimes(2))
     expect(shareRevoke).toHaveBeenLastCalledWith('file-a')
-    await vi.waitFor(() => expect(useStore.getState().share.orphans).toEqual([]))
+    await vi.waitFor(() => expect(useUi.getState().orphans).toEqual([]))
   })
 
   it('revokes the link and closes', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     openSend('l1')
     await screen.findByTestId('share-link')
 
@@ -149,12 +156,13 @@ describe('sharing an entry', () => {
 
     expect(shareRevoke).toHaveBeenCalledWith('file-1')
     expect(screen.queryByTestId('share-send-modal')).not.toBeInTheDocument()
-    expect(useStore.getState().share.sendFor).toBeNull()
+    expect(useUi.getState().sendFor).toBeNull()
   })
 
   it('shows what the backend said when the seal fails', async () => {
     vi.mocked(shareCreate).mockRejectedValueOnce('sync is not configured')
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     openSend('l1')
 
@@ -168,7 +176,8 @@ describe('sharing an entry', () => {
   it('says why a passkey-only login cannot be shared, and offers the way out', async () => {
     const refusal = 'a login whose only secret is a passkey cannot be shared'
     vi.mocked(shareCreate).mockRejectedValueOnce(refusal)
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     openSend('l1')
 
@@ -179,7 +188,8 @@ describe('sharing an entry', () => {
 
   it('retries the revoke that failed rather than sealing a second link', async () => {
     vi.mocked(shareRevoke).mockRejectedValueOnce('drive is unreachable')
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     openSend('l1')
     await screen.findByTestId('share-link')
 
@@ -199,13 +209,14 @@ describe('sharing an entry', () => {
   })
 
   it('is offered from the detail header of a live entry', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await userEvent.click(await screen.findByTestId('entry-item'))
 
     await userEvent.click(await screen.findByTestId('more-actions-button'))
     await userEvent.click(screen.getByTestId('share-entry-button'))
 
-    expect(useStore.getState().share.sendFor).toBe('l1')
+    expect(useUi.getState().sendFor).toBe('l1')
   })
 })
 
@@ -217,18 +228,20 @@ describe('receiving a shared entry', () => {
   }
 
   it('is reachable from the kind picker', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await userEvent.click(screen.getByTestId('add-entry-button'))
 
     await userEvent.click(screen.getByTestId('add-receive-share'))
 
-    expect(useStore.getState().share.receiveOpen).toBe(true)
-    expect(useStore.getState().ui.addPicker).toBe(false)
+    expect(useUi.getState().receiveOpen).toBe(true)
+    expect(useUi.getState().addPicker).toBe(false)
   })
 
   it('shows a backend refusal verbatim', async () => {
     vi.mocked(shareOpen).mockRejectedValueOnce('this share has expired or was revoked')
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await paste('not-a-link')
 
@@ -239,7 +252,8 @@ describe('receiving a shared entry', () => {
   })
 
   it('previews without showing a single secret', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await paste()
 
@@ -255,7 +269,8 @@ describe('receiving a shared entry', () => {
   })
 
   it('adds it as a new entry of its own', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await paste()
     await screen.findByTestId('share-preview')
 
@@ -275,13 +290,14 @@ describe('receiving a shared entry', () => {
     })
 
     await vi.waitFor(() => {
-      expect(useStore.getState().share.receiveOpen).toBe(false)
-      expect(useStore.getState().entries.current?.title).toBe('Shared Netflix')
+      expect(useUi.getState().receiveOpen).toBe(false)
+      expect(selectCurrent(useVault.getState())?.title).toBe('Shared Netflix')
     })
   })
 
   it('keeps nothing of the last link once the dialog is closed', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await paste()
     await screen.findByTestId('share-preview')
 
@@ -313,7 +329,8 @@ describe('receiving a shared entry', () => {
       favorite: true,
       passkeys: [{ id: 'pk1', rpId: 'netflix.com' }]
     } as unknown as Entry)
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await paste()
     await screen.findByTestId('share-preview')
 
@@ -334,15 +351,17 @@ describe('receiving a shared entry', () => {
 
 describe('Settings › Shared links', () => {
   const expand = async () => {
-    renderWithStore(<Settings />, { store: seed() })
-    useStore.getState().openSettings('sync')
+    seed()
+    render(<Settings />)
+    openSettings('sync')
     const row = within(await screen.findByTestId('settings-shares-row'))
     await userEvent.click(row.getByRole('button', { name: 'Show' }))
   }
 
   it('is not offered without Drive', async () => {
-    renderWithStore(<Settings />, { store: seed({ connected: false }) })
-    useStore.getState().openSettings('sync')
+    seed({ connected: false })
+    render(<Settings />)
+    openSettings('sync')
 
     expect(await screen.findByTestId('settings-drive-row')).toBeInTheDocument()
     expect(screen.queryByTestId('settings-shares-row')).not.toBeInTheDocument()
@@ -423,8 +442,9 @@ describe('Settings › Shared links', () => {
         .mockResolvedValueOnce([share(new Date(Date.now() + 150_000).toISOString())])
         .mockResolvedValueOnce([])
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-      renderWithStore(<Settings />, { store: seed() })
-      useStore.getState().openSettings('sync')
+      seed()
+      render(<Settings />)
+      openSettings('sync')
       const row = within(await screen.findByTestId('settings-shares-row'))
       await user.click(row.getByRole('button', { name: 'Show' }))
       expect(await screen.findByTestId('settings-share-f1')).toHaveTextContent(
@@ -466,8 +486,9 @@ describe('Settings › Shared links', () => {
         .mockRejectedValueOnce('Drive API 503')
         .mockResolvedValueOnce([])
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-      renderWithStore(<Settings />, { store: seed() })
-      useStore.getState().openSettings('sync')
+      seed()
+      render(<Settings />)
+      openSettings('sync')
       const row = within(await screen.findByTestId('settings-shares-row'))
       await user.click(row.getByRole('button', { name: 'Show' }))
       expect(await screen.findByTestId('settings-share-f1')).toBeInTheDocument()
@@ -510,8 +531,9 @@ describe('Settings › Shared links', () => {
         .mockReturnValueOnce(slow.promise)
         .mockReturnValueOnce(fast.promise)
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-      renderWithStore(<Settings />, { store: seed() })
-      useStore.getState().openSettings('sync')
+      seed()
+      render(<Settings />)
+      openSettings('sync')
       const row = within(await screen.findByTestId('settings-shares-row'))
       await user.click(row.getByRole('button', { name: 'Show' }))
       expect(await screen.findByTestId('settings-share-f1')).toBeInTheDocument()

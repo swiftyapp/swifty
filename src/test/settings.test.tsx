@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import i18n, { changeLocale } from '@/i18n'
-import { usePrefs } from '@/store'
+import { usePrefs, useApp, useUi, openSettings, syncPending, syncConnected, syncFailed } from '@/store'
 import { dateTime } from '@/utils/time'
 import {
   changeMasterPassword,
@@ -17,16 +17,15 @@ import {
   setAutolockTimeout,
   getAudit
 } from '@/lib/commands'
-import { renderWithStore } from './utils'
 
 beforeEach(() => vi.clearAllMocks())
 
 afterEach(() => changeLocale('en-US'))
 
 const open = async () => {
-  const { container, store } = renderWithStore(<Settings />)
+  const { container } = render(<Settings />)
   await userEvent.click(container.querySelector('.settings-button')!)
-  return { container, store }
+  return { container }
 }
 
 const go = (section: string) =>
@@ -41,11 +40,11 @@ describe('Settings shell', () => {
   })
 
   it('switches sections from the nav and remembers the last one', async () => {
-    const { store } = await open()
+    await open()
 
     await go('audit')
     expect(screen.getByRole('heading', { name: 'Vault audit' })).toBeInTheDocument()
-    expect(store.getState().ui.settingsSection).toBe('audit')
+    expect(useUi.getState().settingsSection).toBe('audit')
 
     await go('language')
     expect(
@@ -58,15 +57,15 @@ describe('Settings shell', () => {
   })
 
   it('deep-links to a section through openSettings', async () => {
-    const { store } = renderWithStore(<Settings />)
-    store.getState().openSettings('security')
+    render(<Settings />)
+    openSettings('security')
     expect(await screen.findByRole('heading', { name: 'Security' })).toBeInTheDocument()
   })
 
   it('closes from the header X', async () => {
-    const { store } = await open()
+    await open()
     await userEvent.click(screen.getByTestId('modal-close'))
-    expect(store.getState().ui.settings).toBe(false)
+    expect(useUi.getState().settings).toBe(false)
   })
 })
 
@@ -81,35 +80,35 @@ describe('Settings › sync', () => {
   // Safari has the screen, so the row waits on the backend's events — the
   // click itself claims nothing.
   it('waits for Google after a connect that resolved early', async () => {
-    const { store } = await open()
+    await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
-    expect(store.getState().sync.pending).toBe(false)
+    expect(useApp.getState().sync.pending).toBe(false)
 
-    store.getState().syncPending()
+    syncPending()
     expect(await screen.findByText('Waiting for Google…')).toBeInTheDocument()
 
-    store.getState().syncConnected()
+    syncConnected()
     expect(await screen.findByText('Connected')).toBeInTheDocument()
   })
 
   it('reports a consent that failed, and stays disconnected', async () => {
-    const { store } = await open()
+    await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
-    store.getState().syncPending()
-    store.getState().syncFailed('access_denied')
+    syncPending()
+    syncFailed('access_denied')
 
     expect(await screen.findByTestId('settings-sync-error')).toHaveTextContent(
       'access_denied'
     )
-    expect(store.getState().sync.enabled).toBe(false)
+    expect(useApp.getState().sync.enabled).toBe(false)
   })
 
   it('surfaces a connect that could not even start', async () => {
     vi.mocked(syncConnect).mockRejectedValueOnce('no OAuth client configured')
-    const { store } = await open()
+    await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
 
-    await waitFor(() => expect(store.getState().sync.pending).toBe(false))
+    await waitFor(() => expect(useApp.getState().sync.pending).toBe(false))
     expect(screen.getByTestId('settings-sync-error')).toHaveTextContent(
       'no OAuth client configured'
     )
@@ -293,12 +292,12 @@ describe('Settings › vault audit', () => {
   })
 
   it('jumps to the Vault Health view and closes', async () => {
-    const { store } = await open()
+    await open()
     await go('audit')
     await userEvent.click(screen.getByTestId('settings-open-health'))
 
-    expect(store.getState().ui.view).toBe('health')
-    expect(store.getState().ui.settings).toBe(false)
+    expect(useUi.getState().view).toBe('health')
+    expect(useUi.getState().settings).toBe(false)
   })
 })
 

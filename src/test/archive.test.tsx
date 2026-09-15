@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Body from '@/components/Main/Body'
 import { useShortcuts } from '@/components/Main/useShortcuts'
@@ -10,8 +10,8 @@ import {
   restoreEntry,
   revealEntry
 } from '@/lib/commands'
-import { makeStore, useStore, setView } from '@/store'
-import { renderWithStore, withEntries, deletedMeta, loginMeta } from './utils'
+import { useVault, selectCurrent, setView } from '@/store'
+import { withEntries, deletedMeta, loginMeta } from './utils'
 
 const NOW = new Date('2024-01-08T00:00:00.000Z')
 
@@ -29,11 +29,10 @@ const Harness = () => {
 // Open the Archive the way the rail does, and wait for `list_deleted` to land.
 const openArchive = async (tombstones = [gone]) => {
   vi.mocked(listDeleted).mockResolvedValue(tombstones)
-  const store = makeStore()
   withEntries([live])
-  const rendered = renderWithStore(<Harness />, { store })
+  const rendered = render(<Harness />)
   setView('archive')
-  await vi.waitFor(() => expect(useStore.getState().entries.archive).toEqual(tombstones))
+  await vi.waitFor(() => expect(useVault.getState().archive).toEqual(tombstones))
   return rendered
 }
 
@@ -79,7 +78,8 @@ describe('the Archive view', () => {
 
     expect(restoreEntry).toHaveBeenCalledWith('gone')
     await vi.waitFor(() => {
-      const { items, archive, current } = useStore.getState().entries
+      const { items, archive } = useVault.getState()
+      const current = selectCurrent(useVault.getState())
       expect(items.map(e => e.id)).toEqual(['live', 'gone'])
       expect(archive).toEqual([])
       expect(current).toBeNull()
@@ -97,9 +97,9 @@ describe('the Archive view', () => {
     await userEvent.click(screen.getByTestId('purge-entry-confirm'))
 
     expect(purgeEntry).toHaveBeenCalledWith('gone')
-    await vi.waitFor(() => expect(useStore.getState().entries.archive).toEqual([]))
+    await vi.waitFor(() => expect(useVault.getState().archive).toEqual([]))
     // It does not come back as a live entry either.
-    expect(useStore.getState().entries.items.map(e => e.id)).toEqual(['live'])
+    expect(useVault.getState().items.map(e => e.id)).toEqual(['live'])
   })
 
   // ⌘E and ⌘⏎ reach the entry without going through the detail header, so the
@@ -110,21 +110,20 @@ describe('the Archive view', () => {
 
     await userEvent.keyboard('{Meta>}e{/Meta}')
 
-    expect(useStore.getState().entries.edit).toBe(false)
+    expect(useVault.getState().editing).toBe(false)
     expect(screen.queryByTestId('entry-sheet')).not.toBeInTheDocument()
     // Still the read-only cluster, not an editor.
     expect(screen.getByTestId('restore-entry-button')).toBeInTheDocument()
   })
 
   it('still edits a live entry — the guard is about tombstones, not ⌘E', async () => {
-    const store = makeStore()
     withEntries([live])
-    renderWithStore(<Harness />, { store })
+    render(<Harness />)
 
     await userEvent.click(screen.getByTestId('entry-item'))
     await userEvent.keyboard('{Meta>}e{/Meta}')
 
-    expect(useStore.getState().entries.edit).toBe(true)
+    expect(useVault.getState().editing).toBe(true)
   })
 
   it('fails quietly when ⌘⏎ asks a tombstone for its secret', async () => {
@@ -150,9 +149,8 @@ describe('the Archive view', () => {
 
   it('survives a failed read of the tombstones', async () => {
     vi.mocked(listDeleted).mockRejectedValue(new Error('vault busy'))
-    const store = makeStore()
     withEntries([live])
-    renderWithStore(<Harness />, { store })
+    render(<Harness />)
 
     setView('archive')
     await vi.waitFor(() => expect(listDeleted).toHaveBeenCalled())

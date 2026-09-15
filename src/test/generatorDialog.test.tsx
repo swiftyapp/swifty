@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Generator from '@/components/Main/Generator'
 import Main from '@/components/Main'
 import { useShortcuts } from '@/components/Main/useShortcuts'
 import { copyToClipboard, generatePassword, generateSshKey } from '@/lib/commands'
-import { makeStore, useStore, openGenerator, openPalette, openSshGenerator } from '@/store'
-import { renderWithStore, withEntries, loginMeta } from './utils'
+import { useUi, useVault, openGenerator, openPalette, openSshGenerator } from '@/store'
+import { withEntries, loginMeta } from './utils'
 
 // ⌘G lives in the app-level shortcut surface now (Main/useShortcuts), so the
 // harness mounts it alongside the dialog the way Main does.
@@ -27,12 +27,12 @@ beforeEach(() => {
 
 describe('Generator', () => {
   it('stays closed until the shortcut is pressed', () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 
   it('opens on the shortcut and copies on confirm', async () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     await open()
     expect(await screen.findByText('Generated123!')).toBeInTheDocument()
 
@@ -44,18 +44,17 @@ describe('Generator', () => {
   // The rail tile is the pointer half of ⌘G: same open, no apply callback, so
   // confirming copies rather than filling a field.
   it('opens from the rail tile with nothing to apply the value to', async () => {
-    const store = makeStore()
     withEntries([loginMeta({ id: 'l1', title: 'Google' })])
-    renderWithStore(<Main />, { store })
+    render(<Main />)
 
     await userEvent.click(screen.getByTestId('generator-button'))
 
     expect(await screen.findByTestId('generator-dialog')).toBeInTheDocument()
-    expect(useStore.getState().generator.apply).toBeNull()
+    expect(useUi.getState().generator.apply).toBeNull()
   })
 
   it('closes on escape without copying', async () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     await open()
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
@@ -63,7 +62,7 @@ describe('Generator', () => {
   })
 
   it('switches to memorable words without calling the random engine', async () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     await open()
     vi.mocked(generatePassword).mockClear()
 
@@ -92,13 +91,13 @@ describe('Generator, SSH keys', () => {
   }
 
   it('offers the SSH tab when opened standalone', async () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     await open()
     expect(screen.getByTestId('generator-mode-ssh')).toBeInTheDocument()
   })
 
   it('hides the SSH tab when a password field is waiting for a value', async () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     openGenerator(() => {})
 
     await screen.findByTestId('generator-dialog')
@@ -107,7 +106,7 @@ describe('Generator, SSH keys', () => {
   })
 
   it('shows the public key, the fingerprint and a masked private key', async () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     await openSsh()
 
     expect(screen.getByTestId('generator-ssh-public')).toHaveTextContent(PAIR.publicKey)
@@ -119,7 +118,7 @@ describe('Generator, SSH keys', () => {
   })
 
   it('draws a fresh key for a changed comment', async () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     await openSsh()
     vi.mocked(generateSshKey).mockClear()
 
@@ -129,22 +128,22 @@ describe('Generator, SSH keys', () => {
   })
 
   it('opens a prefilled ssh draft on "Save as SSH key"', async () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     await openSsh()
 
     const save = screen.getByTestId('generator-use-button')
     expect(save).toHaveTextContent('Save as SSH key')
     await userEvent.click(save)
 
-    expect(useStore.getState().entries.new).toBe('ssh')
-    expect(useStore.getState().entries.prefill).toEqual(PAIR)
+    expect(useVault.getState().creating).toBe('ssh')
+    expect(useVault.getState().prefill).toEqual(PAIR)
     // A private key does not go on the clipboard behind the user's back.
     expect(copyToClipboard).not.toHaveBeenCalled()
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 
   it('hands the whole pair back to the field that asked for one', async () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     const applied = vi.fn()
     openSshGenerator(applied)
 
@@ -156,7 +155,7 @@ describe('Generator, SSH keys', () => {
 
     expect(applied).toHaveBeenCalledWith(PAIR)
     // The editor's own draft takes it; no new entry is started.
-    expect(useStore.getState().entries.new).toBeNull()
+    expect(useVault.getState().creating).toBeNull()
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 })
@@ -164,14 +163,11 @@ describe('Generator, SSH keys', () => {
 // An open dialog owns the keyboard: every app-level chord stands down, and the
 // dialog's own window handler only answers while it is the topmost one.
 describe('Generator, with the shell behind it', () => {
-  const seed = () => {
-    const store = makeStore()
-    withEntries([loginMeta({ id: 'l1', title: 'Google' })])
-    return store
-  }
+  const seed = () => withEntries([loginMeta({ id: 'l1', title: 'Google' })])
 
   const openGeneratorOver = async (ui = <Main />) => {
-    renderWithStore(ui, { store: seed() })
+    seed()
+    render(ui)
     await userEvent.keyboard('{Meta>}g{/Meta}')
     return screen.findByTestId('generator-dialog')
   }
@@ -190,7 +186,7 @@ describe('Generator, with the shell behind it', () => {
     await userEvent.keyboard('{Meta>}n{/Meta}')
 
     expect(screen.queryByTestId('add-secret-modal')).not.toBeInTheDocument()
-    expect(useStore.getState().ui.addPicker).toBe(false)
+    expect(useUi.getState().addPicker).toBe(false)
   })
 
   it('leaves ⏎ to the palette stacked over it', async () => {
@@ -204,7 +200,7 @@ describe('Generator, with the shell behind it', () => {
     await userEvent.type(within(palette).getByTestId('command-palette-input'), '{Enter}')
 
     // The palette's own command ran; the generator did not also confirm.
-    expect(useStore.getState().entries.new).toBe('login')
+    expect(useVault.getState().creating).toBe('login')
     expect(copyToClipboard).not.toHaveBeenCalled()
   })
 })
@@ -227,7 +223,7 @@ describe('Generator, SSH keys in flight', () => {
   }
 
   it('refuses the old pair while a replacement is on its way', async () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     await openSsh()
 
     let settle: (pair: typeof PAIR) => void = () => {}
@@ -240,18 +236,18 @@ describe('Generator, SSH keys in flight', () => {
     expect(save).toBeDisabled()
     expect(screen.getByTestId('generator-ssh-key')).toHaveAttribute('aria-busy', 'true')
     await userEvent.keyboard('{Enter}')
-    expect(useStore.getState().entries.new).toBeNull()
+    expect(useVault.getState().creating).toBeNull()
     expect(screen.getByTestId('generator-dialog')).toBeInTheDocument()
 
     settle(FRESH)
     await screen.findByText(FRESH.publicKey)
     expect(save).toBeEnabled()
     await userEvent.click(save)
-    expect(useStore.getState().entries.prefill).toEqual(FRESH)
+    expect(useVault.getState().prefill).toEqual(FRESH)
   })
 
   it('shows a refused draw and offers to try again', async () => {
-    renderWithStore(<Harness />)
+    render(<Harness />)
     vi.mocked(generateSshKey).mockRejectedValueOnce(new Error('no entropy'))
     await open()
     await userEvent.click(screen.getByTestId('generator-mode-ssh'))

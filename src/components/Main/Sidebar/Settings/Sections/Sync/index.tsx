@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useStore, syncFailed } from '@/store'
+import { useApp, syncFailed } from '@/store'
 import { syncConnect, syncDisconnect, syncNow } from '@/lib/commands'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
@@ -16,7 +16,7 @@ const ErrorNote = ({ message }: { message: string }) => (
 
 export default function Sync() {
   const { t } = useTranslation()
-  const sync = useStore(state => state.sync)
+  const sync = useApp(state => state.sync)
 
   // Consent happens in the browser: the backend says `sync:pending` when it
   // opens it and `sync:connected` / `sync:error` when it hears back, so nothing

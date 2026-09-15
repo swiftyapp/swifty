@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
-import { useStore, dismissScan } from '@/store'
-import type { ScanError } from '@/store/uiSlice'
+import { useUi, dismissScan, type ScanError } from '@/store'
 import { TOAST } from '@/components/elements/tokens'
 import { ScanGlyph } from '../icons'
 
@@ -25,7 +24,8 @@ const DISMISS_MS = 8000
 // working, so neither state may block anything or move the pane underneath.
 export default function Status() {
   const { t } = useTranslation()
-  const { busy, error } = useStore(state => state.ui.scan)
+  const busy = useUi(state => state.scanBusy)
+  const error = useUi(state => state.scanError)
 
   useEffect(() => {
     if (!error) return

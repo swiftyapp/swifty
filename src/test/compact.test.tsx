@@ -15,8 +15,9 @@ import {
   type Entry
 } from '@/lib/commands'
 import {
-  makeStore,
-  useStore,
+  useUi,
+  useVault,
+  selectCurrent,
   editEntry,
   openPalette,
   openSettings,
@@ -27,14 +28,11 @@ import {
   setView,
   startEntry
 } from '@/store'
-import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
+import { withEntries, loginEntry, loginMeta } from './utils'
 import { setLayout } from './layout'
 
-const seed = () => {
-  const store = makeStore()
+const seed = () =>
   withEntries([loginMeta({ id: 'l1', title: 'Google' }), loginMeta({ id: 'l2', title: 'Airbnb' })])
-  return store
-}
 
 const audit: Audit = {
   l1: { score: 0, isWeak: true, isRepeating: false, breached: false },
@@ -59,7 +57,8 @@ beforeEach(() => {
 
 describe('compact shell', () => {
   it('replaces the rail with a tab bar, puts add in its centre and tags in the list header', () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     expect(screen.getByTestId('compact-shell')).toBeInTheDocument()
     expect(screen.getByTestId('tab-bar')).toBeInTheDocument()
@@ -76,7 +75,8 @@ describe('compact shell', () => {
 
   it('pushes the detail screen on select and comes back from it', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
     expect(screen.queryByTestId('compact-back')).not.toBeInTheDocument()
@@ -98,17 +98,18 @@ describe('compact shell', () => {
     await userEvent.keyboard('{Escape}')
 
     await userEvent.click(screen.getByTestId('compact-back'))
-    expect(useStore.getState().entries.current).toBeNull()
+    expect(selectCurrent(useVault.getState())).toBeNull()
     expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
   })
 
   it('lands a new entry on the form screen, titled by its kind', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByTestId('add-entry-button'))
     await userEvent.click(screen.getByTestId('add-kind-login'))
 
-    expect(useStore.getState().entries.new).toBe('login')
+    expect(useVault.getState().creating).toBe('login')
     // Cancel · what this screen is for · Save, the iOS way round. The kind
     // names the screen because there is no entry to name it yet.
     expect(screen.getByTestId('cancel-entry-button')).toHaveTextContent('Cancel')
@@ -123,7 +124,8 @@ describe('compact shell', () => {
   })
 
   it('refuses to save an untitled draft and stays on the form', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     act(() => startEntry('login'))
     await userEvent.click(screen.getByTestId('save-entry-button'))
@@ -131,11 +133,12 @@ describe('compact shell', () => {
     // The title's own message plus the two rows login also requires.
     expect(screen.getAllByText('Required')).toHaveLength(3)
     expect(saveEntry).not.toHaveBeenCalled()
-    expect(useStore.getState().entries.new).toBe('login')
+    expect(useVault.getState().creating).toBe('login')
   })
 
   it('guards a dirty draft behind two presses of Cancel', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     act(() => startEntry('login'))
     await userEvent.type(titleInput(), 'Netflix')
@@ -144,10 +147,10 @@ describe('compact shell', () => {
     await userEvent.click(cancel)
     // Armed, and saying so where the way out is.
     expect(cancel).toHaveTextContent('Discard changes?')
-    expect(useStore.getState().entries.new).toBe('login')
+    expect(useVault.getState().creating).toBe('login')
 
     await userEvent.click(cancel)
-    expect(useStore.getState().entries.new).toBeNull()
+    expect(useVault.getState().creating).toBeNull()
     expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
   })
 
@@ -155,12 +158,13 @@ describe('compact shell', () => {
     vi.mocked(revealEntry).mockResolvedValue(
       loginEntry({ id: 'l1', title: 'Google', username: 'me@example.com' })
     )
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByText('Google'))
     await openEdit()
 
-    expect(useStore.getState().entries.edit).toBe(true)
+    expect(useVault.getState().editing).toBe(true)
     // The entry names its own form, and the draft holds the decrypted values:
     // the screen is held back until the reveal lands, so it never seeds empty.
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
@@ -180,7 +184,8 @@ describe('compact shell', () => {
     vi.mocked(revealEntry).mockResolvedValue(
       loginEntry({ id: 'l1', title: 'Google', username: 'me@example.com' })
     )
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByText('Google'))
     expect(revealEntry).toHaveBeenCalledTimes(1)
@@ -196,14 +201,15 @@ describe('compact shell', () => {
     // A reveal that never settles: the editor cannot be seeded, so the screen
     // holds its frame — and has to stay leavable while it does.
     vi.mocked(revealEntry).mockReturnValue(new Promise<Entry>(() => {}))
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByText('Google'))
     await openEdit()
 
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
     await userEvent.click(screen.getByTestId('cancel-entry-button'))
-    expect(useStore.getState().entries.current).toBeNull()
+    expect(selectCurrent(useVault.getState())).toBeNull()
     expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
   })
 
@@ -214,7 +220,8 @@ describe('compact shell', () => {
         land = resolve
       })
     )
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByText('Google'))
     const action = screen.getByTestId('primary-action-button')
@@ -232,7 +239,8 @@ describe('compact shell', () => {
 
   it('copies a field value when the value itself is tapped', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', username: 'copyme' }))
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByText('Google'))
     await userEvent.click(await screen.findByTestId('entry-value-username'))
@@ -241,18 +249,20 @@ describe('compact shell', () => {
   })
 
   it('switches view from the tab bar', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByTestId('tab-favorites'))
-    expect(useStore.getState().ui.view).toBe('favorites')
+    expect(useUi.getState().view).toBe('favorites')
     expect(screen.getByTestId('list-title')).toHaveTextContent('Favorites')
 
     await userEvent.click(screen.getByTestId('tab-items'))
-    expect(useStore.getState().ui.view).toBe('items')
+    expect(useUi.getState().view).toBe('items')
   })
 
   it('slides one lens to the selected tab and parks it for a view with no tab', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     const lens = screen.getByTestId('tab-lens')
 
     // Five slots, the third empty under the Add disc: the lens is moved by
@@ -278,7 +288,8 @@ describe('compact shell', () => {
   })
 
   it('carries four tabs and keeps the archive in settings', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     expect(screen.getByTestId('tab-bar').querySelectorAll('button')).toHaveLength(4)
     expect(screen.queryByTestId('tab-archive')).not.toBeInTheDocument()
@@ -286,24 +297,26 @@ describe('compact shell', () => {
     await userEvent.click(screen.getByTestId('tab-settings'))
     await userEvent.click(screen.getByTestId('settings-archive'))
 
-    expect(useStore.getState().ui.view).toBe('archive')
-    expect(useStore.getState().ui.settings).toBe(false)
+    expect(useUi.getState().view).toBe('archive')
+    expect(useUi.getState().settings).toBe(false)
     expect(screen.getByTestId('list-title')).toHaveTextContent('Archive')
   })
 
   it('leaves the settings root when a list tab is tapped', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     act(() => openSettings())
     expect(screen.queryByTestId('entry-item')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('tab-items'))
-    expect(useStore.getState().ui.settings).toBe(false)
+    expect(useUi.getState().settings).toBe(false)
     expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
   })
 
   it('opens the generator and settings from the tab bar', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByTestId('tab-generator'))
     // A root screen rather than the sheet it used to be: no dialog, and the bar
@@ -314,9 +327,9 @@ describe('compact shell', () => {
     expect(screen.getByTestId('tab-bar')).toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('tab-settings'))
-    expect(useStore.getState().ui.settings).toBe(true)
+    expect(useUi.getState().settings).toBe(true)
     // The two non-list roots are one slot: taking it closes the other.
-    expect(useStore.getState().generator.open).toBe(false)
+    expect(useUi.getState().generator.open).toBe(false)
     expect(screen.queryByTestId('generator-screen')).not.toBeInTheDocument()
     // A root screen, with the bar still up: the tab bar is the way out of it.
     expect(screen.getByTestId('settings-nav-security')).toBeInTheDocument()
@@ -324,7 +337,8 @@ describe('compact shell', () => {
   })
 
   it('generates and copies from the generator root, and leaves it by tab', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByTestId('tab-generator'))
     expect(await screen.findByText('Generated123!')).toBeInTheDocument()
@@ -339,7 +353,7 @@ describe('compact shell', () => {
     expect(screen.getByTestId('generator-screen')).toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('tab-items'))
-    expect(useStore.getState().generator.open).toBe(false)
+    expect(useUi.getState().generator.open).toBe(false)
     expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
   })
 
@@ -347,7 +361,8 @@ describe('compact shell', () => {
   // the detail sets `generator.open` and nothing visible happens.
   it('puts a root opened over a selected entry in front of it', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByText('Google'))
     expect(screen.getByTestId('compact-back')).toBeInTheDocument()
@@ -364,7 +379,8 @@ describe('compact shell', () => {
 
   // The one thing that still outranks a root: a draft has unsaved work on it.
   it('keeps the form in front of a root opened under it', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     act(() => startEntry('login'))
     act(() => openSettings())
@@ -373,9 +389,8 @@ describe('compact shell', () => {
   })
 
   it('shows the audit score under the groups on the health view', () => {
-    const store = makeStore()
     withEntries([loginMeta({ id: 'l1' }), loginMeta({ id: 'l2', title: 'Airbnb' })], audit)
-    renderWithStore(<Main />, { store })
+    render(<Main />)
 
     act(() => setView('health'))
     // The list root is the only pane, so it carries what the wide shell puts
@@ -386,7 +401,8 @@ describe('compact shell', () => {
   })
 
   it('pushes a settings section and comes back to the root', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     act(() => openSettings())
     // Every section is a row, in the desktop nav's order.
@@ -405,7 +421,8 @@ describe('compact shell', () => {
   // The chip's default is the wide modal's section state, which a pushed pane
   // does not read — on this shell it navigates the way the rows do.
   it('opens the Sync pane from the sync chip on the settings root', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     act(() => openSettings())
     await userEvent.click(screen.getByTestId('sync-indicator'))
@@ -415,7 +432,8 @@ describe('compact shell', () => {
   })
 
   it('locks the vault from the settings root', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     act(() => openSettings())
     await userEvent.click(screen.getByTestId('lock-vault-button'))
@@ -424,15 +442,15 @@ describe('compact shell', () => {
   })
 
   it('shows the empty-vault hero on the one pane it has', () => {
-    const store = makeStore()
     withEntries([])
-    renderWithStore(<Main />, { store })
+    render(<Main />)
 
     expect(screen.getAllByText('Your vault is empty')).toHaveLength(1)
   })
 
   it('leaves the command palette out', () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     act(() => openPalette())
     expect(screen.queryByPlaceholderText('Run a command')).not.toBeInTheDocument()
@@ -441,7 +459,8 @@ describe('compact shell', () => {
 
 describe('overlay frames', () => {
   it('makes settings a screen on compact and the modal on wide', () => {
-    const { unmount } = renderWithStore(<Main />, { store: seed() })
+    seed()
+    const { unmount } = render(<Main />)
     act(() => openSettings())
     // A tab root rather than an overlay: no sheet over the list, and the
     // sections it navigates are in the shell itself.
@@ -452,7 +471,8 @@ describe('overlay frames', () => {
     unmount()
 
     setLayout('wide')
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     act(() => openSettings())
     expect(screen.getByTestId('settings-modal')).not.toHaveAttribute('data-frame')
   })
@@ -460,19 +480,22 @@ describe('overlay frames', () => {
   // `fit="content"`: the picker is short, so the phone answers it from the
   // bottom edge instead of giving it a page.
   it('gives the add picker a bottom sheet on compact and the card on wide', () => {
-    const { unmount } = renderWithStore(<Main />, { store: seed() })
+    seed()
+    const { unmount } = render(<Main />)
     act(() => openAddPicker())
     expect(screen.getByTestId('add-secret-modal')).toHaveAttribute('data-frame', 'bottom-sheet')
     unmount()
 
     setLayout('wide')
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     act(() => openAddPicker())
     expect(screen.getByTestId('add-secret-modal')).not.toHaveAttribute('data-frame')
   })
 
   it('keeps the page sheet for the generator a password row opens', () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     // What the login form's generate action does: a full dialog with a callback
     // to fill, which needs the whole screen rather than a card off the edge.
     act(() => openGenerator(() => {}))
@@ -485,7 +508,8 @@ describe('overlay frames', () => {
   })
 
   it('makes the standalone generator a screen on compact and the card on wide', () => {
-    const { unmount } = renderWithStore(<Main />, { store: seed() })
+    seed()
+    const { unmount } = render(<Main />)
     act(() => openGenerator())
     // Nothing is waiting for the value, so there is nothing to overlay: it is a
     // tab root of its own.
@@ -496,7 +520,8 @@ describe('overlay frames', () => {
     unmount()
 
     setLayout('wide')
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     act(() => openGenerator())
     const card = screen.getByTestId('generator-dialog')
     expect(card).not.toHaveAttribute('data-frame')
@@ -509,28 +534,26 @@ describe('overlay frames', () => {
 // A sync merge replaces the list wholesale, and the selection is re-resolved
 // against it. Losing the selection has to end the edit of it too: the compact
 // form is a whole screen, and one with no subject is a blank one with no exit.
-describe('entries slice', () => {
+describe('vault store', () => {
   it('ends an edit when the row being edited falls out of the list', () => {
-    makeStore()
     withEntries([loginMeta({ id: 'l1' }), loginMeta({ id: 'l2', title: 'Airbnb' })])
     setCurrentEntry('l1')
     editEntry()
-    expect(useStore.getState().entries.edit).toBe(true)
+    expect(useVault.getState().editing).toBe(true)
 
     setEntries([loginMeta({ id: 'l2', title: 'Airbnb' })])
-    expect(useStore.getState().entries.current).toBeNull()
-    expect(useStore.getState().entries.edit).toBe(false)
+    expect(selectCurrent(useVault.getState())).toBeNull()
+    expect(useVault.getState().editing).toBe(false)
   })
 
   it('keeps the edit when the row survives the merge', () => {
-    makeStore()
     withEntries([loginMeta({ id: 'l1' })])
     setCurrentEntry('l1')
     editEntry()
 
     setEntries([loginMeta({ id: 'l1', title: 'Google Mail' })])
-    expect(useStore.getState().entries.current?.title).toBe('Google Mail')
-    expect(useStore.getState().entries.edit).toBe(true)
+    expect(selectCurrent(useVault.getState())?.title).toBe('Google Mail')
+    expect(useVault.getState().editing).toBe(true)
   })
 })
 
@@ -555,7 +578,7 @@ describe('Frame', () => {
 describe('AuthShell on compact', () => {
   it('renders its column and the back affordance', () => {
     const onBack = vi.fn()
-    renderWithStore(
+    render(
       <AuthShell onBack={onBack}>
         <div>Unlock</div>
       </AuthShell>

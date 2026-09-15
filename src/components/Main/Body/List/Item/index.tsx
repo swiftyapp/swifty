@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { cx } from '@/utils/cx'
-import { useStore, setCurrentEntry } from '@/store'
+import { useVault, setCurrentEntry } from '@/store'
 import type { EntryMeta } from '@/lib/commands'
 import { kindOf } from '@/kinds'
 import { relativeTime } from '@/utils/time'
@@ -18,10 +18,10 @@ interface Props {
 export default function Item({ entry }: Props) {
   const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
-  const selected = useStore(state => state.entries.current?.id === entry.id)
+  const selected = useVault(state => state.currentId === entry.id)
   // Read the flag off the audit the vault already ran on unlock — never score
   // a password during a row render (see src/hooks/useStrength.ts).
-  const flagKind = useStore(state => flagOf(state.audit?.[entry.id]))
+  const flagKind = useVault(state => flagOf(state.audit?.[entry.id]))
 
   const flag = flagKind ? <Flag kind={flagKind} /> : undefined
   // A tombstone's one useful stamp is when it went, and it needs the word: "3d"

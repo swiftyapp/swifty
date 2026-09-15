@@ -1,4 +1,4 @@
-import { useStore } from '@/store'
+import { useVault } from '@/store'
 import { cx } from '@/utils/cx'
 import ListColumn from './ListColumn'
 import SortMenu from './List/SortMenu'
@@ -9,7 +9,7 @@ import DetailPane from './DetailPane'
 // stays visible for context but goes quiet and inert — nothing over there can
 // compete with, or navigate away from, an unsaved draft.
 export default function Body() {
-  const writing = useStore(state => state.entries.edit || !!state.entries.new)
+  const writing = useVault(state => state.editing || !!state.creating)
 
   return (
     <>

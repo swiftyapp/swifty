@@ -2,10 +2,11 @@ import { useCallback, useState } from 'react'
 import {
   biometryType,
   canEnrollBiometric,
+  setupCreate,
   type BiometryType,
   type UnlockResult
 } from '@/lib/commands'
-import { enterMain, setupCreate } from '@/store'
+import { enterMain } from '@/store'
 import Welcome from './Welcome'
 import Password from './Password'
 import Sync from './Sync'

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { shareList, shareRevoke, type ActiveShare } from '@/lib/commands'
-import { useStore, revokeOrphans } from '@/store'
+import { useVault, revokeOrphans } from '@/store'
 import { kindOf } from '@/kinds'
 import { useNow } from '@/hooks/useNow'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
@@ -16,7 +16,7 @@ const TICK_MS = 60_000
 // fetch happen on expand rather than on every visit to this pane.
 function Shares() {
   const { t } = useTranslation()
-  const entries = useStore(state => state.entries.items)
+  const entries = useVault(state => state.items)
   const [shares, setShares] = useState<ActiveShare[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const now = useNow(TICK_MS)

@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ListColumn from '@/components/Main/Body/ListColumn'
 import SortMenu from '@/components/Main/Body/List/SortMenu'
 import { copyToClipboard, fetchFavicon, revealEntry, type Audit } from '@/lib/commands'
-import { makeStore, useStore, setFilterType } from '@/store'
+import { useVault, selectCurrent, setFilterType } from '@/store'
 import { resetFavicons } from '@/hooks/useFavicon'
-import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
+import { withEntries, loginEntry, loginMeta } from './utils'
 
 // A fixed clock (Date only, so userEvent's real timers keep working) makes the
 // recency buckets and the relative times deterministic.
@@ -25,11 +25,7 @@ const titles = () =>
     .getAllByTestId('entry-item')
     .map(row => row.querySelector('.text-base')?.textContent)
 
-const seed = (audit?: Audit) => {
-  const store = makeStore()
-  withEntries(entries, audit)
-  return store
-}
+const seed = (audit?: Audit) => withEntries(entries, audit)
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -42,7 +38,8 @@ afterEach(() => vi.useRealTimers())
 
 describe('Entry list', () => {
   it('lists newest first as a flat list, no date headers', () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
 
     expect(titles()).toEqual(['Zebra', 'Airbnb', 'Monzo', 'Basecamp'])
     expect(screen.queryByText('Today')).not.toBeInTheDocument()
@@ -50,7 +47,8 @@ describe('Entry list', () => {
   })
 
   it('shows a relative time on every row', () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
     expect(screen.getByText('3h')).toBeInTheDocument()
     expect(screen.getByText('4d')).toBeInTheDocument()
     expect(screen.getByText('01/12/2024')).toBeInTheDocument()
@@ -61,7 +59,8 @@ describe('Entry list', () => {
       fresh: { score: 0, isWeak: true, isRepeating: false, breached: false },
       yday: { score: 2, isWeak: false, isRepeating: true, breached: false }
     }
-    renderWithStore(<ListColumn />, { store: seed(audit) })
+    seed(audit)
+    render(<ListColumn />)
 
     expect(screen.getByText('weak')).toBeInTheDocument()
     expect(screen.getByText('reused')).toBeInTheDocument()
@@ -72,7 +71,8 @@ describe('Entry list', () => {
   it('swaps the glyph for the site favicon once it resolves, one fetch per host', async () => {
     const uri = 'data:image/png;base64,AAAA'
     vi.mocked(fetchFavicon).mockResolvedValue(uri)
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
 
     await waitFor(() =>
       expect(document.querySelectorAll(`img[src="${uri}"]`)).toHaveLength(4)
@@ -83,20 +83,20 @@ describe('Entry list', () => {
 
   it('keeps the type glyph when the host has no favicon', async () => {
     vi.mocked(fetchFavicon).mockResolvedValue(null)
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
 
     await waitFor(() => expect(fetchFavicon).toHaveBeenCalled())
     expect(document.querySelector('img')).not.toBeInTheDocument()
   })
 
   it('shows the network mark on card rows that carry a brand', () => {
-    const store = makeStore()
     withEntries([
       loginMeta({ id: 'c1', type: 'card', title: 'Company Visa', cardBrand: 'visa', urlHost: '' }),
       loginMeta({ id: 'c2', type: 'card', title: 'Mystery Card', urlHost: '' })
     ])
     setFilterType('card')
-    renderWithStore(<ListColumn />, { store })
+    render(<ListColumn />)
 
     expect(document.querySelector('svg[aria-label="visa"]')).toBeInTheDocument()
     // The brandless card falls back to the generic glyph, not an empty tile.
@@ -107,7 +107,8 @@ describe('Entry list', () => {
   it('sorts alphabetically', async () => {
     // The sort control is one of the title row's actions, handed down by the
     // shell — the wide one sends exactly this.
-    renderWithStore(<ListColumn actions={<SortMenu />} />, { store: seed() })
+    seed()
+    render(<ListColumn actions={<SortMenu />} />)
 
     await userEvent.click(screen.getByTestId('sort-menu'))
     await userEvent.click(screen.getByText('Alphabetical'))
@@ -118,12 +119,11 @@ describe('Entry list', () => {
   // Read off the `hasPasskey` column, so a row is marked without the list
   // decrypting anything — and unmarked rows stay unmarked.
   it('marks only the logins that hold a passkey', () => {
-    const store = makeStore()
     withEntries([
       loginMeta({ id: 'key', title: 'Acme', hasPasskey: true }),
       loginMeta({ id: 'plain', title: 'Basecamp' })
     ])
-    renderWithStore(<ListColumn />, { store })
+    render(<ListColumn />)
 
     const marks = screen.getAllByTitle('Passkey')
     expect(marks).toHaveLength(1)
@@ -139,7 +139,8 @@ describe('List search', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('narrows the list as you type and restores it on clear', async () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
 
     await userEvent.type(field(), 'air')
     expect(screen.getByText('Airbnb')).toBeInTheDocument()
@@ -152,12 +153,11 @@ describe('List search', () => {
   // A query is answered by relevance, not by the sort control: re-sorting the
   // ranked results buried the closest match under whatever was newest.
   it('keeps the search ranking, so the best match leads', async () => {
-    const store = makeStore()
     withEntries([
       loginMeta({ id: 'loose', title: 'Monzo Business Account', updatedAt: at(2024, 2, 14, 9) }),
       loginMeta({ id: 'exact', title: 'Monzo', updatedAt: at(2024, 0, 12, 12) })
     ])
-    renderWithStore(<ListColumn />, { store })
+    render(<ListColumn />)
 
     // Recency alone would lead with the newer, looser match.
     expect(titles()).toEqual(['Monzo Business Account', 'Monzo'])
@@ -167,20 +167,22 @@ describe('List search', () => {
   })
 
   it('selects the first visible row on ⏎', async () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
 
     // No query: the first row of the list as sorted (newest first).
     await userEvent.type(field(), '{Enter}')
-    expect(useStore.getState().entries.current?.id).toBe('fresh')
+    expect(useVault.getState().currentId).toBe('fresh')
 
     // With one: the first row the query leaves standing.
     await userEvent.type(field(), 'air{Enter}')
-    expect(useStore.getState().entries.current?.id).toBe('yday')
+    expect(useVault.getState().currentId).toBe('yday')
   })
 
   it('copies the first visible row’s primary secret on ⌘⏎', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'fresh', password: 's3cret' }))
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
 
     await userEvent.click(field())
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
@@ -190,11 +192,12 @@ describe('List search', () => {
       expect(copyToClipboard).toHaveBeenCalledWith('s3cret', expect.anything())
     )
     // Copying is not selecting.
-    expect(useStore.getState().entries.current).toBeNull()
+    expect(selectCurrent(useVault.getState())).toBeNull()
   })
 
   it('clears the query on Esc, then blurs', async () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
 
     await userEvent.type(field(), 'air')
     await userEvent.keyboard('{Escape}')
@@ -210,12 +213,13 @@ describe('List search', () => {
 // it: with the caret in the search field, and with a row itself focused.
 describe('List keyboard navigation', () => {
   const field = () => screen.getByTestId('search-input')
-  const currentId = () => useStore.getState().entries.current?.id
+  const currentId = () => useVault.getState().currentId
 
   beforeEach(() => vi.clearAllMocks())
 
   it('walks the visible rows with ↓/↑ without taking the caret out of the field', async () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
     await userEvent.click(field())
 
     // Nothing selected yet: ↓ opens the list at its top row.
@@ -231,7 +235,8 @@ describe('List keyboard navigation', () => {
   })
 
   it('clamps at both ends rather than wrapping', async () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
     await userEvent.click(field())
 
     // One press more than there are rows, at each end.
@@ -242,7 +247,8 @@ describe('List keyboard navigation', () => {
   })
 
   it('moves on from the selected row, carrying focus when the row has it', async () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
 
     await userEvent.click(screen.getByText('Monzo'))
     expect(currentId()).toBe('week')
@@ -254,7 +260,8 @@ describe('List keyboard navigation', () => {
   })
 
   it('re-aims at the first row left standing when a query hides the selection', async () => {
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
 
     await userEvent.click(screen.getByText('Monzo'))
     await userEvent.type(field(), 'air')
@@ -265,7 +272,8 @@ describe('List keyboard navigation', () => {
 
   it('points ⌘⏎ at the row the arrows landed on', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'yday', password: 'airbnb' }))
-    renderWithStore(<ListColumn />, { store: seed() })
+    seed()
+    render(<ListColumn />)
 
     await userEvent.click(field())
     await userEvent.keyboard('{ArrowDown}{ArrowDown}')
@@ -279,7 +287,8 @@ describe('List keyboard navigation', () => {
   })
 
   it('leaves ⏎ on the column’s own controls to that control', async () => {
-    renderWithStore(<ListColumn actions={<SortMenu />} />, { store: seed() })
+    seed()
+    render(<ListColumn actions={<SortMenu />} />)
 
     // The sort button opens its menu on ⏎; selecting a row as well would be
     // two actions on one press.
@@ -287,30 +296,31 @@ describe('List keyboard navigation', () => {
     await userEvent.keyboard('{Enter}')
 
     expect(screen.getByTestId('sort-option-recent')).toBeInTheDocument()
-    expect(useStore.getState().entries.current).toBeNull()
+    expect(selectCurrent(useVault.getState())).toBeNull()
   })
 
   it('leaves the arrows alone while the sort menu owns them', async () => {
-    renderWithStore(<ListColumn actions={<SortMenu />} />, { store: seed() })
+    seed()
+    render(<ListColumn actions={<SortMenu />} />)
 
     await userEvent.click(screen.getByTestId('sort-menu'))
     await userEvent.keyboard('{ArrowDown}{ArrowDown}')
 
-    expect(useStore.getState().entries.current).toBeNull()
+    expect(selectCurrent(useVault.getState())).toBeNull()
   })
 
   it('leaves the arrows alone in fields outside the column', async () => {
-    renderWithStore(
+    seed()
+    render(
       <>
         <input data-testid="outside-field" />
         <ListColumn />
-      </>,
-      { store: seed() }
+      </>
     )
 
     await userEvent.click(screen.getByTestId('outside-field'))
     await userEvent.keyboard('{ArrowDown}{ArrowUp}')
 
-    expect(useStore.getState().entries.current).toBeNull()
+    expect(selectCurrent(useVault.getState())).toBeNull()
   })
 })

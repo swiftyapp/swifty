@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import AuthShell from '@/components/elements/AuthShell'
 import Button from '@/components/elements/Button'
 import { META_TYPE } from '@/components/elements/tokens'
-import { useStore, setupDriveReset } from '@/store'
+import { useApp, setupDriveReset } from '@/store'
 import StepHeader from '../shared/StepHeader'
 import BenefitsCard from '../shared/BenefitsCard'
 import SpinnerCard from '../shared/SpinnerCard'
@@ -24,7 +24,7 @@ interface Props {
 // the probe, not the press, is what decides where this goes next.
 export default function Sync({ onBack, onCreate, onConflict }: Props) {
   const { t } = useTranslation()
-  const drive = useStore(state => state.setup.drive)
+  const drive = useApp(state => state.setupDrive)
   const [error, setError] = useState<string | null>(null)
   // Creating is in flight. Both buttons go inert on it: a second press would
   // ask the backend to create again, and while the backend now refuses the

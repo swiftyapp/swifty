@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Show from '@/components/Main/Body/Aside/Show'
 import Aside from '@/components/Main/Body/Aside'
 import Generator from '@/components/Main/Generator'
 import AddSecret from '@/components/Main/AddSecret'
-import { openAddPicker, makeStore, setCurrentEntry } from '@/store'
+import { useVault, newEntry, openAddPicker, setCurrentEntry } from '@/store'
 import { saveEntry, revealEntry, generatePassword, generateOtp, copyToClipboard, deleteEntry, toEntryMeta } from '@/lib/commands'
 import type { LoginEntry } from '@/lib/commands'
-import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
+import { withEntries, loginEntry, loginMeta } from './utils'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -20,31 +20,31 @@ const field = (name: string) => document.querySelector<HTMLInputElement>(`input[
 
 describe('Editing in the pane', () => {
   it('renders login fields for a new entry', () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     // en-US maps "Website" -> "URL"
     expect(screen.getByText('URL')).toBeInTheDocument()
     expect(screen.getByText('Username')).toBeInTheDocument()
   })
 
   it('says which kind is being edited, and names the empty title after it', () => {
-    renderWithStore(<Show type="card" editing />)
+    render(<Show type="card" editing />)
     expect(screen.getByText('Editing')).toBeInTheDocument()
     expect(titleInput()).toHaveAttribute('placeholder', 'Untitled credit card')
   })
 
   it('saves a valid new login', async () => {
-    const { store } = renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     await userEvent.type(titleInput(), 'GitHub')
     await userEvent.type(field('username'), 'octocat')
     await userEvent.type(field('password'), 'pw')
     await userEvent.click(screen.getByText('Save'))
 
     expect(saveEntry).toHaveBeenCalledOnce()
-    await waitFor(() => expect(store.getState().entries.items[0].title).toBe('GitHub'))
+    await waitFor(() => expect(useVault.getState().items[0].title).toBe('GitHub'))
   })
 
   it('blocks an invalid save and says which rows are missing', async () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     await userEvent.click(screen.getByText('Save'))
 
     expect(saveEntry).not.toHaveBeenCalled()
@@ -53,49 +53,49 @@ describe('Editing in the pane', () => {
   })
 
   it('closes straight away when nothing was typed', async () => {
-    const { store } = renderWithStore(<Show type="login" editing />)
-    store.getState().newEntry('login')
+    render(<Show type="login" editing />)
+    newEntry('login')
     await userEvent.click(screen.getByTestId('cancel-entry-button'))
     expect(screen.queryByText('Discard changes?')).not.toBeInTheDocument()
-    expect(store.getState().entries.new).toBeNull()
+    expect(useVault.getState().creating).toBeNull()
   })
 
   it('guards unsaved changes with an inline confirm', async () => {
-    const { store } = renderWithStore(<Show type="login" editing />)
-    store.getState().newEntry('login')
+    render(<Show type="login" editing />)
+    newEntry('login')
     await userEvent.type(titleInput(), 'GitHub')
 
     // First press only arms the confirm; the editor stays open.
     await userEvent.click(screen.getByTestId('cancel-entry-button'))
     expect(screen.getByText('Discard changes?')).toBeInTheDocument()
-    expect(store.getState().entries.new).toBe('login')
+    expect(useVault.getState().creating).toBe('login')
 
     // Second press discards.
     await userEvent.click(screen.getByTestId('cancel-entry-button'))
-    expect(store.getState().entries.new).toBeNull()
+    expect(useVault.getState().creating).toBeNull()
   })
 
   it('runs the same discard guard on Escape', async () => {
-    const { store } = renderWithStore(<Show type="login" editing />)
-    store.getState().newEntry('login')
+    render(<Show type="login" editing />)
+    newEntry('login')
     await userEvent.type(titleInput(), 'GitHub')
 
     await userEvent.keyboard('{Escape}')
     expect(screen.getByText('Discard changes?')).toBeInTheDocument()
-    expect(store.getState().entries.new).toBe('login')
+    expect(useVault.getState().creating).toBe('login')
 
     await userEvent.keyboard('{Escape}')
-    expect(store.getState().entries.new).toBeNull()
+    expect(useVault.getState().creating).toBeNull()
   })
 
   it('stands down on both keys while a dialog owns the keyboard', async () => {
-    const { store } = renderWithStore(
+    render(
       <>
         <Show type="login" editing />
         <AddSecret />
       </>
     )
-    store.getState().newEntry('login')
+    newEntry('login')
     await userEvent.type(titleInput(), 'GitHub')
     await userEvent.type(field('username'), 'octocat')
     await userEvent.type(field('password'), 'pw')
@@ -108,7 +108,7 @@ describe('Editing in the pane', () => {
 
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByText('Discard changes?')).not.toBeInTheDocument()
-    expect(store.getState().entries.new).toBe('login')
+    expect(useVault.getState().creating).toBe('login')
 
     act(() => openAddPicker())
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
@@ -116,7 +116,7 @@ describe('Editing in the pane', () => {
   })
 
   it('saves on ⌘⏎ from anywhere in the pane', async () => {
-    renderWithStore(<Show type="login" editing />)
+    render(<Show type="login" editing />)
     await userEvent.type(titleInput(), 'GitHub')
     await userEvent.type(field('username'), 'octocat')
     await userEvent.type(field('password'), 'pw')
@@ -127,7 +127,7 @@ describe('Editing in the pane', () => {
 
   it('generates a password through the generator dialog', async () => {
     vi.mocked(generatePassword).mockResolvedValue('Generated123!')
-    renderWithStore(
+    render(
       <>
         <Show type="login" editing />
         <Generator />
@@ -145,7 +145,7 @@ describe('Editing in the pane', () => {
   // One press of Generate settles three rows: an SSH key is a keypair, not a
   // string, so the generator hands the whole thing back to the draft.
   it('generates a whole SSH keypair into the draft', async () => {
-    renderWithStore(
+    render(
       <>
         <Show type="ssh" editing />
         <Generator />
@@ -181,13 +181,13 @@ describe('Editing in the pane', () => {
     // the key first — and a draft with nothing typed yet closes with no confirm,
     // silently taking the session down with the dialog.
     vi.mocked(generatePassword).mockResolvedValue('Generated123!')
-    const { store } = renderWithStore(
+    render(
       <>
         <Show type="login" editing />
         <Generator />
       </>
     )
-    store.getState().newEntry('login')
+    newEntry('login')
 
     await userEvent.click(screen.getByTestId('generate-password-link'))
     expect(await screen.findByTestId('generator-dialog')).toBeInTheDocument()
@@ -196,19 +196,19 @@ describe('Editing in the pane', () => {
 
     // Only the generator went.
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
-    expect(store.getState().entries.new).toBe('login')
+    expect(useVault.getState().creating).toBe('login')
     expect(screen.getByTestId('entry-sheet')).toBeInTheDocument()
 
     // And the editor still owns Escape now that the dialog is gone.
     await userEvent.keyboard('{Escape}')
-    expect(store.getState().entries.new).toBeNull()
+    expect(useVault.getState().creating).toBeNull()
   })
 
   it('keeps in-progress edits when the entry refreshes mid-edit', async () => {
     // The revealed title differs from the metadata title so this wait proves
     // the decrypted values were actually adopted, not just the initial meta.
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google (decrypted)' }))
-    const { rerender } = renderWithStore(<Show entry={loginMeta()} editing />)
+    const { rerender } = render(<Show entry={loginMeta()} editing />)
     await waitFor(() => expect(titleInput().value).toBe('Google (decrypted)'))
 
     await userEvent.clear(titleInput())
@@ -231,16 +231,15 @@ describe('Editing in the pane', () => {
     // render too late. The fresh draft adopted the read entry, id included, and
     // "Add" quietly saved over it instead of creating a row.
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google' }))
-    const store = makeStore()
     withEntries([loginMeta()])
     setCurrentEntry('l1')
-    renderWithStore(<Aside />, { store })
+    render(<Aside />)
 
     // The read view is up and the reveal has landed.
     await screen.findByTestId('more-actions-button')
     await waitFor(() => expect(revealEntry).toHaveBeenCalledWith('l1'))
 
-    act(() => store.getState().newEntry('login'))
+    act(() => newEntry('login'))
     expect(titleInput().value).toBe('')
 
     await userEvent.type(titleInput(), 'GitHub')
@@ -256,15 +255,15 @@ describe('Editing in the pane', () => {
     expect(saved.id).not.toBe('l1')
 
     // And the list grew instead of the read entry being overwritten.
-    await waitFor(() => expect(store.getState().entries.items).toHaveLength(2))
-    expect(store.getState().entries.items[0].title).toBe('Google')
+    await waitFor(() => expect(useVault.getState().items).toHaveLength(2))
+    expect(useVault.getState().items[0].title).toBe('Google')
   })
 })
 
 describe('Show', () => {
   it('renders entry details', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google' }))
-    renderWithStore(<Show entry={loginMeta({ title: 'Google' })} />)
+    render(<Show entry={loginMeta({ title: 'Google' })} />)
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
     expect(await screen.findByText('me@example.com')).toBeInTheDocument()
   })
@@ -272,7 +271,7 @@ describe('Show', () => {
   it('renders and copies a TOTP code', async () => {
     vi.mocked(generateOtp).mockResolvedValue({ code: '123456', time: 25 })
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ otp: 'BASE32SECRET' }) as LoginEntry)
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
 
     expect(await screen.findByText('123 456')).toBeInTheDocument()
     expect(generateOtp).toHaveBeenCalledWith('BASE32SECRET')
@@ -280,7 +279,7 @@ describe('Show', () => {
 
   it('copies a field value', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ username: 'copyme' }))
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
     await screen.findByText('copyme')
     // One copy button per rendered row, in row order: URL, then username.
     await userEvent.click(screen.getAllByTitle('Copy')[1])
@@ -289,7 +288,7 @@ describe('Show', () => {
 
   it('copies the password from the header without revealing it', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'hunter2' }))
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
 
     const action = await screen.findByTestId('primary-action-button')
     await waitFor(() => expect(action).toBeEnabled())
@@ -303,7 +302,7 @@ describe('Show', () => {
 
   it('re-decrypts after an in-place save, so copy never serves the old secret', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'old-secret' }))
-    const { rerender } = renderWithStore(<Show entry={loginMeta()} />)
+    const { rerender } = render(<Show entry={loginMeta()} />)
     const action = await screen.findByTestId('primary-action-button')
     await waitFor(() => expect(action).toBeEnabled())
 
@@ -323,7 +322,7 @@ describe('Show', () => {
 
   it('runs the primary action on a bare Enter', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'hunter2' }))
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
 
     await waitFor(() => expect(screen.getByTestId('primary-action-button')).toBeEnabled())
     await userEvent.keyboard('{Enter}')
@@ -333,7 +332,7 @@ describe('Show', () => {
 
   it('announces the more menu trigger as a disclosure', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry())
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
 
     const trigger = screen.getByTestId('more-actions-button')
     expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
@@ -345,7 +344,7 @@ describe('Show', () => {
 
   it('leaves Enter to whichever control holds focus', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'hunter2' }))
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
 
     await waitFor(() => expect(screen.getByTestId('primary-action-button')).toBeEnabled())
 
@@ -360,7 +359,7 @@ describe('Show', () => {
 
   it('archives from the more menu behind a two-press inline confirm', async () => {
     vi.mocked(revealEntry).mockResolvedValue(loginEntry())
-    renderWithStore(<Show entry={loginMeta()} />)
+    render(<Show entry={loginMeta()} />)
 
     await userEvent.click(screen.getByTestId('more-actions-button'))
 

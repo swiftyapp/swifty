@@ -1,20 +1,21 @@
 import { scanImage, type EntryType } from '@/lib/commands'
-import type { ScanError } from '@/store/uiSlice'
 import {
-  useStore,
+  useVault,
+  selectCurrent,
   startEntry,
   setPrefill,
   scanStarted,
-  scanFinished
+  scanFinished,
+  type ScanError
 } from '@/store'
 import { cleanFields } from './fields'
 
 // Which kind the detail pane is editing right now, if any — a new entry's
 // chosen kind, or the kind of the entry being edited.
 const editingKind = (): EntryType | null => {
-  const { new: creating, edit, current } = useStore.getState().entries
+  const { creating, editing } = useVault.getState()
   if (creating) return creating
-  return edit ? (current?.type ?? null) : null
+  return editing ? (selectCurrent(useVault.getState())?.type ?? null) : null
 }
 
 // The backend's failures, classified for the copy. An invoke rejects with the
@@ -33,7 +34,7 @@ const reason = (error: unknown): ScanError => {
  * The same path for a drop and for a file picked from the dialog. A scan of the
  * kind already open fills that form in place — a second photo of the same
  * passport should not open a second draft — and anything else starts a new
- * entry of the kind that was recognized. Both go through `entries.prefill`,
+ * entry of the kind that was recognized. Both go through the vault `prefill`,
  * which `useDraft` is the only reader of.
  *
  * Never throws: the outcome is the status in the store.
