@@ -10,9 +10,9 @@
 //!      registration in `lib.rs` — a release binary does not contain it at all.
 //!      (The suite drives the debug binary, which is also the only build that
 //!      carries the in-app WebDriver server.)
-//!   2. `SWIFTY_E2E=1` must be set — a developer's own `tauri dev` run is a
+//!   2. `ROWEL_E2E=1` must be set — a developer's own `tauri dev` run is a
 //!      debug build too, and must not expose this to a stray `invoke`.
-//!   3. `SWIFTY_DB_DIR` must be set — the wipe targets *that* dir and nothing
+//!   3. `ROWEL_DB_DIR` must be set — the wipe targets *that* dir and nothing
 //!      else, so even a debug binary run by hand can never touch the real
 //!      app-data dir (which is what `storage::app_dir` falls back to).
 
@@ -44,15 +44,15 @@ impl ResetMode {
 }
 
 // Gates 2 and 3. Returns the one directory this command is allowed to erase.
-// `storage::app_dir` returns `SWIFTY_DB_DIR` verbatim when it is set, so the dir
+// `storage::app_dir` returns `ROWEL_DB_DIR` verbatim when it is set, so the dir
 // resolved here is by construction the same one the app reads and writes.
 fn e2e_data_dir() -> Result<PathBuf> {
-    if std::env::var("SWIFTY_E2E").as_deref() != Ok("1") {
-        return Err(Error::Other("e2e_reset requires SWIFTY_E2E=1".into()));
+    if std::env::var("ROWEL_E2E").as_deref() != Ok("1") {
+        return Err(Error::Other("e2e_reset requires ROWEL_E2E=1".into()));
     }
-    match std::env::var("SWIFTY_DB_DIR") {
+    match std::env::var("ROWEL_DB_DIR") {
         Ok(dir) if !dir.is_empty() => Ok(PathBuf::from(dir)),
-        _ => Err(Error::Other("e2e_reset requires SWIFTY_DB_DIR".into())),
+        _ => Err(Error::Other("e2e_reset requires ROWEL_DB_DIR".into())),
     }
 }
 
@@ -122,7 +122,7 @@ mod tests {
     fn tmp_dir() -> PathBuf {
         static N: AtomicU64 = AtomicU64::new(0);
         let dir = std::env::temp_dir().join(format!(
-            "swifty-e2e-reset-{}-{}",
+            "rowel-e2e-reset-{}-{}",
             std::process::id(),
             N.fetch_add(1, Ordering::SeqCst)
         ));

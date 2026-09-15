@@ -258,7 +258,7 @@ if (FREED === 'dot') {
 }
 
 const svg =
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 64 64" fill="${INK}" aria-label="Swifty">\n` +
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 64 64" fill="${INK}" aria-label="Rowel">\n` +
   `  <path d="${body.d}"/>\n` +
   `  ${freedSvg}\n` +
   `</svg>\n`

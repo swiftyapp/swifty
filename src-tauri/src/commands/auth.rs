@@ -95,7 +95,6 @@ fn record_failed_attempt(mut state: LockoutState, now_ms: i64) -> LockoutState {
 // "Import from .swftx" instead (see `import_swftx`).
 #[tauri::command]
 pub fn is_initialized(app: AppHandle) -> Result<bool> {
-    storage::ensure_migrated(&app);
     Ok(storage::db_exists(&app))
 }
 
@@ -122,7 +121,6 @@ pub async fn unlock(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
-    storage::ensure_migrated(&app);
 
     let lockout = LockoutState::load(&app)?;
     let now = now_ms();
@@ -205,7 +203,6 @@ pub fn lock(state: State<'_, AppState>) -> Result<()> {
 // store then opens off the UI thread. No migration on unlock.
 #[tauri::command]
 pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<UnlockResult> {
-    storage::ensure_migrated(&app);
     let Some(marker) = storage::biometric_marker(&app) else {
         return Err(Error::Other("biometric unlock is not enabled".into()));
     };

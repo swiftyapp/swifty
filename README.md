@@ -1,4 +1,4 @@
-![Swifty — Password Manager](docs/banner.svg)
+![Rowel — Password Manager](docs/banner.svg)
 
 ## Free Offline-first Password Manager for MacOS, Windows and Linux.
 
@@ -33,8 +33,8 @@
 
 ## Screenshots
 
-<img width="1012" alt="Swifty lock screen — vault sealed, master password prompt with Touch ID" src="docs/screenshots/lock-screen.png">
-<img width="1012" alt="Swifty credit card view — card list and masked card details" src="docs/screenshots/card-view.png">
+<img width="1012" alt="Rowel lock screen — vault sealed, master password prompt with Touch ID" src="docs/screenshots/lock-screen.png">
+<img width="1012" alt="Rowel credit card view — card list and masked card details" src="docs/screenshots/card-view.png">
 
 
 ## Install
@@ -52,15 +52,15 @@ Every release is built in GitHub Actions and ships with supply-chain evidence:
   workflow, from this source, with the [GitHub CLI](https://cli.github.com):
 
   ```bash
-  gh attestation verify ./Swifty_1.0.0_amd64.AppImage --repo swiftyapp/swifty
+  gh attestation verify ./Rowel_1.0.0_amd64.AppImage --repo swiftyapp/swifty
   ```
 
   (works for the `.dmg`, `.msi`, `-setup.exe`, `.deb`, `.rpm` and `.AppImage`
   assets — point it at whichever you downloaded).
 
-- **CycloneDX SBOM** — every release attaches `swifty-rust.cdx.json` (the full
-  Rust dependency graph) and, when available, `swifty-js.cdx.json` (the
-  frontend). Feed them to any CycloneDX-aware scanner (e.g. `grype sbom:./swifty-rust.cdx.json`)
+- **CycloneDX SBOM** — every release attaches `rowel-rust.cdx.json` (the full
+  Rust dependency graph) and, when available, `rowel-js.cdx.json` (the
+  frontend). Feed them to any CycloneDX-aware scanner (e.g. `grype sbom:./rowel-rust.cdx.json`)
   to audit the exact dependencies a build shipped.
 
 - **Update signature** — the auto-updater only installs updates signed with the
@@ -72,7 +72,7 @@ so builds are reproducible from a fixed toolchain.
 
 ## Development
 
-Swifty is built with [Tauri 2](https://v2.tauri.app) (Rust backend + TypeScript/React/Vite frontend).
+Rowel is built with [Tauri 2](https://v2.tauri.app) (Rust backend + TypeScript/React/Vite frontend).
 
 ### Prerequisites
 
@@ -89,7 +89,7 @@ Swifty is built with [Tauri 2](https://v2.tauri.app) (Rust backend + TypeScript/
 
 ```bash
 git clone git@github.com:swiftyapp/swifty.git
-cd swifty
+cd rowel
 bun install
 
 bun run tauri:dev     # run the app in development
@@ -105,11 +105,11 @@ cd src-tauri && cargo test   # backend tests
 Run the scripts with `bun run <name>`, not `bun <name>`: bare `bun test` starts
 Bun's own test runner instead of the Vitest suite this repo is written against.
 
-`tauri:dev:fresh` points `SWIFTY_DB_DIR` at a **new** temp directory each run, so
+`tauri:dev:fresh` points `ROWEL_DB_DIR` at a **new** temp directory each run, so
 the app finds no vault there and starts at the setup/restore screen every time.
 Your real dev vault is left untouched — `bun run tauri:dev` goes back to it.
 
-Setting `SWIFTY_DB_DIR` yourself overrides that and keeps the same directory
+Setting `ROWEL_DB_DIR` yourself overrides that and keeps the same directory
 across runs, which is how you set a throwaway vault up once and then relaunch
 into its unlock screen. Nothing here ever deletes a data directory; to start
 that one over, remove it yourself.
@@ -192,16 +192,16 @@ Release builds are signed for `tauri-plugin-updater`. The public key lives in
 `src-tauri/tauri.conf.json`; the matching **private key is never committed** and
 is provided to CI via the `TAURI_SIGNING_PRIVATE_KEY` (and
 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) secrets. Generate a keypair with
-`bun run tauri signer generate -w ~/.swifty/updater.key`.
+`bun run tauri signer generate -w ~/.rowel/updater.key`.
 
 ## Security
 
-Swifty is offline-first: your vault is an encrypted SQLite database (SQLCipher)
+Rowel is offline-first: your vault is an encrypted SQLite database (SQLCipher)
 on your own device, with each entry's secrets sealed in an additional
 application-level AEAD layer, and there is no backend that holds your secrets.
 See [`SECURITY.md`](SECURITY.md) for
 how to report a vulnerability, and [`docs/threat-model.md`](docs/threat-model.md)
-for what Swifty does and does not defend against.
+for what Rowel does and does not defend against.
 
 ## Contributors
 

@@ -1,4 +1,4 @@
-const KEY = 'swifty:clipboardTimeout'
+const KEY = 'rowel:clipboardTimeout'
 
 // How long a copied secret lingers before the clipboard is cleared (ms).
 // One of the choices offered in Settings › Security, so the segmented control

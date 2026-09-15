@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use swifty_lib::scan::{platform_ocr, scan_lines};
+use rowel_lib::scan::{platform_ocr, scan_lines};
 
 fn main() {
     let Some(path) = std::env::args().nth(1) else {

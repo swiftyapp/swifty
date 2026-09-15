@@ -2,7 +2,7 @@ export type DateFormat = 'MM/DD/YYYY' | 'DD.MM.YYYY' | 'YYYY-MM-DD'
 
 export const DATE_FORMATS: DateFormat[] = ['MM/DD/YYYY', 'DD.MM.YYYY', 'YYYY-MM-DD']
 
-const KEY = 'swifty:dateFormat'
+const KEY = 'rowel:dateFormat'
 
 export const DEFAULT_DATE_FORMAT: DateFormat = 'MM/DD/YYYY'
 

@@ -1,12 +1,12 @@
-# Swifty Threat Model
+# Rowel Threat Model
 
-This describes what Swifty protects, what it deliberately does not, and how the
+This describes what Rowel protects, what it deliberately does not, and how the
 master key moves through the app. It reflects the code merged on `v1-0-0`; where
 the current implementation differs from the planned design, that is called out.
 
 ## Architecture in one paragraph
 
-Swifty is a Tauri 2 desktop app: a trusted Rust core plus a system-webview
+Rowel is a Tauri 2 desktop app: a trusted Rust core plus a system-webview
 frontend (React/TypeScript). All cryptography and key handling live in Rust. The
 webview never sees the master key; it talks to the core through a fixed,
 enumerated list of commands (`src-tauri/src/lib.rs`) and receives non-secret
@@ -124,7 +124,7 @@ carries them as part of the opaque payload and never sees them.
   synced keys and are not incremented on sign-in; an imported credential that
   arrived with a non-zero counter keeps counting.
 - **The AAGUID is a model identifier, not a device one.** One fixed value for
-  every Swifty install (`passkey::AAGUID`), so it cannot be used to correlate a
+  every Rowel install (`passkey::AAGUID`), so it cannot be used to correlate a
   user across relying parties.
 
 ## Key lifecycle across the process split
@@ -172,11 +172,7 @@ Bringing an old vault forward is an **explicit** action, and there are two paths
   then merged by id. This CPU-bound re-encrypt loop runs **off the UI thread** and
   emits `import:progress` events so the UI can show progress.
 
-(The one automatic step, `ensure_migrated`, only *relocates* a legacy
-Electron-era `vault.swftx` file into the new Tauri app-data directory; it does not
-convert it into the encrypted database.)
-
-## What Swifty defends against
+## What Rowel defends against
 
 - **Device theft / a lost or stolen laptop.** The vault is a local, SQLCipher-
   encrypted database; each entry's secrets carry an additional app-AEAD layer.
@@ -188,7 +184,7 @@ convert it into the encrypted database.)
   encrypted vault blob to the user's own Google Drive; the master passphrase and
   derived keys never leave the device. A compromised Drive account or a tapped
   sync channel yields ciphertext, not secrets.
-- **Remote server breach.** There is nothing central to breach. Swifty is
+- **Remote server breach.** There is nothing central to breach. Rowel is
   offline-first with no account server, no telemetry, and no phone-home. The only
   outbound request at launch is the signed updater check to GitHub Releases; Drive
   sync (when enabled) runs from the Rust core over HTTPS, not from the webview.
@@ -213,17 +209,17 @@ fresh random 256-bit AES-GCM key and uploaded to the sender's own Drive as an
   sender's opaque local entry id. It never holds the key and cannot read the
   entry. Neither the vault key nor the master passphrase is involved.
 - **The link is the secret.** Anyone who obtains it can open the share while
-  the file exists. Swifty cannot defend the channel the sender chose to send it
+  the file exists. Rowel cannot defend the channel the sender chose to send it
   over. What bounds the exposure is two guarantees of different strength, and
   they should not be read as one:
-  - **Swifty refuses to open a share after 24 hours.** The expiry is inside the
-    authenticated ciphertext, so every Swifty client honours it whether or not
+  - **Rowel refuses to open a share after 24 hours.** The expiry is inside the
+    authenticated ciphertext, so every Rowel client honours it whether or not
     the file is still on Drive.
   - **Deleting the file is best effort.** Revoke deletes it at once. Otherwise
     the sender's devices sweep expired shares after each successful sync and
     whenever the shares list is opened, which needs a device to be on. Until
     then the ciphertext is still downloadable, and a leaked link in the hands
-    of someone using their own AES-GCM code rather than Swifty decrypts it past
+    of someone using their own AES-GCM code rather than Rowel decrypts it past
     the 24 hours. The hard stop is deletion; revoke is the only immediate one.
 - **Integrity.** AES-GCM authentication means a modified or substituted file
   fails to open rather than yielding a tampered entry. The expiry is inside the
@@ -245,12 +241,12 @@ fresh random 256-bit AES-GCM key and uploaded to the sender's own Drive as an
   is revoked; revoking stops future downloads but cannot retract a credential
   already imported or erase a downloaded copy.
 
-## What Swifty explicitly does NOT defend against
+## What Rowel explicitly does NOT defend against
 
 - **A compromised operating system.** Code running as the user — malware, a
   malicious app with the same privileges, an attacker at local root — can read
   process memory while the vault is unlocked, tamper with the binary, or inject
-  into the webview. Swifty cannot protect secrets from the platform it runs on.
+  into the webview. Rowel cannot protect secrets from the platform it runs on.
 - **Keyloggers and screen capture.** The master passphrase (as typed) and any
   revealed secret (as displayed) can be captured by such tools.
 - **A coerced or observed unlock.** If the user is compelled to unlock, or a
@@ -264,7 +260,7 @@ fresh random 256-bit AES-GCM key and uploaded to the sender's own Drive as an
   stolen database can be attacked offline, bounded only by the KDF cost. That cost
   is the PBKDF2 parameters described above until Argon2id is wired into the live
   path.
-- **The clipboard window.** Copied secrets go to the system clipboard. Swifty
+- **The clipboard window.** Copied secrets go to the system clipboard. Rowel
   marks them as concealed and auto-clears after a timeout, but other apps can read
   the clipboard during that window.
 - **Physical memory attacks.** Cold-boot or DMA attacks against an unlocked
@@ -272,7 +268,7 @@ fresh random 256-bit AES-GCM key and uploaded to the sender's own Drive as an
 
 ## Summary
 
-Swifty's security rests on a SQLCipher-encrypted database, a second app-AEAD layer
+Rowel's security rests on a SQLCipher-encrypted database, a second app-AEAD layer
 that keeps each entry's secrets sealed until reveal, keys that are derived on
 unlock, held only in the Rust process, and zeroized on lock, and the absence of
 any server that could be breached. It assumes the user's device and operating

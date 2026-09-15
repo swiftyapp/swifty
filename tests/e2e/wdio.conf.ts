@@ -20,12 +20,12 @@ import path from "path";
 const ROOT = path.resolve(__dirname, "../..");
 
 const APP_BINARY =
-  process.env.SWIFTY_APP_BINARY ??
-  path.join(ROOT, "src-tauri", "target", "debug", "swifty");
+  process.env.ROWEL_APP_BINARY ??
+  path.join(ROOT, "src-tauri", "target", "debug", "rowel");
 
 const VITE_PORT = process.env.E2E_VITE_PORT ?? "1420";
 
-const TEST_DB_DIR = path.join(os.tmpdir(), `swifty-e2e-${Date.now()}`);
+const TEST_DB_DIR = path.join(os.tmpdir(), `rowel-e2e-${Date.now()}`);
 
 const SPECS_DIR = path.join(__dirname, "specs");
 
@@ -174,13 +174,13 @@ export const config: WebdriverIO.Config = {
 
     // Start the app binary — it loads the frontend from Vite and starts
     // the WebDriver server on :4445. That port must be ours to open: another
-    // debug Swifty already running (a second checkout's dev app, say) holds
+    // debug Rowel already running (a second checkout's dev app, say) holds
     // it, the single-instance plugin quietly exits the binary we spawn, and
     // the whole suite then drives the wrong app. Seen locally; every reset
-    // was refused by the SWIFTY_E2E gate, but nothing else would have been.
+    // was refused by the ROWEL_E2E gate, but nothing else would have been.
     if (await portOpen(4445)) {
       throw new Error(
-        "[e2e] port 4445 is already in use — is another Swifty instance running? Quit it first.",
+        "[e2e] port 4445 is already in use — is another Rowel instance running? Quit it first.",
       );
     }
     console.log(`[e2e] Starting app (${APP_BINARY})`);
@@ -190,10 +190,10 @@ export const config: WebdriverIO.Config = {
       env: {
         ...process.env,
         // Both are gates on the `e2e_reset` command: it refuses to run unless
-        // SWIFTY_E2E is 1, and it only ever wipes SWIFTY_DB_DIR — so it can
+        // ROWEL_E2E is 1, and it only ever wipes ROWEL_DB_DIR — so it can
         // never reach a developer's real app-data dir. See commands/e2e.rs.
-        SWIFTY_DB_DIR: TEST_DB_DIR,
-        SWIFTY_E2E: "1",
+        ROWEL_DB_DIR: TEST_DB_DIR,
+        ROWEL_E2E: "1",
         WEBKIT_DISABLE_COMPOSITING_MODE: "1",
       },
     });

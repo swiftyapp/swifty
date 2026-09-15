@@ -34,7 +34,7 @@ const ERROR_EVENT: &str = "setup:drive:error";
 
 // User-facing, so deliberately plain about what to do next.
 const NOT_CONNECTED: &str = "connect a Google account first";
-const NO_REMOTE_VAULT: &str = "this Google account has no Swifty data to restore";
+const NO_REMOTE_VAULT: &str = "this Google account has no Rowel data to restore";
 const ALREADY_SET_UP: &str = "this device is already set up";
 const SETUP_BUSY: &str = "another setup step is still running";
 

@@ -66,7 +66,7 @@ describe("settings", () => {
   });
 
   it("names the build in the pinned footer", async () => {
-    await expect($('[data-testid="settings-version"]')).toHaveText(/^Swifty /);
+    await expect($('[data-testid="settings-version"]')).toHaveText(/^Rowel /);
     await expect($('[data-testid="settings-update-status"]')).toBeDisplayed();
   });
 
@@ -93,13 +93,13 @@ describe("settings", () => {
       "aria-checked",
       "true",
     );
-    expect(await stored("swifty:autolockSecs")).toBe("900");
+    expect(await stored("rowel:autolockSecs")).toBe("900");
 
     await $('[data-testid="settings-clipboard-0"]').click();
-    expect(await stored("swifty:clipboardTimeout")).toBe("0");
+    expect(await stored("rowel:clipboardTimeout")).toBe("0");
 
     await $('[data-testid="settings-clipboard-30000"]').click();
-    expect(await stored("swifty:clipboardTimeout")).toBe("30000");
+    expect(await stored("rowel:clipboardTimeout")).toBe("30000");
   });
 
   it("persists the generator defaults", async () => {
@@ -107,7 +107,7 @@ describe("settings", () => {
     await $('[data-testid="settings-generator-symbols"]').click();
 
     const props = await browser.execute(() =>
-      JSON.parse(localStorage.getItem("swifty:generatorDefaults") ?? "{}"),
+      JSON.parse(localStorage.getItem("rowel:generatorDefaults") ?? "{}"),
     );
     expect(props.symbols).toBe(false);
 
@@ -164,9 +164,9 @@ describe("settings", () => {
     await expect($("html")).toHaveAttribute("data-theme", "light");
 
     await $('[data-testid="settings-date-format-YYYY-MM-DD"]').click();
-    expect(await stored("swifty:dateFormat")).toBe("YYYY-MM-DD");
+    expect(await stored("rowel:dateFormat")).toBe("YYYY-MM-DD");
     await $('[data-testid="settings-date-format-MM/DD/YYYY"]').click();
-    expect(await stored("swifty:dateFormat")).toBe("MM/DD/YYYY");
+    expect(await stored("rowel:dateFormat")).toBe("MM/DD/YYYY");
   });
 
   it("closes from the header X", async () => {

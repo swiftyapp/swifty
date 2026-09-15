@@ -1,20 +1,13 @@
-//! On-disk vault storage under the Tauri app-data dir. Mirrors legacy
-//! `application/storage`: ensure-file, utf8 read, overwrite write, `.swftx`
-//! export copy. Also handles one-time migration from the Electron location.
+//! On-disk vault storage under the Tauri app-data dir: ensure-file, utf8 read,
+//! overwrite write, `.swftx` export copy.
 
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-#[cfg(desktop)]
-use std::sync::OnceLock;
 use tauri::{AppHandle, Manager};
 
 use crate::error::{Error, Result};
 
-// The legacy Electron JSON vault, superseded by DB_FILE. Only the one-time
-// migration below still names it, and that only ever ran on desktop.
-#[cfg(desktop)]
-pub const VAULT_FILE: &str = "vault.swftx";
 pub const DB_FILE: &str = "vault.db";
 // Pre-change recovery snapshot of the encrypted DB, written next to it before the
 // destructive change-master-password sequence (see `change_master_password`).
@@ -37,7 +30,7 @@ pub const BIOMETRIC_FILE: &str = "biometric.enabled";
 
 fn app_dir(app: &AppHandle) -> Result<PathBuf> {
     // E2E test isolation: point the whole data dir at a fresh temp dir per run.
-    if let Ok(dir) = std::env::var("SWIFTY_DB_DIR") {
+    if let Ok(dir) = std::env::var("ROWEL_DB_DIR") {
         return Ok(PathBuf::from(dir));
     }
 
@@ -52,11 +45,6 @@ fn app_dir(app: &AppHandle) -> Result<PathBuf> {
     } else {
         dir
     })
-}
-
-#[cfg(desktop)]
-pub fn vault_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(app_dir(app)?.join(VAULT_FILE))
 }
 
 // The SQLCipher database that supersedes the JSON vault.
@@ -272,56 +260,6 @@ pub fn sync_configured(app: &AppHandle) -> bool {
         .is_some_and(|m| m.len() > 0)
 }
 
-// Legacy Electron userData dir (productName "Swifty"): equals `config_dir/Swifty`
-// on all platforms (Roaming\Swifty, ~/Library/Application Support/Swifty, ~/.config/Swifty).
-#[cfg(desktop)]
-fn legacy_dir() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("Swifty"))
-}
-
-// One-time copy of the legacy vault (and gdrive creds) into the new location.
-// Idempotent: skips if the new vault already exists or no legacy vault is found.
-#[cfg(desktop)]
-fn migrate_legacy(app: &AppHandle) -> Result<()> {
-    let new_vault = vault_path(app)?;
-    if new_vault.exists() {
-        return Ok(());
-    }
-    let Some(legacy) = legacy_dir() else {
-        return Ok(());
-    };
-    let legacy_vault = legacy.join(VAULT_FILE);
-    if !legacy_vault.exists() {
-        return Ok(());
-    }
-    if let Some(parent) = new_vault.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::copy(&legacy_vault, &new_vault)?;
-
-    let legacy_gdrive = legacy.join(GDRIVE_FILE);
-    if legacy_gdrive.exists() {
-        write_gdrive(app, &fs::read_to_string(&legacy_gdrive)?)?;
-    }
-    Ok(())
-}
-
-// Run the migration at most once per process; errors are logged, not fatal.
-// There was never a mobile Electron app to migrate from, so on mobile this is
-// a no-op.
-#[cfg_attr(mobile, allow(unused_variables))]
-pub fn ensure_migrated(app: &AppHandle) {
-    #[cfg(desktop)]
-    {
-        static DONE: OnceLock<()> = OnceLock::new();
-        DONE.get_or_init(|| {
-            if let Err(e) = migrate_legacy(app) {
-                log::warn!("legacy vault migration failed: {e}");
-            }
-        });
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{atomic_replace_with, atomic_write_file};
@@ -333,7 +271,7 @@ mod tests {
     fn tmp_sidecar() -> PathBuf {
         static N: AtomicU64 = AtomicU64::new(0);
         let dir = std::env::temp_dir().join(format!(
-            "swifty-storage-{}-{}",
+            "rowel-storage-{}-{}",
             std::process::id(),
             N.fetch_add(1, Ordering::SeqCst)
         ));

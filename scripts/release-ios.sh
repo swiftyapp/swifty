@@ -114,7 +114,7 @@ fi
 # behind in the project, and the CLI only ever writes them — it never resets
 # them once the variable is gone. Automatic signing cannot take over while they
 # are there, so refuse rather than fail later inside exportArchive.
-PBXPROJ=src-tauri/gen/apple/swifty.xcodeproj/project.pbxproj
+PBXPROJ=src-tauri/gen/apple/rowel.xcodeproj/project.pbxproj
 if grep -qE "CODE_SIGN_STYLE = Manual|PROVISIONING_PROFILE_SPECIFIER" "$PBXPROJ"; then
   echo "error: $PBXPROJ carries manual-signing settings from an earlier build." >&2
   echo "       Restore it and re-run:  git checkout -- $PBXPROJ" >&2
@@ -129,7 +129,7 @@ shopt -s nullglob
 # Everything under build/ is generated and gitignored, so clearing it is free.
 rm -f src-tauri/gen/apple/build/*.ipa src-tauri/gen/apple/build/*/*.ipa
 
-echo "Building Swifty $SHORT_VERSION build $BUILD_NUMBER (config version $VERSION)…"
+echo "Building Rowel $SHORT_VERSION build $BUILD_NUMBER (config version $VERSION)…"
 bun run tauri ios build --ci \
   --export-method app-store-connect \
   --config "$BUILD_CONFIG"

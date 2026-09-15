@@ -1,11 +1,11 @@
-# Contributing to Swifty
+# Contributing to Rowel
 
 :tada: First off, thanks for taking the time to contribute! :tada:
 
 This project adheres to the Contributor Covenant [code of conduct](CODE_OF_CONDUCT.md).
 By participating, you are expected to uphold this code.
 
-The following are guidelines for contributing to Swifty.
+The following are guidelines for contributing to Rowel.
 These are just guidelines, not rules, use your best judgment and feel free to
 propose changes to this document in a pull request.
 
@@ -27,7 +27,7 @@ dependencies, and tools contained in the `swiftyapp/swifty` repository.
   * Fork the project on GitHub and clone your fork locally.
   ```
   $ git clone git@github.com:swiftyapp/swifty.git
-  $ cd swifty
+  $ cd rowel
   $ git remote add upstream https://github.com/swiftyapp/swifty.git
   $ git fetch upstream
   ```

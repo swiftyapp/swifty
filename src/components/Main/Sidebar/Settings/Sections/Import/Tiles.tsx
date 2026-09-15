@@ -4,7 +4,7 @@ import type { TKey } from '@/i18n'
 import type { ImportFormat } from '@/lib/commands'
 import { CARD, META, META_TYPE } from '@/components/elements/tokens'
 
-// One tile per source. `format` absent means the Swifty backup tile, which goes
+// One tile per source. `format` absent means the Rowel backup tile, which goes
 // through its own picker and password.
 const TILES: {
   key: string

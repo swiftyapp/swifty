@@ -51,7 +51,7 @@ pub fn hash_secret(password: &str) -> String {
 /// per-vault salt. Retained only for sidecar-less interim/dev DBs so they still
 /// open; Argon2id vaults derive their SQLCipher key via [`VaultKey`] instead.
 pub fn sqlcipher_key(secret: &str) -> [u8; KEY_LEN] {
-    const SALT: &[u8] = b"swifty-sqlcipher-v1";
+    const SALT: &[u8] = b"rowel-sqlcipher-v1";
     const INFO: &[u8] = b"sqlcipher-db-key";
     let prk = ring::hkdf::Salt::new(ring::hkdf::HKDF_SHA256, SALT).extract(secret.as_bytes());
     let okm = prk
@@ -67,7 +67,7 @@ pub fn sqlcipher_key(secret: &str) -> [u8; KEY_LEN] {
 /// payload key as independent subkeys (distinct `info`), so a single KDF pass
 /// covers both without either revealing the other.
 pub(crate) fn hkdf_subkey(ikm: &[u8], info: &[u8]) -> [u8; KEY_LEN] {
-    const SALT: &[u8] = b"swifty-kdf-hkdf-v1";
+    const SALT: &[u8] = b"rowel-kdf-hkdf-v1";
     let prk = ring::hkdf::Salt::new(ring::hkdf::HKDF_SHA256, SALT).extract(ikm);
     let info = [info];
     let okm = prk

@@ -3,7 +3,7 @@ import { cardBrandOf } from '@/utils/cardBrand'
 import { parseEnv, varsOf } from '@/kinds/env/parse'
 
 /**
- * Frozen command contract for the Swifty backend.
+ * Frozen command contract for the Rowel backend.
  * Every function is a thin, typed wrapper over a Rust `#[tauri::command]`.
  * Crypto and the master key live entirely in Rust: `unlock` returns decrypted
  * data for display and mutations send plaintext back to be re-encrypted.

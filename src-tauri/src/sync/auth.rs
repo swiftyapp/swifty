@@ -592,7 +592,7 @@ mod tests {
         ));
         // Our scheme, some other path.
         assert!(!matches("com.googleusercontent.apps.1-a:/anything?code=x"));
-        assert!(!matches("swifty:/oauth2redirect"));
+        assert!(!matches("rowel:/oauth2redirect"));
     }
 
     #[test]
@@ -609,7 +609,7 @@ mod tests {
 
     #[test]
     fn a_foreign_scheme_yields_no_client_id() {
-        assert!(client_id_from_scheme("swifty").is_none());
+        assert!(client_id_from_scheme("rowel").is_none());
         // The prefix alone names no client.
         assert!(client_id_from_scheme("com.googleusercontent.apps.").is_none());
         assert!(scheme_from_client_id("123-abc.example.com").is_none());

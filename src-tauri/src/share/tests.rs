@@ -152,7 +152,7 @@ fn a_link_that_is_not_a_link_fails_before_anything_is_fetched() {
         open(&FakeShareRemote::new(), "https://example.com/share", NOW)
             .unwrap_err()
             .to_string(),
-        "this is not a Swifty share link"
+        "this is not a Rowel share link"
     );
 }
 

@@ -1,5 +1,5 @@
 [package]
-name = "swifty"
+name = "rowel"
 version = "1.0.0-alpha.1"
 description = "Modern, Lightweight, Fast and Free Password Manager"
 authors = ["Alex Chaplinsky"]
@@ -13,7 +13,7 @@ rust-version = "1.92"
 publish = false
 
 [lib]
-name = "swifty_lib"
+name = "rowel_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

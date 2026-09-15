@@ -1,4 +1,4 @@
-const KEY = 'swifty:breachCheck'
+const KEY = 'rowel:breachCheck'
 
 // Off by default: the HIBP breach check makes an outbound request, so it stays
 // opt-in until the user explicitly enables it.

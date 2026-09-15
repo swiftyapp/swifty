@@ -14,7 +14,7 @@ use super::{EntryKind, ImportedEntry, ImportedPasskey};
 use crate::app::APP_NAME;
 
 /// The exporter's relying-party id in a CXF document: the project's domain.
-pub const EXPORTER_RP_ID: &str = "getswifty.pro";
+pub const EXPORTER_RP_ID: &str = "rowel.app";
 
 /// Bitwarden `type` codes. Bitwarden has no item for a `.env` file, so one goes
 /// out as a secure note carrying the file text — never as an empty login. Nor
@@ -526,9 +526,9 @@ const COLUMNS: &[&str] = &[
     CSV_VERSION_HEADER,
 ];
 
-/// Marks rows produced by Swifty so the importer may reverse spreadsheet
+/// Marks rows produced by Rowel so the importer may reverse spreadsheet
 /// escaping without guessing whether a leading apostrophe was user data.
-pub const CSV_VERSION_HEADER: &str = "_swifty_csv_version";
+pub const CSV_VERSION_HEADER: &str = "_rowel_csv_version";
 pub const CSV_VERSION: &str = "2";
 
 /// Serialize to a generic CSV. Every cell is passed through [`sanitize_cell`].
@@ -575,7 +575,7 @@ pub fn to_generic_csv(entries: &[ImportedEntry]) -> csv::Result<Vec<u8>> {
 
 /// Neutralize spreadsheet formula injection with a reversible encoding. A
 /// formula-looking cell gains a leading apostrophe; an apostrophe already in
-/// the data is doubled so decoding a versioned Swifty row is unambiguous.
+/// the data is doubled so decoding a versioned Rowel row is unambiguous.
 pub fn sanitize_cell(cell: &str) -> String {
     if cell.starts_with('\'') || starts_like_a_formula(cell) {
         format!("'{cell}")

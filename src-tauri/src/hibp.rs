@@ -45,7 +45,7 @@ fn is_breached(suffix: &str, body: &str) -> bool {
 async fn fetch_range(client: &Client, prefix: &str) -> Result<String> {
     let resp = client
         .get(range_url(prefix))
-        .header("User-Agent", "Swifty-Password-Manager")
+        .header("User-Agent", "Rowel-Password-Manager")
         .send()
         .await
         .map_err(|e| Error::Other(e.to_string()))?;

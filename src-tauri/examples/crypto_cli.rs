@@ -1,7 +1,7 @@
 //! Thin CLI over the public crypto API, used by scripts/crypto-crosscheck.mjs
 //! to prove Rust and the Node reference interoperate. Not shipped in the app.
 
-use swifty_lib::crypto::{hash_secret, Cryptor};
+use rowel_lib::crypto::{hash_secret, Cryptor};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();

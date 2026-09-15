@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { getProps, setProps } from '@/defaults/generator'
 
-const KEY = 'swifty:generatorDefaults'
+const KEY = 'rowel:generatorDefaults'
 
 const DEFAULTS = {
   length: 20,

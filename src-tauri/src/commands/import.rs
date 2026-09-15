@@ -192,7 +192,7 @@ pub async fn export_entries(
             fs::write(&dest, bytes)?;
             Some(dest)
         }
-        None => save::save_export(&app, &format!("swifty-export.{ext}"), "Export", bytes).await?,
+        None => save::save_export(&app, &format!("rowel-export.{ext}"), "Export", bytes).await?,
     };
     Ok(dest.map(|p| p.to_string_lossy().into_owned()))
 }

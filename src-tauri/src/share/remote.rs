@@ -1,5 +1,5 @@
 //! Where a one-time share lives while it is outstanding: a `Shares` subfolder
-//! of the same `Swifty` Drive folder sync already uses.
+//! of the same `Rowel` Drive folder sync already uses.
 //!
 //! The sender uploads sealed bytes and makes the file link-readable; the
 //! recipient — who has no Google account — fetches it with a public API key.
@@ -22,7 +22,7 @@ use crate::error::{Error, Result};
 use crate::sync::drive::{self, DriveFile};
 use crate::sync::{access_token, http_client, FOLDER_NAME};
 
-/// The subfolder of `Swifty` that holds outstanding shares.
+/// The subfolder of `Rowel` that holds outstanding shares.
 pub const SHARES_FOLDER: &str = "Shares";
 
 /// `appProperties` keys on a share file. Values are opaque to Google.
@@ -32,7 +32,7 @@ pub const PROP_EXPIRES_AT: &str = "expiresAt";
 /// The marker every share carries, and the only thing a listing selects on:
 /// shares are found by it wherever they sit, so a duplicate `Shares` folder
 /// created by a racing device hides nothing from the sweep or the revoke list.
-pub const PROP_SHARE: &str = "swiftyShare";
+pub const PROP_SHARE: &str = "rowelShare";
 pub const PROP_SHARE_VALUE: &str = "1";
 
 /// How long the recipient waits on Drive before giving up.
@@ -88,7 +88,7 @@ pub fn parse_share_file(file: &DriveFile) -> ShareFile {
     }
 }
 
-/// [`ShareRemote`] over the `Swifty/Shares` folder of the connected account.
+/// [`ShareRemote`] over the `Rowel/Shares` folder of the connected account.
 ///
 /// The folder id is resolved once per instance and cached: unlike the sync
 /// pack, a share file is addressed by the id upload just returned, so nothing
@@ -112,7 +112,7 @@ impl DriveShareRemote {
         access_token(client, &self.app, &self.cryptor).await
     }
 
-    /// `Swifty/Shares`, if it exists. Never creates: every sync run sweeps, and
+    /// `Rowel/Shares`, if it exists. Never creates: every sync run sweeps, and
     /// most users never share, so a listing must not leave a folder behind in
     /// an account that has nothing to list.
     async fn find_folder(&self, client: &Client, token: &str) -> Result<Option<String>> {
@@ -129,7 +129,7 @@ impl DriveShareRemote {
         Ok(shares)
     }
 
-    /// Find-or-create `Swifty/Shares`, for the upload path only. Creating is the
+    /// Find-or-create `Rowel/Shares`, for the upload path only. Creating is the
     /// normal case the first time a user shares anything, including before
     /// they have ever synced.
     async fn ensure_folder(&self, client: &Client, token: &str) -> Result<String> {

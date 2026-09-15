@@ -1,6 +1,6 @@
 export type SortMode = 'recent' | 'alpha'
 
-const KEY = 'swifty:listSort'
+const KEY = 'rowel:listSort'
 
 // Recency first: the list is a working surface, so the things you touched last
 // should be at the top until you say otherwise.

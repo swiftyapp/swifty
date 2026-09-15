@@ -1,4 +1,4 @@
-//! Google Drive sync provider. Finds (or creates) a "Swifty" folder and the
+//! Google Drive sync provider. Finds (or creates) a "Rowel" folder and the
 //! `vault.swsync` pack inside it, and reads/writes that one file.
 //!
 //! This module is only the *transport*: the sync algorithm lives in [`engine`],
@@ -27,7 +27,7 @@ use crate::error::{Error, Result};
 use crate::state::AppState;
 use engine::{Remote, RemoteFile, SessionVault, SyncOutcome};
 
-pub(crate) const FOLDER_NAME: &str = "Swifty";
+pub(crate) const FOLDER_NAME: &str = "Rowel";
 
 /// A valid Drive access token for the connected account, refreshed if needed.
 /// Crate-visible so `share::remote` can act on the same account.
@@ -165,7 +165,7 @@ impl DriveRemote {
         }
     }
 
-    // Resolve the Swifty folder, remembering it for the rest of the run.
+    // Resolve the Rowel folder, remembering it for the rest of the run.
     // `None` means it does not exist yet — which is also "no remote vault".
     async fn folder(&self, client: &Client, token: &str) -> Result<Option<String>> {
         if let Some(id) = self.folder.lock().unwrap().clone() {

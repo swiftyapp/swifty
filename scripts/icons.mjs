@@ -18,7 +18,7 @@ const run = (cmd) => execSync(cmd, { stdio: "inherit" });
 run(`tauri icon ${ICONS}/asterisq.svg -o ${ICONS}`);
 run(`tauri icon ${ICONS}/tray.svg -o ${ICONS}/tray -p 72`);
 
-const tmp = mkdtempSync(join(tmpdir(), "swifty-ios-icons-"));
+const tmp = mkdtempSync(join(tmpdir(), "rowel-ios-icons-"));
 try {
   run(`tauri icon ${ICONS}/asterisq-ios.svg -o ${tmp}`);
   cpSync(join(tmp, "ios"), `${ICONS}/ios`, { recursive: true });

@@ -1,6 +1,6 @@
 # Security Policy
 
-Swifty is an offline-first password manager. Your vault lives on your own device
+Rowel is an offline-first password manager. Your vault lives on your own device
 as an encrypted SQLite database (SQLCipher), with each entry's secrets sealed in
 an additional application-level AEAD layer, and the app has no backend that holds
 your secrets. We take reports about the encryption, key derivation and handling,
@@ -29,7 +29,7 @@ Preferred channel — GitHub private security advisories:
 3. We triage from there and, if needed, invite you into the advisory thread.
 
 If you cannot use GitHub advisories, email the maintainers at
-`security@getswifty.pro`.
+`security@rowel.app`.
 
 What to include:
 
@@ -59,5 +59,5 @@ surface and capabilities, the webview CSP, and the signed updater.
 Out of scope: issues that require an already-compromised operating system,
 physical access to an unlocked device, malware running with the user's
 privileges, or social-engineering of the device owner. These are covered in
-[`docs/threat-model.md`](docs/threat-model.md), which describes what Swifty does
+[`docs/threat-model.md`](docs/threat-model.md), which describes what Rowel does
 and does not defend against.

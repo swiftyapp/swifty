@@ -1,4 +1,4 @@
-const KEY = 'swifty:autolockSecs'
+const KEY = 'rowel:autolockSecs'
 
 export const DEFAULT_AUTOLOCK_SECS = 60
 

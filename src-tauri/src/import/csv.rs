@@ -38,7 +38,7 @@ const OTP: &[&str] = &[
     "otp secret",
     "totp secret",
 ];
-// Swifty's own columns (see `export::COLUMNS`): no foreign sheet has them.
+// Rowel's own columns (see `export::COLUMNS`): no foreign sheet has them.
 const TYPE: &[&str] = &["type"];
 const BODY: &[&str] = &["body"];
 const FILE_NAME: &[&str] = &["file_name"];
@@ -96,11 +96,11 @@ fn get(headers: &[String], rec: &StringRecord, aliases: &[&str]) -> Option<Strin
         .filter(|v| !v.is_empty())
 }
 
-// Reverse spreadsheet escaping only for a row carrying Swifty's explicit
+// Reverse spreadsheet escaping only for a row carrying Rowel's explicit
 // format marker. A generic sheet's leading apostrophe is always literal data.
-fn decoded(value: Option<String>, swifty: bool) -> Option<String> {
+fn decoded(value: Option<String>, rowel: bool) -> Option<String> {
     value.map(|v| {
-        if swifty {
+        if rowel {
             super::export::unsanitize_cell(&v)
         } else {
             v
@@ -112,9 +112,9 @@ fn get_decoded(
     headers: &[String],
     rec: &StringRecord,
     aliases: &[&str],
-    swifty: bool,
+    rowel: bool,
 ) -> Option<String> {
-    decoded(get_verbatim(headers, rec, aliases), swifty)
+    decoded(get_verbatim(headers, rec, aliases), rowel)
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
 }
@@ -140,9 +140,9 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
         return result;
     };
     for (i, rec) in rows.records.iter().enumerate() {
-        let swifty =
+        let rowel =
             get(&rows.headers, rec, CSV_VERSION).as_deref() == Some(super::export::CSV_VERSION);
-        let cell = |aliases| get_decoded(&rows.headers, rec, aliases, swifty);
+        let cell = |aliases| get_decoded(&rows.headers, rec, aliases, rowel);
         let title = cell(TITLE).or_else(|| cell(URL)).or_else(|| cell(USERNAME));
         let Some(title) = title else {
             result.push_err(i + 2, "empty row");
@@ -157,7 +157,7 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
                 kind: EntryKind::Env,
                 title,
                 notes: cell(NOTES),
-                env_body: decoded(get_verbatim(&rows.headers, rec, BODY), swifty),
+                env_body: decoded(get_verbatim(&rows.headers, rec, BODY), rowel),
                 env_file_name: cell(FILE_NAME),
                 ..Default::default()
             });

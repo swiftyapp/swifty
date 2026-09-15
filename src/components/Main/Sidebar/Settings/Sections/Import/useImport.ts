@@ -14,7 +14,7 @@ import { t } from '@/i18n'
 import { useProgress } from './useProgress'
 
 // Either a third-party export (parsed by the backend under `format`) or a
-// Swifty backup, which is independently encrypted and needs its own password.
+// Rowel backup, which is independently encrypted and needs its own password.
 export type Picked =
   | { kind: 'format'; format: ImportFormat; path: string }
   | { kind: 'swftx'; path: string }

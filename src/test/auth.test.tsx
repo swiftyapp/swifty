@@ -16,7 +16,7 @@ describe('Auth', () => {
   it('footers the version and where the vault lives', async () => {
     renderWithStore(<Auth touchID={false} />)
     expect(
-      await screen.findByText('Swifty 1.0.0 · Vault on this device')
+      await screen.findByText('Rowel 1.0.0 · Vault on this device')
     ).toBeInTheDocument()
   })
 
@@ -118,7 +118,7 @@ describe('Auth', () => {
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'right{Enter}')
 
-    expect(await screen.findByText('Vault needs a newer version of Swifty')).toBeInTheDocument()
+    expect(await screen.findByText('Vault needs a newer version of Rowel')).toBeInTheDocument()
     expect(screen.queryByText('Incorrect Master Password')).not.toBeInTheDocument()
   })
 

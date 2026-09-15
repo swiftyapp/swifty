@@ -19,5 +19,5 @@ src-tauri/gen/schemas
 # Claude Code local state & agent worktrees
 .claude/
 
-# Local dev vault used when running the app from the workspace (see SWIFTY_DB_DIR)
+# Local dev vault used when running the app from the workspace (see ROWEL_DB_DIR)
 .dev-vault/

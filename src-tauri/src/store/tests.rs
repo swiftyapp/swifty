@@ -46,7 +46,7 @@ fn passkey_entry() -> Entry {
 fn tmp_db() -> PathBuf {
     static N: AtomicU64 = AtomicU64::new(0);
     let dir = std::env::temp_dir().join(format!(
-        "swifty-store-{}-{}",
+        "rowel-store-{}-{}",
         std::process::id(),
         N.fetch_add(1, Ordering::SeqCst)
     ));

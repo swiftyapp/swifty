@@ -8,7 +8,7 @@ const defaults: GeneratorOptions = {
   exclude: ''
 }
 
-const KEY = 'swifty:generatorDefaults'
+const KEY = 'rowel:generatorDefaults'
 
 // Stored JSON is user-writable and predates every knob added since it was
 // written, so it is merged over the defaults instead of trusted as a whole

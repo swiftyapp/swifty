@@ -220,7 +220,7 @@ mod tests {
     fn tmp_dir() -> PathBuf {
         static N: AtomicU64 = AtomicU64::new(0);
         let dir = std::env::temp_dir().join(format!(
-            "swifty-pack-{}-{}",
+            "rowel-pack-{}-{}",
             std::process::id(),
             N.fetch_add(1, Ordering::SeqCst)
         ));

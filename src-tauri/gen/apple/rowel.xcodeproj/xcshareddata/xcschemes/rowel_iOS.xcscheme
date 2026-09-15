@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "1FC9409741F10A76599A2114"
-               BuildableName = "swifty_iOS.app"
-               BlueprintName = "swifty_iOS"
-               ReferencedContainer = "container:swifty.xcodeproj">
+               BuildableName = "rowel_iOS.app"
+               BlueprintName = "rowel_iOS"
+               ReferencedContainer = "container:rowel.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "1FC9409741F10A76599A2114"
-            BuildableName = "swifty_iOS.app"
-            BlueprintName = "swifty_iOS"
-            ReferencedContainer = "container:swifty.xcodeproj">
+            BuildableName = "rowel_iOS.app"
+            BlueprintName = "rowel_iOS"
+            ReferencedContainer = "container:rowel.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -70,9 +70,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "1FC9409741F10A76599A2114"
-            BuildableName = "swifty_iOS.app"
-            BlueprintName = "swifty_iOS"
-            ReferencedContainer = "container:swifty.xcodeproj">
+            BuildableName = "rowel_iOS.app"
+            BlueprintName = "rowel_iOS"
+            ReferencedContainer = "container:rowel.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -101,9 +101,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "1FC9409741F10A76599A2114"
-            BuildableName = "swifty_iOS.app"
-            BlueprintName = "swifty_iOS"
-            ReferencedContainer = "container:swifty.xcodeproj">
+            BuildableName = "rowel_iOS.app"
+            BlueprintName = "rowel_iOS"
+            ReferencedContainer = "container:rowel.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
