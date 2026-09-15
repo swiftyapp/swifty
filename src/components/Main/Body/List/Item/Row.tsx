@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 import type { Kind } from '@/kinds/types'
 import { KIND_TINT } from '@/kinds/tint'
 import { cx } from '@/utils/cx'

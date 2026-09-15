@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { Entry, EntryMeta } from '@/lib/commands'
+import type { Entry, EntryMeta } from '@/api/types'
 import { eyebrow, listSubtitle } from './meta'
 
 // What the list and the header can say about an env file without, and with, a

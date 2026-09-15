@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
-import type { EntryMeta } from '@/lib/commands'
-import { revealEntry } from '@/lib/commands'
-import { useUi, useVault, selectCurrent, setView } from '@/store'
+import type { EntryMeta } from '@/api/types'
+import { useUi, useVault, setView } from '@/store'
 import { withEntries, loginEntry, loginMeta } from './utils'
+import { mockCommand } from './ipc'
 
 const note = (id: string, title: string): EntryMeta =>
   ({ id, type: 'note', title, tags: [], urlHost: '', favorite: false })
@@ -31,7 +31,7 @@ describe('Main', () => {
 
   it('selects an entry and shows its details', async () => {
     // Details are revealed (decrypted) on demand for the selected entry.
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
     seed()
     render(<Main />)
     await userEvent.click(screen.getByText('Google'))
@@ -74,7 +74,7 @@ describe('Main', () => {
   })
 
   it('edits the selected entry on ⌘E, and needs a selection to do it', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
     seed()
     render(<Main />)
 
@@ -91,7 +91,7 @@ describe('Main', () => {
   // assertion: it is what takes the column's rows, chips and arrows out of the
   // browser's keyboard and pointer reach while a draft is open.
   it('takes the list column out of the keyboard while a draft is open', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
     seed()
     render(<Main />)
 
@@ -154,7 +154,7 @@ describe('Main', () => {
   })
 
   it('keeps the selected entry when the kind filter still admits it', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
     seed()
     render(<Main />)
 
@@ -167,7 +167,7 @@ describe('Main', () => {
 
     // Narrowing to a kind that would hide it does clear the selection.
     await userEvent.click(screen.getByTestId('filter-card'))
-    expect(selectCurrent(useVault.getState())).toBeNull()
+    expect(useVault.getState().currentId).toBeNull()
   })
 
   it('shows the empty-vault hero in the detail pane when there are no entries', () => {

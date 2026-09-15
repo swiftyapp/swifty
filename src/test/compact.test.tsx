@@ -5,15 +5,8 @@ import Main from '@/components/Main'
 import AuthShell from '@/components/elements/AuthShell'
 import Frame, { FrameProvider } from '@/components/elements/Frame'
 import Sheet from '@/components/elements/Sheet'
-import {
-  copyToClipboard,
-  generatePassword,
-  lock,
-  revealEntry,
-  saveEntry,
-  type Audit,
-  type Entry
-} from '@/lib/commands'
+import type { Entry } from '@/api/types'
+import { type Audit } from '@/api/tools'
 import {
   useUi,
   useVault,
@@ -30,6 +23,7 @@ import {
 } from '@/store'
 import { withEntries, loginEntry, loginMeta } from './utils'
 import { setLayout } from './layout'
+import { calls, mockCommand } from './ipc'
 
 const seed = () =>
   withEntries([loginMeta({ id: 'l1', title: 'Google' }), loginMeta({ id: 'l2', title: 'Airbnb' })])
@@ -51,7 +45,7 @@ const openEdit = async () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(generatePassword).mockResolvedValue('Generated123!')
+  mockCommand('generate_password', () => 'Generated123!')
   setLayout('compact')
 })
 
@@ -74,7 +68,7 @@ describe('compact shell', () => {
   })
 
   it('pushes the detail screen on select and comes back from it', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
     seed()
     render(<Main />)
 
@@ -98,7 +92,7 @@ describe('compact shell', () => {
     await userEvent.keyboard('{Escape}')
 
     await userEvent.click(screen.getByTestId('compact-back'))
-    expect(selectCurrent(useVault.getState())).toBeNull()
+    expect(useVault.getState().currentId).toBeNull()
     expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
   })
 
@@ -132,7 +126,7 @@ describe('compact shell', () => {
 
     // The title's own message plus the two rows login also requires.
     expect(screen.getAllByText('Required')).toHaveLength(3)
-    expect(saveEntry).not.toHaveBeenCalled()
+    expect(calls('save_entry')).toHaveLength(0)
     expect(useVault.getState().creating).toBe('login')
   })
 
@@ -155,7 +149,7 @@ describe('compact shell', () => {
   })
 
   it('opens an existing entry seeded from its reveal, and saves it', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(
+    mockCommand('reveal_entry', () =>
       loginEntry({ id: 'l1', title: 'Google', username: 'me@example.com' })
     )
     seed()
@@ -172,8 +166,8 @@ describe('compact shell', () => {
     expect(screen.queryByTestId('compact-back')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('save-entry-button'))
-    expect(saveEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'l1', title: 'Google', username: 'me@example.com' })
+    expect(calls('save_entry')).toContainEqual(
+      { entry: expect.objectContaining({ id: 'l1', title: 'Google', username: 'me@example.com' }) }
     )
   })
 
@@ -181,17 +175,17 @@ describe('compact shell', () => {
   // `Compact/Entry`, so stepping between them decrypts nothing again — which is
   // what used to blank the screen on the way into edit.
   it('shares one reveal between reading and editing an entry', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(
+    mockCommand('reveal_entry', () =>
       loginEntry({ id: 'l1', title: 'Google', username: 'me@example.com' })
     )
     seed()
     render(<Main />)
 
     await userEvent.click(screen.getByText('Google'))
-    expect(revealEntry).toHaveBeenCalledTimes(1)
+    expect(calls('reveal_entry')).toHaveLength(1)
 
     await openEdit()
-    expect(revealEntry).toHaveBeenCalledTimes(1)
+    expect(calls('reveal_entry')).toHaveLength(1)
     // Seeded from the reveal the read screen already had, with no held frame
     // in between.
     expect(field('username')).toHaveValue('me@example.com')
@@ -200,7 +194,7 @@ describe('compact shell', () => {
   it('leaves a way out of a form whose secrets never land', async () => {
     // A reveal that never settles: the editor cannot be seeded, so the screen
     // holds its frame — and has to stay leavable while it does.
-    vi.mocked(revealEntry).mockReturnValue(new Promise<Entry>(() => {}))
+    mockCommand('reveal_entry', () => new Promise<Entry>(() => {}))
     seed()
     render(<Main />)
 
@@ -209,17 +203,15 @@ describe('compact shell', () => {
 
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
     await userEvent.click(screen.getByTestId('cancel-entry-button'))
-    expect(selectCurrent(useVault.getState())).toBeNull()
+    expect(useVault.getState().currentId).toBeNull()
     expect(screen.getAllByTestId('entry-item')).toHaveLength(2)
   })
 
   it('holds the primary action at the bottom until the secrets are in', async () => {
     let land: (entry: Entry) => void = () => {}
-    vi.mocked(revealEntry).mockReturnValue(
-      new Promise<Entry>(resolve => {
+    mockCommand('reveal_entry', () => new Promise<Entry>(resolve => {
         land = resolve
-      })
-    )
+      }))
     seed()
     render(<Main />)
 
@@ -234,18 +226,22 @@ describe('compact shell', () => {
     expect(action).toHaveTextContent('Copy password')
 
     await userEvent.click(action)
-    expect(copyToClipboard).toHaveBeenCalledWith('hunter2', expect.any(Number))
+    expect(calls('copy_to_clipboard')).toContainEqual(
+      { value: 'hunter2', clearAfterMs: expect.any(Number) }
+    )
   })
 
   it('copies a field value when the value itself is tapped', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', username: 'copyme' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'l1', username: 'copyme' }))
     seed()
     render(<Main />)
 
     await userEvent.click(screen.getByText('Google'))
     await userEvent.click(await screen.findByTestId('entry-value-username'))
 
-    expect(copyToClipboard).toHaveBeenCalledWith('copyme', expect.any(Number))
+    expect(calls('copy_to_clipboard')).toContainEqual(
+      { value: 'copyme', clearAfterMs: expect.any(Number) }
+    )
   })
 
   it('switches view from the tab bar', async () => {
@@ -348,7 +344,9 @@ describe('compact shell', () => {
     const use = screen.getByTestId('generator-use-button')
     expect(use).toHaveTextContent('Use & copy')
     await userEvent.click(use)
-    expect(copyToClipboard).toHaveBeenCalledWith('Generated123!', expect.any(Number))
+    expect(calls('copy_to_clipboard')).toContainEqual(
+      { value: 'Generated123!', clearAfterMs: expect.any(Number) }
+    )
     // Confirming is not leaving: a tab root is left through the tab bar.
     expect(screen.getByTestId('generator-screen')).toBeInTheDocument()
 
@@ -360,7 +358,7 @@ describe('compact shell', () => {
   // A root opened over a selection has to be the screen, or ⌘G with a row on
   // the detail sets `generator.open` and nothing visible happens.
   it('puts a root opened over a selected entry in front of it', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
     seed()
     render(<Main />)
 
@@ -438,7 +436,7 @@ describe('compact shell', () => {
     act(() => openSettings())
     await userEvent.click(screen.getByTestId('lock-vault-button'))
 
-    expect(lock).toHaveBeenCalledOnce()
+    expect(calls('lock')).toHaveLength(1)
   })
 
   it('shows the empty-vault hero on the one pane it has', () => {
@@ -534,7 +532,7 @@ describe('overlay frames', () => {
 // A sync merge replaces the list wholesale, and the selection is re-resolved
 // against it. Losing the selection has to end the edit of it too: the compact
 // form is a whole screen, and one with no subject is a blank one with no exit.
-describe('vault store', () => {
+describe('entries slice', () => {
   it('ends an edit when the row being edited falls out of the list', () => {
     withEntries([loginMeta({ id: 'l1' }), loginMeta({ id: 'l2', title: 'Airbnb' })])
     setCurrentEntry('l1')
@@ -542,7 +540,7 @@ describe('vault store', () => {
     expect(useVault.getState().editing).toBe(true)
 
     setEntries([loginMeta({ id: 'l2', title: 'Airbnb' })])
-    expect(selectCurrent(useVault.getState())).toBeNull()
+    expect(useVault.getState().currentId).toBeNull()
     expect(useVault.getState().editing).toBe(false)
   })
 

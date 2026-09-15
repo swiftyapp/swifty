@@ -1,4 +1,4 @@
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 import { toggleFavorite } from '@/store'
 import { useTranslation } from 'react-i18next'
 import IconButton from '@/components/elements/IconButton'

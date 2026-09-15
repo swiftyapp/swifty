@@ -1,5 +1,5 @@
-import type { EntryType } from '@/lib/commands'
-import { syncImport } from '@/lib/commands'
+import type { EntryType } from '@/api/types'
+import { syncImport } from '@/api/sync'
 import {
   useApp,
   openAddPicker,
@@ -33,7 +33,8 @@ export function VaultEmpty() {
   // every step through `sync:status` — the consent page opening, the answer,
   // the pull. On mobile `sync_import` resolves the moment Safari is on screen,
   // and a rejection has already been reported as status. On success the
-  // restored entries replace this screen.
+  // restored entries replace this screen; on failure the button comes back
+  // rather than spinning forever.
   const restore = () => {
     syncImport().catch(() => {})
   }

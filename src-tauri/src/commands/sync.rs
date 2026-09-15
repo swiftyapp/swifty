@@ -15,31 +15,29 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use chrono::{SecondsFormat, Utc};
-use serde_json::json;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
 
-use crate::commands::list_metas;
 use crate::crypto::Cryptor;
-use crate::error::{Error, Result};
-use crate::models::{EntryMetaDto, SyncStatus};
-use crate::state::{AppState, SyncRun};
+use crate::error::Result;
+use crate::events;
+use crate::models::EntryMetaDto;
+use crate::session::list_metas;
+use crate::state::{AppState, SyncRun, SyncStatus};
 #[cfg(mobile)]
 use crate::state::AuthPurpose;
 use crate::sync;
 
-const STATUS_EVENT: &str = "sync:status";
-
 /// Connect a sync provider (OAuth), then publish/adopt straight away so the
 /// user sees the effect of connecting without a second click.
 ///
-/// `async` because the consent flow blocks on a browser round trip and a
-/// loopback listener; a synchronous command would run that on the main thread.
+/// Returns as soon as the session has a cryptor to give: the consent flow is a
+/// browser round trip, and the frontend hears how it went on `sync:status`
+/// rather than from this promise — the same story mobile tells.
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    authorize(&app, &state).await?;
-    connected(&app);
-    start_run(&app);
+pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    let cryptor = cryptor_or_report(&app, &state)?;
+    spawn_consent(&app, cryptor, Follow::Run);
     Ok(())
 }
 
@@ -105,11 +103,10 @@ pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 /// result the user expects — every remote entry appears — without the risk.
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    authorize(&app, &state).await?;
-    connected(&app);
-    let cryptor = state.session.lock().unwrap().cryptor()?;
-    pull(&app, cryptor).await
+pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    let cryptor = cryptor_or_report(&app, &state)?;
+    spawn_consent(&app, cryptor, Follow::Pull);
+    Ok(())
 }
 
 /// The mobile twin of [`sync_import`]: start consent, adopt on the redirect.
@@ -120,29 +117,62 @@ pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
         .inspect_err(|e| failed(&app, e.to_string()))
 }
 
-/// The backend's view of sync, for the frontend to seed itself from on unlock.
-/// Everything after that arrives as `sync:status`.
-#[tauri::command]
-pub fn sync_status(app: AppHandle) -> Result<SyncStatus> {
-    Ok(status(&app))
+/// A connect that fails before the browser even opens (the vault locked under
+/// it) is still reported as status, so the frontend never has to turn a
+/// rejected promise into state itself.
+#[cfg(desktop)]
+fn cryptor_or_report(app: &AppHandle, state: &State<'_, AppState>) -> Result<Cryptor> {
+    state
+        .session
+        .lock()
+        .unwrap()
+        .cryptor()
+        .inspect_err(|e| failed(app, e.to_string()))
 }
 
-/// Take on whatever the account holds. A run like any other as far as the
-/// frontend is concerned: in progress, then the merged rows, then a result.
-async fn pull(app: &AppHandle, cryptor: Cryptor) -> Result<()> {
+/// What a connection is for: publishing what this device has, or taking on what
+/// the account already holds.
+#[cfg(desktop)]
+#[derive(Clone, Copy)]
+enum Follow {
+    Run,
+    Pull,
+}
+
+/// Run the desktop consent flow on a thread of its own. `sync::setup` waits on
+/// a loopback listener and drives Drive with `block_on`, so it may never run on
+/// the command thread nor on an async worker.
+#[cfg(desktop)]
+fn spawn_consent(app: &AppHandle, cryptor: Cryptor, follow: Follow) {
+    pending(app);
+    let app = app.clone();
+    std::thread::spawn(move || match sync::setup(&app, &cryptor) {
+        Ok(()) => {
+            connected(&app);
+            match follow {
+                Follow::Run => start_run(&app),
+                Follow::Pull => pull(&app, cryptor),
+            }
+        }
+        Err(e) => failed(&app, e.to_string()),
+    });
+}
+
+/// Take on whatever the account holds. The refreshed list always goes out on a
+/// success: the user connected in order to see what was up there, and "nothing
+/// new" is an answer worth rendering.
+///
+/// Blocking, and deliberately: `sync::run` drives Drive with `block_on`, so
+/// every caller has to be a plain thread (see [`start_run`]).
+fn pull(app: &AppHandle, cryptor: Cryptor) {
     started(app);
-    let handle = app.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || sync::run(&handle, cryptor))
-        .await
-        .map_err(|e| Error::Other(e.to_string()));
-    match &result {
-        Ok(Ok(_)) => {
-            let _ = app.emit("vault:merged", json!({ "entries": entry_metas(app) }));
+    match sync::run(app, cryptor) {
+        Ok(_) => {
+            events::vault_merged(app, entry_metas(app));
             finished(app, None);
         }
-        Ok(Err(e)) | Err(e) => finished(app, Some(e.to_string())),
+        Err(e) => finished(app, Some(e.to_string())),
     }
-    result?.map(|_| ())
 }
 
 // --- the mobile consent flow ---
@@ -193,12 +223,11 @@ pub(crate) fn start_consent(app: &AppHandle, state: &AppState, purpose: AuthPurp
         purpose,
         started: std::time::Instant::now(),
     });
-    // Onboarding has its own `setup:drive:*` family because it runs on a screen
-    // that knows nothing about sync settings.
-    if purpose == AuthPurpose::Setup {
-        let _ = app.emit(crate::commands::setup::PENDING_EVENT, ());
-    } else {
-        pending(app);
+    // Onboarding announces itself on its own `setup:drive:*` family, because it
+    // runs on a screen that knows nothing about sync settings.
+    match purpose {
+        AuthPurpose::Setup => events::setup_drive_pending(app),
+        _ => pending(app),
     }
     Ok(())
 }
@@ -263,7 +292,9 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
             Ok(()) => {
                 connected(&app);
                 if purpose == AuthPurpose::Import {
-                    let _ = pull(&app, cryptor).await;
+                    // A plain thread, for the same reason `start_run` uses one.
+                    let handle = app.clone();
+                    std::thread::spawn(move || pull(&handle, cryptor));
                 } else {
                     start_run(&app);
                 }
@@ -321,31 +352,10 @@ pub fn on_resume(app: &AppHandle) {
 fn fail(app: &AppHandle, purpose: AuthPurpose, why: String) {
     if purpose == AuthPurpose::Setup {
         log::warn!("drive setup failed: {why}");
-        crate::commands::setup::emit_error(app, &why);
+        events::setup_drive_error(app, &why);
         return;
     }
     failed(app, why);
-}
-
-// Run the OAuth consent flow off the main thread. Any ending short of a
-// connection is reported as a status too, so the frontend never has to turn a
-// rejected promise into state itself.
-#[cfg(desktop)]
-async fn authorize(app: &AppHandle, state: &State<'_, AppState>) -> Result<()> {
-    let cryptor = match state.session.lock().unwrap().cryptor() {
-        Ok(cryptor) => cryptor,
-        Err(e) => {
-            failed(app, e.to_string());
-            return Err(e);
-        }
-    };
-    pending(app);
-    let handle = app.clone();
-    tauri::async_runtime::spawn_blocking(move || sync::setup(&handle, &cryptor))
-        .await
-        .map_err(|e| Error::Other(e.to_string()))
-        .and_then(|result| result)
-        .inspect_err(|e| failed(app, e.to_string()))
 }
 
 // --- status ------------------------------------------------------------------
@@ -353,7 +363,7 @@ async fn authorize(app: &AppHandle, state: &State<'_, AppState>) -> Result<()> {
 /// Change the run state and tell the frontend the whole of it.
 fn update(app: &AppHandle, change: impl FnOnce(&mut SyncRun)) {
     change(&mut app.state::<AppState>().sync_run.lock().unwrap());
-    let _ = app.emit(STATUS_EVENT, status(app));
+    events::sync_status(app, status(app));
 }
 
 /// The browser is out with a consent request.
@@ -415,7 +425,8 @@ fn finished(app: &AppHandle, error: Option<String>) {
     });
 }
 
-fn status(app: &AppHandle) -> SyncStatus {
+/// The whole of sync as the frontend should see it right now.
+pub(crate) fn status(app: &AppHandle) -> SyncStatus {
     let state = app.state::<AppState>();
     // The session flag only exists after an unlock; while locked, answer from
     // the persisted (non-secret) settings so e.g. the lock screen can say
@@ -427,14 +438,8 @@ fn status(app: &AppHandle) -> SyncStatus {
         crate::storage::sync_configured(app)
     };
     drop(session);
-    let run = state.sync_run.lock().unwrap();
-    SyncStatus {
-        configured,
-        pending: run.pending,
-        in_progress: run.in_progress,
-        error: run.error.clone(),
-        last_synced_at: run.last_synced_at.clone(),
-    }
+    let status = state.sync_run.lock().unwrap().status(configured);
+    status
 }
 
 // --- runs ----------------------------------------------------------------------
@@ -488,7 +493,7 @@ fn report(app: &AppHandle, result: Result<sync::engine::SyncOutcome>) {
     match result {
         Ok(outcome) => {
             if outcome.merged > 0 {
-                let _ = app.emit("vault:merged", json!({ "entries": entry_metas(app) }));
+                events::vault_merged(app, entry_metas(app));
             }
             finished(app, None);
         }

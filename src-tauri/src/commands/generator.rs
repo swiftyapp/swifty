@@ -121,14 +121,6 @@ pub fn generate_otp(secret: String) -> Result<OtpResult> {
     })
 }
 
-#[tauri::command]
-pub fn verify_otp(secret: String, token: String) -> Result<bool> {
-    // 6.0 returns the matched step instead of a bool, so a caller can reject a
-    // replayed code. Nothing here tracks used steps, so "matched at all" is the
-    // same answer 5.x gave.
-    Ok(totp(&secret)?.check(&token, unix_now()?).is_some())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,19 +191,18 @@ mod tests {
         assert!(generate_password(o).is_err());
     }
 
+    // The code has to be the one the secret is currently good for, which is
+    // what the vault's own checker would accept.
     #[test]
-    fn otp_round_trips() {
+    fn otp_generates_the_code_for_the_current_step() {
         let secret = "JBSWY3DPEHPK3PXP"; // "Hello!\xDE\xAD\xBE\xEF" base32
         let otp = generate_otp(secret.to_string()).unwrap();
         assert_eq!(otp.code.len(), 6);
         assert!(otp.time >= 1 && otp.time <= 30);
-        assert!(verify_otp(secret.to_string(), otp.code).unwrap());
-    }
-
-    #[test]
-    fn otp_rejects_malformed_token() {
-        let secret = "JBSWY3DPEHPK3PXP";
-        assert!(!verify_otp(secret.to_string(), "1".to_string()).unwrap());
+        assert!(totp(secret)
+            .unwrap()
+            .check(&otp.code, unix_now().unwrap())
+            .is_some());
     }
 
     // The three strings have to describe one key: parse the private block back

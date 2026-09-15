@@ -426,6 +426,8 @@
   "Scan a photo…": "Scan a photo…",
   "A card or document from your photo library, read on this device.": "A card or document from your photo library, read on this device.",
   "Images": "Images",
+  "Rowel backup": "Rowel backup",
+  "Password exports": "Password exports",
   "Drop a .env file here, or paste KEY=VALUE lines into any row": "Drop a .env file here, or paste KEY=VALUE lines into any row",
   "Choose a .env file": "Choose a .env file",
   "Drop a .env file": "Drop a .env file",

@@ -1,11 +1,7 @@
 import { useCallback, useState } from 'react'
-import {
-  biometryType,
-  canEnrollBiometric,
-  setupCreate,
-  type BiometryType,
-  type UnlockResult
-} from '@/lib/commands'
+import type { BiometryType, UnlockResult } from '@/api/types'
+import { appStatus } from '@/api/app'
+import { setupCreate } from '@/api/setup'
 import { enterMain } from '@/store'
 import Welcome from './Welcome'
 import Password from './Password'
@@ -67,20 +63,19 @@ export function Start() {
   }
 
   /**
-   * An open session, and one question left. Asking for biometrics costs two
-   * probes, so it is only asked where it can be offered; everywhere else this
-   * is simply the way in. "Can be offered" is whether enrolling would work —
-   * not `isBiometricAvailable`, which also asks whether it already *has* been,
-   * and so is false on every fresh install by definition.
+   * An open session, and one question left. Biometrics are only asked about
+   * where they can be offered; everywhere else this is simply the way in. "Can
+   * be offered" is whether enrolling would work — not `biometric.available`,
+   * which also asks whether it already *has* been, and so is false on every
+   * fresh install by definition.
    */
   const finish = useCallback(async (unlocked: UnlockResult) => {
-    const [available, type] = await Promise.all([
-      canEnrollBiometric().catch(() => false),
-      biometryType().catch(() => 'touch' as const)
-    ])
-    if (!available) return enterMain(unlocked)
+    const biometric = await appStatus()
+      .then(status => status.biometric)
+      .catch(() => null)
+    if (!biometric?.canEnroll) return enterMain(unlocked)
     setResult(unlocked)
-    setBiometry(type)
+    setBiometry(biometric.type)
     // Replaces the stack: there is no going back from an unlocked session.
     setStack(['biometric'])
   }, [])

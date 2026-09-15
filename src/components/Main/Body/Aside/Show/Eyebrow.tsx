@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { Entry, EntryMeta } from '@/lib/commands'
+import type { Entry, EntryMeta } from '@/api/types'
 import { kindOf } from '@/kinds'
 import { LABEL } from '@/components/elements/tokens'
 

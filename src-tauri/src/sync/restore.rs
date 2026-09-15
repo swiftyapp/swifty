@@ -107,7 +107,7 @@ fn install(
     // invented yet.
     store
         .meta_delete_prefix(SYNC_META_PREFIX)
-        .map_err(crate::commands::store_err)?;
+        .map_err(crate::session::store_err)?;
 
     Ok((key, store))
 }

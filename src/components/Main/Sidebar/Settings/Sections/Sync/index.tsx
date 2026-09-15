@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useApp } from '@/store'
-import { syncConnect, syncDisconnect, syncNow } from '@/lib/commands'
+import { syncConnect, syncDisconnect, syncNow } from '@/api/sync'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'

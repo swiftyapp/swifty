@@ -21,8 +21,8 @@ use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, State};
 
-use crate::commands::create_vault;
 use crate::error::{Error, Result};
+use crate::session::create_vault;
 use crate::state::AppState;
 
 // The state a spec wants to start from.
@@ -80,7 +80,7 @@ fn wipe_dir(dir: &Path) -> Result<()> {
 /// Reset the E2E data dir to `mode`. `password` is required for `"empty"`.
 ///
 /// The frontend reloads itself after this resolves (see `src/lib/e2e.ts`), so
-/// the app re-runs `is_initialized` against the state left here.
+/// the app re-runs `app_status` against the state left here.
 #[tauri::command]
 pub fn e2e_reset(
     mode: String,

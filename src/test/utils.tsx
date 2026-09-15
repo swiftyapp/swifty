@@ -1,4 +1,7 @@
 import {
+  setEntries,
+  flowMain,
+  auditDone,
   useApp,
   useUi,
   useVault,
@@ -6,14 +9,12 @@ import {
   initialApp,
   initialUi,
   initialVault,
-  DEFAULT_PREFS,
-  setEntries,
-  flowMain,
-  auditDone
+  DEFAULT_PREFS
 } from '@/store'
-import type { Entry, EntryMeta, Audit } from '@/lib/commands'
+import type { Entry, EntryMeta } from '@/api/types'
+import type { Audit } from '@/api/tools'
 
-// Puts every store back to its initial state so tests never share state.
+// Puts every store back to its initial shape so tests never share state.
 export const resetStores = () => {
   useApp.setState(initialApp, true)
   useUi.setState(initialUi, true)

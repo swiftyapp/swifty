@@ -5,14 +5,15 @@ import Show from '@/components/Main/Body/Aside/Show'
 import Aside from '@/components/Main/Body/Aside'
 import Generator from '@/components/Main/Generator'
 import AddSecret from '@/components/Main/AddSecret'
-import { useVault, newEntry, openAddPicker, setCurrentEntry } from '@/store'
-import { saveEntry, revealEntry, generatePassword, generateOtp, copyToClipboard, deleteEntry, toEntryMeta } from '@/lib/commands'
-import type { LoginEntry } from '@/lib/commands'
+import { openAddPicker, newEntry, setCurrentEntry, useVault } from '@/store'
+import type { Entry, LoginEntry } from '@/api/types'
 import { withEntries, loginEntry, loginMeta } from './utils'
+import { calls, mockCommand } from './ipc'
+import { toEntryMeta } from './meta'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(saveEntry).mockImplementation(entry => Promise.resolve(toEntryMeta(entry)))
+  mockCommand('save_entry', ({ entry }) => toEntryMeta(entry as Entry))
 })
 
 const titleInput = () => document.querySelector<HTMLInputElement>('input[name="title"]')!
@@ -39,7 +40,7 @@ describe('Editing in the pane', () => {
     await userEvent.type(field('password'), 'pw')
     await userEvent.click(screen.getByText('Save'))
 
-    expect(saveEntry).toHaveBeenCalledOnce()
+    expect(calls('save_entry')).toHaveLength(1)
     await waitFor(() => expect(useVault.getState().items[0].title).toBe('GitHub'))
   })
 
@@ -47,7 +48,7 @@ describe('Editing in the pane', () => {
     render(<Show type="login" editing />)
     await userEvent.click(screen.getByText('Save'))
 
-    expect(saveEntry).not.toHaveBeenCalled()
+    expect(calls('save_entry')).toHaveLength(0)
     // Title, username and password: the three fields login's isValid requires.
     expect(screen.getAllByText('Required')).toHaveLength(3)
   })
@@ -112,7 +113,7 @@ describe('Editing in the pane', () => {
 
     act(() => openAddPicker())
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
-    expect(saveEntry).not.toHaveBeenCalled()
+    expect(calls('save_entry')).toHaveLength(0)
   })
 
   it('saves on ⌘⏎ from anywhere in the pane', async () => {
@@ -122,11 +123,11 @@ describe('Editing in the pane', () => {
     await userEvent.type(field('password'), 'pw')
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
 
-    expect(saveEntry).toHaveBeenCalledOnce()
+    expect(calls('save_entry')).toHaveLength(1)
   })
 
   it('generates a password through the generator dialog', async () => {
-    vi.mocked(generatePassword).mockResolvedValue('Generated123!')
+    mockCommand('generate_password', () => 'Generated123!')
     render(
       <>
         <Show type="login" editing />
@@ -165,14 +166,12 @@ describe('Editing in the pane', () => {
     )
 
     await userEvent.click(screen.getByText('Save'))
-    expect(saveEntry).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(calls('save_entry')).toContainEqual({ entry: expect.objectContaining({
         type: 'ssh',
         title: 'Deploy key',
         privateKey: expect.stringContaining('OPENSSH PRIVATE KEY'),
         fingerprint: 'SHA256:GeneratedFingerprint'
-      })
-    )
+      }) })
   })
 
   it('dismisses the generator on Escape without ending the edit session', async () => {
@@ -180,7 +179,7 @@ describe('Editing in the pane', () => {
     // row, press Escape. The editor's Esc listener is on `document`, so it sees
     // the key first — and a draft with nothing typed yet closes with no confirm,
     // silently taking the session down with the dialog.
-    vi.mocked(generatePassword).mockResolvedValue('Generated123!')
+    mockCommand('generate_password', () => 'Generated123!')
     render(
       <>
         <Show type="login" editing />
@@ -207,7 +206,7 @@ describe('Editing in the pane', () => {
   it('keeps in-progress edits when the entry refreshes mid-edit', async () => {
     // The revealed title differs from the metadata title so this wait proves
     // the decrypted values were actually adopted, not just the initial meta.
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google (decrypted)' }))
+    mockCommand('reveal_entry', () => loginEntry({ title: 'Google (decrypted)' }))
     const { rerender } = render(<Show entry={loginMeta()} editing />)
     await waitFor(() => expect(titleInput().value).toBe('Google (decrypted)'))
 
@@ -217,9 +216,9 @@ describe('Editing in the pane', () => {
     // A sync merge landing mid-edit bumps updatedAt and re-runs the decrypt.
     // The draft adopts the reveal once, at open — a refetch must not clobber
     // what the user has typed (their save wins by last-writer-wins anyway).
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Merged elsewhere' }))
+    mockCommand('reveal_entry', () => loginEntry({ title: 'Merged elsewhere' }))
     rerender(<Show entry={loginMeta({ updatedAt: '2024-06-01T00:00:00.000Z' })} editing />)
-    await waitFor(() => expect(revealEntry).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(calls('reveal_entry')).toHaveLength(2))
 
     expect(titleInput().value).toBe('Renamed by me')
   })
@@ -230,14 +229,14 @@ describe('Editing in the pane', () => {
     // instance, and `useRevealed` only drops the old reveal in an effect — one
     // render too late. The fresh draft adopted the read entry, id included, and
     // "Add" quietly saved over it instead of creating a row.
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ title: 'Google' }))
     withEntries([loginMeta()])
     setCurrentEntry('l1')
     render(<Aside />)
 
     // The read view is up and the reveal has landed.
     await screen.findByTestId('more-actions-button')
-    await waitFor(() => expect(revealEntry).toHaveBeenCalledWith('l1'))
+    await waitFor(() => expect(calls('reveal_entry')).toContainEqual({ id: 'l1' }))
 
     act(() => newEntry('login'))
     expect(titleInput().value).toBe('')
@@ -249,8 +248,8 @@ describe('Editing in the pane', () => {
 
     // The store mints the id for a draft that has none, so what proves the
     // draft was new is that the id is not the entry we were just reading.
-    expect(saveEntry).toHaveBeenCalledOnce()
-    const saved = vi.mocked(saveEntry).mock.calls[0][0]
+    expect(calls('save_entry')).toHaveLength(1)
+    const saved = calls('save_entry')[0].entry as Entry
     expect(saved.title).toBe('GitHub')
     expect(saved.id).not.toBe('l1')
 
@@ -262,32 +261,34 @@ describe('Editing in the pane', () => {
 
 describe('Show', () => {
   it('renders entry details', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ title: 'Google' }))
     render(<Show entry={loginMeta({ title: 'Google' })} />)
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
     expect(await screen.findByText('me@example.com')).toBeInTheDocument()
   })
 
   it('renders and copies a TOTP code', async () => {
-    vi.mocked(generateOtp).mockResolvedValue({ code: '123456', time: 25 })
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ otp: 'BASE32SECRET' }) as LoginEntry)
+    mockCommand('generate_otp', () => ({ code: '123456', time: 25 }))
+    mockCommand('reveal_entry', () => loginEntry({ otp: 'BASE32SECRET' }) as LoginEntry)
     render(<Show entry={loginMeta()} />)
 
     expect(await screen.findByText('123 456')).toBeInTheDocument()
-    expect(generateOtp).toHaveBeenCalledWith('BASE32SECRET')
+    expect(calls('generate_otp')).toContainEqual({ secret: 'BASE32SECRET' })
   })
 
   it('copies a field value', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ username: 'copyme' }))
+    mockCommand('reveal_entry', () => loginEntry({ username: 'copyme' }))
     render(<Show entry={loginMeta()} />)
     await screen.findByText('copyme')
     // One copy button per rendered row, in row order: URL, then username.
     await userEvent.click(screen.getAllByTitle('Copy')[1])
-    expect(copyToClipboard).toHaveBeenCalledWith('copyme', expect.any(Number))
+    expect(calls('copy_to_clipboard')).toContainEqual(
+      { value: 'copyme', clearAfterMs: expect.any(Number) }
+    )
   })
 
   it('copies the password from the header without revealing it', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'hunter2' }))
+    mockCommand('reveal_entry', () => loginEntry({ password: 'hunter2' }))
     render(<Show entry={loginMeta()} />)
 
     const action = await screen.findByTestId('primary-action-button')
@@ -295,13 +296,15 @@ describe('Show', () => {
     expect(action).toHaveTextContent('Copy password')
     await userEvent.click(action)
 
-    expect(copyToClipboard).toHaveBeenCalledWith('hunter2', expect.any(Number))
+    expect(calls('copy_to_clipboard')).toContainEqual(
+      { value: 'hunter2', clearAfterMs: expect.any(Number) }
+    )
     // The password row is still masked: nothing toggled its reveal.
     expect(screen.getByTitle('Reveal')).toBeInTheDocument()
   })
 
   it('re-decrypts after an in-place save, so copy never serves the old secret', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'old-secret' }))
+    mockCommand('reveal_entry', () => loginEntry({ password: 'old-secret' }))
     const { rerender } = render(<Show entry={loginMeta()} />)
     const action = await screen.findByTestId('primary-action-button')
     await waitFor(() => expect(action).toBeEnabled())
@@ -309,29 +312,33 @@ describe('Show', () => {
     // A save keeps the id but stamps updatedAt. The pane stays mounted across
     // saves, so a decrypt keyed on the id alone kept serving — and copying —
     // the pre-edit password. The regression: rotate, then copy.
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'new-secret' }))
+    mockCommand('reveal_entry', () => loginEntry({ password: 'new-secret' }))
     rerender(<Show entry={loginMeta({ updatedAt: '2024-06-01T00:00:00.000Z' })} />)
-    await waitFor(() => expect(revealEntry).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(calls('reveal_entry')).toHaveLength(2))
 
     const refreshed = screen.getByTestId('primary-action-button')
     await waitFor(() => expect(refreshed).toBeEnabled())
     await userEvent.click(refreshed)
 
-    expect(copyToClipboard).toHaveBeenCalledWith('new-secret', expect.any(Number))
+    expect(calls('copy_to_clipboard')).toContainEqual(
+      { value: 'new-secret', clearAfterMs: expect.any(Number) }
+    )
   })
 
   it('runs the primary action on a bare Enter', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'hunter2' }))
+    mockCommand('reveal_entry', () => loginEntry({ password: 'hunter2' }))
     render(<Show entry={loginMeta()} />)
 
     await waitFor(() => expect(screen.getByTestId('primary-action-button')).toBeEnabled())
     await userEvent.keyboard('{Enter}')
 
-    expect(copyToClipboard).toHaveBeenCalledWith('hunter2', expect.any(Number))
+    expect(calls('copy_to_clipboard')).toContainEqual(
+      { value: 'hunter2', clearAfterMs: expect.any(Number) }
+    )
   })
 
   it('announces the more menu trigger as a disclosure', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry())
+    mockCommand('reveal_entry', () => loginEntry())
     render(<Show entry={loginMeta()} />)
 
     const trigger = screen.getByTestId('more-actions-button')
@@ -343,7 +350,7 @@ describe('Show', () => {
   })
 
   it('leaves Enter to whichever control holds focus', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password: 'hunter2' }))
+    mockCommand('reveal_entry', () => loginEntry({ password: 'hunter2' }))
     render(<Show entry={loginMeta()} />)
 
     await waitFor(() => expect(screen.getByTestId('primary-action-button')).toBeEnabled())
@@ -354,21 +361,21 @@ describe('Show', () => {
     await userEvent.keyboard('{Enter}')
 
     expect(screen.getByRole('menu')).toBeInTheDocument()
-    expect(copyToClipboard).not.toHaveBeenCalled()
+    expect(calls('copy_to_clipboard')).toHaveLength(0)
   })
 
   it('archives from the more menu behind a two-press inline confirm', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry())
+    mockCommand('reveal_entry', () => loginEntry())
     render(<Show entry={loginMeta()} />)
 
     await userEvent.click(screen.getByTestId('more-actions-button'))
 
     // First press only arms the row.
     await userEvent.click(screen.getByText('Archive'))
-    expect(deleteEntry).not.toHaveBeenCalled()
+    expect(calls('delete_entry')).toHaveLength(0)
 
     // Second press archives.
     await userEvent.click(screen.getByText('Archive entry?'))
-    await waitFor(() => expect(deleteEntry).toHaveBeenCalledWith('l1'))
+    await waitFor(() => expect(calls('delete_entry')).toContainEqual({ id: 'l1' }))
   })
 })

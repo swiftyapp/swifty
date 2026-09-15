@@ -3,9 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '@/App'
 import LockScreen from '@/components/Auth/LockScreen'
-import { isBiometricAvailable, unlockBiometric } from '@/lib/commands'
 import { useApp } from '@/store'
 import { setLayout } from './layout'
+import { calls, mockCommand } from './ipc'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -29,17 +29,17 @@ describe('lock screen on compact', () => {
   })
 
   it('unlocks from the tile', async () => {
-    vi.mocked(unlockBiometric).mockResolvedValue({ entries: [], syncConfigured: false })
+    mockCommand('unlock_biometric', () => ({ entries: [], syncConfigured: false }))
     render(<LockScreen touchID />)
 
     await userEvent.click(screen.getByTestId('biometric-tile'))
 
-    expect(unlockBiometric).toHaveBeenCalledOnce()
+    expect(calls('unlock_biometric')).toHaveLength(1)
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   it('blames the prompt, not the passphrase, when biometrics fail', async () => {
-    vi.mocked(unlockBiometric).mockRejectedValue(new Error('cancelled'))
+    mockCommand('unlock_biometric', () => Promise.reject({ kind: 'cancelled', message: 'cancelled' }))
     render(<LockScreen touchID />)
 
     await userEvent.click(screen.getByTestId('biometric-tile'))
@@ -81,7 +81,10 @@ describe('lock screen on compact', () => {
   })
 
   it('is what the auth flow renders on a phone', async () => {
-    vi.mocked(isBiometricAvailable).mockResolvedValue(true)
+    mockCommand('app_status', () => ({
+      initialized: true,
+      biometric: { available: true, type: 'touch' }
+    }))
     render(<App />)
 
     expect(await screen.findByTestId('biometric-tile')).toBeInTheDocument()

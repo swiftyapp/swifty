@@ -6,9 +6,9 @@ import ListColumn from '@/components/Main/Body/ListColumn'
 import SortMenu from '@/components/Main/Body/List/SortMenu'
 import Body from '@/components/Main/Body'
 import Show from '@/components/Main/Body/Aside/Show'
-import { revealEntry, setFavorite } from '@/lib/commands'
 import { useVault, selectCurrent, setView, setCurrentEntry } from '@/store'
 import { withEntries, loginEntry, loginMeta } from './utils'
+import { calls, mockCommand } from './ipc'
 
 const starred = loginMeta({ id: 'star', title: 'Monzo', favorite: true })
 const plain = loginMeta({ id: 'plain', title: 'Airbnb' })
@@ -21,26 +21,26 @@ beforeEach(() => vi.clearAllMocks())
 
 describe('the favorite toggle', () => {
   it('stars an unstarred entry and keeps the new value in the list', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'plain' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'plain' }))
     seed()
     render(<Show entry={plain} />)
 
     await userEvent.click(screen.getByTestId('favorite-toggle'))
 
-    expect(setFavorite).toHaveBeenCalledWith('plain', true)
+    expect(calls('set_favorite')).toContainEqual({ id: 'plain', favorite: true })
     await vi.waitFor(() =>
       expect(useVault.getState().items.find(e => e.id === 'plain')?.favorite).toBe(true)
     )
   })
 
   it('unstars an entry that is already starred', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'star' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'star' }))
     seed()
     render(<Show entry={starred} />)
 
     await userEvent.click(screen.getByTestId('favorite-toggle'))
 
-    expect(setFavorite).toHaveBeenCalledWith('star', false)
+    expect(calls('set_favorite')).toContainEqual({ id: 'star', favorite: false })
   })
 
   it('is absent for an archived entry — a tombstone cannot be starred', () => {
@@ -108,7 +108,7 @@ describe('the Favorites view', () => {
   })
 
   it('drops the selection when the shown entry is unstarred from inside it', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'star' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'star' }))
     withEntries([starred])
     setView('favorites')
     setCurrentEntry('star')

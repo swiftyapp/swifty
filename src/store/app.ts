@@ -1,16 +1,10 @@
 import { create } from 'zustand'
-import {
-  lock,
-  isBiometricAvailable,
-  biometryType,
-  setAutolockTimeout,
-  scanSupported,
-  syncNow,
-  type BiometryType,
-  type SetupDriveFile,
-  type SyncStatus,
-  type UnlockResult
-} from '@/lib/commands'
+import type { BiometryType, UnlockResult } from '@/api/types'
+import { appStatus } from '@/api/app'
+import { lock } from '@/api/auth'
+import type { SetupDriveFile } from '@/api/setup'
+import { syncNow, type SyncStatus } from '@/api/sync'
+import { setAutolockTimeout } from '@/api/tools'
 import { checkForUpdate } from '@/services/autoUpdate'
 import { usePrefs } from './prefs'
 import { setEntries, resetVault, runAudit } from './vault'
@@ -89,14 +83,10 @@ export const flowAuth = (touchID: boolean, biometry?: BiometryType) =>
 // Whether the lock screen can offer a biometric gate, and which one. Asked
 // rather than assumed — hardcoding `false` here is how the Touch ID button used
 // to vanish on every in-session lock.
-export const probeGate = () =>
-  Promise.all([
-    isBiometricAvailable().catch(() => false),
-    biometryType().catch(() => 'touch' as const)
-  ])
-
 export const showLockScreen = () =>
-  probeGate().then(([available, biometry]) => flowAuth(available, biometry))
+  appStatus()
+    .then(({ biometric }) => flowAuth(biometric.available, biometric.type))
+    .catch(() => flowAuth(false))
 
 // Everything the unlocked session put in the stores. A lock has to drop all of
 // it — it outlives the session otherwise, and the next unlock (of this or any
@@ -127,7 +117,9 @@ export const enterMain = async (result: UnlockResult) => {
   useApp.setState(state => ({ sync: { ...state.sync, configured: result.syncConfigured } }))
   // Asked once per session: whether the OS can read a card off a photo decides
   // whether any scan affordance is offered at all.
-  scanSupported().then(setScanSupported).catch(() => {})
+  appStatus()
+    .then(status => setScanSupported(status.scanSupported))
+    .catch(() => {})
   // One run on unlock: this device may have been off while another pushed,
   // and it may itself be holding writes a previous session never published.
   if (result.syncConfigured) syncNow().catch(() => {})

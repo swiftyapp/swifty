@@ -1,5 +1,5 @@
 import type { UnlistenFn } from '@tauri-apps/api/event'
-import { on, EVENTS } from '@/lib/events'
+import { on, EVENTS } from '@/api/events'
 import {
   setSyncStatus,
   setupDrivePending,
@@ -8,7 +8,7 @@ import {
   clearSession,
   showLockScreen
 } from './app'
-import { setEntries, loadArchive, runAudit, auditDone } from './vault'
+import { setEntries, loadArchive, runAudit } from './vault'
 import { useUi } from './ui'
 
 // A merge can add or drop tombstones as readily as live entries, but the Archive
@@ -30,7 +30,6 @@ export const subscribeToEvents = (): (() => void) => {
       void runAudit()
       refreshOpenArchive()
     }),
-    on(EVENTS.auditDone, payload => auditDone(payload.data)),
     // The first run's own consent flow: the same pending/result/error trio as
     // sync, against an account there is no vault behind yet.
     on(EVENTS.setupDrivePending, () => setupDrivePending()),

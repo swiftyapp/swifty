@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { cx } from '@/utils/cx'
 import { useVault, setCurrentEntry } from '@/store'
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 import { kindOf } from '@/kinds'
 import { relativeTime } from '@/utils/time'
 import { useTranslation } from 'react-i18next'

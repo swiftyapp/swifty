@@ -1,5 +1,5 @@
 import type { TKey } from '@/i18n'
-import type { SyncStatus } from '@/lib/commands'
+import type { SyncStatus } from '@/api/sync'
 
 export type SyncTone = 'local' | 'idle' | 'loading' | 'good' | 'bad'
 

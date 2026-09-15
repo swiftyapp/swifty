@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
 import type { TKey } from '@/i18n'
-import type { Entry, EntryMeta, EntryType } from '@/lib/commands'
+import type { Entry, EntryMeta, EntryType } from '@/api/types'
 import type { EntryDraft } from '@/defaults/entries'
 import type { LoginGlyph } from '@/components/Main/icons'
 import type { ContentProps } from '@/components/Main/Body/List/Item/Row'

@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import AuditList from '@/components/Main/Body/List/Audit'
 import AuditAside from '@/components/Main/Body/Aside/Audit'
-import type { Audit } from '@/lib/commands'
+import type { Audit } from '@/api/tools'
 import { setPref } from '@/store'
-import { withEntries, loginMeta } from './utils'
+import { resetStores, withEntries, loginMeta } from './utils'
 
 const audit: Audit = {
   l1: { score: 0, isWeak: true, isRepeating: false, breached: false },
@@ -63,6 +63,7 @@ describe('Audit aside', () => {
     render(<AuditAside />)
     expect(screen.getByTestId('audit-score')).toHaveTextContent('0.0')
 
+    resetStores()
     withEntries([loginMeta()], {
       l1: { score: 4, isWeak: false, isRepeating: false, breached: false }
     })

@@ -158,7 +158,7 @@ carries them as part of the opaque payload and never sees them.
 
 ## Fresh start and explicit import
 
-`v1-0-0` starts with an **empty SQLite vault**. `is_initialized` is true only when
+`v1-0-0` starts with an **empty SQLite vault**. `app_status.initialized` is true only when
 the encrypted database exists; a legacy `vault.swftx` file alone does **not**
 count. Nothing is migrated automatically on unlock.
 

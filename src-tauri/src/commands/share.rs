@@ -12,11 +12,10 @@ use tauri::{AppHandle, State};
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::models::Entry;
+use crate::session::{store_err, Session};
 use crate::share::{self, remote::DrivePublicFetch, ActiveShare, Created};
 use crate::state::AppState;
 use crate::store::VaultStore;
-
-use super::store_err;
 
 /// Seal one of this vault's entries and publish it; returns the link.
 #[tauri::command]
@@ -70,7 +69,7 @@ pub async fn share_list(app: AppHandle, state: State<'_, AppState>) -> Result<Ve
 /// What the sending side requires. Checked in this order because a locked
 /// session also reports `sync_configured == false`, and telling someone to
 /// connect Drive when they merely need to unlock is a dead end.
-fn sendable(session: &crate::state::Session) -> Result<()> {
+fn sendable(session: &Session) -> Result<()> {
     if !session.is_unlocked() {
         return Err(Error::Locked);
     }

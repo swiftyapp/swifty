@@ -1,4 +1,4 @@
-import { generatePassword, type GeneratorOptions } from '@/lib/commands'
+import { generatePassword, type GeneratorOptions } from '@/api/tools'
 import { usePrefs, setPref } from '@/store/prefs'
 import type { TKey } from '@/i18n'
 import WORDS from './wordlist'

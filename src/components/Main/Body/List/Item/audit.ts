@@ -1,4 +1,4 @@
-import type { AuditItem } from '@/lib/commands'
+import type { AuditItem } from '@/api/tools'
 
 export type FlagKind = 'weak' | 'reused'
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { RowError } from '@/lib/commands'
+import type { RowError } from '@/api/imports'
 
 const MAX_SHOWN = 20
 

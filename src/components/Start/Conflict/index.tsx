@@ -8,7 +8,7 @@ import StepHeader from '../shared/StepHeader'
 import FoundFileCard from '../shared/FoundFileCard'
 import { COLUMN, ACTIONS, FOOTNOTE } from '../shared/layout'
 import { describeDriveFile } from '../shared/describe'
-import { messageOf } from '../shared/errors'
+import { messageOf } from '@/api/errors'
 
 interface Props {
   onBack: () => void

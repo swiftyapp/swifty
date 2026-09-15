@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { Entry, EntryMeta } from '@/lib/commands'
+import type { Entry, EntryMeta } from '@/api/types'
 import { cx } from '@/utils/cx'
 import { usePrimaryAction } from '../../Body/Aside/Show/usePrimaryAction'
 import { CheckGlyph } from '../../icons'

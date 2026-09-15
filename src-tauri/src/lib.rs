@@ -5,6 +5,7 @@ mod cards;
 mod commands;
 pub mod crypto;
 mod error;
+mod events;
 mod favicon;
 mod hibp;
 mod import;
@@ -13,10 +14,12 @@ mod models;
 // The WebAuthn authenticator core. Declared only: its caller is the browser
 // extension host a later PR adds, so no command is registered below yet.
 mod passkey;
+mod save;
 // Local image scanning (card / identity document). `pub` so `examples/scan.rs`
 // can drive the OCR backend without the app around it.
 pub mod scan;
 mod secure_store;
+mod session;
 mod share;
 mod state;
 mod storage;
@@ -108,19 +111,14 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::auth::is_initialized,
             commands::auth::setup,
             commands::auth::unlock,
             commands::auth::lock,
             commands::auth::unlock_biometric,
-            commands::auth::is_biometric_available,
-            commands::auth::can_enroll_biometric,
-            commands::auth::biometry_type,
-            commands::auth::biometric_status,
             commands::auth::enable_biometric,
             commands::auth::disable_biometric,
             commands::auth::change_master_password,
-            commands::vault::read_vault,
+            commands::app::app_status,
             commands::vault::reveal_entry,
             commands::vault::save_entry,
             commands::vault::delete_entry,
@@ -128,26 +126,20 @@ pub fn run() {
             commands::vault::restore_entry,
             commands::vault::purge_entry,
             commands::vault::set_favorite,
-            commands::vault::pick_backup,
             commands::vault::import_swftx,
             commands::vault::export_vault,
             commands::vault::save_env_file,
-            commands::import::pick_import_file,
             commands::import::import_entries,
             commands::import::export_entries,
             commands::env::read_env_file,
-            commands::env::pick_env_file,
             commands::generator::generate_password,
             commands::generator::generate_ssh_key,
             commands::generator::generate_otp,
-            commands::generator::verify_otp,
             commands::audit::get_audit,
-            scan::scan_image,
-            scan::scan_supported,
-            favicon::fetch_favicon,
+            commands::tools::scan_image,
+            commands::tools::fetch_favicon,
             commands::clipboard::copy_to_clipboard,
-            autolock::set_autolock_timeout,
-            locale::os_locale,
+            commands::tools::set_autolock_timeout,
             commands::setup::setup_drive_connect,
             commands::setup::setup_drive_disconnect,
             commands::setup::setup_restore_from_drive,
@@ -157,7 +149,6 @@ pub fn run() {
             commands::sync::sync_disconnect,
             commands::sync::sync_now,
             commands::sync::sync_import,
-            commands::sync::sync_status,
             commands::share::share_create,
             commands::share::share_open,
             commands::share::share_revoke,

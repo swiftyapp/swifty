@@ -1,4 +1,4 @@
-import type { Audit, AuditItem } from '@/lib/commands'
+import type { Audit, AuditItem } from '@/api/tools'
 
 // A single entry's health, 0..1: strength, minus a penalty for reuse and a
 // heavier one for a known breach.

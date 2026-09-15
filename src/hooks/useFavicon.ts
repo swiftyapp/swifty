@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import { fetchFavicon } from '@/lib/commands'
+import { fetchFavicon } from '@/api/tools'
 
 // Favicons for list rows: one backend call per host per session (the backend
 // caches on disk), fanned out to every row showing that host. Returns the

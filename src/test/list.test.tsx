@@ -3,10 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ListColumn from '@/components/Main/Body/ListColumn'
 import SortMenu from '@/components/Main/Body/List/SortMenu'
-import { copyToClipboard, fetchFavicon, revealEntry, type Audit } from '@/lib/commands'
-import { useVault, selectCurrent, setFilterType } from '@/store'
+import { type Audit } from '@/api/tools'
+import { useVault, setFilterType } from '@/store'
 import { resetFavicons } from '@/hooks/useFavicon'
 import { withEntries, loginEntry, loginMeta } from './utils'
+import { calls, mockCommand, clearCalls } from './ipc'
 
 // A fixed clock (Date only, so userEvent's real timers keep working) makes the
 // recency buckets and the relative times deterministic.
@@ -31,7 +32,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
   resetFavicons()
-  vi.mocked(fetchFavicon).mockClear()
+  clearCalls('fetch_favicon')
 })
 
 afterEach(() => vi.useRealTimers())
@@ -70,7 +71,7 @@ describe('Entry list', () => {
 
   it('swaps the glyph for the site favicon once it resolves, one fetch per host', async () => {
     const uri = 'data:image/png;base64,AAAA'
-    vi.mocked(fetchFavicon).mockResolvedValue(uri)
+    mockCommand('fetch_favicon', () => uri)
     seed()
     render(<ListColumn />)
 
@@ -78,15 +79,15 @@ describe('Entry list', () => {
       expect(document.querySelectorAll(`img[src="${uri}"]`)).toHaveLength(4)
     )
     // All four rows share one host — the lookup is deduped across them.
-    expect(fetchFavicon).toHaveBeenCalledTimes(1)
+    expect(calls('fetch_favicon')).toHaveLength(1)
   })
 
   it('keeps the type glyph when the host has no favicon', async () => {
-    vi.mocked(fetchFavicon).mockResolvedValue(null)
+    mockCommand('fetch_favicon', () => null)
     seed()
     render(<ListColumn />)
 
-    await waitFor(() => expect(fetchFavicon).toHaveBeenCalled())
+    await waitFor(() => expect(calls('fetch_favicon').length).toBeGreaterThan(0))
     expect(document.querySelector('img')).not.toBeInTheDocument()
   })
 
@@ -180,19 +181,21 @@ describe('List search', () => {
   })
 
   it('copies the first visible row’s primary secret on ⌘⏎', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'fresh', password: 's3cret' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'fresh', password: 's3cret' }))
     seed()
     render(<ListColumn />)
 
     await userEvent.click(field())
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
 
-    expect(revealEntry).toHaveBeenCalledWith('fresh')
+    expect(calls('reveal_entry')).toContainEqual({ id: 'fresh' })
     await vi.waitFor(() =>
-      expect(copyToClipboard).toHaveBeenCalledWith('s3cret', expect.anything())
+      expect(calls('copy_to_clipboard')).toContainEqual(
+        { value: 's3cret', clearAfterMs: expect.anything() }
+      )
     )
     // Copying is not selecting.
-    expect(selectCurrent(useVault.getState())).toBeNull()
+    expect(useVault.getState().currentId).toBeNull()
   })
 
   it('clears the query on Esc, then blurs', async () => {
@@ -271,7 +274,7 @@ describe('List keyboard navigation', () => {
   })
 
   it('points ⌘⏎ at the row the arrows landed on', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'yday', password: 'airbnb' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'yday', password: 'airbnb' }))
     seed()
     render(<ListColumn />)
 
@@ -280,9 +283,11 @@ describe('List keyboard navigation', () => {
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
 
     // The second row, not the first the empty query would have offered.
-    expect(revealEntry).toHaveBeenCalledWith('yday')
+    expect(calls('reveal_entry')).toContainEqual({ id: 'yday' })
     await vi.waitFor(() =>
-      expect(copyToClipboard).toHaveBeenCalledWith('airbnb', expect.anything())
+      expect(calls('copy_to_clipboard')).toContainEqual(
+        { value: 'airbnb', clearAfterMs: expect.anything() }
+      )
     )
   })
 
@@ -296,7 +301,7 @@ describe('List keyboard navigation', () => {
     await userEvent.keyboard('{Enter}')
 
     expect(screen.getByTestId('sort-option-recent')).toBeInTheDocument()
-    expect(selectCurrent(useVault.getState())).toBeNull()
+    expect(useVault.getState().currentId).toBeNull()
   })
 
   it('leaves the arrows alone while the sort menu owns them', async () => {
@@ -306,7 +311,7 @@ describe('List keyboard navigation', () => {
     await userEvent.click(screen.getByTestId('sort-menu'))
     await userEvent.keyboard('{ArrowDown}{ArrowDown}')
 
-    expect(selectCurrent(useVault.getState())).toBeNull()
+    expect(useVault.getState().currentId).toBeNull()
   })
 
   it('leaves the arrows alone in fields outside the column', async () => {
@@ -321,6 +326,6 @@ describe('List keyboard navigation', () => {
     await userEvent.click(screen.getByTestId('outside-field'))
     await userEvent.keyboard('{ArrowDown}{ArrowUp}')
 
-    expect(selectCurrent(useVault.getState())).toBeNull()
+    expect(useVault.getState().currentId).toBeNull()
   })
 })

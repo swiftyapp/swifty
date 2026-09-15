@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { on, EVENTS } from '@/lib/events'
+import { on, EVENTS } from '@/api/events'
 
 // Subscribe to the backend's off-thread `import:progress` stream. Shared by every
 // import flow (a .swftx merge and third-party imports both emit it).

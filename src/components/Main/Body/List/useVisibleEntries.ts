@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 import { useUi, useVault, usePrefs } from '@/store'
 import { filterEntries } from '@/services/entries'
 import { byTitle, byRecency } from './order'

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { isInitialized } from './lib/commands'
-import { useApp, flowSetup, showLockScreen } from './store'
+import { appStatus } from '@/api/app'
+import { useApp, flowAuth, flowSetup } from './store'
 import { subscribeToEvents } from './store/events'
 import { useLayout } from './hooks/useLayout'
 import Start from './components/Start'
@@ -34,8 +34,12 @@ function Shell() {
 export default function App() {
   useEffect(() => {
     const unsubscribe = subscribeToEvents()
-    isInitialized()
-      .then(initialized => (initialized ? showLockScreen() : flowSetup()))
+    // Which biometry, not just whether: the same iOS build runs on Face ID
+    // phones and Touch ID iPads.
+    appStatus()
+      .then(({ initialized, biometric }) =>
+        initialized ? flowAuth(biometric.available, biometric.type) : flowSetup()
+      )
       .catch(() => {})
     return unsubscribe
   }, [])

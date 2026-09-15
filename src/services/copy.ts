@@ -1,4 +1,4 @@
-import { copyToClipboard } from '@/lib/commands'
+import { copyToClipboard } from '@/api/tools'
 import { usePrefs } from '@/store/prefs'
 
 const NOTIFICATION_TIMEOUT = 2000

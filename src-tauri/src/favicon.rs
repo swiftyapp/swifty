@@ -41,12 +41,11 @@ const SAFE_TYPES: [&str; 6] = [
 
 // The favicon for `host` as a data: URI, or None when it has none. Disk-cached
 // both ways; safe to call before unlock (touches no vault state).
-#[tauri::command]
-pub async fn fetch_favicon(app: AppHandle, host: String) -> Result<Option<String>> {
-    let Some(host) = safe_host(&host) else {
+pub async fn fetch(app: &AppHandle, host: &str) -> Result<Option<String>> {
+    let Some(host) = safe_host(host) else {
         return Ok(None);
     };
-    let dir = storage::icons_dir(&app)?;
+    let dir = storage::icons_dir(app)?;
     fs::create_dir_all(&dir)?;
 
     let hit = dir.join(format!("{host}.uri"));

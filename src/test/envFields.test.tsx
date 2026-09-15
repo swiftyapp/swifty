@@ -6,9 +6,9 @@ import { FieldsProvider } from '@/components/elements/fields'
 import { BLOCK_DOTS, MASK_DOTS } from '@/components/elements/tokens'
 import type { DraftValue, EntryDraft } from '@/defaults/entries'
 import { copy } from '@/services/copy'
-import { saveEnvFile } from '@/lib/commands'
 import Fields from '@/kinds/env/Fields'
 import { parseEnv, removeLine, setKey, setValue, varsOf } from '@/kinds/env/parse'
+import { calls, mockCommand } from './ipc'
 
 vi.mock('@/services/copy', () => ({ copy: vi.fn() }))
 
@@ -173,7 +173,7 @@ describe('Env fields, reading', () => {
     await userEvent.click(screen.getByTestId('env-tab-file'))
     await userEvent.click(screen.getByTestId('env-save-file'))
 
-    expect(saveEnvFile).toHaveBeenCalledWith('.env.production', BODY)
+    expect(calls('save_env_file')).toContainEqual({ fileNameSuggestion: '.env.production', body: BODY })
   })
 
   // A pasted file has no name; the backend falls back to `.env`, so the
@@ -183,11 +183,11 @@ describe('Env fields, reading', () => {
     await userEvent.click(screen.getByTestId('env-tab-file'))
     await userEvent.click(screen.getByTestId('env-save-file'))
 
-    expect(saveEnvFile).toHaveBeenCalledWith('', BODY)
+    expect(calls('save_env_file')).toContainEqual({ fileNameSuggestion: '', body: BODY })
   })
 
   it('shows a failed file commit beside the Save as file action', async () => {
-    vi.mocked(saveEnvFile).mockRejectedValue('disk is full')
+    mockCommand('save_env_file', () => Promise.reject({ kind: 'io', message: 'disk is full' }))
     renderRead(BODY, '.env.production')
     await userEvent.click(screen.getByTestId('env-tab-file'))
     await userEvent.click(screen.getByTestId('env-save-file'))

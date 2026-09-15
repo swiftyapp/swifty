@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { Entry, EntryMeta } from '@/lib/commands'
+import type { Entry, EntryMeta } from '@/api/types'
 import type { TKey } from '@/i18n'
 import { kindOf } from '@/kinds'
 import { useCopied } from '@/hooks/useCopied'

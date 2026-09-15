@@ -1,17 +1,14 @@
 import { create } from 'zustand'
+import type { Entry, EntryMeta, EntryType } from '@/api/types'
 import {
   saveEntry as saveEntryCmd,
   deleteEntry as deleteEntryCmd,
   listDeleted,
   restoreEntry as restoreEntryCmd,
   purgeEntry as purgeEntryCmd,
-  setFavorite,
-  getAudit,
-  type Audit,
-  type Entry,
-  type EntryMeta,
-  type EntryType
-} from '@/lib/commands'
+  setFavorite
+} from '@/api/vault'
+import { getAudit, type Audit } from '@/api/tools'
 import type { EntryDraft } from '@/defaults/entries'
 import { usePrefs } from './prefs'
 import { useUi, setFilterType, setView } from './ui'

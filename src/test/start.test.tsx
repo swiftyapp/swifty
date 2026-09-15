@@ -2,18 +2,17 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Start from '@/components/Start'
-import {
-  setupCreate as setupCreateCmd,
-  setupDriveConnect,
-  setupDriveDisconnect,
-  setupRestoreFromDrive,
-  canEnrollBiometric,
-  enableBiometric,
-  pickBackup,
-  setupRestoreFromFile,
-  type SetupDriveFile
-} from '@/lib/commands'
-import { useApp, setupDriveProbed, setupDriveFailed } from '@/store'
+import type { SetupDriveFile } from '@/api/setup'
+import { open } from '@tauri-apps/plugin-dialog'
+import { setupDriveProbed, setupDriveFailed, useApp } from '@/store'
+import { calls, mockCommand, mockCommandOnce } from './ipc'
+
+// Whether the device could enroll a biometric gate at all, which is what
+// decides if the first run asks its last question.
+const biometricStatus = (canEnroll: boolean) => ({
+  initialized: true,
+  biometric: { available: false, canEnroll, type: 'touch', mode: null }
+})
 
 // Must satisfy the setup strength gate (>= 12 chars, zxcvbn score >= 2).
 const STRONG = 'my-strong-vault-passphrase-2026'
@@ -77,7 +76,7 @@ describe('choosing a master password', () => {
     await choosePassword(STRONG, 'something-else-entirely')
 
     expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
-    expect(setupCreateCmd).not.toHaveBeenCalled()
+    expect(calls('setup_create')).toHaveLength(0)
   })
 })
 
@@ -88,7 +87,7 @@ describe('the backup step', () => {
 
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
 
-    expect(setupCreateCmd).toHaveBeenCalledWith(STRONG, false)
+    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
@@ -97,12 +96,12 @@ describe('the backup step', () => {
     await choosePassword()
 
     await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
-    expect(setupDriveConnect).toHaveBeenCalledOnce()
+    expect(calls('setup_drive_connect')).toHaveLength(1)
     expect(screen.getByTestId('setup-drive-spinner')).toBeInTheDocument()
 
     await act(async () => setupDriveProbed(null))
 
-    expect(setupCreateCmd).toHaveBeenCalledWith(STRONG, false)
+    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
@@ -110,11 +109,7 @@ describe('the backup step', () => {
   // create is in flight both buttons are inert.
   it('creates once however many times the button is pressed', async () => {
     let finish: (result: { entries: never[]; syncConfigured: boolean }) => void = () => {}
-    vi.mocked(setupCreateCmd).mockImplementationOnce(
-      () => new Promise(resolve => {
-        finish = resolve
-      })
-    )
+    mockCommandOnce('setup_create', () => new Promise(resolve => (finish = resolve)))
     render(<Start />)
     await choosePassword()
 
@@ -123,8 +118,8 @@ describe('the backup step', () => {
     await userEvent.click(skip)
     await userEvent.click(screen.getByTestId('setup-connect-drive-button'))
 
-    expect(setupCreateCmd).toHaveBeenCalledOnce()
-    expect(setupDriveConnect).not.toHaveBeenCalled()
+    expect(calls('setup_create')).toHaveLength(1)
+    expect(calls('setup_drive_connect')).toHaveLength(0)
 
     await act(async () => finish({ entries: [], syncConfigured: false }))
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
@@ -141,7 +136,7 @@ describe('the backup step', () => {
 
     await userEvent.click(screen.getByTestId('go-back-button'))
 
-    expect(setupDriveDisconnect).toHaveBeenCalledOnce()
+    expect(calls('setup_drive_disconnect')).toHaveLength(1)
     expect(useApp.getState().setupDrive).toEqual({ status: 'idle', file: null, error: null })
     expect(screen.getByTestId('setup-password-input')).toBeInTheDocument()
   })
@@ -157,7 +152,7 @@ describe('the backup step', () => {
       'no oauth client configured'
     )
     expect(screen.getByTestId('setup-connect-drive-button')).toBeInTheDocument()
-    expect(setupCreateCmd).not.toHaveBeenCalled()
+    expect(calls('setup_create')).toHaveLength(0)
   })
 })
 
@@ -174,7 +169,7 @@ describe('a Drive that already holds data', () => {
 
     expect(await screen.findByText('This Drive already has Rowel data')).toBeInTheDocument()
     expect(screen.getByTestId('setup-conflict-file')).toHaveTextContent('vault.swsync')
-    expect(setupCreateCmd).not.toHaveBeenCalled()
+    expect(calls('setup_create')).toHaveLength(0)
   })
 
   it('archives the old one when the new password is kept', async () => {
@@ -183,7 +178,7 @@ describe('a Drive that already holds data', () => {
 
     await userEvent.click(await screen.findByTestId('setup-archive-button'))
 
-    expect(setupCreateCmd).toHaveBeenCalledWith(STRONG, true)
+    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: true })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
@@ -195,7 +190,7 @@ describe('a Drive that already holds data', () => {
 
     expect(await screen.findByTestId('drive-password-input')).toBeInTheDocument()
     // One connect for the whole flow: the found file is already in hand.
-    expect(setupDriveConnect).toHaveBeenCalledOnce()
+    expect(calls('setup_drive_connect')).toHaveLength(1)
   })
 })
 
@@ -208,7 +203,7 @@ describe('restoring from Google Drive', () => {
     render(<Start />)
     await openDrive()
 
-    expect(setupDriveConnect).toHaveBeenCalledOnce()
+    expect(calls('setup_drive_connect')).toHaveLength(1)
     expect(screen.getByTestId('drive-spinner')).toBeInTheDocument()
 
     await act(async () => setupDriveProbed(REMOTE))
@@ -217,7 +212,7 @@ describe('restoring from Google Drive', () => {
     await userEvent.type(screen.getByTestId('drive-password-input'), STRONG)
     await userEvent.click(screen.getByTestId('drive-unlock-button'))
 
-    expect(setupRestoreFromDrive).toHaveBeenCalledWith(STRONG)
+    expect(calls('setup_restore_from_drive')).toContainEqual({ password: STRONG })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
@@ -225,11 +220,7 @@ describe('restoring from Google Drive', () => {
   // switching it, or leaving for a file, is not offered until it settles.
   it('withdraws account switching while the unlock is running', async () => {
     let finish: (result: { entries: never[]; syncConfigured: boolean }) => void = () => {}
-    vi.mocked(setupRestoreFromDrive).mockImplementationOnce(
-      () => new Promise(resolve => {
-        finish = resolve
-      })
-    )
+    mockCommandOnce('setup_restore_from_drive', () => new Promise(resolve => (finish = resolve)))
     render(<Start />)
     await openDrive()
     await act(async () => setupDriveProbed(REMOTE))
@@ -246,7 +237,9 @@ describe('restoring from Google Drive', () => {
   })
 
   it('names the password as the problem when the pack will not open', async () => {
-    vi.mocked(setupRestoreFromDrive).mockRejectedValueOnce('invalid master password')
+    mockCommandOnce('setup_restore_from_drive', () =>
+      Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })
+    )
     render(<Start />)
     await openDrive()
     await act(async () => setupDriveProbed(REMOTE))
@@ -271,7 +264,7 @@ describe('restoring from Google Drive', () => {
     await userEvent.type(screen.getByTestId('setup-confirm-password-input'), STRONG)
     await userEvent.click(screen.getByTestId('setup-continue-button'))
 
-    expect(setupCreateCmd).toHaveBeenCalledWith(STRONG, false)
+    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
@@ -282,7 +275,7 @@ describe('restoring from Google Drive', () => {
 
     await userEvent.click(screen.getByTestId('go-back-button'))
 
-    expect(setupDriveDisconnect).toHaveBeenCalledOnce()
+    expect(calls('setup_drive_disconnect')).toHaveLength(1)
     expect(useApp.getState().setupDrive).toEqual({ status: 'idle', file: null, error: null })
     expect(screen.getByTestId('start-setup-button')).toBeInTheDocument()
   })
@@ -296,14 +289,16 @@ describe('restoring from Google Drive', () => {
 
     await userEvent.click(screen.getByTestId('drive-use-file'))
 
-    expect(setupDriveDisconnect).toHaveBeenCalledOnce()
+    expect(calls('setup_drive_disconnect')).toHaveLength(1)
     expect(screen.getByTestId('restore-dropzone')).toBeInTheDocument()
   })
 
   // Only the backend's own verdict blames the password; a failure before the
   // password was ever checked is shown as what it was.
   it('shows a non-password failure as itself', async () => {
-    vi.mocked(setupRestoreFromDrive).mockRejectedValueOnce('sync file is truncated')
+    mockCommandOnce('setup_restore_from_drive', () =>
+      Promise.reject({ kind: 'io', message: 'sync file is truncated' })
+    )
     render(<Start />)
     await openDrive()
     await act(async () => setupDriveProbed(REMOTE))
@@ -317,7 +312,7 @@ describe('restoring from Google Drive', () => {
 
 describe('restoring from a backup file', () => {
   it('picks a file, then unseals it with the master password', async () => {
-    vi.mocked(pickBackup).mockResolvedValue('/tmp/Rowel backup 2026-09-15.rowel')
+    vi.mocked(open).mockResolvedValue('/tmp/Rowel backup 2026-09-15.rowel')
     render(<Start />)
 
     await userEvent.click(screen.getByTestId('start-restore-button'))
@@ -330,9 +325,8 @@ describe('restoring from a backup file', () => {
     await userEvent.type(screen.getByTestId('restore-password-input'), STRONG)
     await userEvent.click(screen.getByTestId('restore-confirm-button'))
 
-    expect(setupRestoreFromFile).toHaveBeenCalledWith(
-      '/tmp/Rowel backup 2026-09-15.rowel',
-      STRONG
+    expect(calls('setup_restore_from_file')).toContainEqual(
+      { path: '/tmp/Rowel backup 2026-09-15.rowel', password: STRONG }
     )
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
@@ -340,8 +334,10 @@ describe('restoring from a backup file', () => {
   // The pack is what says whether the password was wrong; anything else it
   // reports — a truncated file, a vault from a newer build — is shown as itself.
   it('shows a non-password failure as itself', async () => {
-    vi.mocked(pickBackup).mockResolvedValue('/tmp/vault.rowel')
-    vi.mocked(setupRestoreFromFile).mockRejectedValueOnce('sync file is truncated')
+    vi.mocked(open).mockResolvedValue('/tmp/vault.rowel')
+    mockCommandOnce('setup_restore_from_file', () =>
+      Promise.reject({ kind: 'io', message: 'sync file is truncated' })
+    )
     render(<Start />)
 
     await userEvent.click(screen.getByTestId('start-restore-button'))
@@ -357,7 +353,7 @@ describe('restoring from a backup file', () => {
 
 describe('the biometric step', () => {
   const reachBiometric = async () => {
-    vi.mocked(canEnrollBiometric).mockResolvedValue(true)
+    mockCommand('app_status', () => biometricStatus(true))
     render(<Start />)
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
@@ -365,7 +361,7 @@ describe('the biometric step', () => {
   }
 
   it('is only offered where the device has a gate to offer', async () => {
-    vi.mocked(canEnrollBiometric).mockResolvedValue(false)
+    mockCommand('app_status', () => biometricStatus(false))
     render(<Start />)
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
@@ -380,7 +376,7 @@ describe('the biometric step', () => {
     expect(useApp.getState().flow).not.toBe('main')
     await userEvent.click(screen.getByTestId('setup-enable-biometric-button'))
 
-    expect(enableBiometric).toHaveBeenCalledOnce()
+    expect(calls('enable_biometric')).toHaveLength(1)
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
@@ -389,7 +385,7 @@ describe('the biometric step', () => {
 
     await userEvent.click(screen.getByTestId('setup-skip-biometric-button'))
 
-    expect(enableBiometric).not.toHaveBeenCalled()
+    expect(calls('enable_biometric')).toHaveLength(0)
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 })

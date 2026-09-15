@@ -4,12 +4,13 @@ import { act, render, renderHook, screen, waitFor } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { FieldsProvider } from '@/components/elements/fields'
 import type { DraftValue, EntryDraft } from '@/defaults/entries'
-import { pickEnvFile, readEnvFile } from '@/lib/commands'
+import { open } from '@tauri-apps/plugin-dialog'
 import Fields from '@/kinds/env/Fields'
 import { useEnvIngest } from '@/kinds/env/useIngest'
 import Main from '@/components/Main'
 import { useUi, useVault, startEntry, openAddPicker } from '@/store'
 import { withEntries, loginMeta, deferred } from './utils'
+import { calls, mockCommand } from './ipc'
 
 // The webview's drag-drop stream, replaced by a hand that can drop a file. The
 // hook subscribes after a lazy import, so a test waits for the listener before
@@ -72,7 +73,7 @@ function Editor({
 beforeEach(() => {
   vi.clearAllMocks()
   handlers = []
-  vi.mocked(readEnvFile).mockResolvedValue(FILE)
+  mockCommand('read_env_file', () => FILE)
 })
 
 describe('the editor drop zone', () => {
@@ -97,7 +98,7 @@ describe('the editor drop zone', () => {
     await waitFor(() => expect(onSet).toHaveBeenCalledWith('body', THEIRS))
     expect(onSet).toHaveBeenCalledWith('fileName', '.env.production')
     expect(onSet).toHaveBeenCalledWith('title', 'api · production')
-    expect(readEnvFile).toHaveBeenCalledWith('/Users/me/code/api/.env.production')
+    expect(calls('read_env_file')).toContainEqual({ path: '/Users/me/code/api/.env.production' })
     expect(keyInputs()).toEqual(['DB_POOL', 'STRIPE_KEY'])
   })
 
@@ -113,7 +114,7 @@ describe('the editor drop zone', () => {
 
   it('rechecks the live draft after a pending read instead of replacing newer typing', async () => {
     const reading = deferred<typeof FILE>()
-    vi.mocked(readEnvFile).mockReturnValue(reading.promise)
+    mockCommand('read_env_file', () => reading.promise)
     const onSet = vi.fn()
     render(<Editor body="" onSet={onSet} />)
 
@@ -184,7 +185,7 @@ describe('the editor drop zone', () => {
   })
 
   it('shows why a file was refused', async () => {
-    vi.mocked(readEnvFile).mockRejectedValue('file is larger than 1 MiB')
+    mockCommand('read_env_file', () => Promise.reject({ kind: 'io', message: 'file is larger than 1 MiB' }))
     const onSet = vi.fn()
     render(<Editor body="" onSet={onSet} />)
 
@@ -195,15 +196,15 @@ describe('the editor drop zone', () => {
   })
 
   it('declines image and unrelated-text drops so their owning surfaces can handle them', async () => {
-    vi.mocked(readEnvFile).mockResolvedValue({ fileName: 'notes.txt', body: 'hello\nworld\n' })
+    mockCommand('read_env_file', () => ({ fileName: 'notes.txt', body: 'hello\nworld\n' }))
     const onSet = vi.fn()
     render(<Editor body={MINE} onSet={onSet} />)
 
     await drop('/Users/me/notes.txt')
-    await waitFor(() => expect(readEnvFile).toHaveBeenCalledWith('/Users/me/notes.txt'))
+    await waitFor(() => expect(calls('read_env_file')).toContainEqual({ path: '/Users/me/notes.txt' }))
     await drop('/Users/me/card.png')
 
-    expect(readEnvFile).not.toHaveBeenCalledWith('/Users/me/card.png')
+    expect(calls('read_env_file')).not.toContainEqual({ path: '/Users/me/card.png' })
     expect(screen.queryByTestId('env-drop-prompt')).not.toBeInTheDocument()
     expect(screen.queryByTestId('env-drop-error')).not.toBeInTheDocument()
     expect(onSet).not.toHaveBeenCalled()
@@ -212,7 +213,7 @@ describe('the editor drop zone', () => {
 
 describe('interactive env ingestion', () => {
   it('surfaces picker failures through the shared request lifecycle', async () => {
-    vi.mocked(pickEnvFile).mockRejectedValue('file is larger than 1 MiB')
+    vi.mocked(open).mockRejectedValue({ kind: 'io', message: 'file is larger than 1 MiB' })
     const consume = vi.fn()
     const { result } = renderHook(() => useEnvIngest(consume))
 
@@ -225,8 +226,8 @@ describe('interactive env ingestion', () => {
   it('lets only the newest read publish a result', async () => {
     const first = deferred<typeof FILE>()
     const second = deferred<typeof FILE>()
-    vi.mocked(readEnvFile).mockImplementation(path =>
-      path.endsWith('first.env') ? first.promise : second.promise
+    mockCommand('read_env_file', ({ path }) =>
+      (path as string).endsWith('first.env') ? first.promise : second.promise
     )
     const consume = vi.fn()
     const { result } = renderHook(() => useEnvIngest(consume))
@@ -266,7 +267,7 @@ describe('a .env dropped on the idle window', () => {
   })
 
   it('takes a file that only reads like one', async () => {
-    vi.mocked(readEnvFile).mockResolvedValue({ fileName: 'keys.txt', body: 'A=1\nB=2\n' })
+    mockCommand('read_env_file', () => ({ fileName: 'keys.txt', body: 'A=1\nB=2\n' }))
     seed()
     render(<Main />)
 
@@ -276,7 +277,7 @@ describe('a .env dropped on the idle window', () => {
   })
 
   it('ignores anything that is neither named nor written like one', async () => {
-    vi.mocked(readEnvFile).mockResolvedValue({ fileName: 'notes.txt', body: 'hello\nworld\n' })
+    mockCommand('read_env_file', () => ({ fileName: 'notes.txt', body: 'hello\nworld\n' }))
     seed()
     render(<Main />)
 
@@ -285,7 +286,7 @@ describe('a .env dropped on the idle window', () => {
 
     expect(useVault.getState().creating).toBeNull()
     // The scanner's, so not even read.
-    expect(readEnvFile).not.toHaveBeenCalledWith('/Users/me/card.png')
+    expect(calls('read_env_file')).not.toContainEqual({ path: '/Users/me/card.png' })
   })
 
   it('leaves an open editor alone', async () => {
@@ -296,12 +297,12 @@ describe('a .env dropped on the idle window', () => {
     await drop('/Users/me/code/api/.env')
 
     expect(useVault.getState().creating).toBe('login')
-    expect(readEnvFile).not.toHaveBeenCalled()
+    expect(calls('read_env_file')).toHaveLength(0)
   })
 
   it('does not replace an editor opened while the file is still being read', async () => {
     const reading = deferred<typeof FILE>()
-    vi.mocked(readEnvFile).mockReturnValue(reading.promise)
+    mockCommand('read_env_file', () => reading.promise)
     seed()
     render(<Main />)
 

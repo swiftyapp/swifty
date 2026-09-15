@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { unlock, unlockBiometric, type UnlockResult } from '@/lib/commands'
-import { isTooManyAttempts, isVaultTooNew } from '@/lib/authErrors'
+import type { UnlockResult } from '@/api/types'
+import { unlock, unlockBiometric } from '@/api/auth'
+import { errorKind, isTooManyAttempts } from '@/api/errors'
 import { enterMain } from '@/store'
 import type { MascotState } from '@/components/elements/Mascot'
 
@@ -10,7 +11,7 @@ import type { MascotState } from '@/components/elements/Mascot'
 const SUCCESS_HOLD_MS = 650
 
 const unlockError = (t: TFunction, error: unknown): string =>
-  isVaultTooNew(error)
+  errorKind(error) === 'vaultTooNew'
     ? t('Vault needs a newer version of the app')
     : t('Incorrect Master Password')
 
@@ -19,7 +20,7 @@ const unlockError = (t: TFunction, error: unknown): string =>
 // Claiming "Incorrect Master Password" for any of them would send the user
 // retyping a password that was never checked.
 const biometricError = (t: TFunction, error: unknown): string =>
-  isVaultTooNew(error)
+  errorKind(error) === 'vaultTooNew'
     ? t('Vault needs a newer version of the app')
     : t('Biometric unlock failed')
 

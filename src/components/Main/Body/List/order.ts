@@ -1,4 +1,4 @@
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 import { toTime } from '@/utils/time'
 
 // How the entry list is ordered. "recent" is the working order (newest

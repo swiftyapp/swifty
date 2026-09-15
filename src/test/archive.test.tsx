@@ -3,15 +3,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Body from '@/components/Main/Body'
 import { useShortcuts } from '@/components/Main/useShortcuts'
-import {
-  copyToClipboard,
-  listDeleted,
-  purgeEntry,
-  restoreEntry,
-  revealEntry
-} from '@/lib/commands'
 import { useVault, selectCurrent, setView } from '@/store'
 import { withEntries, deletedMeta, loginMeta } from './utils'
+import { calls, mockCommand } from './ipc'
 
 const NOW = new Date('2024-01-08T00:00:00.000Z')
 
@@ -28,7 +22,7 @@ const Harness = () => {
 
 // Open the Archive the way the rail does, and wait for `list_deleted` to land.
 const openArchive = async (tombstones = [gone]) => {
-  vi.mocked(listDeleted).mockResolvedValue(tombstones)
+  mockCommand('list_deleted', () => tombstones)
   withEntries([live])
   const rendered = render(<Harness />)
   setView('archive')
@@ -48,7 +42,7 @@ describe('the Archive view', () => {
   it('lists the tombstones with when they went, not when they changed', async () => {
     await openArchive()
 
-    expect(listDeleted).toHaveBeenCalledTimes(1)
+    expect(calls('list_deleted')).toHaveLength(1)
     expect(screen.getByTestId('list-title')).toHaveTextContent('Archive')
     expect(screen.getByTestId('entry-item-title')).toHaveTextContent('Old Account')
     expect(screen.getByText('Deleted 3d')).toBeInTheDocument()
@@ -66,23 +60,22 @@ describe('the Archive view', () => {
     expect(screen.queryByTestId('primary-action-button')).not.toBeInTheDocument()
     expect(screen.queryByTestId('more-actions-button')).not.toBeInTheDocument()
     // A deleted row has no readable payload, so nothing should even ask.
-    expect(revealEntry).not.toHaveBeenCalled()
+    expect(calls('reveal_entry')).toHaveLength(0)
   })
 
   it('restores an entry back into the live list and out of the Archive', async () => {
-    vi.mocked(restoreEntry).mockResolvedValue(loginMeta({ id: 'gone', title: 'Old Account' }))
+    mockCommand('restore_entry', () => loginMeta({ id: 'gone', title: 'Old Account' }))
     await openArchive()
     await userEvent.click(screen.getByTestId('entry-item'))
 
     await userEvent.click(screen.getByTestId('restore-entry-button'))
 
-    expect(restoreEntry).toHaveBeenCalledWith('gone')
+    expect(calls('restore_entry')).toContainEqual({ id: 'gone' })
     await vi.waitFor(() => {
-      const { items, archive } = useVault.getState()
-      const current = selectCurrent(useVault.getState())
-      expect(items.map(e => e.id)).toEqual(['live', 'gone'])
-      expect(archive).toEqual([])
-      expect(current).toBeNull()
+      const state = useVault.getState()
+      expect(state.items.map(e => e.id)).toEqual(['live', 'gone'])
+      expect(state.archive).toEqual([])
+      expect(selectCurrent(state)).toBeNull()
     })
   })
 
@@ -91,12 +84,12 @@ describe('the Archive view', () => {
     await userEvent.click(screen.getByTestId('entry-item'))
 
     await userEvent.click(screen.getByTestId('purge-entry-button'))
-    expect(purgeEntry).not.toHaveBeenCalled()
+    expect(calls('purge_entry')).toHaveLength(0)
     expect(screen.getByTestId('purge-entry-confirm')).toHaveTextContent('Delete forever?')
 
     await userEvent.click(screen.getByTestId('purge-entry-confirm'))
 
-    expect(purgeEntry).toHaveBeenCalledWith('gone')
+    expect(calls('purge_entry')).toContainEqual({ id: 'gone' })
     await vi.waitFor(() => expect(useVault.getState().archive).toEqual([]))
     // It does not come back as a live entry either.
     expect(useVault.getState().items.map(e => e.id)).toEqual(['live'])
@@ -127,7 +120,7 @@ describe('the Archive view', () => {
   })
 
   it('fails quietly when ⌘⏎ asks a tombstone for its secret', async () => {
-    vi.mocked(revealEntry).mockRejectedValue(new Error('entry not found'))
+    mockCommand('reveal_entry', () => Promise.reject({ kind: 'notFound', message: 'entry not found' }))
     await openArchive()
 
     await userEvent.click(screen.getByTestId('search-input'))
@@ -135,8 +128,8 @@ describe('the Archive view', () => {
 
     // `reveal_entry` refuses deleted rows; the rejection must not escape
     // `copySecret`, and nothing may reach the clipboard.
-    await vi.waitFor(() => expect(revealEntry).toHaveBeenCalledWith('gone'))
-    expect(copyToClipboard).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(calls('reveal_entry')).toContainEqual({ id: 'gone' }))
+    expect(calls('copy_to_clipboard')).toHaveLength(0)
   })
 
   it('shows the archive empty state when there is nothing to restore', async () => {
@@ -148,12 +141,12 @@ describe('the Archive view', () => {
   })
 
   it('survives a failed read of the tombstones', async () => {
-    vi.mocked(listDeleted).mockRejectedValue(new Error('vault busy'))
+    mockCommand('list_deleted', () => Promise.reject({ kind: 'io', message: 'vault busy' }))
     withEntries([live])
     render(<Harness />)
 
     setView('archive')
-    await vi.waitFor(() => expect(listDeleted).toHaveBeenCalled())
+    await vi.waitFor(() => expect(calls('list_deleted').length).toBeGreaterThan(0))
 
     // No unhandled rejection, and the view still renders its own empty state.
     expect(screen.getByTestId('empty-archive')).toBeInTheDocument()
@@ -165,6 +158,6 @@ describe('the Archive view', () => {
     setView('items')
     setView('archive')
 
-    await vi.waitFor(() => expect(listDeleted).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(calls('list_deleted')).toHaveLength(2))
   })
 })

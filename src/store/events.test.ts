@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { on, EVENTS, type EventName, type EventPayloads } from '@/lib/events'
-import { getAudit, isBiometricAvailable, listDeleted } from '@/lib/commands'
-import type { EntryMeta } from '@/lib/commands'
+import { on, EVENTS, type EventName, type EventPayloads } from '@/api/events'
+import type { EntryMeta } from '@/api/types'
+import { calls, clearCalls, mockCommand } from '../test/ipc'
 import { subscribeToEvents } from './events'
 import {
   useApp,
@@ -35,6 +35,18 @@ const handlerFor = <E extends EventName>(event: E) => {
   if (!call) throw new Error(`nothing subscribed to ${event}`)
   return call[1] as (payload: EventPayloads[E]) => void
 }
+
+// What `app_status` answers about the biometric gate.
+const gate = (available: boolean) =>
+  mockCommand('app_status', () => ({
+    initialized: true,
+    version: '1.0.0',
+    locale: 'en-US',
+    syncConfigured: false,
+    syncPending: false,
+    scanSupported: false,
+    biometric: { available, canEnroll: available, type: 'touch', mode: null }
+  }))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -73,27 +85,27 @@ describe('vault:merged', () => {
 
   it('re-runs the audit, since the new rows have no strength result yet', () => {
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
-    expect(getAudit).toHaveBeenCalled()
+    expect(calls('get_audit')).toHaveLength(1)
   })
 
   // A merge can add or drop tombstones too, and the Archive only loads on entry
   // — so an open one has to be told, while a closed one refetches on its own.
   it('re-reads the tombstones when the Archive is the open view', () => {
     setView('archive')
-    vi.mocked(listDeleted).mockClear()
+    clearCalls('list_deleted')
 
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
 
-    expect(listDeleted).toHaveBeenCalledTimes(1)
+    expect(calls('list_deleted')).toHaveLength(1)
   })
 
   it('leaves the tombstones alone when the Archive is not open', () => {
     setView('items')
-    vi.mocked(listDeleted).mockClear()
+    clearCalls('list_deleted')
 
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
 
-    expect(listDeleted).not.toHaveBeenCalled()
+    expect(calls('list_deleted')).toHaveLength(0)
   })
 })
 
@@ -126,7 +138,7 @@ describe('sync:status', () => {
 
 describe('vault:locked', () => {
   it('shows the Touch ID button when a key is enrolled, not a hardcoded false', async () => {
-    vi.mocked(isBiometricAvailable).mockResolvedValue(true)
+    gate(true)
     flowMain()
 
     handlerFor(EVENTS.vaultLocked)()
@@ -158,7 +170,7 @@ describe('vault:locked', () => {
   })
 
   it('lands on the plain lock screen when nothing is enrolled', async () => {
-    vi.mocked(isBiometricAvailable).mockRejectedValue(new Error('no backend'))
+    mockCommand('app_status', () => Promise.reject({ kind: 'other', message: 'no backend' }))
     flowMain()
 
     handlerFor(EVENTS.vaultLocked)()

@@ -1,4 +1,4 @@
-import type { EntryType, ExtraField, Passkey } from '@/lib/commands'
+import type { EntryType, ExtraField, Passkey } from '@/api/types'
 
 /**
  * Everything a draft key can hold. Text is what the fields type; the three list

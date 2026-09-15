@@ -12,7 +12,7 @@ import {
   showTag
 } from './index'
 import { filterEntries } from '@/services/entries'
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 
 const meta = (id: string, tags: string[] = []): EntryMeta =>
   ({ id, type: 'login', title: id, tags, urlHost: '', favorite: false })

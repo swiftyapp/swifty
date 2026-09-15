@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { setAutolockTimeout } from '@/lib/commands'
+import { setAutolockTimeout } from '@/api/tools'
 import { usePrefs, setPref } from '@/store'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'

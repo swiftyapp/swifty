@@ -1,5 +1,7 @@
 import { create } from 'zustand'
-import { shareRevoke, type EntryType, type SshKeyPair } from '@/lib/commands'
+import type { EntryType } from '@/api/types'
+import { shareRevoke } from '@/api/share'
+import type { SshKeyPair } from '@/api/tools'
 import { loadArchive, setNoEntry, useVault, selectCurrent } from './vault'
 
 /**

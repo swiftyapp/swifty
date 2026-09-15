@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { GeneratorOptions } from '@/lib/commands'
+import type { GeneratorOptions } from '@/api/tools'
 import { applyTheme, resolveTheme, type Theme, type ThemePreference } from '@/theme'
 
 /**

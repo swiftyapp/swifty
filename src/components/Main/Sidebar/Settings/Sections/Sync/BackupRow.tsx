@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { exportVault } from '@/lib/commands'
+import { exportVault } from '@/api/vault'
 import Button from '@/components/elements/Button'
 import { inputClass } from '@/components/elements/formStyles'
 import ExpandableRow from '../ExpandableRow'

@@ -1,5 +1,6 @@
 import { useVault, usePrefs } from '@/store'
-import type { AuditItem, EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
+import type { AuditItem } from '@/api/tools'
 import { useTranslation } from 'react-i18next'
 import Group from '../Group'
 import { LABEL } from '@/components/elements/tokens'

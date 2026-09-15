@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { GeneratorOptions } from '@/lib/commands'
+import type { GeneratorOptions } from '@/api/tools'
 import { usePrefs, setPref } from '@/store'
 import { LENGTH_RANGE } from '@/services/generator'
 import SettingsGroup from '@/components/elements/SettingsGroup'

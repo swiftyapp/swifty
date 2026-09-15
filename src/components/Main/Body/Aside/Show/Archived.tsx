@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 import { restoreEntry, purgeEntry } from '@/store'
 import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'

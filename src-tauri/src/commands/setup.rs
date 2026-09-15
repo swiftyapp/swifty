@@ -9,28 +9,22 @@
 //!
 //! The connect step reports through events rather than its return value, so the
 //! frontend can render "waiting for the browser" while the flow is out. Exactly
-//! one of [`PROBED_EVENT`] / [`ERROR_EVENT`] follows every [`PENDING_EVENT`].
+//! one of `setup:drive:probed` / `setup:drive:error` follows every
+//! `setup:drive:pending` (see [`crate::events`]).
 
 use std::sync::atomic::Ordering;
 
-use serde_json::json;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
 
-use crate::commands::{create_vault, list_metas};
 use crate::crypto::VaultKey;
 use crate::error::{Error, Result};
+use crate::events;
 use crate::models::UnlockResult;
+use crate::session::{create_vault, list_metas};
 use crate::state::AppState;
 use crate::storage;
 use crate::store::SqliteStore;
 use crate::sync::{self, restore, setup::PackInfo};
-
-/// The browser is out and the app is waiting on consent.
-pub(crate) const PENDING_EVENT: &str = "setup:drive:pending";
-/// Connected, and here is what the account holds (`{ file: … | null }`).
-const PROBED_EVENT: &str = "setup:drive:probed";
-/// The flow ended without a connection (`{ error: String }`).
-const ERROR_EVENT: &str = "setup:drive:error";
 
 // User-facing, so deliberately plain about what to do next.
 const NOT_CONNECTED: &str = "connect a Google account first";
@@ -42,30 +36,27 @@ const SETUP_BUSY: &str = "another setup step is still running";
 
 /// Connect an account and report what it holds. Onboarding only.
 ///
-/// Desktop: the consent flow blocks on a loopback listener and the probe is a
-/// network round trip, so both go to a blocking thread — the command itself
-/// returns as soon as they are scheduled, and the frontend listens for the
+/// Desktop: the consent flow waits on a loopback listener and the probe is a
+/// network round trip, so both go to a thread of their own — the command
+/// returns as soon as its guards have passed, and the frontend listens for the
 /// events.
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn setup_drive_connect(app: AppHandle) -> Result<()> {
+pub fn setup_drive_connect(app: AppHandle) -> Result<()> {
     guard_no_vault(&app)?;
     ensure_idle(&app.state::<AppState>())?;
     let attempt = begin_attempt(&app.state::<AppState>());
-    let _ = app.emit(PENDING_EVENT, ());
+    events::setup_drive_pending(&app);
 
-    let handle = app.clone();
-    let probed = tauri::async_runtime::spawn_blocking(move || {
-        let mut tokens = sync::obtain_tokens(&handle)?;
-        // `block_on` is legal here and only here: a blocking thread is not one
-        // of the async runtime's workers. Same rule as a sync run.
-        let file = tauri::async_runtime::block_on(probe(&handle, &mut tokens))?;
-        Ok((tokens, file))
-    })
-    .await
-    .map_err(|e| Error::Other(e.to_string()))?;
-
-    report(&app, attempt, probed);
+    std::thread::spawn(move || {
+        let probed = sync::obtain_tokens(&app).and_then(|mut tokens| {
+            // `block_on` is legal here and only here: a plain thread is not one
+            // of the async runtime's workers. Same rule as a sync run.
+            let file = tauri::async_runtime::block_on(probe(&app, &mut tokens))?;
+            Ok((tokens, file))
+        });
+        report(&app, attempt, probed);
+    });
     Ok(())
 }
 
@@ -146,20 +137,16 @@ fn report(app: &AppHandle, attempt: u64, probed: Result<(sync::Tokens, Option<Pa
     match probed {
         Ok((tokens, file)) => {
             *app.state::<AppState>().pending_drive.lock().unwrap() = Some(tokens);
-            let _ = app.emit(PROBED_EVENT, json!({ "file": file }));
+            events::setup_drive_probed(app, file);
         }
         Err(e) => {
             // Half a connection is worse than none — the next attempt starts
             // from consent rather than from credentials that failed once.
             take_pending(&app.state::<AppState>());
             log::warn!("drive setup failed: {e}");
-            emit_error(app, &e.to_string());
+            events::setup_drive_error(app, &e.to_string());
         }
     }
-}
-
-pub(crate) fn emit_error(app: &AppHandle, why: &str) {
-    let _ = app.emit(ERROR_EVENT, json!({ "error": why }));
 }
 
 // --- restore ---------------------------------------------------------------
@@ -552,15 +539,11 @@ mod tests {
         assert_eq!(current_attempt(&state), next);
     }
 
-    // The event names are the frontend's contract, and a probe always names the
-    // `file` key — `null` is an answer, not an absence.
+    // The event names are the frontend's contract.
     #[test]
-    fn the_probe_payload_names_the_file_or_null() {
-        assert_eq!(PENDING_EVENT, "setup:drive:pending");
-        assert_eq!(PROBED_EVENT, "setup:drive:probed");
-        assert_eq!(ERROR_EVENT, "setup:drive:error");
-
-        let none: Option<PackInfo> = None;
-        assert_eq!(json!({ "file": none }), json!({ "file": null }));
+    fn the_onboarding_events_keep_their_names() {
+        assert_eq!(events::SETUP_DRIVE_PENDING, "setup:drive:pending");
+        assert_eq!(events::SETUP_DRIVE_PROBED, "setup:drive:probed");
+        assert_eq!(events::SETUP_DRIVE_ERROR, "setup:drive:error");
     }
 }
