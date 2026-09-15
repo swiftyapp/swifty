@@ -1,10 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
-import { useStore } from './store'
+import { usePrefs, setUpdateReady } from './store'
 import { runStartupUpdateCheck } from './services/autoUpdate'
 import { applyPlatform } from './utils/platform'
-import { applyTheme, getTheme } from './theme'
+import { applyTheme } from './theme'
 import { i18nReady } from './i18n'
 import { runSplash } from './lib/splash'
 import './shortcuts'
@@ -15,7 +15,7 @@ import './styles/theme.css'
 applyPlatform()
 // Theme first: the splash in index.html recolors off `data-theme` the moment
 // it is set, before its animation starts.
-applyTheme(getTheme())
+applyTheme(usePrefs.getState().theme)
 const splashSettled = runSplash()
 
 // Awaiting the catalog before the first paint means no flash of English on a
@@ -38,6 +38,4 @@ if (import.meta.env.DEV) {
 }
 
 // Stage any signed update in the background; the toast surfaces it when ready.
-void runStartupUpdateCheck((version, notes) =>
-  useStore.getState().setUpdateReady(version, notes)
-)
+void runStartupUpdateCheck(setUpdateReady)

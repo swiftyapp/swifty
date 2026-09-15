@@ -2,14 +2,20 @@ import '@testing-library/jest-dom/vitest'
 import { beforeEach, vi } from 'vitest'
 import { resetIpc } from './ipc'
 import { setLayout } from './layout'
+import { resetStores } from './utils'
 
 // jsdom implements no layout, so it ships no scrollIntoView.
 Element.prototype.scrollIntoView = vi.fn()
 
 // Every suite starts on the wide shell — the one the desktop window and all the
-// pre-existing tests assume. A compact test calls `setLayout('compact')` itself.
+// pre-existing tests assume — with pristine stores and preferences. A compact
+// test calls `setLayout('compact')` itself.
 setLayout('wide')
-beforeEach(() => setLayout('wide'))
+beforeEach(() => {
+  setLayout('wide')
+  localStorage.clear()
+  resetStores()
+})
 
 // The Rust backend is built in parallel, so the one seam that reaches it is
 // faked here and every command answers out of `./ipc`. A spec overrides the
@@ -47,6 +53,10 @@ vi.mock('@tauri-apps/plugin-opener', () => ({
 vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn().mockResolvedValue(null)
 }))
+
+// The app store imports the updater at module load.
+vi.mock('@tauri-apps/plugin-updater', () => ({ check: vi.fn() }))
+vi.mock('@tauri-apps/plugin-process', () => ({ relaunch: vi.fn() }))
 
 // Components under test call useTranslation(); the singleton must be
 // initialized once before any of them render.

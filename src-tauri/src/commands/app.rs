@@ -61,12 +61,9 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
     };
     drop(session);
 
-    #[cfg(mobile)]
-    let sync_pending = state.pending_auth.lock().unwrap().is_some();
-    // Desktop's consent flow is started and forgotten, so the frontend learns
-    // of it from `sync:pending` rather than by asking.
-    #[cfg(desktop)]
-    let sync_pending = false;
+    // The same answer `sync:status` carries, so a fresh webview and one that
+    // has been listening agree.
+    let sync_pending = state.sync_run.lock().unwrap().pending;
 
     Ok(AppStatus {
         initialized: storage::db_exists(&app),

@@ -1,25 +1,34 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import {
-  makeStore,
-  setEntries,
-  saveEntry,
-  deleteEntry,
-  enterMain,
-  syncInit,
-  setFilterType,
-  lockVault
-} from './index'
 import type { Entry, EntryMeta, Passkey } from '@/api/types'
 import { calls, mockCommand } from '../test/ipc'
 import { toEntryMeta } from '../test/meta'
+import {
+  useApp,
+  useUi,
+  useVault,
+  selectCurrent,
+  setEntries,
+  setArchive,
+  setCurrentEntry,
+  editEntry,
+  saveEntry,
+  deleteEntry,
+  enterMain,
+  setSyncStatus,
+  initialApp,
+  setFilterType,
+  lockVault
+} from './index'
 
 const meta = (id: string, title = id): EntryMeta =>
   ({ id, type: 'login', title, tags: [], urlHost: '', favorite: false })
 
+const current = () => selectCurrent(useVault.getState())
+
+const connected = () => setSyncStatus({ ...initialApp.sync, configured: true })
+
 beforeEach(() => {
-  vi.clearAllMocks()
   vi.useFakeTimers({ shouldAdvanceTime: true })
-  makeStore()
   // Echo back the saved entry's metadata, as the real backend does.
   mockCommand('save_entry', ({ entry }) => toEntryMeta(entry as Entry))
 })
@@ -28,13 +37,12 @@ afterEach(() => vi.useRealTimers())
 
 describe('saveEntry', () => {
   it('creates a new entry and selects it', async () => {
-    const store = makeStore()
     await saveEntry({ type: 'login', title: 'New', username: 'u', password: 'p' })
 
-    const { items, current } = store.getState().entries
+    const { items } = useVault.getState()
     expect(items).toHaveLength(1)
     expect(items[0].title).toBe('New')
-    expect(current?.id).toBe(items[0].id)
+    expect(current()?.id).toBe(items[0].id)
     expect(calls('save_entry')).toHaveLength(1)
     // Nothing to sync to: this vault is local-only.
     await vi.advanceTimersByTimeAsync(60_000)
@@ -42,17 +50,15 @@ describe('saveEntry', () => {
   })
 
   it('updates an existing entry', async () => {
-    const store = makeStore()
     setEntries([meta('a', 'Old')])
     await saveEntry({ id: 'a', type: 'login', title: 'Updated', username: 'u', password: 'p' })
 
-    const { items } = store.getState().entries
+    const { items } = useVault.getState()
     expect(items).toHaveLength(1)
     expect(items[0].title).toBe('Updated')
   })
 
   it('drops a kind filter that would hide the entry just saved', async () => {
-    const store = makeStore()
     setFilterType('login')
 
     await saveEntry({
@@ -65,24 +71,22 @@ describe('saveEntry', () => {
     })
 
     // The row has to be visible for the selection to mean anything.
-    expect(store.getState().filters.type).toBeNull()
-    expect(store.getState().entries.current?.title).toBe('Travel Card')
+    expect(useUi.getState().filterType).toBeNull()
+    expect(current()?.title).toBe('Travel Card')
   })
 
   it('keeps a kind filter the saved entry still matches', async () => {
-    const store = makeStore()
     setFilterType('login')
 
     await saveEntry({ type: 'login', title: 'New', username: 'u', password: 'p' })
 
-    expect(store.getState().filters.type).toBe('login')
-    expect(store.getState().entries.current?.title).toBe('New')
+    expect(useUi.getState().filterType).toBe('login')
+    expect(current()?.title).toBe('New')
   })
 
   // A draft spread from a revealed login carries its passkeys, and they reach
   // the backend untouched — while staying out of the list metadata.
   it('carries a login draft passkeys through to the backend', async () => {
-    const store = makeStore()
     const passkeys: Passkey[] = [
       {
         credentialId: 'Y3JlZDE',
@@ -99,14 +103,43 @@ describe('saveEntry', () => {
 
     const saved = calls('save_entry')[0].entry as Entry
     expect(saved.type === 'login' && saved.passkeys).toEqual(passkeys)
-    expect(store.getState().entries.items[0]).not.toHaveProperty('passkeys')
+    expect(useVault.getState().items[0]).not.toHaveProperty('passkeys')
+  })
+})
+
+describe('selection', () => {
+  it('resolves the selected row across live rows and tombstones', () => {
+    setEntries([meta('a')])
+    setArchive([{ ...meta('t'), deletedAt: '2024-01-05T00:00:00.000Z' }])
+
+    setCurrentEntry('t')
+    expect(current()?.id).toBe('t')
+  })
+
+  it('refuses to open a tombstone in the editor', () => {
+    setArchive([{ ...meta('t'), deletedAt: '2024-01-05T00:00:00.000Z' }])
+    setCurrentEntry('t')
+
+    editEntry()
+    expect(useVault.getState().editing).toBe(false)
+  })
+
+  it('ends an edit whose row a list replacement dropped', () => {
+    setEntries([meta('a')])
+    setCurrentEntry('a')
+    editEntry()
+    expect(useVault.getState().editing).toBe(true)
+
+    setEntries([])
+
+    expect(useVault.getState().editing).toBe(false)
+    expect(current()).toBeNull()
   })
 })
 
 describe('auto-sync', () => {
   it('debounces a burst of writes into a single push', async () => {
-    makeStore()
-    syncInit(true)
+    connected()
 
     await saveEntry({ type: 'login', title: 'One', username: 'u', password: 'p' })
     await vi.advanceTimersByTimeAsync(20_000)
@@ -121,8 +154,7 @@ describe('auto-sync', () => {
   })
 
   it('drops a write still waiting when the vault locks', async () => {
-    makeStore()
-    syncInit(true)
+    connected()
 
     await saveEntry({ type: 'login', title: 'One', username: 'u', password: 'p' })
     await lockVault()
@@ -134,8 +166,7 @@ describe('auto-sync', () => {
   })
 
   it('publishes a delete too', async () => {
-    makeStore()
-    syncInit(true)
+    connected()
     setEntries([meta('a')])
 
     await deleteEntry('a')
@@ -146,34 +177,29 @@ describe('auto-sync', () => {
 
 describe('deleteEntry', () => {
   it('removes the entry and clears the selection', async () => {
-    const store = makeStore()
     setEntries([meta('a'), meta('b')])
     await deleteEntry('a')
 
-    const { items, current } = store.getState().entries
-    expect(items.map(e => e.id)).toEqual(['b'])
-    expect(current).toBeNull()
+    expect(useVault.getState().items.map(e => e.id)).toEqual(['b'])
+    expect(current()).toBeNull()
   })
 })
 
 describe('enterMain', () => {
   it('loads the vault and switches to the main flow', async () => {
-    const store = makeStore()
     await enterMain({ entries: [meta('a')], syncConfigured: true })
 
-    const state = store.getState()
-    expect(state.flow.name).toBe('main')
-    expect(state.entries.items.map(e => e.id)).toEqual(['a'])
+    expect(useApp.getState().flow).toBe('main')
+    expect(useVault.getState().items.map(e => e.id)).toEqual(['a'])
     // A configured vault syncs once on unlock, before any local write.
-    expect(state.sync.enabled).toBe(true)
+    expect(useApp.getState().sync.configured).toBe(true)
     expect(calls('sync_now')).toHaveLength(1)
   })
 
   it('leaves sync off for a vault that has never been connected', async () => {
-    const store = makeStore()
     await enterMain({ entries: [], syncConfigured: false })
 
-    expect(store.getState().sync.enabled).toBe(false)
+    expect(useApp.getState().sync.configured).toBe(false)
     expect(calls('sync_now')).toHaveLength(0)
   })
 })

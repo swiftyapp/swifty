@@ -5,7 +5,8 @@ import Masterpass from '@/components/elements/Masterpass'
 import Button from '@/components/elements/Button'
 import { isMobile } from '@/lib/platform'
 import type { UnlockResult } from '@/api/types'
-import { useStore, restoreFromDrive } from '@/store'
+import { setupRestoreFromDrive } from '@/api/setup'
+import { useApp } from '@/store'
 import StepHeader from '../shared/StepHeader'
 import FoundFileCard from '../shared/FoundFileCard'
 import SpinnerCard from '../shared/SpinnerCard'
@@ -30,7 +31,7 @@ interface Props {
 // redraws the screen.
 export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: Props) {
   const { t } = useTranslation()
-  const drive = useStore(state => state.setup.drive)
+  const drive = useApp(state => state.setupDrive)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -44,7 +45,7 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
     if (busy || !password) return
     setBusy(true)
     setError(null)
-    restoreFromDrive(password)
+    setupRestoreFromDrive(password)
       .then(onRestored)
       .catch((err: unknown) => {
         setBusy(false)

@@ -1,4 +1,4 @@
-import { useStore } from '@/store'
+import { useVault, useCurrentEntry } from '@/store'
 import { useShown } from '../../Body/Aside/Show/useShown'
 import Read from '../Detail/Read'
 import Editor from '../Form/Editor'
@@ -19,9 +19,9 @@ import Held from '../Form/Held'
  */
 export default function Entry() {
   // The kind being created, or null. An edit takes its kind from the entry.
-  const type = useStore(state => state.entries.new)
-  const editing = useStore(state => state.entries.edit)
-  const selected = useStore(state => state.entries.current)
+  const type = useVault(state => state.creating)
+  const editing = useVault(state => state.editing)
+  const selected = useCurrentEntry()
   // A draft is never handed the selection: it would inherit that entry's
   // in-flight reveal, and with it its id. (`newEntry` clears the selection, so
   // this only ever restates the intent — but it restates it where it matters.)

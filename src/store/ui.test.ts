@@ -1,5 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { makeStore, useStore, setEntries, setCurrentEntry, setFilterTag, editEntry } from './index'
+import {
+  useUi,
+  useVault,
+  selectCurrent,
+  setEntries,
+  setCurrentEntry,
+  setFilterTag,
+  setFilterType,
+  editEntry,
+  setView,
+  showTag
+} from './index'
 import { filterEntries } from '@/services/entries'
 import type { EntryMeta } from '@/api/types'
 
@@ -8,19 +19,20 @@ const meta = (id: string, tags: string[] = []): EntryMeta =>
 
 const items = [meta('work', ['work']), meta('home', ['home']), meta('both', ['work', 'home'])]
 
+const current = () => selectCurrent(useVault.getState())
+
 const visible = () => {
-  const { filters, entries } = useStore.getState()
-  return filterEntries(entries.items, filters).map(e => e.id)
+  const { filterType, filterTag, query } = useUi.getState()
+  return filterEntries(useVault.getState().items, { type: filterType, tag: filterTag, query }).map(
+    e => e.id
+  )
 }
 
-beforeEach(() => {
-  makeStore()
-  setEntries(items)
-})
+beforeEach(() => setEntries(items))
 
 describe('setFilterTag', () => {
   it('starts unset, so every row is in scope', () => {
-    expect(useStore.getState().filters.tag).toBeNull()
+    expect(useUi.getState().filterTag).toBeNull()
     expect(visible()).toHaveLength(3)
   })
 
@@ -39,7 +51,7 @@ describe('setFilterTag', () => {
     setCurrentEntry('both')
     setFilterTag('work')
 
-    expect(useStore.getState().entries.current?.id).toBe('both')
+    expect(current()?.id).toBe('both')
   })
 
   it('drops a selection the new tag would hide, along with the open editor', () => {
@@ -47,23 +59,39 @@ describe('setFilterTag', () => {
     editEntry()
     setFilterTag('work')
 
-    const { current, edit } = useStore.getState().entries
-    expect(current).toBeNull()
-    expect(edit).toBe(false)
+    expect(current()).toBeNull()
+    expect(useVault.getState().editing).toBe(false)
   })
 
   it('keeps the selection when the filter is cleared', () => {
     setCurrentEntry('home')
     setFilterTag(null)
 
-    expect(useStore.getState().entries.current?.id).toBe('home')
+    expect(current()?.id).toBe('home')
   })
 
   it('is independent of the kind filter — both narrow the same list', () => {
     setFilterTag('work')
-    useStore.getState().setFilterType('login')
+    setFilterType('login')
 
-    expect(useStore.getState().filters).toMatchObject({ type: 'login', tag: 'work' })
+    expect(useUi.getState()).toMatchObject({ filterType: 'login', filterTag: 'work' })
     expect(visible()).toEqual(['work', 'both'])
+  })
+})
+
+describe('views', () => {
+  it('enters the Tags view with its tag in one step', () => {
+    showTag('work')
+    expect(useUi.getState()).toMatchObject({ view: 'tags', filterTag: 'work' })
+  })
+
+  it('drops the tag and the selection on the way to another view', () => {
+    showTag('work')
+    setCurrentEntry('both')
+
+    setView('favorites')
+
+    expect(useUi.getState()).toMatchObject({ view: 'favorites', filterTag: null })
+    expect(current()).toBeNull()
   })
 })

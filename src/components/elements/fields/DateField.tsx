@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
-import { getFormat } from '@/defaults/dateFormat'
+import { usePrefs } from '@/store'
 import { cx } from '@/utils/cx'
 import { daysUntil, formatDate, relativeFuture, toIsoDate } from '@/utils/time'
 import { META_TYPE } from '../tokens'
@@ -24,6 +24,7 @@ export default function DateField({
 }) {
   const { t } = useTranslation()
   const { value, editing } = useField(name)
+  const dateFormat = usePrefs(state => state.dateFormat)
 
   // A sentence about the date, not a second copy of it — and only where there
   // is nothing to type: mid-edit the date is half a date most of the time.
@@ -42,7 +43,7 @@ export default function DateField({
       required={required}
       maxLength={10}
       // The pattern itself, not catalog copy — a date format has no translation.
-      placeholder={getFormat()}
+      placeholder={dateFormat}
       format={formatDate}
       normalize={toIsoDate}
       below={stamp}

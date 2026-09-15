@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Section } from '@/store/uiSlice'
+import type { Section } from '@/store'
 import Root from './Root'
 import Pane from './Pane'
 

@@ -1,4 +1,4 @@
-import { useStore } from '@/store'
+import { useVault, usePrefs } from '@/store'
 import type { EntryMeta } from '@/api/types'
 import type { AuditItem } from '@/api/tools'
 import { useTranslation } from 'react-i18next'
@@ -7,9 +7,9 @@ import { LABEL } from '@/components/elements/tokens'
 
 export default function AuditList() {
   const { t } = useTranslation()
-  const audit = useStore(state => state.audit)
-  const breachCheck = useStore(state => state.breachCheck)
-  const items = useStore(state => state.entries.items)
+  const audit = useVault(state => state.audit)
+  const breachCheck = usePrefs(state => state.breachCheck)
+  const items = useVault(state => state.items)
 
   if (!audit)
     return (

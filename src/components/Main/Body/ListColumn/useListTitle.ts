@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useStore } from '@/store'
-import type { View } from '@/store/uiSlice'
+import { useUi, type View } from '@/store'
 import { kindOf } from '@/kinds'
 import type { TKey } from '@/i18n'
 
@@ -20,9 +19,9 @@ const TITLES: Record<View, TKey> = {
 // the same name in its own large title: one computation, two headers.
 export const useListTitle = (): string => {
   const { t } = useTranslation()
-  const view = useStore(state => state.ui.view)
-  const type = useStore(state => state.filters.type)
-  const tag = useStore(state => state.filters.tag)
+  const view = useUi(state => state.view)
+  const type = useUi(state => state.filterType)
+  const tag = useUi(state => state.filterTag)
 
   if (view === 'items' && type) return t(kindOf(type).pluralLabel)
   if (view === 'tags' && tag) return `#${tag}`

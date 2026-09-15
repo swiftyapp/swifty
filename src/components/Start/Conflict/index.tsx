@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import AuthShell from '@/components/elements/AuthShell'
 import Button from '@/components/elements/Button'
 import { META_TYPE } from '@/components/elements/tokens'
-import { useStore } from '@/store'
+import { useApp } from '@/store'
 import StepHeader from '../shared/StepHeader'
 import FoundFileCard from '../shared/FoundFileCard'
 import { COLUMN, ACTIONS, FOOTNOTE } from '../shared/layout'
@@ -23,7 +23,7 @@ interface Props {
 // the choice is still free, and both ways out of it are spelled out plainly.
 export default function Conflict({ onBack, onUnlockExisting, onArchive }: Props) {
   const { t } = useTranslation()
-  const file = useStore(state => state.setup.drive.file)
+  const file = useApp(state => state.setupDrive.file)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 

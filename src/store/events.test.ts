@@ -1,9 +1,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { on, EVENTS, type EventName, type EventPayloads } from '@/api/events'
 import type { EntryMeta } from '@/api/types'
-import { subscribeToEvents } from './events'
-import { makeStore, setEntries, setView, setCurrentEntry } from './index'
 import { calls, clearCalls, mockCommand } from '../test/ipc'
+import { subscribeToEvents } from './events'
+import {
+  useApp,
+  useUi,
+  useVault,
+  selectCurrent,
+  setEntries,
+  setArchive,
+  setView,
+  setCurrentEntry,
+  flowMain,
+  initialApp
+} from './index'
 
 const meta = (id: string): EntryMeta => ({
   id,
@@ -14,6 +25,8 @@ const meta = (id: string): EntryMeta => ({
   favorite: false
 })
 
+const current = () => selectCurrent(useVault.getState())
+
 // The handler `subscribeToEvents` registered for one event. `on` is mocked
 // globally (src/test/setup.ts), so the subscription is inspectable without a
 // Tauri runtime.
@@ -23,50 +36,56 @@ const handlerFor = <E extends EventName>(event: E) => {
   return call[1] as (payload: EventPayloads[E]) => void
 }
 
+// What `app_status` answers about the biometric gate.
+const gate = (available: boolean) =>
+  mockCommand('app_status', () => ({
+    initialized: true,
+    version: '1.0.0',
+    locale: 'en-US',
+    syncConfigured: false,
+    syncPending: false,
+    scanSupported: false,
+    biometric: { available, canEnroll: available, type: 'touch', mode: null }
+  }))
+
 beforeEach(() => {
   vi.clearAllMocks()
-  makeStore()
   subscribeToEvents()
 })
 
 describe('vault:merged', () => {
   it('adopts the entries a sync pulled in from another device', () => {
-    const store = makeStore()
     setEntries([meta('a')])
-    subscribeToEvents()
 
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('a'), meta('b')] })
 
-    expect(store.getState().entries.items.map(e => e.id)).toEqual(['a', 'b'])
+    expect(useVault.getState().items.map(e => e.id)).toEqual(['a', 'b'])
   })
 
-  // The selection is a row object, not an id, so a merge that rewrote or
-  // dropped that row has to be re-resolved against the incoming list.
-  it('re-reads the selected row from the merged list', () => {
-    const store = makeStore()
+  // The selection is an id, so the row it names is whatever the merged list
+  // says it is now.
+  it('reads the selected row from the merged list', () => {
     setEntries([meta('a')])
     setCurrentEntry('a')
-    subscribeToEvents()
 
     handlerFor(EVENTS.vaultMerged)({ entries: [{ ...meta('a'), title: 'Renamed' }] })
 
-    expect(store.getState().entries.current?.title).toBe('Renamed')
+    expect(current()?.title).toBe('Renamed')
   })
 
   it('clears the selection when the merge dropped that row', () => {
-    const store = makeStore()
     setEntries([meta('a'), meta('b')])
     setCurrentEntry('b')
-    subscribeToEvents()
 
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('a')] })
 
-    expect(store.getState().entries.current).toBeNull()
+    expect(useVault.getState().currentId).toBeNull()
+    expect(current()).toBeNull()
   })
 
   it('re-runs the audit, since the new rows have no strength result yet', () => {
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
-    expect(calls('get_audit').length).toBeGreaterThan(0)
+    expect(calls('get_audit')).toHaveLength(1)
   })
 
   // A merge can add or drop tombstones too, and the Archive only loads on entry
@@ -90,118 +109,72 @@ describe('vault:merged', () => {
   })
 })
 
-describe('sync:stopped', () => {
-  it('surfaces the backend error for the sync indicator', () => {
-    const store = makeStore()
-    subscribeToEvents()
+// The backend owns sync — the consent flow, the runs, their outcome — and
+// reports the whole of it on every change. The frontend stores it verbatim.
+describe('sync:status', () => {
+  it('is adopted as-is', () => {
+    const status = {
+      configured: true,
+      pending: false,
+      inProgress: false,
+      error: 'Drive API 403',
+      lastSyncedAt: '2024-01-01T00:00:00.000Z'
+    }
 
-    handlerFor(EVENTS.syncStarted)()
-    expect(store.getState().sync.inProgress).toBe(true)
+    handlerFor(EVENTS.syncStatus)(status)
 
-    handlerFor(EVENTS.syncStopped)({ error: 'Drive API 403' })
-
-    const { inProgress, success, error } = store.getState().sync
-    expect(inProgress).toBe(false)
-    expect(success).toBe(false)
-    expect(error).toBe('Drive API 403')
-  })
-})
-
-// The backend owns the consent flow: `sync:pending` when it opens the browser,
-// then exactly one of `sync:connected` / `sync:error`. The frontend only mirrors.
-describe('the pending connect', () => {
-  it('is started by sync:pending', () => {
-    const store = makeStore()
-    subscribeToEvents()
-
-    handlerFor(EVENTS.syncPending)()
-
-    expect(store.getState().sync.pending).toBe(true)
+    expect(useApp.getState().sync).toEqual(status)
   })
 
-  it('is finished by sync:connected', () => {
-    const store = makeStore()
-    subscribeToEvents()
-    handlerFor(EVENTS.syncPending)()
-    expect(store.getState().sync.pending).toBe(true)
+  it('replaces the previous status rather than merging into it', () => {
+    handlerFor(EVENTS.syncStatus)({ ...initialApp.sync, pending: true })
+    handlerFor(EVENTS.syncStatus)({ ...initialApp.sync, configured: true })
 
-    handlerFor(EVENTS.syncConnected)()
-
-    const { pending, enabled, error } = store.getState().sync
+    const { pending, configured } = useApp.getState().sync
     expect(pending).toBe(false)
-    expect(enabled).toBe(true)
-    expect(error).toBeNull()
-  })
-
-  it('is finished by sync:error, which leaves the vault unconnected', () => {
-    const store = makeStore()
-    subscribeToEvents()
-    store.getState().syncPending()
-
-    handlerFor(EVENTS.syncError)({ error: 'access_denied' })
-
-    const { pending, enabled, error } = store.getState().sync
-    expect(pending).toBe(false)
-    expect(enabled).toBe(false)
-    expect(error).toBe('access_denied')
-  })
-
-  it('clears a previous failure when the user tries again', () => {
-    const store = makeStore()
-    subscribeToEvents()
-    handlerFor(EVENTS.syncError)({ error: 'access_denied' })
-
-    store.getState().syncPending()
-
-    expect(store.getState().sync.error).toBeNull()
+    expect(configured).toBe(true)
   })
 })
 
 describe('vault:locked', () => {
   it('shows the Touch ID button when a key is enrolled, not a hardcoded false', async () => {
-    mockCommand('app_status', () => ({ biometric: { available: true, type: 'touch' } }))
-    const store = makeStore()
-    subscribeToEvents()
-    store.getState().flowMain()
+    gate(true)
+    flowMain()
 
     handlerFor(EVENTS.vaultLocked)()
-    await vi.waitFor(() => expect(store.getState().flow.name).toBe('auth'))
+    await vi.waitFor(() => expect(useApp.getState().flow).toBe('auth'))
 
     // The regression: this used to be `flowAuth(false)` unconditionally, so an
     // in-session lock (autolock, tray) never offered Touch ID again until a
     // full app restart.
-    expect(store.getState().flow.touchID).toBe(true)
+    expect(useApp.getState().touchID).toBe(true)
   })
 
   it('drops the session data with the key', async () => {
-    const store = makeStore()
-    subscribeToEvents()
-    store.getState().flowMain()
+    flowMain()
     setEntries([meta('a')])
-    store.getState().setArchive([meta('t')])
+    setArchive([meta('t')])
     setCurrentEntry('a')
     setView('archive')
 
     handlerFor(EVENTS.vaultLocked)()
-    await vi.waitFor(() => expect(store.getState().flow.name).toBe('auth'))
+    await vi.waitFor(() => expect(useApp.getState().flow).toBe('auth'))
 
     // Nothing of the unlocked vault survives the lock — the next unlock must
     // not open onto the previous session's rows.
-    const state = store.getState()
-    expect(state.entries.items).toEqual([])
-    expect(state.entries.archive).toEqual([])
-    expect(state.entries.current).toBeNull()
-    expect(state.ui.view).toBe('items')
+    const vault = useVault.getState()
+    expect(vault.items).toEqual([])
+    expect(vault.archive).toEqual([])
+    expect(vault.currentId).toBeNull()
+    expect(useUi.getState().view).toBe('items')
   })
 
   it('lands on the plain lock screen when nothing is enrolled', async () => {
     mockCommand('app_status', () => Promise.reject({ kind: 'other', message: 'no backend' }))
-    const store = makeStore()
-    subscribeToEvents()
-    store.getState().flowMain()
+    flowMain()
 
     handlerFor(EVENTS.vaultLocked)()
-    await vi.waitFor(() => expect(store.getState().flow.name).toBe('auth'))
-    expect(store.getState().flow.touchID).toBe(false)
+    await vi.waitFor(() => expect(useApp.getState().flow).toBe('auth'))
+    expect(useApp.getState().touchID).toBe(false)
   })
 })

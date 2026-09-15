@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useStore, showTag } from '@/store'
+import { useUi, showTag } from '@/store'
 import { cx } from '@/utils/cx'
 import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
 import { CheckGlyph } from '../../icons'
@@ -18,7 +18,7 @@ export default function Menu({
 }) {
   const { t } = useTranslation()
   // The tag the Tags view is showing, if that is the open view.
-  const active = useStore(state => (state.ui.view === 'tags' ? state.filters.tag : null))
+  const active = useUi(state => (state.view === 'tags' ? state.filterTag : null))
   const tags = useTagCounts()
 
   // Picking a tag is navigation: it opens the Tags view on that tag's items,
