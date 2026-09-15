@@ -1,5 +1,5 @@
 import type { TKey } from '@/i18n'
-import type { EntryDraft } from '@/defaults/entries'
+import type { EntryDraft } from '@/kinds/draft'
 
 /**
  * What each kind of ID document is made of.

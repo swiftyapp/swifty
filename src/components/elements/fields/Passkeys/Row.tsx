@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import type { Passkey } from '@/api/types'
 import { cx } from '@/utils/cx'
-import { shortDate, toTime } from '@/utils/time'
+import { useDates } from '@/hooks/useDates'
+import { toTime } from '@/utils/time'
 import { KeyGlyph, TrashGlyph } from '../../../Main/icons'
 import IconButton from '../../IconButton'
 import { META, ROW_HAIRLINE } from '../../tokens'
@@ -23,6 +24,7 @@ interface Props {
 // person — so there is no reason for either to be on screen or on a clipboard.
 export default function PasskeyRow({ passkey, onRemove }: Props) {
   const { t } = useTranslation()
+  const { shortDate } = useDates()
   const created = toTime(passkey.createdAt)
 
   return (

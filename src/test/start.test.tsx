@@ -5,14 +5,13 @@ import Start from '@/components/Start'
 import type { SetupDriveFile } from '@/api/setup'
 import { open } from '@tauri-apps/plugin-dialog'
 import { setupDriveProbed, setupDriveFailed, useApp } from '@/store'
-import { calls, mockCommand, mockCommandOnce } from './ipc'
+import { calls, mockCommandOnce } from './ipc'
+import { seedApp } from './utils'
 
 // Whether the device could enroll a biometric gate at all, which is what
 // decides if the first run asks its last question.
-const biometricStatus = (canEnroll: boolean) => ({
-  initialized: true,
-  biometric: { available: false, canEnroll, type: 'touch', mode: null }
-})
+const biometricStatus = (canEnroll: boolean) =>
+  seedApp({ biometric: { available: false, canEnroll, type: 'touch', mode: null } })
 
 // Must satisfy the setup strength gate (>= 12 chars, zxcvbn score >= 2).
 const STRONG = 'my-strong-vault-passphrase-2026'
@@ -353,7 +352,7 @@ describe('restoring from a backup file', () => {
 
 describe('the biometric step', () => {
   const reachBiometric = async () => {
-    mockCommand('app_status', () => biometricStatus(true))
+    biometricStatus(true)
     render(<Start />)
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
@@ -361,7 +360,7 @@ describe('the biometric step', () => {
   }
 
   it('is only offered where the device has a gate to offer', async () => {
-    mockCommand('app_status', () => biometricStatus(false))
+    biometricStatus(false)
     render(<Start />)
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))

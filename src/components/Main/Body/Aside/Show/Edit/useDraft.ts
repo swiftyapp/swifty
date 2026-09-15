@@ -4,7 +4,7 @@ import { kindOf } from '@/kinds'
 import { pruneExtra } from '@/components/elements/fields'
 import { mergeFields } from '@/components/Main/Scan/fields'
 import { dialogOpen } from '@/utils/dialogOpen'
-import type { DraftValue, EntryDraft } from '@/defaults/entries'
+import type { DraftValue, EntryDraft } from '@/kinds/draft'
 import type { Entry, EntryType } from '@/api/types'
 import { t } from '@/i18n'
 

@@ -1,4 +1,4 @@
-import type { EntryDraft } from '@/defaults/entries'
+import type { EntryDraft } from '@/kinds/draft'
 import type { ExtraField } from '@/api/types'
 
 // The list side of the extra fields: reading a draft key as pairs, and deciding

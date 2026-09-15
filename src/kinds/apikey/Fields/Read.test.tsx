@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FieldsProvider } from '@/components/elements/fields'
-import type { EntryDraft } from '@/defaults/entries'
+import type { EntryDraft } from '@/kinds/draft'
 import Fields from '.'
 
 const BODY = '4f9a0b3c7d2e1f6a8b9c0d1e2f3a4b5c'

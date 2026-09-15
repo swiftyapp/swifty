@@ -66,9 +66,19 @@ export interface UiState {
   scanSupported: boolean
   scanBusy: boolean
   scanError: ScanError | null
+  // The app-level "Copied to Clipboard" pill is up. Raised by `flashCopied`
+  // and lowered by it alone, so nothing else has to know the timing.
+  copied: boolean
 }
 
 const GENERATOR_CLOSED: Generator = { open: false, apply: null, ssh: null }
+
+const COPIED_TIMEOUT = 2000
+
+// Module-level rather than in the state: the pill's countdown is not something
+// anything renders, and keeping it out means `flashCopied` is the only writer
+// of `copied`.
+let copiedTimer: ReturnType<typeof setTimeout>
 
 export const initialUi: UiState = {
   view: 'items',
@@ -85,10 +95,21 @@ export const initialUi: UiState = {
   orphans: [],
   scanSupported: false,
   scanBusy: false,
-  scanError: null
+  scanError: null,
+  copied: false
 }
 
 export const useUi = create<UiState>()(() => initialUi)
+
+// --- clipboard feedback ----------------------------------------------------------
+
+// A copy while the pill is still up restarts its two seconds rather than
+// letting the first copy's timer take it down early.
+export const flashCopied = () => {
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => useUi.setState({ copied: false }), COPIED_TIMEOUT)
+  useUi.setState({ copied: true })
+}
 
 // --- views and filters -----------------------------------------------------------
 

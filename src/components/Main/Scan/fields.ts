@@ -1,4 +1,4 @@
-import type { EntryDraft } from '@/defaults/entries'
+import type { EntryDraft } from '@/kinds/draft'
 import { isImagePath } from '@/lib/fileTypes'
 
 export { IMAGE_EXTENSIONS, isImagePath } from '@/lib/fileTypes'

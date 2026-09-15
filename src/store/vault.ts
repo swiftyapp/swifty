@@ -9,7 +9,7 @@ import {
   setFavorite
 } from '@/api/vault'
 import { getAudit, type Audit } from '@/api/tools'
-import type { EntryDraft } from '@/defaults/entries'
+import type { EntryDraft } from '@/kinds/draft'
 import { usePrefs } from './prefs'
 import { useUi, setFilterType, setView } from './ui'
 import { scheduleSync } from './app'

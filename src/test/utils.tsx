@@ -11,12 +11,22 @@ import {
   initialVault,
   DEFAULT_PREFS
 } from '@/store'
+import type { AppStatus } from '@/api/app'
 import type { Entry, EntryMeta } from '@/api/types'
 import type { Audit } from '@/api/tools'
+import { appStatusDefault } from './ipc'
+
+/**
+ * The launch probe's answer, as the store holds it after `main.tsx` has run.
+ * Every suite starts booted (see `resetStores`); a spec about one leaf of it
+ * overrides that leaf.
+ */
+export const seedApp = (overrides: Partial<AppStatus> = {}) =>
+  useApp.setState({ status: { ...appStatusDefault(), ...overrides } })
 
 // Puts every store back to its initial shape so tests never share state.
 export const resetStores = () => {
-  useApp.setState(initialApp, true)
+  useApp.setState({ ...initialApp, status: appStatusDefault() }, true)
   useUi.setState(initialUi, true)
   useVault.setState(initialVault, true)
   usePrefs.setState(DEFAULT_PREFS)

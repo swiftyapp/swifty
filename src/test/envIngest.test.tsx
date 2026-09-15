@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FieldsProvider } from '@/components/elements/fields'
-import type { DraftValue, EntryDraft } from '@/defaults/entries'
+import type { DraftValue, EntryDraft } from '@/kinds/draft'
 import { open } from '@tauri-apps/plugin-dialog'
 import Fields from '@/kinds/env/Fields'
 import { useEnvIngest } from '@/kinds/env/useIngest'
@@ -12,9 +12,9 @@ import { useUi, useVault, startEntry, openAddPicker } from '@/store'
 import { withEntries, loginMeta, deferred } from './utils'
 import { calls, mockCommand } from './ipc'
 
-// The webview's drag-drop stream, replaced by a hand that can drop a file. The
-// hook subscribes after a lazy import, so a test waits for the listener before
-// it drops; `unlisten` takes it back out.
+// The webview's drag-drop stream, replaced by a hand that can drop a file —
+// setup.ts's mock is the inert one. A test waits for the listener before it
+// drops; `unlisten` takes it back out.
 type Handler = (event: { payload: { type: string; paths: string[] } }) => void
 let handlers: Handler[] = []
 vi.mock('@tauri-apps/api/webview', () => ({

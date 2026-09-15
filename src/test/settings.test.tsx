@@ -3,11 +3,15 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import i18n, { changeLocale } from '@/i18n'
-import { dateTime } from '@/utils/time'
+import { dates } from '@/utils/time'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import type { SyncStatus } from '@/api/sync'
 import { initialApp, openSettings, setSyncStatus, useApp, usePrefs, useUi } from '@/store'
-import { calls, mockCommand, mockCommandOnce } from './ipc'
+import DateField from '@/components/elements/fields/DateField'
+import { FieldsProvider } from '@/components/elements/fields/context'
+import Footer from '@/components/Main/Body/Aside/Show/Footer'
+import { appStatusDefault, calls, mockCommand, mockCommandOnce } from './ipc'
+import { seedApp } from './utils'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -15,9 +19,12 @@ const report = (s: Partial<SyncStatus>) => setSyncStatus({ ...initialApp.sync, .
 
 afterEach(() => changeLocale('en-US'))
 
-// Only the biometric leaf of app_status matters here; the row reads nothing else.
+// Only the biometric leaf of app_status matters here; the row reads nothing
+// else. Seeded into the store as what the boot probe said, and returned by the
+// mocked probe as what a re-run after a toggle says.
 const enrolled = (available: boolean, mode: 'protected' | 'prompt' | null) => ({
-  biometric: { available, canEnroll: available, type: 'touch', mode }
+  ...appStatusDefault(),
+  biometric: { available, canEnroll: true, type: 'touch' as const, mode }
 })
 
 const open = async () => {
@@ -178,8 +185,10 @@ describe('Settings › security', () => {
     expect(await screen.findByTestId('change-password-error')).toBeInTheDocument()
   })
 
-  it('enables biometric unlock from the toggle', async () => {
-    mockCommand('app_status', () => enrolled(false, null))
+  // The row is redrawn from a fresh probe after the toggle, not from a guess.
+  it('enables biometric unlock and redraws from the refreshed status', async () => {
+    seedApp(enrolled(false, null))
+    mockCommand('app_status', () => enrolled(true, 'protected'))
     mockCommand('enable_biometric', () => 'protected')
     await open()
     await go('security')
@@ -196,7 +205,8 @@ describe('Settings › security', () => {
   })
 
   it('disables biometric unlock from the toggle', async () => {
-    mockCommand('app_status', () => enrolled(true, 'prompt'))
+    seedApp(enrolled(true, 'prompt'))
+    mockCommand('app_status', () => enrolled(false, null))
     mockCommand('disable_biometric', () => undefined)
     await open()
     await go('security')
@@ -204,16 +214,18 @@ describe('Settings › security', () => {
     await userEvent.click(await screen.findByTestId('settings-biometric-toggle'))
 
     expect(calls('disable_biometric')).toHaveLength(1)
-    expect(screen.getByTestId('settings-biometric-toggle')).toHaveAttribute(
-      'aria-checked',
-      'false'
+    await waitFor(() =>
+      expect(screen.getByTestId('settings-biometric-toggle')).toHaveAttribute(
+        'aria-checked',
+        'false'
+      )
     )
   })
 
   // The copy must name the gate actually in force: an OS-enforced Secure Enclave
   // item and an app-enforced verify-then-read item are different promises.
   it('describes the OS-enforced gate when enrolled in protected mode', async () => {
-    mockCommand('app_status', () => enrolled(true, 'protected'))
+    seedApp(enrolled(true, 'protected'))
     await open()
     await go('security')
     expect(await screen.findByText(/Secure Enclave/)).toBeInTheDocument()
@@ -222,7 +234,8 @@ describe('Settings › security', () => {
   it('switches the copy to the mode enrollment settled on', async () => {
     // An unentitled build falls back to prompt mode; the description must follow
     // the enable response rather than keep advertising the generic offer.
-    mockCommand('app_status', () => enrolled(false, null))
+    seedApp(enrolled(false, null))
+    mockCommand('app_status', () => enrolled(true, 'prompt'))
     mockCommand('enable_biometric', () => 'prompt')
     await open()
     await go('security')
@@ -233,13 +246,15 @@ describe('Settings › security', () => {
     ).toBeInTheDocument()
   })
 
-  it('stores the auto-lock choice and pushes it to the backend', async () => {
+  // One write: Rust owns the file and re-arms the auto-lock from it, so there
+  // is no second command to push the value with.
+  it('stores the auto-lock choice through the settings file', async () => {
     await open()
     await go('security')
     await userEvent.click(screen.getByTestId('settings-autolock-300'))
 
     expect(usePrefs.getState().autolockSecs).toBe(300)
-    expect(calls('set_autolock_timeout')).toContainEqual({ secs: 300 })
+    expect(calls('set_settings')).toContainEqual({ patch: { autolockSecs: 300 } })
   })
 
   it('stores the clipboard delay, "Never" included', async () => {
@@ -401,12 +416,53 @@ describe('Settings › language & region', () => {
     await open()
     await go('language')
 
-    expect(dateTime(iso)).toMatch(/^01\/02\/2024/)
+    expect(dates(usePrefs.getState().dateFormat).dateTime(iso)).toMatch(/^01\/02\/2024/)
 
     await userEvent.click(screen.getByTestId('settings-date-format-DD.MM.YYYY'))
-    expect(dateTime(iso)).toMatch(/^02\.01\.2024/)
+    expect(dates(usePrefs.getState().dateFormat).dateTime(iso)).toMatch(/^02\.01\.2024/)
 
     await userEvent.click(screen.getByTestId('settings-date-format-YYYY-MM-DD'))
-    expect(dateTime(iso)).toMatch(/^2024-01-02/)
+    expect(dates(usePrefs.getState().dateFormat).dateTime(iso)).toMatch(/^2024-01-02/)
+  })
+})
+
+describe('Settings › date format', () => {
+  // Not just stored: a date already on screen has to be re-read in the new
+  // pattern. The format used to be read at call time by helpers nothing
+  // subscribed to, so every rendered date kept the pattern it was first drawn
+  // in. Two consumers, on purpose: the date field, and the entry footer's
+  // "Created" stamp, which formats a timestamp through `shortDate` rather than
+  // through a field.
+  it('re-renders every shown date when the format changes', async () => {
+    render(
+      <>
+        <Settings />
+        <FieldsProvider
+          value={{
+            entry: { type: 'apikey', title: '', expiry_date: '2035-06-01' },
+            set: null,
+            attempted: false
+          }}
+        >
+          <DateField name="expiry_date" label="Expires" />
+        </FieldsProvider>
+        {/* Midday UTC, so the local date is the 15th in every zone a test runs in. */}
+        <Footer tags={[]} createdAt="2024-01-15T12:00:00.000Z" />
+      </>
+    )
+    await userEvent.click(document.querySelector('.settings-button')!)
+    await go('language')
+
+    expect(screen.getByText('06/01/2035')).toBeInTheDocument()
+    expect(screen.getByText('01/15/2024')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-date-format-DD.MM.YYYY'))
+    expect(await screen.findByText('01.06.2035')).toBeInTheDocument()
+    expect(screen.getByText('15.01.2024')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-date-format-YYYY-MM-DD'))
+    expect(await screen.findByText('2035-06-01')).toBeInTheDocument()
+    expect(screen.getByText('2024-01-15')).toBeInTheDocument()
+    expect(usePrefs.getState().dateFormat).toBe('YYYY-MM-DD')
   })
 })

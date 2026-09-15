@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
-import { openLink } from '@/services/openLink'
+import { isOpenableUrl, openLink } from '@/services/openLink'
 import { useFavicon } from '@/hooks/useFavicon'
 import { ExternalGlyph, GlobeGlyph } from '../../Main/icons'
 import IconButton from '../IconButton'
@@ -41,7 +41,9 @@ export default function UrlField({
         )
       }
       actions={
-        value ? (
+        // Offered only for a link the OS opener will actually take (http/https),
+        // so there is no button that answers a click by doing nothing.
+        isOpenableUrl(value) ? (
           <IconButton title={t('Open')} onClick={() => openLink(value)}>
             <ExternalGlyph />
           </IconButton>

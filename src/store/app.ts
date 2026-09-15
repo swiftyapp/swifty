@@ -1,12 +1,10 @@
 import { create } from 'zustand'
-import type { BiometryType, UnlockResult } from '@/api/types'
-import { appStatus } from '@/api/app'
+import type { UnlockResult } from '@/api/types'
+import { appStatus, type AppStatus } from '@/api/app'
 import { lock } from '@/api/auth'
 import type { SetupDriveFile } from '@/api/setup'
 import { syncNow, type SyncStatus } from '@/api/sync'
-import { setAutolockTimeout } from '@/api/tools'
 import { checkForUpdate } from '@/services/autoUpdate'
-import { usePrefs } from './prefs'
 import { setEntries, resetVault, runAudit } from './vault'
 import { setScanSupported, resetUi } from './ui'
 
@@ -30,10 +28,17 @@ export type SetupDriveStatus = 'idle' | 'pending' | 'found' | 'empty' | 'error'
 
 export interface AppState {
   flow: FlowName
-  /** Biometric unlock is enrolled *and* usable, so the lock screen offers it. */
-  touchID: boolean
-  /** Which gate it is, for the copy: the same iOS build runs on Face ID and Touch ID. */
-  biometry: BiometryType
+  /**
+   * The launch probe's last answer, in one place. It was eight `app_status`
+   * calls racing each other — one per screen that wanted a leaf of it — so
+   * every screen reads this instead and re-renders when it is refreshed. The
+   * lock screen's gate (`biometric.available`, `biometric.type`) is read off it
+   * rather than copied out at each flow change.
+   *
+   * Null until the boot probe lands (`main.tsx`), and on a host where that call
+   * failed outright; every reader treats that as "nothing known yet".
+   */
+  status: AppStatus | null
   /**
    * The backend's sync status, verbatim. It owns every flow — it opens the
    * browser, hears back from it, runs the sync — so it is the one that can say;
@@ -57,12 +62,11 @@ export interface AppState {
 const DRIVE_IDLE = { status: 'idle' as SetupDriveStatus, file: null, error: null }
 
 export const initialApp: AppState = {
-  // No backend command exists to detect a pristine vault, so the auth screen is
-  // the default; setup is reached explicitly via `flowSetup`. `touchID: false`
-  // means nothing biometric is drawn before the probe answers.
+  // The auth screen is the default; setup is reached explicitly via `flowSetup`
+  // once the probe says there is nothing on disk. With `status` null nothing
+  // biometric is drawn before the probe answers.
   flow: 'auth',
-  touchID: false,
-  biometry: 'touch',
+  status: null,
   sync: { configured: false, pending: false, inProgress: false, error: null, lastSyncedAt: null },
   setupDrive: DRIVE_IDLE,
   update: { readyVersion: null, readyNotes: null, status: null }
@@ -70,23 +74,35 @@ export const initialApp: AppState = {
 
 export const useApp = create<AppState>()(() => initialApp)
 
+// --- launch probe -----------------------------------------------------------------
+
+/** Take the boot probe's answer wholesale (see `main.tsx`). */
+export const setApp = (status: AppStatus) => useApp.setState({ status })
+
+/**
+ * Ask again, after something that can change the answer: an unlock, a lock, an
+ * enrollment. Resolves with what it stored — or null, keeping the last known
+ * answer, if the call failed — and never rejects, so no caller has to guard it.
+ */
+export const refreshApp = (): Promise<AppStatus | null> =>
+  appStatus()
+    .then(status => {
+      setApp(status)
+      return status
+    })
+    .catch(() => null)
+
 // --- flow -----------------------------------------------------------------------
 
 export const flowSetup = () => useApp.setState({ flow: 'setup' })
+export const flowAuth = () => useApp.setState({ flow: 'auth' })
 export const flowMain = () => useApp.setState({ flow: 'main' })
 
-// Omit `biometry` to keep the last known one: it is a property of the device,
-// so only the callers already probing the backend have a fresh answer to hand.
-export const flowAuth = (touchID: boolean, biometry?: BiometryType) =>
-  useApp.setState(state => ({ flow: 'auth', touchID, biometry: biometry ?? state.biometry }))
-
-// Whether the lock screen can offer a biometric gate, and which one. Asked
+// The lock screen reads its gate off `status`, so a lock re-runs the probe
+// first: whether a key is enrolled can have changed since the last one. Asked
 // rather than assumed — hardcoding `false` here is how the Touch ID button used
 // to vanish on every in-session lock.
-export const showLockScreen = () =>
-  appStatus()
-    .then(({ biometric }) => flowAuth(biometric.available, biometric.type))
-    .catch(() => flowAuth(false))
+export const showLockScreen = () => refreshApp().then(() => flowAuth())
 
 // Everything the unlocked session put in the stores. A lock has to drop all of
 // it — it outlives the session otherwise, and the next unlock (of this or any
@@ -109,17 +125,13 @@ export const lockVault = () =>
 export const enterMain = async (result: UnlockResult) => {
   setEntries(result.entries)
   flowMain()
-  // The backend resets to its built-in default on every launch; re-apply the
-  // stored preference as soon as there is a session to protect.
-  setAutolockTimeout(usePrefs.getState().autolockSecs).catch(() => {})
   // The unlock result carries whether this vault syncs; everything else about
   // sync arrives as `sync:status` once a flow or a run happens.
   useApp.setState(state => ({ sync: { ...state.sync, configured: result.syncConfigured } }))
-  // Asked once per session: whether the OS can read a card off a photo decides
-  // whether any scan affordance is offered at all.
-  appStatus()
-    .then(status => setScanSupported(status.scanSupported))
-    .catch(() => {})
+  // The session just changed what the probe says (sync, initialized), and it
+  // carries whether the OS can read a card off a photo — asked once per unlock,
+  // it decides whether any scan affordance is offered at all.
+  void refreshApp().then(status => status && setScanSupported(status.scanSupported))
   // One run on unlock: this device may have been off while another pushed,
   // and it may itself be holding writes a previous session never published.
   if (result.syncConfigured) syncNow().catch(() => {})

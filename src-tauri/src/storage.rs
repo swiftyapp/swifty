@@ -21,6 +21,9 @@ pub const KDF_SIDECAR_FILE: &str = "vault.kdf.json";
 // so the attempt counter cannot live in the `meta` table. Public by design —
 // it only ever holds a counter and a timestamp, nothing secret.
 pub const LOCKOUT_SIDECAR_FILE: &str = "vault.lock.json";
+// User preferences (theme, locale, auto-lock, …). Plaintext and readable while
+// locked by design: the shell has to know what to draw before the vault opens.
+pub const SETTINGS_FILE: &str = "settings.json";
 pub const GDRIVE_FILE: &str = "auth/gdrive.swftx";
 // Marker for "biometric unlock is enabled". The key itself lives in the OS
 // secure store; this flag lets us report availability without a biometric prompt.
@@ -117,6 +120,16 @@ pub fn remove_db_files(path: &Path) {
         sibling.push(suffix);
         let _ = fs::remove_file(PathBuf::from(sibling));
     }
+}
+
+pub fn settings_path(app: &AppHandle) -> Result<PathBuf> {
+    Ok(app_dir(app)?.join(SETTINGS_FILE))
+}
+
+// Write (or overwrite) the preferences file. Atomic like the sidecars: a torn
+// write here would boot the next launch on the defaults.
+pub fn write_settings(app: &AppHandle, json: &str) -> Result<()> {
+    atomic_write_file(&settings_path(app)?, json)
 }
 
 fn lockout_sidecar_path(app: &AppHandle) -> Result<PathBuf> {

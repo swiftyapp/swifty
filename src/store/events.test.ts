@@ -146,8 +146,8 @@ describe('vault:locked', () => {
 
     // The regression: this used to be `flowAuth(false)` unconditionally, so an
     // in-session lock (autolock, tray) never offered Touch ID again until a
-    // full app restart.
-    expect(useApp.getState().touchID).toBe(true)
+    // full app restart. The lock screen reads the gate off the re-run probe.
+    expect(useApp.getState().status?.biometric.available).toBe(true)
   })
 
   it('drops the session data with the key', async () => {
@@ -169,12 +169,14 @@ describe('vault:locked', () => {
     expect(useUi.getState().view).toBe('items')
   })
 
-  it('lands on the plain lock screen when nothing is enrolled', async () => {
+  it('lands on the plain lock screen when the probe never answered', async () => {
     mockCommand('app_status', () => Promise.reject({ kind: 'other', message: 'no backend' }))
+    useApp.setState({ status: null })
     flowMain()
 
     handlerFor(EVENTS.vaultLocked)()
     await vi.waitFor(() => expect(useApp.getState().flow).toBe('auth'))
-    expect(useApp.getState().touchID).toBe(false)
+    // A failed re-probe keeps the last known answer, and there was none.
+    expect(useApp.getState().status).toBeNull()
   })
 })
