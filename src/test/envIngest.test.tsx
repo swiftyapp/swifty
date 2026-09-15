@@ -12,9 +12,9 @@ import { makeStore, useStore, startEntry, openAddPicker } from '@/store'
 import { renderWithStore, withEntries, loginMeta, deferred } from './utils'
 import { calls, mockCommand } from './ipc'
 
-// The webview's drag-drop stream, replaced by a hand that can drop a file. The
-// hook subscribes after a lazy import, so a test waits for the listener before
-// it drops; `unlisten` takes it back out.
+// The webview's drag-drop stream, replaced by a hand that can drop a file —
+// setup.ts's mock is the inert one. A test waits for the listener before it
+// drops; `unlisten` takes it back out.
 type Handler = (event: { payload: { type: string; paths: string[] } }) => void
 let handlers: Handler[] = []
 vi.mock('@tauri-apps/api/webview', () => ({

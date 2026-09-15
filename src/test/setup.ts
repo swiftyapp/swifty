@@ -35,6 +35,15 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn().mockResolvedValue(null)
 }))
 
+// The drag-drop stream `useFileDrop` subscribes to. Nothing drops a file by
+// default; a suite that needs to replaces this with a mock that keeps the
+// handlers (see envIngest.test.tsx).
+vi.mock('@tauri-apps/api/webview', () => ({
+  getCurrentWebview: () => ({
+    onDragDropEvent: vi.fn().mockResolvedValue(() => {})
+  })
+}))
+
 // Components under test call useTranslation(); the singleton must be
 // initialized once before any of them render.
 const { i18nReady } = await import('@/i18n')

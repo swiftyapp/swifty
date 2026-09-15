@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { useStore } from './store'
 import { runStartupUpdateCheck } from './services/autoUpdate'
-import { applyPlatform } from './utils/platform'
 import { applyTheme, getTheme } from './theme'
 import { i18nReady } from './i18n'
 import { runSplash } from './lib/splash'
@@ -23,7 +22,6 @@ const blockReloadShortcuts = () => {
 }
 
 blockReloadShortcuts()
-applyPlatform()
 // Theme first: the splash in index.html recolors off `data-theme` the moment
 // it is set, before its animation starts.
 applyTheme(getTheme())
