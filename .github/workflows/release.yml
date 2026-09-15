@@ -30,14 +30,13 @@
 
 name: Release
 
-# Manual, or on a version tag. Either way the release tag/name comes from
+# Manual only — a release happens when someone clicks "Run workflow", never as
+# a side effect of a merge or a pushed tag. The release tag/name comes from
 # `version` in src-tauri/tauri.conf.json (keep package.json + Cargo.toml in
 # sync). Note: GitHub only offers "Run workflow" for workflows present on the
-# repo's default branch; pushing a `v*` tag works from any branch.
+# repo's default branch.
 on:
   workflow_dispatch:
-  push:
-    tags: ['v*']
 
 jobs:
   release:

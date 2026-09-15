@@ -9,7 +9,7 @@ per-release procedure. iOS is a separate workflow: see
 ## Overview
 
 ```
-bump version → push a v* tag (or run Release manually) → CI builds all three platforms
+bump version → run Release manually from Actions → CI builds all three platforms
             → DRAFT GitHub release (installers + .app.tar.gz + .sig + latest.json)
             → you review and publish the draft → installed apps update on next launch
 ```
@@ -93,11 +93,13 @@ pubkey.
    `@tauri-apps/*` npm package and its Rust crate are on different major.minor
    releases, which is exactly the check `tauri build` would otherwise fail on
    release day (`scripts/check-tauri-versions.mjs`).
-3. Trigger the build, either way:
-   - push a tag: `git tag v<version> && git push origin v<version>`
-     (this also triggers the iOS release), or
-   - GitHub → Actions → *Release* → *Run workflow* (only offered for the
-     default branch).
+3. Trigger the build by hand: GitHub → Actions → *Release* → *Run workflow*
+   (only offered for the default branch). Nothing releases automatically — not
+   on merge, not on a pushed tag — so a release only ever happens when you ask
+   for one. Shipping iOS in the same version is a separate manual run
+   ([releasing-ios.md](releasing-ios.md)) that must come **after** this one:
+   this workflow creates the draft release, and the iOS run only attaches its
+   IPA to a draft that already exists.
 4. Wait for all three platform jobs. They create one **draft** release
    `Rowel v<version>` with the installers, the updater artifacts, their
    `.sig` files, `latest.json` and the SBOMs. The Linux job replaces the

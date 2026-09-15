@@ -156,34 +156,47 @@ you want the app on a connected device.
    one marketing version is `CFBundleVersion`, which the release script sets
    per build.
 
-2. **Tag and push**: `git tag v<version> && git push origin v<version>`. This
-   triggers both `Release` (desktop) and `Release iOS`. The iOS workflow can
-   also be started manually from the Actions tab (`workflow_dispatch`) — GitHub
-   only offers that for workflows on the default branch.
+2. **Run the desktop release first.** *Release* ([releasing.md](releasing.md))
+   is what creates the draft GitHub release; this workflow only attaches its
+   IPA to an existing one. Started first, the iOS run finds no draft, logs a
+   notice, exits green, and the IPA survives only as the `rowel-ios-ipa`
+   artifact — so the draft the desktop run then creates has no IPA on it and
+   you have to re-run iOS anyway. iOS-only build (TestFlight upload, no
+   GitHub-release asset)? Then order does not matter.
 
-3. **Watch the run.** `CFBundleVersion` is set to the workflow run number
+3. **Run the workflow**: Actions → *Release iOS* → *Run workflow*. It is
+   manual-only — nothing triggers it on merge or on a pushed tag — and GitHub
+   only offers "Run workflow" for workflows on the default branch.
+
+   **Pick the ref deliberately**, because it decides both what gets built and
+   how the IPA is attached in step 5:
+
+   - *A `v<version>` tag* — builds that exact revision, and attaches with
+     `--clobber`, replacing any IPA already on that release. This is the one to
+     use when re-running a release, and the only way to replace an IPA.
+   - *A branch (e.g. `main`)* — builds the branch tip, which may be **ahead of
+     the version being released**, and attaches to `v<version from
+     tauri.conf.json>` only if that release carries no IPA yet. It never
+     replaces one.
+
+4. **Watch the run.** `CFBundleVersion` is set to the workflow run number
    (through `--config bundle.iOS.bundleVersion`, for the ITMS-90060 reason
    above), which is strictly increasing, so re-running the workflow for the
    same version always produces an acceptable new build.
 
-4. **TestFlight processing** takes roughly 5–30 minutes after the upload step
+5. **TestFlight processing** takes roughly 5–30 minutes after the upload step
    succeeds. The build then appears under **TestFlight → iOS builds**. The IPA
    is always kept as the `rowel-ios-ipa` workflow artifact — including when
    App Store Connect rejects the upload — and is also attached to the draft
-   GitHub release for the tag (created by the desktop workflow).
+   GitHub release created by the desktop workflow, per the ref rules in step 3.
+   No draft yet is a notice, not a failure: the artifact is then the only copy,
+   and re-running against the tag once the draft exists attaches it.
 
-   A tag run attaches to the tag that triggered it. A manual run builds the
-   default branch, which may be ahead of the released version, so it attaches
-   to `v<version from tauri.conf.json>` only when that release does not already
-   carry an IPA; otherwise it logs a warning and leaves the existing asset
-   alone. To replace the IPA on a release, re-run the workflow by pushing (or
-   re-pushing) that tag.
-
-5. **Export compliance** must be answered for the build — see below. Until it
+6. **Export compliance** must be answered for the build — see below. Until it
    is answered the build stays in "Missing Compliance" and cannot be
    distributed to testers.
 
-6. **App Store submission**: **Apps → Rowel → iOS App → + Version**, fill in
+7. **App Store submission**: **Apps → Rowel → iOS App → + Version**, fill in
    what's new, screenshots and the review notes (include test-vault credentials
    if the reviewer needs them), select the processed build, then **Add for
    Review → Submit**.
