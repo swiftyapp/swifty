@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { generateSshKey, type SshKeyPair } from '@/lib/commands'
+import { generateSshKey, type SshKeyPair } from '@/api/tools'
 
 /**
  * One generated ed25519 keypair and the comment it carries. The comment is

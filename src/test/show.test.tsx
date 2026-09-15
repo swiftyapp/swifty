@@ -4,11 +4,11 @@ import userEvent from '@testing-library/user-event'
 import Show from '@/components/Main/Body/Aside/Show'
 import Aside from '@/components/Main/Body/Aside'
 import Body from '@/components/Main/Body'
-import { revealEntry } from '@/lib/commands'
 import { makeStore, setCurrentEntry } from '@/store'
 import { kindOf } from '@/kinds'
 import { t } from '@/i18n'
 import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
+import { mockCommand } from './ipc'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -16,7 +16,7 @@ beforeEach(() => vi.clearAllMocks())
 // field set. The field set itself is covered by entry.test.tsx.
 describe('Show chrome', () => {
   it('names the kind once and reduces the stamps to one footer line', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry())
+    mockCommand('reveal_entry', () => loginEntry())
     renderWithStore(<Show entry={loginMeta()} />)
 
     // The eyebrow above the title is the only place the kind is named; the
@@ -30,7 +30,7 @@ describe('Show chrome', () => {
   })
 
   it('filters the list by a tag pressed in the detail pane', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ tags: ['work'] }))
+    mockCommand('reveal_entry', () => loginEntry({ tags: ['work'] }))
     const { store } = renderWithStore(<Show entry={loginMeta({ tags: ['work'] })} />)
 
     await userEvent.click(await screen.findByLabelText('Filter by tag work'))
@@ -48,7 +48,7 @@ describe('Edit mode in the pane', () => {
     return store
   }
 
-  beforeEach(() => vi.mocked(revealEntry).mockResolvedValue(loginEntry()))
+  beforeEach(() => mockCommand('reveal_entry', () => loginEntry()))
 
   // Edit lives under the header's one menu, not as a button of its own.
   const openEdit = async () => {

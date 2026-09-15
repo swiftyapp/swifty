@@ -1,4 +1,4 @@
-import type { GeneratorOptions } from '@/lib/commands'
+import type { GeneratorOptions } from '@/api/tools'
 
 const defaults: GeneratorOptions = {
   length: 20,

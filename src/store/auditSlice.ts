@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand'
-import type { Audit } from '@/lib/commands'
+import type { Audit } from '@/api/tools'
 import { getBreachCheck, setBreachCheck } from '@/defaults/audit'
 import type { StoreState } from './index'
 

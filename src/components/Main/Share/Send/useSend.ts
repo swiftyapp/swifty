@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { shareCreate, shareRevoke, type ShareCreated } from '@/lib/commands'
+import { shareCreate, shareRevoke, type ShareCreated } from '@/api/share'
+import { messageOf } from '@/api/errors'
 import { useStore, closeSend, queueOrphan, revokeOrphans } from '@/store'
 import { useCopied } from '@/hooks/useCopied'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
@@ -78,7 +79,7 @@ export function useSend(entryId: string): Send {
       // than mapped to copy of our own.
       .catch(reason => {
         if (!current()) return
-        setFailed({ op: 'create', message: String(reason) })
+        setFailed({ op: 'create', message: messageOf(reason) })
         setBusy(false)
       })
   }, [entryId, begin])
@@ -102,7 +103,7 @@ export function useSend(entryId: string): Send {
         if (!current()) return
         // The link is still live, so it stays on screen with the complaint
         // under it — the only honest thing to show after a failed revoke.
-        setFailed({ op: 'revoke', message: String(reason) })
+        setFailed({ op: 'revoke', message: messageOf(reason) })
         setBusy(false)
       })
   }, [share, busy, begin])

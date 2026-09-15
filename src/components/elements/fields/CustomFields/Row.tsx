@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { ExtraField } from '@/lib/commands'
+import type { ExtraField } from '@/api/types'
 import { cx } from '@/utils/cx'
 import { TrashGlyph } from '../../../Main/icons'
 import CopyButton from '../../CopyButton'

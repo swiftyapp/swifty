@@ -69,7 +69,7 @@ describe("first-run setup", () => {
     );
     await expect($('[data-testid="main-view"]')).not.toBeDisplayed();
 
-    // Nothing was written: a reload re-runs `is_initialized` against disk, and
+    // Nothing was written: a reload re-runs `app_status` against disk, and
     // the app offers first-run setup again rather than an unlock screen.
     await reload();
     await waitFor("start-setup-button");

@@ -1,4 +1,4 @@
-import type { Entry, EntryMeta } from '@/lib/commands'
+import type { Entry, EntryMeta } from '@/api/types'
 import { editEntry, openSend } from '@/store'
 import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'

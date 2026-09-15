@@ -1,7 +1,8 @@
 import type { ReactElement } from 'react'
 import { render } from '@testing-library/react'
 import { makeStore, setEntries, flowMain, auditDone } from '@/store'
-import type { Entry, EntryMeta, Audit } from '@/lib/commands'
+import type { Entry, EntryMeta } from '@/api/types'
+import type { Audit } from '@/api/tools'
 
 interface Options {
   store?: ReturnType<typeof makeStore>

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { BiometryType } from '@/lib/commands'
+import type { BiometryType } from '@/api/types'
 import { biometryLabel } from '@/lib/biometry'
 import BiometryGlyph from '@/components/elements/BiometryGlyph'
 

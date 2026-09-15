@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { EntryMeta, EntryType } from '@/lib/commands'
+import type { EntryMeta, EntryType } from '@/api/types'
 import { kindOf } from '@/kinds'
 
 /**

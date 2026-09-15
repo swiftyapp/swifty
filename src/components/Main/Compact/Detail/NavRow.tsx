@@ -1,4 +1,4 @@
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 import { editEntry, openSend, setNoEntry } from '@/store'
 import Archived from '../../Body/Aside/Show/Archived'
 import MoreMenu from '../../Body/Aside/Show/MoreMenu'

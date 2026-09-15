@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { filterEntries } from './entries'
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 
 const login = (title: string, tags: string[] = [], urlHost = ''): EntryMeta =>
   ({ id: title, type: 'login', title, tags, urlHost, favorite: false })

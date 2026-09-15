@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { ExtraField } from '@/lib/commands'
+import type { ExtraField } from '@/api/types'
 import AddAction from '../../AddAction'
 import Panel from '../../Panel'
 import { LABEL } from '../../tokens'

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { KINDS, kindOf } from '.'
 import type { EntryDraft } from '@/defaults/entries'
-import type { Passkey } from '@/lib/commands'
+import type { Passkey } from '@/api/types'
 
 // What each kind will let through to `saveEntry` — the only thing standing
 // between a typed draft and the vault.

@@ -4,9 +4,9 @@ import userEvent from '@testing-library/user-event'
 import Generator from '@/components/Main/Generator'
 import Main from '@/components/Main'
 import { useShortcuts } from '@/components/Main/useShortcuts'
-import { copyToClipboard, generatePassword, generateSshKey } from '@/lib/commands'
 import { makeStore, useStore, openGenerator, openPalette, openSshGenerator } from '@/store'
 import { renderWithStore, withEntries, loginMeta } from './utils'
+import { calls, mockCommand, clearCalls, mockCommandOnce } from './ipc'
 
 // ⌘G lives in the app-level shortcut surface now (Main/useShortcuts), so the
 // harness mounts it alongside the dialog the way Main does.
@@ -22,7 +22,7 @@ const open = async () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(generatePassword).mockResolvedValue('Generated123!')
+  mockCommand('generate_password', () => 'Generated123!')
 })
 
 describe('Generator', () => {
@@ -37,7 +37,7 @@ describe('Generator', () => {
     expect(await screen.findByText('Generated123!')).toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('generator-use-button'))
-    expect(copyToClipboard).toHaveBeenCalledWith('Generated123!', expect.any(Number))
+    expect(calls('copy_to_clipboard')).toContainEqual({ value: 'Generated123!', clearAfterMs: expect.any(Number) })
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 
@@ -59,17 +59,17 @@ describe('Generator', () => {
     await open()
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
-    expect(copyToClipboard).not.toHaveBeenCalled()
+    expect(calls('copy_to_clipboard')).toHaveLength(0)
   })
 
   it('switches to memorable words without calling the random engine', async () => {
     renderWithStore(<Harness />)
     await open()
-    vi.mocked(generatePassword).mockClear()
+    clearCalls('generate_password')
 
     await userEvent.click(screen.getByText('Memorable'))
     expect(await screen.findByText('Words')).toBeInTheDocument()
-    expect(generatePassword).not.toHaveBeenCalled()
+    expect(calls('generate_password')).toHaveLength(0)
     expect(screen.getByTestId('generator-output').textContent).toMatch(/^[a-z]+(-[a-z]+)+-\d{2}$/)
   })
 })
@@ -121,11 +121,11 @@ describe('Generator, SSH keys', () => {
   it('draws a fresh key for a changed comment', async () => {
     renderWithStore(<Harness />)
     await openSsh()
-    vi.mocked(generateSshKey).mockClear()
+    clearCalls('generate_ssh_key')
 
     await userEvent.type(screen.getByTestId('generator-ssh-comment'), 'me')
 
-    expect(generateSshKey).toHaveBeenLastCalledWith('me')
+    expect(calls('generate_ssh_key')).toContainEqual({ comment: 'me' })
   })
 
   it('opens a prefilled ssh draft on "Save as SSH key"', async () => {
@@ -139,7 +139,7 @@ describe('Generator, SSH keys', () => {
     expect(useStore.getState().entries.new).toBe('ssh')
     expect(useStore.getState().entries.prefill).toEqual(PAIR)
     // A private key does not go on the clipboard behind the user's back.
-    expect(copyToClipboard).not.toHaveBeenCalled()
+    expect(calls('copy_to_clipboard')).toHaveLength(0)
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 
@@ -205,7 +205,7 @@ describe('Generator, with the shell behind it', () => {
 
     // The palette's own command ran; the generator did not also confirm.
     expect(useStore.getState().entries.new).toBe('login')
-    expect(copyToClipboard).not.toHaveBeenCalled()
+    expect(calls('copy_to_clipboard')).toHaveLength(0)
   })
 })
 
@@ -231,9 +231,7 @@ describe('Generator, SSH keys in flight', () => {
     await openSsh()
 
     let settle: (pair: typeof PAIR) => void = () => {}
-    vi.mocked(generateSshKey).mockImplementationOnce(
-      () => new Promise(resolve => (settle = resolve))
-    )
+    mockCommandOnce('generate_ssh_key', () => new Promise(resolve => settle = resolve))
     await userEvent.type(screen.getByTestId('generator-ssh-comment'), 'm')
 
     const save = screen.getByTestId('generator-use-button')
@@ -252,7 +250,9 @@ describe('Generator, SSH keys in flight', () => {
 
   it('shows a refused draw and offers to try again', async () => {
     renderWithStore(<Harness />)
-    vi.mocked(generateSshKey).mockRejectedValueOnce(new Error('no entropy'))
+    mockCommandOnce('generate_ssh_key', () =>
+      Promise.reject({ kind: 'crypto', message: 'no entropy' })
+    )
     await open()
     await userEvent.click(screen.getByTestId('generator-mode-ssh'))
 
@@ -264,7 +264,7 @@ describe('Generator, SSH keys in flight', () => {
 
     await userEvent.click(screen.getByTestId('generator-ssh-retry'))
     await screen.findByTestId('generator-ssh-public')
-    expect(generateSshKey).toHaveBeenCalledTimes(2)
+    expect(calls('generate_ssh_key')).toHaveLength(2)
     expect(screen.getByTestId('generator-use-button')).toBeEnabled()
   })
 })

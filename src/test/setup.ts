@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { beforeEach, vi } from 'vitest'
+import { resetIpc } from './ipc'
 import { setLayout } from './layout'
 
 // jsdom implements no layout, so it ships no scrollIntoView.
@@ -10,126 +11,19 @@ Element.prototype.scrollIntoView = vi.fn()
 setLayout('wide')
 beforeEach(() => setLayout('wide'))
 
-// The Rust backend is built in parallel; mock the whole command/event layer so
-// screens render without a live backend. Individual tests override as needed.
-vi.mock('@/lib/commands', () => ({
-  isInitialized: vi.fn().mockResolvedValue(true),
-  osLocale: vi.fn().mockResolvedValue('en-US'),
-  setup: vi.fn().mockResolvedValue(undefined),
-  unlock: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
-  lock: vi.fn().mockResolvedValue(undefined),
-  unlockBiometric: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
-  isBiometricAvailable: vi.fn().mockResolvedValue(false),
-  canEnrollBiometric: vi.fn().mockResolvedValue(false),
-  // The desktop's gate, and what every pre-existing spec asserts by name.
-  biometryType: vi.fn().mockResolvedValue('touch'),
-  biometricStatus: vi.fn().mockResolvedValue({ enabled: false, mode: null }),
-  enableBiometric: vi.fn().mockResolvedValue('protected'),
-  disableBiometric: vi.fn().mockResolvedValue(undefined),
-  changeMasterPassword: vi.fn().mockResolvedValue(undefined),
-  // First run. The probe's result never comes back through these promises —
-  // it arrives as `setup:drive:*`, which a spec drives through the store.
-  setupDriveConnect: vi.fn().mockResolvedValue(undefined),
-  setupDriveDisconnect: vi.fn().mockResolvedValue(undefined),
-  setupCreate: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
-  setupRestoreFromDrive: vi
-    .fn()
-    .mockResolvedValue({ entries: [], syncConfigured: true }),
-  readVault: vi.fn().mockResolvedValue([]),
-  revealEntry: vi.fn().mockImplementation((id: string) =>
-    Promise.resolve({ id, type: 'login', title: '' })
-  ),
-  saveEntry: vi.fn().mockImplementation((entry: { id: string; type: string; title: string }) =>
-    Promise.resolve({
-      id: entry.id,
-      type: entry.type,
-      title: entry.title,
-      tags: [],
-      urlHost: '',
-      favorite: false
-    })
-  ),
-  deleteEntry: vi.fn().mockResolvedValue(undefined),
-  listDeleted: vi.fn().mockResolvedValue([]),
-  restoreEntry: vi.fn().mockImplementation((id: string) =>
-    Promise.resolve({ id, type: 'login', title: '', tags: [], urlHost: '', favorite: false })
-  ),
-  purgeEntry: vi.fn().mockResolvedValue(undefined),
-  setFavorite: vi.fn().mockImplementation((id: string, favorite: boolean) =>
-    Promise.resolve({ id, type: 'login', title: '', tags: [], urlHost: '', favorite })
-  ),
-  pickBackup: vi.fn().mockResolvedValue(null),
-  pickImportFile: vi.fn().mockResolvedValue(null),
-  pickEnvFile: vi.fn().mockResolvedValue(null),
-  readEnvFile: vi.fn().mockRejectedValue('file is not UTF-8 text'),
-  importEntries: vi
-    .fn()
-    .mockResolvedValue({ total: 0, imported: 0, skipped: 0, dryRun: true, errors: [] }),
-  exportEntries: vi.fn().mockResolvedValue(null),
-  saveEnvFile: vi.fn().mockResolvedValue(null),
-  setAutolockTimeout: vi.fn().mockResolvedValue(undefined),
-  setupRestoreFromFile: vi.fn().mockResolvedValue({ entries: [], syncConfigured: false }),
-  importSwftx: vi.fn().mockResolvedValue(0),
-  exportVault: vi.fn().mockResolvedValue(null),
-  generatePassword: vi.fn().mockResolvedValue('Generated123!'),
-  generateSshKey: vi.fn().mockResolvedValue({
-    privateKey: '-----BEGIN OPENSSH PRIVATE KEY-----\nc2VjcmV0\n-----END OPENSSH PRIVATE KEY-----\n',
-    publicKey: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI',
-    fingerprint: 'SHA256:GeneratedFingerprint'
-  }),
-  generateOtp: vi.fn().mockResolvedValue({ code: '123456', time: 30 }),
-  verifyOtp: vi.fn().mockResolvedValue(true),
-  getAudit: vi.fn().mockResolvedValue({}),
-  fetchFavicon: vi.fn().mockResolvedValue(null),
-  copyToClipboard: vi.fn().mockResolvedValue(undefined),
-  syncConnect: vi.fn().mockResolvedValue(undefined),
-  syncDisconnect: vi.fn().mockResolvedValue(undefined),
-  syncNow: vi.fn().mockResolvedValue(undefined),
-  syncImport: vi.fn().mockResolvedValue(undefined),
-  syncStatus: vi.fn().mockResolvedValue({ configured: false, pending: false }),
-  // Sharing. The link is the shape the backend hands back — file id plus key —
-  // and `shareOpen` resolves a plain login, so a suite only overrides the one
-  // call it is about.
-  shareCreate: vi.fn().mockResolvedValue({
-    link: 'rowel://share#v1.file-1.a2V5LTFrZXktMWtleS0xa2V5LTFrZXktMWtleS0xa2V5',
-    fileId: 'file-1',
-    expiresAt: '2024-01-02T00:00:00.000Z'
-  }),
-  shareOpen: vi.fn().mockResolvedValue({
-    id: '',
-    type: 'login',
-    title: 'Shared Netflix',
-    website: 'https://netflix.com',
-    username: 'shared@example.com',
-    password: 'from-a-friend',
-    email: '',
-    note: '',
-    otp: ''
-  }),
-  shareRevoke: vi.fn().mockResolvedValue(undefined),
-  shareList: vi.fn().mockResolvedValue([]),
-  // Off by default, so no suite sees a scan affordance it did not ask for.
-  scanSupported: vi.fn().mockResolvedValue(false),
-  scanImage: vi.fn().mockRejectedValue('nothing recognized'),
-  // Pure helper (not a command); mirror the real projection so tests and the
-  // dead sync path can use it against the mocked module.
-  toEntryMeta: (entry: { id: string; type: string; title: string; tags?: string[] }) => ({
-    id: entry.id,
-    type: entry.type,
-    title: entry.title,
-    tags: entry.tags ?? [],
-    urlHost: '',
-    favorite: false
-  })
-}))
+// The Rust backend is built in parallel, so the one seam that reaches it is
+// faked here and every command answers out of `./ipc`. A spec overrides the
+// single call it is about with `mockCommand`.
+vi.mock('@tauri-apps/api/core', async () => {
+  const { invokeMock } = await import('./ipc')
+  return { invoke: invokeMock }
+})
 
-vi.mock('@/lib/events', async orig => ({
-  ...(await orig<typeof import('@/lib/events')>()),
+beforeEach(resetIpc)
+
+vi.mock('@/api/events', async orig => ({
+  ...(await orig<typeof import('@/api/events')>()),
   on: vi.fn().mockResolvedValue(() => {})
-}))
-
-vi.mock('@tauri-apps/api/app', () => ({
-  getVersion: vi.fn().mockResolvedValue('1.0.0')
 }))
 
 vi.mock('@tauri-apps/api/window', () => ({

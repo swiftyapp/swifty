@@ -1,4 +1,4 @@
-import type { Entry, EntryMeta } from '@/lib/commands'
+import type { Entry, EntryMeta } from '@/api/types'
 import Actions from './Actions'
 import Body from './Body'
 import Eyebrow from './Eyebrow'

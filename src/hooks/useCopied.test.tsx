@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import { copyToClipboard } from '@/lib/commands'
 import { useCopied } from './useCopied'
+import { calls } from '../test/ipc'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -19,7 +19,7 @@ describe('useCopied', () => {
 
     act(() => result.current.copy('secret'))
 
-    expect(copyToClipboard).toHaveBeenCalledWith('secret', expect.any(Number))
+    expect(calls('copy_to_clipboard')).toContainEqual({ value: 'secret', clearAfterMs: expect.any(Number) })
     expect(result.current.copied).toBe(true)
   })
 

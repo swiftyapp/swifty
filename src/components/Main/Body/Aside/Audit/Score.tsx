@@ -1,4 +1,4 @@
-import type { Audit } from '@/lib/commands'
+import type { Audit } from '@/api/tools'
 import { useTranslation } from 'react-i18next'
 import { vaultScore } from '@/utils/vaultScore'
 import { LABEL } from '@/components/elements/tokens'

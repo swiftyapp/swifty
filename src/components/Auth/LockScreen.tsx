@@ -4,7 +4,7 @@ import AuthShell from '@/components/elements/AuthShell'
 import Eyebrow from '@/components/elements/Eyebrow'
 import Mascot from '@/components/elements/Mascot'
 import Masterpass from '@/components/elements/Masterpass'
-import type { BiometryType } from '@/lib/commands'
+import type { BiometryType } from '@/api/types'
 import BiometricTile from './BiometricTile'
 import { useUnlock } from './useUnlock'
 

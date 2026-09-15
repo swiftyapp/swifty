@@ -1,3 +1,4 @@
+import { pickFile } from '@/api/pickers'
 import { t } from '@/i18n'
 import { IMAGE_EXTENSIONS } from './fields'
 import { runScan } from './run'
@@ -16,15 +17,8 @@ import { runScan } from './run'
  * the scan itself is the status in the store (see `run.ts`).
  */
 export const pickAndScan = async (): Promise<boolean> => {
-  const { open } = await import('@tauri-apps/plugin-dialog')
-  const path = await open({
-    multiple: false,
-    directory: false,
-    // The native dialog's own chrome, so the filter is named in the user's
-    // language like everything else in it.
-    filters: [{ name: t('Images'), extensions: IMAGE_EXTENSIONS }]
-  })
-  if (typeof path !== 'string') return false
+  const path = await pickFile([{ name: t('Images'), extensions: IMAGE_EXTENSIONS }])
+  if (path === null) return false
   void runScan(path)
   return true
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { setAutolockTimeout } from '@/lib/commands'
+import { setAutolockTimeout } from '@/api/tools'
 import { getSecs, setSecs } from '@/defaults/autolock'
 import { getTimeout, setTimeout as setClipboardTimeout } from '@/defaults/clipboard'
 import SettingsGroup from '@/components/elements/SettingsGroup'

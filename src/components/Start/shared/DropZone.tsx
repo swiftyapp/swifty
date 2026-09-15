@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { pickBackup } from '@/lib/commands'
+import { pickBackup } from '@/api/pickers'
 import { useFileDrop } from '@/hooks/useFileDrop'
 import { DownloadGlyph } from '@/components/Main/icons'
 import { META } from '@/components/elements/tokens'

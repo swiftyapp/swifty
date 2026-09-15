@@ -6,19 +6,9 @@ import i18n, { changeLocale } from '@/i18n'
 import { getTimeout } from '@/defaults/clipboard'
 import { getSecs } from '@/defaults/autolock'
 import { dateTime } from '@/utils/time'
-import {
-  changeMasterPassword,
-  biometricStatus,
-  enableBiometric,
-  disableBiometric,
-  pickBackup,
-  importSwftx,
-  exportEntries,
-  syncConnect,
-  setAutolockTimeout,
-  getAudit
-} from '@/lib/commands'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { renderWithStore } from './utils'
+import { calls, mockCommand, mockCommandOnce } from './ipc'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -30,6 +20,11 @@ beforeEach(() => {
 })
 
 afterEach(() => changeLocale('en-US'))
+
+// Only the biometric leaf of app_status matters here; the row reads nothing else.
+const enrolled = (available: boolean, mode: 'protected' | 'prompt' | null) => ({
+  biometric: { available, canEnroll: available, type: 'touch', mode }
+})
 
 const open = async () => {
   const { container, store } = renderWithStore(<Settings />)
@@ -82,7 +77,7 @@ describe('Settings › sync', () => {
   it('connects Google Drive', async () => {
     await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
-    expect(syncConnect).toHaveBeenCalledOnce()
+    expect(calls('sync_connect')).toHaveLength(1)
   })
 
   // The mobile shape of the same flow: `sync_connect` resolves as soon as
@@ -113,7 +108,9 @@ describe('Settings › sync', () => {
   })
 
   it('surfaces a connect that could not even start', async () => {
-    vi.mocked(syncConnect).mockRejectedValueOnce('no OAuth client configured')
+    mockCommandOnce('sync_connect', () =>
+      Promise.reject({ kind: 'other', message: 'no OAuth client configured' })
+    )
     const { store } = await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
 
@@ -133,7 +130,7 @@ describe('Settings › sync', () => {
   // One warning covers the whole picker, CXF included — it is as plaintext as
   // the other two.
   it('exports to CXF from the portable export picker', async () => {
-    vi.mocked(exportEntries).mockResolvedValue('/tmp/rowel-export.json')
+    mockCommand('export_entries', () => '/tmp/rowel-export.json')
     await open()
     expect(
       screen.getByText('Bitwarden JSON, FIDO CXF or generic CSV, unencrypted')
@@ -145,14 +142,14 @@ describe('Settings › sync', () => {
     )
     await userEvent.click(screen.getByTestId('settings-export-run'))
 
-    expect(exportEntries).toHaveBeenCalledWith('cxf')
+    expect(calls('export_entries')).toContainEqual({ path: null, format: 'cxf' })
     expect(await screen.findByText(/rowel-export\.json/)).toBeInTheDocument()
   })
 })
 
 describe('Settings › security', () => {
   it('changes the master password', async () => {
-    vi.mocked(changeMasterPassword).mockResolvedValue(undefined)
+    mockCommand('change_master_password', () => undefined)
     await open()
     await go('security')
     await userEvent.click(screen.getByText('Change…'))
@@ -165,12 +162,12 @@ describe('Settings › security', () => {
     )
     await userEvent.click(screen.getByTestId('change-password-submit'))
 
-    expect(changeMasterPassword).toHaveBeenCalledWith('old', 'newpass')
+    expect(calls('change_master_password')).toContainEqual({ current: 'old', new: 'newpass' })
     expect(await screen.findByTestId('change-password-success')).toBeInTheDocument()
   })
 
   it('reports a rejected master password change', async () => {
-    vi.mocked(changeMasterPassword).mockRejectedValue(new Error('nope'))
+    mockCommand('change_master_password', () => Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' }))
     await open()
     await go('security')
     await userEvent.click(screen.getByText('Change…'))
@@ -187,8 +184,8 @@ describe('Settings › security', () => {
   })
 
   it('enables biometric unlock from the toggle', async () => {
-    vi.mocked(biometricStatus).mockResolvedValue({ enabled: false, mode: null })
-    vi.mocked(enableBiometric).mockResolvedValue('protected')
+    mockCommand('app_status', () => enrolled(false, null))
+    mockCommand('enable_biometric', () => 'protected')
     await open()
     await go('security')
 
@@ -196,7 +193,7 @@ describe('Settings › security', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false')
     await userEvent.click(toggle)
 
-    expect(enableBiometric).toHaveBeenCalledOnce()
+    expect(calls('enable_biometric')).toHaveLength(1)
     expect(await screen.findByTestId('settings-biometric-toggle')).toHaveAttribute(
       'aria-checked',
       'true'
@@ -204,14 +201,14 @@ describe('Settings › security', () => {
   })
 
   it('disables biometric unlock from the toggle', async () => {
-    vi.mocked(biometricStatus).mockResolvedValue({ enabled: true, mode: 'prompt' })
-    vi.mocked(disableBiometric).mockResolvedValue(undefined)
+    mockCommand('app_status', () => enrolled(true, 'prompt'))
+    mockCommand('disable_biometric', () => undefined)
     await open()
     await go('security')
 
     await userEvent.click(await screen.findByTestId('settings-biometric-toggle'))
 
-    expect(disableBiometric).toHaveBeenCalledOnce()
+    expect(calls('disable_biometric')).toHaveLength(1)
     expect(screen.getByTestId('settings-biometric-toggle')).toHaveAttribute(
       'aria-checked',
       'false'
@@ -221,7 +218,7 @@ describe('Settings › security', () => {
   // The copy must name the gate actually in force: an OS-enforced Secure Enclave
   // item and an app-enforced verify-then-read item are different promises.
   it('describes the OS-enforced gate when enrolled in protected mode', async () => {
-    vi.mocked(biometricStatus).mockResolvedValue({ enabled: true, mode: 'protected' })
+    mockCommand('app_status', () => enrolled(true, 'protected'))
     await open()
     await go('security')
     expect(await screen.findByText(/Secure Enclave/)).toBeInTheDocument()
@@ -230,8 +227,8 @@ describe('Settings › security', () => {
   it('switches the copy to the mode enrollment settled on', async () => {
     // An unentitled build falls back to prompt mode; the description must follow
     // the enable response rather than keep advertising the generic offer.
-    vi.mocked(biometricStatus).mockResolvedValue({ enabled: false, mode: null })
-    vi.mocked(enableBiometric).mockResolvedValue('prompt')
+    mockCommand('app_status', () => enrolled(false, null))
+    mockCommand('enable_biometric', () => 'prompt')
     await open()
     await go('security')
     await userEvent.click(await screen.findByTestId('settings-biometric-toggle'))
@@ -247,7 +244,7 @@ describe('Settings › security', () => {
     await userEvent.click(screen.getByTestId('settings-autolock-300'))
 
     expect(getSecs()).toBe(300)
-    expect(setAutolockTimeout).toHaveBeenCalledWith(300)
+    expect(calls('set_autolock_timeout')).toContainEqual({ secs: 300 })
   })
 
   it('stores the clipboard delay, "Never" included', async () => {
@@ -289,7 +286,7 @@ describe('Settings › vault audit', () => {
     await userEvent.click(screen.getByTestId('settings-breach-toggle'))
 
     expect(store.getState().breachCheck).toBe(true)
-    expect(getAudit).toHaveBeenCalledWith(true)
+    expect(calls('get_audit')).toContainEqual({ checkBreaches: true })
   })
 
   it('leaves the always-on monitors without a fake control', async () => {
@@ -313,8 +310,8 @@ describe('Settings › vault audit', () => {
 
 describe('Settings › import', () => {
   it('imports a .swftx file with the source password', async () => {
-    vi.mocked(pickBackup).mockResolvedValue('/tmp/other.swftx')
-    vi.mocked(importSwftx).mockResolvedValue(3)
+    vi.mocked(openDialog).mockResolvedValue('/tmp/other.swftx')
+    mockCommand('import_swftx', () => 3)
     await open()
     await go('import')
 
@@ -327,13 +324,13 @@ describe('Settings › import', () => {
     )
     await userEvent.click(screen.getByTestId('import-run-backup'))
 
-    expect(importSwftx).toHaveBeenCalledWith('/tmp/other.swftx', 'source-pw')
+    expect(calls('import_swftx')).toContainEqual({ path: '/tmp/other.swftx', password: 'source-pw' })
     expect(await screen.findByText(/Imported/)).toBeInTheDocument()
   })
 
   it('shows an error when the backup password is wrong', async () => {
-    vi.mocked(pickBackup).mockResolvedValue('/tmp/other.swftx')
-    vi.mocked(importSwftx).mockRejectedValue(new Error('invalid password'))
+    vi.mocked(openDialog).mockResolvedValue('/tmp/other.swftx')
+    mockCommand('import_swftx', () => Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' }))
     await open()
     await go('import')
 

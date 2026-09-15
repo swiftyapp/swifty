@@ -4,11 +4,12 @@ import AuthShell from '@/components/elements/AuthShell'
 import Button from '@/components/elements/Button'
 import BiometryGlyph from '@/components/elements/BiometryGlyph'
 import { META_TYPE } from '@/components/elements/tokens'
-import { enableBiometric, type BiometryType } from '@/lib/commands'
+import type { BiometryType } from '@/api/types'
+import { enableBiometric } from '@/api/auth'
 import { biometryLabel } from '@/lib/biometry'
 import StepHeader from '../shared/StepHeader'
 import { ACTIONS, FOOTNOTE } from '../shared/layout'
-import { messageOf } from '../shared/errors'
+import { messageOf } from '@/api/errors'
 
 interface Props {
   /** Which gate this device has, so the screen uses the OS's own word for it. */

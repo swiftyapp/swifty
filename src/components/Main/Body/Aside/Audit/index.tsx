@@ -1,5 +1,5 @@
 import { useStore } from '@/store'
-import type { Audit, AuditItem } from '@/lib/commands'
+import type { Audit, AuditItem } from '@/api/tools'
 import { useTranslation } from 'react-i18next'
 import Score from './Score'
 import Panel from '@/components/elements/Panel'

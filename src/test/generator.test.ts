@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { generatePassword } from '@/lib/commands'
 import {
   charset,
   defaultSettings,
@@ -10,6 +9,7 @@ import {
   type GeneratorSettings
 } from '@/services/generator'
 import WORDS from '@/services/wordlist'
+import { calls } from './ipc'
 
 const settings = (overrides: Partial<GeneratorSettings> = {}): GeneratorSettings => ({
   ...defaultSettings(),
@@ -49,7 +49,7 @@ describe('charset', () => {
 describe('generate (random)', () => {
   it('asks the engine for the chosen length and charset', async () => {
     await generate(settings({ length: 32, symbols: false, numbers: true }))
-    expect(generatePassword).toHaveBeenCalledWith({
+    expect(calls('generate_password')).toContainEqual({ options: {
       length: 32,
       numbers: true,
       symbols: false,
@@ -57,14 +57,12 @@ describe('generate (random)', () => {
       lowercase: true,
       excludeSimilarCharacters: false,
       strict: true
-    })
+    } })
   })
 
   it('forwards the look-alike exclusion', async () => {
     await generate(settings({ excludeSimilar: true }))
-    expect(generatePassword).toHaveBeenCalledWith(
-      expect.objectContaining({ excludeSimilarCharacters: true })
-    )
+    expect(calls('generate_password')).toContainEqual({ options: expect.objectContaining({ excludeSimilarCharacters: true }) })
   })
 })
 
@@ -101,7 +99,7 @@ describe('memorable', () => {
   it('is routed through generate without touching the engine', async () => {
     const value = await generate(settings({ mode: 'memorable', words: 3 }))
     expect(value.split('-').length).toBeGreaterThanOrEqual(3)
-    expect(generatePassword).not.toHaveBeenCalled()
+    expect(calls('generate_password')).toHaveLength(0)
   })
 })
 

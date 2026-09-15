@@ -1,12 +1,11 @@
 import type { UnlistenFn } from '@tauri-apps/api/event'
-import { on, EVENTS } from '@/lib/events'
-import { isBiometricAvailable } from '@/lib/commands'
+import { on, EVENTS } from '@/api/events'
+import { appStatus } from '@/api/app'
 import {
   useStore,
   setEntries,
   loadArchive,
   runAudit,
-  auditDone,
   flowAuth,
   syncStart,
   syncStop,
@@ -37,20 +36,14 @@ export const subscribeToEvents = (): (() => void) => {
     on(EVENTS.syncConnected, () => syncConnected()),
     on(EVENTS.syncError, payload => syncFailed(payload.error)),
     on(EVENTS.syncDisconnected, () => syncDisconnected()),
-    on(EVENTS.pullStarted, () => syncStart()),
-    on(EVENTS.pullStopped, payload => {
-      syncStop(payload)
-      if (payload.data) setEntries(payload.data.entries)
-      refreshOpenArchive()
-    }),
-    // A merge brought in entries from another device: refresh the list, and the
-    // audit with it — the new rows have no strength or breach result yet.
+    // A merge brought in entries from another device — a pull included: refresh
+    // the list, and the audit with it, since the new rows have no strength or
+    // breach result yet.
     on(EVENTS.vaultMerged, payload => {
       setEntries(payload.entries)
       runAudit()
       refreshOpenArchive()
     }),
-    on(EVENTS.auditDone, payload => auditDone(payload.data)),
     // The first run's own consent flow: the same pending/result/error trio as
     // sync, against an account there is no vault behind yet.
     on(EVENTS.setupDrivePending, () => setupDrivePending()),
@@ -63,9 +56,9 @@ export const subscribeToEvents = (): (() => void) => {
       // Autolock takes this path instead of `lockVault`, so the session data
       // has to be dropped here too.
       resetVaultData()
-      return isBiometricAvailable()
-        .catch(() => false)
-        .then(flowAuth)
+      return appStatus()
+        .then(({ biometric }) => flowAuth(biometric.available, biometric.type))
+        .catch(() => flowAuth(false))
     })
   ]
 

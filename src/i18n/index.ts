@@ -1,7 +1,7 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import resourcesToBackend from 'i18next-resources-to-backend'
-import { osLocale } from '@/lib/commands'
+import { appStatus } from '@/api/app'
 import { APP_NAME } from '@/lib/app'
 import enUS from './locales/en-US.json'
 
@@ -40,7 +40,9 @@ const resolveInitial = async (): Promise<string> => {
   if (stored && SUPPORTED.includes(stored)) return stored
 
   // A dead IPC call must not stop the app from starting.
-  return osLocale().catch(() => DEFAULT_LOCALE)
+  return appStatus()
+    .then(status => status.locale)
+    .catch(() => DEFAULT_LOCALE)
 }
 
 /**

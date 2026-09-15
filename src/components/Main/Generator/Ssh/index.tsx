@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { SshKeyPair } from '@/lib/commands'
+import type { SshKeyPair } from '@/api/tools'
 import Button from '@/components/elements/Button'
 import { LABEL, META_TYPE } from '@/components/elements/tokens'
 import { inputClass, wellClass } from '@/components/elements/formStyles'
