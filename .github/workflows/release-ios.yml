@@ -19,14 +19,21 @@
 #                               desktop notarization. If it is ever unset, the
 #                               fallback below matches bundle.iOS.developmentTeam in
 #                               src-tauri/tauri.conf.json.
-#   GOOGLE_OAUTH_IOS_CLIENT_ID  Google iOS OAuth client id for Drive sync, exported as
-#                               GOOGLE_OAUTH_CLIENT_ID and baked in at compile time
-#                               (src-tauri/src/sync/auth.rs). iOS OAuth clients have no
-#                               client secret, so GOOGLE_OAUTH_CLIENT_SECRET is
-#                               deliberately not set here.
+#   GOOGLE_OAUTH_IOS_CLIENT_ID  Google iOS OAuth client id for Drive sync. Turned into
+#                               the app's deep-link URL scheme by
+#                               scripts/ios-build-config.mjs and passed to the build
+#                               as a `--config` patch; the app derives the client id
+#                               back from the scheme (src-tauri/src/sync/auth.rs).
+#                               iOS OAuth clients have no client secret, so
+#                               GOOGLE_OAUTH_CLIENT_SECRET is deliberately not set.
 #   GOOGLE_API_KEY              Public Drive API key for receiving shared secrets
-#                               without a login, baked in at compile time
-#                               (src-tauri/src/share/remote.rs). Same key as desktop.
+#                               without a login. Same key as desktop; travels in the
+#                               same `--config` patch (src-tauri/src/build_settings.rs).
+#
+# Neither Google value is read from the environment by the Rust build: the Tauri
+# CLI compiles inside xcodebuild with a replaced environment and forwards only
+# its own TAURI_* variables, so an `option_env!` sees nothing that is exported
+# here. The `--config` patch is what gets through (see ios-build-config.mjs).
 #
 # Signing is fully automatic: the App Store Connect API key lets Xcode create
 # and download the Apple Distribution certificate and the App Store provisioning
@@ -130,12 +137,18 @@ jobs:
       # Connect rejects a malformed one with 90158 — at the end of the upload,
       # after the whole build. `bun run release:ios` runs this same check.
       - name: Check the iOS URL schemes
+        env:
+          GOOGLE_OAUTH_IOS_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_IOS_CLIENT_ID }}
         run: bun scripts/check-ios-url-schemes.mjs
 
-      # Set through --config rather than with --build-number: that flag appends
-      # to the app version, so `1.0.0-alpha.1` plus run 7 would come out as
-      # CFBundleVersion `1.0.0.1.7`, and App Store Connect rejects anything
-      # longer than three period-separated integers (ITMS-90060).
+      # Everything the build takes from secrets goes through the one `--config`
+      # patch ios-build-config.mjs prints (see the header for why the
+      # environment alone does not reach the iOS compile).
+      #
+      # The build number is set there rather than with --build-number: that
+      # flag appends to the app version, so `1.0.0-alpha.1` plus run 7 would
+      # come out as CFBundleVersion `1.0.0.1.7`, and App Store Connect rejects
+      # anything longer than three period-separated integers (ITMS-90060).
       # CFBundleShortVersionString is unaffected — it is derived from the
       # config version, with the prerelease tag stripped by the CLI.
       - name: Build the App Store IPA
@@ -144,15 +157,17 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           # APPLE_API_KEY_PATH is exported by the previous step via $GITHUB_ENV.
           APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID || 'UFBL3F444A' }}
-          # Google Drive sync OAuth client, read via option_env! at compile time.
-          # iOS clients are public: there is no client secret to set.
-          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_IOS_CLIENT_ID }}
+          # Inputs to ios-build-config.mjs. iOS OAuth clients are public: there
+          # is no client secret to set.
+          GOOGLE_OAUTH_IOS_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_IOS_CLIENT_ID }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
+          set -euo pipefail
+          CONFIG_PATCH=$(bun scripts/ios-build-config.mjs)
           bun run tauri ios build --ci \
             --export-method app-store-connect \
-            --config "{\"bundle\":{\"iOS\":{\"bundleVersion\":\"$BUILD_NUMBER\"}}}"
+            --config "$CONFIG_PATCH"
 
       # Path is src-tauri/gen/apple/build/<arch>/<productName>.ipa; resolved by
       # glob so it does not have to be kept in sync with productName.

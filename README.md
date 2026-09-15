@@ -151,37 +151,44 @@ that URL scheme, and the client id is derived from it.
 1. In the same project create a second OAuth 2.0 Client ID, of type **iOS**,
    with the **iOS** bundle id from `src-tauri/tauri.ios.conf.json`
    (`app.rowel.mobile` — not the desktop one in `tauri.conf.json`).
-2. Take the client id it gives you — `123456-abcdef.apps.googleusercontent.com`
-   — and reverse it into a scheme: `com.googleusercontent.apps.123456-abcdef`.
-   (Google shows this as the "iOS URL scheme" on the credential page.)
-3. Add the scheme to `src-tauri/tauri.ios.conf.json` (there is no `plugins`
-   block there until you do — a placeholder scheme is not a legal URL scheme
-   and App Store Connect rejects the upload over it, so the file ships without
-   one):
-
-   ```json
-   "plugins": {
-     "deep-link": {
-       "mobile": [{ "scheme": ["com.googleusercontent.apps.123456-abcdef"] }]
-     }
-   }
-   ```
-
-   This is the committed source of truth for iOS, and it is safe to commit —
-   an iOS client id is public by design. The Tauri CLI registers the scheme as
-   `CFBundleURLTypes` in the generated `Info.plist` during `tauri ios build`
-   (via `tauri-plugin-deep-link`'s build script), and the app derives both the
-   client id and the redirect URI `com.googleusercontent.apps.<id>:/oauth2redirect`
-   from it at runtime. Re-run `bun run tauri ios init` if the Xcode project is
-   out of date.
-4. Add the **redirect URI** `com.googleusercontent.apps.123456-abcdef:/oauth2redirect`
+2. Put the client id it gives you — `123456-abcdef.apps.googleusercontent.com`
+   — in `.env` as `GOOGLE_OAUTH_IOS_CLIENT_ID` (locally) or in the
+   `GOOGLE_OAUTH_IOS_CLIENT_ID` repository secret (CI). `bun run release:ios`
+   and the `Release iOS` workflow reverse it into the scheme
+   `com.googleusercontent.apps.123456-abcdef` (Google shows the same value as
+   the "iOS URL scheme" on the credential page) and pass it to
+   `tauri ios build --config` as the app's deep-link scheme, together with
+   `GOOGLE_API_KEY` for share receiving. See `scripts/ios-build-config.mjs`.
+3. Add the **redirect URI** `com.googleusercontent.apps.123456-abcdef:/oauth2redirect`
    to the client in the console.
 
-`GOOGLE_OAUTH_CLIENT_ID` still overrides the scheme on iOS (the release workflow
-sets it from a secret), and the redirect is then derived back from that id — but
-the scheme in `tauri.ios.conf.json` is what actually registers the app with the
-OS, so it has to be right either way. `GOOGLE_OAUTH_CLIENT_SECRET` is ignored on
-iOS and must never be shipped in a mobile binary.
+The Tauri CLI registers the scheme as `CFBundleURLTypes` in the generated
+`Info.plist` during `tauri ios build` (via `tauri-plugin-deep-link`'s build
+script), and the app derives both the client id and the redirect URI
+`com.googleusercontent.apps.<id>:/oauth2redirect` from it at runtime. The scheme
+can equally be committed in `src-tauri/tauri.ios.conf.json` — an iOS client id
+is public by design — which is also what a plain `tauri ios dev` needs:
+
+```json
+"plugins": {
+  "deep-link": {
+    "mobile": [{ "scheme": ["com.googleusercontent.apps.123456-abcdef"] }]
+  }
+}
+```
+
+A build-time `--config` scheme replaces a committed one. There is no `plugins`
+block in that file by default: a placeholder is not a legal URL scheme and App
+Store Connect rejects the upload over it.
+
+**Why not just export `GOOGLE_OAUTH_CLIENT_ID` like on desktop?** Because it
+never arrives. `tauri ios build` compiles inside xcodebuild with a replaced
+environment, and the CLI forwards only its own `TAURI_*` (plus `WRY_*`,
+`CARGO_*`, `RUST_*`) variables into it, so `option_env!` in the Rust is `None`
+on iOS whatever the shell holds — the build succeeds and the app then reports
+"Google OAuth client not configured". The `--config` patch is forwarded, which
+is why both the scheme and the API key travel that way. `GOOGLE_OAUTH_CLIENT_SECRET`
+is ignored on iOS and must never be shipped in a mobile binary.
 
 ### Auto-update signing
 
