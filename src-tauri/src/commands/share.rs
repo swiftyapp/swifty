@@ -46,8 +46,8 @@ pub async fn share_create(
 /// Open a link someone sent. Needs no account and no unlocked vault — the
 /// recipient may not even have a vault yet.
 #[tauri::command]
-pub async fn share_open(app: AppHandle, link: String) -> Result<Entry> {
-    blocking(move || share::open(&DrivePublicFetch { app }, &link, share::now_ms())).await
+pub async fn share_open(link: String) -> Result<Entry> {
+    blocking(move || share::open(&DrivePublicFetch, &link, share::now_ms())).await
 }
 
 #[tauri::command]

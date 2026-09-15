@@ -1,7 +1,6 @@
 mod app;
 mod autolock;
 mod biometrics;
-mod build_settings;
 mod cards;
 mod commands;
 pub mod crypto;

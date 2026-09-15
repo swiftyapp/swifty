@@ -17,7 +17,6 @@ use reqwest::Client;
 use tauri::{async_runtime::block_on, AppHandle};
 
 use super::envelope::MAX_SHARE_BYTES;
-use crate::build_settings::{self, build_setting};
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::sync::drive::{self, DriveFile};
@@ -189,14 +188,12 @@ impl ShareRemote for DriveShareRemote {
 }
 
 /// The recipient's fetcher. Holds no account state — an API key is all a
-/// link-shared download needs, and the app is only kept to look that up.
-pub struct DrivePublicFetch {
-    pub app: AppHandle,
-}
+/// link-shared download needs.
+pub struct DrivePublicFetch;
 
 impl PublicFetch for DrivePublicFetch {
     fn download(&self, file_id: &str) -> Result<Vec<u8>> {
-        let key = api_key(&self.app)?;
+        let key = api_key()?;
         block_on(async {
             // Not the shared client: this request is made on a stranger's
             // say-so, so it gets a deadline the account-bound calls do not.
@@ -210,16 +207,13 @@ impl PublicFetch for DrivePublicFetch {
     }
 }
 
-/// The Google API key this build downloads with: from the environment at run
-/// time, else from the build's config patch (how an iOS build gets it — see
-/// `build_settings`), else baked in at compile time. A public identifier, not
-/// a secret: it names the project for quota and grants nothing on its own.
-/// Mirrors the OAuth client resolution in `sync::auth`.
-fn api_key(app: &AppHandle) -> Result<String> {
+/// The Google API key this build downloads with, from the environment at run
+/// time or baked in at build time. A public identifier, not a secret: it names
+/// the project for quota and grants nothing on its own. Mirrors the OAuth
+/// client resolution in `sync::auth`.
+fn api_key() -> Result<String> {
     std::env::var("GOOGLE_API_KEY")
         .ok()
-        .filter(|key| !key.is_empty())
-        .or_else(|| build_setting(app, build_settings::GOOGLE_API_KEY))
         .or_else(|| option_env!("GOOGLE_API_KEY").map(String::from))
         .filter(|key| !key.is_empty())
         .ok_or_else(|| Error::Other("Google API key not configured; set GOOGLE_API_KEY".into()))

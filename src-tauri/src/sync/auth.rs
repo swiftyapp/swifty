@@ -141,14 +141,11 @@ impl Credentials {
 
 #[cfg(mobile)]
 impl Credentials {
-    /// The deep-link scheme is the source of truth (iOS client ids are public,
-    /// and the scheme is what actually registers the app for the redirect). It
-    /// is either committed in `tauri.ios.conf.json` or set per build through
-    /// the `--config` patch `scripts/ios-build-config.mjs` derives from
-    /// `GOOGLE_OAUTH_IOS_CLIENT_ID` — the environment itself never reaches the
-    /// iOS compile (see `build_settings`), so `GOOGLE_OAUTH_CLIENT_ID` is only
-    /// ever an override for a run where it is set at runtime. Either way the
-    /// redirect is derived back from the id, so the two can never disagree.
+    /// The committed deep-link scheme is the source of truth (iOS client ids
+    /// are public, and the scheme is what actually registers the app for the
+    /// redirect). `GOOGLE_OAUTH_CLIENT_ID` overrides it for a build that is
+    /// given the id from a secret — and the redirect is then derived back from
+    /// that same id, so the two can never disagree at runtime.
     fn resolve(app: &AppHandle) -> Result<Self> {
         let client_id = match env_client_id() {
             Some(id) => id,

@@ -63,19 +63,12 @@ In the Google Cloud console for the existing Swifty project, **APIs & Services
 → Credentials → Create credentials → OAuth client ID → iOS**, with bundle id
 `app.rowel.mobile`. iOS OAuth clients are public: there is **no client
 secret**, and none must be set in CI. Copy the client id into the
-`GOOGLE_OAUTH_IOS_CLIENT_ID` secret, and add the redirect URI
-`com.googleusercontent.apps.<id>:/oauth2redirect` to the client.
-
-The build does **not** read it from the environment: `tauri ios build`
-compiles inside xcodebuild with a replaced environment that carries only the
-CLI's own `TAURI_*` variables, so an exported `GOOGLE_OAUTH_CLIENT_ID` (or
-`GOOGLE_API_KEY`) never reaches `option_env!` and the app ships reporting
-"Google OAuth client not configured". Instead `scripts/ios-build-config.mjs`
-turns the id into the app's deep-link URL scheme and passes it — with
-`GOOGLE_API_KEY` — to `tauri ios build --config`, which the CLI does forward.
-The app derives the client id from the scheme at runtime
-(`src-tauri/src/sync/auth.rs`) and reads the API key from the embedded config
-(`src-tauri/src/build_settings.rs`).
+`GOOGLE_OAUTH_IOS_CLIENT_ID` secret and add the redirect URI
+`com.googleusercontent.apps.<id>:/oauth2redirect` to the client. The workflow
+passes the id to the build as the app's deep-link URL scheme through
+`--config` (environment variables do not reach the iOS compile — README,
+"Drive sync on iOS"), and the app derives the client id back from the scheme
+(`src-tauri/src/sync/auth.rs`).
 
 ### 5. Repository secrets
 
@@ -88,7 +81,6 @@ Add under **Settings → Secrets and variables → Actions**:
 | `APPLE_API_KEY_P8` | base64 of the `AuthKey_<KEYID>.p8` file |
 | `APPLE_TEAM_ID` | `UFBL3F444A` — **already set** for desktop notarization; reused here as `APPLE_DEVELOPMENT_TEAM` |
 | `GOOGLE_OAUTH_IOS_CLIENT_ID` | Google iOS OAuth client id (no secret) |
-| `GOOGLE_API_KEY` | Public Drive API key for share receiving — **already set** for desktop; the same key |
 
 Base64 the key file (macOS):
 
@@ -257,21 +249,11 @@ no biometric data leaves the device or reaches the app.
 - **`src-tauri/gen/apple is missing`** — the Xcode project is committed to the
   repo; regenerate it locally with `bun run tauri ios init` and commit.
 - **90158, "URL schemes found in your app are not in the correct format"** —
-  a deep-link scheme is not a legal URL scheme, and it ships verbatim as
-  `CFBundleURLTypes`. It is either a bad `deep-link` block in
-  `src-tauri/tauri.ios.conf.json` or a `GOOGLE_OAUTH_IOS_CLIENT_ID` that is
-  not an iOS client id. `scripts/check-ios-url-schemes.mjs` runs before both
-  the local and the CI build and refuses to start on either.
-- **The TestFlight build says "Google OAuth client not configured; set
-  GOOGLE_OAUTH_CLIENT_ID"** — the build was made without the client id. It
-  has to come in as `GOOGLE_OAUTH_IOS_CLIENT_ID` (in `.env` locally, as a
-  repository secret in CI) so the build turns it into the deep-link scheme via
-  `--config`; exporting `GOOGLE_OAUTH_CLIENT_ID` does nothing on iOS (step 4).
-  To confirm which it was, look at the compiled
-  `src-tauri/target/aarch64-apple-ios/release/deps/swifty_lib.d`: a bare
-  `# env-dep:GOOGLE_OAUTH_CLIENT_ID` line with no `=value` means the
-  environment never reached rustc, which is the expected state now; the
-  scheme is in the embedded config instead.
+  the deep-link scheme in `src-tauri/tauri.ios.conf.json` is still the
+  `YOUR_IOS_CLIENT_ID` placeholder, and it ships verbatim as
+  `CFBundleURLTypes`. Put the reversed iOS OAuth client id in (README, Drive
+  sync on iOS) or delete the `deep-link` block. The release script now refuses
+  to start on the placeholder.
 - **90737, "Missing Document Configuration"** — `bundle.fileAssociations`
   declares `CFBundleDocumentTypes`, and iOS then wants
   `UISupportsDocumentBrowser` or `LSSupportsOpeningDocumentsInPlace` as well.
