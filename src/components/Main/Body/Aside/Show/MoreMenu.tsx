@@ -7,9 +7,8 @@ import { ArchiveGlyph, MoreGlyph, PencilGlyph, ShareGlyph } from '../../../icons
 interface Props {
   onDelete: () => void
   /**
-   * Given, Edit is the menu's first item. The desktop keeps Edit as a button
-   * beside the menu, so it leaves this out; the phone's nav row has one control
-   * and folds Edit under it.
+   * Given, Edit is the menu's first item. Both shells fold Edit under the menu
+   * for a live entry; optional because a tombstone has nothing to edit.
    */
   onEdit?: () => void
   /**
@@ -24,8 +23,8 @@ interface Props {
   menu?: string
 }
 
-// The overflow menu of a live entry: sharing it, archiving it, and on the phone
-// editing it too. Archiving is two-press by design — the first press arms the row
+// The overflow menu of a live entry: editing it, sharing it, and archiving it.
+// Archiving is two-press by design — the first press arms the row
 // ("Archive entry?"), the second executes; closing or reopening the menu
 // disarms. Both shells mount this one menu, so the confirm dance is written
 // once.

@@ -2,6 +2,7 @@ import {
   createLogin,
   entryItems,
   resetEmpty,
+  startEdit,
   unlock,
   waitFor,
 } from "../helpers";
@@ -37,8 +38,7 @@ const field = (name: string) => sheet().$(`input[name="${name}"]`);
  * draft, so anything typed before that arrives is silently overwritten.
  */
 async function openEditor(currentPassword: string): Promise<void> {
-  await $('[data-testid="edit-entry-button"]').click();
-  await waitFor("entry-sheet");
+  await startEdit();
   await browser.waitUntil(
     async () => (await field("password").getValue()) === currentPassword,
     {

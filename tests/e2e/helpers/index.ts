@@ -13,6 +13,7 @@ export {
   visibleTitles,
   expectTitles,
   openEntry,
+  startEdit,
   toggleFavorite,
   type LoginFields,
   type CardFields,

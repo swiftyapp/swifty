@@ -50,11 +50,18 @@ describe('Edit mode in the pane', () => {
 
   beforeEach(() => vi.mocked(revealEntry).mockResolvedValue(loginEntry()))
 
+  // Edit lives under the header's one menu, not as a button of its own.
+  const openEdit = async () => {
+    await userEvent.click(screen.getByTestId('more-actions-button'))
+    await userEvent.click(screen.getByTestId('edit-entry-button'))
+  }
+
   it('replaces the read view with the editor, in the same pane', async () => {
     const { store } = renderWithStore(<Aside />, { store: seed() })
 
     expect(screen.queryByTestId('entry-sheet')).not.toBeInTheDocument()
-    await userEvent.click(screen.getByTestId('edit-entry-button'))
+    expect(screen.queryByTestId('edit-entry-button')).not.toBeInTheDocument()
+    await openEdit()
 
     expect(store.getState().entries.edit).toBe(true)
     expect(screen.getByTestId('entry-sheet')).toBeInTheDocument()
@@ -79,7 +86,7 @@ describe('Edit mode in the pane', () => {
     renderWithStore(<Body />, { store: seed() })
     expect(screen.getByTestId('list-column')).not.toHaveClass('opacity-60')
 
-    await userEvent.click(screen.getByTestId('edit-entry-button'))
+    await openEdit()
     expect(screen.getByTestId('list-column')).toHaveClass('opacity-60')
     // `inert`, not `pointer-events-none`: the keyboard has to stand down too.
     expect(screen.getByTestId('list-column')).toHaveAttribute('inert')

@@ -237,7 +237,7 @@ describe('Editing in the pane', () => {
     renderWithStore(<Aside />, { store })
 
     // The read view is up and the reveal has landed.
-    await screen.findByTestId('edit-entry-button')
+    await screen.findByTestId('more-actions-button')
     await waitFor(() => expect(revealEntry).toHaveBeenCalledWith('l1'))
 
     act(() => store.getState().newEntry('login'))

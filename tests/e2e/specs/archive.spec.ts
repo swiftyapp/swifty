@@ -72,9 +72,10 @@ describe("archive", () => {
     await view("items");
     await expectTitles([TITLE]);
 
-    // The restored entry is a normal, editable entry again.
+    // The restored entry is a normal, editable entry again: the overflow menu
+    // (Edit, Share, Archive) is back, where a tombstone had none.
     await $('[data-testid="entry-item"]').click();
-    await waitFor("edit-entry-button");
+    await waitFor("more-actions-button");
   });
 
   it("needs two presses to delete permanently, and then it is gone for good", async () => {

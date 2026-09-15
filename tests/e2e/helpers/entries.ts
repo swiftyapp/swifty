@@ -237,6 +237,23 @@ export async function openEntry(title: string): Promise<void> {
 }
 
 /**
+ * Take the open entry into the editor. Edit is a row of the header's overflow
+ * menu rather than a button of its own, so this is two clicks; it returns once
+ * the editing container is up, but not once the decrypted values have landed —
+ * callers that type wait on the field they need.
+ *
+ * The first wait is not decoration: the read cluster mounts a beat after the
+ * row is clicked, so clicking blind races the menu into existence.
+ */
+export async function startEdit(): Promise<void> {
+  await waitFor("more-actions-button");
+  await $('[data-testid="more-actions-button"]').click();
+  await waitFor("edit-entry-button");
+  await $('[data-testid="edit-entry-button"]').click();
+  await waitFor("entry-sheet");
+}
+
+/**
  * Star or unstar whatever the detail pane is showing.
  *
  * The wait is not decoration: the header's read cluster mounts a beat after the
