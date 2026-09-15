@@ -1,9 +1,9 @@
-import { resetEmpty, unlock, waitFor } from "../helpers";
+import { pref, resetEmpty, unlock, waitFor } from "../helpers";
 
 // The Settings modal: the nav, and the preference rows that are provable
 // locally. Drive sync, the native file dialogs and the updater endpoint are all
 // out of reach for the driver (see COVERAGE.md) — everything asserted here is
-// either store state, localStorage, or the DOM.
+// either the persisted prefs store or the DOM.
 
 const MASTER_PASSWORD = "Kp9$wTz4nBv7qXe!";
 
@@ -19,23 +19,12 @@ async function section(name: string): Promise<void> {
   await $(`[data-testid="settings-nav-${name}"]`).click();
 }
 
-/** A localStorage value, read from the page. */
-async function stored(key: string): Promise<string | null> {
-  return browser.execute((k: string) => localStorage.getItem(k), key);
-}
-
 describe("settings", () => {
   before(async () => {
     // Every selector below is an English label; `reset()` seeds the locale.
     await resetEmpty(MASTER_PASSWORD);
     await unlock(MASTER_PASSWORD);
     await openSettings();
-  });
-
-  after(async () => {
-    // The theme case below persists; leave the app on the default for the next
-    // spec in the run.
-    await browser.execute(() => localStorage.setItem("theme", "light"));
   });
 
   it("opens on Sync & devices and marks the active nav item", async () => {
@@ -93,23 +82,20 @@ describe("settings", () => {
       "aria-checked",
       "true",
     );
-    expect(await stored("rowel:autolockSecs")).toBe("900");
+    expect(await pref("autolockSecs")).toBe(900);
 
     await $('[data-testid="settings-clipboard-0"]').click();
-    expect(await stored("rowel:clipboardTimeout")).toBe("0");
+    expect(await pref("clipboardTimeoutMs")).toBe(0);
 
     await $('[data-testid="settings-clipboard-30000"]').click();
-    expect(await stored("rowel:clipboardTimeout")).toBe("30000");
+    expect(await pref("clipboardTimeoutMs")).toBe(30000);
   });
 
   it("persists the generator defaults", async () => {
     await section("security");
     await $('[data-testid="settings-generator-symbols"]').click();
 
-    const props = await browser.execute(() =>
-      JSON.parse(localStorage.getItem("rowel:generatorDefaults") ?? "{}"),
-    );
-    expect(props.symbols).toBe(false);
+    expect((await pref<{ symbols: boolean }>("generator"))?.symbols).toBe(false);
 
     // Put it back — the generator spec asserts against the default charset.
     await $('[data-testid="settings-generator-symbols"]').click();
@@ -164,9 +150,9 @@ describe("settings", () => {
     await expect($("html")).toHaveAttribute("data-theme", "light");
 
     await $('[data-testid="settings-date-format-YYYY-MM-DD"]').click();
-    expect(await stored("rowel:dateFormat")).toBe("YYYY-MM-DD");
+    expect(await pref("dateFormat")).toBe("YYYY-MM-DD");
     await $('[data-testid="settings-date-format-MM/DD/YYYY"]').click();
-    expect(await stored("rowel:dateFormat")).toBe("MM/DD/YYYY");
+    expect(await pref("dateFormat")).toBe("MM/DD/YYYY");
   });
 
   it("closes from the header X", async () => {

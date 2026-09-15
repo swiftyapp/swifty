@@ -1,11 +1,11 @@
-import { chord, resetEmpty, setRange, unlock, waitFor } from "../helpers";
+import { chord, pref, resetEmpty, setRange, unlock, waitFor } from "../helpers";
 
 // The password generator dialog, opened both ways it can be reached: the
 // app-level chord (standalone — it copies) and the login editor's "generate"
 // link (it fills the field it was opened from).
 //
 // The dialog and Settings › Security › Generator defaults share one stored
-// record (`rowel:generatorDefaults`): the dialog seeds from it and writes
+// record (the `generator` preference): the dialog seeds from it and writes
 // back, so a change in either place is what the other one opens with.
 
 const MASTER_PASSWORD = "Nc8$jRt5vQz1mHf!";
@@ -89,12 +89,7 @@ describe("password generator", () => {
 
     // Settings reads the very same record, so this is the whole handshake.
     await browser.waitUntil(
-      async () =>
-        (await browser.execute(
-          () =>
-            JSON.parse(localStorage.getItem("rowel:generatorDefaults") ?? "{}")
-              .length,
-        )) === before + 1,
+      async () => (await pref<{ length: number }>("generator"))?.length === before + 1,
       { timeout: 10_000, timeoutMsg: "the default length was not persisted" },
     );
 
