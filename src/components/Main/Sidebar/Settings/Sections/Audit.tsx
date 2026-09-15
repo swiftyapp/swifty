@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useStore, setBreachCheck, runAudit, setView, closeSettings } from '@/store'
+import { useStore, usePrefs, setPref, runAudit, setView, closeSettings } from '@/store'
 import { vaultScore, auditCounts } from '@/utils/vaultScore'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
@@ -11,13 +11,13 @@ import { META_TYPE, ROW_HAIRLINE } from '@/components/elements/tokens'
 export default function Audit() {
   const { t } = useTranslation()
   const audit = useStore(state => state.audit)
-  const breachCheck = useStore(state => state.breachCheck)
+  const breachCheck = usePrefs(state => state.breachCheck)
 
   const counts = audit ? auditCounts(audit) : { weak: 0, reused: 0, breached: 0 }
   const score = audit ? vaultScore(audit) : null
 
   const onBreachToggle = (next: boolean) => {
-    setBreachCheck(next)
+    setPref('breachCheck', next)
     runAudit()
   }
 

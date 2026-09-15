@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
-import { makeStore, useStore } from '@/store'
+import { makeStore, useStore, usePrefs } from '@/store'
 import { renderWithStore, withEntries, loginMeta } from './utils'
 
 const open = () => userEvent.keyboard('{Meta>}k{/Meta}')
@@ -106,11 +106,11 @@ describe('command palette', () => {
 
   it('runs a command on click', async () => {
     renderWithStore(<Main />, { store: seed() })
-    const before = useStore.getState().theme
+    const before = usePrefs.getState().theme
 
     await open()
     await userEvent.click(screen.getByText('Toggle theme'))
 
-    expect(useStore.getState().theme).not.toBe(before)
+    expect(usePrefs.getState().theme).not.toBe(before)
   })
 })

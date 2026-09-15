@@ -17,7 +17,7 @@ import {
   scanSupported
 } from '@/lib/commands'
 import type { EntryDraft } from '@/defaults/entries'
-import { getSecs } from '@/defaults/autolock'
+import { usePrefs } from './prefs'
 import type { StoreState } from './index'
 
 export interface AsyncSlice {
@@ -103,7 +103,7 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
   }
 
   const refreshAudit = () =>
-    getAudit(get().breachCheck)
+    getAudit(usePrefs.getState().breachCheck)
       .then(data => get().auditDone(data))
       .catch(() => {})
 
@@ -180,7 +180,7 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       get().flowMain()
       // The backend resets to its built-in default on every launch; re-apply
       // the stored preference as soon as there is a session to protect.
-      setAutolockTimeout(getSecs()).catch(() => {})
+      setAutolockTimeout(usePrefs.getState().autolockSecs).catch(() => {})
       get().syncInit(result.syncConfigured)
       // Asked once per session: whether the OS can read a card off a photo
       // decides whether any scan affordance is offered at all.

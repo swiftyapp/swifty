@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { DEFAULT_DATE_FORMAT, setFormat, type DateFormat } from '@/defaults/dateFormat'
+import { DEFAULT_PREFS, setPref, type DateFormat } from '@/store/prefs'
 import {
   daysUntil,
   formatDate,
@@ -115,7 +115,7 @@ describe('toTime', () => {
 // A stored date is ISO and a shown date is the user's pattern; the pair has to
 // be a true round trip or an edit silently rewrites the date it was showing.
 describe('formatDate / toIsoDate', () => {
-  afterEach(() => setFormat(DEFAULT_DATE_FORMAT))
+  afterEach(() => setPref('dateFormat', DEFAULT_PREFS.dateFormat))
 
   const patterns: [DateFormat, string][] = [
     ['MM/DD/YYYY', '06/01/2035'],
@@ -125,7 +125,7 @@ describe('formatDate / toIsoDate', () => {
 
   it('reads an ISO date in every pattern, and back', () => {
     for (const [pattern, shown] of patterns) {
-      setFormat(pattern)
+      setPref('dateFormat', pattern)
       expect(formatDate('2035-06-01')).toBe(shown)
       expect(toIsoDate(shown)).toBe('2035-06-01')
       // Already-stored input is left alone rather than re-read as the pattern.

@@ -9,7 +9,8 @@ import {
   useStore,
   openSend,
   openReceive,
-  syncInit
+  syncInit,
+  DEFAULT_PREFS
 } from '@/store'
 import {
   shareCreate,
@@ -22,7 +23,6 @@ import {
   type Entry,
   type ShareCreated
 } from '@/lib/commands'
-import { DEFAULT_CLIPBOARD_TIMEOUT } from '@/defaults/clipboard'
 import { renderWithStore, withEntries, loginMeta, deferred } from './utils'
 
 const LINK = 'rowel://share#v1.file-1.a2V5LTFrZXktMWtleS0xa2V5LTFrZXktMWtleS0xa2V5'
@@ -85,7 +85,7 @@ describe('sharing an entry', () => {
 
     // The link opens the entry for anyone holding it, so it leaves the
     // clipboard on the same timer as the secrets it stands in for.
-    expect(copyToClipboard).toHaveBeenCalledWith(LINK, DEFAULT_CLIPBOARD_TIMEOUT)
+    expect(copyToClipboard).toHaveBeenCalledWith(LINK, DEFAULT_PREFS.clipboardTimeoutMs)
     expect(screen.getByTestId('share-copy-button')).toHaveTextContent('Copied')
   })
 

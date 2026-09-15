@@ -1,7 +1,6 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { GeneratorOptions } from '@/lib/commands'
-import { getProps, setProps } from '@/defaults/generator'
+import { usePrefs, setPref } from '@/store'
 import { LENGTH_RANGE } from '@/services/generator'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
@@ -13,13 +12,10 @@ import { META } from '@/components/elements/tokens'
 // but is preserved in the stored props.
 export default function GeneratorGroup() {
   const { t } = useTranslation()
-  const [options, setOptions] = useState<GeneratorOptions>(getProps())
+  const options = usePrefs(state => state.generator)
 
-  const update = (patch: Partial<GeneratorOptions>) => {
-    const next = { ...options, ...patch }
-    setProps(next)
-    setOptions(next)
-  }
+  const update = (patch: Partial<GeneratorOptions>) =>
+    setPref('generator', { ...options, ...patch })
 
   return (
     <SettingsGroup label={t('Generator defaults')}>

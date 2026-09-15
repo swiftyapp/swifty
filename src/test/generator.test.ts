@@ -10,6 +10,7 @@ import {
   type GeneratorSettings
 } from '@/services/generator'
 import WORDS from '@/services/wordlist'
+import { usePrefs } from '@/store/prefs'
 
 const settings = (overrides: Partial<GeneratorSettings> = {}): GeneratorSettings => ({
   ...defaultSettings(),
@@ -126,10 +127,9 @@ describe('entropy', () => {
 
 describe('defaultSettings', () => {
   it('clamps the stored default length into the slider range', () => {
-    localStorage.setItem(
-      'rowel:generatorDefaults',
-      JSON.stringify({ length: 60, numbers: false, symbols: true, uppercase: true })
-    )
+    usePrefs.setState({
+      generator: { length: 60, numbers: false, symbols: true, uppercase: true, exclude: '' }
+    })
     const initial = defaultSettings()
     expect(initial.length).toBe(48)
     expect(initial.numbers).toBe(false)

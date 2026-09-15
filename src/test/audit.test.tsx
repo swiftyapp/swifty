@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react'
 import AuditList from '@/components/Main/Body/List/Audit'
 import AuditAside from '@/components/Main/Body/Aside/Audit'
 import type { Audit } from '@/lib/commands'
-import { makeStore, setBreachCheck } from '@/store'
+import { makeStore, setPref } from '@/store'
 import { renderWithStore, withEntries, loginMeta } from './utils'
 
 const audit: Audit = {
@@ -36,10 +36,10 @@ describe('Audit list', () => {
 
   it('shows breached results when the breach check is enabled', () => {
     const store = seed()
-    setBreachCheck(true)
+    setPref('breachCheck', true)
     renderWithStore(<AuditList />, { store })
     expect(screen.getByText('Breached')).toBeInTheDocument()
-    setBreachCheck(false)
+    setPref('breachCheck', false)
   })
 
   it('shows a loading state before results arrive', () => {

@@ -1,5 +1,5 @@
 import {
-  useStore,
+  usePrefs,
   lockVault as lockVaultAction,
   openAddPicker,
   openSettings,
@@ -35,7 +35,7 @@ export const lockVault = () => {
 // than the dependency bookkeeping, and `t` reads a module-level locale that a
 // dependency array can't see.
 export const useCommands = (): Command[] => {
-  const theme = useStore(state => state.theme)
+  const theme = usePrefs(state => state.theme)
 
   return [
     ...KINDS.map(kind => ({

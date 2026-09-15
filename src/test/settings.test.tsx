@@ -3,8 +3,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import i18n, { changeLocale } from '@/i18n'
-import { getTimeout } from '@/defaults/clipboard'
-import { getSecs } from '@/defaults/autolock'
+import { usePrefs } from '@/store'
 import { dateTime } from '@/utils/time'
 import {
   changeMasterPassword,
@@ -20,14 +19,7 @@ import {
 } from '@/lib/commands'
 import { renderWithStore } from './utils'
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  // Every panel reads its initial value from localStorage, so leftovers from an
-  // earlier case would decide which segment starts selected.
-  localStorage.removeItem('rowel:clipboardTimeout')
-  localStorage.removeItem('rowel:autolockSecs')
-  localStorage.removeItem('rowel:dateFormat')
-})
+beforeEach(() => vi.clearAllMocks())
 
 afterEach(() => changeLocale('en-US'))
 
@@ -246,7 +238,7 @@ describe('Settings › security', () => {
     await go('security')
     await userEvent.click(screen.getByTestId('settings-autolock-300'))
 
-    expect(getSecs()).toBe(300)
+    expect(usePrefs.getState().autolockSecs).toBe(300)
     expect(setAutolockTimeout).toHaveBeenCalledWith(300)
   })
 
@@ -255,10 +247,10 @@ describe('Settings › security', () => {
     await go('security')
 
     await userEvent.click(screen.getByTestId('settings-clipboard-15000'))
-    expect(getTimeout()).toBe(15000)
+    expect(usePrefs.getState().clipboardTimeoutMs).toBe(15000)
 
     await userEvent.click(screen.getByTestId('settings-clipboard-0'))
-    expect(getTimeout()).toBe(0)
+    expect(usePrefs.getState().clipboardTimeoutMs).toBe(0)
   })
 
   it('names both session radiogroups after their rows', async () => {
@@ -275,20 +267,19 @@ describe('Settings › security', () => {
 
     await userEvent.click(screen.getByTestId('settings-generator-symbols'))
 
-    const stored = JSON.parse(localStorage.getItem('rowel:generatorDefaults')!)
-    expect(stored.symbols).toBe(false)
+    expect(usePrefs.getState().generator.symbols).toBe(false)
   })
 })
 
 describe('Settings › vault audit', () => {
   it('toggles breach monitoring and re-runs the audit', async () => {
-    const { store } = await open()
+    await open()
     await go('audit')
 
-    expect(store.getState().breachCheck).toBe(false)
+    expect(usePrefs.getState().breachCheck).toBe(false)
     await userEvent.click(screen.getByTestId('settings-breach-toggle'))
 
-    expect(store.getState().breachCheck).toBe(true)
+    expect(usePrefs.getState().breachCheck).toBe(true)
     expect(getAudit).toHaveBeenCalledWith(true)
   })
 
@@ -382,19 +373,19 @@ describe('Settings › language & region', () => {
   })
 
   it('sets the theme from the segmented control', async () => {
-    const { store } = await open()
+    await open()
     await go('language')
     await userEvent.click(screen.getByTestId('settings-theme-dark'))
 
-    expect(store.getState().theme).toBe('dark')
+    expect(usePrefs.getState().theme).toBe('dark')
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
   it('offers System as a theme', async () => {
-    const { store } = await open()
+    await open()
     await go('language')
     await userEvent.click(screen.getByTestId('settings-theme-system'))
-    expect(store.getState().theme).toBe('system')
+    expect(usePrefs.getState().theme).toBe('system')
   })
 
   it('names both region radiogroups after their rows', async () => {

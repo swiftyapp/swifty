@@ -1,5 +1,5 @@
 import { getLocale, t } from '@/i18n'
-import { getFormat } from '@/defaults/dateFormat'
+import { usePrefs } from '@/store/prefs'
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
@@ -137,7 +137,7 @@ export const formatDate = (iso: string): string => {
   if (!match) return iso
   const [, year, month, day] = match
 
-  switch (getFormat()) {
+  switch (usePrefs.getState().dateFormat) {
     case 'DD.MM.YYYY':
       return `${day}.${month}.${year}`
     case 'YYYY-MM-DD':
@@ -156,7 +156,7 @@ export const toIsoDate = (value: string): string => {
   const parts = value.trim().split(/\D+/).filter(Boolean)
   if (parts.length !== 3) return value
 
-  const format = getFormat()
+  const format = usePrefs.getState().dateFormat
   const [day, month, year] =
     format === 'DD.MM.YYYY'
       ? parts

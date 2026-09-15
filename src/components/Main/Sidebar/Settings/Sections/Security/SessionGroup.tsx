@@ -1,9 +1,7 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { setAutolockTimeout } from '@/lib/commands'
-import { getSecs, setSecs } from '@/defaults/autolock'
-import { getTimeout, setTimeout as setClipboardTimeout } from '@/defaults/clipboard'
+import { usePrefs, setPref } from '@/store'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Segmented from '@/components/elements/Segmented'
@@ -27,18 +25,16 @@ const clipboardOptions = (t: TFunction) => [
 
 export default function SessionGroup() {
   const { t } = useTranslation()
-  const [lock, setLock] = useState(String(getSecs()))
-  const [clipboard, setClipboard] = useState(String(getTimeout()))
+  const lock = usePrefs(state => state.autolockSecs)
+  const clipboard = usePrefs(state => state.clipboardTimeoutMs)
 
   const onLock = (value: string) => {
-    setLock(value)
-    setSecs(Number(value))
+    setPref('autolockSecs', Number(value))
     setAutolockTimeout(Number(value)).catch(() => {})
   }
 
   const onClipboard = (value: string) => {
-    setClipboard(value)
-    setClipboardTimeout(Number(value))
+    setPref('clipboardTimeoutMs', Number(value))
   }
 
   // The row label doubles as the radiogroup's accessible name.
@@ -54,7 +50,7 @@ export default function SessionGroup() {
           <Segmented
             name={lockLabel}
             options={LOCK_OPTIONS}
-            value={lock}
+            value={String(lock)}
             onChange={onLock}
             testidPrefix="settings-autolock"
           />
@@ -67,7 +63,7 @@ export default function SessionGroup() {
           <Segmented
             name={clipboardLabel}
             options={clipboardOptions(t)}
-            value={clipboard}
+            value={String(clipboard)}
             onChange={onClipboard}
             testidPrefix="settings-clipboard"
           />

@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { useStore, setSort } from '@/store'
-import type { SortMode } from '@/defaults/list'
+import { usePrefs, setPref, type SortMode } from '@/store'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
 import IconButton from '@/components/elements/IconButton'
@@ -17,10 +16,10 @@ const OPTIONS: { mode: SortMode; label: TKey }[] = [
 export default function SortMenu({ className }: { className?: string }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const sort = useStore(state => state.sort)
+  const sort = usePrefs(state => state.sort)
 
   const pick = (mode: SortMode) => {
-    setSort(mode)
+    setPref('sort', mode)
     setOpen(false)
   }
 

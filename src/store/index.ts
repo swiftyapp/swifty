@@ -5,23 +5,21 @@ import { createGeneratorSlice, type GeneratorSlice } from './generatorSlice'
 import { createFiltersSlice, type FiltersSlice } from './filtersSlice'
 import { createEntriesSlice, type EntriesSlice } from './entriesSlice'
 import { createAuditSlice, type AuditSlice } from './auditSlice'
-import { createListSlice, type ListSlice } from './listSlice'
 import { createSyncSlice, type SyncSlice } from './syncSlice'
-import { createThemeSlice, type ThemeSlice } from './themeSlice'
 import { createUpdateSlice, type UpdateSlice } from './updateSlice'
 import { createUiSlice, type UiSlice } from './uiSlice'
 import { createShareSlice, type ShareSlice } from './shareSlice'
 import { createSetupSlice, type SetupSlice } from './setupSlice'
 import { createAsyncSlice, cancelScheduledSync, type AsyncSlice } from './thunks'
 
+export * from './prefs'
+
 export type StoreState = FlowSlice &
   GeneratorSlice &
   FiltersSlice &
   EntriesSlice &
   AuditSlice &
-  ListSlice &
   SyncSlice &
-  ThemeSlice &
   UpdateSlice &
   UiSlice &
   ShareSlice &
@@ -34,9 +32,7 @@ export const useStore = create<StoreState>()((...a) => ({
   ...createFiltersSlice(...a),
   ...createEntriesSlice(...a),
   ...createAuditSlice(...a),
-  ...createListSlice(...a),
   ...createSyncSlice(...a),
-  ...createThemeSlice(...a),
   ...createUpdateSlice(...a),
   ...createUiSlice(...a),
   ...createShareSlice(...a),
@@ -50,16 +46,11 @@ const pickData = (s: StoreState) => ({
   filters: s.filters,
   entries: s.entries,
   audit: s.audit,
-  breachCheck: s.breachCheck,
   sync: s.sync,
   update: s.update,
   ui: s.ui,
   share: s.share,
-  setup: s.setup,
-  // Both read a persisted preference at slice creation, so a test that changes
-  // one has to have it put back like everything else.
-  sort: s.sort,
-  theme: s.theme
+  setup: s.setup
 })
 
 const initialData = pickData(useStore.getState())
@@ -103,9 +94,7 @@ export const {
   setEntries,
   setCurrentEntry,
   auditDone,
-  setBreachCheck,
   runAudit,
-  setSort,
   syncInit,
   syncPending,
   syncConnected,
@@ -113,8 +102,6 @@ export const {
   syncDisconnected,
   syncStart,
   syncStop,
-  changeTheme,
-  toggleTheme,
   setUpdateReady,
   dismissUpdate,
   openPalette,

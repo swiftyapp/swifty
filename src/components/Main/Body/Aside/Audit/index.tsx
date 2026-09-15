@@ -1,4 +1,4 @@
-import { useStore } from '@/store'
+import { useStore, usePrefs } from '@/store'
 import type { Audit, AuditItem } from '@/lib/commands'
 import { useTranslation } from 'react-i18next'
 import Score from './Score'
@@ -11,7 +11,7 @@ const count = (audit: Audit, property: keyof AuditItem) =>
 export default function Audit() {
   const { t } = useTranslation()
   const audit = useStore(state => state.audit)
-  const breachCheck = useStore(state => state.breachCheck)
+  const breachCheck = usePrefs(state => state.breachCheck)
   const isPristine = useStore(state => state.entries.items.length === 0)
 
   if (isPristine || !audit) return null
