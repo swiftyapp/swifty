@@ -135,6 +135,7 @@ export const {
   revokeOrphans,
   setView,
   showTag,
+  flashCopied,
   setScanSupported,
   scanStarted,
   scanFinished,

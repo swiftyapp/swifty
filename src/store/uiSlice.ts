@@ -11,6 +11,13 @@ export type Section = 'sync' | 'security' | 'audit' | 'import' | 'language'
 /** Why a scan produced no fields. The copy for each lives in `Scan/Status`. */
 export type ScanError = 'unreadable' | 'unsupported' | 'failed'
 
+const COPIED_TIMEOUT = 2000
+
+// Module-level rather than in the state: the pill's countdown is not something
+// anything renders, and keeping it out means `flashCopied` is the only writer
+// of `ui.copied`.
+let copiedTimer: ReturnType<typeof setTimeout>
+
 export interface UiSlice {
   ui: {
     palette: boolean
@@ -18,6 +25,9 @@ export interface UiSlice {
     settingsSection: Section
     addPicker: boolean
     view: View
+    // The app-level "Copied to Clipboard" pill is up. Raised by `flashCopied`
+    // and lowered by it alone, so nothing else has to know the timing.
+    copied: boolean
     // Image scanning: whether the platform can do it at all (asked once per
     // unlock — no affordance is shown when it cannot), and the current run.
     scan: {
@@ -26,6 +36,7 @@ export interface UiSlice {
       error: ScanError | null
     }
   }
+  flashCopied: () => void
   setScanSupported: (supported: boolean) => void
   scanStarted: () => void
   scanFinished: (error?: ScanError | null) => void
@@ -48,7 +59,18 @@ export const createUiSlice: StateCreator<StoreState, [], [], UiSlice> = (set, ge
     settingsSection: 'sync',
     addPicker: false,
     view: 'items',
+    copied: false,
     scan: { supported: false, busy: false, error: null }
+  },
+  // A copy while the pill is still up restarts its two seconds rather than
+  // letting the first copy's timer take it down early.
+  flashCopied: () => {
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(
+      () => set(s => ({ ui: { ...s.ui, copied: false } })),
+      COPIED_TIMEOUT
+    )
+    set(s => ({ ui: { ...s.ui, copied: true } }))
   },
   setScanSupported: supported =>
     set(s => ({ ui: { ...s.ui, scan: { ...s.ui.scan, supported } } })),

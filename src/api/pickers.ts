@@ -1,3 +1,4 @@
+import { open } from '@tauri-apps/plugin-dialog'
 import { t } from '@/i18n'
 
 interface Filter {
@@ -6,13 +7,8 @@ interface Filter {
   extensions: string[]
 }
 
-/**
- * One file off disk, or null when the dialog was dismissed. The plugin is
- * imported lazily so jsdom never loads it for the suites that touch these paths
- * without opening anything.
- */
+/** One file off disk, or null when the dialog was dismissed. */
 export const pickFile = async (filters?: Filter[]): Promise<string | null> => {
-  const { open } = await import('@tauri-apps/plugin-dialog')
   const path = await open({ multiple: false, directory: false, filters })
   return typeof path === 'string' ? path : null
 }
