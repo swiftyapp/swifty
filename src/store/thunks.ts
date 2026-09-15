@@ -1,6 +1,5 @@
 import type { StateCreator } from 'zustand'
 import type { Entry, EntryMeta, UnlockResult } from '@/api/types'
-import { appStatus } from '@/api/app'
 import {
   setupCreate as setupCreateCmd,
   setupRestoreFromDrive,
@@ -179,11 +178,15 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       get().setEntries(result.entries)
       get().flowMain()
       get().syncInit(result.syncConfigured)
-      // Asked once per session: whether the OS can read a card off a photo
-      // decides whether any scan affordance is offered at all.
-      appStatus()
-        .then(status => get().setScanSupported(status.scanSupported))
-        .catch(() => {})
+      // An open session changes what the probe answers — sync, the vault on
+      // disk, the gate — so re-ask once here. Scan support comes off the same
+      // answer: whether the OS can read a card off a photo decides whether any
+      // scan affordance is offered at all.
+      void get()
+        .refreshApp()
+        .then(status => {
+          if (status) get().setScanSupported(status.scanSupported)
+        })
       // One run on unlock: this device may have been off while another pushed,
       // and it may itself be holding writes a previous session never published.
       if (result.syncConfigured) syncNow().catch(() => {})

@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
-import { appStatus } from '@/api/app'
-import { useStore, flowAuth, flowSetup } from './store'
+import { useStore, flowSetup } from './store'
 import { subscribeToEvents } from './store/events'
 import { useLayout } from './hooks/useLayout'
 import Start from './components/Start'
@@ -13,17 +12,19 @@ import UpdateToast from './components/elements/UpdateToast'
 // here and in `Main`) — the lock screen is not under `Main`, so this is where
 // the phone's biometric-first layout is chosen over the desktop card.
 function Shell() {
-  const flow = useStore(state => state.flow)
+  const name = useStore(state => state.flow.name)
+  // Straight off the launch probe, so a lock that re-ran it redraws the button
+  // rather than keeping a copy made at the last transition. Which biometry, not
+  // just whether: the same iOS build runs on Face ID phones and Touch ID iPads.
+  const gate = useStore(state => state.app?.biometric)
   const compact = useLayout() === 'compact'
-  switch (flow.name) {
+  switch (name) {
     case 'setup':
       return <Start />
-    case 'auth':
-      return compact ? (
-        <LockScreen touchID={flow.touchID} biometry={flow.biometry} />
-      ) : (
-        <Auth touchID={flow.touchID} biometry={flow.biometry} />
-      )
+    case 'auth': {
+      const props = { biometric: !!gate?.available, biometry: gate?.type }
+      return compact ? <LockScreen {...props} /> : <Auth {...props} />
+    }
     case 'main':
       return <Main />
   }
@@ -32,13 +33,10 @@ function Shell() {
 export default function App() {
   useEffect(() => {
     const unsubscribe = subscribeToEvents()
-    // Which biometry, not just whether: the same iOS build runs on Face ID
-    // phones and Touch ID iPads.
-    appStatus()
-      .then(({ initialized, biometric }) =>
-        initialized ? flowAuth(biometric.available, biometric.type) : flowSetup()
-      )
-      .catch(() => {})
+    // The boot probe already answered (main.tsx). Nothing on disk is the only
+    // answer that sends us somewhere other than the lock screen — which is also
+    // where a probe that failed leaves us, since `flow` starts there.
+    if (useStore.getState().app?.initialized === false) flowSetup()
     return unsubscribe
   }, [])
 

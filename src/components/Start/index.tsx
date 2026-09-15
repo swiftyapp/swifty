@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react'
 import type { BiometryType, UnlockResult } from '@/api/types'
-import { appStatus } from '@/api/app'
-import { enterMain, setupCreate } from '@/store'
+import { useStore, enterMain, setupCreate } from '@/store'
 import Welcome from './Welcome'
 import Password from './Password'
 import Sync from './Sync'
@@ -67,11 +66,12 @@ export function Start() {
    * be offered" is whether enrolling would work — not `biometric.available`,
    * which also asks whether it already *has* been, and so is false on every
    * fresh install by definition.
+   *
+   * The launch probe already answered, and both halves it answers with are
+   * facts about the device: nothing the setup flow does can change them.
    */
   const finish = useCallback(async (unlocked: UnlockResult) => {
-    const biometric = await appStatus()
-      .then(status => status.biometric)
-      .catch(() => null)
+    const biometric = useStore.getState().app?.biometric
     if (!biometric?.canEnroll) return enterMain(unlocked)
     setResult(unlocked)
     setBiometry(biometric.type)

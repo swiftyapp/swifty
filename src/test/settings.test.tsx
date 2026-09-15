@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
+import type { AppStatus } from '@/api/app'
+import type { BiometricMode } from '@/api/types'
 import DateField from '@/components/elements/fields/DateField'
 import { FieldsProvider } from '@/components/elements/fields/context'
 import i18n, { changeLocale } from '@/i18n'
@@ -10,7 +12,7 @@ import {
   persistDefaults
 } from '@/services/generator'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { renderWithStore } from './utils'
+import { renderWithStore, seedApp } from './utils'
 import { calls, mockCommand, mockCommandOnce } from './ipc'
 
 beforeEach(() => {
@@ -19,13 +21,17 @@ beforeEach(() => {
 
 afterEach(() => changeLocale('en-US'))
 
-// Only the biometric leaf of app_status matters here; the row reads nothing else.
-const enrolled = (available: boolean, mode: 'protected' | 'prompt' | null) => ({
+// Only the biometric leaf of the launch probe matters here; the row reads
+// nothing else. Good both for seeding the store and for what a refresh finds.
+const enrolled = (available: boolean, mode: BiometricMode | null): Partial<AppStatus> => ({
   biometric: { available, canEnroll: available, type: 'touch', mode }
 })
 
-const open = async () => {
+// `app` is what the probe had already answered when Settings opened — the row
+// reads the store, not the backend.
+const open = async (app?: Partial<AppStatus>) => {
   const { container, store } = renderWithStore(<Settings />)
+  if (app) seedApp(app)
   await userEvent.click(container.querySelector('.settings-button')!)
   return { container, store }
 }
@@ -181,10 +187,12 @@ describe('Settings › security', () => {
     expect(await screen.findByTestId('change-password-error')).toBeInTheDocument()
   })
 
-  it('enables biometric unlock from the toggle', async () => {
-    mockCommand('app_status', () => enrolled(false, null))
+  // The row never tracks the enrollment itself: it draws the store, and the
+  // toggle's job is to enroll and then re-run the probe behind it.
+  it('enables biometric unlock and redraws from the refreshed status', async () => {
     mockCommand('enable_biometric', () => 'protected')
-    await open()
+    mockCommand('app_status', () => enrolled(true, 'protected'))
+    await open(enrolled(false, null))
     await go('security')
 
     const toggle = await screen.findByTestId('settings-biometric-toggle')
@@ -199,15 +207,15 @@ describe('Settings › security', () => {
   })
 
   it('disables biometric unlock from the toggle', async () => {
-    mockCommand('app_status', () => enrolled(true, 'prompt'))
     mockCommand('disable_biometric', () => undefined)
-    await open()
+    mockCommand('app_status', () => enrolled(false, null))
+    await open(enrolled(true, 'prompt'))
     await go('security')
 
     await userEvent.click(await screen.findByTestId('settings-biometric-toggle'))
 
     expect(calls('disable_biometric')).toHaveLength(1)
-    expect(screen.getByTestId('settings-biometric-toggle')).toHaveAttribute(
+    expect(await screen.findByTestId('settings-biometric-toggle')).toHaveAttribute(
       'aria-checked',
       'false'
     )
@@ -216,18 +224,17 @@ describe('Settings › security', () => {
   // The copy must name the gate actually in force: an OS-enforced Secure Enclave
   // item and an app-enforced verify-then-read item are different promises.
   it('describes the OS-enforced gate when enrolled in protected mode', async () => {
-    mockCommand('app_status', () => enrolled(true, 'protected'))
-    await open()
+    await open(enrolled(true, 'protected'))
     await go('security')
     expect(await screen.findByText(/Secure Enclave/)).toBeInTheDocument()
   })
 
   it('switches the copy to the mode enrollment settled on', async () => {
     // An unentitled build falls back to prompt mode; the description must follow
-    // the enable response rather than keep advertising the generic offer.
-    mockCommand('app_status', () => enrolled(false, null))
+    // what the probe reports afterwards, not keep advertising the generic offer.
     mockCommand('enable_biometric', () => 'prompt')
-    await open()
+    mockCommand('app_status', () => enrolled(true, 'prompt'))
+    await open(enrolled(false, null))
     await go('security')
     await userEvent.click(await screen.findByTestId('settings-biometric-toggle'))
 

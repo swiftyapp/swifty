@@ -1,18 +1,27 @@
 import type { ReactElement } from 'react'
 import { render } from '@testing-library/react'
-import { makeStore, setEntries, flowMain, auditDone } from '@/store'
+import { useStore, makeStore, setEntries, flowMain, auditDone } from '@/store'
 import type { Entry, EntryMeta } from '@/api/types'
+import type { AppStatus } from '@/api/app'
 import type { Audit } from '@/api/tools'
+import { appStatusDefault } from './ipc'
 
 interface Options {
   store?: ReturnType<typeof makeStore>
 }
 
+// The launch probe's answer, in the store the way `main.tsx` leaves it, with
+// whatever one spec needs different about it (a gate that is enrolled, a vault
+// that is not on disk yet). Every screen reads its half of this rather than
+// asking the backend, so this is how a spec sets the scene.
+export const seedApp = (overrides: Partial<AppStatus> = {}) =>
+  useStore.setState({ app: { ...appStatusDefault(), ...overrides } })
+
 // Renders a component against a freshly reset store so tests never share state.
-export const renderWithStore = (ui: ReactElement, { store = makeStore() }: Options = {}) => ({
-  store,
-  ...render(ui)
-})
+export const renderWithStore = (ui: ReactElement, { store = makeStore() }: Options = {}) => {
+  seedApp()
+  return { store, ...render(ui) }
+}
 
 // Puts the (singleton) store into the unlocked "main" flow with the given entry
 // metadata. Acts on the store the bound actions already point at, so there is

@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import type { EntryType } from '@/api/types'
-import { appStatus, type SortMode, type Theme, type ThemePreference } from '@/api/app'
+import { type SortMode, type Theme, type ThemePreference } from '@/api/app'
 import { lock } from '@/api/auth'
 import { resolveTheme } from '@/theme/apply'
+import { createAppSlice, type AppSlice } from './appSlice'
 import { createFlowSlice, type FlowSlice } from './flowSlice'
 import { createGeneratorSlice, type GeneratorSlice } from './generatorSlice'
 import { createFiltersSlice, type FiltersSlice } from './filtersSlice'
@@ -16,7 +17,8 @@ import { createShareSlice, type ShareSlice } from './shareSlice'
 import { createSetupSlice, type SetupSlice } from './setupSlice'
 import { createAsyncSlice, cancelScheduledSync, type AsyncSlice } from './thunks'
 
-export type StoreState = FlowSlice &
+export type StoreState = AppSlice &
+  FlowSlice &
   GeneratorSlice &
   FiltersSlice &
   EntriesSlice &
@@ -30,6 +32,7 @@ export type StoreState = FlowSlice &
   AsyncSlice
 
 export const useStore = create<StoreState>()((...a) => ({
+  ...createAppSlice(...a),
   ...createFlowSlice(...a),
   ...createGeneratorSlice(...a),
   ...createFiltersSlice(...a),
@@ -45,6 +48,7 @@ export const useStore = create<StoreState>()((...a) => ({
 }))
 
 const pickData = (s: StoreState) => ({
+  app: s.app,
   flow: s.flow,
   generator: s.generator,
   filters: s.filters,
@@ -84,6 +88,8 @@ export const resetVaultData = () => {
 
 // Actions never change reference, so we expose them bound for non-reactive use.
 export const {
+  setApp,
+  refreshApp,
   flowSetup,
   flowAuth,
   flowMain,
@@ -178,16 +184,16 @@ export const startEntry = (type: EntryType, prefill?: Record<string, string>) =>
   newEntry(type, prefill)
 }
 
+// Land on the lock screen, behind a fresh probe: the screen draws its biometric
+// button off `app.biometric` (App.tsx), and hardcoding that false is how the
+// button used to vanish on every in-session lock. Both ways in — the manual
+// lock below and autolock's `vault:locked` (events.ts) — come through here.
+export const showLockScreen = () => refreshApp().then(() => flowAuth())
+
 // Manual lock, from anywhere (top chrome, Settings, palette): clear the session,
-// then land on the lock screen with the Touch ID button when — and only when —
-// a key is enrolled. Hardcoding `false` here is how the button used to vanish
-// on every in-session lock. Autolock takes the same path via the vault:locked
-// event (events.ts).
+// then back to the lock screen.
 export const lockVault = () =>
   lock().finally(() => {
     resetVaultData()
-    // Which gate it is comes along for the ride: the lock screen names it.
-    return appStatus()
-      .then(({ biometric }) => flowAuth(biometric.available, biometric.type))
-      .catch(() => flowAuth(false))
+    return showLockScreen()
   })
