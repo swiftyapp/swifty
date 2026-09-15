@@ -9,7 +9,7 @@ import {
   setFilterType
 } from '@/store'
 import { kindOf } from '@/kinds'
-import { chord } from '@/utils/platform'
+import { chord } from '@/lib/platform'
 import { useTranslation } from 'react-i18next'
 import Logo from '@/assets/images/logo.svg?react'
 import EmptyState from '@/components/elements/EmptyState'
