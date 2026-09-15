@@ -121,7 +121,6 @@ pub async fn unlock(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
-
     let lockout = LockoutState::load(&app)?;
     let now = now_ms();
     if lockout.locked_until_ms > now {
