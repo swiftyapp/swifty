@@ -9,24 +9,24 @@ beforeEach(() => vi.clearAllMocks())
 
 describe('Auth', () => {
   it('renders the lock screen', () => {
-    renderWithStore(<Auth touchID={false} />)
+    renderWithStore(<Auth biometric={false} />)
     expect(screen.getByPlaceholderText('Master Password')).toBeInTheDocument()
   })
 
   it('footers the version and where the vault lives', async () => {
-    renderWithStore(<Auth touchID={false} />)
+    renderWithStore(<Auth biometric={false} />)
     expect(
       await screen.findByText('Rowel 1.0.0 · Vault on this device')
     ).toBeInTheDocument()
   })
 
   it('has no unlock button — Enter is the only way to submit', () => {
-    renderWithStore(<Auth touchID />)
+    renderWithStore(<Auth biometric />)
     expect(screen.queryByLabelText('Unseal')).not.toBeInTheDocument()
   })
 
   it('keeps Touch ID in the field and reveals the eye only once typing starts', async () => {
-    renderWithStore(<Auth touchID />)
+    renderWithStore(<Auth biometric />)
 
     expect(screen.getByLabelText('Touch ID')).toBeInTheDocument()
     expect(screen.queryByLabelText('Reveal passphrase')).not.toBeInTheDocument()
@@ -37,7 +37,7 @@ describe('Auth', () => {
   })
 
   it('puts the caret where you click so backspace edits mid-passphrase', async () => {
-    renderWithStore(<Auth touchID={false} />)
+    renderWithStore(<Auth biometric={false} />)
     const input = screen.getByPlaceholderText<HTMLInputElement>('Master Password')
 
     await userEvent.type(input, 'abcd')
@@ -57,7 +57,7 @@ describe('Auth', () => {
   it('acknowledges Enter immediately with a verifying state', async () => {
     // Never resolves: we're asserting the in-flight presentation.
     mockCommand('unlock', () => new Promise(() => {}))
-    renderWithStore(<Auth touchID={false} />)
+    renderWithStore(<Auth biometric={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'pw{Enter}')
 
@@ -71,7 +71,7 @@ describe('Auth', () => {
       Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })
     )
     mockCommandOnce('unlock', () => ({ entries: [], syncConfigured: false }))
-    const { store } = renderWithStore(<Auth touchID={false} />)
+    const { store } = renderWithStore(<Auth biometric={false} />)
     const mascot = () => screen.getByTestId('lock-mascot')
     const input = screen.getByPlaceholderText('Master Password')
 
@@ -95,7 +95,7 @@ describe('Auth', () => {
 
   it('unlocks the vault on Enter', async () => {
     mockCommand('unlock', () => ({ entries: [], syncConfigured: false }))
-    const { store } = renderWithStore(<Auth touchID={false} />)
+    const { store } = renderWithStore(<Auth biometric={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'hunter2{Enter}')
 
@@ -105,7 +105,7 @@ describe('Auth', () => {
 
   it('shows an error on a wrong password', async () => {
     mockCommand('unlock', () => Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' }))
-    renderWithStore(<Auth touchID={false} />)
+    renderWithStore(<Auth biometric={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'bad{Enter}')
 
@@ -116,7 +116,7 @@ describe('Auth', () => {
     mockCommand('unlock', () =>
       Promise.reject({ kind: 'vaultTooNew', message: 'vault requires a newer version of the app' })
     )
-    renderWithStore(<Auth touchID={false} />)
+    renderWithStore(<Auth biometric={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'right{Enter}')
 
@@ -128,7 +128,7 @@ describe('Auth', () => {
     mockCommand('unlock', () =>
       Promise.reject({ kind: 'tooManyAttempts', message: 'too many attempts', retryAfterSecs: 2 })
     )
-    renderWithStore(<Auth touchID={false} />)
+    renderWithStore(<Auth biometric={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'bad{Enter}')
 
@@ -138,7 +138,7 @@ describe('Auth', () => {
 
   it('unlocks with biometrics', async () => {
     mockCommand('unlock_biometric', () => ({ entries: [], syncConfigured: false }))
-    const { store } = renderWithStore(<Auth touchID />)
+    const { store } = renderWithStore(<Auth biometric />)
 
     await userEvent.click(screen.getByLabelText('Touch ID'))
 

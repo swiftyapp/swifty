@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import { appStatus } from './api/app'
-import { useStore, hydrateSettings } from './store'
+import { useStore, hydrateSettings, setApp } from './store'
 import { DEFAULT_SETTINGS } from './store/settingsSlice'
 import { runStartupUpdateCheck } from './services/autoUpdate'
 import { DEFAULT_LOCALE, initI18n } from './i18n'
@@ -26,11 +26,14 @@ blockReloadShortcuts()
 const splashSettled = runSplash()
 
 // One probe, and everything the shell opens with comes out of it: the theme
-// (which the splash in index.html recolors off `data-theme`) and the language
-// the catalog is loaded for. A dead IPC call must not stop the app starting, so
-// a rejection falls back to the same defaults a fresh install would show.
+// (which the splash in index.html recolors off `data-theme`), the language the
+// catalog is loaded for, and — kept whole in the store — which flow to open on
+// and what the lock screen may offer. A dead IPC call must not stop the app
+// starting, so a rejection falls back to the same defaults a fresh install
+// would show, and `app` stays null for everyone reading it.
 const settled = appStatus()
   .then(status => {
+    setApp(status)
     hydrateSettings(status.settings)
     return status.locale
   })

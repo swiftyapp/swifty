@@ -169,8 +169,8 @@ describe('vault:locked', () => {
 
     // The regression: this used to be `flowAuth(false)` unconditionally, so an
     // in-session lock (autolock, tray) never offered Touch ID again until a
-    // full app restart.
-    expect(store.getState().flow.touchID).toBe(true)
+    // full app restart. The lock screen draws the button off this.
+    expect(store.getState().app?.biometric.available).toBe(true)
   })
 
   it('drops the session data with the key', async () => {
@@ -202,6 +202,8 @@ describe('vault:locked', () => {
 
     handlerFor(EVENTS.vaultLocked)()
     await vi.waitFor(() => expect(store.getState().flow.name).toBe('auth'))
-    expect(store.getState().flow.touchID).toBe(false)
+    // A probe that never answered knows of no gate, which is what the lock
+    // screen reads as "passphrase only".
+    expect(store.getState().app?.biometric.available ?? false).toBe(false)
   })
 })

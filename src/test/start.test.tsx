@@ -5,13 +5,14 @@ import Start from '@/components/Start'
 import type { SetupDriveFile } from '@/api/setup'
 import { open } from '@tauri-apps/plugin-dialog'
 import { setupDriveProbed, setupDriveFailed } from '@/store'
-import { renderWithStore } from './utils'
-import { calls, mockCommand, mockCommandOnce } from './ipc'
+import type { AppStatus } from '@/api/app'
+import { renderWithStore, seedApp } from './utils'
+import { calls, mockCommandOnce } from './ipc'
 
 // Whether the device could enroll a biometric gate at all, which is what
-// decides if the first run asks its last question.
-const biometricStatus = (canEnroll: boolean) => ({
-  initialized: true,
+// decides if the first run asks its last question. Read off the launch probe
+// in the store, so this is seeded rather than mocked.
+const biometricStatus = (canEnroll: boolean): Partial<AppStatus> => ({
   biometric: { available: false, canEnroll, type: 'touch', mode: null }
 })
 
@@ -354,8 +355,8 @@ describe('restoring from a backup file', () => {
 
 describe('the biometric step', () => {
   const reachBiometric = async () => {
-    mockCommand('app_status', () => biometricStatus(true))
     const rendered = renderWithStore(<Start />)
+    seedApp(biometricStatus(true))
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
     await screen.findByTestId('setup-enable-biometric-button')
@@ -363,8 +364,8 @@ describe('the biometric step', () => {
   }
 
   it('is only offered where the device has a gate to offer', async () => {
-    mockCommand('app_status', () => biometricStatus(false))
     const { store } = renderWithStore(<Start />)
+    seedApp(biometricStatus(false))
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
 

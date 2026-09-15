@@ -1,5 +1,5 @@
 import type { BackendError } from '@/api/errors'
-import type { Settings } from '@/api/app'
+import type { AppStatus, Settings } from '@/api/app'
 
 /**
  * The fake Rust backend. One mock of `@tauri-apps/api/core` stands in for every
@@ -47,19 +47,26 @@ const DEFAULT_SETTINGS: Settings = {
 
 let settings: Settings = DEFAULT_SETTINGS
 
+/**
+ * The launch probe's answer on a plain desktop with nothing enrolled. Exported
+ * because the store now holds it too: `renderWithStore` seeds the same object
+ * `main.tsx` would have put there (see test/utils).
+ */
+export const appStatusDefault = (): AppStatus => ({
+  initialized: true,
+  version: '1.0.0',
+  locale: 'en-US',
+  settings,
+  syncConfigured: false,
+  syncPending: false,
+  // Off by default, so no suite sees a scan affordance it did not ask for.
+  scanSupported: false,
+  // The desktop's gate, and what every pre-existing spec asserts by name.
+  biometric: { available: false, canEnroll: false, type: 'touch', mode: null }
+})
+
 const DEFAULTS: Record<string, Handler> = {
-  app_status: () => ({
-    initialized: true,
-    version: '1.0.0',
-    locale: 'en-US',
-    settings,
-    syncConfigured: false,
-    syncPending: false,
-    // Off by default, so no suite sees a scan affordance it did not ask for.
-    scanSupported: false,
-    // The desktop's gate, and what every pre-existing spec asserts by name.
-    biometric: { available: false, canEnroll: false, type: 'touch', mode: null }
-  }),
+  app_status: appStatusDefault,
 
   setup: () => undefined,
   unlock: () => session,
