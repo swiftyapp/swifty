@@ -31,9 +31,9 @@ const STORAGE_KEY = 'locale'
 export type TKey = keyof typeof enUS
 
 /**
- * An explicit choice wins; otherwise the OS decides. Asking Rust rather than
- * reading `navigator.language` keeps one authority for the locale — the same
- * one the tray menu has to use, since it is built before the webview exists.
+ * An explicit choice wins; otherwise the OS decides. Rust is asked rather than
+ * read off `navigator.language`, because that reports the webview engine's own
+ * language configuration, not the OS setting the user actually changed.
  */
 const resolveInitial = async (): Promise<string> => {
   const stored = localStorage.getItem(STORAGE_KEY)
