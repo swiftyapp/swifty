@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Entry, EntryMeta, EntryType } from '@/lib/commands'
+import type { Entry, EntryMeta, EntryType } from '@/api/types'
 import { useRevealed } from '@/hooks/useRevealed'
 
 export interface Shown {

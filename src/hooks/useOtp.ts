@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { generateOtp } from '@/lib/commands'
+import { generateOtp } from '@/api/tools'
 
 export const OTP_PERIOD = 30
 

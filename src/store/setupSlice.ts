@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand'
-import type { SetupDriveFile } from '@/lib/commands'
+import type { SetupDriveFile } from '@/api/setup'
 import type { StoreState } from './index'
 
 /**

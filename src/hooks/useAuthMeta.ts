@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getVersion } from '@tauri-apps/api/app'
-import { syncStatus } from '@/lib/commands'
+import { appStatus } from '@/api/app'
 import { t } from '@/i18n'
 import { APP_NAME } from '@/lib/app'
 
@@ -11,11 +10,10 @@ export interface VaultMeta {
 
 let cached: Promise<VaultMeta> | null = null
 
-const load = () =>
-  (cached ??= Promise.all([
-    getVersion().catch(() => null),
-    syncStatus().catch(() => ({ configured: false }))
-  ]).then(([version, sync]) => ({ version, configured: sync.configured })))
+const load = (): Promise<VaultMeta> =>
+  (cached ??= appStatus()
+    .then(status => ({ version: status.version, configured: status.syncConfigured }))
+    .catch(() => ({ version: null, configured: false })))
 
 // Where the vault lives, in one phrase.
 export const vaultHome = (configured: boolean): string =>

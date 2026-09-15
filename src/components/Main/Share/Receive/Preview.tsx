@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { Entry } from '@/lib/commands'
+import type { Entry } from '@/api/types'
 import type { TKey } from '@/i18n'
 import { kindOf } from '@/kinds'
 import { secretFieldCount } from '@/kinds/secrets'

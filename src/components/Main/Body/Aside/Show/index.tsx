@@ -1,4 +1,4 @@
-import type { EntryMeta, EntryType } from '@/lib/commands'
+import type { EntryMeta, EntryType } from '@/api/types'
 import Read from './Read'
 import Edit from './Edit'
 import { useShown } from './useShown'

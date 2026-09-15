@@ -1,4 +1,4 @@
-import type { Entry, EntryMeta, EntryType } from '@/lib/commands'
+import type { Entry, EntryMeta, EntryType } from '@/api/types'
 import { kindOf } from '@/kinds'
 import Body from '../../Body/Aside/Show/Edit/Body'
 import Title from '../../Body/Aside/Show/Edit/Title'

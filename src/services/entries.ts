@@ -1,5 +1,6 @@
 import Fuse from 'fuse.js'
-import { revealEntry, type EntryMeta, type EntryType } from '@/lib/commands'
+import type { EntryMeta, EntryType } from '@/api/types'
+import { revealEntry } from '@/api/vault'
 import { kindOf } from '@/kinds'
 import { copy } from './copy'
 

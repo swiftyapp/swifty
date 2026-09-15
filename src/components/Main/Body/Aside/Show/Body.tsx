@@ -1,5 +1,5 @@
 import { editEntry } from '@/store'
-import type { Entry, EntryMeta } from '@/lib/commands'
+import type { Entry, EntryMeta } from '@/api/types'
 import { FieldsProvider } from '@/components/elements/fields'
 import { kindOf } from '@/kinds'
 import DeleteError from './DeleteError'

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
 import type { TKey } from '@/i18n'
-import type { ImportFormat } from '@/lib/commands'
+import type { ImportFormat } from '@/api/imports'
 import { CARD, META, META_TYPE } from '@/components/elements/tokens'
 
 // One tile per source. `format` absent means the Rowel backup tile, which goes

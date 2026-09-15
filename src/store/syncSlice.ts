@@ -29,7 +29,8 @@ export interface SyncSlice {
   syncFailed: (error: string) => void
   syncDisconnected: () => void
   syncStart: () => void
-  syncStop: (payload: { success: boolean; error?: string }) => void
+  /** `error: null` is a run that succeeded. */
+  syncStop: (payload: { error: string | null }) => void
 }
 
 export const createSyncSlice: StateCreator<StoreState, [], [], SyncSlice> = set => ({
@@ -53,16 +54,16 @@ export const createSyncSlice: StateCreator<StoreState, [], [], SyncSlice> = set 
   syncDisconnected: () =>
     set(s => ({ sync: { ...s.sync, enabled: false, pending: false, lastSyncedAt: null } })),
   syncStart: () => set(s => ({ sync: { ...s.sync, inProgress: true, success: true, error: null } })),
-  syncStop: payload =>
+  syncStop: ({ error }) =>
     set(s => ({
       sync: {
         ...s.sync,
         inProgress: false,
-        success: payload.success,
-        error: payload.error ?? null,
+        success: error === null,
+        error,
         // A failed run leaves the previous success standing -- the vault is
         // still current as of whenever it last landed.
-        lastSyncedAt: payload.success ? new Date().toISOString() : s.sync.lastSyncedAt
+        lastSyncedAt: error === null ? new Date().toISOString() : s.sync.lastSyncedAt
       }
     }))
 })

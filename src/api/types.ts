@@ -1,0 +1,194 @@
+/**
+ * The wire types more than one domain speaks: what an entry is, what the list
+ * shows of it, and how a session opens. Crypto and the master key live entirely
+ * in Rust — `unlock` returns decrypted data for display and mutations send
+ * plaintext back to be re-encrypted.
+ */
+
+export type EntryType = 'login' | 'note' | 'card' | 'identity' | 'ssh' | 'env' | 'apikey'
+
+// One free-form field on an entry: a label the user wrote and its value.
+export interface ExtraField {
+  label: string
+  value: string
+}
+
+interface BaseEntry {
+  id: string
+  type: EntryType
+  title: string
+  tags?: string[]
+  // Free-form label/value pairs, in the user's order. Any kind may carry them;
+  // absent when there are none, so an entry without any is unchanged.
+  extra?: ExtraField[]
+  createdAt?: string
+  updatedAt?: string
+  // snake_case aliases kept for backward compatibility with legacy vaults
+  created_at?: string
+  updated_at?: string
+}
+
+// A WebAuthn credential held by a login entry. Only P-256 ECDSA is supported,
+// so there is no algorithm field. credentialId/userHandle/privateKey are
+// base64url and are carried verbatim — never re-encoded. privateKey is a secret
+// and only ever arrives inside a revealed entry.
+export interface Passkey {
+  credentialId: string
+  rpId: string
+  rpName?: string
+  userHandle: string
+  userName: string
+  userDisplayName: string
+  privateKey: string // PKCS#8 DER, base64url
+  counter: number
+  createdAt?: string // RFC3339
+}
+
+export interface LoginEntry extends BaseEntry {
+  type: 'login'
+  website: string
+  username: string
+  password: string
+  email: string
+  note: string
+  otp: string // base32 TOTP secret
+  password_updated_at?: string
+  // Absent on entries with no passkeys, so a pre-passkey vault is unchanged.
+  passkeys?: Passkey[]
+}
+
+export interface NoteEntry extends BaseEntry {
+  type: 'note'
+  note: string
+}
+
+export interface CardEntry extends BaseEntry {
+  type: 'card'
+  number: string
+  month: string
+  year: string
+  cvc: string
+  pin: string
+  name: string
+  note: string
+}
+
+// An ID document. `number` (the document number) and `personal_number` are the
+// secrets; `name` is the holder's full name, kept whole rather than split. The
+// three dates are ISO `YYYY-MM-DD` — the display pattern is a preference, never
+// what is stored.
+export interface IdentityEntry extends BaseEntry {
+  type: 'identity'
+  /** One of `passport`, `id_card`, `driver_license`, `residence_permit`, `other`. */
+  doc_type: string
+  name: string
+  number: string
+  /** Issuing country, ISO 3166-1 alpha-3 by preference but free text. */
+  country: string
+  nationality: string
+  birth_date: string
+  sex: string
+  issue_date: string
+  expiry_date: string
+  authority: string
+  personal_number: string
+  note: string
+}
+
+// An SSH keypair. ed25519 only for now, so there is no algorithm field: the
+// public line names it. `fingerprint` is derived from the key at generation or
+// paste time and stored alongside, so the detail view can show it without
+// parsing a PEM block. `passphrase` is what the key was protected with
+// elsewhere — the app never encrypts the private key itself.
+export interface SshEntry extends BaseEntry {
+  type: 'ssh'
+  privateKey: string // OpenSSH PEM
+  publicKey: string // `ssh-ed25519 AAAA… comment`
+  fingerprint: string // `SHA256:…`
+  passphrase: string
+  note: string
+}
+
+// A `.env` file. The file text is the one secret and the canonical form; the
+// variables table the detail view shows is parsed from it at render time and
+// written back into it, so there is never a second copy to keep in step and
+// comments, blank lines and quoting round-trip untouched. `fileName` is the
+// name of the file that was dropped in (`.env.production`), empty when the
+// body was typed or pasted — it is not secret and is only kept so the file
+// can be handed back out under its own name.
+export interface EnvEntry extends BaseEntry {
+  type: 'env'
+  body: string // the file, verbatim
+  fileName: string
+  note: string
+}
+
+// An API key. The token is the one secret; the rest says where it is sent and
+// what it may do there. `environment` is `test` or `production` (or empty),
+// `scopes` the granted scopes as typed — space- or comma-separated, split for
+// display — and the expiry rides in the identity's ISO date slot.
+export interface ApiKeyEntry extends BaseEntry {
+  type: 'apikey'
+  apiKey: string
+  environment: string
+  baseUrl: string
+  scopes: string
+  expiry_date: string
+  note: string
+}
+
+export type Entry =
+  | LoginEntry
+  | NoteEntry
+  | CardEntry
+  | IdentityEntry
+  | SshEntry
+  | EnvEntry
+  | ApiKeyEntry
+
+// Non-secret entry metadata for the list. Secrets live in the encrypted store
+// and arrive only via revealEntry, one entry at a time.
+export interface EntryMeta {
+  id: string
+  type: EntryType
+  title: string
+  tags: string[]
+  urlHost: string
+  // Card network slug ("visa", …) derived from the number at save time;
+  // absent for non-cards and unrecognized numbers.
+  cardBrand?: string
+  // Starred by the user. Metadata rather than an entry field, so it is toggled
+  // through setFavorite and never travels with the secrets.
+  favorite: boolean
+  // Whether the entry holds at least one passkey, derived from the payload at
+  // save time so the list can mark the row without revealing anything. The
+  // passkeys themselves only ever arrive via revealEntry.
+  hasPasskey?: boolean
+  // What an env file was called (".env.production") and how many variables it
+  // defines, derived at save time like cardBrand so the list can subtitle the
+  // row without a reveal. Absent on other kinds, on env rows saved before the
+  // columns existed, and — for the name alone — on a pasted file.
+  fileName?: string
+  varCount?: number
+  createdAt?: string
+  updatedAt?: string
+  // Present only on the tombstones listDeleted returns.
+  deletedAt?: string
+}
+
+export interface UnlockResult {
+  entries: EntryMeta[]
+  syncConfigured: boolean
+}
+
+// Which biometry this device gates with, straight from the OS (Apple reads
+// `LAContext.biometryType`; everywhere else a fingerprint is the only kind
+// there has ever been). The platform alone cannot answer it — iPhones and Touch
+// ID iPads are the same build.
+export type BiometryType = 'face' | 'touch' | 'none'
+
+// How the enrolled vault key is gated. `protected` is OS-enforced (the macOS
+// data-protection keychain releases the key only to Touch ID); `prompt` is
+// app-enforced (we run the biometric check, then read a plain credential-store
+// item). Decided once at enrollment and recorded, so the copy can be honest.
+export type BiometricMode = 'protected' | 'prompt'

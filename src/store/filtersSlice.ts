@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand'
-import type { EntryType } from '@/lib/commands'
+import type { EntryType } from '@/api/types'
 import type { StoreState } from './index'
 
 export interface FiltersSlice {

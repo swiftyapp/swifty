@@ -1,5 +1,5 @@
 import type { TKey } from '@/i18n'
-import type { BiometryType } from '@/lib/commands'
+import type { BiometryType } from '@/api/types'
 
 /**
  * What the OS biometric gate is called on *this device*. The glyph that goes

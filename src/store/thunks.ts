@@ -1,21 +1,22 @@
 import type { StateCreator } from 'zustand'
-import type { Entry, EntryMeta, UnlockResult } from '@/lib/commands'
+import type { Entry, EntryMeta, UnlockResult } from '@/api/types'
+import { appStatus } from '@/api/app'
 import {
-  shareRevoke,
+  setupCreate as setupCreateCmd,
+  setupRestoreFromDrive,
+  setupRestoreFromFile
+} from '@/api/setup'
+import {
   saveEntry as saveEntryCmd,
   deleteEntry as deleteEntryCmd,
   listDeleted,
   restoreEntry as restoreEntryCmd,
   purgeEntry as purgeEntryCmd,
-  setFavorite,
-  getAudit,
-  syncNow,
-  setupCreate as setupCreateCmd,
-  setupRestoreFromDrive,
-  setupRestoreFromFile,
-  setAutolockTimeout,
-  scanSupported
-} from '@/lib/commands'
+  setFavorite
+} from '@/api/vault'
+import { syncNow } from '@/api/sync'
+import { shareRevoke } from '@/api/share'
+import { getAudit, setAutolockTimeout } from '@/api/tools'
 import type { EntryDraft } from '@/defaults/entries'
 import { getSecs } from '@/defaults/autolock'
 import type { StoreState } from './index'
@@ -184,8 +185,8 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
       get().syncInit(result.syncConfigured)
       // Asked once per session: whether the OS can read a card off a photo
       // decides whether any scan affordance is offered at all.
-      scanSupported()
-        .then(get().setScanSupported)
+      appStatus()
+        .then(status => get().setScanSupported(status.scanSupported))
         .catch(() => {})
       // One run on unlock: this device may have been off while another pushed,
       // and it may itself be holding writes a previous session never published.

@@ -1,4 +1,4 @@
-import { readEnvFile, type EnvFile } from '@/lib/commands'
+import { readEnvFile, type EnvFile } from '@/api/imports'
 import { isImagePath } from '@/lib/fileTypes'
 import { appendVars, looksLikeEnv, parseEnv, varsOf } from './parse'
 

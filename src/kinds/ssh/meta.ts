@@ -1,4 +1,4 @@
-import type { Entry, EntryMeta } from '@/lib/commands'
+import type { Entry, EntryMeta } from '@/api/types'
 import type { EntryDraft } from '@/defaults/entries'
 import { filled } from '@/components/elements/fields/formats'
 

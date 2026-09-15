@@ -1,4 +1,4 @@
-import type { Entry, EntryType } from '@/lib/commands'
+import type { Entry, EntryType } from '@/api/types'
 import { kindOf } from '@/kinds'
 import { useTranslation } from 'react-i18next'
 import { LABEL_TYPE } from '@/components/elements/tokens'
