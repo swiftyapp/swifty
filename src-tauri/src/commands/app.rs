@@ -10,7 +10,7 @@ use crate::error::Result;
 use crate::secure_store::{self, GateMode};
 use crate::settings::Settings;
 use crate::state::AppState;
-use crate::{autolock, biometrics, locale, scan, settings, storage};
+use crate::{biometrics, locale, scan, settings, storage};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -90,16 +90,10 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
 }
 
 /// Apply a partial settings object and hand the whole merged result back, so a
-/// caller that patched one key ends up holding exactly what is on disk.
-///
-/// The auto-lock is re-armed from here rather than by the frontend: this is the
-/// only place the value can change, so it is the only place that has to know.
+/// caller that patched one key ends up holding exactly what is on disk. The
+/// auto-lock is re-armed inside `settings::set`, under its lock, rather than by
+/// the frontend: the file is the only place the value changes.
 #[tauri::command]
 pub fn set_settings(app: AppHandle, patch: serde_json::Value) -> Result<Settings> {
-    let before = settings::current(&app).autolock_secs;
-    let settings = settings::set(&app, &patch)?;
-    if settings.autolock_secs != before {
-        autolock::set_timeout(&app, settings.autolock_secs);
-    }
-    Ok(settings)
+    settings::set(&app, &patch)
 }

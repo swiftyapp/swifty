@@ -157,11 +157,18 @@ pub fn boot(app: &AppHandle) {
 /// One transaction under the lock: a slider drag lands several of these at
 /// once, and merging each from its own stale snapshot would let the last write
 /// drop the keys the others carried. A failed write leaves the state as it was.
+///
+/// The auto-lock is re-armed here too, still under the lock, so the timer
+/// always runs the value the file ends up holding: two overlapping changes
+/// persist in one order and would otherwise be allowed to arm in the other.
 pub fn set(app: &AppHandle, patch: &Value) -> Result<Settings> {
     let state = app.state::<SettingsState>();
     let mut guard = state.0.lock().unwrap();
     let merged = merge(&guard, patch)?;
     storage::write_settings(app, &serde_json::to_string_pretty(&merged)?)?;
+    if merged.autolock_secs != guard.autolock_secs {
+        crate::autolock::set_timeout(app, merged.autolock_secs);
+    }
     *guard = merged.clone();
     Ok(merged)
 }
