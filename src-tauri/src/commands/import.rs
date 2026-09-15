@@ -13,6 +13,7 @@ use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::commands::{save, store_err};
+use crate::crypto::PayloadCipher;
 use crate::error::{Error, Result};
 use crate::import::{self, EntryKind, Format, ImportedEntry, ImportedPasskey, RowError};
 use crate::models::{Entry, ExtraField, Passkey};
@@ -160,19 +161,10 @@ pub async fn export_entries(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Option<String>> {
-    let entries: Vec<ImportedEntry> = {
+    let entries = {
         let session = state.session.lock().unwrap();
-        let cryptor = session.cryptor()?;
-        crate::commands::live_records(session.store()?)?
-            .into_iter()
-            .map(|r| {
-                let blob =
-                    String::from_utf8(r.payload).map_err(|e| Error::Crypto(e.to_string()))?;
-                let obscured: Entry = cryptor.decrypt_data(&blob)?;
-                let plain = cryptor.expose(&obscured)?;
-                Ok(entry_to_imported(&plain))
-            })
-            .collect::<Result<Vec<_>>>()?
+        let cipher = session.payload_cipher()?;
+        to_imported(&crate::commands::live_records(session.store()?)?, &cipher)?
     };
 
     let (bytes, ext) = match format.to_lowercase().as_str() {
@@ -195,6 +187,15 @@ pub async fn export_entries(
         None => save::save_export(&app, &format!("rowel-export.{ext}"), "Export", bytes).await?,
     };
     Ok(dest.map(|p| p.to_string_lossy().into_owned()))
+}
+
+// Stored records -> the plaintext rows an export is written from. Split out of
+// the command so the unseal path can be tested without a Tauri app around it.
+fn to_imported(records: &[Record], cipher: &PayloadCipher) -> Result<Vec<ImportedEntry>> {
+    records
+        .iter()
+        .map(|r| Ok(entry_to_imported(&cipher.unseal(&r.payload)?)))
+        .collect()
 }
 
 // ImportedEntry -> a plaintext models::Entry, ready to be obscured + sealed.
@@ -361,5 +362,59 @@ fn to_imported_passkey(p: &Passkey) -> ImportedPasskey {
         private_key: p.private_key.clone(),
         counter: p.counter,
         created_at: p.created_at.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crypto::{self, KdfParams, VaultKey};
+    use crate::store::SqliteStore;
+
+    // Cheap Argon2id params: this proves which cipher the export reads with,
+    // not how expensive the KDF is.
+    fn argon2_vault(path: &Path) -> (VaultKey, SqliteStore) {
+        let params = KdfParams::argon2id(b"salt-for-the-export-test", 256, 1, 1);
+        let key = VaultKey::Argon2 {
+            master: crypto::derive(b"master-password", &params).unwrap(),
+        };
+        let store = SqliteStore::open(path, &key.sqlcipher_key()).unwrap();
+        (key, store)
+    }
+
+    fn tmp_db() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("rowel-export-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("vault.db");
+        let _ = std::fs::remove_file(&path);
+        path
+    }
+
+    // Every vault this app creates seals payloads with the AEAD payload cipher,
+    // so an export that reaches for the legacy cryptor reads nothing at all.
+    #[test]
+    fn exports_an_entry_sealed_the_way_save_entry_seals_it() {
+        let path = tmp_db();
+        let (key, store) = argon2_vault(&path);
+        let entry: Entry = serde_json::from_value(serde_json::json!({
+            "id": "1", "type": "login", "title": "Site",
+            "website": "https://ex.com/login", "username": "alice", "password": "s3cret"
+        }))
+        .unwrap();
+
+        let cipher = key.payload_cipher();
+        let record = migrate::build_record(&entry, cipher.seal(&entry).unwrap()).unwrap();
+        store.upsert(&record).unwrap();
+
+        let records = crate::commands::live_records(&store).unwrap();
+        let exported = to_imported(&records, &cipher).unwrap();
+
+        assert_eq!(exported.len(), 1);
+        assert_eq!(exported[0].title, "Site");
+        assert_eq!(exported[0].username.as_deref(), Some("alice"));
+        assert_eq!(exported[0].password.as_deref(), Some("s3cret"));
+
+        drop(store);
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
 }
