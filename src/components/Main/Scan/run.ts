@@ -1,4 +1,6 @@
-import { scanImage, type EntryType } from '@/lib/commands'
+import type { EntryType } from '@/api/types'
+import { scanImage } from '@/api/tools'
+import { errorKind } from '@/api/errors'
 import type { ScanError } from '@/store/uiSlice'
 import {
   useStore,
@@ -17,14 +19,16 @@ const editingKind = (): EntryType | null => {
   return edit ? (current?.type ?? null) : null
 }
 
-// The backend's failures, classified for the copy. An invoke rejects with the
-// serialized error — a string here — but a thrown Error is handled too so a
-// broken IPC still lands as a message rather than as an unhandled rejection.
+// The backend's failures, classified for the copy.
 const reason = (error: unknown): ScanError => {
-  const message = typeof error === 'string' ? error : String((error as Error)?.message ?? error)
-  if (message.includes('nothing recognized')) return 'unreadable'
-  if (message.includes('not available on this platform')) return 'unsupported'
-  return 'failed'
+  switch (errorKind(error)) {
+    case 'unrecognized':
+      return 'unreadable'
+    case 'unsupported':
+      return 'unsupported'
+    default:
+      return 'failed'
+  }
 }
 
 /**

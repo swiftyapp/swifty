@@ -1,9 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { pickEnvFile } from '@/lib/commands'
+import { pickEnvFile } from '@/api/pickers'
+import { messageOf } from '@/api/errors'
 import { ingestDroppedEnvFile, ingestEnvFile, type IngestedEnv } from './ingest'
-
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error)
 
 /**
  * The lifecycle shared by every interactive env-file entry point.

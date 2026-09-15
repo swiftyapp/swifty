@@ -1,5 +1,6 @@
-import type { EntryType } from '@/lib/commands'
-import { syncImport } from '@/lib/commands'
+import type { EntryType } from '@/api/types'
+import { syncImport } from '@/api/sync'
+import { messageOf } from '@/api/errors'
 import {
   useStore,
   openAddPicker,
@@ -37,7 +38,7 @@ export function VaultEmpty() {
   // replace this screen; on failure the button has to come back rather than
   // spin forever.
   const restore = () => {
-    syncImport().catch(error => syncFailed(String(error)))
+    syncImport().catch((error: unknown) => syncFailed(messageOf(error)))
   }
 
   return (

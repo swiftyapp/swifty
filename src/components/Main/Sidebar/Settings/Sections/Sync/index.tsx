@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useStore, syncFailed } from '@/store'
-import { syncConnect, syncDisconnect, syncNow } from '@/lib/commands'
+import { syncConnect, syncDisconnect, syncNow } from '@/api/sync'
+import { messageOf } from '@/api/errors'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
@@ -24,7 +25,7 @@ export default function Sync() {
   // on screen. A rejection is the call itself failing (no client configured,
   // vault locked), which no event will report.
   const onConnect = () => {
-    syncConnect().catch(error => syncFailed(String(error)))
+    syncConnect().catch((error: unknown) => syncFailed(messageOf(error)))
   }
 
   const lastSynced = sync.inProgress

@@ -1,6 +1,6 @@
-import { setupDriveConnect, setupDriveDisconnect } from '@/lib/commands'
+import { setupDriveConnect, setupDriveDisconnect } from '@/api/setup'
 import { setupDrivePending, setupDriveFailed, setupDriveReset } from '@/store'
-import { messageOf } from './errors'
+import { messageOf } from '@/api/errors'
 
 /**
  * Open the Google consent flow for a device that has no data yet.

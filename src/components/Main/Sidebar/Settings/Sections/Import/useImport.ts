@@ -1,15 +1,10 @@
 import { useCallback, useState } from 'react'
 import { setEntries } from '@/store'
-import {
-  pickImportFile,
-  pickBackup,
-  importEntries,
-  importSwftx,
-  readVault,
-  syncNow,
-  type ImportFormat,
-  type ImportReport
-} from '@/lib/commands'
+import { importSwftx } from '@/api/vault'
+import { importEntries, type ImportFormat, type ImportReport } from '@/api/imports'
+import { syncNow } from '@/api/sync'
+import { pickImportFile, pickBackup } from '@/api/pickers'
+import { errorKind, messageOf } from '@/api/errors'
 import { t } from '@/i18n'
 import { useProgress } from './useProgress'
 
@@ -41,7 +36,7 @@ export function useImport() {
     setRunning(true)
     importEntries(next.path, next.format, true)
       .then(setPreview)
-      .catch(e => setError(String(e)))
+      .catch((e: unknown) => setError(messageOf(e)))
       .finally(() => setRunning(false))
   }, [])
 
@@ -73,12 +68,12 @@ export function useImport() {
     setError(null)
     reset()
     importEntries(picked.path, picked.format, false)
-      .then(async report => {
-        setEntries(await readVault())
+      .then(report => {
+        setEntries(report.entries)
         setResult(report)
         setPreview(null)
       })
-      .catch(e => setError(String(e)))
+      .catch((e: unknown) => setError(messageOf(e)))
       .finally(() => setRunning(false))
   }
 
@@ -89,13 +84,17 @@ export function useImport() {
     setCount(null)
     reset()
     importSwftx(picked.path, password)
-      .then(async imported => {
-        setEntries(await readVault())
-        setCount(imported)
+      .then(({ count, entries }) => {
+        setEntries(entries)
+        setCount(count)
         // Publish the imported entries; a no-op when sync is not configured.
         syncNow().catch(() => {})
       })
-      .catch(() => setError(t('Invalid password for backup')))
+      .catch((e: unknown) =>
+        setError(
+          errorKind(e) === 'invalidPassword' ? t('Invalid password for backup') : messageOf(e)
+        )
+      )
       .finally(() => setRunning(false))
   }
 

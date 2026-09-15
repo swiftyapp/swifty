@@ -7,7 +7,7 @@ import Button from '@/components/elements/Button'
 import { evaluate, MIN_LENGTH } from '@/services/strength'
 import StepHeader from '../shared/StepHeader'
 import { COLUMN } from '../shared/layout'
-import { messageOf } from '../shared/errors'
+import { messageOf } from '@/api/errors'
 
 interface Props {
   onBack: () => void

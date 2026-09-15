@@ -8,7 +8,7 @@ import StepHeader from '../shared/StepHeader'
 import BenefitsCard from '../shared/BenefitsCard'
 import SpinnerCard from '../shared/SpinnerCard'
 import { COLUMN, ACTIONS, FOOTNOTE } from '../shared/layout'
-import { messageOf } from '../shared/errors'
+import { messageOf } from '@/api/errors'
 import { connectDrive } from '../shared/driveSession'
 
 interface Props {

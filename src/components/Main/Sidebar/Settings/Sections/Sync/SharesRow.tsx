@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { shareList, shareRevoke, type ActiveShare } from '@/lib/commands'
+import { shareList, shareRevoke, type ActiveShare } from '@/api/share'
+import { messageOf } from '@/api/errors'
 import { useStore, revokeOrphans } from '@/store'
 import { kindOf } from '@/kinds'
 import { useNow } from '@/hooks/useNow'
@@ -36,7 +37,7 @@ function Shares() {
           setShares(list)
           setError(null)
         })
-        .catch(reason => current() && setError(String(reason)))
+        .catch(reason => current() && setError(messageOf(reason)))
     },
     [begin]
   )
@@ -62,7 +63,7 @@ function Shares() {
   const revoke = (fileId: string) => {
     shareRevoke(fileId)
       .then(() => setShares(list => (list ?? []).filter(share => share.fileId !== fileId)))
-      .catch(reason => setError(String(reason)))
+      .catch(reason => setError(messageOf(reason)))
   }
 
   if (error)
