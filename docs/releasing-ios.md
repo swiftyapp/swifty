@@ -156,10 +156,11 @@ you want the app on a connected device.
    one marketing version is `CFBundleVersion`, which the release script sets
    per build.
 
-2. **Tag and push**: `git tag v<version> && git push origin v<version>`. This
-   triggers both `Release` (desktop) and `Release iOS`. The iOS workflow can
-   also be started manually from the Actions tab (`workflow_dispatch`) — GitHub
-   only offers that for workflows on the default branch.
+2. **Run the workflow**: Actions → *Release iOS* → *Run workflow*. It is
+   manual-only — nothing triggers it on merge or on a pushed tag — and GitHub
+   only offers "Run workflow" for workflows on the default branch. Shipping
+   desktop at the same time means a second, separate run of *Release*
+   ([releasing.md](releasing.md)).
 
 3. **Watch the run.** `CFBundleVersion` is set to the workflow run number
    (through `--config bundle.iOS.bundleVersion`, for the ITMS-90060 reason
@@ -172,12 +173,11 @@ you want the app on a connected device.
    App Store Connect rejects the upload — and is also attached to the draft
    GitHub release for the tag (created by the desktop workflow).
 
-   A tag run attaches to the tag that triggered it. A manual run builds the
-   default branch, which may be ahead of the released version, so it attaches
-   to `v<version from tauri.conf.json>` only when that release does not already
-   carry an IPA; otherwise it logs a warning and leaves the existing asset
-   alone. To replace the IPA on a release, re-run the workflow by pushing (or
-   re-pushing) that tag.
+   The run builds the default branch, which may be ahead of the released
+   version, so it attaches to `v<version from tauri.conf.json>` only when that
+   release does not already carry an IPA; otherwise it logs a warning and
+   leaves the existing asset alone. To replace the IPA on a release, delete the
+   existing asset from the draft first, then re-run the workflow.
 
 5. **Export compliance** must be answered for the build — see below. Until it
    is answered the build stays in "Missing Compliance" and cannot be

@@ -35,13 +35,11 @@
 
 name: Release iOS
 
-# Manual, or on a version tag — same triggers as the desktop release, so one
-# `v*` tag ships every platform. The tag/release name comes from `version` in
-# src-tauri/tauri.conf.json, exactly as in release.yml.
+# Manual only — same trigger as the desktop release, so shipping a version means
+# running both workflows deliberately. The tag/release name comes from `version`
+# in src-tauri/tauri.conf.json, exactly as in release.yml.
 on:
   workflow_dispatch:
-  push:
-    tags: ['v*']
 
 jobs:
   release-ios:
@@ -233,13 +231,15 @@ jobs:
         with:
           subject-path: ${{ steps.ipa.outputs.path }}
 
-      # A tag run attaches to the tag that triggered it, which is the revision
-      # that was just built. A manual run has no tag, so it falls back to the
-      # version in the config the way release.yml does — but that release may
-      # have been built from an older revision, so a manual run never replaces
-      # an IPA that is already attached. Either way, no release yet (the
-      # desktop workflow creates it as a draft) is not an error: the artifact
-      # above is then the only copy.
+      # Runs are always manual, but "Run workflow" lets you pick a tag as the
+      # ref as well as a branch. Dispatched against a tag, that tag IS the
+      # revision just built, so attaching to it (and replacing an older IPA on
+      # it) is safe. Dispatched against a branch there is no tag, so it falls
+      # back to the version in the config the way release.yml does — but that
+      # release may have been built from an older revision, so such a run never
+      # replaces an IPA that is already attached. Either way, no release yet
+      # (the desktop workflow creates it as a draft) is not an error: the
+      # artifact above is then the only copy.
       - name: Attach the IPA to the GitHub release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -259,7 +259,8 @@ jobs:
           fi
 
           if [ -n "$PUSHED_TAG" ]; then
-            # Re-running a tag rebuilds that same tag, so replacing is safe.
+            # Re-dispatching against a tag rebuilds that same tag, so replacing
+            # is safe.
             gh release upload "$TAG" "$IPA_PATH" --clobber
             exit 0
           fi
@@ -269,7 +270,7 @@ jobs:
           ATTACHED=$(gh release view "$TAG" --json assets \
             --jq '[.assets[].name | select(endswith(".ipa"))] | length')
           if [ "$ATTACHED" -gt 0 ]; then
-            echo "::warning::$TAG already has an IPA and this run was not triggered by that tag; leaving it in place. This build is the rowel-ios-ipa artifact"
+            echo "::warning::$TAG already has an IPA and this run was not dispatched against that tag; leaving it in place. This build is the rowel-ios-ipa artifact"
             exit 0
           fi
           gh release upload "$TAG" "$IPA_PATH"
