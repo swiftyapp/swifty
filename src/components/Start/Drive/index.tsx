@@ -14,6 +14,7 @@ import TextLink from '../shared/TextLink'
 import { COLUMN, ACTIONS, FOOTNOTE } from '../shared/layout'
 import { unsealError } from '../shared/errors'
 import { describeDriveFile } from '../shared/describe'
+import { useDates } from '@/hooks/useDates'
 import { connectDrive, switchDriveAccount } from '../shared/driveSession'
 
 interface Props {
@@ -31,6 +32,7 @@ interface Props {
 // redraws the screen.
 export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: Props) {
   const { t } = useTranslation()
+  const dates = useDates()
   const drive = useApp(state => state.setupDrive)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -134,7 +136,7 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
             where="drive"
             testid="drive-found-file"
             name={drive.file.name}
-            meta={describeDriveFile(drive.file)}
+            meta={describeDriveFile(drive.file, dates)}
             encrypted
           />
         )}

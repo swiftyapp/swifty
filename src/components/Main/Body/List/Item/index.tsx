@@ -3,7 +3,7 @@ import { cx } from '@/utils/cx'
 import { useVault, setCurrentEntry } from '@/store'
 import type { EntryMeta } from '@/api/types'
 import { kindOf } from '@/kinds'
-import { relativeTime } from '@/utils/time'
+import { useDates } from '@/hooks/useDates'
 import { useTranslation } from 'react-i18next'
 import { StarGlyph } from '../../../icons'
 import { stampOf } from '../order'
@@ -17,6 +17,7 @@ interface Props {
 
 export default function Item({ entry }: Props) {
   const { t } = useTranslation()
+  const { relativeTime } = useDates()
   const ref = useRef<HTMLDivElement>(null)
   const selected = useVault(state => state.currentId === entry.id)
   // Read the flag off the audit the vault already ran on unlock — never score

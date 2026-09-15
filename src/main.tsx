@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import { appStatus } from './api/app'
-import { hydratePrefs, setUpdateReady, usePrefs } from './store'
+import { hydratePrefs, setApp, setUpdateReady, usePrefs } from './store'
 import { runStartupUpdateCheck } from './services/autoUpdate'
 import { applyTheme } from './theme'
 import { DEFAULT_LOCALE, initI18n } from './i18n'
@@ -27,9 +27,11 @@ blockReloadShortcuts()
 
 // One probe, and everything the shell opens with comes out of it: the
 // preferences (the theme among them, which the splash in index.html recolors
-// off `data-theme`) and the language the catalog is loaded for. A dead IPC call
-// must not stop the app starting, so a rejection falls back to the same
-// defaults a fresh install would show.
+// off `data-theme`), the language the catalog is loaded for, and — kept whole
+// in the app store — which flow to open on and what the lock screen may offer.
+// A dead IPC call must not stop the app starting, so a rejection falls back to
+// the same defaults a fresh install would show, and `status` stays null for
+// everyone reading it.
 //
 // Between the probe and the hydration, a build that kept its preferences in
 // localStorage gets them carried into Rust's file (see lib/legacyPrefs), and
@@ -37,6 +39,7 @@ blockReloadShortcuts()
 const booted = appStatus()
   .then(adoptLegacyPrefs)
   .then(status => {
+    setApp(status)
     hydratePrefs(status.settings)
     return status.locale
   })

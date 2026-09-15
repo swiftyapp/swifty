@@ -1,8 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { BiometryType, UnlockResult } from '@/api/types'
-import { appStatus } from '@/api/app'
 import { setupCreate } from '@/api/setup'
-import { enterMain } from '@/store'
+import { enterMain, useApp } from '@/store'
 import Welcome from './Welcome'
 import Password from './Password'
 import Sync from './Sync'
@@ -70,9 +69,9 @@ export function Start() {
    * fresh install by definition.
    */
   const finish = useCallback(async (unlocked: UnlockResult) => {
-    const biometric = await appStatus()
-      .then(status => status.biometric)
-      .catch(() => null)
+    // The boot probe already answered, and `canEnroll` and `type` are facts
+    // about the device that do not change during setup.
+    const biometric = useApp.getState().status?.biometric
     if (!biometric?.canEnroll) return enterMain(unlocked)
     setResult(unlocked)
     setBiometry(biometric.type)

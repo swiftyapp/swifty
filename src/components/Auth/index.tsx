@@ -6,7 +6,8 @@ import type { BiometryType } from '@/api/types'
 import { useUnlock } from './useUnlock'
 
 interface Props {
-  touchID: boolean
+  /** Whether biometric unlock is enrolled *and* usable (see `appSlice`). */
+  biometric: boolean
   /** Which gate the card's end segment names (see lib/biometry). */
   biometry?: BiometryType
 }
@@ -15,8 +16,8 @@ interface Props {
 // in the auth ground. Biometrics live inside the card as its end segment —
 // there is a keyboard here, so typing is the lead affordance. The phone leads
 // the other way round (see LockScreen); both run the same `useUnlock`.
-export function Auth({ touchID, biometry = 'touch' }: Props) {
-  const { mascot, eyebrow, field, submit, biometric, change } = useUnlock()
+export function Auth({ biometric, biometry = 'touch' }: Props) {
+  const { mascot, eyebrow, field, submit, biometric: unlock, change } = useUnlock()
 
   return (
     <AuthShell>
@@ -29,7 +30,7 @@ export function Auth({ touchID, biometry = 'touch' }: Props) {
       <div className="mt-8">
         <Masterpass
           variant="lock"
-          touchID={touchID}
+          biometric={biometric}
           biometry={biometry}
           testid="unlock-password-input"
           invalid={field.invalid}
@@ -38,7 +39,7 @@ export function Auth({ touchID, biometry = 'touch' }: Props) {
           disabled={field.disabled}
           onChange={change}
           onEnter={submit}
-          onTouchID={biometric}
+          onBiometric={unlock}
         />
       </div>
     </AuthShell>

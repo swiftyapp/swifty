@@ -8,6 +8,7 @@ import StepHeader from '../shared/StepHeader'
 import FoundFileCard from '../shared/FoundFileCard'
 import { COLUMN, ACTIONS, FOOTNOTE } from '../shared/layout'
 import { describeDriveFile } from '../shared/describe'
+import { useDates } from '@/hooks/useDates'
 import { messageOf } from '@/api/errors'
 
 interface Props {
@@ -23,6 +24,7 @@ interface Props {
 // the choice is still free, and both ways out of it are spelled out plainly.
 export default function Conflict({ onBack, onUnlockExisting, onArchive }: Props) {
   const { t } = useTranslation()
+  const dates = useDates()
   const file = useApp(state => state.setupDrive.file)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -54,7 +56,7 @@ export default function Conflict({ onBack, onUnlockExisting, onArchive }: Props)
             where="drive"
             testid="setup-conflict-file"
             name={file.name}
-            meta={describeDriveFile(file)}
+            meta={describeDriveFile(file, dates)}
             encrypted
           />
         </div>
