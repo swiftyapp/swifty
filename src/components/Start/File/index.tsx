@@ -18,9 +18,10 @@ interface Props {
   onRestored: (result: UnlockResult) => Promise<void>
 }
 
-// Restoring from a `.swftx` export: pick the file, then unseal it. Desktop
-// only — a phone has nowhere to drag a file from, and the export it would need
-// was written on a machine that does.
+// Restoring from a `.rowel` backup: pick the file, then unseal it with the
+// master password it was sealed under. Desktop only — a phone has nowhere to
+// drag a file from, and the backup it would need was saved on a machine that
+// does.
 export default function File({ onBack, onRestored }: Props) {
   const { t } = useTranslation()
   const [path, setPath] = useState<string | null>(null)

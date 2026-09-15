@@ -176,7 +176,7 @@
   "Up to date": "已是最新",
   "Last attempt failed": "上次同步失败",
   "Sync now": "立即同步",
-  "Encrypted backup (.swftx)": "加密备份（.swftx）",
+  "Encrypted backup (.rowel)": "加密备份（.rowel）",
   "Your whole vault, sealed with your master password": "整个保险库，用主密码加密封存",
   "Save…": "保存…",
   "Master password": "主密码",

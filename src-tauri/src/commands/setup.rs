@@ -191,6 +191,28 @@ pub async fn setup_restore_from_drive(
     adopt(&app, &state, key, store, Some(&tokens))
 }
 
+/// Restore from a `.rowel` backup on disk. Onboarding only.
+///
+/// The same pack the sync engine uploads, written by `export_vault` instead of
+/// pulled from Drive — so this is [`setup_restore_from_drive`] with the
+/// download swapped for a file read, and no account to keep afterwards. The
+/// read happens before the step is claimed: a missing or unreadable file is
+/// the common mistake here, and it should fail before anything is locked.
+#[tauri::command]
+pub async fn setup_restore_from_file(
+    path: String,
+    password: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<UnlockResult> {
+    guard_no_vault(&app)?;
+    let bytes = std::fs::read(&path)?;
+    let _step = begin_step(&state)?;
+
+    let (key, store) = restore_off_thread(&app, bytes, password).await?;
+    adopt(&app, &state, key, store, None)
+}
+
 /// Fetch the account's pack, re-locating it rather than trusting the id the
 /// probe saw: the two are minutes apart, and a stale id is a confusing failure
 /// where "no vault up there any more" is a clear one.

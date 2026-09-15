@@ -266,7 +266,7 @@ no biometric data leaves the device or reaches the app.
   `CFBundleDocumentTypes`, and iOS then wants `UISupportsDocumentBrowser` or
   `LSSupportsOpeningDocumentsInPlace` as well. `tauri.ios.conf.json` sets
   `bundle.fileAssociations` to `null`, which the RFC 7396 merge treats as a
-  delete, so the `.swftx` association is desktop-only: nothing on iOS handles
+  delete, so the `.rowel` / `.swftx` associations are desktop-only: nothing on iOS handles
   an opened file today. The block was nevertheless left behind in the committed
   `src-tauri/gen/apple/rowel_iOS/Info.plist` by an earlier `tauri ios init`
   (the CLI only ever adds to that file) and has been removed. Declare the
