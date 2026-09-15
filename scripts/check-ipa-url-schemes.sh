@@ -24,10 +24,19 @@ if [[ -z $PLIST ]]; then
   exit 1
 fi
 
-# Space-separated schemes, empty when CFBundleURLTypes is absent.
-GOT=$(unzip -p "$IPA" "$PLIST" \
-  | plutil -extract CFBundleURLTypes json -o - - 2>/dev/null \
-  | jq -r '[.[].CFBundleURLSchemes[]] | join(" ")' 2>/dev/null || true)
+# Space-separated schemes. Only a well-formed plist *without* the key counts as
+# "none"; a plist that cannot be read or parsed fails here rather than passing
+# as an app that registers nothing.
+TMP=$(mktemp)
+trap 'rm -f "$TMP"' EXIT
+unzip -p "$IPA" "$PLIST" > "$TMP"
+plutil -lint -s "$TMP"
+if plutil -type CFBundleURLTypes "$TMP" >/dev/null 2>&1; then
+  GOT=$(plutil -extract CFBundleURLTypes json -o - "$TMP" \
+    | jq -r '[.[].CFBundleURLSchemes[]] | join(" ")')
+else
+  GOT=""
+fi
 
 if [[ $GOT != "$WANT" ]]; then
   echo "error: the IPA registers URL schemes [$GOT], expected [$WANT]." >&2
