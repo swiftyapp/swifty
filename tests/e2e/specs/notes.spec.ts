@@ -1,4 +1,4 @@
-import { createNote, resetEmpty, unlock, waitFor } from "../helpers";
+import { createNote, resetEmpty, startEdit, unlock, waitFor } from "../helpers";
 
 // Known app bug (not fixed here): `useRevealed` keys the decrypt on the entry
 // id alone, so after an in-place save the detail pane keeps serving the
@@ -43,9 +43,7 @@ describe("secure notes", () => {
   });
 
   it("round-trips an edit of the body", async () => {
-    await waitFor("edit-entry-button");
-    await $('[data-testid="edit-entry-button"]').click();
-    await waitFor("entry-sheet");
+    await startEdit();
 
     // The editor opens on encrypted metadata and swaps in the decrypted values
     // a tick later; typing before that lands would be overwritten. The body is

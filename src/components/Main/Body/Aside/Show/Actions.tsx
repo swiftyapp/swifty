@@ -14,9 +14,10 @@ interface Props {
   onDelete: () => void
 }
 
-// The detail header's action cluster: Edit, an overflow menu and the per-type
-// primary copy action — or, for a tombstone, Restore and the last delete. The
-// phone shell spreads the same three across its nav row and bottom button.
+// The detail header's action cluster: an overflow menu (Edit, Share, Archive)
+// and the per-type primary copy action — or, for a tombstone, Restore and the
+// last delete. The phone shell spreads the same two across its nav row and
+// bottom button.
 export default function Actions({ entry, revealed, onDelete }: Props) {
   const { t } = useTranslation()
   const { label, secret, copied, copy } = usePrimaryAction(entry, revealed)
@@ -27,16 +28,11 @@ export default function Actions({ entry, revealed, onDelete }: Props) {
 
   return (
     <div className="flex flex-none items-center gap-1.5">
-      <Button
-        variant="pale"
-        size="md"
-        testid="edit-entry-button"
-        onClick={() => editEntry()}
-      >
-        {t('Edit')}
-      </Button>
-
-      <MoreMenu onDelete={onDelete} onShare={() => openSend(entry.id)} />
+      <MoreMenu
+        onDelete={onDelete}
+        onEdit={() => editEntry()}
+        onShare={() => openSend(entry.id)}
+      />
 
       <Button size="md" kbd="⏎" disabled={!secret} onClick={copy} testid="primary-action-button">
         {copied ? (

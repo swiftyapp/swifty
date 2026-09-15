@@ -4,6 +4,7 @@ import {
   expectTitles,
   pickDocType,
   resetEmpty,
+  startEdit,
   unlock,
   waitFor,
 } from "../helpers";
@@ -145,9 +146,7 @@ describe("identity entries", () => {
   });
 
   it("round-trips an edit of the document number", async () => {
-    await waitFor("edit-entry-button");
-    await $('[data-testid="edit-entry-button"]').click();
-    await waitFor("entry-sheet");
+    await startEdit();
 
     // The editor opens on metadata and swaps in the decrypted values a tick
     // later; typing before that lands would be overwritten.
@@ -188,9 +187,7 @@ describe("identity entries", () => {
   // survive a save and come back on the read view.
   it("round-trips a custom field the template has no row for", async () => {
     await reopen(PASSPORT.title);
-    await waitFor("edit-entry-button");
-    await $('[data-testid="edit-entry-button"]').click();
-    await waitFor("entry-sheet");
+    await startEdit();
 
     await $('[data-testid="add-extra-field"]').click();
     await $('input[name="extra-label-0"]').setValue(EXTRA.label);
@@ -214,9 +211,7 @@ describe("identity entries", () => {
   // to drop the rows the new document lacks rather than save them unseen.
   it("drops the rows the new type lacks when the type is switched", async () => {
     await reopen(PASSPORT.title);
-    await waitFor("edit-entry-button");
-    await $('[data-testid="edit-entry-button"]').click();
-    await waitFor("entry-sheet");
+    await startEdit();
     await expect($('input[name="nationality"]')).toHaveValue(
       PASSPORT.nationality,
     );

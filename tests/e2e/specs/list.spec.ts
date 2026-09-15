@@ -4,6 +4,7 @@ import {
   expectTitles,
   openEntry,
   resetEmpty,
+  startEdit,
   toggleFavorite,
   unlock,
   waitFor,
@@ -41,9 +42,7 @@ async function pickSort(mode: SortMode): Promise<void> {
  */
 async function resaveEntry(title: string): Promise<void> {
   await openEntry(title);
-  await waitFor("edit-entry-button");
-  await $('[data-testid="edit-entry-button"]').click();
-  await waitFor("entry-sheet");
+  await startEdit();
   await expect($('input[name="password"]')).toHaveValue(PASSWORD);
   await $('[data-testid="save-entry-button"]').click();
   await $('[data-testid="entry-sheet"]').waitForDisplayed({

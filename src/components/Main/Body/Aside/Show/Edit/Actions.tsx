@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'
 import type { Draft } from './useDraft'
 
-// The editing header's cluster, where the read view's Edit / menu / copy
-// buttons sit: an unsaved dot, the guarded Cancel, and Save.
+// The editing header's cluster, where the read view's menu / copy buttons sit:
+// an unsaved dot, the guarded Cancel, and Save.
 export default function Actions({ draft }: { draft: Draft }) {
   const { t } = useTranslation()
   return (

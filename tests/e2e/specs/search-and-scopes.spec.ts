@@ -178,7 +178,7 @@ describe("search and kind filters", () => {
 
     // ⏎ opens the single match in the detail pane.
     await pressEnter();
-    await waitFor("edit-entry-button");
+    await waitFor("more-actions-button");
 
     await $('[data-testid="search-clear-button"]').click();
     await expect(searchInput()).toHaveValue("");
@@ -215,7 +215,7 @@ describe("search and kind filters", () => {
     // ⏎ stays on the row the arrows landed on instead of snapping back to the
     // first, and the detail pane is showing it.
     await pressEnter();
-    await waitFor("edit-entry-button");
+    await waitFor("more-actions-button");
     await expectSelected(second);
 
     // ⌘E takes that selection into the editor.

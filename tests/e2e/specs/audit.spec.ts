@@ -1,4 +1,11 @@
-import { createLogin, openEntry, resetEmpty, unlock, waitFor } from "../helpers";
+import {
+  createLogin,
+  openEntry,
+  resetEmpty,
+  startEdit,
+  unlock,
+  waitFor,
+} from "../helpers";
 
 // The Password Audit pane behind the rail's vault-health dial.
 //
@@ -66,9 +73,7 @@ async function selectLogin(title: string): Promise<void> {
 async function repassword(title: string, password: string): Promise<void> {
   await selectLogin(title);
 
-  await waitFor("edit-entry-button");
-  await $('[data-testid="edit-entry-button"]').click();
-  await waitFor("entry-sheet");
+  await startEdit();
 
   // Secrets arrive via `revealEntry`, so the field is empty for a beat after
   // the editor opens; typing before it lands would be overwritten. Only the
