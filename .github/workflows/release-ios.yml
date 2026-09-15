@@ -156,6 +156,11 @@ jobs:
         # scheme (its reverse), same as scripts/release-ios.sh does.
         run: |
           set -euo pipefail
+          # Anything else would ship as an illegal URL scheme and be rejected at upload (90158).
+          if [ -n "$GOOGLE_OAUTH_IOS_CLIENT_ID" ] && ! [[ $GOOGLE_OAUTH_IOS_CLIENT_ID =~ ^[A-Za-z0-9.+-]+\.apps\.googleusercontent\.com$ ]]; then
+            echo "::error::GOOGLE_OAUTH_IOS_CLIENT_ID is not an iOS OAuth client id (<id>.apps.googleusercontent.com)" >&2
+            exit 1
+          fi
           SCHEME="com.googleusercontent.apps.${GOOGLE_OAUTH_IOS_CLIENT_ID%.apps.googleusercontent.com}"
           CONFIG=$(jq -cn --arg build "$BUILD_NUMBER" --arg scheme "$SCHEME" --arg id "$GOOGLE_OAUTH_IOS_CLIENT_ID" \
             '{bundle:{iOS:{bundleVersion:$build}}}

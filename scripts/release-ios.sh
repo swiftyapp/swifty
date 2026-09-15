@@ -73,6 +73,12 @@ BUILD_NUMBER="${BUILD_NUMBER:-$(( $(date -u +%s) / 60 ))}"
 # `option_env!` never sees the shell. The `--config` patch does get through.
 SCHEME=""
 if [[ -n ${GOOGLE_OAUTH_IOS_CLIENT_ID:-} ]]; then
+  # Anything else — the desktop client, a placeholder with an underscore — would
+  # ship as an illegal URL scheme and be rejected at upload (90158).
+  if [[ ! $GOOGLE_OAUTH_IOS_CLIENT_ID =~ ^[A-Za-z0-9.+-]+\.apps\.googleusercontent\.com$ ]]; then
+    echo "error: GOOGLE_OAUTH_IOS_CLIENT_ID is not an iOS OAuth client id (<id>.apps.googleusercontent.com)." >&2
+    exit 1
+  fi
   SCHEME="com.googleusercontent.apps.${GOOGLE_OAUTH_IOS_CLIENT_ID%.apps.googleusercontent.com}"
 else
   echo "warning: GOOGLE_OAUTH_IOS_CLIENT_ID is not set — building without Drive sync." >&2
