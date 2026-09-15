@@ -12,7 +12,7 @@ beforeEach(() => vi.clearAllMocks())
 const synced = () => {
   const store = makeStore()
   store.getState().syncConnected()
-  store.getState().syncStop({ success: true })
+  store.getState().syncStop({ error: null })
   return store
 }
 
@@ -50,7 +50,7 @@ describe('Header', () => {
 
   it('surfaces the backend message on a failed sync', () => {
     const store = synced()
-    store.getState().syncStop({ success: false, error: 'Drive said no' })
+    store.getState().syncStop({ error: 'Drive said no' })
     renderWithStore(<Header />, { store })
     expect(chip()).toHaveAttribute('data-tone', 'bad')
     expect(chip()).toHaveAccessibleName('Drive said no')
@@ -58,7 +58,7 @@ describe('Header', () => {
 
   it('reads as syncing, not failed, when a retry follows an error', () => {
     const store = synced()
-    store.getState().syncStop({ success: false, error: 'Drive said no' })
+    store.getState().syncStop({ error: 'Drive said no' })
     store.getState().syncStart()
     renderWithStore(<Header />, { store })
     expect(chip()).toHaveAttribute('data-tone', 'loading')

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { generateOtp } from '@/lib/commands'
+import { mockCommand } from '@/test/ipc'
 import { useOtp } from './useOtp'
 
 type Otp = { code: string; time: number }
@@ -22,7 +22,7 @@ describe('useOtp', () => {
   it('discards a rollover fetch for a secret that is no longer current', async () => {
     const stale = deferred()
     let asked = 0
-    vi.mocked(generateOtp).mockImplementation(secret => {
+    mockCommand('generate_otp', ({ secret }) => {
       if (secret !== 'AAAAAAAA') return Promise.resolve({ code: '222222', time: 30 })
       // The first code for AAAAAAAA arrives with its window already spent, so
       // the rollover fetch fires straight away — and then hangs.

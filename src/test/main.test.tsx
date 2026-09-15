@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
-import type { EntryMeta } from '@/lib/commands'
-import { revealEntry } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 import { makeStore, useStore, setView } from '@/store'
 import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
+import { mockCommand } from './ipc'
 
 const note = (id: string, title: string): EntryMeta =>
   ({ id, type: 'note', title, tags: [], urlHost: '', favorite: false })
@@ -33,7 +33,7 @@ describe('Main', () => {
 
   it('selects an entry and shows its details', async () => {
     // Details are revealed (decrypted) on demand for the selected entry.
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
     renderWithStore(<Main />, { store: seed() })
     await userEvent.click(screen.getByText('Google'))
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
@@ -74,7 +74,7 @@ describe('Main', () => {
   })
 
   it('edits the selected entry on ⌘E, and needs a selection to do it', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
     renderWithStore(<Main />, { store: seed() })
 
     // Nothing selected: the chord has nothing to edit.
@@ -90,7 +90,7 @@ describe('Main', () => {
   // assertion: it is what takes the column's rows, chips and arrows out of the
   // browser's keyboard and pointer reach while a draft is open.
   it('takes the list column out of the keyboard while a draft is open', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
     renderWithStore(<Main />, { store: seed() })
 
     const column = screen.getByTestId('list-column')
@@ -149,7 +149,7 @@ describe('Main', () => {
   })
 
   it('keeps the selected entry when the kind filter still admits it', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ id: 'l1', title: 'Google' }))
+    mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
     renderWithStore(<Main />, { store: seed() })
 
     await userEvent.click(screen.getByText('Google'))

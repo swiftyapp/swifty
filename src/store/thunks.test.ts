@@ -9,8 +9,9 @@ import {
   setFilterType,
   lockVault
 } from './index'
-import { saveEntry as saveEntryCmd, toEntryMeta, syncNow } from '@/lib/commands'
-import type { EntryMeta, Passkey } from '@/lib/commands'
+import type { Entry, EntryMeta, Passkey } from '@/api/types'
+import { calls, mockCommand } from '../test/ipc'
+import { toEntryMeta } from '../test/meta'
 
 const meta = (id: string, title = id): EntryMeta =>
   ({ id, type: 'login', title, tags: [], urlHost: '', favorite: false })
@@ -20,7 +21,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   makeStore()
   // Echo back the saved entry's metadata, as the real backend does.
-  vi.mocked(saveEntryCmd).mockImplementation(entry => Promise.resolve(toEntryMeta(entry)))
+  mockCommand('save_entry', ({ entry }) => toEntryMeta(entry as Entry))
 })
 
 afterEach(() => vi.useRealTimers())
@@ -34,10 +35,10 @@ describe('saveEntry', () => {
     expect(items).toHaveLength(1)
     expect(items[0].title).toBe('New')
     expect(current?.id).toBe(items[0].id)
-    expect(saveEntryCmd).toHaveBeenCalledOnce()
+    expect(calls('save_entry')).toHaveLength(1)
     // Nothing to sync to: this vault is local-only.
     await vi.advanceTimersByTimeAsync(60_000)
-    expect(syncNow).not.toHaveBeenCalled()
+    expect(calls('sync_now')).toHaveLength(0)
   })
 
   it('updates an existing entry', async () => {
@@ -96,7 +97,7 @@ describe('saveEntry', () => {
 
     await saveEntry({ type: 'login', title: 'Acme', username: 'u', password: 'p', passkeys })
 
-    const saved = vi.mocked(saveEntryCmd).mock.calls[0][0]
+    const saved = calls('save_entry')[0].entry as Entry
     expect(saved.type === 'login' && saved.passkeys).toEqual(passkeys)
     expect(store.getState().entries.items[0]).not.toHaveProperty('passkeys')
   })
@@ -113,10 +114,10 @@ describe('auto-sync', () => {
 
     // The second write reset the timer, so nothing has gone out yet.
     await vi.advanceTimersByTimeAsync(20_000)
-    expect(syncNow).not.toHaveBeenCalled()
+    expect(calls('sync_now')).toHaveLength(0)
 
     await vi.advanceTimersByTimeAsync(20_000)
-    expect(syncNow).toHaveBeenCalledOnce()
+    expect(calls('sync_now')).toHaveLength(1)
   })
 
   it('drops a write still waiting when the vault locks', async () => {
@@ -129,7 +130,7 @@ describe('auto-sync', () => {
     // The key is gone: a push fired now could only fail, and the next unlock
     // syncs anyway.
     await vi.advanceTimersByTimeAsync(60_000)
-    expect(syncNow).not.toHaveBeenCalled()
+    expect(calls('sync_now')).toHaveLength(0)
   })
 
   it('publishes a delete too', async () => {
@@ -139,7 +140,7 @@ describe('auto-sync', () => {
 
     await deleteEntry('a')
     await vi.advanceTimersByTimeAsync(30_000)
-    expect(syncNow).toHaveBeenCalledOnce()
+    expect(calls('sync_now')).toHaveLength(1)
   })
 })
 
@@ -165,7 +166,7 @@ describe('enterMain', () => {
     expect(state.entries.items.map(e => e.id)).toEqual(['a'])
     // A configured vault syncs once on unlock, before any local write.
     expect(state.sync.enabled).toBe(true)
-    expect(syncNow).toHaveBeenCalledOnce()
+    expect(calls('sync_now')).toHaveLength(1)
   })
 
   it('leaves sync off for a vault that has never been connected', async () => {
@@ -173,6 +174,6 @@ describe('enterMain', () => {
     await enterMain({ entries: [], syncConfigured: false })
 
     expect(store.getState().sync.enabled).toBe(false)
-    expect(syncNow).not.toHaveBeenCalled()
+    expect(calls('sync_now')).toHaveLength(0)
   })
 })

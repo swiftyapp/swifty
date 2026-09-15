@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { screen } from '@testing-library/react'
 import AuditList from '@/components/Main/Body/List/Audit'
 import AuditAside from '@/components/Main/Body/Aside/Audit'
-import type { Audit } from '@/lib/commands'
+import type { Audit } from '@/api/tools'
 import { makeStore, setBreachCheck } from '@/store'
 import { renderWithStore, withEntries, loginMeta } from './utils'
 
