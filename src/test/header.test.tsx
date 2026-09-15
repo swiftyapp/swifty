@@ -2,16 +2,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Header from '@/components/Main/Header'
-import { useUi, syncConnected, syncStart, syncStop } from '@/store'
+import { useUi, setSyncStatus, initialApp } from '@/store'
+import type { SyncStatus } from '@/lib/commands'
 
 beforeEach(() => vi.clearAllMocks())
 
+// What the backend would report, one snapshot at a time.
+const report = (status: Partial<SyncStatus>) =>
+  setSyncStatus({ ...initialApp.sync, configured: true, ...status })
+
 // Sync configured *and* one run already landed -- the pair the chip needs
 // before it will claim to be up to date.
-const synced = () => {
-  syncConnected()
-  syncStop({ success: true })
-}
+const synced = () => report({ lastSyncedAt: '2024-01-01T00:00:00.000Z' })
 
 const chip = () => screen.getByTestId('sync-indicator')
 
@@ -25,10 +27,10 @@ describe('Header', () => {
   })
 
   it('stays unbadged on a fresh connection, before any run has landed', () => {
-    syncConnected()
+    report({})
     render(<Header />)
-    // Not 'good': `success` defaults true, and a chip that ticked here would be
-    // vouching for a sync that has not happened.
+    // Not 'good': a chip that ticked here would be vouching for a sync that
+    // has not happened.
     expect(chip()).toHaveAttribute('data-tone', 'idle')
   })
 
@@ -39,24 +41,22 @@ describe('Header', () => {
   })
 
   it('spins while a sync is in flight', () => {
-    synced()
-    syncStart()
+    report({ lastSyncedAt: '2024-01-01T00:00:00.000Z', inProgress: true })
     render(<Header />)
     expect(chip()).toHaveAttribute('data-tone', 'loading')
   })
 
   it('surfaces the backend message on a failed sync', () => {
-    synced()
-    syncStop({ success: false, error: 'Drive said no' })
+    report({ lastSyncedAt: '2024-01-01T00:00:00.000Z', error: 'Drive said no' })
     render(<Header />)
     expect(chip()).toHaveAttribute('data-tone', 'bad')
     expect(chip()).toHaveAccessibleName('Drive said no')
   })
 
   it('reads as syncing, not failed, when a retry follows an error', () => {
-    synced()
-    syncStop({ success: false, error: 'Drive said no' })
-    syncStart()
+    report({ lastSyncedAt: '2024-01-01T00:00:00.000Z', error: 'Drive said no' })
+    // The backend clears the error when the next run starts.
+    report({ lastSyncedAt: '2024-01-01T00:00:00.000Z', inProgress: true })
     render(<Header />)
     expect(chip()).toHaveAttribute('data-tone', 'loading')
   })

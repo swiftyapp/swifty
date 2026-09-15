@@ -91,7 +91,13 @@ vi.mock('@/lib/commands', () => ({
   syncDisconnect: vi.fn().mockResolvedValue(undefined),
   syncNow: vi.fn().mockResolvedValue(undefined),
   syncImport: vi.fn().mockResolvedValue(undefined),
-  syncStatus: vi.fn().mockResolvedValue({ configured: false, pending: false }),
+  syncStatus: vi.fn().mockResolvedValue({
+    configured: false,
+    pending: false,
+    inProgress: false,
+    error: null,
+    lastSyncedAt: null
+  }),
   // Sharing. The link is the shape the backend hands back — file id plus key —
   // and `shareOpen` resolves a plain login, so a suite only overrides the one
   // call it is about.

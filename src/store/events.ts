@@ -1,12 +1,7 @@
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { on, EVENTS } from '@/lib/events'
 import {
-  syncStart,
-  syncStop,
-  syncPending,
-  syncConnected,
-  syncFailed,
-  syncDisconnected,
+  setSyncStatus,
   setupDrivePending,
   setupDriveProbed,
   setupDriveFailed,
@@ -27,18 +22,7 @@ const refreshOpenArchive = () => {
 // Wires backend events to store actions. Returns a cleanup function.
 export const subscribeToEvents = (): (() => void) => {
   const pending: Promise<UnlistenFn>[] = [
-    on(EVENTS.syncStarted, () => syncStart()),
-    on(EVENTS.syncStopped, payload => syncStop(payload)),
-    on(EVENTS.syncPending, () => syncPending()),
-    on(EVENTS.syncConnected, () => syncConnected()),
-    on(EVENTS.syncError, payload => syncFailed(payload.error)),
-    on(EVENTS.syncDisconnected, () => syncDisconnected()),
-    on(EVENTS.pullStarted, () => syncStart()),
-    on(EVENTS.pullStopped, payload => {
-      syncStop(payload)
-      if (payload.data) setEntries(payload.data.entries)
-      refreshOpenArchive()
-    }),
+    on(EVENTS.syncStatus, setSyncStatus),
     // A merge brought in entries from another device: refresh the list, and the
     // audit with it — the new rows have no strength or breach result yet.
     on(EVENTS.vaultMerged, payload => {

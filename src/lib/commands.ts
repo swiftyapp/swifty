@@ -260,10 +260,20 @@ export interface AuditItem {
 // Keyed by entry id; only entries that have a password are included.
 export type Audit = Record<string, AuditItem>
 
+/**
+ * The whole of what the frontend knows about sync. Returned by `sync_status`
+ * and carried by every `sync:status` event; the store keeps it verbatim.
+ */
 export interface SyncStatus {
+  /** This vault has a provider connected. */
   configured: boolean
-  // A consent flow is out with the browser (see `sync:pending` in events.ts).
+  /** A consent flow is out with the browser. */
   pending: boolean
+  inProgress: boolean
+  /** What the last connect or run failed with, until the next one starts. */
+  error: string | null
+  /** ISO time of the last run that succeeded in this process, or null. */
+  lastSyncedAt: string | null
 }
 
 // ---------------------------------------------------------------------------

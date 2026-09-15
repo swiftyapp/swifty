@@ -13,7 +13,7 @@ import {
   setView,
   setCurrentEntry,
   flowMain,
-  syncPending
+  initialApp
 } from './index'
 
 const meta = (id: string): EntryMeta => ({
@@ -92,63 +92,35 @@ describe('vault:merged', () => {
     vi.mocked(listDeleted).mockClear()
 
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
-    handlerFor(EVENTS.pullStopped)({ success: true })
 
     expect(listDeleted).not.toHaveBeenCalled()
   })
 })
 
-describe('sync:stopped', () => {
-  it('surfaces the backend error for the sync indicator', () => {
-    handlerFor(EVENTS.syncStarted)()
-    expect(useApp.getState().sync.inProgress).toBe(true)
+// The backend owns sync — the consent flow, the runs, their outcome — and
+// reports the whole of it on every change. The frontend stores it verbatim.
+describe('sync:status', () => {
+  it('is adopted as-is', () => {
+    const status = {
+      configured: true,
+      pending: false,
+      inProgress: false,
+      error: 'Drive API 403',
+      lastSyncedAt: '2024-01-01T00:00:00.000Z'
+    }
 
-    handlerFor(EVENTS.syncStopped)({ success: false, error: 'Drive API 403' })
+    handlerFor(EVENTS.syncStatus)(status)
 
-    const { inProgress, success, error } = useApp.getState().sync
-    expect(inProgress).toBe(false)
-    expect(success).toBe(false)
-    expect(error).toBe('Drive API 403')
-  })
-})
-
-// The backend owns the consent flow: `sync:pending` when it opens the browser,
-// then exactly one of `sync:connected` / `sync:error`. The frontend only mirrors.
-describe('the pending connect', () => {
-  it('is started by sync:pending', () => {
-    handlerFor(EVENTS.syncPending)()
-    expect(useApp.getState().sync.pending).toBe(true)
+    expect(useApp.getState().sync).toEqual(status)
   })
 
-  it('is finished by sync:connected', () => {
-    handlerFor(EVENTS.syncPending)()
-    expect(useApp.getState().sync.pending).toBe(true)
+  it('replaces the previous status rather than merging into it', () => {
+    handlerFor(EVENTS.syncStatus)({ ...initialApp.sync, pending: true })
+    handlerFor(EVENTS.syncStatus)({ ...initialApp.sync, configured: true })
 
-    handlerFor(EVENTS.syncConnected)()
-
-    const { pending, enabled, error } = useApp.getState().sync
+    const { pending, configured } = useApp.getState().sync
     expect(pending).toBe(false)
-    expect(enabled).toBe(true)
-    expect(error).toBeNull()
-  })
-
-  it('is finished by sync:error, which leaves the vault unconnected', () => {
-    syncPending()
-
-    handlerFor(EVENTS.syncError)({ error: 'access_denied' })
-
-    const { pending, enabled, error } = useApp.getState().sync
-    expect(pending).toBe(false)
-    expect(enabled).toBe(false)
-    expect(error).toBe('access_denied')
-  })
-
-  it('clears a previous failure when the user tries again', () => {
-    handlerFor(EVENTS.syncError)({ error: 'access_denied' })
-
-    syncPending()
-
-    expect(useApp.getState().sync.error).toBeNull()
+    expect(configured).toBe(true)
   })
 })
 

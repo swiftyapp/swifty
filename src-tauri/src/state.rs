@@ -109,6 +109,21 @@ pub struct PendingAuth {
     pub started: std::time::Instant,
 }
 
+/// Sync as the frontend sees it. Every transition in `commands::sync` updates
+/// this and re-emits the whole thing as `sync:status`, so the frontend mirrors
+/// one value instead of reconstructing it from an order of events. Process
+/// lifetime, not session: a lock does not un-happen the last successful run.
+#[derive(Default)]
+pub struct SyncRun {
+    /// A consent flow is out with the browser.
+    pub pending: bool,
+    pub in_progress: bool,
+    /// What the last connect or run failed with, until the next one starts.
+    pub error: Option<String>,
+    /// RFC 3339 time of the last run that succeeded in this process.
+    pub last_synced_at: Option<String>,
+}
+
 #[derive(Default)]
 pub struct AppState {
     pub session: Mutex<Session>,
@@ -116,6 +131,7 @@ pub struct AppState {
     // and releases the session lock repeatedly (never across a network call),
     // so the "one at a time" guard cannot live behind that same lock.
     pub syncing: AtomicBool,
+    pub sync_run: Mutex<SyncRun>,
     /// Drive tokens for an account connected during first-run onboarding.
     ///
     /// Memory only, and deliberately so: they are sealed under the vault key,

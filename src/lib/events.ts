@@ -1,5 +1,5 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { Audit, EntryMeta, SetupDriveFile } from './commands'
+import type { Audit, EntryMeta, SetupDriveFile, SyncStatus } from './commands'
 
 /**
  * Frozen event catalog. The backend `emit`s these; the frontend `listen`s.
@@ -8,14 +8,7 @@ import type { Audit, EntryMeta, SetupDriveFile } from './commands'
  */
 
 export const EVENTS = {
-  syncStarted: 'sync:started',
-  syncStopped: 'sync:stopped',
-  syncPending: 'sync:pending',
-  syncConnected: 'sync:connected',
-  syncDisconnected: 'sync:disconnected',
-  syncError: 'sync:error',
-  pullStarted: 'vault:pull:started',
-  pullStopped: 'vault:pull:stopped',
+  syncStatus: 'sync:status',
   vaultMerged: 'vault:merged',
   auditDone: 'audit:done',
   vaultLocked: 'vault:locked',
@@ -26,27 +19,13 @@ export const EVENTS = {
   setupDriveError: 'setup:drive:error'
 } as const
 
-export interface SyncStoppedPayload {
-  success: boolean
-  error?: string
-}
-
 /**
- * A consent flow is out with the browser (`sync:pending`), then finished by
- * exactly one of `sync:connected` or `sync:error`. The backend owns all three:
- * it is what opens the browser and what hears back from it, so the frontend
- * mirrors these rather than guessing from a click. On mobile the command
- * resolves the moment Safari is on screen; on desktop it blocks — either way
- * the promise is not what carries the outcome.
+ * A consent flow ended without a connection. The backend owns the flow: it is
+ * what opens the browser and what hears back from it, so the frontend mirrors
+ * what it says rather than guessing from a click or a command's promise.
  */
 export interface SyncErrorPayload {
   error: string
-}
-
-export interface PullStoppedPayload {
-  success: boolean
-  data?: { entries: EntryMeta[] }
-  error?: string
 }
 
 /**
@@ -74,9 +53,6 @@ export interface ImportDonePayload {
 /**
  * The first-run Drive probe answered. `file: null` is a Google account with no
  * Rowel data in it yet — a fact, not a failure, so it is not an error event.
- * Mirrors the `sync:pending` / `sync:connected` / `sync:error` trio: the
- * backend opens the browser and hears back from it, so the frontend follows
- * these rather than guessing from the command's promise.
  */
 export interface SetupDriveProbedPayload {
   file: SetupDriveFile | null
@@ -84,14 +60,12 @@ export interface SetupDriveProbedPayload {
 
 // Maps each event to its payload type (void = no payload).
 export interface EventPayloads {
-  'sync:started': void
-  'sync:stopped': SyncStoppedPayload
-  'sync:pending': void
-  'sync:connected': void
-  'sync:disconnected': void
-  'sync:error': SyncErrorPayload
-  'vault:pull:started': void
-  'vault:pull:stopped': PullStoppedPayload
+  /**
+   * The whole of sync, every time anything about it changes: a consent flow
+   * opening or closing, a run starting or ending. The frontend stores it as-is
+   * — there is no sequence of events to reconstruct state from.
+   */
+  'sync:status': SyncStatus
   'vault:merged': VaultMergedPayload
   'audit:done': AuditDonePayload
   'vault:locked': void

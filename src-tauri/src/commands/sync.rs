@@ -1,15 +1,20 @@
 //! Sync commands.
 //!
 //! Nothing here does the work: every command validates, starts a run, and
-//! returns. The run itself lives on a thread of its own and reports through the
-//! `sync:*` events the frontend already listens for. That split is the whole
-//! point of this rewrite — the first Drive implementation drove Google's API
-//! from the command thread and froze the window for the length of a round trip.
+//! returns. The run itself lives on a thread of its own and reports through
+//! `sync:status`. That split is the whole point of this rewrite — the first
+//! Drive implementation drove Google's API from the command thread and froze
+//! the window for the length of a round trip.
+//!
+//! The frontend never reconstructs sync state from a sequence of events: every
+//! transition updates [`SyncRun`] and re-emits the whole [`SyncStatus`], which
+//! the frontend stores as-is. One event, one shape, no order to agree on.
 
 use std::sync::atomic::Ordering;
 #[cfg(mobile)]
 use std::time::Duration;
 
+use chrono::{SecondsFormat, Utc};
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -17,10 +22,12 @@ use crate::commands::list_metas;
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::models::{EntryMetaDto, SyncStatus};
-use crate::state::AppState;
+use crate::state::{AppState, SyncRun};
 #[cfg(mobile)]
 use crate::state::AuthPurpose;
 use crate::sync;
+
+const STATUS_EVENT: &str = "sync:status";
 
 /// Connect a sync provider (OAuth), then publish/adopt straight away so the
 /// user sees the effect of connecting without a second click.
@@ -39,8 +46,8 @@ pub async fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<
 /// Start the consent flow and return — see [`on_redirect`] for the other half.
 ///
 /// Nothing here waits: Safari takes the screen and iOS suspends the app behind
-/// it, so there is no result to wait for. The frontend is told by `sync:connected`
-/// or `sync:error` rather than by this promise.
+/// it, so there is no result to wait for. The frontend is told by `sync:status`
+/// rather than by this promise.
 ///
 /// Synchronous on purpose, unlike its desktop twin. It does no blocking work,
 /// and running on the IPC (main) thread is what puts the opener plugin's
@@ -49,6 +56,7 @@ pub async fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     start_consent(&app, &state, AuthPurpose::Connect)
+        .inspect_err(|e| failed(&app, e.to_string()))
 }
 
 // Disconnect the sync provider (keeps the refresh token, per legacy).
@@ -57,12 +65,18 @@ pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()>
     let cryptor = state.session.lock().unwrap().cryptor()?;
     sync::disconnect(&app, &cryptor)?;
     state.session.lock().unwrap().sync_configured = false;
-    let _ = app.emit("sync:disconnected", ());
+    // The timestamp goes with the connection: the next one is a new pairing,
+    // and "synced 3m ago" from a previous one would be a lie about it.
+    update(&app, |run| {
+        run.pending = false;
+        run.error = None;
+        run.last_synced_at = None;
+    });
     Ok(())
 }
 
-/// Start a sync. Returns as soon as the run is scheduled; `sync:started` and
-/// `sync:stopped` report the rest.
+/// Start a sync. Returns as soon as the run is scheduled; `sync:status`
+/// reports the rest.
 #[tauri::command]
 pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     // Both of these are silent no-ops rather than errors. This is a routine
@@ -103,22 +117,32 @@ pub async fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<(
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     start_consent(&app, &state, AuthPurpose::Import)
+        .inspect_err(|e| failed(&app, e.to_string()))
 }
 
-/// Take on whatever the account holds, reporting through `vault:pull:*`.
+/// The backend's view of sync, for the frontend to seed itself from on unlock.
+/// Everything after that arrives as `sync:status`.
+#[tauri::command]
+pub fn sync_status(app: AppHandle) -> Result<SyncStatus> {
+    Ok(status(&app))
+}
+
+/// Take on whatever the account holds. A run like any other as far as the
+/// frontend is concerned: in progress, then the merged rows, then a result.
 async fn pull(app: &AppHandle, cryptor: Cryptor) -> Result<()> {
-    let _ = app.emit("vault:pull:started", ());
+    started(app);
     let handle = app.clone();
     let result = tauri::async_runtime::spawn_blocking(move || sync::run(&handle, cryptor))
         .await
-        .map_err(|e| Error::Other(e.to_string()))?;
-
-    let payload = match &result {
-        Ok(_) => json!({ "success": true, "data": { "entries": entry_metas(app) } }),
-        Err(e) => json!({ "success": false, "error": e.to_string() }),
-    };
-    let _ = app.emit("vault:pull:stopped", payload);
-    result.map(|_| ())
+        .map_err(|e| Error::Other(e.to_string()));
+    match &result {
+        Ok(Ok(_)) => {
+            let _ = app.emit("vault:merged", json!({ "entries": entry_metas(app) }));
+            finished(app, None);
+        }
+        Ok(Err(e)) | Err(e) => finished(app, Some(e.to_string())),
+    }
+    result?.map(|_| ())
 }
 
 // --- the mobile consent flow ---
@@ -127,8 +151,8 @@ async fn pull(app: &AppHandle, cryptor: Cryptor) -> Result<()> {
 // `start_consent`, identified by its `state` nonce, and ends in exactly one of
 // four ways — the redirect it was waiting for (`on_redirect`), Google's refusal
 // (also `on_redirect`), the user coming back without one (`on_resume`), or old
-// age (`CONSENT_TTL`). Each end is announced to the frontend, so `sync:pending`
-// is always followed by `sync:connected` or `sync:error`.
+// age (`CONSENT_TTL`). Each end is announced to the frontend, so a `pending`
+// status is always followed by one that is not.
 
 /// How long a consent request stays redeemable. Google's own codes die well
 /// inside this; it exists so a flow the OS never told us about (the app was
@@ -169,19 +193,14 @@ pub(crate) fn start_consent(app: &AppHandle, state: &AppState, purpose: AuthPurp
         purpose,
         started: std::time::Instant::now(),
     });
-    let _ = app.emit(pending_event(purpose), ());
-    Ok(())
-}
-
-/// Which "the browser is out" event a flow announces itself with. Onboarding
-/// has its own `setup:drive:*` family because it runs on a screen that knows
-/// nothing about sync settings.
-#[cfg(mobile)]
-fn pending_event(purpose: AuthPurpose) -> &'static str {
-    match purpose {
-        AuthPurpose::Setup => crate::commands::setup::PENDING_EVENT,
-        _ => "sync:pending",
+    // Onboarding has its own `setup:drive:*` family because it runs on a screen
+    // that knows nothing about sync settings.
+    if purpose == AuthPurpose::Setup {
+        let _ = app.emit(crate::commands::setup::PENDING_EVENT, ());
+    } else {
+        pending(app);
     }
+    Ok(())
 }
 
 /// iOS reopened the app with a URL. If it is Google's answer to the consent
@@ -300,12 +319,58 @@ pub fn on_resume(app: &AppHandle) {
 /// reports the same way — on whichever event family the flow was started under.
 #[cfg(mobile)]
 fn fail(app: &AppHandle, purpose: AuthPurpose, why: String) {
-    log::warn!("sync connect failed: {why}");
     if purpose == AuthPurpose::Setup {
+        log::warn!("drive setup failed: {why}");
         crate::commands::setup::emit_error(app, &why);
         return;
     }
-    let _ = app.emit("sync:error", json!({ "error": why }));
+    failed(app, why);
+}
+
+// Run the OAuth consent flow off the main thread. Any ending short of a
+// connection is reported as a status too, so the frontend never has to turn a
+// rejected promise into state itself.
+#[cfg(desktop)]
+async fn authorize(app: &AppHandle, state: &State<'_, AppState>) -> Result<()> {
+    let cryptor = match state.session.lock().unwrap().cryptor() {
+        Ok(cryptor) => cryptor,
+        Err(e) => {
+            failed(app, e.to_string());
+            return Err(e);
+        }
+    };
+    pending(app);
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || sync::setup(&handle, &cryptor))
+        .await
+        .map_err(|e| Error::Other(e.to_string()))
+        .and_then(|result| result)
+        .inspect_err(|e| failed(app, e.to_string()))
+}
+
+// --- status ------------------------------------------------------------------
+
+/// Change the run state and tell the frontend the whole of it.
+fn update(app: &AppHandle, change: impl FnOnce(&mut SyncRun)) {
+    change(&mut app.state::<AppState>().sync_run.lock().unwrap());
+    let _ = app.emit(STATUS_EVENT, status(app));
+}
+
+/// The browser is out with a consent request.
+fn pending(app: &AppHandle) {
+    update(app, |run| {
+        run.pending = true;
+        run.error = None;
+    });
+}
+
+/// The consent flow ended without a connection.
+fn failed(app: &AppHandle, why: String) {
+    log::warn!("sync connect failed: {why}");
+    update(app, |run| {
+        run.pending = false;
+        run.error = Some(why);
+    });
 }
 
 /// Mark the session connected and say so. The flag is session-only — what
@@ -320,11 +385,38 @@ fn connected(app: &AppHandle) {
         session.sync_configured = true;
     }
     drop(session);
-    let _ = app.emit("sync:connected", ());
+    update(app, |run| {
+        run.pending = false;
+        run.error = None;
+    });
 }
 
-#[tauri::command]
-pub fn sync_status(app: AppHandle, state: State<'_, AppState>) -> Result<SyncStatus> {
+/// A run is in flight. A retry after a failure reads as "syncing" rather than
+/// staying red until it lands.
+fn started(app: &AppHandle) {
+    update(app, |run| {
+        run.in_progress = true;
+        run.error = None;
+    });
+}
+
+/// A run ended. A failed run leaves the previous timestamp standing: the vault
+/// is still current as of whenever it last landed.
+fn finished(app: &AppHandle, error: Option<String>) {
+    if let Some(why) = &error {
+        log::warn!("sync failed: {why}");
+    }
+    update(app, |run| {
+        run.in_progress = false;
+        if error.is_none() {
+            run.last_synced_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
+        }
+        run.error = error;
+    });
+}
+
+fn status(app: &AppHandle) -> SyncStatus {
+    let state = app.state::<AppState>();
     // The session flag only exists after an unlock; while locked, answer from
     // the persisted (non-secret) settings so e.g. the lock screen can say
     // where the vault lives.
@@ -332,33 +424,20 @@ pub fn sync_status(app: AppHandle, state: State<'_, AppState>) -> Result<SyncSta
     let configured = if session.is_unlocked() {
         session.sync_configured
     } else {
-        crate::storage::sync_configured(&app)
+        crate::storage::sync_configured(app)
     };
     drop(session);
-    #[cfg(mobile)]
-    let pending = state.pending_auth.lock().unwrap().is_some();
-    // Desktop's consent flow blocks its command, so there is never a moment to
-    // ask this in.
-    #[cfg(desktop)]
-    let pending = false;
-    Ok(SyncStatus {
+    let run = state.sync_run.lock().unwrap();
+    SyncStatus {
         configured,
-        pending,
-    })
+        pending: run.pending,
+        in_progress: run.in_progress,
+        error: run.error.clone(),
+        last_synced_at: run.last_synced_at.clone(),
+    }
 }
 
-// Run the OAuth consent flow off the main thread.
-#[cfg(desktop)]
-async fn authorize(app: &AppHandle, state: &State<'_, AppState>) -> Result<()> {
-    let cryptor = state.session.lock().unwrap().cryptor()?;
-    // The same three-event shape as mobile, so the frontend has one story: the
-    // backend says when the browser is out and when it has heard back.
-    let _ = app.emit("sync:pending", ());
-    let handle = app.clone();
-    tauri::async_runtime::spawn_blocking(move || sync::setup(&handle, &cryptor))
-        .await
-        .map_err(|e| Error::Other(e.to_string()))?
-}
+// --- runs ----------------------------------------------------------------------
 
 /// Start a run unless one is already in flight, in which case this is a no-op:
 /// a second request is dropped rather than queued, because a sync is
@@ -393,7 +472,7 @@ fn start_run(app: &AppHandle) {
     let app = app.clone();
     std::thread::spawn(move || {
         let _guard = RunGuard(app.clone());
-        let _ = app.emit("sync:started", ());
+        started(&app);
         report(&app, sync::run(&app, cryptor));
     });
 }
@@ -406,19 +485,15 @@ fn session_cryptor(state: &State<'_, AppState>) -> Option<Cryptor> {
 // frontend the refreshed list. Emitting the metas rather than a bare "reload"
 // signal keeps the store's update in one round trip and one render.
 fn report(app: &AppHandle, result: Result<sync::engine::SyncOutcome>) {
-    let payload = match &result {
+    match result {
         Ok(outcome) => {
             if outcome.merged > 0 {
                 let _ = app.emit("vault:merged", json!({ "entries": entry_metas(app) }));
             }
-            json!({ "success": true })
+            finished(app, None);
         }
-        Err(e) => {
-            log::warn!("sync failed: {e}");
-            json!({ "success": false, "error": e.to_string() })
-        }
-    };
-    let _ = app.emit("sync:stopped", payload);
+        Err(e) => finished(app, Some(e.to_string())),
+    }
 }
 
 // The current entry list, or an empty one if the vault locked in the meantime.

@@ -4,7 +4,15 @@ import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
 import Aside from '@/components/Main/Body/Aside'
 import AuditList from '@/components/Main/Body/List/Audit'
-import { useUi, useVault, setFilterQuery, setFilterType, setView, syncInit } from '@/store'
+import {
+  useUi,
+  useVault,
+  setFilterQuery,
+  setFilterType,
+  setView,
+  setSyncStatus,
+  initialApp
+} from '@/store'
 import { resetStores, withEntries, loginMeta } from './utils'
 
 // One empty-state system: the variant is decided from store state, and the
@@ -43,7 +51,7 @@ describe('empty states', () => {
 
     it('swaps the secondary action for a Drive restore once sync is on', () => {
       seed([])
-      syncInit(true)
+      setSyncStatus({ ...initialApp.sync, configured: true })
       render(<Main />)
 
       expect(screen.getByText('Restore from Google Drive')).toBeInTheDocument()

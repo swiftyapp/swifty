@@ -293,12 +293,21 @@ pub struct AuditItem {
 // Audit results keyed by entry id.
 pub type Audit = HashMap<String, AuditItem>;
 
+/// The whole of what the frontend knows about sync: returned by `sync_status`
+/// and carried by every `sync:status` event. Owned here, not by the frontend —
+/// the backend is what starts and ends every flow, so it is the one that can say.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SyncStatus {
+    /// This vault has a provider connected.
     pub configured: bool,
-    /// A consent flow is out with the browser. Owned here, not by the frontend:
-    /// the backend is what starts and ends it, so it is the one that can say.
+    /// A consent flow is out with the browser.
     pub pending: bool,
+    pub in_progress: bool,
+    /// What the last connect or run failed with, until the next one starts.
+    pub error: Option<String>,
+    /// RFC 3339 time of the last run that succeeded in this process, or null.
+    pub last_synced_at: Option<String>,
 }
 
 #[cfg(test)]

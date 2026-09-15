@@ -8,6 +8,7 @@ import {
   syncNow,
   type BiometryType,
   type SetupDriveFile,
+  type SyncStatus,
   type UnlockResult
 } from '@/lib/commands'
 import { checkForUpdate } from '@/services/autoUpdate'
@@ -33,33 +34,18 @@ export type UpdateCheckStatus = 'checking' | 'uptodate' | 'error' | null
  */
 export type SetupDriveStatus = 'idle' | 'pending' | 'found' | 'empty' | 'error'
 
-export interface SyncState {
-  enabled: boolean
-  inProgress: boolean
-  success: boolean
-  error: string | null
-  /**
-   * ISO time of the last run that actually succeeded, or null if none has in
-   * this session. `success` alone cannot answer "has this vault synced yet" —
-   * it starts optimistically true, so a freshly connected vault would claim to
-   * be up to date before a single run.
-   */
-  lastSyncedAt: string | null
-  /**
-   * A consent flow is out with the browser. On mobile `sync_connect` returns
-   * the moment Safari opens — the result arrives later as `sync:connected` or
-   * `sync:error` — so the promise cannot be what the button waits on.
-   */
-  pending: boolean
-}
-
 export interface AppState {
   flow: FlowName
   /** Biometric unlock is enrolled *and* usable, so the lock screen offers it. */
   touchID: boolean
   /** Which gate it is, for the copy: the same iOS build runs on Face ID and Touch ID. */
   biometry: BiometryType
-  sync: SyncState
+  /**
+   * The backend's sync status, verbatim. It owns every flow — it opens the
+   * browser, hears back from it, runs the sync — so it is the one that can say;
+   * every change arrives whole as `sync:status` and is stored as-is.
+   */
+  sync: SyncStatus
   /**
    * The first run's Drive probe, which has no vault behind it yet — so it
    * cannot live in `sync`, whose `enabled` means "this vault syncs".
@@ -83,22 +69,12 @@ export const initialApp: AppState = {
   flow: 'auth',
   touchID: false,
   biometry: 'touch',
-  sync: {
-    enabled: false,
-    inProgress: false,
-    success: true,
-    error: null,
-    lastSyncedAt: null,
-    pending: false
-  },
+  sync: { configured: false, pending: false, inProgress: false, error: null, lastSyncedAt: null },
   setupDrive: DRIVE_IDLE,
   update: { readyVersion: null, readyNotes: null, status: null }
 }
 
 export const useApp = create<AppState>()(() => initialApp)
-
-const patchSync = (patch: Partial<SyncState>) =>
-  useApp.setState(state => ({ sync: { ...state.sync, ...patch } }))
 
 // --- flow -----------------------------------------------------------------------
 
@@ -146,7 +122,9 @@ export const enterMain = async (result: UnlockResult) => {
   // The backend resets to its built-in default on every launch; re-apply the
   // stored preference as soon as there is a session to protect.
   setAutolockTimeout(usePrefs.getState().autolockSecs).catch(() => {})
-  syncInit(result.syncConfigured)
+  // The unlock result carries whether this vault syncs; everything else about
+  // sync arrives as `sync:status` once a flow or a run happens.
+  useApp.setState(state => ({ sync: { ...state.sync, configured: result.syncConfigured } }))
   // Asked once per session: whether the OS can read a card off a photo decides
   // whether any scan affordance is offered at all.
   scanSupported().then(setScanSupported).catch(() => {})
@@ -180,7 +158,7 @@ export const cancelScheduledSync = () => {
 }
 
 export const scheduleSync = () => {
-  if (!useApp.getState().sync.enabled) return
+  if (!useApp.getState().sync.configured) return
   cancelScheduledSync()
   syncTimer = setTimeout(() => {
     syncTimer = undefined
@@ -188,28 +166,7 @@ export const scheduleSync = () => {
   }, SYNC_DEBOUNCE_MS)
 }
 
-export const syncInit = (enabled: boolean) => patchSync({ enabled })
-export const syncPending = () => patchSync({ pending: true, error: null })
-export const syncConnected = () =>
-  patchSync({ enabled: true, success: true, error: null, pending: false })
-export const syncFailed = (error: string) => patchSync({ pending: false, error })
-// Disconnecting drops the timestamp with it: the next connection is a new
-// pairing, and "synced 3m ago" from a previous one would be a lie about it.
-export const syncDisconnected = () =>
-  patchSync({ enabled: false, pending: false, lastSyncedAt: null })
-export const syncStart = () => patchSync({ inProgress: true, success: true, error: null })
-export const syncStop = (payload: { success: boolean; error?: string }) =>
-  useApp.setState(state => ({
-    sync: {
-      ...state.sync,
-      inProgress: false,
-      success: payload.success,
-      error: payload.error ?? null,
-      // A failed run leaves the previous success standing: the vault is still
-      // current as of whenever it last landed.
-      lastSyncedAt: payload.success ? new Date().toISOString() : state.sync.lastSyncedAt
-    }
-  }))
+export const setSyncStatus = (sync: SyncStatus) => useApp.setState({ sync })
 
 // --- first-run Drive probe ---------------------------------------------------------
 

@@ -3,7 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import i18n, { changeLocale } from '@/i18n'
-import { usePrefs, useApp, useUi, openSettings, syncPending, syncConnected, syncFailed } from '@/store'
+import { usePrefs, useApp, useUi, openSettings, setSyncStatus, initialApp } from '@/store'
+import type { SyncStatus } from '@/lib/commands'
 import { dateTime } from '@/utils/time'
 import {
   changeMasterPassword,
@@ -76,35 +77,44 @@ describe('Settings › sync', () => {
     expect(syncConnect).toHaveBeenCalledOnce()
   })
 
+  // What the backend would report, one `sync:status` snapshot at a time.
+  const report = (status: Partial<SyncStatus>) => setSyncStatus({ ...initialApp.sync, ...status })
+
   // The mobile shape of the same flow: `sync_connect` resolves as soon as
-  // Safari has the screen, so the row waits on the backend's events — the
+  // Safari has the screen, so the row waits on the backend's status — the
   // click itself claims nothing.
   it('waits for Google after a connect that resolved early', async () => {
     await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
     expect(useApp.getState().sync.pending).toBe(false)
 
-    syncPending()
+    report({ pending: true })
     expect(await screen.findByText('Waiting for Google…')).toBeInTheDocument()
 
-    syncConnected()
+    report({ configured: true })
     expect(await screen.findByText('Connected')).toBeInTheDocument()
   })
 
   it('reports a consent that failed, and stays disconnected', async () => {
     await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
-    syncPending()
-    syncFailed('access_denied')
+    report({ pending: true })
+    report({ error: 'access_denied' })
 
     expect(await screen.findByTestId('settings-sync-error')).toHaveTextContent(
       'access_denied'
     )
-    expect(useApp.getState().sync.enabled).toBe(false)
+    expect(useApp.getState().sync.configured).toBe(false)
   })
 
+  // A connect that fails before the browser even opens is still the backend's
+  // to report: the rejected promise carries the reason, the status carries
+  // the state, and the row reads the latter.
   it('surfaces a connect that could not even start', async () => {
-    vi.mocked(syncConnect).mockRejectedValueOnce('no OAuth client configured')
+    vi.mocked(syncConnect).mockImplementationOnce(() => {
+      report({ error: 'no OAuth client configured' })
+      return Promise.reject('no OAuth client configured')
+    })
     await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
 

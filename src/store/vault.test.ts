@@ -13,7 +13,8 @@ import {
   saveEntry,
   deleteEntry,
   enterMain,
-  syncInit,
+  setSyncStatus,
+  initialApp,
   setFilterType,
   lockVault
 } from './index'
@@ -136,7 +137,7 @@ describe('selection', () => {
 
 describe('auto-sync', () => {
   it('debounces a burst of writes into a single push', async () => {
-    syncInit(true)
+    setSyncStatus({ ...initialApp.sync, configured: true })
 
     await saveEntry({ type: 'login', title: 'One', username: 'u', password: 'p' })
     await vi.advanceTimersByTimeAsync(20_000)
@@ -151,7 +152,7 @@ describe('auto-sync', () => {
   })
 
   it('drops a write still waiting when the vault locks', async () => {
-    syncInit(true)
+    setSyncStatus({ ...initialApp.sync, configured: true })
 
     await saveEntry({ type: 'login', title: 'One', username: 'u', password: 'p' })
     await lockVault()
@@ -163,7 +164,7 @@ describe('auto-sync', () => {
   })
 
   it('publishes a delete too', async () => {
-    syncInit(true)
+    setSyncStatus({ ...initialApp.sync, configured: true })
     setEntries([meta('a')])
 
     await deleteEntry('a')
@@ -189,14 +190,14 @@ describe('enterMain', () => {
     expect(useApp.getState().flow).toBe('main')
     expect(useVault.getState().items.map(e => e.id)).toEqual(['a'])
     // A configured vault syncs once on unlock, before any local write.
-    expect(useApp.getState().sync.enabled).toBe(true)
+    expect(useApp.getState().sync.configured).toBe(true)
     expect(syncNow).toHaveBeenCalledOnce()
   })
 
   it('leaves sync off for a vault that has never been connected', async () => {
     await enterMain({ entries: [], syncConfigured: false })
 
-    expect(useApp.getState().sync.enabled).toBe(false)
+    expect(useApp.getState().sync.configured).toBe(false)
     expect(syncNow).not.toHaveBeenCalled()
   })
 })

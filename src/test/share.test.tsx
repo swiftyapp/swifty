@@ -12,7 +12,8 @@ import {
   openReceive,
   openSettings,
   closeSend,
-  syncInit,
+  setSyncStatus,
+  initialApp,
   DEFAULT_PREFS
 } from '@/store'
 import {
@@ -38,7 +39,7 @@ const created = (fileId: string): ShareCreated => ({
 
 const seed = ({ connected = true } = {}) => {
   withEntries([loginMeta({ id: 'l1', title: 'Google' })])
-  if (connected) syncInit(true)
+  if (connected) setSyncStatus({ ...initialApp.sync, configured: true })
 }
 
 // A share still N hours out. Half an hour past the mark so the floor in

@@ -6,8 +6,7 @@ import {
   openSettings,
   startEntry,
   setFilterQuery,
-  setFilterType,
-  syncFailed
+  setFilterType
 } from '@/store'
 import { kindOf } from '@/kinds'
 import { chord } from '@/utils/platform'
@@ -31,13 +30,12 @@ export function VaultEmpty() {
   const sync = useApp(state => state.sync)
 
   // The spinner runs off the store, not off the promise: the backend reports
-  // `sync:pending` when the consent page opens and `sync:connected`/`sync:error`
-  // when it hears back, then the pull's own events. On mobile `sync_import`
-  // resolves the moment Safari is on screen. On success the restored entries
-  // replace this screen; on failure the button has to come back rather than
-  // spin forever.
+  // every step through `sync:status` — the consent page opening, the answer,
+  // the pull. On mobile `sync_import` resolves the moment Safari is on screen,
+  // and a rejection has already been reported as status. On success the
+  // restored entries replace this screen.
   const restore = () => {
-    syncImport().catch(error => syncFailed(String(error)))
+    syncImport().catch(() => {})
   }
 
   return (
@@ -52,7 +50,7 @@ export function VaultEmpty() {
         testid: 'create-first-entry-button'
       }}
       secondary={
-        sync.enabled
+        sync.configured
           ? {
               label: t('Restore from Google Drive'),
               onClick: restore,
