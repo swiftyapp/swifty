@@ -235,6 +235,6 @@ pub async fn save_env_file(
     #[cfg(mobile)]
     {
         let _ = (file_name, body, app);
-        Err(Error::Other("saving a file is a desktop action".into()))
+        Err(Error::Unsupported("saving a file is a desktop action".into()))
     }
 }

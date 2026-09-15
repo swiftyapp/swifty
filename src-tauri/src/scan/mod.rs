@@ -92,13 +92,13 @@ pub fn scan_lines(lines: &[String]) -> Option<ScanResult> {
 pub async fn scan_image(path: String) -> Result<ScanResult> {
     tauri::async_runtime::spawn_blocking(move || {
         let ocr = platform_ocr()
-            .ok_or_else(|| Error::Other("scanning is not available on this platform".into()))?;
+            .ok_or_else(|| Error::Unsupported("scanning is not available on this platform".into()))?;
         let mut lines = ocr.recognize(&local_path(&path))?;
         let found = scan_lines(&lines);
         // The recognized lines are the card number in the clear; the parsed
         // result is all that may outlive this call.
         lines.zeroize();
-        found.ok_or_else(|| Error::Other("nothing recognized".into()))
+        found.ok_or(Error::Unrecognized)
     })
     .await
     .map_err(|e| Error::Other(e.to_string()))?
