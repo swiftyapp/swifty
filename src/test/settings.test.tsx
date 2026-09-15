@@ -2,21 +2,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
+import DateField from '@/components/elements/fields/DateField'
+import { FieldsProvider } from '@/components/elements/fields/context'
 import i18n, { changeLocale } from '@/i18n'
-import { getTimeout } from '@/defaults/clipboard'
-import { getSecs } from '@/defaults/autolock'
-import { dateTime } from '@/utils/time'
+import {
+  defaultSettings as generatorSettings,
+  persistDefaults
+} from '@/services/generator'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { renderWithStore } from './utils'
 import { calls, mockCommand, mockCommandOnce } from './ipc'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  // Every panel reads its initial value from localStorage, so leftovers from an
-  // earlier case would decide which segment starts selected.
-  localStorage.removeItem('rowel:clipboardTimeout')
-  localStorage.removeItem('rowel:autolockSecs')
-  localStorage.removeItem('rowel:dateFormat')
 })
 
 afterEach(() => changeLocale('en-US'))
@@ -238,24 +236,26 @@ describe('Settings › security', () => {
     ).toBeInTheDocument()
   })
 
-  it('stores the auto-lock choice and pushes it to the backend', async () => {
-    await open()
+  // Rust arms its own timer off the same write, so there is nothing else for
+  // the frontend to push.
+  it('stores the auto-lock choice', async () => {
+    const { store } = await open()
     await go('security')
     await userEvent.click(screen.getByTestId('settings-autolock-300'))
 
-    expect(getSecs()).toBe(300)
-    expect(calls('set_autolock_timeout')).toContainEqual({ secs: 300 })
+    expect(store.getState().settings.autolockSecs).toBe(300)
+    expect(calls('set_settings')).toContainEqual({ patch: { autolockSecs: 300 } })
   })
 
   it('stores the clipboard delay, "Never" included', async () => {
-    await open()
+    const { store } = await open()
     await go('security')
 
     await userEvent.click(screen.getByTestId('settings-clipboard-15000'))
-    expect(getTimeout()).toBe(15000)
+    expect(store.getState().settings.clipboardTimeoutMs).toBe(15000)
 
     await userEvent.click(screen.getByTestId('settings-clipboard-0'))
-    expect(getTimeout()).toBe(0)
+    expect(store.getState().settings.clipboardTimeoutMs).toBe(0)
   })
 
   it('names both session radiogroups after their rows', async () => {
@@ -267,13 +267,30 @@ describe('Settings › security', () => {
   })
 
   it('writes the generator defaults the dialog reads', async () => {
-    await open()
+    const { store } = await open()
     await go('security')
 
     await userEvent.click(screen.getByTestId('settings-generator-symbols'))
 
-    const stored = JSON.parse(localStorage.getItem('rowel:generatorDefaults')!)
-    expect(stored.symbols).toBe(false)
+    expect(store.getState().settings.generator.symbols).toBe(false)
+    expect(generatorSettings().symbols).toBe(false)
+  })
+
+  // The other direction, which used to be one-way: the dialog wrote its own
+  // copy of the defaults and the row went on showing what it read on mount.
+  it('shows a change the generator dialog persisted', async () => {
+    const { store } = await open()
+    await go('security')
+    expect(screen.getByTestId('settings-generator-length')).toHaveValue('20')
+
+    persistDefaults({ ...generatorSettings(), length: 32, numbers: false })
+
+    expect(await screen.findByTestId('settings-generator-length')).toHaveValue('32')
+    expect(screen.getByTestId('settings-generator-numbers')).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
+    expect(store.getState().settings.generator.length).toBe(32)
   })
 })
 
@@ -282,10 +299,10 @@ describe('Settings › vault audit', () => {
     const { store } = await open()
     await go('audit')
 
-    expect(store.getState().breachCheck).toBe(false)
+    expect(store.getState().settings.breachCheck).toBe(false)
     await userEvent.click(screen.getByTestId('settings-breach-toggle'))
 
-    expect(store.getState().breachCheck).toBe(true)
+    expect(store.getState().settings.breachCheck).toBe(true)
     expect(calls('get_audit')).toContainEqual({ checkBreaches: true })
   })
 
@@ -383,7 +400,7 @@ describe('Settings › language & region', () => {
     await go('language')
     await userEvent.click(screen.getByTestId('settings-theme-dark'))
 
-    expect(store.getState().theme).toBe('dark')
+    expect(store.getState().settings.theme).toBe('dark')
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
@@ -391,7 +408,7 @@ describe('Settings › language & region', () => {
     const { store } = await open()
     await go('language')
     await userEvent.click(screen.getByTestId('settings-theme-system'))
-    expect(store.getState().theme).toBe('system')
+    expect(store.getState().settings.theme).toBe('system')
   })
 
   it('names both region radiogroups after their rows', async () => {
@@ -402,17 +419,34 @@ describe('Settings › language & region', () => {
     expect(screen.getByRole('radiogroup', { name: 'Theme' })).toBeInTheDocument()
   })
 
-  it('applies the date format to rendered timestamps', async () => {
-    const iso = new Date(2024, 0, 2, 10, 30).toISOString()
-    await open()
+  // Not just stored: a date already on screen has to be re-read in the new
+  // pattern. The format used to be module state nothing subscribed to, so every
+  // rendered date kept the pattern it was first drawn in.
+  it('re-renders a shown date when the format changes', async () => {
+    const { store } = renderWithStore(
+      <>
+        <Settings />
+        <FieldsProvider
+          value={{
+            entry: { type: 'apikey', title: '', expiry_date: '2035-06-01' },
+            set: null,
+            attempted: false
+          }}
+        >
+          <DateField name="expiry_date" label="Expires" />
+        </FieldsProvider>
+      </>
+    )
+    await userEvent.click(document.querySelector('.settings-button')!)
     await go('language')
 
-    expect(dateTime(iso)).toMatch(/^01\/02\/2024/)
+    expect(screen.getByText('06/01/2035')).toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('settings-date-format-DD.MM.YYYY'))
-    expect(dateTime(iso)).toMatch(/^02\.01\.2024/)
+    expect(await screen.findByText('01.06.2035')).toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('settings-date-format-YYYY-MM-DD'))
-    expect(dateTime(iso)).toMatch(/^2024-01-02/)
+    expect(await screen.findByText('2035-06-01')).toBeInTheDocument()
+    expect(store.getState().settings.dateFormat).toBe('YYYY-MM-DD')
   })
 })

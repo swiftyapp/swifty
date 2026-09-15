@@ -1,5 +1,5 @@
 import { copyToClipboard } from '@/api/tools'
-import { getTimeout } from '@/defaults/clipboard'
+import { useStore } from '@/store'
 
 const NOTIFICATION_TIMEOUT = 2000
 
@@ -7,7 +7,7 @@ const NOTIFICATION_TIMEOUT = 2000
 export const copy = (value: string) => {
   // The backend clears after whatever it is handed, so 0 ("Never") has to reach
   // it as "no timeout at all" rather than "clear immediately".
-  copyToClipboard(value, getTimeout() || undefined)
+  copyToClipboard(value, useStore.getState().settings.clipboardTimeoutMs || undefined)
   const notification = document.getElementsByClassName('copied-notification')[0]
   if (!notification) return
   notification.classList.remove('hidden')

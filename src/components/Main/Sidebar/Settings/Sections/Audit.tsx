@@ -11,7 +11,7 @@ import { META_TYPE, ROW_HAIRLINE } from '@/components/elements/tokens'
 export default function Audit() {
   const { t } = useTranslation()
   const audit = useStore(state => state.audit)
-  const breachCheck = useStore(state => state.breachCheck)
+  const breachCheck = useStore(state => state.settings.breachCheck)
 
   const counts = audit ? auditCounts(audit) : { weak: 0, reused: 0, breached: 0 }
   const score = audit ? vaultScore(audit) : null

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Entry } from '@/api/types'
 import { shareOpen } from '@/api/share'
 import { messageOf } from '@/api/errors'
-import type { EntryDraft } from '@/defaults/entries'
+import type { EntryDraft } from '@/kinds/draft'
 import { saveEntry, closeReceive } from '@/store'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
 

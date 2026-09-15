@@ -9,6 +9,7 @@ import {
   type GeneratorSettings
 } from '@/services/generator'
 import WORDS from '@/services/wordlist'
+import { makeStore } from '@/store'
 import { calls } from './ipc'
 
 const settings = (overrides: Partial<GeneratorSettings> = {}): GeneratorSettings => ({
@@ -18,7 +19,7 @@ const settings = (overrides: Partial<GeneratorSettings> = {}): GeneratorSettings
 
 beforeEach(() => {
   vi.clearAllMocks()
-  localStorage.clear()
+  makeStore()
 })
 
 describe('wordlist', () => {
@@ -124,10 +125,13 @@ describe('entropy', () => {
 
 describe('defaultSettings', () => {
   it('clamps the stored default length into the slider range', () => {
-    localStorage.setItem(
-      'rowel:generatorDefaults',
-      JSON.stringify({ length: 60, numbers: false, symbols: true, uppercase: true })
-    )
+    const store = makeStore()
+    store.setState({
+      settings: {
+        ...store.getState().settings,
+        generator: { ...store.getState().settings.generator, length: 60, numbers: false }
+      }
+    })
     const initial = defaultSettings()
     expect(initial.length).toBe(48)
     expect(initial.numbers).toBe(false)

@@ -106,11 +106,11 @@ describe('command palette', () => {
 
   it('runs a command on click', async () => {
     renderWithStore(<Main />, { store: seed() })
-    const before = useStore.getState().theme
+    const before = useStore.getState().settings.theme
 
     await open()
     await userEvent.click(screen.getByText('Toggle theme'))
 
-    expect(useStore.getState().theme).not.toBe(before)
+    expect(useStore.getState().settings.theme).not.toBe(before)
   })
 })

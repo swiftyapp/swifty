@@ -1,9 +1,6 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { setAutolockTimeout } from '@/api/tools'
-import { getSecs, setSecs } from '@/defaults/autolock'
-import { getTimeout, setTimeout as setClipboardTimeout } from '@/defaults/clipboard'
+import { useStore, updateSettings } from '@/store'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Segmented from '@/components/elements/Segmented'
@@ -27,19 +24,8 @@ const clipboardOptions = (t: TFunction) => [
 
 export default function SessionGroup() {
   const { t } = useTranslation()
-  const [lock, setLock] = useState(String(getSecs()))
-  const [clipboard, setClipboard] = useState(String(getTimeout()))
-
-  const onLock = (value: string) => {
-    setLock(value)
-    setSecs(Number(value))
-    setAutolockTimeout(Number(value)).catch(() => {})
-  }
-
-  const onClipboard = (value: string) => {
-    setClipboard(value)
-    setClipboardTimeout(Number(value))
-  }
+  const lock = useStore(state => String(state.settings.autolockSecs))
+  const clipboard = useStore(state => String(state.settings.clipboardTimeoutMs))
 
   // The row label doubles as the radiogroup's accessible name.
   const lockLabel = t('Lock vault after')
@@ -55,7 +41,7 @@ export default function SessionGroup() {
             name={lockLabel}
             options={LOCK_OPTIONS}
             value={lock}
-            onChange={onLock}
+            onChange={value => updateSettings({ autolockSecs: Number(value) })}
             testidPrefix="settings-autolock"
           />
         }
@@ -68,7 +54,7 @@ export default function SessionGroup() {
             name={clipboardLabel}
             options={clipboardOptions(t)}
             value={clipboard}
-            onChange={onClipboard}
+            onChange={value => updateSettings({ clipboardTimeoutMs: Number(value) })}
             testidPrefix="settings-clipboard"
           />
         }

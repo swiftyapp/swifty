@@ -3,9 +3,9 @@
 //! was configured with — WebKitGTK and WebView2 do not always agree with the
 //! user's actual system setting — so the OS is the only authority worth asking.
 //!
-//! This is the *system* locale only, used when the user has never chosen one.
-//! An explicit choice is a preference the frontend persists and pushes back
-//! down, the same way the autolock timeout works.
+//! The system locale is what the app opens in until the user picks a language.
+//! That choice lives in `settings.json`; `resolve_preferred` is the one place
+//! the two are weighed against each other.
 
 use sys_locale::get_locale;
 
@@ -52,9 +52,38 @@ pub fn system_locale() -> String {
         .to_string()
 }
 
+/// The locale the UI actually opens in: an explicit choice when it names a
+/// catalogue we ship, and the OS otherwise. Anything else — a language dropped
+/// since it was picked, junk from a hand-edited settings file — is ignored
+/// rather than forced to en-US, so the OS still gets a say.
+pub fn resolve_preferred(preferred: Option<&str>) -> String {
+    preferred
+        .and_then(|tag| {
+            SUPPORTED
+                .iter()
+                .find(|shipped| shipped.eq_ignore_ascii_case(tag.trim()))
+        })
+        .map(|tag| tag.to_string())
+        .unwrap_or_else(system_locale)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_shipped_choice_wins_over_the_os() {
+        assert_eq!(resolve_preferred(Some("uk-UA")), "uk-UA");
+        assert_eq!(resolve_preferred(Some(" zh-CN ")), "zh-CN");
+    }
+
+    #[test]
+    fn no_choice_or_an_unshipped_one_falls_back_to_the_os() {
+        let system = system_locale();
+        assert_eq!(resolve_preferred(None), system);
+        assert_eq!(resolve_preferred(Some("ja-JP")), system);
+        assert_eq!(resolve_preferred(Some("")), system);
+    }
 
     #[test]
     fn matches_an_exact_tag() {

@@ -13,7 +13,7 @@ import {
 } from '@/store'
 import type { Entry } from '@/api/types'
 import type { ActiveShare, ShareCreated } from '@/api/share'
-import { DEFAULT_CLIPBOARD_TIMEOUT } from '@/defaults/clipboard'
+import { DEFAULT_SETTINGS } from '@/store/settingsSlice'
 import { renderWithStore, withEntries, loginMeta, deferred } from './utils'
 import { calls, mockCommandOnce } from './ipc'
 
@@ -78,7 +78,7 @@ describe('sharing an entry', () => {
     // The link opens the entry for anyone holding it, so it leaves the
     // clipboard on the same timer as the secrets it stands in for.
     expect(calls('copy_to_clipboard')).toContainEqual(
-      { value: LINK, clearAfterMs: DEFAULT_CLIPBOARD_TIMEOUT }
+      { value: LINK, clearAfterMs: DEFAULT_SETTINGS.clipboardTimeoutMs }
     )
     expect(screen.getByTestId('share-copy-button')).toHaveTextContent('Copied')
   })

@@ -8,7 +8,7 @@ import { LABEL } from '@/components/elements/tokens'
 export default function AuditList() {
   const { t } = useTranslation()
   const audit = useStore(state => state.audit)
-  const breachCheck = useStore(state => state.breachCheck)
+  const breachCheck = useStore(state => state.settings.breachCheck)
   const items = useStore(state => state.entries.items)
 
   if (!audit)

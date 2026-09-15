@@ -99,7 +99,7 @@ async function repassword(title: string, password: string): Promise<void> {
 
 describe("password audit", () => {
   before(async () => {
-    // The Breached group is opt-in (`defaults/audit.ts`, off by default) and
+    // The Breached group is opt-in (`breachCheck` in settings.json, off by default) and
     // `reset()` clears the webview storage a previous spec could have left it
     // on in, so the reset is the pin.
     await resetEmpty(MASTER_PASSWORD);
