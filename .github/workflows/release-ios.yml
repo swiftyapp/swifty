@@ -19,11 +19,12 @@
 #                               desktop notarization. If it is ever unset, the
 #                               fallback below matches bundle.iOS.developmentTeam in
 #                               src-tauri/tauri.conf.json.
-#   GOOGLE_OAUTH_IOS_CLIENT_ID  Google iOS OAuth client id for Drive sync, exported as
-#                               GOOGLE_OAUTH_CLIENT_ID and baked in at compile time
-#                               (src-tauri/src/sync/auth.rs). iOS OAuth clients have no
-#                               client secret, so GOOGLE_OAUTH_CLIENT_SECRET is
-#                               deliberately not set here.
+#   GOOGLE_OAUTH_IOS_CLIENT_ID  Google iOS OAuth client id for Drive sync, passed to
+#                               the build as the app's deep-link URL scheme (the id
+#                               reversed) through --config; the app derives the client
+#                               id from it (src-tauri/src/sync/auth.rs). iOS OAuth
+#                               clients have no client secret, so
+#                               GOOGLE_OAUTH_CLIENT_SECRET is deliberately not set here.
 #   GOOGLE_API_KEY              Public Drive API key for receiving shared secrets
 #                               without a login, baked in at compile time
 #                               (src-tauri/src/share/remote.rs). Same key as desktop.
@@ -144,15 +145,29 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           # APPLE_API_KEY_PATH is exported by the previous step via $GITHUB_ENV.
           APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID || 'UFBL3F444A' }}
-          # Google Drive sync OAuth client, read via option_env! at compile time.
           # iOS clients are public: there is no client secret to set.
-          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_IOS_CLIENT_ID }}
+          GOOGLE_OAUTH_IOS_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_IOS_CLIENT_ID }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           BUILD_NUMBER: ${{ github.run_number }}
+        # The OAuth client cannot be exported into the build: the Tauri CLI
+        # compiles inside xcodebuild with a replaced environment that carries
+        # only its own TAURI_* variables, so option_env! never sees it. The
+        # --config patch does get through, so the id goes in as the deep-link
+        # scheme (its reverse), same as scripts/release-ios.sh does.
         run: |
+          set -euo pipefail
+          # Anything else would ship as an illegal URL scheme and be rejected at upload (90158).
+          if [ -n "$GOOGLE_OAUTH_IOS_CLIENT_ID" ] && ! [[ $GOOGLE_OAUTH_IOS_CLIENT_ID =~ ^[A-Za-z0-9.+-]+\.apps\.googleusercontent\.com$ ]]; then
+            echo "::error::GOOGLE_OAUTH_IOS_CLIENT_ID is not an iOS OAuth client id (<id>.apps.googleusercontent.com)" >&2
+            exit 1
+          fi
+          SCHEME="com.googleusercontent.apps.${GOOGLE_OAUTH_IOS_CLIENT_ID%.apps.googleusercontent.com}"
+          CONFIG=$(jq -cn --arg build "$BUILD_NUMBER" --arg scheme "$SCHEME" --arg id "$GOOGLE_OAUTH_IOS_CLIENT_ID" \
+            '{bundle:{iOS:{bundleVersion:$build}}}
+             + (if $id == "" then {} else {plugins:{"deep-link":{mobile:[{scheme:[$scheme]}]}}} end)')
           bun run tauri ios build --ci \
             --export-method app-store-connect \
-            --config "{\"bundle\":{\"iOS\":{\"bundleVersion\":\"$BUILD_NUMBER\"}}}"
+            --config "$CONFIG"
 
       # Path is src-tauri/gen/apple/build/<arch>/<productName>.ipa; resolved by
       # glob so it does not have to be kept in sync with productName.

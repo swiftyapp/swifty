@@ -177,11 +177,14 @@ that URL scheme, and the client id is derived from it.
 4. Add the **redirect URI** `com.googleusercontent.apps.123456-abcdef:/oauth2redirect`
    to the client in the console.
 
-`GOOGLE_OAUTH_CLIENT_ID` still overrides the scheme on iOS (the release workflow
-sets it from a secret), and the redirect is then derived back from that id — but
-the scheme in `tauri.ios.conf.json` is what actually registers the app with the
-OS, so it has to be right either way. `GOOGLE_OAUTH_CLIENT_SECRET` is ignored on
-iOS and must never be shipped in a mobile binary.
+Release builds do not need the block committed: `bun run release:ios` and the
+`Release iOS` workflow derive the scheme from `GOOGLE_OAUTH_IOS_CLIENT_ID` (in
+`.env` / the repository secret) and pass it through `tauri ios build --config`,
+which replaces a committed one. That is the only way in — exporting
+`GOOGLE_OAUTH_CLIENT_ID` does nothing on iOS, because `tauri ios build` compiles
+inside xcodebuild with a replaced environment that carries only the CLI's own
+`TAURI_*` variables, so `option_env!` never sees it. `GOOGLE_OAUTH_CLIENT_SECRET`
+is ignored on iOS and must never be shipped in a mobile binary.
 
 ### Auto-update signing
 

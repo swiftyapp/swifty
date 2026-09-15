@@ -65,25 +65,37 @@ console.log(m ? `${m[1]}.${m[2]}.${m[3]}` : v)')
 # stays inside u32. Override for a specific number.
 BUILD_NUMBER="${BUILD_NUMBER:-$(( $(date -u +%s) / 60 ))}"
 
-# Set as the config value rather than with `tauri ios build --build-number`:
-# that flag *appends* to the app version, producing a CFBundleVersion like
-# `1.0.0.1.29822658`, and App Store Connect rejects anything longer than three
-# period-separated integers (ITMS-90060). Setting it outright makes
-# CFBundleVersion exactly the build number, which is a single integer.
-BUNDLE_VERSION_CONFIG=$(bun -e "console.log(JSON.stringify(
-  { bundle: { iOS: { bundleVersion: process.argv[1] } } }))" "$BUILD_NUMBER")
-
-export APPLE_DEVELOPMENT_TEAM="${APPLE_TEAM_ID:-UFBL3F444A}"
-export APPLE_API_KEY_PATH
-
-# iOS OAuth clients are public and have no secret; the desktop client in .env is
-# the wrong one for this bundle id. Both are read via option_env! at compile time.
+# The Google iOS OAuth client goes in as the app's deep-link URL scheme — the
+# client id reversed (README, "Drive sync on iOS") — which registers the OAuth
+# redirect and is where the app derives the client id from. It cannot simply be
+# exported: `tauri ios build` compiles inside xcodebuild with a replaced
+# environment that carries only the CLI's own TAURI_* variables, so an
+# `option_env!` never sees the shell. The `--config` patch does get through.
+SCHEME=""
 if [[ -n ${GOOGLE_OAUTH_IOS_CLIENT_ID:-} ]]; then
-  export GOOGLE_OAUTH_CLIENT_ID="$GOOGLE_OAUTH_IOS_CLIENT_ID"
-  unset GOOGLE_OAUTH_CLIENT_SECRET
+  # Anything else — the desktop client, a placeholder with an underscore — would
+  # ship as an illegal URL scheme and be rejected at upload (90158).
+  if [[ ! $GOOGLE_OAUTH_IOS_CLIENT_ID =~ ^[A-Za-z0-9.+-]+\.apps\.googleusercontent\.com$ ]]; then
+    echo "error: GOOGLE_OAUTH_IOS_CLIENT_ID is not an iOS OAuth client id (<id>.apps.googleusercontent.com)." >&2
+    exit 1
+  fi
+  SCHEME="com.googleusercontent.apps.${GOOGLE_OAUTH_IOS_CLIENT_ID%.apps.googleusercontent.com}"
 else
   echo "warning: GOOGLE_OAUTH_IOS_CLIENT_ID is not set — building without Drive sync." >&2
 fi
+
+# The build number is set as a config value rather than with `tauri ios build
+# --build-number`: that flag *appends* to the app version, producing a
+# CFBundleVersion like `1.0.0.1.29822658`, and App Store Connect rejects
+# anything longer than three period-separated integers (ITMS-90060). Setting
+# it outright makes CFBundleVersion exactly the build number.
+BUILD_CONFIG=$(bun -e 'const [build, scheme] = process.argv.slice(1)
+const config = { bundle: { iOS: { bundleVersion: build } } }
+if (scheme) config.plugins = { "deep-link": { mobile: [{ scheme: [scheme] }] } }
+console.log(JSON.stringify(config))' "$BUILD_NUMBER" "$SCHEME")
+
+export APPLE_DEVELOPMENT_TEAM="${APPLE_TEAM_ID:-UFBL3F444A}"
+export APPLE_API_KEY_PATH
 
 # Deep-link schemes ship verbatim as CFBundleURLTypes and a malformed one is
 # rejected at upload (90158). The release workflow runs this same check.
@@ -120,7 +132,7 @@ rm -f src-tauri/gen/apple/build/*.ipa src-tauri/gen/apple/build/*/*.ipa
 echo "Building Swifty $SHORT_VERSION build $BUILD_NUMBER (config version $VERSION)…"
 bun run tauri ios build --ci \
   --export-method app-store-connect \
-  --config "$BUNDLE_VERSION_CONFIG"
+  --config "$BUILD_CONFIG"
 
 ipas=(src-tauri/gen/apple/build/*.ipa src-tauri/gen/apple/build/*/*.ipa)
 if [[ ${#ipas[@]} -eq 0 ]]; then

@@ -63,9 +63,12 @@ In the Google Cloud console for the existing Swifty project, **APIs & Services
 → Credentials → Create credentials → OAuth client ID → iOS**, with bundle id
 `app.rowel.mobile`. iOS OAuth clients are public: there is **no client
 secret**, and none must be set in CI. Copy the client id into the
-`GOOGLE_OAUTH_IOS_CLIENT_ID` secret; the build maps it to the
-`GOOGLE_OAUTH_CLIENT_ID` env var that `src-tauri/src/sync/auth.rs` reads at
-compile time.
+`GOOGLE_OAUTH_IOS_CLIENT_ID` secret and add the redirect URI
+`com.googleusercontent.apps.<id>:/oauth2redirect` to the client. The workflow
+passes the id to the build as the app's deep-link URL scheme through
+`--config` (environment variables do not reach the iOS compile — README,
+"Drive sync on iOS"), and the app derives the client id back from the scheme
+(`src-tauri/src/sync/auth.rs`).
 
 ### 5. Repository secrets
 
