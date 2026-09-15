@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { on, EVENTS, type EventName, type EventPayloads } from '@/lib/events'
-import { getAudit, isBiometricAvailable, listDeleted } from '@/lib/commands'
-import type { EntryMeta } from '@/lib/commands'
+import { on, EVENTS, type EventName, type EventPayloads } from '@/api/events'
+import type { EntryMeta } from '@/api/types'
 import { subscribeToEvents } from './events'
 import { makeStore, setEntries, setView, setCurrentEntry } from './index'
+import { calls, clearCalls, mockCommand } from '../test/ipc'
 
 const meta = (id: string): EntryMeta => ({
   id,
@@ -66,28 +66,27 @@ describe('vault:merged', () => {
 
   it('re-runs the audit, since the new rows have no strength result yet', () => {
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
-    expect(getAudit).toHaveBeenCalled()
+    expect(calls('get_audit').length).toBeGreaterThan(0)
   })
 
   // A merge can add or drop tombstones too, and the Archive only loads on entry
   // — so an open one has to be told, while a closed one refetches on its own.
   it('re-reads the tombstones when the Archive is the open view', () => {
     setView('archive')
-    vi.mocked(listDeleted).mockClear()
+    clearCalls('list_deleted')
 
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
 
-    expect(listDeleted).toHaveBeenCalledTimes(1)
+    expect(calls('list_deleted')).toHaveLength(1)
   })
 
   it('leaves the tombstones alone when the Archive is not open', () => {
     setView('items')
-    vi.mocked(listDeleted).mockClear()
+    clearCalls('list_deleted')
 
     handlerFor(EVENTS.vaultMerged)({ entries: [meta('b')] })
-    handlerFor(EVENTS.pullStopped)({ success: true })
 
-    expect(listDeleted).not.toHaveBeenCalled()
+    expect(calls('list_deleted')).toHaveLength(0)
   })
 })
 
@@ -99,7 +98,7 @@ describe('sync:stopped', () => {
     handlerFor(EVENTS.syncStarted)()
     expect(store.getState().sync.inProgress).toBe(true)
 
-    handlerFor(EVENTS.syncStopped)({ success: false, error: 'Drive API 403' })
+    handlerFor(EVENTS.syncStopped)({ error: 'Drive API 403' })
 
     const { inProgress, success, error } = store.getState().sync
     expect(inProgress).toBe(false)
@@ -160,7 +159,7 @@ describe('the pending connect', () => {
 
 describe('vault:locked', () => {
   it('shows the Touch ID button when a key is enrolled, not a hardcoded false', async () => {
-    vi.mocked(isBiometricAvailable).mockResolvedValue(true)
+    mockCommand('app_status', () => ({ biometric: { available: true, type: 'touch' } }))
     const store = makeStore()
     subscribeToEvents()
     store.getState().flowMain()
@@ -196,7 +195,7 @@ describe('vault:locked', () => {
   })
 
   it('lands on the plain lock screen when nothing is enrolled', async () => {
-    vi.mocked(isBiometricAvailable).mockRejectedValue(new Error('no backend'))
+    mockCommand('app_status', () => Promise.reject({ kind: 'other', message: 'no backend' }))
     const store = makeStore()
     subscribeToEvents()
     store.getState().flowMain()

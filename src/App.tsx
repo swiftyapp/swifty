@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { biometryType, isBiometricAvailable, isInitialized } from './lib/commands'
+import { appStatus } from '@/api/app'
 import { useStore, flowAuth, flowSetup } from './store'
 import { subscribeToEvents } from './store/events'
 import { useLayout } from './hooks/useLayout'
@@ -32,15 +32,11 @@ function Shell() {
 export default function App() {
   useEffect(() => {
     const unsubscribe = subscribeToEvents()
-    Promise.all([
-      isInitialized(),
-      isBiometricAvailable().catch(() => false),
-      // Which biometry, not just whether: the same iOS build runs on Face ID
-      // phones and Touch ID iPads.
-      biometryType().catch(() => 'touch' as const)
-    ])
-      .then(([initialized, biometric, biometry]) =>
-        initialized ? flowAuth(biometric, biometry) : flowSetup()
+    // Which biometry, not just whether: the same iOS build runs on Face ID
+    // phones and Touch ID iPads.
+    appStatus()
+      .then(({ initialized, biometric }) =>
+        initialized ? flowAuth(biometric.available, biometric.type) : flowSetup()
       )
       .catch(() => {})
     return unsubscribe

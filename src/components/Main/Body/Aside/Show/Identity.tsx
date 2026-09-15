@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 import { cx } from '@/utils/cx'
 import CardBrandMark from '@/components/elements/CardBrandMark'
 import { hasBrandMark } from '@/utils/cardBrand'

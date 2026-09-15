@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { Passkey } from '@/lib/commands'
+import type { Passkey } from '@/api/types'
 import { cx } from '@/utils/cx'
 import { shortDate, toTime } from '@/utils/time'
 import { KeyGlyph, TrashGlyph } from '../../../Main/icons'

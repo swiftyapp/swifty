@@ -1,4 +1,4 @@
-import type { Entry, EntryType } from '@/lib/commands'
+import type { Entry, EntryType } from '@/api/types'
 import { kindOf } from '@/kinds'
 import { FieldsProvider } from '@/components/elements/fields'
 import Footer from '../Footer'

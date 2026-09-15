@@ -2,16 +2,17 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Show from '@/components/Main/Body/Aside/Show'
-import { saveEntry, revealEntry, generateOtp, toEntryMeta } from '@/lib/commands'
-import type { Entry, ExtraField, LoginEntry, Passkey } from '@/lib/commands'
+import type { Entry, ExtraField, LoginEntry, Passkey } from '@/api/types'
 import { renderWithStore, loginEntry, loginMeta } from './utils'
+import { calls, mockCommand } from './ipc'
+import { toEntryMeta } from './meta'
 
 const input = (name: string) =>
   document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(saveEntry).mockImplementation(entry => Promise.resolve(toEntryMeta(entry)))
+  mockCommand('save_entry', ({ entry }) => toEntryMeta(entry as Entry))
 })
 
 // One behaviour per type-aware field: the thing that field knows and a plain
@@ -37,7 +38,7 @@ describe('Type-aware fields', () => {
   // A login without a code keeps the read view's one-column layout while
   // editing: the dial's column is opened by the user, not by the mode switch.
   it('offers to add a one-time code instead of an empty dial', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry())
+    mockCommand('reveal_entry', () => loginEntry())
     renderWithStore(<Show entry={loginMeta()} editing />)
 
     // The editor mounts once the reveal lands.
@@ -91,7 +92,7 @@ describe('Type-aware fields', () => {
 
     await userEvent.click(screen.getByText('Save'))
 
-    expect(saveEntry).not.toHaveBeenCalled()
+    expect(calls('save_entry')).toHaveLength(0)
     expect(screen.getByText('Not an email address')).toBeInTheDocument()
   })
 
@@ -113,8 +114,8 @@ describe('Type-aware fields', () => {
     expect(input('expiry').value).toBe('12/30')
 
     await userEvent.click(screen.getByText('Save'))
-    expect(saveEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ month: '12', year: '30' })
+    expect(calls('save_entry')).toContainEqual(
+      { entry: expect.objectContaining({ month: '12', year: '30' }) }
     )
   })
 
@@ -130,7 +131,7 @@ describe('Type-aware fields', () => {
     // The box is not empty, so only the pair-aware check can complain — and
     // without it the refusal to save was silent.
     expect(screen.getByText('Required')).toBeInTheDocument()
-    expect(saveEntry).not.toHaveBeenCalled()
+    expect(calls('save_entry')).toHaveLength(0)
   })
 
   // The identity form is cut from its document's template, so the rows on
@@ -165,14 +166,12 @@ describe('Type-aware fields', () => {
 
     // Nothing invisible rides along: the licence saves without the nationality
     // the passport form had collected.
-    expect(saveEntry).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(calls('save_entry')).toContainEqual({ entry: expect.objectContaining({
         type: 'identity',
         doc_type: 'driver_license',
         number: 'X1234567',
         nationality: ''
-      })
-    )
+      }) })
   })
 
   it('stores a date as ISO and reads it back in the user’s pattern', async () => {
@@ -188,8 +187,8 @@ describe('Type-aware fields', () => {
     expect(input('expiry_date').value).toBe('06/01/2035')
 
     await userEvent.click(screen.getByText('Save'))
-    expect(saveEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ expiry_date: '2035-06-01' })
+    expect(calls('save_entry')).toContainEqual(
+      { entry: expect.objectContaining({ expiry_date: '2035-06-01' }) }
     )
   })
 
@@ -201,7 +200,7 @@ describe('Type-aware fields', () => {
     await userEvent.tab()
 
     expect(input('otp').value).toBe('JBSWY3DPEHPK3PXP')
-    expect(generateOtp).toHaveBeenCalledWith('JBSWY3DPEHPK3PXP')
+    expect(calls('generate_otp')).toContainEqual({ secret: 'JBSWY3DPEHPK3PXP' })
     expect(screen.queryByText('Not a one-time-password secret')).not.toBeInTheDocument()
   })
 
@@ -211,23 +210,23 @@ describe('Type-aware fields', () => {
     await userEvent.type(input('otp'), 'not-a-secret')
 
     expect(screen.getByText('Not a one-time-password secret')).toBeInTheDocument()
-    expect(generateOtp).not.toHaveBeenCalled()
+    expect(calls('generate_otp')).toHaveLength(0)
   })
 
   // A pre-redesign vault can hold something `otpSecret` cannot read. The
   // backend would reject it too, so there is no code to offer and no panel.
   it('shows no dial for a stored secret it cannot read', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ otp: 'legacy-garbage' }))
+    mockCommand('reveal_entry', () => loginEntry({ otp: 'legacy-garbage' }))
     renderWithStore(<Show entry={loginMeta()} />)
 
     await waitFor(() => expect(screen.getByTestId('entry-value-username')).toBeInTheDocument())
     expect(screen.queryByText('Copy code')).not.toBeInTheDocument()
-    expect(generateOtp).not.toHaveBeenCalled()
+    expect(calls('generate_otp')).toHaveLength(0)
   })
 
   it('previews the live code for a secret that is already saved', async () => {
-    vi.mocked(generateOtp).mockResolvedValue({ code: '123456', time: 25 })
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ otp: 'JBSWY3DPEHPK3PXP' }))
+    mockCommand('generate_otp', () => ({ code: '123456', time: 25 }))
+    mockCommand('reveal_entry', () => loginEntry({ otp: 'JBSWY3DPEHPK3PXP' }))
     renderWithStore(<Show entry={loginMeta()} editing />)
 
     await waitFor(() => expect(input('otp').value).toBe('JBSWY3DPEHPK3PXP'))
@@ -239,11 +238,9 @@ describe('Type-aware fields', () => {
   // lands takes typing it is about to throw away.
   it('offers no editor until an existing entry has been decrypted', async () => {
     let resolveReveal: (entry: ReturnType<typeof loginEntry>) => void = () => {}
-    vi.mocked(revealEntry).mockReturnValue(
-      new Promise(resolve => {
+    mockCommand('reveal_entry', () => new Promise(resolve => {
         resolveReveal = resolve
-      })
-    )
+      }))
     renderWithStore(<Show entry={loginMeta()} editing />)
 
     expect(document.querySelector('input[name="title"]')).toBeNull()
@@ -264,9 +261,7 @@ describe('Type-aware fields', () => {
 
   it('counts a recent rotation as a duration', async () => {
     const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
-    vi.mocked(revealEntry).mockResolvedValue(
-      loginEntry({ password_updated_at: threeHoursAgo })
-    )
+    mockCommand('reveal_entry', () => loginEntry({ password_updated_at: threeHoursAgo }))
     renderWithStore(<Show entry={loginMeta()} editing />)
 
     expect(await screen.findByText('Changed 3h ago')).toBeInTheDocument()
@@ -276,7 +271,7 @@ describe('Type-aware fields', () => {
   // not inside "Changed ... ago".
   it('names the date once the rotation is older than a week', async () => {
     const longAgo = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString()
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password_updated_at: longAgo }))
+    mockCommand('reveal_entry', () => loginEntry({ password_updated_at: longAgo }))
     renderWithStore(<Show entry={loginMeta()} editing />)
 
     const stamp = await screen.findByText(/^Changed /)
@@ -300,7 +295,7 @@ describe('Type-aware fields', () => {
 
   it('leaves the rotation stamp alone when the password ends up unchanged', async () => {
     const stamp = '2024-01-01T00:00:00.000Z'
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password_updated_at: stamp }))
+    mockCommand('reveal_entry', () => loginEntry({ password_updated_at: stamp }))
     renderWithStore(<Show entry={loginMeta()} editing />)
 
     await waitFor(() => expect(input('password').value).toBe('secret'))
@@ -309,23 +304,25 @@ describe('Type-aware fields', () => {
     await userEvent.type(input('password'), '{backspace}')
 
     await userEvent.click(screen.getByText('Save'))
-    expect(saveEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ password: 'secret', password_updated_at: stamp })
+    expect(calls('save_entry')).toContainEqual(
+      { entry: expect.objectContaining({ password: 'secret', password_updated_at: stamp }) }
     )
   })
 
   it('moves the rotation stamp when the password really changed', async () => {
     const stamp = '2024-01-01T00:00:00.000Z'
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry({ password_updated_at: stamp }))
+    mockCommand('reveal_entry', () => loginEntry({ password_updated_at: stamp }))
     renderWithStore(<Show entry={loginMeta()} editing />)
 
     await waitFor(() => expect(input('password').value).toBe('secret'))
     await userEvent.type(input('password'), '2')
 
     await userEvent.click(screen.getByText('Save'))
-    expect(saveEntry).toHaveBeenCalledWith(expect.objectContaining({ password: 'secret2' }))
-    expect(saveEntry).not.toHaveBeenCalledWith(
-      expect.objectContaining({ password_updated_at: stamp })
+    expect(calls('save_entry')).toContainEqual(
+      { entry: expect.objectContaining({ password: 'secret2' }) }
+    )
+    expect(calls('save_entry')).not.toContainEqual(
+      { entry: expect.objectContaining({ password_updated_at: stamp }) }
     )
   })
 })
@@ -347,7 +344,7 @@ const passkeyLogin = (passkeys: Passkey[] = [PASSKEY]) =>
 
 describe('Passkeys on a login', () => {
   it('identifies each passkey by its site and account', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(passkeyLogin())
+    mockCommand('reveal_entry', () => passkeyLogin())
     renderWithStore(<Show entry={loginMeta()} />)
 
     expect(await screen.findByText('Passkeys')).toBeInTheDocument()
@@ -357,9 +354,7 @@ describe('Passkeys on a login', () => {
   })
 
   it('falls back to the relying-party id when the site named itself nothing', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(
-      passkeyLogin([{ ...PASSKEY, rpName: undefined }])
-    )
+    mockCommand('reveal_entry', () => passkeyLogin([{ ...PASSKEY, rpName: undefined }]))
     renderWithStore(<Show entry={loginMeta()} />)
 
     expect(await screen.findByText('acme.test')).toBeInTheDocument()
@@ -369,7 +364,7 @@ describe('Passkeys on a login', () => {
   // name it to the site and to nobody else. None of the three has any business
   // on screen — or on a clipboard, so no row offers a copy button either.
   it('never puts the private key, user handle or credential id on screen', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(passkeyLogin())
+    mockCommand('reveal_entry', () => passkeyLogin())
     const { container } = renderWithStore(<Show entry={loginMeta()} />)
 
     await screen.findByText('Passkeys')
@@ -380,7 +375,7 @@ describe('Passkeys on a login', () => {
   })
 
   it('shows nothing at all for a login with no passkeys', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(loginEntry())
+    mockCommand('reveal_entry', () => loginEntry())
     renderWithStore(<Show entry={loginMeta()} />)
 
     await screen.findByTestId('entry-value-username')
@@ -389,7 +384,7 @@ describe('Passkeys on a login', () => {
 
   it('drops one from the draft when its remove button is pressed', async () => {
     const other = { ...PASSKEY, credentialId: 'Y3JlZDI', rpName: 'Beta' }
-    vi.mocked(revealEntry).mockResolvedValue(passkeyLogin([PASSKEY, other]))
+    mockCommand('reveal_entry', () => passkeyLogin([PASSKEY, other]))
     renderWithStore(<Show entry={loginMeta()} editing />)
 
     await screen.findByText('Acme')
@@ -400,11 +395,13 @@ describe('Passkeys on a login', () => {
     expect(screen.getByText('Beta')).toBeInTheDocument()
 
     await userEvent.click(screen.getByText('Save'))
-    expect(saveEntry).toHaveBeenCalledWith(expect.objectContaining({ passkeys: [other] }))
+    expect(calls('save_entry')).toContainEqual(
+      { entry: expect.objectContaining({ passkeys: [other] }) }
+    )
   })
 
   it('offers no remove button while reading', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(passkeyLogin())
+    mockCommand('reveal_entry', () => passkeyLogin())
     renderWithStore(<Show entry={loginMeta()} />)
 
     await screen.findByText('Passkeys')
@@ -414,9 +411,7 @@ describe('Passkeys on a login', () => {
   // A passkey IS the credential, so the password row stops demanding one —
   // both in the complaint it shows and in what the save lets through.
   it('saves a passkey-only login with no password', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(
-      passkeyLogin() as LoginEntry & { password: string }
-    )
+    mockCommand('reveal_entry', () => passkeyLogin() as LoginEntry & { password: string })
     renderWithStore(<Show entry={loginMeta()} editing />)
 
     await screen.findByText('Acme')
@@ -424,7 +419,9 @@ describe('Passkeys on a login', () => {
     await userEvent.click(screen.getByText('Save'))
 
     expect(screen.queryByText('Required')).not.toBeInTheDocument()
-    expect(saveEntry).toHaveBeenCalledWith(expect.objectContaining({ password: '' }))
+    expect(calls('save_entry')).toContainEqual(
+      { entry: expect.objectContaining({ password: '' }) }
+    )
   })
 })
 
@@ -454,16 +451,14 @@ const identityEntry = (extra?: ExtraField[]): Entry =>
     ...(extra ? { extra } : {})
   }) as Entry
 
-const savedDraft = () => vi.mocked(saveEntry).mock.calls[0][0]
+const savedDraft = () => calls('save_entry')[0].entry as Entry
 
 describe('Custom fields', () => {
   it('reads one row per pair, with the label the user wrote', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(
-      identityEntry([
+    mockCommand('reveal_entry', () => (identityEntry([
         { label: 'Categories', value: 'B, BE' },
         { label: 'Blood type', value: 'O+' }
-      ])
-    )
+      ])))
     renderWithStore(<Show entry={identityMeta()} />)
 
     expect(await screen.findByText('Custom fields')).toBeInTheDocument()
@@ -475,7 +470,7 @@ describe('Custom fields', () => {
   })
 
   it('shows nothing at all when the entry has no extra fields', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    mockCommand('reveal_entry', () => identityEntry())
     renderWithStore(<Show entry={identityMeta()} />)
 
     await screen.findByTestId('entry-value-name')
@@ -485,12 +480,10 @@ describe('Custom fields', () => {
   // A blank row is the editor's own scaffolding, so reading skips it — an empty
   // row on a read view explains nothing.
   it('skips a blank row while reading', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(
-      identityEntry([
+    mockCommand('reveal_entry', () => (identityEntry([
         { label: '', value: '' },
         { label: 'Blood type', value: 'O+' }
-      ])
-    )
+      ])))
     renderWithStore(<Show entry={identityMeta()} />)
 
     await screen.findByText('Custom fields')
@@ -499,7 +492,7 @@ describe('Custom fields', () => {
   })
 
   it('appends a row, takes a label and a value, and saves the pair', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    mockCommand('reveal_entry', () => identityEntry())
     renderWithStore(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('name').value).toBe('ADA LOVELACE'))
@@ -514,12 +507,10 @@ describe('Custom fields', () => {
   })
 
   it('drops the row whose remove button is pressed', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(
-      identityEntry([
+    mockCommand('reveal_entry', () => (identityEntry([
         { label: 'Categories', value: 'B, BE' },
         { label: 'Blood type', value: 'O+' }
-      ])
-    )
+      ])))
     renderWithStore(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('extra-value-0').value).toBe('B, BE'))
@@ -535,9 +526,7 @@ describe('Custom fields', () => {
   })
 
   it('edits a stored value in place', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(
-      identityEntry([{ label: 'Blood type', value: 'O+' }])
-    )
+    mockCommand('reveal_entry', () => identityEntry([{ label: 'Blood type', value: 'O+' }]))
     renderWithStore(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('extra-value-0').value).toBe('O+'))
@@ -553,9 +542,7 @@ describe('Custom fields', () => {
   // Enter is inert in the editor (only ⌘⏎ saves), so the last row spends it on
   // the next one — a list of fields is filled without reaching for the mouse.
   it('adds a row on Enter in the last value box', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(
-      identityEntry([{ label: 'Categories', value: 'B, BE' }])
-    )
+    mockCommand('reveal_entry', () => identityEntry([{ label: 'Categories', value: 'B, BE' }]))
     renderWithStore(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('extra-value-0').value).toBe('B, BE'))
@@ -570,7 +557,7 @@ describe('Custom fields', () => {
   // An entry the user never gave an extra field has to stay without one, so a
   // row that was added and left alone is not something the vault ever sees.
   it('sends no extra key when every row is blank', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    mockCommand('reveal_entry', () => identityEntry())
     renderWithStore(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('name').value).toBe('ADA LOVELACE'))
@@ -582,7 +569,7 @@ describe('Custom fields', () => {
   })
 
   it('keeps the rows that say something and drops the blank ones', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    mockCommand('reveal_entry', () => identityEntry())
     renderWithStore(<Show entry={identityMeta()} editing />)
 
     await waitFor(() => expect(input('name').value).toBe('ADA LOVELACE'))
@@ -612,7 +599,7 @@ describe('Identity read view', () => {
     ({ ...identityEntry(), expiry_date: expiry }) as Entry
 
   it('names the document in the eyebrow instead of a line of its own', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    mockCommand('reveal_entry', () => identityEntry())
     renderWithStore(<Show entry={identityMeta()} />)
 
     expect(await screen.findByTestId('entry-value-doc_type')).toHaveTextContent('Passport')
@@ -621,14 +608,14 @@ describe('Identity read view', () => {
   // The face captions the date "Expires", so the time left stands on its own
   // line under it rather than repeating the word.
   it('says how long the document has left', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(document_(away(400)))
+    mockCommand('reveal_entry', () => document_(away(400)))
     renderWithStore(<Show entry={identityMeta()} />)
 
     expect(await screen.findByText('in 1 year')).toBeInTheDocument()
   })
 
   it('says so once it has run out', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(document_(away(-1)))
+    mockCommand('reveal_entry', () => document_(away(-1)))
     renderWithStore(<Show entry={identityMeta()} />)
 
     expect(await screen.findByText('Expired')).toBeInTheDocument()
@@ -637,7 +624,7 @@ describe('Identity read view', () => {
   // The code is what the document prints and what a click copies; the face's
   // header names the country in full beside the document's type.
   it('names the country beside its alpha-3 code', async () => {
-    vi.mocked(revealEntry).mockResolvedValue(identityEntry())
+    mockCommand('reveal_entry', () => identityEntry())
     renderWithStore(<Show entry={identityMeta()} />)
 
     expect(await screen.findByTestId('entry-value-country')).toHaveTextContent('GBR')

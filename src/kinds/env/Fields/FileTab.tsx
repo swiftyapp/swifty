@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
 import { isMobile } from '@/lib/platform'
-import { saveEnvFile } from '@/lib/commands'
+import { saveEnvFile } from '@/api/vault'
+import { messageOf } from '@/api/errors'
 import CopyButton from '@/components/elements/CopyButton'
 import IconButton from '@/components/elements/IconButton'
 import Panel from '@/components/elements/Panel'
@@ -37,7 +38,7 @@ export default function FileTab() {
   // initiated it, so the user never has to infer success from a closed dialog.
   const save = () => {
     setSaveError(null)
-    saveEnvFile(fileName, value).catch(e => setSaveError(String(e)))
+    saveEnvFile(fileName, value).catch((e: unknown) => setSaveError(messageOf(e)))
   }
 
   return (

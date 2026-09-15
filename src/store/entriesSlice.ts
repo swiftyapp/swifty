@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand'
-import type { EntryMeta, EntryType } from '@/lib/commands'
+import type { EntryMeta, EntryType } from '@/api/types'
 import type { StoreState } from './index'
 
 interface Entries {

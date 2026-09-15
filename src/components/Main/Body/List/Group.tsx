@@ -1,4 +1,4 @@
-import type { EntryMeta } from '@/lib/commands'
+import type { EntryMeta } from '@/api/types'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
 import Item from './Item'

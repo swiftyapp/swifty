@@ -1,4 +1,4 @@
-import type { BiometryType } from '@/lib/commands'
+import type { BiometryType } from '@/api/types'
 import { FingerprintGlyph, FaceIdGlyph } from '@/components/Main/icons'
 
 /**

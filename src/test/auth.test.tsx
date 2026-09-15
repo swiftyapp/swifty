@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Auth from '@/components/Auth'
-import { unlock, unlockBiometric } from '@/lib/commands'
 import { renderWithStore } from './utils'
+import { calls, mockCommand, mockCommandOnce } from './ipc'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -56,7 +56,7 @@ describe('Auth', () => {
 
   it('acknowledges Enter immediately with a verifying state', async () => {
     // Never resolves: we're asserting the in-flight presentation.
-    vi.mocked(unlock).mockReturnValue(new Promise(() => {}))
+    mockCommand('unlock', () => new Promise(() => {}))
     renderWithStore(<Auth touchID={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'pw{Enter}')
@@ -67,9 +67,10 @@ describe('Auth', () => {
   })
 
   it('walks the mascot through idle → typing → error → success', async () => {
-    vi.mocked(unlock)
-      .mockRejectedValueOnce(new Error('nope'))
-      .mockResolvedValueOnce({ entries: [], syncConfigured: false })
+    mockCommandOnce('unlock', () =>
+      Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })
+    )
+    mockCommandOnce('unlock', () => ({ entries: [], syncConfigured: false }))
     const { store } = renderWithStore(<Auth touchID={false} />)
     const mascot = () => screen.getByTestId('lock-mascot')
     const input = screen.getByPlaceholderText('Master Password')
@@ -93,17 +94,17 @@ describe('Auth', () => {
   })
 
   it('unlocks the vault on Enter', async () => {
-    vi.mocked(unlock).mockResolvedValue({ entries: [], syncConfigured: false })
+    mockCommand('unlock', () => ({ entries: [], syncConfigured: false }))
     const { store } = renderWithStore(<Auth touchID={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'hunter2{Enter}')
 
-    expect(unlock).toHaveBeenCalledWith('hunter2')
+    expect(calls('unlock')).toContainEqual({ password: 'hunter2' })
     await waitFor(() => expect(store.getState().flow.name).toBe('main'))
   })
 
   it('shows an error on a wrong password', async () => {
-    vi.mocked(unlock).mockRejectedValue(new Error('nope'))
+    mockCommand('unlock', () => Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' }))
     renderWithStore(<Auth touchID={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'bad{Enter}')
@@ -112,8 +113,9 @@ describe('Auth', () => {
   })
 
   it('names the real problem when the vault schema is newer than the app', async () => {
-    // Rust's Error::VaultTooNew serializes as this exact string (error.rs).
-    vi.mocked(unlock).mockRejectedValue('vault requires a newer version of the app')
+    mockCommand('unlock', () =>
+      Promise.reject({ kind: 'vaultTooNew', message: 'vault requires a newer version of the app' })
+    )
     renderWithStore(<Auth touchID={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'right{Enter}')
@@ -123,7 +125,9 @@ describe('Auth', () => {
   })
 
   it('disables the input and shows a countdown on too many attempts', async () => {
-    vi.mocked(unlock).mockRejectedValue({ retryAfterSecs: 2 })
+    mockCommand('unlock', () =>
+      Promise.reject({ kind: 'tooManyAttempts', message: 'too many attempts', retryAfterSecs: 2 })
+    )
     renderWithStore(<Auth touchID={false} />)
 
     await userEvent.type(screen.getByPlaceholderText('Master Password'), 'bad{Enter}')
@@ -133,12 +137,12 @@ describe('Auth', () => {
   })
 
   it('unlocks with biometrics', async () => {
-    vi.mocked(unlockBiometric).mockResolvedValue({ entries: [], syncConfigured: false })
+    mockCommand('unlock_biometric', () => ({ entries: [], syncConfigured: false }))
     const { store } = renderWithStore(<Auth touchID />)
 
     await userEvent.click(screen.getByLabelText('Touch ID'))
 
-    expect(unlockBiometric).toHaveBeenCalledOnce()
+    expect(calls('unlock_biometric')).toHaveLength(1)
     await waitFor(() => expect(store.getState().flow.name).toBe('main'))
   })
 })

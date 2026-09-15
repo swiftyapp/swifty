@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { changeMasterPassword } from '@/lib/commands'
+import { changeMasterPassword } from '@/api/auth'
+import { messageOf } from '@/api/errors'
 import type { TKey } from '@/i18n'
 import Button from '@/components/elements/Button'
 import { inputClass } from '@/components/elements/formStyles'
@@ -34,7 +35,7 @@ export default function MasterPasswordRow() {
         setValues({})
         setSuccess(t('Successfully changed password'))
       })
-      .catch(err => setError(String(err?.message ?? err)))
+      .catch((err: unknown) => setError(messageOf(err)))
       .finally(() => setProcessing(false))
   }
 

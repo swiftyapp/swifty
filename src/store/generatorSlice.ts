@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand'
-import type { SshKeyPair } from '@/lib/commands'
+import type { SshKeyPair } from '@/api/tools'
 import type { StoreState } from './index'
 
 // Receives the generated value when the user confirms. The login form supplies

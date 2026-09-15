@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { Passkey } from '@/lib/commands'
+import type { Passkey } from '@/api/types'
 import Panel from '../../Panel'
 import { LABEL } from '../../tokens'
 import { useFields } from '../context'

@@ -1,4 +1,4 @@
-import { copyToClipboard } from '@/lib/commands'
+import { copyToClipboard } from '@/api/tools'
 import { getTimeout } from '@/defaults/clipboard'
 
 const NOTIFICATION_TIMEOUT = 2000

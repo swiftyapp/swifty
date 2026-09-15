@@ -3,7 +3,6 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { open } from '@tauri-apps/plugin-dialog'
 import Main from '@/components/Main'
-import { scanImage } from '@/lib/commands'
 import { makeStore, useStore, setScanSupported, startEntry } from '@/store'
 import {
   cleanFields,
@@ -13,6 +12,7 @@ import {
 } from '@/components/Main/Scan/fields'
 import { runScan } from '@/components/Main/Scan/run'
 import { renderWithStore, withEntries, loginMeta } from './utils'
+import { calls, mockCommand } from './ipc'
 
 const CARD = { number: '4242424242424242', month: '04', year: '27', name: 'ADA LOVELACE' }
 
@@ -98,7 +98,7 @@ describe('scan fields', () => {
 describe('scan routing', () => {
   it('starts a new entry of the kind that was recognized, seeded', async () => {
     seed()
-    vi.mocked(scanImage).mockResolvedValue({ kind: 'card', fields: CARD })
+    mockCommand('scan_image', () => ({ kind: 'card', fields: CARD }))
 
     await scan('/Users/me/card.png')
 
@@ -110,7 +110,7 @@ describe('scan routing', () => {
   it('fills the editor already open for that kind instead of opening another', async () => {
     seed()
     startEntry('identity')
-    vi.mocked(scanImage).mockResolvedValue({ kind: 'identity', fields: PASSPORT })
+    mockCommand('scan_image', () => ({ kind: 'identity', fields: PASSPORT }))
 
     await scan('/Users/me/passport.jpg')
 
@@ -120,7 +120,7 @@ describe('scan routing', () => {
 
   it('reports why nothing came back', async () => {
     seed()
-    vi.mocked(scanImage).mockRejectedValue('nothing recognized')
+    mockCommand('scan_image', () => Promise.reject({ kind: 'unrecognized', message: 'nothing recognized' }))
 
     await scan('/Users/me/wall.png')
 
@@ -133,7 +133,7 @@ describe('a scanned draft', () => {
   it('opens the editor with the fields already in it', async () => {
     const store = seed()
     setScanSupported(true)
-    vi.mocked(scanImage).mockResolvedValue({ kind: 'identity', fields: PASSPORT })
+    mockCommand('scan_image', () => ({ kind: 'identity', fields: PASSPORT }))
     renderWithStore(<Main />, { store })
 
     await scan('/Users/me/passport.jpg')
@@ -155,7 +155,7 @@ describe('a scanned draft', () => {
     const name = document.querySelector('input[name="name"]') as HTMLInputElement
     await userEvent.type(name, 'MY OWN NAME')
 
-    vi.mocked(scanImage).mockResolvedValue({ kind: 'identity', fields: PASSPORT })
+    mockCommand('scan_image', () => ({ kind: 'identity', fields: PASSPORT }))
     await scan('/Users/me/passport.jpg')
 
     await waitFor(() =>
@@ -189,7 +189,7 @@ describe('scanning from the picker', () => {
     const store = seed()
     setScanSupported(true)
     vi.mocked(open).mockResolvedValue('/Users/me/card.png')
-    vi.mocked(scanImage).mockResolvedValue({ kind: 'card', fields: CARD })
+    mockCommand('scan_image', () => ({ kind: 'card', fields: CARD }))
     renderWithStore(<Main />, { store })
     await openFromRail()
 
@@ -197,7 +197,7 @@ describe('scanning from the picker', () => {
 
     await waitFor(() => expect(useStore.getState().entries.new).toBe('card'))
     expect(useStore.getState().ui.addPicker).toBe(false)
-    expect(vi.mocked(scanImage)).toHaveBeenCalledWith('/Users/me/card.png')
+    expect(calls('scan_image')).toContainEqual({ path: '/Users/me/card.png' })
   })
 
   it('leaves the picker alone when the dialog is cancelled', async () => {
@@ -210,7 +210,7 @@ describe('scanning from the picker', () => {
     await userEvent.click(screen.getByTestId('add-scan-image'))
 
     expect(screen.getByTestId('add-secret-modal')).toBeInTheDocument()
-    expect(vi.mocked(scanImage)).not.toHaveBeenCalled()
+    expect(calls('scan_image')).toHaveLength(0)
   })
 
   it('keeps the tiles answering to the digits', async () => {

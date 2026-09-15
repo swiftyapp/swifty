@@ -1,5 +1,5 @@
 import type { EntryDraft } from '@/defaults/entries'
-import type { ExtraField } from '@/lib/commands'
+import type { ExtraField } from '@/api/types'
 
 // The list side of the extra fields: reading a draft key as pairs, and deciding
 // which of them a save should carry. Kept out of the component file so the

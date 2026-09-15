@@ -1,4 +1,4 @@
-import type { SetupDriveFile } from '@/lib/commands'
+import type { SetupDriveFile } from '@/api/setup'
 import { relativeLong } from '@/utils/time'
 import { humanSize } from '@/utils/size'
 

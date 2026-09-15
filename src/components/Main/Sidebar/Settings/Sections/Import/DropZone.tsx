@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { isMobile } from '@/lib/platform'
-import { pickImportFile } from '@/lib/commands'
+import { pickImportFile } from '@/api/pickers'
 import { useFileDrop } from '@/hooks/useFileDrop'
 import { DownloadGlyph } from '../../../../icons'
 import { META_TYPE } from '@/components/elements/tokens'

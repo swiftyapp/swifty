@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { revealEntry, type Entry } from '@/lib/commands'
+import type { Entry } from '@/api/types'
+import { revealEntry } from '@/api/vault'
 
 // Decrypt one entry's secret fields on demand, mirroring the original app: the
 // whole vault is never decrypted at once, only the entry currently in view/edit.

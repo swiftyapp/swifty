@@ -135,7 +135,7 @@ the eyebrow's text and tone). The desktop leads with the passphrase card and
 keeps biometrics as its end segment; the phone leads with an 88px biometric
 tile when a key is enrolled and reveals the same card under "Enter Master
 Password". Which biometry the copy names is `lib/biometry` — `biometryLabel(type)`
-and `biometryGlyph(type)`, from the `biometry_type` command (`LAContext.biometryType`
+and `biometryGlyph(type)`, from `app_status.biometric.type` (`LAContext.biometryType`
 on Apple, the fingerprint everywhere else), carried alongside `touchID` in the
 `flowAuth` payload — so `Masterpass` says the same thing wherever it is drawn.
 The card also survives a late probe: once the user has typed into it, it stays

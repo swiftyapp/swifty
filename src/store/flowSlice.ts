@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand'
-import type { BiometryType } from '@/lib/commands'
+import type { BiometryType } from '@/api/types'
 import type { StoreState } from './index'
 
 export type FlowName = 'setup' | 'auth' | 'main'

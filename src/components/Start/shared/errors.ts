@@ -1,17 +1,5 @@
 import type { TFunction } from 'i18next'
-import { isInvalidPassword, isVaultTooNew } from '@/lib/authErrors'
-
-/**
- * A backend rejection as something showable. Rust errors arrive as plain
- * strings; anything else is a thrown JS error or, at worst, nothing worth
- * repeating — the caller falls back to its own wording for that.
- */
-export const messageOf = (error: unknown): string =>
-  typeof error === 'string'
-    ? error
-    : error instanceof Error
-      ? error.message
-      : ''
+import { errorKind, messageOf } from '@/api/errors'
 
 /**
  * What to say when a pack refuses to open. The password is blamed only when the
@@ -21,13 +9,13 @@ export const messageOf = (error: unknown): string =>
  * hides the cause they could act on. `wrongPassword` is the caller's wording,
  * since the one you want back differs by where the pack came from.
  */
-export const unsealError = (
-  t: TFunction,
-  error: unknown,
-  wrongPassword: string
-): string =>
-  isInvalidPassword(error)
-    ? wrongPassword
-    : isVaultTooNew(error)
-      ? t('Vault needs a newer version of the app')
-      : messageOf(error) || t('Something went wrong')
+export const unsealError = (t: TFunction, error: unknown, wrongPassword: string): string => {
+  switch (errorKind(error)) {
+    case 'invalidPassword':
+      return wrongPassword
+    case 'vaultTooNew':
+      return t('Vault needs a newer version of the app')
+    default:
+      return messageOf(error) || t('Something went wrong')
+  }
+}

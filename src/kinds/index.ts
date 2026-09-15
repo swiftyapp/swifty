@@ -1,4 +1,4 @@
-import type { EntryType } from '@/lib/commands'
+import type { EntryType } from '@/api/types'
 import type { TKey } from '@/i18n'
 import type { Kind } from './types'
 import login from './login'

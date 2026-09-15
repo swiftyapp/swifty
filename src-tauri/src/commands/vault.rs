@@ -1,21 +1,13 @@
 use crate::app::APP_NAME;
-use crate::commands::{derive_key, list_deleted_metas, list_metas, meta_dto_of, save, store_err};
 use crate::error::{Error, Result};
+use crate::events;
 use crate::models::{Entry, EntryMetaDto, VaultData};
+use crate::session::{derive_key, list_deleted_metas, list_metas, meta_dto_of, store_err};
 use crate::state::AppState;
 use crate::store::{migrate, Record, VaultStore};
-use crate::{crypto, storage, sync};
-use serde_json::json;
-use tauri::{AppHandle, Emitter, State};
-use tauri_plugin_dialog::DialogExt;
-
-// The entry list: non-secret metadata only. Secrets stay encrypted in the store
-// and are revealed one entry at a time (reveal_entry).
-#[tauri::command]
-pub fn read_vault(state: State<'_, AppState>) -> Result<Vec<EntryMetaDto>> {
-    let session = state.session.lock().unwrap();
-    list_metas(session.store()?)
-}
+use crate::{crypto, save, storage, sync};
+use serde::Serialize;
+use tauri::{AppHandle, State};
 
 // Decrypt one entry on demand (view/edit): fetch its payload and unseal it with
 // the session payload key. Nothing is cached in the session.
@@ -92,28 +84,17 @@ pub fn set_favorite(
     meta_dto_of(store, &id)
 }
 
-/// The backup file's extension, and the one the picker filters on. Also the
+/// The backup file's extension, and the one `export_vault` writes. Also the
 /// desktop file association in `tauri.conf.json`; keep the two in step.
 pub const BACKUP_EXTENSION: &str = "rowel";
 
-// Open a file picker for a `.rowel` backup. Returns the chosen path, or None if cancelled.
-// The blocking picker must run off the main thread: a sync command runs on the
-// main thread, and blocking there deadlocks the event loop (window hangs) while
-// the modal waits for it. spawn_blocking moves the wait off-main; the plugin
-// still presents the panel on the main thread internally.
-#[tauri::command]
-pub async fn pick_backup(app: AppHandle) -> Result<Option<String>> {
-    let file = tauri::async_runtime::spawn_blocking(move || {
-        app.dialog()
-            .file()
-            .add_filter(format!("{APP_NAME} backup"), &[BACKUP_EXTENSION])
-            .blocking_pick_file()
-    })
-    .await
-    .map_err(|e| Error::Other(e.to_string()))?;
-    Ok(file
-        .and_then(|f| f.into_path().ok())
-        .map(|p| p.to_string_lossy().into_owned()))
+/// What an import merged, plus the list it left behind — so the frontend takes
+/// the refreshed vault from the same call rather than re-reading it.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SwftxReport {
+    pub count: usize,
+    pub entries: Vec<EntryMetaDto>,
 }
 
 // Import a `.swftx` backup into the *currently unlocked* vault. The file is
@@ -127,7 +108,7 @@ pub async fn import_swftx(
     password: String,
     app: AppHandle,
     state: State<'_, AppState>,
-) -> Result<usize> {
+) -> Result<SwftxReport> {
     let blob = storage::read_backup(&path)?;
     let src_cryptor = crypto::Cryptor::new(&crypto::hash_secret(&password));
     // Validate the source password before touching the store.
@@ -144,7 +125,7 @@ pub async fn import_swftx(
         let mut records = Vec::with_capacity(total);
         for (i, obscured) in src.entries.iter().enumerate() {
             records.push(migrate::reseal_one(obscured, &src_cryptor, &cur_cipher)?);
-            let _ = emitter.emit("import:progress", json!({ "done": i + 1, "total": total }));
+            events::import_progress(&emitter, i + 1, total);
         }
         Ok(records)
     })
@@ -152,16 +133,15 @@ pub async fn import_swftx(
     .map_err(|e| Error::Other(e.to_string()))??;
 
     // Merge into the open store (upsert by id).
-    {
-        let session = state.session.lock().unwrap();
-        let store = session.store()?;
-        for record in &records {
-            store.upsert(record).map_err(store_err)?;
-        }
+    let session = state.session.lock().unwrap();
+    let store = session.store()?;
+    for record in &records {
+        store.upsert(record).map_err(store_err)?;
     }
-    let count = records.len();
-    let _ = app.emit("import:done", json!({ "count": count }));
-    Ok(count)
+    Ok(SwftxReport {
+        count: records.len(),
+        entries: list_metas(store)?,
+    })
 }
 
 // Export the vault to a user-chosen `.rowel` file: the same pack the sync engine
@@ -235,6 +215,8 @@ pub async fn save_env_file(
     #[cfg(mobile)]
     {
         let _ = (file_name, body, app);
-        Err(Error::Other("saving a file is a desktop action".into()))
+        Err(Error::Unsupported(
+            "saving a file is a desktop action".into(),
+        ))
     }
 }

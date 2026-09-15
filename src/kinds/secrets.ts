@@ -1,4 +1,4 @@
-import type { Entry, EntryType } from '@/lib/commands'
+import type { Entry, EntryType } from '@/api/types'
 
 /**
  * Which of each kind's fields hold a secret — the same set the vault seals

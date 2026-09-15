@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import {
-  biometricStatus,
-  enableBiometric,
-  disableBiometric,
-  type BiometricMode
-} from '@/lib/commands'
+import type { BiometricMode } from '@/api/types'
+import { appStatus } from '@/api/app'
+import { enableBiometric, disableBiometric } from '@/api/auth'
+import { messageOf } from '@/api/errors'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Toggle from '@/components/elements/Toggle'
@@ -35,10 +33,10 @@ export default function BiometricRow() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    biometricStatus()
-      .then(({ enabled, mode }) => {
-        setEnabled(enabled)
-        setMode(mode)
+    appStatus()
+      .then(({ biometric }) => {
+        setEnabled(biometric.available)
+        setMode(biometric.mode)
       })
       .catch(() => setEnabled(false))
   }, [])
@@ -53,7 +51,7 @@ export default function BiometricRow() {
           setEnabled(false)
           setMode(null)
         })
-        .catch(err => setError(String(err?.message ?? err)))
+        .catch((err: unknown) => setError(messageOf(err)))
         .finally(done)
       return
     }
@@ -62,7 +60,7 @@ export default function BiometricRow() {
         setEnabled(true)
         setMode(next)
       })
-      .catch(err => setError(String(err?.message ?? err)))
+      .catch((err: unknown) => setError(messageOf(err)))
       .finally(done)
   }
 
