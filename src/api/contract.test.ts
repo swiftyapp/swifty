@@ -11,8 +11,9 @@ import { EVENTS } from './events'
 
 const api = import.meta.glob('./*.ts', { query: '?raw', import: 'default', eager: true })
 
+// A set: one command invoked from two places is still one command.
 const names = (source: string, pattern: RegExp) =>
-  [...source.matchAll(pattern)].map(m => m[1]).sort()
+  [...new Set([...source.matchAll(pattern)].map(m => m[1]))].sort()
 
 const invoked = () => {
   const sources = Object.entries(api)
