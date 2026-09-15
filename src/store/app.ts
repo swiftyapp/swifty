@@ -4,9 +4,7 @@ import { appStatus } from '@/api/app'
 import { lock } from '@/api/auth'
 import type { SetupDriveFile } from '@/api/setup'
 import { syncNow, type SyncStatus } from '@/api/sync'
-import { setAutolockTimeout } from '@/api/tools'
 import { checkForUpdate } from '@/services/autoUpdate'
-import { usePrefs } from './prefs'
 import { setEntries, resetVault, runAudit } from './vault'
 import { setScanSupported, resetUi } from './ui'
 
@@ -109,9 +107,6 @@ export const lockVault = () =>
 export const enterMain = async (result: UnlockResult) => {
   setEntries(result.entries)
   flowMain()
-  // The backend resets to its built-in default on every launch; re-apply the
-  // stored preference as soon as there is a session to protect.
-  setAutolockTimeout(usePrefs.getState().autolockSecs).catch(() => {})
   // The unlock result carries whether this vault syncs; everything else about
   // sync arrives as `sync:status` once a flow or a run happens.
   useApp.setState(state => ({ sync: { ...state.sync, configured: result.syncConfigured } }))

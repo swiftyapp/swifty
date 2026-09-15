@@ -1,76 +1,33 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import type { GeneratorOptions } from '@/api/tools'
+import { DATE_FORMATS, setSettings, type DateFormat, type Settings } from '@/api/app'
+import i18n from '@/i18n'
 import { applyTheme, resolveTheme, type Theme, type ThemePreference } from '@/theme'
 
 /**
- * User preferences: everything that outlives a session and a lock. One store,
- * one localStorage key, persisted by zustand's middleware — so a preference is
- * read like any other state (`usePrefs(s => s.sort)`) and a change re-renders
- * whoever shows it, instead of each preference having its own storage module
- * that components copy into local state.
+ * User preferences: everything that outlives a session and a lock.
+ *
+ * Rust owns the file (`settings.json` beside the other sidecars, see
+ * `src-tauri/src/settings.rs`); this is the webview's copy of it, hydrated once
+ * at boot from `app_status` and written back through `set_settings`. One store,
+ * so a preference is read like any other state (`usePrefs(s => s.sort)`) and a
+ * change re-renders whoever shows it — nothing copies a preference into local
+ * state, and nothing reads it from disk at call time.
  */
 
-export type SortMode = 'recent' | 'alpha'
+export type { DateFormat, SortMode, Settings as Prefs } from '@/api/app'
+export { DATE_FORMATS } from '@/api/app'
 
-export type DateFormat = 'MM/DD/YYYY' | 'DD.MM.YYYY' | 'YYYY-MM-DD'
-export const DATE_FORMATS: DateFormat[] = ['MM/DD/YYYY', 'DD.MM.YYYY', 'YYYY-MM-DD']
-
-export interface Prefs {
-  /** Light by default, dark opt-in, or follow the OS. */
-  theme: ThemePreference
-  /** The entry list's order. Recency first: the list is a working surface. */
-  sort: SortMode
-  /** Off by default: the HIBP breach check makes an outbound request. */
-  breachCheck: boolean
-  /** Idle seconds before the vault seals itself. */
-  autolockSecs: number
-  /** How long a copied secret lingers before the clipboard is cleared (ms). */
-  clipboardTimeoutMs: number
-  dateFormat: DateFormat
-  /** Seed values for every new password, shared with the ⌘G dialog. */
-  generator: GeneratorOptions
-}
-
-export const DEFAULT_PREFS: Prefs = {
+// The same defaults as Rust, so a test store — and the split second before
+// hydration lands — reads like a fresh install rather than like `undefined`.
+export const DEFAULT_PREFS: Settings = {
   theme: 'light',
   sort: 'recent',
   breachCheck: false,
   autolockSecs: 60,
   clipboardTimeoutMs: 30_000,
   dateFormat: 'MM/DD/YYYY',
+  locale: null,
   generator: { length: 20, numbers: true, symbols: true, uppercase: true, exclude: '' }
-}
-
-const STORAGE_KEY = 'rowel:prefs'
-
-/**
- * Before this store each preference had its own localStorage key. Read them
- * once to seed the first launch on this version; the persisted blob, once it
- * exists, wins over them (see `merge`). They are left in place: harmless, and
- * removing them is a migration a downgrade would regret.
- */
-const readLegacy = (): Partial<Prefs> => {
-  const legacy: Partial<Prefs> = {}
-  try {
-    const theme = localStorage.getItem('theme')
-    if (theme) legacy.theme = theme as ThemePreference
-    const sort = localStorage.getItem('rowel:listSort')
-    if (sort) legacy.sort = sort as SortMode
-    const breach = localStorage.getItem('rowel:breachCheck')
-    if (breach) legacy.breachCheck = breach === 'true'
-    const secs = localStorage.getItem('rowel:autolockSecs')
-    if (secs) legacy.autolockSecs = Number(secs)
-    const clip = localStorage.getItem('rowel:clipboardTimeout')
-    if (clip) legacy.clipboardTimeoutMs = Number(clip)
-    const format = localStorage.getItem('rowel:dateFormat')
-    if (format) legacy.dateFormat = format as DateFormat
-    const generator = localStorage.getItem('rowel:generatorDefaults')
-    if (generator) legacy.generator = JSON.parse(generator) as GeneratorOptions
-  } catch {
-    // A locked-down webview or a corrupt value: the defaults stand.
-  }
-  return legacy
 }
 
 const isTheme = (value: unknown): value is ThemePreference =>
@@ -80,11 +37,12 @@ const isPositive = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0
 
 /**
- * Stored values are user-writable and may predate a knob added since, so each
- * field is checked and falls back to its default rather than trusted as a
- * whole shape. `generator` is merged one level deep for the same reason.
+ * The file is user-writable and may predate a knob added since, so each field
+ * is checked and falls back to its default rather than trusted as a whole
+ * shape. `generator` is merged one level deep for the same reason. Rust stores
+ * the enum-ish fields as plain strings; this is where they are narrowed.
  */
-const sanitize = (raw: Partial<Prefs>): Prefs => {
+const sanitize = (raw: Partial<Settings>): Settings => {
   const generator = { ...DEFAULT_PREFS.generator, ...(raw.generator ?? {}) }
   return {
     theme: isTheme(raw.theme) ? raw.theme : DEFAULT_PREFS.theme,
@@ -100,21 +58,32 @@ const sanitize = (raw: Partial<Prefs>): Prefs => {
     dateFormat: DATE_FORMATS.includes(raw.dateFormat as DateFormat)
       ? (raw.dateFormat as DateFormat)
       : DEFAULT_PREFS.dateFormat,
+    locale: typeof raw.locale === 'string' ? raw.locale : null,
     generator: Number.isFinite(generator.length)
       ? generator
       : { ...generator, length: DEFAULT_PREFS.generator.length }
   }
 }
 
-export const usePrefs = create<Prefs>()(
-  persist(() => sanitize(readLegacy()), {
-    name: STORAGE_KEY,
-    merge: (persisted, current) => sanitize({ ...current, ...(persisted as Partial<Prefs>) })
-  })
-)
+export const usePrefs = create<Settings>()(() => DEFAULT_PREFS)
 
-export const setPref = <K extends keyof Prefs>(key: K, value: Prefs[K]): void => {
-  usePrefs.setState({ [key]: value } as Pick<Prefs, K>)
+/** Take the boot probe's answer wholesale (see `main.tsx`). */
+export const hydratePrefs = (settings: Settings): void => {
+  usePrefs.setState(sanitize(settings), true)
+}
+
+/**
+ * Patch one preference. The new value lands immediately — a toggle must not
+ * wait on a file write to look pressed — and is then replaced by what Rust
+ * merged, which is authoritative. A failed write leaves the optimistic value in
+ * place: the preference still applies for this session, it just won't survive
+ * a restart.
+ */
+export const setPref = <K extends keyof Settings>(key: K, value: Settings[K]): void => {
+  usePrefs.setState({ [key]: value } as Pick<Settings, K>)
+  setSettings({ [key]: value } as Partial<Settings>)
+    .then(merged => usePrefs.setState(sanitize(merged), true))
+    .catch(() => {})
 }
 
 // The palette command is a flip, so it resolves "system" first and then lands
@@ -140,3 +109,16 @@ try {
 } catch {
   // No subscription; "system" stays on whatever it resolved to at load.
 }
+
+// The language is changed through i18next rather than through a row, so this
+// is where that choice becomes a stored preference — one listener, so a change
+// from anywhere is persisted the same way. The document's own `lang` is i18n's
+// half of the same event.
+//
+// Not during init: i18next fires the same event while starting in the locale
+// Rust resolved, and writing that back would pin an OS-following install
+// (`locale: null`) to whatever the OS said on first boot. Only a change made
+// once the app is up is a choice worth keeping.
+i18n.on('languageChanged', locale => {
+  if (i18n.isInitialized && locale !== usePrefs.getState().locale) setPref('locale', locale)
+})

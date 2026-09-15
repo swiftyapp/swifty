@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { setAutolockTimeout } from '@/api/tools'
 import { usePrefs, setPref } from '@/store'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
@@ -28,10 +27,8 @@ export default function SessionGroup() {
   const lock = usePrefs(state => state.autolockSecs)
   const clipboard = usePrefs(state => state.clipboardTimeoutMs)
 
-  const onLock = (value: string) => {
-    setPref('autolockSecs', Number(value))
-    setAutolockTimeout(Number(value)).catch(() => {})
-  }
+  // Rust re-arms the auto-lock itself when this preference lands (`set_settings`).
+  const onLock = (value: string) => setPref('autolockSecs', Number(value))
 
   const onClipboard = (value: string) => {
     setPref('clipboardTimeoutMs', Number(value))

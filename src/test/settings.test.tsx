@@ -233,13 +233,15 @@ describe('Settings › security', () => {
     ).toBeInTheDocument()
   })
 
-  it('stores the auto-lock choice and pushes it to the backend', async () => {
+  // One write: Rust owns the file and re-arms the auto-lock from it, so there
+  // is no second command to push the value with.
+  it('stores the auto-lock choice through the settings file', async () => {
     await open()
     await go('security')
     await userEvent.click(screen.getByTestId('settings-autolock-300'))
 
     expect(usePrefs.getState().autolockSecs).toBe(300)
-    expect(calls('set_autolock_timeout')).toContainEqual({ secs: 300 })
+    expect(calls('set_settings')).toContainEqual({ patch: { autolockSecs: 300 } })
   })
 
   it('stores the clipboard delay, "Never" included', async () => {
