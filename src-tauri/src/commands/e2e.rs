@@ -23,6 +23,7 @@ use tauri::{AppHandle, State};
 
 use crate::error::{Error, Result};
 use crate::session::create_vault;
+use crate::settings;
 use crate::state::AppState;
 
 // The state a spec wants to start from.
@@ -58,7 +59,8 @@ fn e2e_data_dir() -> Result<PathBuf> {
 
 // Empty the directory without removing the directory itself (the app already
 // holds its path). Covers the DB triple, both sidecars, the biometric marker,
-// cached icons, sync scratch — everything, so no spec inherits a stray file.
+// the preferences file, cached icons, sync scratch — everything, so no spec
+// inherits a stray file.
 fn wipe_dir(dir: &Path) -> Result<()> {
     if !dir.exists() {
         fs::create_dir_all(dir)?;
@@ -98,6 +100,10 @@ pub fn e2e_reset(
     state.session.lock().unwrap().clear();
 
     wipe_dir(&dir)?;
+    // The preferences file went with it, so the copy held in memory has to
+    // follow — otherwise the next `app_status` hands the frontend the theme and
+    // sort order the previous spec left behind.
+    settings::boot(&app);
 
     match mode {
         ResetMode::Pristine => Ok(()),

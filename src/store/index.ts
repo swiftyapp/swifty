@@ -1,15 +1,15 @@
 import { create } from 'zustand'
 import type { EntryType } from '@/api/types'
-import { appStatus } from '@/api/app'
+import { appStatus, type SortMode, type Theme, type ThemePreference } from '@/api/app'
 import { lock } from '@/api/auth'
+import { resolveTheme } from '@/theme/apply'
 import { createFlowSlice, type FlowSlice } from './flowSlice'
 import { createGeneratorSlice, type GeneratorSlice } from './generatorSlice'
 import { createFiltersSlice, type FiltersSlice } from './filtersSlice'
 import { createEntriesSlice, type EntriesSlice } from './entriesSlice'
 import { createAuditSlice, type AuditSlice } from './auditSlice'
-import { createListSlice, type ListSlice } from './listSlice'
+import { createSettingsSlice, type SettingsSlice } from './settingsSlice'
 import { createSyncSlice, type SyncSlice } from './syncSlice'
-import { createThemeSlice, type ThemeSlice } from './themeSlice'
 import { createUpdateSlice, type UpdateSlice } from './updateSlice'
 import { createUiSlice, type UiSlice } from './uiSlice'
 import { createShareSlice, type ShareSlice } from './shareSlice'
@@ -21,9 +21,8 @@ export type StoreState = FlowSlice &
   FiltersSlice &
   EntriesSlice &
   AuditSlice &
-  ListSlice &
+  SettingsSlice &
   SyncSlice &
-  ThemeSlice &
   UpdateSlice &
   UiSlice &
   ShareSlice &
@@ -36,9 +35,8 @@ export const useStore = create<StoreState>()((...a) => ({
   ...createFiltersSlice(...a),
   ...createEntriesSlice(...a),
   ...createAuditSlice(...a),
-  ...createListSlice(...a),
+  ...createSettingsSlice(...a),
   ...createSyncSlice(...a),
-  ...createThemeSlice(...a),
   ...createUpdateSlice(...a),
   ...createUiSlice(...a),
   ...createShareSlice(...a),
@@ -52,16 +50,14 @@ const pickData = (s: StoreState) => ({
   filters: s.filters,
   entries: s.entries,
   audit: s.audit,
-  breachCheck: s.breachCheck,
   sync: s.sync,
   update: s.update,
   ui: s.ui,
   share: s.share,
   setup: s.setup,
-  // Both read a persisted preference at slice creation, so a test that changes
-  // one has to have it put back like everything else.
-  sort: s.sort,
-  theme: s.theme
+  // Hydrated from the backend at boot, so a test that changes a preference has
+  // to have it put back like everything else.
+  settings: s.settings
 })
 
 const initialData = pickData(useStore.getState())
@@ -79,7 +75,7 @@ export const makeStore = () => {
 // this or any other vault) opens onto the previous one's rows. A share dialog
 // goes with them: its link is live credentials, and it would otherwise still be
 // on screen behind whoever unlocks next. Session-shaped state (flow, sync,
-// theme, locale, update) is deliberately kept.
+// settings, update) is deliberately kept.
 export const resetVaultData = () => {
   const { entries, ui, filters, audit, share } = structuredClone(initialData)
   useStore.setState({ entries, ui, filters, audit, share })
@@ -105,9 +101,9 @@ export const {
   setEntries,
   setCurrentEntry,
   auditDone,
-  setBreachCheck,
   runAudit,
-  setSort,
+  hydrateSettings,
+  updateSettings,
   syncInit,
   syncPending,
   syncConnected,
@@ -115,8 +111,6 @@ export const {
   syncDisconnected,
   syncStart,
   syncStop,
-  changeTheme,
-  toggleTheme,
   setUpdateReady,
   dismissUpdate,
   openPalette,
@@ -156,6 +150,22 @@ export const {
   setupDriveFailed,
   setupDriveReset
 } = useStore.getState()
+
+// The named preferences, each a one-key patch. They read as what they do at the
+// call site, and keep `updateSettings` the only way a preference is written.
+export const changeTheme = (theme: ThemePreference) => updateSettings({ theme })
+
+export const setSort = (listSort: SortMode) => updateSettings({ listSort })
+
+export const setBreachCheck = (breachCheck: boolean) => updateSettings({ breachCheck })
+
+// The palette command is a flip, so it resolves "system" first and then lands
+// on a concrete light/dark preference.
+export const toggleTheme = () => {
+  const next: Theme =
+    resolveTheme(useStore.getState().settings.theme) === 'dark' ? 'light' : 'dark'
+  changeTheme(next)
+}
 
 // Starts a new entry of `type` from anywhere (kind picker, palette command,
 // a scan), leaving the audit view first — it has no editor to land the form in.

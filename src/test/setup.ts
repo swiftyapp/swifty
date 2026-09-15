@@ -46,5 +46,5 @@ vi.mock('@tauri-apps/api/webview', () => ({
 
 // Components under test call useTranslation(); the singleton must be
 // initialized once before any of them render.
-const { i18nReady } = await import('@/i18n')
-await i18nReady
+const { initI18n } = await import('@/i18n')
+await initI18n('en-US')

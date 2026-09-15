@@ -11,7 +11,7 @@ const count = (audit: Audit, property: keyof AuditItem) =>
 export default function Audit() {
   const { t } = useTranslation()
   const audit = useStore(state => state.audit)
-  const breachCheck = useStore(state => state.breachCheck)
+  const breachCheck = useStore(state => state.settings.breachCheck)
   const isPristine = useStore(state => state.entries.items.length === 0)
 
   if (isPristine || !audit) return null

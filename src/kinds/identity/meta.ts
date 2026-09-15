@@ -1,6 +1,6 @@
 import { t } from '@/i18n'
 import type { Entry, EntryMeta } from '@/api/types'
-import type { EntryDraft } from '@/defaults/entries'
+import type { EntryDraft } from '@/kinds/draft'
 import { filled } from '@/components/elements/fields/formats'
 import { docTypeOf, DOC_TYPE_LABELS, TEMPLATES } from './templates'
 

@@ -1,9 +1,7 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useStore, changeTheme } from '@/store'
+import { useStore, changeTheme, updateSettings } from '@/store'
 import { LANGUAGES, type TKey } from '@/i18n'
-import { getFormat, setFormat, DATE_FORMATS, type DateFormat } from '@/defaults/dateFormat'
-import type { ThemePreference } from '@/theme'
+import { DATE_FORMATS, type DateFormat, type ThemePreference } from '@/api/app'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Segmented from '@/components/elements/Segmented'
@@ -18,13 +16,8 @@ const THEMES: { value: ThemePreference; label: TKey }[] = [
 
 export default function Language() {
   const { t, i18n } = useTranslation()
-  const theme = useStore(state => state.theme)
-  const [format, setDateFormat] = useState<DateFormat>(getFormat())
-
-  const onFormat = (next: DateFormat) => {
-    setDateFormat(next)
-    setFormat(next)
-  }
+  const theme = useStore(state => state.settings.theme)
+  const format = useStore(state => state.settings.dateFormat)
 
   // Each row label doubles as its radiogroup's accessible name.
   const formatLabel = t('Date format')
@@ -55,7 +48,7 @@ export default function Language() {
               name={formatLabel}
               options={DATE_FORMATS.map(value => ({ value, label: value }))}
               value={format}
-              onChange={onFormat}
+              onChange={(dateFormat: DateFormat) => updateSettings({ dateFormat })}
               testidPrefix="settings-date-format"
             />
           }

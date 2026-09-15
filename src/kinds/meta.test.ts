@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { KINDS, kindOf } from '.'
-import type { EntryDraft } from '@/defaults/entries'
+import type { EntryDraft } from '@/kinds/draft'
 import type { Passkey } from '@/api/types'
 
 // What each kind will let through to `saveEntry` — the only thing standing

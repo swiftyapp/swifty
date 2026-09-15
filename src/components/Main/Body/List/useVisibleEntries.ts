@@ -35,7 +35,7 @@ export const useVisibleEntries = () => {
   // on the way out, and this is what makes the other views immune regardless.
   const tag = useStore(state => (state.ui.view === 'tags' ? state.filters.tag : null))
   const query = useStore(state => state.filters.query)
-  const sort = useStore(state => state.sort)
+  const sort = useStore(state => state.settings.listSort)
   const rows = useRows()
 
   return useMemo(() => {

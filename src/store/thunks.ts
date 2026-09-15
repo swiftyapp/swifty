@@ -16,9 +16,8 @@ import {
 } from '@/api/vault'
 import { syncNow } from '@/api/sync'
 import { shareRevoke } from '@/api/share'
-import { getAudit, setAutolockTimeout } from '@/api/tools'
-import type { EntryDraft } from '@/defaults/entries'
-import { getSecs } from '@/defaults/autolock'
+import { getAudit } from '@/api/tools'
+import type { EntryDraft } from '@/kinds/draft'
 import type { StoreState } from './index'
 
 export interface AsyncSlice {
@@ -104,7 +103,7 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
   }
 
   const refreshAudit = () =>
-    getAudit(get().breachCheck)
+    getAudit(get().settings.breachCheck)
       .then(data => get().auditDone(data))
       .catch(() => {})
 
@@ -179,9 +178,6 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
     enterMain: async result => {
       get().setEntries(result.entries)
       get().flowMain()
-      // The backend resets to its built-in default on every launch; re-apply
-      // the stored preference as soon as there is a session to protect.
-      setAutolockTimeout(getSecs()).catch(() => {})
       get().syncInit(result.syncConfigured)
       // Asked once per session: whether the OS can read a card off a photo
       // decides whether any scan affordance is offered at all.

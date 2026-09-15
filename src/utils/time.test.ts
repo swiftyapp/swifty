@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { DEFAULT_DATE_FORMAT, setFormat, type DateFormat } from '@/defaults/dateFormat'
+import type { DateFormat } from '@/api/app'
+import { useStore } from '@/store'
+import { DEFAULT_SETTINGS } from '@/store/settingsSlice'
 import {
   daysUntil,
   formatDate,
@@ -9,6 +11,11 @@ import {
   toIsoDate,
   toTime
 } from './time'
+
+// The pattern is a setting now, so a case that wants another one puts it in the
+// store rather than in localStorage.
+const setFormat = (dateFormat: DateFormat) =>
+  useStore.setState({ settings: { ...useStore.getState().settings, dateFormat } })
 
 // A fixed "now" so every case is deterministic: 2024-03-14, midday local time.
 const now = new Date(2024, 2, 14, 12, 0, 0).getTime()
@@ -115,7 +122,7 @@ describe('toTime', () => {
 // A stored date is ISO and a shown date is the user's pattern; the pair has to
 // be a true round trip or an edit silently rewrites the date it was showing.
 describe('formatDate / toIsoDate', () => {
-  afterEach(() => setFormat(DEFAULT_DATE_FORMAT))
+  afterEach(() => setFormat(DEFAULT_SETTINGS.dateFormat))
 
   const patterns: [DateFormat, string][] = [
     ['MM/DD/YYYY', '06/01/2035'],

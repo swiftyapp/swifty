@@ -1,5 +1,6 @@
 import { generatePassword, type GeneratorOptions } from '@/api/tools'
-import { getProps, setProps } from '@/defaults/generator'
+import type { GeneratorDefaults } from '@/api/app'
+import { useStore } from '@/store'
 import type { TKey } from '@/i18n'
 import WORDS from './wordlist'
 
@@ -67,14 +68,14 @@ const randomIndex = (bound: number): number => {
 // Seeded from the shared generator defaults so the Settings page's preferences
 // carry into the dialog.
 export const defaultSettings = (): GeneratorSettings => {
-  const stored = getProps()
+  const stored = useStore.getState().settings.generator
   return {
     mode: 'random',
     length: clamp(stored.length, LENGTH_RANGE),
     words: 5,
     symbols: stored.symbols,
     numbers: stored.numbers,
-    excludeSimilar: stored.excludeSimilarCharacters ?? false,
+    excludeSimilar: stored.excludeSimilarCharacters,
     capitalize: false
   }
 }
@@ -82,15 +83,21 @@ export const defaultSettings = (): GeneratorSettings => {
 // The dialog always keeps both letter cases and asks for `strict`, so toggling
 // Symbols or Numbers on guarantees the class shows up in the result.
 // Write the shared knobs back so the dialog and Settings › Security agree.
-// Everything else in the stored props (uppercase, exclude) is left untouched.
-export const persistDefaults = (settings: GeneratorSettings) =>
-  setProps({
-    ...getProps(),
+// Everything else in the stored defaults (uppercase, exclude) is left untouched,
+// and an unchanged group is not written at all — the dialog runs this on every
+// settings change, including the first, which read these very values.
+export const persistDefaults = (settings: GeneratorSettings) => {
+  const { settings: current, updateSettings } = useStore.getState()
+  const generator: GeneratorDefaults = {
+    ...current.generator,
     length: settings.length,
     symbols: settings.symbols,
     numbers: settings.numbers,
     excludeSimilarCharacters: settings.excludeSimilar
-  })
+  }
+  if (JSON.stringify(generator) !== JSON.stringify(current.generator))
+    updateSettings({ generator })
+}
 
 export const toOptions = (settings: GeneratorSettings): GeneratorOptions => ({
   length: settings.length,

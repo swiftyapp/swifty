@@ -1,4 +1,5 @@
 import { reload, waitFor } from "./app";
+import { setSettings, waitForBridge } from "./settings";
 
 /**
  * Per-spec state isolation.
@@ -9,29 +10,11 @@ import { reload, waitFor } from "./app";
  * opens with an explicit `resetPristine()` / `resetEmpty()`.
  *
  * Both go through `window.__e2eReset`, the dev-only bridge installed by
- * `src/main.tsx`, onto the debug-only `e2e_reset` Tauri command.
+ * `src/main.tsx`, onto the debug-only `e2e_reset` Tauri command. It wipes the
+ * whole data dir, preferences (`settings.json`) included.
  */
 
 type ResetMode = "pristine" | "empty";
-
-// The bridge is installed from a dynamic import, so on a cold boot (and again
-// after every refresh) it lands one module fetch behind the first paint. Wait
-// for it rather than assuming the app has settled.
-async function waitForBridge(): Promise<void> {
-  await browser.waitUntil(
-    () =>
-      browser.execute(
-        () =>
-          typeof (window as unknown as { __e2eReset?: unknown }).__e2eReset ===
-          "function",
-      ),
-    {
-      timeout: 30_000,
-      timeoutMsg:
-        "window.__e2eReset never appeared — is the app running against the Vite dev server?",
-    },
-  );
-}
 
 // Run the backend reset, then reload the app so it re-reads disk.
 //
@@ -64,23 +47,16 @@ async function reset(mode: ResetMode, password?: string): Promise<void> {
 
   if (failure) throw new Error(`[e2e] reset("${mode}") failed: ${failure}`);
 
-  // The backend reset wipes only ROWEL_DB_DIR. UI preferences (sort mode,
-  // theme, …) live in webview localStorage, which the OS keys to the app — so
-  // on a dev machine EVERY debug build shares one profile, and a preference a
-  // spec (or a human) set in some other run leaks into this one. That is not
-  // hypothetical: a sort-mode leak made a suite green locally and red on CI.
-  // Clear it here so a reset means what it says: the app boots with defaults.
+  // UI preferences live in `settings.json` inside ROWEL_DB_DIR, so the backend
+  // reset above already took them with it — nothing a spec (or a human) set in
+  // some other run can leak into this one.
   //
-  // The locale goes straight back in: every spec selects on English labels, and
-  // here is the only place a pin can survive — one set by a spec before its own
-  // reset() is simply wiped again. `en-US` is also the app's fallback
-  // (`src/i18n`), so this states the suite's requirement rather than leaning on
-  // that default staying put.
-  await browser.execute(() => {
-    localStorage.clear();
-    sessionStorage.clear();
-    localStorage.setItem("locale", "en-US");
-  });
+  // The locale goes back in explicitly: every spec selects on English labels,
+  // and with no stored choice the app follows the OS, which on a non-English
+  // machine is not en-US. This states the suite's requirement rather than
+  // leaning on a developer's system settings.
+  await setSettings({ locale: "en-US" });
+  await browser.execute(() => sessionStorage.clear());
 
   await reload();
 }

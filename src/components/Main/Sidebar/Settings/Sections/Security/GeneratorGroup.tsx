@@ -1,7 +1,6 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { GeneratorOptions } from '@/api/tools'
-import { getProps, setProps } from '@/defaults/generator'
+import type { GeneratorDefaults } from '@/api/app'
+import { useStore, updateSettings } from '@/store'
 import { LENGTH_RANGE } from '@/services/generator'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
@@ -9,17 +8,16 @@ import Toggle from '@/components/elements/Toggle'
 import { META } from '@/components/elements/tokens'
 
 // The seed values for every new password, shared with the ⌘G generator dialog.
+// Read from the store rather than copied into state on mount, so a change the
+// dialog persisted shows up here instead of leaving the rows stale.
 // `uppercase` stays out of the UI — the dialog always draws from both cases —
-// but is preserved in the stored props.
+// but is preserved in the stored defaults.
 export default function GeneratorGroup() {
   const { t } = useTranslation()
-  const [options, setOptions] = useState<GeneratorOptions>(getProps())
+  const options = useStore(state => state.settings.generator)
 
-  const update = (patch: Partial<GeneratorOptions>) => {
-    const next = { ...options, ...patch }
-    setProps(next)
-    setOptions(next)
-  }
+  const update = (patch: Partial<GeneratorDefaults>) =>
+    updateSettings({ generator: { ...options, ...patch } })
 
   return (
     <SettingsGroup label={t('Generator defaults')}>

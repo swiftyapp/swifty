@@ -1,5 +1,11 @@
 import { getLocale, t } from '@/i18n'
-import { getFormat } from '@/defaults/dateFormat'
+import { useStore } from '@/store'
+
+// The pattern picked in Settings › Language & region. Read on each call rather
+// than taken as an argument: every caller is rendering inside a component that
+// already subscribes to the store, so the value is current and no date helper
+// grows a parameter it would only ever be handed the same way.
+const dateFormat = () => useStore.getState().settings.dateFormat
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
@@ -137,7 +143,7 @@ export const formatDate = (iso: string): string => {
   if (!match) return iso
   const [, year, month, day] = match
 
-  switch (getFormat()) {
+  switch (dateFormat()) {
     case 'DD.MM.YYYY':
       return `${day}.${month}.${year}`
     case 'YYYY-MM-DD':
@@ -156,7 +162,7 @@ export const toIsoDate = (value: string): string => {
   const parts = value.trim().split(/\D+/).filter(Boolean)
   if (parts.length !== 3) return value
 
-  const format = getFormat()
+  const format = dateFormat()
   const [day, month, year] =
     format === 'DD.MM.YYYY'
       ? parts
