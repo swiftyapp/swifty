@@ -30,7 +30,7 @@ export default function BackupRow() {
 
   return (
     <ExpandableRow
-      label={t('Encrypted backup (.swftx)')}
+      label={t('Encrypted backup (.rowel)')}
       description={t('Your whole vault, sealed with your master password')}
       action={t('Save…')}
       testid="settings-backup-row"

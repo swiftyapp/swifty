@@ -191,6 +191,35 @@ pub async fn setup_restore_from_drive(
     adopt(&app, &state, key, store, Some(&tokens))
 }
 
+/// Restore from a `.rowel` backup on disk. Onboarding only.
+///
+/// The same pack the sync engine uploads, written by `export_vault` instead of
+/// pulled from Drive — so this is [`setup_restore_from_drive`] with the
+/// download swapped for a file read, and no account to keep afterwards. The
+/// read shares the blocking thread with the restore: a backup is the whole
+/// vault, and a large one on a slow disk must not stall the async runtime. No
+/// size cap, for the same reason the Drive download has none — the pack's own
+/// structural checks (`pack::unpack`) are what reject a file that is not one.
+#[tauri::command]
+pub async fn setup_restore_from_file(
+    path: String,
+    password: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<UnlockResult> {
+    guard_no_vault(&app)?;
+    let _step = begin_step(&state)?;
+
+    let handle = app.clone();
+    let (key, store) = tauri::async_runtime::spawn_blocking(move || {
+        let bytes = std::fs::read(&path)?;
+        restore::restore_from_pack(&handle, &bytes, &password)
+    })
+    .await
+    .map_err(|e| Error::Other(e.to_string()))??;
+    adopt(&app, &state, key, store, None)
+}
+
 /// Fetch the account's pack, re-locating it rather than trusting the id the
 /// probe saw: the two are minutes apart, and a stale id is a confusing failure
 /// where "no vault up there any more" is a clear one.

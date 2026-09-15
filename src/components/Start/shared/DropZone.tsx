@@ -15,7 +15,7 @@ export default function DropZone({ onPick }: Props) {
   const { t } = useTranslation()
 
   useFileDrop(paths => {
-    const path = paths.find(p => p.toLowerCase().endsWith('.swftx'))
+    const path = paths.find(p => p.toLowerCase().endsWith('.rowel'))
     if (path) onPick(path)
   })
 
@@ -36,7 +36,7 @@ export default function DropZone({ onPick }: Props) {
       <span className="text-text2">
         <DownloadGlyph size={24} />
       </span>
-      <span className="text-base font-medium text-text">{t('Drop a .swftx file here')}</span>
+      <span className="text-base font-medium text-text">{t('Drop a .rowel file here')}</span>
       <span className={META}>
         <span className="text-accent">{t('or browse…')}</span>
       </span>

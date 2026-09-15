@@ -51,9 +51,15 @@
     },
     "fileAssociations": [
       {
+        "ext": ["rowel"],
+        "name": "Rowel Backup",
+        "description": "Rowel encrypted vault backup",
+        "mimeType": "application/vnd.rowel"
+      },
+      {
         "ext": ["swftx"],
-        "name": "Rowel Vault",
-        "description": "Rowel encrypted vault",
+        "name": "Rowel Legacy Vault",
+        "description": "Rowel legacy encrypted vault (import only)",
         "mimeType": "application/vnd.swftx"
       }
     ]

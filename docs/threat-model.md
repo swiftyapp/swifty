@@ -109,9 +109,10 @@ carries them as part of the opaque payload and never sees them.
 - **The private key never leaves the core.** `src-tauri/src/passkey/` unseals a
   login, converts the stored PKCS#8 key to a COSE key in memory, signs, and drops
   it. No command returns a private key to the webview. The one way a passkey
-  leaves the app is an **explicit user-initiated export** (`.swftx`, or Bitwarden
-  JSON, which is plaintext by construction and carries the key as base64url) —
-  the same deliberate exposure the password export already is.
+  leaves the app is an **explicit user-initiated export** (a `.rowel` backup,
+  which is the encrypted vault snapshot itself, or Bitwarden JSON, which is
+  plaintext by construction and carries the key as base64url) — the same
+  deliberate exposure the password export already is.
 - **User verification is the unlocked session.** WebAuthn's "user verified" bit
   is asserted on the strength of the vault being unlocked; there is no
   per-ceremony prompt yet, so any code that can reach the authenticator can sign.
@@ -161,16 +162,22 @@ carries them as part of the opaque payload and never sees them.
 the encrypted database exists; a legacy `vault.swftx` file alone does **not**
 count. Nothing is migrated automatically on unlock.
 
-Bringing an old vault forward is an **explicit** action, and there are two paths
-(`commands/vault.rs`):
+Bringing existing data forward is an **explicit** action, and there are two paths:
 
-- **Restore a backup as a new vault** (`import_backup`): decrypt a chosen `.swftx`
-  with its password and create the database from it.
-- **Import into the currently-unlocked vault** (`import_swftx`): the `.swftx` is
-  independently encrypted and carries its own master password. Each entry is
-  decrypted under the backup's key and re-sealed under the current session key,
-  then merged by id. This CPU-bound re-encrypt loop runs **off the UI thread** and
-  emits `import:progress` events so the UI can show progress.
+- **Restore a backup as a new vault** (`setup_restore_from_file`,
+  `commands/setup.rs`): a `.rowel` backup is the same pack the sync engine
+  uploads to Drive — the plaintext KDF descriptor followed by the SQLCipher
+  snapshot (`sync/pack.rs`) — written by `export_vault`. Restoring installs it
+  through the same `restore_from_pack` path as a Drive restore: fresh installs
+  only, the password is validated by SQLCipher opening the snapshot, and the
+  source device's sync bookkeeping is scrubbed.
+- **Import a legacy vault into the currently-unlocked vault** (`import_swftx`,
+  `commands/vault.rs`): the Electron-era `.swftx` is independently encrypted and
+  carries its own master password. Each entry is decrypted under the backup's
+  key and re-sealed under the current session key, then merged by id. This
+  CPU-bound re-encrypt loop runs **off the UI thread** and emits
+  `import:progress` events so the UI can show progress. It is an import feature
+  in Settings, not a first-run path.
 
 ## What Rowel defends against
 

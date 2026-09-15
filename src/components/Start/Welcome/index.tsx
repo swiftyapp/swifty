@@ -2,11 +2,12 @@ import { useTranslation } from 'react-i18next'
 import AuthShell from '@/components/elements/AuthShell'
 import Mascot from '@/components/elements/Mascot'
 import Button from '@/components/elements/Button'
+import GoogleDriveMark from '@/components/elements/GoogleDriveMark'
 import { LABEL, META } from '@/components/elements/tokens'
-import { CloudGlyph, DiskGlyph } from '@/components/Main/icons'
+import { DiskGlyph } from '@/components/Main/icons'
 import { isMobile } from '@/lib/platform'
 import StepHeader from '../shared/StepHeader'
-import OptionCard from '../shared/OptionCard'
+import RestoreAction from '../shared/RestoreAction'
 import { COLUMN, FOOTNOTE } from '../shared/layout'
 
 interface Props {
@@ -40,25 +41,25 @@ export default function Welcome({ onFresh, onDrive, onFile }: Props) {
         </Button>
       </div>
 
-      <div className={`${COLUMN} mt-7 flex items-center gap-3`}>
+      <div className={`${COLUMN} mt-6 flex items-center gap-3`}>
         <span aria-hidden className="h-px flex-1 bg-line" />
         <span className={LABEL}>{t('Already using Rowel?')}</span>
         <span aria-hidden className="h-px flex-1 bg-line" />
       </div>
 
-      <div className={`${COLUMN} mt-4 grid gap-2.5 md:grid-cols-2`}>
-        <OptionCard
-          glyph={<CloudGlyph size={16} />}
-          title={t('Google Drive')}
+      <div className={`${COLUMN} mt-3 flex flex-col gap-2`}>
+        <RestoreAction
+          mark={<GoogleDriveMark size={20} />}
+          title={t('Continue with Google Drive')}
           body={t('Sync your data to this device.')}
           onClick={onDrive}
           testid="start-drive-button"
         />
         {!isMobile && (
-          <OptionCard
-            glyph={<DiskGlyph size={16} />}
-            title={t('Backup file')}
-            body={t('Restore from a .swftx export.')}
+          <RestoreAction
+            mark={<DiskGlyph size={16} />}
+            title={t('Restore from a backup file')}
+            body={t('A .rowel backup saved on another device.')}
             muted
             onClick={onFile}
             testid="start-restore-button"

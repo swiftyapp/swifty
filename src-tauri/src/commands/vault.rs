@@ -1,13 +1,10 @@
 use crate::app::APP_NAME;
-use crate::commands::{
-    create_vault, derive_key, list_deleted_metas, list_metas, live_records, meta_dto_of, save,
-    store_err,
-};
+use crate::commands::{derive_key, list_deleted_metas, list_metas, meta_dto_of, save, store_err};
 use crate::error::{Error, Result};
-use crate::models::{Entry, EntryMetaDto, UnlockResult, VaultData};
+use crate::models::{Entry, EntryMetaDto, VaultData};
 use crate::state::AppState;
 use crate::store::{migrate, Record, VaultStore};
-use crate::{crypto, storage};
+use crate::{crypto, storage, sync};
 use serde_json::json;
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_dialog::DialogExt;
@@ -95,7 +92,11 @@ pub fn set_favorite(
     meta_dto_of(store, &id)
 }
 
-// Open a file picker for a `.swftx` backup. Returns the chosen path, or None if cancelled.
+/// The backup file's extension, and the one the picker filters on. Also the
+/// desktop file association in `tauri.conf.json`; keep the two in step.
+pub const BACKUP_EXTENSION: &str = "rowel";
+
+// Open a file picker for a `.rowel` backup. Returns the chosen path, or None if cancelled.
 // The blocking picker must run off the main thread: a sync command runs on the
 // main thread, and blocking there deadlocks the event loop (window hangs) while
 // the modal waits for it. spawn_blocking moves the wait off-main; the plugin
@@ -105,7 +106,7 @@ pub async fn pick_backup(app: AppHandle) -> Result<Option<String>> {
     let file = tauri::async_runtime::spawn_blocking(move || {
         app.dialog()
             .file()
-            .add_filter(format!("{APP_NAME} backup"), &["swftx"])
+            .add_filter(format!("{APP_NAME} backup"), &[BACKUP_EXTENSION])
             .blocking_pick_file()
     })
     .await
@@ -113,40 +114,6 @@ pub async fn pick_backup(app: AppHandle) -> Result<Option<String>> {
     Ok(file
         .and_then(|f| f.into_path().ok())
         .map(|p| p.to_string_lossy().into_owned()))
-}
-
-// Restore a `.swftx` backup: decrypt it with `password` (legacy format), create a
-// fresh Argon2id vault under the same password, re-seal every entry under the new
-// payload key, and adopt it as the unlocked session.
-#[tauri::command]
-pub fn import_backup(
-    path: String,
-    password: String,
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> Result<UnlockResult> {
-    let blob = storage::read_backup(&path)?;
-    let src_cryptor = crypto::Cryptor::new(&crypto::hash_secret(&password));
-    // Validate it decrypts before touching the store.
-    let vault: VaultData = src_cryptor
-        .decrypt_data(&blob)
-        .map_err(|_| Error::InvalidPassword)?;
-
-    let (key, store) = create_vault(&app, &password)?;
-    let records = migrate::reseal_swftx(&vault.entries, &src_cryptor, &key.payload_cipher())?;
-    store.import(&records).map_err(store_err)?;
-
-    let metas = list_metas(&store)?;
-    let sync_configured = storage::sync_configured(&app);
-    state
-        .session
-        .lock()
-        .unwrap()
-        .set(key, store, sync_configured);
-    Ok(UnlockResult {
-        entries: metas,
-        sync_configured,
-    })
 }
 
 // Import a `.swftx` backup into the *currently unlocked* vault. The file is
@@ -197,38 +164,46 @@ pub async fn import_swftx(
     Ok(count)
 }
 
-// Export the vault to a user-chosen file. Reconstructs the legacy `.swftx` blob
-// (entries obscured + sealed under `hash_secret(password)`) so backups stay
-// restorable via import_backup on any install. `password` must be the current
-// master password; a mismatch is rejected so a backup is never unrecoverable.
+// Export the vault to a user-chosen `.rowel` file: the same pack the sync engine
+// uploads (KDF descriptor + SQLCipher snapshot, see `sync::pack`), so a backup
+// restores through `setup_restore_from_file` exactly as a Drive pack does. The
+// snapshot is already sealed under the vault key; `password` is asked for only
+// to prove the person exporting can open what they are about to carry away.
+// Nothing is purged first — a backup keeps every tombstone the sync pack would
+// have reclaimed.
 #[tauri::command]
 pub async fn export_vault(
     password: String,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Option<String>> {
-    let blob = {
+    let kdf_params_json = storage::read_kdf_sidecar(&app)?.ok_or_else(|| {
+        Error::Other("this vault predates the key descriptor and cannot be backed up".into())
+    })?;
+    let scratch = storage::sync_scratch_dir(&app)?;
+    let bytes = {
         let session = state.session.lock().unwrap();
         // Guard: the export key must match the unlocked vault.
-        if derive_key(&app, &password)?.sqlcipher_key() != session.key()?.sqlcipher_key() {
+        let key = session.key()?;
+        if derive_key(&app, &password)?.sqlcipher_key() != key.sqlcipher_key() {
             return Err(Error::InvalidPassword);
         }
-        let cipher = session.payload_cipher()?;
-        // Rebuild each plaintext entry from its stored payload, then obscure + seal
-        // under the legacy password-derived cryptor for a portable `.swftx`.
-        let out = crypto::Cryptor::new(&crypto::hash_secret(&password));
-        let entries = live_records(session.store()?)?
-            .iter()
-            .map(|r| migrate::export_entry(r, &cipher, &out))
-            .collect::<Result<Vec<Entry>>>()?;
-        out.encrypt_data(&VaultData { entries })?
+        sync::pack::pack_store(
+            session.store()?,
+            &key.sqlcipher_key(),
+            &kdf_params_json,
+            &scratch,
+        )?
     };
 
     let dest = save::save_export(
         &app,
-        "vault.swftx",
+        &format!(
+            "{APP_NAME} backup {}.{BACKUP_EXTENSION}",
+            chrono::Local::now().format("%Y-%m-%d")
+        ),
         &format!("{APP_NAME} backup"),
-        blob.into_bytes(),
+        bytes,
     )
     .await?;
     Ok(dest.map(|p| p.to_string_lossy().into_owned()))

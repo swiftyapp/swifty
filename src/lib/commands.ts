@@ -404,12 +404,15 @@ export const purgeEntry = (id: string): Promise<void> =>
 export const setFavorite = (id: string, favorite: boolean): Promise<EntryMeta> =>
   invoke('set_favorite', { id, favorite })
 
+// Open the OS picker filtered to `.rowel` backups; null when cancelled.
 export const pickBackup = (): Promise<string | null> => invoke('pick_backup')
 
-export const importBackup = (
+// First run only: install a `.rowel` backup as this device's vault. The same
+// pack Drive holds, so it fails the same ways (`setupRestoreFromDrive`).
+export const setupRestoreFromFile = (
   path: string,
   password: string
-): Promise<UnlockResult> => invoke('import_backup', { path, password })
+): Promise<UnlockResult> => invoke('setup_restore_from_file', { path, password })
 
 // Merge a `.swftx` file (encrypted under its own `password`) into the currently
 // unlocked vault. Runs off the UI thread and emits `import:progress`; resolves
@@ -419,9 +422,9 @@ export const importSwftx = (
   password: string
 ): Promise<number> => invoke('import_swftx', { path, password })
 
-// Export a portable `.swftx` backup, encrypted under the master `password` so it
-// can be restored via import_backup on any install. The password must match the
-// unlocked vault.
+// Save a `.rowel` backup: the vault's own encrypted snapshot, restorable on a
+// fresh install via `setupRestoreFromFile`. The `password` must match the
+// unlocked vault; it proves the exporter can open what they are carrying away.
 export const exportVault = (password: string): Promise<string | null> =>
   invoke('export_vault', { password })
 

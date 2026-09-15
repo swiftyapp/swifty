@@ -10,7 +10,7 @@ import {
   canEnrollBiometric,
   enableBiometric,
   pickBackup,
-  importBackup,
+  setupRestoreFromFile,
   type SetupDriveFile
 } from '@/lib/commands'
 import { setupDriveProbed, setupDriveFailed } from '@/store'
@@ -317,22 +317,42 @@ describe('restoring from Google Drive', () => {
 })
 
 describe('restoring from a backup file', () => {
-  it('picks a file, then unseals it with its own password', async () => {
-    vi.mocked(pickBackup).mockResolvedValue('/tmp/rowel-backup.swftx')
+  it('picks a file, then unseals it with the master password', async () => {
+    vi.mocked(pickBackup).mockResolvedValue('/tmp/Rowel backup 2026-09-15.rowel')
     const { store } = renderWithStore(<Start />)
 
     await userEvent.click(screen.getByTestId('start-restore-button'))
     await userEvent.click(screen.getByTestId('restore-dropzone'))
 
     expect(await screen.findByTestId('restore-found-file')).toHaveTextContent(
-      'rowel-backup.swftx'
+      'Rowel backup 2026-09-15.rowel'
     )
 
     await userEvent.type(screen.getByTestId('restore-password-input'), STRONG)
     await userEvent.click(screen.getByTestId('restore-confirm-button'))
 
-    expect(importBackup).toHaveBeenCalledWith('/tmp/rowel-backup.swftx', STRONG)
+    expect(setupRestoreFromFile).toHaveBeenCalledWith(
+      '/tmp/Rowel backup 2026-09-15.rowel',
+      STRONG
+    )
     await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+  })
+
+  // The pack is what says whether the password was wrong; anything else it
+  // reports — a truncated file, a vault from a newer build — is shown as itself.
+  it('shows a non-password failure as itself', async () => {
+    vi.mocked(pickBackup).mockResolvedValue('/tmp/vault.rowel')
+    vi.mocked(setupRestoreFromFile).mockRejectedValueOnce('sync file is truncated')
+    renderWithStore(<Start />)
+
+    await userEvent.click(screen.getByTestId('start-restore-button'))
+    await userEvent.click(screen.getByTestId('restore-dropzone'))
+    await screen.findByTestId('restore-found-file')
+
+    await userEvent.type(screen.getByTestId('restore-password-input'), STRONG)
+    await userEvent.click(screen.getByTestId('restore-confirm-button'))
+
+    expect(await screen.findByText('sync file is truncated')).toBeInTheDocument()
   })
 })
 

@@ -10,9 +10,9 @@ import {
   setFavorite,
   getAudit,
   syncNow,
-  importBackup,
   setupCreate as setupCreateCmd,
   setupRestoreFromDrive,
+  setupRestoreFromFile,
   setAutolockTimeout,
   scanSupported
 } from '@/lib/commands'
@@ -194,6 +194,6 @@ export const createAsyncSlice: StateCreator<StoreState, [], [], AsyncSlice> = (_
     },
     setupCreate: (password, archiveRemote) => setupCreateCmd(password, archiveRemote),
     restoreFromDrive: password => setupRestoreFromDrive(password),
-    restoreBackup: (path, password) => importBackup(path, password)
+    restoreBackup: (path, password) => setupRestoreFromFile(path, password)
   }
 }
