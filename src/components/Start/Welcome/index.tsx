@@ -41,15 +41,15 @@ export default function Welcome({ onFresh, onDrive, onFile }: Props) {
         </Button>
       </div>
 
-      <div className={`${COLUMN} mt-7 flex items-center gap-3`}>
+      <div className={`${COLUMN} mt-6 flex items-center gap-3`}>
         <span aria-hidden className="h-px flex-1 bg-line" />
         <span className={LABEL}>{t('Already using Rowel?')}</span>
         <span aria-hidden className="h-px flex-1 bg-line" />
       </div>
 
-      <div className={`${COLUMN} mt-4 flex flex-col gap-2.5`}>
+      <div className={`${COLUMN} mt-3 flex flex-col gap-2`}>
         <RestoreAction
-          mark={<GoogleDriveMark size={24} />}
+          mark={<GoogleDriveMark size={20} />}
           title={t('Continue with Google Drive')}
           body={t('Sync your data to this device.')}
           onClick={onDrive}
@@ -57,7 +57,7 @@ export default function Welcome({ onFresh, onDrive, onFile }: Props) {
         />
         {!isMobile && (
           <RestoreAction
-            mark={<DiskGlyph size={20} />}
+            mark={<DiskGlyph size={16} />}
             title={t('Restore from a backup file')}
             body={t('A .rowel backup saved on another device.')}
             muted
