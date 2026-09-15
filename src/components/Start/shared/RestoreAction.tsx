@@ -27,7 +27,9 @@ export default function RestoreAction({ mark, title, body, muted, onClick, testi
       className={cx(
         'group flex w-full cursor-pointer items-center gap-3 rounded-lg border border-line bg-card p-2.5 pr-3 text-left',
         'shadow-[0_1px_2px_rgba(20,22,26,0.05),inset_0_1px_0_var(--topglow)]',
-        'transition-[border-color,box-shadow,transform] hover:border-accent-line hover:shadow-[0_8px_22px_rgba(20,22,26,0.09),inset_0_1px_0_var(--topglow)] active:scale-[0.985] active:shadow-[0_1px_2px_rgba(20,22,26,0.05),inset_0_1px_0_var(--topglow)]'
+        // The slow tier for the hover lift so it is seen moving, and a quick
+        // snap on press so the row answers the finger rather than trailing it.
+        'transition-[border-color,box-shadow,transform] duration-300 hover:border-accent-line hover:shadow-[0_8px_22px_rgba(20,22,26,0.09),inset_0_1px_0_var(--topglow)] active:scale-[0.985] active:shadow-[0_1px_2px_rgba(20,22,26,0.05),inset_0_1px_0_var(--topglow)] active:duration-100'
       )}
     >
       <span
@@ -44,7 +46,7 @@ export default function RestoreAction({ mark, title, body, muted, onClick, testi
         <span className="block text-base font-medium text-text">{title}</span>
         <span className="block text-base text-text2">{body}</span>
       </span>
-      <ChevronRightGlyph className="flex-none text-text3 transition-[color,transform] group-hover:translate-x-0.5 group-hover:text-accent" />
+      <ChevronRightGlyph className="flex-none text-text3 transition-[color,transform] duration-300 group-hover:translate-x-0.5 group-hover:text-accent" />
     </button>
   )
 }
