@@ -999,7 +999,7 @@ fn round_trip_generic_csv_env() {
     let out = String::from_utf8(bytes.clone()).unwrap();
     let header = out.lines().next().unwrap();
     assert!(header.contains(",body,file_name,tags"));
-    assert!(header.ends_with("_swifty_csv_version"));
+    assert!(header.ends_with("_rowel_csv_version"));
     assert!(out.trim_end().ends_with(CSV_VERSION));
     assert!(out.contains("\nenv,api · production,"));
     assert!(
@@ -1014,7 +1014,7 @@ fn round_trip_generic_csv_env() {
 }
 
 // Formula-looking bodies are guarded and genuine apostrophes are escaped, so
-// every ambiguous prefix round-trips under the versioned Swifty dialect.
+// every ambiguous prefix round-trips under the versioned Rowel dialect.
 #[test]
 fn round_trip_generic_csv_env_with_a_formula_looking_first_line() {
     for body in [
@@ -1041,7 +1041,7 @@ fn round_trip_generic_csv_env_with_a_formula_looking_first_line() {
 }
 
 // A generic sheet has no provenance marker, so an apostrophe that resembles
-// Swifty's spreadsheet guard remains literal rather than being guessed away.
+// Rowel's spreadsheet guard remains literal rather than being guessed away.
 #[test]
 fn unversioned_generic_csv_keeps_a_literal_apostrophe_in_an_env_body() {
     let bytes = b"type,title,body,file_name\nenv,Literal,\"'=VALUE\nA=1\",.env\n";

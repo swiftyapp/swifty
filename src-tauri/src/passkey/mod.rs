@@ -43,8 +43,8 @@ use crate::error::{Error, Result};
 
 use store::{PasskeyVault, VaultCredentialStore};
 
-/// Swifty's AAGUID — `8f2b41d7-6c93-4e1a-a50d-37e8b16429c5`, a UUIDv4 generated
-/// once for this crate. One fixed identifier for "the Swifty desktop
+/// Rowel's AAGUID — `8f2b41d7-6c93-4e1a-a50d-37e8b16429c5`, a UUIDv4 generated
+/// once for this crate. One fixed identifier for "the Rowel desktop
 /// authenticator", the same on every install: it names the model, never the
 /// device, because a per-install value would be a handle for correlating a user
 /// across relying parties.

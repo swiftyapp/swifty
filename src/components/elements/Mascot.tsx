@@ -18,7 +18,7 @@ const BRAND_INK = 'var(--c-brand)'
 // Eyes and expression strokes: paper on ink, so they flip with the theme too.
 const EYE = 'var(--c-brand-eye)'
 
-// The Swifty mascot: the brand asterisk (a secret value, redacted) with eyes.
+// The Rowel mascot: the brand asterisk (a secret value, redacted) with eyes.
 // It sits still and blinks every once in a while, follows typing with its
 // gaze, cheers when the vault opens and shakes its head at a bad passphrase.
 // Memoized: the filtered SVG is the priciest thing on the lock screen, and

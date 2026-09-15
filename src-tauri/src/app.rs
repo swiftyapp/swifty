@@ -1,9 +1,9 @@
 //! User facing application name — the single place the backend spells it.
 //!
-//! Deliberately *not* the source for anything an installed app is identified
-//! by: `productName`/bundle id in `tauri.conf.json`, the Google Drive folder
-//! (`sync::FOLDER_NAME`), the legacy Electron data directory, and the HTTP
-//! user agent all have to survive a rename, so they keep their own literals.
+//! Identifiers that happen to share the name (`productName`/bundle id in
+//! `tauri.conf.json`, the Google Drive folder `sync::FOLDER_NAME`, the HTTP
+//! user agent) are deliberately separate literals: they are persisted or
+//! observed outside the app, so a change to them is a migration, not a rename.
 //! The frontend has its own copy of this name in `src/lib/app.ts`.
 
-pub const APP_NAME: &str = "Swifty";
+pub const APP_NAME: &str = "Rowel";

@@ -74,7 +74,7 @@ export function useReceive(): Receive {
         setBusy(false)
       })
       // Verbatim: the backend already says which of the three it is ("this is
-      // not a Swifty share link", expired, revoked), and only it can tell.
+      // not a Rowel share link", expired, revoked), and only it can tell.
       .catch(reason => {
         if (!current()) return
         setError(String(reason))

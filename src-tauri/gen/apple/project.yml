@@ -1,4 +1,4 @@
-name: swifty
+name: rowel
 options:
   bundleIdPrefix: app.rowel.mobile
   deploymentTarget:
@@ -10,7 +10,7 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: Swifty
+      PRODUCT_NAME: Rowel
       PRODUCT_BUNDLE_IDENTIFIER: app.rowel.mobile
       DEVELOPMENT_TEAM: UFBL3F444A
 targetTemplates:
@@ -25,14 +25,14 @@ targetTemplates:
     settings:
       groups: [app]
 targets:
-  swifty_iOS:
+  rowel_iOS:
     type: application
     platform: iOS
     sources:
       - path: Sources
       - path: Assets.xcassets
       - path: Externals
-      - path: swifty_iOS
+      - path: rowel_iOS
       - path: assets
         buildPhase: resources
         type: folder
@@ -43,7 +43,7 @@ targets:
       - path: ../../PrivacyInfo.xcprivacy
         buildPhase: resources
     info:
-      path: swifty_iOS/Info.plist
+      path: rowel_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
         UILaunchStoryboardName: LaunchScreen
@@ -60,7 +60,7 @@ targets:
         CFBundleShortVersionString: 1.0.0
         CFBundleVersion: "1.0.0.1"
     entitlements:
-      path: swifty_iOS/swifty_iOS.entitlements
+      path: rowel_iOS/rowel_iOS.entitlements
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full

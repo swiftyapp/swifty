@@ -216,15 +216,15 @@ jobs:
             src-tauri/Info.ios.plist \
             src-tauri/PrivacyInfo.xcprivacy \
             src-tauri/gen/apple/ExportOptions.plist \
-            src-tauri/gen/apple/swifty_iOS/Info.plist \
-            src-tauri/gen/apple/swifty_iOS/swifty_iOS.entitlements
-          grep -q 'PrivacyInfo.xcprivacy' src-tauri/gen/apple/swifty.xcodeproj/project.pbxproj \
+            src-tauri/gen/apple/rowel_iOS/Info.plist \
+            src-tauri/gen/apple/rowel_iOS/rowel_iOS.entitlements
+          grep -q 'PrivacyInfo.xcprivacy' src-tauri/gen/apple/rowel.xcodeproj/project.pbxproj \
             || { echo '::error::PrivacyInfo.xcprivacy is not a resource of the iOS target'; exit 1; }
 
       # Parses the committed project.pbxproj and proves the scheme the release
       # build names still exists.
       - name: Validate the Xcode project
-        run: xcodebuild -list -project src-tauri/gen/apple/swifty.xcodeproj
+        run: xcodebuild -list -project src-tauri/gen/apple/rowel.xcodeproj
 
   supply-chain:
     name: Supply chain (audit + cargo-deny)

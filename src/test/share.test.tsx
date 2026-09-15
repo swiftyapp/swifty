@@ -25,10 +25,10 @@ import {
 import { DEFAULT_CLIPBOARD_TIMEOUT } from '@/defaults/clipboard'
 import { renderWithStore, withEntries, loginMeta, deferred } from './utils'
 
-const LINK = 'swifty://share#v1.file-1.a2V5LTFrZXktMWtleS0xa2V5LTFrZXktMWtleS0xa2V5'
+const LINK = 'rowel://share#v1.file-1.a2V5LTFrZXktMWtleS0xa2V5LTFrZXktMWtleS0xa2V5'
 
 const created = (fileId: string): ShareCreated => ({
-  link: `swifty://share#v1.${fileId}.a2V5`,
+  link: `rowel://share#v1.${fileId}.a2V5`,
   fileId,
   expiresAt: '2024-01-02T00:00:00.000Z'
 })
@@ -72,7 +72,7 @@ describe('sharing an entry', () => {
     expect(field).toHaveAttribute('readonly')
     expect(screen.getByTestId('share-send-modal')).toHaveAccessibleName('Share this entry')
     expect(
-      screen.getByText('Swifty stops opening this link in 24 hours. Revoke it to delete the file now.')
+      screen.getByText('Rowel stops opening this link in 24 hours. Revoke it to delete the file now.')
     ).toBeInTheDocument()
   })
 

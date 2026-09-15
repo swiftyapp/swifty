@@ -43,7 +43,7 @@ const KINDS: [&str; 7] = ["login", "note", "card", "identity", "ssh", "env", "ap
 
 const KEY_LEN: usize = 32;
 const VERSION: u8 = 1;
-const PREFIX: &str = "swifty://share#";
+const PREFIX: &str = "rowel://share#";
 const VERSION_TAG: &str = "v1";
 
 /// The AES-256 key a single share is sealed under. Fresh per share, never
@@ -153,7 +153,7 @@ pub fn unseal(key: &ShareKey, blob: &[u8], now_ms: i64) -> Result<Entry> {
     let envelope: Envelope<serde_json::Value> = serde_json::from_slice(&plaintext)?;
     if envelope.v != VERSION {
         return Err(Error::Other(
-            "this share was made by a newer version of Swifty".into(),
+            "this share was made by a newer version of Rowel".into(),
         ));
     }
     if envelope.expires_at <= now_ms {
@@ -163,13 +163,13 @@ pub fn unseal(key: &ShareKey, blob: &[u8], now_ms: i64) -> Result<Entry> {
     let entry: Entry = serde_json::from_value(envelope.entry)?;
     if !KINDS.contains(&entry.kind.as_str()) {
         return Err(Error::Other(
-            "this share holds a kind of entry this version of Swifty does not know".into(),
+            "this share holds a kind of entry this version of Rowel does not know".into(),
         ));
     }
     Ok(sanitize(&entry))
 }
 
-/// A whole share in one pasteable token: `swifty://share#v1.<fileId>.<key>`.
+/// A whole share in one pasteable token: `rowel://share#v1.<fileId>.<key>`.
 ///
 /// One token rather than a URL with query parameters, because both halves have
 /// to survive being pasted into a chat window by hand, and because a fragment
@@ -243,7 +243,7 @@ fn is_version_tag(s: &str) -> bool {
 // These reach the user verbatim, so they say what to do about it rather than
 // what failed.
 fn not_a_link() -> Error {
-    Error::Other("this is not a Swifty share link".into())
+    Error::Other("this is not a Rowel share link".into())
 }
 
 fn incomplete() -> Error {
@@ -251,7 +251,7 @@ fn incomplete() -> Error {
 }
 
 fn newer_version() -> Error {
-    Error::Other("this link was made by a newer version of Swifty".into())
+    Error::Other("this link was made by a newer version of Rowel".into())
 }
 
 #[cfg(test)]
@@ -339,7 +339,7 @@ mod tests {
         let blob = crate::crypto::seal_aead(key.as_ref(), &plaintext).unwrap();
         assert_eq!(
             unseal(&key, &blob, NOW).unwrap_err().to_string(),
-            "this share was made by a newer version of Swifty"
+            "this share was made by a newer version of Rowel"
         );
     }
 
@@ -387,7 +387,7 @@ mod tests {
         let blob = crafted(&key, json!({"id": "", "type": "wallet", "title": "x"}));
         assert_eq!(
             unseal(&key, &blob, NOW).unwrap_err().to_string(),
-            "this share holds a kind of entry this version of Swifty does not know"
+            "this share holds a kind of entry this version of Rowel does not know"
         );
     }
 
@@ -437,13 +437,13 @@ mod tests {
         let key = URL_SAFE_NO_PAD.encode([7u8; KEY_LEN]);
         for input in [
             "https://example.com/share".to_string(),
-            format!("swifty://open#v1.fileId.{key}"),
-            format!("swifty://share#v1.file!d.{key}"),
-            format!("swifty://share#v1.fileId.{key}.extra"),
+            format!("rowel://open#v1.fileId.{key}"),
+            format!("rowel://share#v1.file!d.{key}"),
+            format!("rowel://share#v1.fileId.{key}.extra"),
         ] {
             assert_eq!(
                 Link::parse(&input).unwrap_err().to_string(),
-                "this is not a Swifty share link",
+                "this is not a Rowel share link",
                 "{input}"
             );
         }
@@ -453,11 +453,11 @@ mod tests {
     fn parse_refuses_an_incomplete_link() {
         let key = URL_SAFE_NO_PAD.encode([7u8; KEY_LEN]);
         for input in [
-            "swifty://share#v1.fileId".to_string(),
-            format!("swifty://share#v1..{key}"),
-            format!("swifty://share#v1.fileId.{}", &key[..20]),
+            "rowel://share#v1.fileId".to_string(),
+            format!("rowel://share#v1..{key}"),
+            format!("rowel://share#v1.fileId.{}", &key[..20]),
             format!(
-                "swifty://share#v1.fileId.{}",
+                "rowel://share#v1.fileId.{}",
                 URL_SAFE_NO_PAD.encode([7u8; 64])
             ),
         ] {
@@ -473,10 +473,10 @@ mod tests {
     fn parse_refuses_a_newer_link_version() {
         let key = URL_SAFE_NO_PAD.encode([7u8; KEY_LEN]);
         assert_eq!(
-            Link::parse(&format!("swifty://share#v2.fileId.{key}"))
+            Link::parse(&format!("rowel://share#v2.fileId.{key}"))
                 .unwrap_err()
                 .to_string(),
-            "this link was made by a newer version of Swifty"
+            "this link was made by a newer version of Rowel"
         );
     }
 

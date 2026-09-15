@@ -39,9 +39,9 @@ impl From<&drive::DriveFile> for PackInfo {
     }
 }
 
-/// The account's `Swifty/vault.swsync`, if it has one.
+/// The account's `Rowel/vault.swsync`, if it has one.
 ///
-/// `None` covers both "no Swifty folder" and "a folder with no pack in it" —
+/// `None` covers both "no Rowel folder" and "a folder with no pack in it" —
 /// to onboarding they are the same answer, and the same fresh start.
 pub async fn find_pack(client: &Client, token: &str) -> Result<Option<drive::DriveFile>> {
     let Some(folder) = drive::folder_id(client, token, FOLDER_NAME).await? else {
@@ -90,7 +90,7 @@ mod tests {
             "vault-archived-2024-05-04.swsync"
         );
         // Same extension as the live pack, so the archive is still recognisably
-        // a Swifty vault the user could restore from.
+        // a Rowel vault the user could restore from.
         assert!(archive_name("2024-05-04")
             .ends_with(&format!(".{}", pack::FILE_NAME.rsplit('.').next().unwrap())));
     }

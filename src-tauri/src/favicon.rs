@@ -26,7 +26,7 @@ const MAX_ICON_BYTES: usize = 256 * 1024;
 const MAX_HTML_BYTES: usize = 512 * 1024;
 const MISS_TTL: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 const TIMEOUT: Duration = Duration::from_secs(8);
-const USER_AGENT: &str = "Swifty-Password-Manager";
+const USER_AGENT: &str = "Rowel-Password-Manager";
 
 // Raster only (see module docs). Octet-stream is deliberately absent: an icon
 // we can't type is an icon we don't render.

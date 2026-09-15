@@ -24,9 +24,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   // Every panel reads its initial value from localStorage, so leftovers from an
   // earlier case would decide which segment starts selected.
-  localStorage.removeItem('swifty:clipboardTimeout')
-  localStorage.removeItem('swifty:autolockSecs')
-  localStorage.removeItem('swifty:dateFormat')
+  localStorage.removeItem('rowel:clipboardTimeout')
+  localStorage.removeItem('rowel:autolockSecs')
+  localStorage.removeItem('rowel:dateFormat')
 })
 
 afterEach(() => changeLocale('en-US'))
@@ -133,7 +133,7 @@ describe('Settings › sync', () => {
   // One warning covers the whole picker, CXF included — it is as plaintext as
   // the other two.
   it('exports to CXF from the portable export picker', async () => {
-    vi.mocked(exportEntries).mockResolvedValue('/tmp/swifty-export.json')
+    vi.mocked(exportEntries).mockResolvedValue('/tmp/rowel-export.json')
     await open()
     expect(
       screen.getByText('Bitwarden JSON, FIDO CXF or generic CSV, unencrypted')
@@ -146,7 +146,7 @@ describe('Settings › sync', () => {
     await userEvent.click(screen.getByTestId('settings-export-run'))
 
     expect(exportEntries).toHaveBeenCalledWith('cxf')
-    expect(await screen.findByText(/swifty-export\.json/)).toBeInTheDocument()
+    expect(await screen.findByText(/rowel-export\.json/)).toBeInTheDocument()
   })
 })
 
@@ -237,7 +237,7 @@ describe('Settings › security', () => {
     await userEvent.click(await screen.findByTestId('settings-biometric-toggle'))
 
     expect(
-      await screen.findByText(/released after a biometric check by Swifty/)
+      await screen.findByText(/released after a biometric check by Rowel/)
     ).toBeInTheDocument()
   })
 
@@ -275,7 +275,7 @@ describe('Settings › security', () => {
 
     await userEvent.click(screen.getByTestId('settings-generator-symbols'))
 
-    const stored = JSON.parse(localStorage.getItem('swifty:generatorDefaults')!)
+    const stored = JSON.parse(localStorage.getItem('rowel:generatorDefaults')!)
     expect(stored.symbols).toBe(false)
   })
 })

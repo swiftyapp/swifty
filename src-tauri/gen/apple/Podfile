@@ -1,13 +1,13 @@
 # Uncomment the next line to define a global platform for your project
 
-target 'swifty_iOS' do
+target 'rowel_iOS' do
 platform :ios, '16.0'
-  # Pods for swifty_iOS
+  # Pods for rowel_iOS
 end
 
-target 'swifty_macOS' do
+target 'rowel_macOS' do
 platform :osx, '11.0'
-  # Pods for swifty_macOS
+  # Pods for rowel_macOS
 end
 
 # Delete the deployment target for iOS and macOS, causing it to be inherited from the Podfile

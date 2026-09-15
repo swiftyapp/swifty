@@ -173,7 +173,7 @@ describe('a Drive that already holds data', () => {
     renderWithStore(<Start />)
     await reachConflict()
 
-    expect(await screen.findByText('This Drive already has Swifty data')).toBeInTheDocument()
+    expect(await screen.findByText('This Drive already has Rowel data')).toBeInTheDocument()
     expect(screen.getByTestId('setup-conflict-file')).toHaveTextContent('vault.swsync')
     expect(setupCreateCmd).not.toHaveBeenCalled()
   })
@@ -318,20 +318,20 @@ describe('restoring from Google Drive', () => {
 
 describe('restoring from a backup file', () => {
   it('picks a file, then unseals it with its own password', async () => {
-    vi.mocked(pickBackup).mockResolvedValue('/tmp/swifty-backup.swftx')
+    vi.mocked(pickBackup).mockResolvedValue('/tmp/rowel-backup.swftx')
     const { store } = renderWithStore(<Start />)
 
     await userEvent.click(screen.getByTestId('start-restore-button'))
     await userEvent.click(screen.getByTestId('restore-dropzone'))
 
     expect(await screen.findByTestId('restore-found-file')).toHaveTextContent(
-      'swifty-backup.swftx'
+      'rowel-backup.swftx'
     )
 
     await userEvent.type(screen.getByTestId('restore-password-input'), STRONG)
     await userEvent.click(screen.getByTestId('restore-confirm-button'))
 
-    expect(importBackup).toHaveBeenCalledWith('/tmp/swifty-backup.swftx', STRONG)
+    expect(importBackup).toHaveBeenCalledWith('/tmp/rowel-backup.swftx', STRONG)
     await waitFor(() => expect(store.getState().flow.name).toBe('main'))
   })
 })

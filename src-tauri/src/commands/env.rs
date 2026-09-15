@@ -63,7 +63,7 @@ mod tests {
     use super::*;
 
     fn scratch(name: &str, bytes: &[u8]) -> std::path::PathBuf {
-        let path = std::env::temp_dir().join(format!("swifty-env-{}-{name}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("rowel-env-{}-{name}", std::process::id()));
         fs::write(&path, bytes).unwrap();
         path
     }

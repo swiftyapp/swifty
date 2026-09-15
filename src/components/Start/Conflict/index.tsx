@@ -42,7 +42,7 @@ export default function Conflict({ onBack, onUnlockExisting, onArchive }: Props)
       <StepHeader
         eyebrow={t('Hold on')}
         tone="warn"
-        title={t('This Drive already has Swifty data')}
+        title={t('This Drive already has Rowel data')}
         body={t(
           "It's sealed with its own master password. If you continue with the new one, the two can't be merged later."
         )}

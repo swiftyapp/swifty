@@ -1,4 +1,4 @@
-# Builds, signs, notarizes and publishes Swifty for macOS, Windows and Linux as
+# Builds, signs, notarizes and publishes Rowel for macOS, Windows and Linux as
 # a DRAFT GitHub release, and uploads the `latest.json` update manifest that
 # tauri-plugin-updater reads from `releases/latest/download/latest.json`.
 # Publishing the draft is what makes a version visible to installed apps.
@@ -118,7 +118,7 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         with:
           tagName: v__VERSION__
-          releaseName: Swifty v__VERSION__
+          releaseName: Rowel v__VERSION__
           releaseBody: See the assets below to download and install this version.
           releaseDraft: true
           prerelease: false
@@ -178,8 +178,8 @@ jobs:
         run: |
           mkdir -p sbom
           cargo cyclonedx --manifest-path src-tauri/Cargo.toml --format json
-          mv src-tauri/swifty.cdx.json sbom/swifty-rust.cdx.json
-          npx --yes @cyclonedx/cdxgen@11 -t npm -o sbom/swifty-js.cdx.json . \
+          mv src-tauri/rowel.cdx.json sbom/rowel-rust.cdx.json
+          npx --yes @cyclonedx/cdxgen@11 -t npm -o sbom/rowel-js.cdx.json . \
             || echo "JS SBOM generation skipped"
 
       - name: Attach SBOMs to the release

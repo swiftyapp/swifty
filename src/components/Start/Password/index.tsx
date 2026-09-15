@@ -69,7 +69,7 @@ export default function Password({ onBack, onContinue }: Props) {
       <StepHeader
         eyebrow={t('Get started · 1 of 2')}
         title={t('Choose a master password')}
-        body={t("Swifty can't reset it for you, so pick one you'll remember.")}
+        body={t("Rowel can't reset it for you, so pick one you'll remember.")}
       />
 
       <div className={`${COLUMN} mt-9`}>

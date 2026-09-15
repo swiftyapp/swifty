@@ -1,4 +1,4 @@
-# Releasing Swifty for iOS
+# Releasing Rowel for iOS
 
 The `.github/workflows/release-ios.yml` workflow builds the App Store IPA and
 uploads it to App Store Connect, where it appears as a TestFlight build. There
@@ -168,7 +168,7 @@ you want the app on a connected device.
 
 4. **TestFlight processing** takes roughly 5–30 minutes after the upload step
    succeeds. The build then appears under **TestFlight → iOS builds**. The IPA
-   is always kept as the `swifty-ios-ipa` workflow artifact — including when
+   is always kept as the `rowel-ios-ipa` workflow artifact — including when
    App Store Connect rejects the upload — and is also attached to the draft
    GitHub release for the tag (created by the desktop workflow).
 
@@ -183,14 +183,14 @@ you want the app on a connected device.
    is answered the build stays in "Missing Compliance" and cannot be
    distributed to testers.
 
-6. **App Store submission**: **Apps → Swifty → iOS App → + Version**, fill in
+6. **App Store submission**: **Apps → Rowel → iOS App → + Version**, fill in
    what's new, screenshots and the review notes (include test-vault credentials
    if the reviewer needs them), select the processed build, then **Add for
    Review → Submit**.
 
 ## Export compliance
 
-Swifty encrypts the user's vault with standard, published algorithms:
+Rowel encrypts the user's vault with standard, published algorithms:
 AES-256-GCM, Argon2id and SQLCipher. That is **not** an exemption. The common
 `ITSAppUsesNonExemptEncryption = false` shortcut is wrong for this app and must
 **not** be added to `Info.ios.plist`.
@@ -200,7 +200,7 @@ Answer the App Store Connect questionnaire as:
 - Does your app use encryption? **Yes.**
 - Does it qualify for any of the listed exemptions? **No.** The exemptions
   cover apps that only use the encryption built into Apple's OS, only make
-  HTTPS calls, or only use encryption for authentication or DRM. Swifty ships
+  HTTPS calls, or only use encryption for authentication or DRM. Rowel ships
   its own cryptography for user data at rest, so none of them apply.
 - Which algorithms? **Standard encryption algorithms instead of, or in addition
   to, using or accessing the encryption in Apple's operating system** — i.e.
@@ -216,7 +216,7 @@ February each year for the previous calendar year. See
 
 Under **App Privacy**, declare **Data Not Collected**:
 
-- The vault is local to the device; nothing is sent to a Swifty-operated
+- The vault is local to the device; nothing is sent to a Rowel-operated
   server (there is none).
 - Drive sync uploads the *encrypted* vault to the user's **own** Google
   account, chosen by the user. It is not collected by the developer and is not
@@ -241,7 +241,7 @@ no biometric data leaves the device or reaches the app.
   `CODE_SIGN_STYLE = Manual`, `CODE_SIGN_IDENTITY` and
   `PROVISIONING_PROFILE_SPECIFIER` into the *committed* `project.pbxproj` and
   the CLI never resets them. Remove the variables from `.env`, then restore the
-  project: `git checkout -- src-tauri/gen/apple/swifty.xcodeproj/project.pbxproj`.
+  project: `git checkout -- src-tauri/gen/apple/rowel.xcodeproj/project.pbxproj`.
 - **ITMS-90060 / invalid `CFBundleVersion`** — the build version came out with
   more than three period-separated integers, which happens when the build
   number is appended to the app version instead of replacing it; see step 1 of

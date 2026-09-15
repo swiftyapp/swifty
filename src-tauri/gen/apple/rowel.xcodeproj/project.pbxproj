@@ -43,7 +43,7 @@
 		4F7C113E4F1AFC68232D1EEA /* tests.rs */ = {isa = PBXFileReference; path = tests.rs; sourceTree = "<group>"; };
 		535805A14F44E433BA0E69B7 /* vault.rs */ = {isa = PBXFileReference; path = vault.rs; sourceTree = "<group>"; };
 		54D46FDEFA7336CAC562D086 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
-		59235512296808FC82DAE5BD /* swifty_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = swifty_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		59235512296808FC82DAE5BD /* rowel_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = rowel_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5D92E2EE908A79E18323E9B2 /* card.rs */ = {isa = PBXFileReference; path = card.rs; sourceTree = "<group>"; };
 		65710603F56AA14C4E34823A /* sqlite.rs */ = {isa = PBXFileReference; path = sqlite.rs; sourceTree = "<group>"; };
 		6647F7ADF78A32F48D519D9D /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -97,7 +97,7 @@
 		F2867CE78BFBAA5D977BEB30 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
 		F51DF3E91AB376338FFEF73B /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		FAE3314DB24A3B07472E98AB /* cxf.rs */ = {isa = PBXFileReference; path = cxf.rs; sourceTree = "<group>"; };
-		FC78F65455C2AB63E08E619C /* swifty_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = swifty_iOS.entitlements; sourceTree = "<group>"; };
+		FC78F65455C2AB63E08E619C /* rowel_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = rowel_iOS.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -122,7 +122,7 @@
 		1EC582C3F2BF65EFEDC08E5D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				59235512296808FC82DAE5BD /* swifty_iOS.app */,
+				59235512296808FC82DAE5BD /* rowel_iOS.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -143,7 +143,7 @@
 		3FB85259DD808466969DF476 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				9DCC963F1AC0DBFA411A30D9 /* swifty */,
+				9DCC963F1AC0DBFA411A30D9 /* rowel */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -171,7 +171,7 @@
 				3FB85259DD808466969DF476 /* Sources */,
 				DEDD965618C6F34E917A7C12 /* src */,
 				89B2DC1DFCD6950D2DC60C08 /* src-tauri */,
-				8ECF4AFD7E400BD4A6B4C76C /* swifty_iOS */,
+				8ECF4AFD7E400BD4A6B4C76C /* rowel_iOS */,
 				B402EC2E891F579F316CA62E /* Frameworks */,
 				1EC582C3F2BF65EFEDC08E5D /* Products */,
 			);
@@ -218,22 +218,22 @@
 			path = store;
 			sourceTree = "<group>";
 		};
-		8ECF4AFD7E400BD4A6B4C76C /* swifty_iOS */ = {
+		8ECF4AFD7E400BD4A6B4C76C /* rowel_iOS */ = {
 			isa = PBXGroup;
 			children = (
 				90B08FA946AA8363C5F1C922 /* Info.plist */,
-				FC78F65455C2AB63E08E619C /* swifty_iOS.entitlements */,
+				FC78F65455C2AB63E08E619C /* rowel_iOS.entitlements */,
 			);
-			path = swifty_iOS;
+			path = rowel_iOS;
 			sourceTree = "<group>";
 		};
-		9DCC963F1AC0DBFA411A30D9 /* swifty */ = {
+		9DCC963F1AC0DBFA411A30D9 /* rowel */ = {
 			isa = PBXGroup;
 			children = (
 				318CF822B4E685B317B920E5 /* main.mm */,
 				B166761E20AB134825D196D3 /* bindings */,
 			);
-			path = swifty;
+			path = rowel;
 			sourceTree = "<group>";
 		};
 		A234A2708CCFF8289FB5B469 /* commands */ = {
@@ -333,9 +333,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		1FC9409741F10A76599A2114 /* swifty_iOS */ = {
+		1FC9409741F10A76599A2114 /* rowel_iOS */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3EDD7ABD186E156CA5314096 /* Build configuration list for PBXNativeTarget "swifty_iOS" */;
+			buildConfigurationList = 3EDD7ABD186E156CA5314096 /* Build configuration list for PBXNativeTarget "rowel_iOS" */;
 			buildPhases = (
 				7792C32789E22DAD0FC06240 /* Build Rust Code */,
 				3FD288CCF34097D8A29B6A50 /* Sources */,
@@ -346,11 +346,11 @@
 			);
 			dependencies = (
 			);
-			name = swifty_iOS;
+			name = rowel_iOS;
 			packageProductDependencies = (
 			);
-			productName = swifty_iOS;
-			productReference = 59235512296808FC82DAE5BD /* swifty_iOS.app */;
+			productName = rowel_iOS;
+			productReference = 59235512296808FC82DAE5BD /* rowel_iOS.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -367,7 +367,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 45283620DFCDE755A9F88E6A /* Build configuration list for PBXProject "swifty" */;
+			buildConfigurationList = 45283620DFCDE755A9F88E6A /* Build configuration list for PBXProject "rowel" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -381,7 +381,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				1FC9409741F10A76599A2114 /* swifty_iOS */,
+				1FC9409741F10A76599A2114 /* rowel_iOS */,
 			);
 		};
 /* End PBXProject section */
@@ -444,7 +444,7 @@
 					arm64,
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = swifty_iOS/swifty_iOS.entitlements;
+				CODE_SIGN_ENTITLEMENTS = rowel_iOS/rowel_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "UFBL3F444A";
 				ENABLE_BITCODE = NO;
@@ -453,7 +453,7 @@
 					"$(inherited)",
 					"\".\"",
 				);
-				INFOPLIST_FILE = swifty_iOS/Info.plist;
+				INFOPLIST_FILE = rowel_iOS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -461,7 +461,7 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = app.rowel.mobile;
-				PRODUCT_NAME = "Swifty";
+				PRODUCT_NAME = "Rowel";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
@@ -477,7 +477,7 @@
 				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
-				CODE_SIGN_ENTITLEMENTS = swifty_iOS/swifty_iOS.entitlements;
+				CODE_SIGN_ENTITLEMENTS = rowel_iOS/rowel_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "UFBL3F444A";
 				ENABLE_BITCODE = NO;
@@ -486,7 +486,7 @@
 					"$(inherited)",
 					"\".\"",
 				);
-				INFOPLIST_FILE = swifty_iOS/Info.plist;
+				INFOPLIST_FILE = rowel_iOS/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -494,7 +494,7 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = app.rowel.mobile;
-				PRODUCT_NAME = "Swifty";
+				PRODUCT_NAME = "Rowel";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
@@ -623,7 +623,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		3EDD7ABD186E156CA5314096 /* Build configuration list for PBXNativeTarget "swifty_iOS" */ = {
+		3EDD7ABD186E156CA5314096 /* Build configuration list for PBXNativeTarget "rowel_iOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				9146B247DA4E7B02703F8C81 /* debug */,
@@ -632,7 +632,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = debug;
 		};
-		45283620DFCDE755A9F88E6A /* Build configuration list for PBXProject "swifty" */ = {
+		45283620DFCDE755A9F88E6A /* Build configuration list for PBXProject "rowel" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B5AC70C6E04566F4634D190A /* debug */,

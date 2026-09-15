@@ -1,4 +1,4 @@
-# Swifty v1-0-0 — Audit Remediation Checklist
+# Rowel v1-0-0 — Audit Remediation Checklist
 
 Systemic remediation plan for `v1-0-0`, derived from the legacy Electron audit (`swifty-audit.md`)
 **re-verified against the actual Tauri 2 code**. Every legacy finding was checked in the current
@@ -133,7 +133,7 @@ on Phase 1.
 
 ### T-SYNC-2 · Deterministic Drive-folder handling  ❌ (S13 remainder)
 **Evidence:** query escaping is already fixed (`sync/drive.rs:21-23` `escape()`, tested), but `find_one()` (`drive.rs:38-52`) still takes `files.first()` unconditionally.
-**Steps:** when multiple "Swifty" folders match, resolve deterministically (error, or pick oldest) instead of blind `[0]`.
+**Steps:** when multiple "Rowel" folders match, resolve deterministically (error, or pick oldest) instead of blind `[0]`.
 **Acceptance:** a two-folder fixture no longer yields nondeterministic sync.
 
 ---

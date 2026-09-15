@@ -98,7 +98,7 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
         <StepHeader
           eyebrow={t('Restore · Google Drive')}
           title={t('Nothing here yet')}
-          body={t('This Google account has no Swifty data. Start fresh and it will sync here.')}
+          body={t('This Google account has no Rowel data. Start fresh and it will sync here.')}
         />
         <div className={ACTIONS}>
           <Button block testid="drive-start-fresh-button" onClick={onStartFresh}>

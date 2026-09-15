@@ -1,6 +1,6 @@
 # Compact shell — the phone UI
 
-How Swifty's iOS layout is built, and the rules every change to it follows. The
+How Rowel's iOS layout is built, and the rules every change to it follows. The
 design reference is the "Keyring Mobile Prototype" (an iPhone mock: large-title
 tab roots, a floating tab bar, a detail screen pushed from the right with a
 bottom primary action, a bottom-sheet kind picker, a slide-up form, a
@@ -212,7 +212,7 @@ palettes. Prototype-only colours map to existing tokens (`--list` → `bg-list`,
 - Unlock leads with the biometric tile when biometrics are enrolled, else the
   passphrase card. No auto-prompt on launch.
 - Not adopted from the prototype: share button, recent searches, vault
-  switcher, card face art. The Swifty mascot stays on the lock screen.
+  switcher, card face art. The Rowel mascot stays on the lock screen.
 
 ## Follow-ups
 

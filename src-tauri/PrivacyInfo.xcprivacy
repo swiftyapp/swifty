@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Swifty collects nothing and tracks nobody: the vault is local, sync is
+	<!-- Rowel collects nothing and tracks nobody: the vault is local, sync is
 	     the user's own Google Drive, and no analytics or ad SDK is linked. -->
 	<key>NSPrivacyTracking</key>
 	<false/>

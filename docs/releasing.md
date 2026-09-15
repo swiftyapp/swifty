@@ -1,6 +1,6 @@
-# Releasing Swifty (desktop)
+# Releasing Rowel (desktop)
 
-Swifty ships for macOS (signed + notarized universal build), Windows (NSIS
+Rowel ships for macOS (signed + notarized universal build), Windows (NSIS
 installer) and Linux (.deb, .rpm, AppImage) through GitHub Releases, with a
 silent in-app auto-updater. This doc covers the one-time setup and the
 per-release procedure. iOS is a separate workflow: see
@@ -23,7 +23,7 @@ bump version → push a v* tag (or run Release manually) → CI builds all three
   `1.0.0-alpha.1`; WiX only accepts numeric pre-release identifiers.
 - **Linux:** `.deb`, `.rpm` and `.AppImage`, unsigned.
 - **Update artifacts:** `createUpdaterArtifacts: true` in `tauri.conf.json`
-  emits the platform-specific updater bundle plus a `.sig` made with the Swifty
+  emits the platform-specific updater bundle plus a `.sig` made with the Rowel
   minisign key. `tauri-action` merges them into one `latest.json`, which the app
   fetches from `releases/latest/download/latest.json`.
 - **Provenance + SBOM:** every installer gets a SLSA build-provenance
@@ -36,13 +36,13 @@ bump version → push a v* tag (or run Release manually) → CI builds all three
 A minisign keypair signs every update artifact; the app verifies it with the
 public key embedded in `src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
 The public key is committed. The private key lives outside the repo, for
-example at `~/.tauri/swifty.key`. To regenerate:
+example at `~/.tauri/rowel.key`. To regenerate:
 
 ```sh
-bun run tauri signer generate -w ~/.tauri/swifty.key
+bun run tauri signer generate -w ~/.tauri/rowel.key
 ```
 
-Then put the new `~/.tauri/swifty.key.pub` contents into
+Then put the new `~/.tauri/rowel.key.pub` contents into
 `plugins.updater.pubkey`. **If you lose the private key, existing installs can
 no longer auto-update** and need a fresh manual install.
 
@@ -59,7 +59,7 @@ onto the env names the Tauri bundler expects.
 | `APPLE_ID` | Apple ID email of the developer account. |
 | `APPLE_ID_PASSWORD` | An **app-specific password** (appleid.apple.com → Sign-In and Security → App-Specific Passwords). Not your account password. |
 | `APPLE_TEAM_ID` | `UFBL3F444A`. |
-| `TAURI_SIGNING_PRIVATE_KEY` | Contents of `~/.tauri/swifty.key`. |
+| `TAURI_SIGNING_PRIVATE_KEY` | Contents of `~/.tauri/rowel.key`. |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for that key (empty if generated without one). |
 | `GOOGLE_OAUTH_CLIENT_ID` | Desktop-app OAuth client id from Google Cloud Console, baked in at compile time for Google Drive sync (`src-tauri/src/sync/auth.rs`). Unset → Drive sync reports "not configured". |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | The matching client secret. |
@@ -87,7 +87,7 @@ pubkey.
    - `src-tauri/tauri.conf.json` → `version` (this is what the release tag and
      name are derived from, via `v__VERSION__`)
    - `package.json` → `version`
-   - `src-tauri/Cargo.toml` → `version` (then `cargo update -p swifty
+   - `src-tauri/Cargo.toml` → `version` (then `cargo update -p rowel
      --manifest-path src-tauri/Cargo.toml` so `Cargo.lock` follows)
 2. Merge that to `main`. CI's supply-chain job must be green: it fails when a
    `@tauri-apps/*` npm package and its Rust crate are on different major.minor
@@ -99,7 +99,7 @@ pubkey.
    - GitHub → Actions → *Release* → *Run workflow* (only offered for the
      default branch).
 4. Wait for all three platform jobs. They create one **draft** release
-   `Swifty v<version>` with the installers, the updater artifacts, their
+   `Rowel v<version>` with the installers, the updater artifacts, their
    `.sig` files, `latest.json` and the SBOMs. The Linux job replaces the
    placeholder body with GitHub's auto-generated release notes.
 5. Review the draft and **Publish** it. Once published, installed apps pick it

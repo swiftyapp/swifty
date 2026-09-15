@@ -5,7 +5,7 @@ import { chord, resetEmpty, setRange, unlock, waitFor } from "../helpers";
 // link (it fills the field it was opened from).
 //
 // The dialog and Settings › Security › Generator defaults share one stored
-// record (`swifty:generatorDefaults`): the dialog seeds from it and writes
+// record (`rowel:generatorDefaults`): the dialog seeds from it and writes
 // back, so a change in either place is what the other one opens with.
 
 const MASTER_PASSWORD = "Nc8$jRt5vQz1mHf!";
@@ -92,7 +92,7 @@ describe("password generator", () => {
       async () =>
         (await browser.execute(
           () =>
-            JSON.parse(localStorage.getItem("swifty:generatorDefaults") ?? "{}")
+            JSON.parse(localStorage.getItem("rowel:generatorDefaults") ?? "{}")
               .length,
         )) === before + 1,
       { timeout: 10_000, timeoutMsg: "the default length was not persisted" },

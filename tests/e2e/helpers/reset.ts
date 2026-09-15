@@ -64,7 +64,7 @@ async function reset(mode: ResetMode, password?: string): Promise<void> {
 
   if (failure) throw new Error(`[e2e] reset("${mode}") failed: ${failure}`);
 
-  // The backend reset wipes only SWIFTY_DB_DIR. UI preferences (sort mode,
+  // The backend reset wipes only ROWEL_DB_DIR. UI preferences (sort mode,
   // theme, …) live in webview localStorage, which the OS keys to the app — so
   // on a dev machine EVERY debug build shares one profile, and a preference a
   // spec (or a human) set in some other run leaks into this one. That is not

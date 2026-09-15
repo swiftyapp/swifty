@@ -73,7 +73,7 @@ export interface ImportDonePayload {
 
 /**
  * The first-run Drive probe answered. `file: null` is a Google account with no
- * Swifty data in it yet — a fact, not a failure, so it is not an error event.
+ * Rowel data in it yet — a fact, not a failure, so it is not an error event.
  * Mirrors the `sync:pending` / `sync:connected` / `sync:error` trio: the
  * backend opens the browser and hears back from it, so the frontend follows
  * these rather than guessing from the command's promise.

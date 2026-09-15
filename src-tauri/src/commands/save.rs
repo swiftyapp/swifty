@@ -218,7 +218,7 @@ mod tests {
     fn write_private_leaves_the_file_owner_readable_only() {
         use std::os::unix::fs::PermissionsExt;
 
-        let dir = std::env::temp_dir().join(format!("swifty-env-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rowel-env-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let dest = dir.join(".env.production");
 
@@ -245,7 +245,7 @@ mod tests {
     // hold the export by the time the dialog runs, and must be gone after it.
     #[tokio::test]
     async fn staging_writes_before_the_dialog_and_cleans_up_after() {
-        let dir = std::env::temp_dir().join(format!("swifty-save-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rowel-save-{}", std::process::id()));
         let (staged, _) = staging(&dir, "vault.swftx");
 
         let chosen = stage_then(
@@ -285,7 +285,7 @@ mod tests {
     // staging used to truncate `<Documents>/vault.swftx` and then remove it.
     #[tokio::test]
     async fn staging_leaves_the_rest_of_the_directory_alone() {
-        let dir = std::env::temp_dir().join(format!("swifty-save-nbr-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rowel-save-nbr-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let kept = dir.join("vault.swftx");
         std::fs::write(&kept, b"an export the user already saved here").unwrap();
@@ -312,12 +312,12 @@ mod tests {
     // Nor a dialog that failed outright.
     #[tokio::test]
     async fn staging_cleans_up_after_a_failed_dialog() {
-        let dir = std::env::temp_dir().join(format!("swifty-save-fail-{}", std::process::id()));
-        let (staged, _) = staging(&dir, "swifty-export.csv");
+        let dir = std::env::temp_dir().join(format!("rowel-save-fail-{}", std::process::id()));
+        let (staged, _) = staging(&dir, "rowel-export.csv");
 
         let result = stage_then(
             &staged,
-            "swifty-export.csv",
+            "rowel-export.csv",
             b"name,password".to_vec(),
             || async { Err(Error::Other("picker crashed".into())) },
         )
@@ -338,14 +338,14 @@ mod tests {
     fn a_failed_write_leaves_nothing_behind() {
         use std::os::unix::fs::PermissionsExt;
 
-        let dir = std::env::temp_dir().join(format!("swifty-save-partial-{}", std::process::id()));
-        let (staged, _) = staging(&dir, "swifty-export.csv");
+        let dir = std::env::temp_dir().join(format!("rowel-save-partial-{}", std::process::id()));
+        let (staged, _) = staging(&dir, "rowel-export.csv");
         std::fs::create_dir_all(&staged).unwrap();
-        let file = staged.join("swifty-export.csv");
+        let file = staged.join("rowel-export.csv");
         std::fs::write(&file, b"").unwrap();
         std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o444)).unwrap();
 
-        let result = Staged::write(&staged, "swifty-export.csv", b"name,password".to_vec());
+        let result = Staged::write(&staged, "rowel-export.csv", b"name,password".to_vec());
 
         assert!(
             result.is_err(),
@@ -361,12 +361,12 @@ mod tests {
     // A dismissed dialog must not leave the plaintext behind either.
     #[tokio::test]
     async fn staging_cleans_up_after_a_cancelled_dialog() {
-        let dir = std::env::temp_dir().join(format!("swifty-save-cancel-{}", std::process::id()));
-        let (staged, _) = staging(&dir, "swifty-export.csv");
+        let dir = std::env::temp_dir().join(format!("rowel-save-cancel-{}", std::process::id()));
+        let (staged, _) = staging(&dir, "rowel-export.csv");
 
         let chosen = stage_then(
             &staged,
-            "swifty-export.csv",
+            "rowel-export.csv",
             b"name,password".to_vec(),
             || async { Ok(None) },
         )

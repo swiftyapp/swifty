@@ -78,7 +78,7 @@ pub fn run() {
             // callback, so ordinary focus changes flood stderr and the log file.
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
-                .level_for("swifty_lib", log::LevelFilter::Debug)
+                .level_for("rowel_lib", log::LevelFilter::Debug)
                 .target(tauri_plugin_log::Target::new(
                     tauri_plugin_log::TargetKind::Stderr,
                 ))
@@ -90,7 +90,6 @@ pub fn run() {
         .manage(AppState::default())
         .manage(autolock::AutoLock::default())
         .setup(|app| {
-            storage::ensure_migrated(app.handle()); // one-time copy from the legacy Electron vault
             window::create(app.handle())?;
             #[cfg(desktop)]
             tray::create(app.handle())?;

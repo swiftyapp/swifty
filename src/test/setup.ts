@@ -91,7 +91,7 @@ vi.mock('@/lib/commands', () => ({
   // and `shareOpen` resolves a plain login, so a suite only overrides the one
   // call it is about.
   shareCreate: vi.fn().mockResolvedValue({
-    link: 'swifty://share#v1.file-1.a2V5LTFrZXktMWtleS0xa2V5LTFrZXktMWtleS0xa2V5',
+    link: 'rowel://share#v1.file-1.a2V5LTFrZXktMWtleS0xa2V5LTFrZXktMWtleS0xa2V5',
     fileId: 'file-1',
     expiresAt: '2024-01-02T00:00:00.000Z'
   }),

@@ -60,7 +60,7 @@ allow = [
   "BSL-1.0",
 ]
 
-# The swifty crate itself is a private application, never published to
+# The rowel crate itself is a private application, never published to
 # crates.io, so it carries no SPDX license field — skip the license check for
 # unpublished workspace members (it is marked `publish = false` in Cargo.toml).
 private = { ignore = true }

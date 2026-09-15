@@ -41,7 +41,7 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Swifty uses Face ID to unlock your vault.</string>
+	<string>Rowel uses Face ID to unlock your vault.</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -50,7 +50,7 @@
 				<string>swftx</string>
 			</array>
 			<key>CFBundleTypeName</key>
-			<string>Swifty Vault</string>
+			<string>Rowel Vault</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>

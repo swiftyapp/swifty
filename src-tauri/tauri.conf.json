@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Swifty",
+  "productName": "Rowel",
   "version": "1.0.0-alpha.1",
   "identifier": "app.rowel.desktop",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Swifty",
+        "title": "Rowel",
         "create": false,
         "width": 1040,
         "height": 700,
@@ -52,8 +52,8 @@
     "fileAssociations": [
       {
         "ext": ["swftx"],
-        "name": "Swifty Vault",
-        "description": "Swifty encrypted vault",
+        "name": "Rowel Vault",
+        "description": "Rowel encrypted vault",
         "mimeType": "application/vnd.swftx"
       }
     ]

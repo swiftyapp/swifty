@@ -6,7 +6,7 @@ use tauri::tray::TrayIconBuilder;
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
-const WEBSITE: &str = "https://getswifty.pro";
+const WEBSITE: &str = "https://rowel.app";
 
 // Monochrome asterisk glyph, generated from icons/tray.svg by `bun run icons`.
 // Rendered as a template image on macOS so the menu bar tints it for

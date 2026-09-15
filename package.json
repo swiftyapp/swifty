@@ -1,5 +1,5 @@
 {
-  "name": "swifty",
+  "name": "rowel",
   "version": "1.0.0-alpha.1",
   "description": "Modern, Lightweight, Fast and Free Password Manager",
   "type": "module",
@@ -23,7 +23,7 @@
     "icons": "bun run scripts/icons.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:dev:fresh": "SWIFTY_DB_DIR=\"${SWIFTY_DB_DIR:-${TMPDIR:-/tmp}/swifty-fresh-$$}\" tauri dev",
+    "tauri:dev:fresh": "ROWEL_DB_DIR=\"${ROWEL_DB_DIR:-${TMPDIR:-/tmp}/rowel-fresh-$$}\" tauri dev",
     "tauri:build": "tauri build",
     "ios:init": "tauri ios init",
     "ios:dev": "tauri ios dev",

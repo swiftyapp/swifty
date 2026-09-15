@@ -42,7 +42,7 @@ export default function Welcome({ onFresh, onDrive, onFile }: Props) {
 
       <div className={`${COLUMN} mt-7 flex items-center gap-3`}>
         <span aria-hidden className="h-px flex-1 bg-line" />
-        <span className={LABEL}>{t('Already using Swifty?')}</span>
+        <span className={LABEL}>{t('Already using Rowel?')}</span>
         <span aria-hidden className="h-px flex-1 bg-line" />
       </div>
 

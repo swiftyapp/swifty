@@ -343,7 +343,7 @@ pub async fn create_file_with_properties(
     parse_file(&check(resp).await?).ok_or_else(|| Error::Other("Drive API returned no id".into()))
 }
 
-const BOUNDARY: &str = "swifty-boundary";
+const BOUNDARY: &str = "rowel-boundary";
 
 /// The envelope is assembled by hand because the body is binary — it is spliced
 /// in between UTF-8 boundary lines rather than formatted into a `String`.
@@ -399,7 +399,7 @@ pub(crate) const SHARE_GONE: &str = "this share has expired or was revoked";
 /// Download a link-shared file with only an API key — the recipient side, which
 /// has no Google account and therefore no bearer token. The key identifies the
 /// calling project for quota; it grants nothing on its own.
-pub(crate) const SHARE_TOO_LARGE: &str = "this share is larger than Swifty allows";
+pub(crate) const SHARE_TOO_LARGE: &str = "this share is larger than Rowel allows";
 
 /// Fetch a link-shared file with no account, refusing anything over
 /// `max_bytes`.
@@ -510,7 +510,7 @@ mod tests {
 
     #[test]
     fn escapes_quotes_and_backslashes() {
-        assert_eq!(escape("Swifty"), "Swifty");
+        assert_eq!(escape("Rowel"), "Rowel");
         assert_eq!(escape("a'b"), "a\\'b");
         assert_eq!(escape("a\\b"), "a\\\\b");
         // A name crafted to break out of the literal stays contained.
@@ -704,9 +704,9 @@ mod tests {
         let body = multipart_body(&json!({ "name": "x" }), &content);
 
         let text = String::from_utf8_lossy(&body);
-        assert!(text.starts_with("--swifty-boundary\r\n"));
+        assert!(text.starts_with("--rowel-boundary\r\n"));
         assert!(text.contains("{\"name\":\"x\"}"));
-        assert!(body.ends_with(b"\r\n--swifty-boundary--"));
+        assert!(body.ends_with(b"\r\n--rowel-boundary--"));
         assert!(body.windows(content.len()).any(|w| w == content));
     }
 }

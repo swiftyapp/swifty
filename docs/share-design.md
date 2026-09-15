@@ -2,7 +2,7 @@
 
 Status: v1. Backend module `src-tauri/src/share`, frontend `src/components/Main/Share`.
 
-Swifty has no server, and sharing does not add one. A share is a sealed copy of
+Rowel has no server, and sharing does not add one. A share is a sealed copy of
 one entry that lives for a day in the sender's own Google Drive. The recipient
 opens it with a link, and the link is the only secret.
 
@@ -27,13 +27,13 @@ either side stay where they were made.
 ## 2. Trust model in one paragraph
 
 The sender's app generates a fresh random 256-bit key, seals the entry with
-AES-256-GCM under it, uploads the ciphertext to a `Swifty/Shares` folder in the
+AES-256-GCM under it, uploads the ciphertext to a `Rowel/Shares` folder in the
 sender's Drive, and marks that one file readable by anyone who knows its id.
 The link carries the file id and the key. Google holds ciphertext and sees that
 a share was made, but never the key. The recipient's app downloads the file with
 a public API key (no login) and unseals it locally. Whoever gets the link gets
 the credential, so the link must travel over a channel the sender already
-trusts. Swifty refuses to open it after 24 hours or once revoked; the file
+trusts. Rowel refuses to open it after 24 hours or once revoked; the file
 itself is gone only once revoked or swept (section 5 has the difference).
 
 ## 3. Formats
@@ -41,7 +41,7 @@ itself is gone only once revoked or swept (section 5 has the difference).
 Link, one pasteable token:
 
 ```
-swifty://share#v1.<driveFileId>.<key>
+rowel://share#v1.<driveFileId>.<key>
 ```
 
 `key` is the 32 key bytes, base64url without padding. Nothing fetches this URL;
@@ -73,13 +73,13 @@ message, rather than arriving as a username and nothing else.
 ## 4. Drive layout
 
 ```
-Swifty/                 the existing sync folder
+Rowel/                 the existing sync folder
   vault.swsync          the vault pack, untouched by sharing
   Shares/
-    <random>.swshare    one share, appProperties: swiftyShare, entryId, kind, expiresAt
+    <random>.swshare    one share, appProperties: rowelShare, entryId, kind, expiresAt
 ```
 
-`appProperties` is the only metadata written. `swiftyShare=1` is the marker
+`appProperties` is the only metadata written. `rowelShare=1` is the marker
 every share carries, and the only thing listing selects on: shares are found by
 it wherever they sit, so two devices racing to create `Shares/` and uploading
 into their own copies hide nothing from the sweep or the revoke list. The
@@ -93,9 +93,9 @@ without its key. Listings follow `nextPageToken` to the end.
 ## 5. Lifetime and control
 
 - Fixed 24-hour lifetime in v1, backed by two guarantees that are not the same
-  strength. **Swifty refuses to open** an envelope whose authenticated
+  strength. **Rowel refuses to open** an envelope whose authenticated
   `expiresAt` has passed, whether or not the file is still there; that holds
-  on every Swifty client. **Deletion is best effort**: until a revoke or sweep
+  on every Rowel client. **Deletion is best effort**: until a revoke or sweep
   removes the file, the ciphertext is still downloadable, and a leaked link
   plus a client that ignores the expiry decrypts it past the 24 hours. Every
   promise in the UI and in `docs/threat-model.md` is worded for that split.

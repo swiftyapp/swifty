@@ -108,7 +108,7 @@ fn reveal(app: &AppHandle, revealed: &std::sync::atomic::AtomicBool) {
     }
 }
 
-// Show and focus the main window (tray "Open Swifty" and second-instance launch).
+// Show and focus the main window (tray "Open Rowel" and second-instance launch).
 pub fn show(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(MAIN) {
         let _ = window.show();

@@ -127,7 +127,7 @@ describe('entropy', () => {
 describe('defaultSettings', () => {
   it('clamps the stored default length into the slider range', () => {
     localStorage.setItem(
-      'swifty:generatorDefaults',
+      'rowel:generatorDefaults',
       JSON.stringify({ length: 60, numbers: false, symbols: true, uppercase: true })
     )
     const initial = defaultSettings()

@@ -208,7 +208,7 @@ jobs:
         if: ${{ !cancelled() && steps.ipa.outputs.path != '' }}
         uses: actions/upload-artifact@v7
         with:
-          name: swifty-ios-ipa
+          name: rowel-ios-ipa
           path: ${{ steps.ipa.outputs.path }}
           if-no-files-found: error
 
@@ -240,7 +240,7 @@ jobs:
           fi
 
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::notice::no GitHub release $TAG (yet); the IPA is available as the swifty-ios-ipa artifact"
+            echo "::notice::no GitHub release $TAG (yet); the IPA is available as the rowel-ios-ipa artifact"
             exit 0
           fi
 
@@ -255,7 +255,7 @@ jobs:
           ATTACHED=$(gh release view "$TAG" --json assets \
             --jq '[.assets[].name | select(endswith(".ipa"))] | length')
           if [ "$ATTACHED" -gt 0 ]; then
-            echo "::warning::$TAG already has an IPA and this run was not triggered by that tag; leaving it in place. This build is the swifty-ios-ipa artifact"
+            echo "::warning::$TAG already has an IPA and this run was not triggered by that tag; leaving it in place. This build is the rowel-ios-ipa artifact"
             exit 0
           fi
           gh release upload "$TAG" "$IPA_PATH"

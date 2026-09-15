@@ -5,6 +5,6 @@
 	<!-- Shown in the Face ID consent sheet the first time the vault is unlocked
 	     biometrically. Required: LAContext raises without it. -->
 	<key>NSFaceIDUsageDescription</key>
-	<string>Swifty uses Face ID to unlock your vault.</string>
+	<string>Rowel uses Face ID to unlock your vault.</string>
 </dict>
 </plist>

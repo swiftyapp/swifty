@@ -1,4 +1,4 @@
-# Swifty v1 — Next Work Checklist
+# Rowel v1 — Next Work Checklist
 
 The post-remediation work batch for `v1-0-0`. The audit-remediation checklist
 ([`v1-remediation.md`](./v1-remediation.md)) is **complete** — this is where the next
@@ -111,7 +111,7 @@ spec *logic* ports nearly 1:1 (`app.client.$` → global `$`; `setValue`/`click`
 **Porting notes:**
 - Map class selectors (`.body .list`) to `data-testid` where the redesign (item 2) will churn
   class names — coordinate ordering with the frontend redesign so specs aren't ported twice.
-- `before({storage: 'empty'|'pristine'})` → the new `SWIFTY_DB_DIR` temp-dir isolation
+- `before({storage: 'empty'|'pristine'})` → the new `ROWEL_DB_DIR` temp-dir isolation
   (`pristine` = no vault → Setup; `empty` = vault, no entries).
 - **Drop/adjust stale assertions** from the rebrand + disabled sync — e.g. `setup/password`
   asserts old welcome copy mentioning "Import from Gdrive"; several assert sync UI that's off.
