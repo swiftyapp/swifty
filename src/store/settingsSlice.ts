@@ -67,7 +67,14 @@ export const createSettingsSlice: StateCreator<StoreState, [], [], SettingsSlice
   // is where that choice becomes a stored preference — one listener, so a
   // change from anywhere is persisted the same way. The document's own `lang`
   // is i18n's half of the same event.
-  i18n.on('languageChanged', locale => updateSettings({ locale }))
+  //
+  // Not during init: i18next fires the same event while starting in the locale
+  // Rust resolved, and writing that back would pin an OS-following install
+  // (`locale: null`) to whatever the OS said on first boot. Only a change made
+  // once the app is up is a choice worth keeping.
+  i18n.on('languageChanged', locale => {
+    if (i18n.isInitialized && locale !== get().settings.locale) updateSettings({ locale })
+  })
 
   return {
     settings: DEFAULT_SETTINGS,

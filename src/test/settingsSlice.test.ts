@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { hydrateSettings, makeStore, updateSettings, useStore } from '@/store'
 import { DEFAULT_SETTINGS } from '@/store/settingsSlice'
-import { calls, mockCommand } from './ipc'
+import i18n from '@/i18n'
+import { calls, clearCalls, mockCommand } from './ipc'
 
 // The store's half of the settings contract. What a patch does to the file is
 // Rust's business (`src-tauri/src/settings.rs`); what it does here is land
@@ -54,5 +55,23 @@ describe('settings slice', () => {
     await settled()
 
     expect(useStore.getState().settings.breachCheck).toBe(true)
+  })
+
+  // The boot init already ran in setup.ts and fired `languageChanged`; had it
+  // been persisted, the fresh install would be pinned to en-US instead of
+  // following the OS.
+  it('persists a language change, but not the one init fires', async () => {
+    expect(useStore.getState().settings.locale).toBeNull()
+    expect(calls('set_settings')).toEqual([])
+
+    await i18n.changeLanguage('de-DE')
+    expect(calls('set_settings')).toContainEqual({ patch: { locale: 'de-DE' } })
+
+    // Re-selecting the current language is not a change worth a disk write.
+    clearCalls('set_settings')
+    await i18n.changeLanguage('de-DE')
+    expect(calls('set_settings')).toEqual([])
+
+    await i18n.changeLanguage('en-US')
   })
 })
