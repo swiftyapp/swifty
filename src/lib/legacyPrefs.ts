@@ -1,4 +1,4 @@
-import { DATE_FORMATS, setSettings, type Settings } from '@/api/app'
+import { appStatus, DATE_FORMATS, setSettings, type AppStatus, type Settings } from '@/api/app'
 import { LANGUAGES } from '@/i18n'
 
 /**
@@ -96,17 +96,19 @@ export const clearLegacyPrefs = (): void => {
 }
 
 /**
- * Carry the old keys into `settings.json` and hand back the settings to boot
- * with: the merged answer when there was something to import, `current`
- * otherwise or when the write failed.
+ * Carry the old keys into `settings.json` and hand back the status to boot
+ * with. After a write the probe is asked again rather than the answer patched
+ * here: `status.locale` is Rust's narrowing of the stored choice to a catalogue
+ * the app ships, and only Rust can say what the new choice resolves to. Without
+ * anything to import — or when the write failed — `status` comes back as it was.
  */
-export const adoptLegacyPrefs = (current: Settings): Promise<Settings> => {
-  const patch = legacyPatch(current)
-  if (!patch) return Promise.resolve(current)
+export const adoptLegacyPrefs = (status: AppStatus): Promise<AppStatus> => {
+  const patch = legacyPatch(status.settings)
+  if (!patch) return Promise.resolve(status)
   return setSettings(patch)
-    .then(merged => {
+    .then(() => {
       clearLegacyPrefs()
-      return merged
+      return appStatus()
     })
-    .catch(() => current)
+    .catch(() => status)
 }

@@ -4,6 +4,7 @@ import AuthShell from '@/components/elements/AuthShell'
 import Button from '@/components/elements/Button'
 import { META_TYPE } from '@/components/elements/tokens'
 import { useStore } from '@/store'
+import { useDates } from '@/hooks/useDates'
 import StepHeader from '../shared/StepHeader'
 import FoundFileCard from '../shared/FoundFileCard'
 import { COLUMN, ACTIONS, FOOTNOTE } from '../shared/layout'
@@ -23,6 +24,7 @@ interface Props {
 // the choice is still free, and both ways out of it are spelled out plainly.
 export default function Conflict({ onBack, onUnlockExisting, onArchive }: Props) {
   const { t } = useTranslation()
+  const dates = useDates()
   const file = useStore(state => state.setup.drive.file)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -54,7 +56,7 @@ export default function Conflict({ onBack, onUnlockExisting, onArchive }: Props)
             where="drive"
             testid="setup-conflict-file"
             name={file.name}
-            meta={describeDriveFile(file)}
+            meta={describeDriveFile(file, dates)}
             encrypted
           />
         </div>

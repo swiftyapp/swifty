@@ -1,6 +1,6 @@
 import { cx } from '@/utils/cx'
 import type { TKey } from '@/i18n'
-import { formatDate } from '@/utils/time'
+import { useDates } from '@/hooks/useDates'
 import { specOf, type IdentityKey } from '../templates'
 import Cell from '@/components/elements/Face/Cell'
 
@@ -32,6 +32,7 @@ const DOTS = '•'.repeat(10)
 // not a cell: it belongs to the document rather than to any one of its dates,
 // so the face states it once, in the status beside the number.
 export default function DocCell({ doc, name, bare, label, ink, wrap, className }: Props) {
+  const { formatDate } = useDates()
   const spec = specOf(name)
   const value = doc.value(name)
   if (!value) return null

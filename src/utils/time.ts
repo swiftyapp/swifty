@@ -1,11 +1,5 @@
+import type { DateFormat } from '@/api/app'
 import { getLocale, t } from '@/i18n'
-import { useStore } from '@/store'
-
-// The pattern picked in Settings › Language & region. Read on each call rather
-// than taken as an argument: every caller is rendering inside a component that
-// already subscribes to the store, so the value is current and no date helper
-// grows a parameter it would only ever be handed the same way.
-const dateFormat = () => useStore.getState().settings.dateFormat
 
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
@@ -32,30 +26,6 @@ export const relativeDuration = (iso?: string, now: number = Date.now()): string
   if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`
   if (elapsed < 7 * DAY) return `${Math.floor(elapsed / DAY)}d`
   return ''
-}
-
-export const relativeTime = (iso?: string, now: number = Date.now()): string => {
-  const at = toTime(iso)
-  if (at === null) return ''
-  return relativeDuration(iso, now) || shortDate(at)
-}
-
-/**
- * The same ladder spelled out for a sentence rather than a list column: "2 days
- * ago", "9 minutes ago", and the date past a week. `Intl` owns the wording and
- * the plural rules, so no locale has to carry a key per unit.
- */
-export const relativeLong = (iso?: string, now: number = Date.now()): string => {
-  const at = toTime(iso)
-  if (at === null) return ''
-
-  const elapsed = now - at
-  if (elapsed < MINUTE) return t('just now')
-  const spell = new Intl.RelativeTimeFormat(getLocale(), { numeric: 'always' })
-  if (elapsed < HOUR) return spell.format(-Math.floor(elapsed / MINUTE), 'minute')
-  if (elapsed < DAY) return spell.format(-Math.floor(elapsed / HOUR), 'hour')
-  if (elapsed < 7 * DAY) return spell.format(-Math.floor(elapsed / DAY), 'day')
-  return shortDate(at)
 }
 
 /**
@@ -131,64 +101,100 @@ export const relativeFuture = (iso: string, now: number = Date.now()): string =>
 }
 
 /**
- * A stored ISO `YYYY-MM-DD` date in the pattern picked in Settings › Language &
- * region. Anything else is passed through unchanged: a half-typed date is not a
- * date yet and has to keep reading as what was typed.
- *
- * Deliberately string-in / string-out — routing a date-only value through
- * `Date` parses it as UTC midnight and shows the day before west of Greenwich.
+ * The helpers whose output depends on the pattern picked in Settings › Language
+ * & region, built for one pattern. A component takes them from `useDates()`,
+ * which subscribes to the setting, so a date already on screen is re-read the
+ * moment the pattern changes; the pattern is an argument here rather than a
+ * store read precisely so that nothing can render a date without subscribing.
  */
-export const formatDate = (iso: string): string => {
-  const match = ISO_DATE.exec(iso.trim())
-  if (!match) return iso
-  const [, year, month, day] = match
+export const dates = (format: DateFormat) => {
+  /**
+   * A stored ISO `YYYY-MM-DD` date in the user's pattern. Anything else is passed
+   * through unchanged: a half-typed date is not a date yet and has to keep
+   * reading as what was typed.
+   *
+   * Deliberately string-in / string-out — routing a date-only value through
+   * `Date` parses it as UTC midnight and shows the day before west of Greenwich.
+   */
+  const formatDate = (iso: string): string => {
+    const match = ISO_DATE.exec(iso.trim())
+    if (!match) return iso
+    const [, year, month, day] = match
 
-  switch (dateFormat()) {
-    case 'DD.MM.YYYY':
-      return `${day}.${month}.${year}`
-    case 'YYYY-MM-DD':
-      return `${year}-${month}-${day}`
-    default:
-      return `${month}/${day}/${year}`
+    switch (format) {
+      case 'DD.MM.YYYY':
+        return `${day}.${month}.${year}`
+      case 'YYYY-MM-DD':
+        return `${year}-${month}-${day}`
+      default:
+        return `${month}/${day}/${year}`
+    }
   }
+
+  /**
+   * The inverse: a date typed in the user's pattern (or already ISO) normalized
+   * to `YYYY-MM-DD`, which is the only form that gets stored. Anything that isn't
+   * a plausible date is left exactly as typed rather than silently dropped.
+   */
+  const toIsoDate = (value: string): string => {
+    const parts = value.trim().split(/\D+/).filter(Boolean)
+    if (parts.length !== 3) return value
+
+    const [day, month, year] =
+      format === 'DD.MM.YYYY'
+        ? parts
+        : format === 'YYYY-MM-DD'
+          ? [parts[2], parts[1], parts[0]]
+          : [parts[1], parts[0], parts[2]]
+
+    const plausible =
+      year.length === 4 && +month >= 1 && +month <= 12 && +day >= 1 && +day <= 31
+    return plausible ? `${year}-${pad(month)}-${pad(day)}` : value
+  }
+
+  // Anything older than a week — and every explicit timestamp in the UI — is
+  // rendered in the user's pattern.
+  const shortDate = (at: number | Date): string => {
+    const date = new Date(at)
+    const year = String(date.getFullYear()).padStart(4, '0')
+    return formatDate(`${year}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`)
+  }
+
+  const relativeTime = (iso?: string, now: number = Date.now()): string => {
+    const at = toTime(iso)
+    if (at === null) return ''
+    return relativeDuration(iso, now) || shortDate(at)
+  }
+
+  /**
+   * The same ladder spelled out for a sentence rather than a list column: "2
+   * days ago", "9 minutes ago", and the date past a week. `Intl` owns the
+   * wording and the plural rules, so no locale has to carry a key per unit.
+   */
+  const relativeLong = (iso?: string, now: number = Date.now()): string => {
+    const at = toTime(iso)
+    if (at === null) return ''
+
+    const elapsed = now - at
+    if (elapsed < MINUTE) return t('just now')
+    const spell = new Intl.RelativeTimeFormat(getLocale(), { numeric: 'always' })
+    if (elapsed < HOUR) return spell.format(-Math.floor(elapsed / MINUTE), 'minute')
+    if (elapsed < DAY) return spell.format(-Math.floor(elapsed / HOUR), 'hour')
+    if (elapsed < 7 * DAY) return spell.format(-Math.floor(elapsed / DAY), 'day')
+    return shortDate(at)
+  }
+
+  const dateTime = (iso?: string): string => {
+    const at = toTime(iso)
+    if (at === null) return '—'
+    const time = new Date(at).toLocaleTimeString(getLocale(), {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+    return `${shortDate(at)} ${time}`
+  }
+
+  return { format, formatDate, toIsoDate, shortDate, relativeTime, relativeLong, dateTime }
 }
 
-/**
- * The inverse: a date typed in the user's pattern (or already ISO) normalized to
- * `YYYY-MM-DD`, which is the only form that gets stored. Anything that isn't a
- * plausible date is left exactly as typed rather than silently dropped.
- */
-export const toIsoDate = (value: string): string => {
-  const parts = value.trim().split(/\D+/).filter(Boolean)
-  if (parts.length !== 3) return value
-
-  const format = dateFormat()
-  const [day, month, year] =
-    format === 'DD.MM.YYYY'
-      ? parts
-      : format === 'YYYY-MM-DD'
-        ? [parts[2], parts[1], parts[0]]
-        : [parts[1], parts[0], parts[2]]
-
-  const plausible =
-    year.length === 4 && +month >= 1 && +month <= 12 && +day >= 1 && +day <= 31
-  return plausible ? `${year}-${pad(month)}-${pad(day)}` : value
-}
-
-// Anything older than a week — and every explicit timestamp in the UI — is
-// rendered in the pattern picked in Settings › Language & region.
-export const shortDate = (at: number | Date): string => {
-  const date = new Date(at)
-  const year = String(date.getFullYear()).padStart(4, '0')
-  return formatDate(`${year}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`)
-}
-
-export const dateTime = (iso?: string): string => {
-  const at = toTime(iso)
-  if (at === null) return '—'
-  const time = new Date(at).toLocaleTimeString(getLocale(), {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-  return `${shortDate(at)} ${time}`
-}
+export type Dates = ReturnType<typeof dates>

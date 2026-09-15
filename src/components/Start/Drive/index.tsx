@@ -6,6 +6,7 @@ import Button from '@/components/elements/Button'
 import { isMobile } from '@/lib/platform'
 import type { UnlockResult } from '@/api/types'
 import { useStore, restoreFromDrive } from '@/store'
+import { useDates } from '@/hooks/useDates'
 import StepHeader from '../shared/StepHeader'
 import FoundFileCard from '../shared/FoundFileCard'
 import SpinnerCard from '../shared/SpinnerCard'
@@ -30,6 +31,7 @@ interface Props {
 // redraws the screen.
 export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: Props) {
   const { t } = useTranslation()
+  const dates = useDates()
   const drive = useStore(state => state.setup.drive)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -133,7 +135,7 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
             where="drive"
             testid="drive-found-file"
             name={drive.file.name}
-            meta={describeDriveFile(drive.file)}
+            meta={describeDriveFile(drive.file, dates)}
             encrypted
           />
         )}

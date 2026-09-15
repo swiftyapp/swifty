@@ -21,10 +21,10 @@
       themed instead of a white flash (matters on reload and on the startup
       fallback path in window.rs). Values mirror `--c-app` in styles/theme.css;
       they have to be literal here because this paints before any CSS loads.
-      Keyed off the OS until the bundle runs — reading localStorage would need
-      an inline script, which the CSP rightly forbids — then off `data-theme`,
-      which main.tsx sets synchronously before anything else (the app defaults
-      to light, not to the OS, so the two can disagree).
+      Keyed off the OS until the settings probe answers — the preference lives
+      in Rust's settings.json, one IPC call away — then off `data-theme`, which
+      main.tsx sets from that answer before the splash choreography starts (the
+      app defaults to light, not to the OS, so the two can disagree).
     -->
     <style>
       html {

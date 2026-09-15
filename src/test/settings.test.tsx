@@ -5,6 +5,7 @@ import Settings from '@/components/Main/Sidebar/Settings'
 import type { AppStatus } from '@/api/app'
 import type { BiometricMode } from '@/api/types'
 import DateField from '@/components/elements/fields/DateField'
+import Footer from '@/components/Main/Body/Aside/Show/Footer'
 import { FieldsProvider } from '@/components/elements/fields/context'
 import i18n, { changeLocale } from '@/i18n'
 import {
@@ -428,8 +429,10 @@ describe('Settings › language & region', () => {
 
   // Not just stored: a date already on screen has to be re-read in the new
   // pattern. The format used to be module state nothing subscribed to, so every
-  // rendered date kept the pattern it was first drawn in.
-  it('re-renders a shown date when the format changes', async () => {
+  // rendered date kept the pattern it was first drawn in. Two consumers, on
+  // purpose: the date field, and the entry footer's "Created" stamp, which
+  // formats a timestamp through `shortDate` rather than through a field.
+  it('re-renders every shown date when the format changes', async () => {
     const { store } = renderWithStore(
       <>
         <Settings />
@@ -442,18 +445,23 @@ describe('Settings › language & region', () => {
         >
           <DateField name="expiry_date" label="Expires" />
         </FieldsProvider>
+        {/* Midday UTC, so the local date is the 15th in every zone a test runs in. */}
+        <Footer tags={[]} createdAt="2024-01-15T12:00:00.000Z" />
       </>
     )
     await userEvent.click(document.querySelector('.settings-button')!)
     await go('language')
 
     expect(screen.getByText('06/01/2035')).toBeInTheDocument()
+    expect(screen.getByText('01/15/2024')).toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('settings-date-format-DD.MM.YYYY'))
     expect(await screen.findByText('01.06.2035')).toBeInTheDocument()
+    expect(screen.getByText('15.01.2024')).toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('settings-date-format-YYYY-MM-DD'))
     expect(await screen.findByText('2035-06-01')).toBeInTheDocument()
+    expect(screen.getByText('2024-01-15')).toBeInTheDocument()
     expect(store.getState().settings.dateFormat).toBe('YYYY-MM-DD')
   })
 })

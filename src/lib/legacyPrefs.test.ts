@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { adoptLegacyPrefs, clearLegacyPrefs, legacyPatch } from './legacyPrefs'
 import { DEFAULT_SETTINGS } from '@/store/settingsSlice'
-import { calls, mockCommand } from '@/test/ipc'
+import { appStatusDefault, calls, mockCommand } from '@/test/ipc'
 
 beforeEach(() => localStorage.clear())
+
+// What the boot probe answered before anything was imported.
+const booted = () => appStatusDefault()
 
 describe('legacyPatch', () => {
   it('is null on a clean install', () => {
@@ -55,17 +58,24 @@ describe('legacyPatch', () => {
 })
 
 describe('adoptLegacyPrefs', () => {
-  it('writes the patch once and removes the keys', async () => {
+  it('writes the patch once, removes the keys and re-reads the probe', async () => {
     localStorage.setItem('swifty:breachCheck', 'true')
-    localStorage.setItem('theme', 'system')
+    localStorage.setItem('locale', 'de-DE')
+    // Rust resolves the stored choice; the frontend takes its word for it.
+    mockCommand('app_status', () => ({
+      ...appStatusDefault(),
+      locale: 'de-DE',
+      settings: { ...DEFAULT_SETTINGS, breachCheck: true, locale: 'de-DE' }
+    }))
 
-    const settings = await adoptLegacyPrefs(DEFAULT_SETTINGS)
+    const status = await adoptLegacyPrefs(booted())
 
-    expect(calls('set_settings')).toEqual([{ patch: { breachCheck: true, theme: 'system' } }])
-    expect(settings.breachCheck).toBe(true)
-    expect(settings.theme).toBe('system')
+    expect(calls('set_settings')).toEqual([{ patch: { breachCheck: true, locale: 'de-DE' } }])
+    expect(calls('app_status')).toHaveLength(1)
+    expect(status.locale).toBe('de-DE')
+    expect(status.settings.breachCheck).toBe(true)
     expect(localStorage.getItem('swifty:breachCheck')).toBeNull()
-    expect(localStorage.getItem('theme')).toBeNull()
+    expect(localStorage.getItem('locale')).toBeNull()
     // Nothing left to import: the next boot is a no-op.
     expect(legacyPatch(DEFAULT_SETTINGS)).toBeNull()
   })
@@ -74,15 +84,19 @@ describe('adoptLegacyPrefs', () => {
     localStorage.setItem('rowel:listSort', 'alpha')
     mockCommand('set_settings', () => Promise.reject({ kind: 'io', message: 'read-only' }))
 
-    const settings = await adoptLegacyPrefs(DEFAULT_SETTINGS)
+    const before = booted()
+    const status = await adoptLegacyPrefs(before)
 
-    expect(settings).toEqual(DEFAULT_SETTINGS)
+    expect(status).toBe(before)
+    expect(calls('app_status')).toEqual([])
     expect(localStorage.getItem('rowel:listSort')).toBe('alpha')
   })
 
   it('does not call the backend when there is nothing to import', async () => {
-    await adoptLegacyPrefs(DEFAULT_SETTINGS)
+    const before = booted()
+    expect(await adoptLegacyPrefs(before)).toBe(before)
     expect(calls('set_settings')).toEqual([])
+    expect(calls('app_status')).toEqual([])
   })
 })
 

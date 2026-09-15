@@ -1,21 +1,10 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import type { DateFormat } from '@/api/app'
-import { useStore } from '@/store'
-import { DEFAULT_SETTINGS } from '@/store/settingsSlice'
-import {
-  daysUntil,
-  formatDate,
-  relativeDuration,
-  relativeFuture,
-  relativeTime,
-  toIsoDate,
-  toTime
-} from './time'
+import { dates, daysUntil, relativeDuration, relativeFuture, toTime } from './time'
 
-// The pattern is a setting now, so a case that wants another one puts it in the
-// store rather than in localStorage.
-const setFormat = (dateFormat: DateFormat) =>
-  useStore.setState({ settings: { ...useStore.getState().settings, dateFormat } })
+// The pattern is an argument: a component gets its bundle from `useDates()`,
+// a test builds one for the pattern it is about.
+const { formatDate, relativeTime, toIsoDate } = dates('MM/DD/YYYY')
 
 // A fixed "now" so every case is deterministic: 2024-03-14, midday local time.
 const now = new Date(2024, 2, 14, 12, 0, 0).getTime()
@@ -122,8 +111,6 @@ describe('toTime', () => {
 // A stored date is ISO and a shown date is the user's pattern; the pair has to
 // be a true round trip or an edit silently rewrites the date it was showing.
 describe('formatDate / toIsoDate', () => {
-  afterEach(() => setFormat(DEFAULT_SETTINGS.dateFormat))
-
   const patterns: [DateFormat, string][] = [
     ['MM/DD/YYYY', '06/01/2035'],
     ['DD.MM.YYYY', '01.06.2035'],
@@ -132,7 +119,7 @@ describe('formatDate / toIsoDate', () => {
 
   it('reads an ISO date in every pattern, and back', () => {
     for (const [pattern, shown] of patterns) {
-      setFormat(pattern)
+      const { formatDate, toIsoDate } = dates(pattern)
       expect(formatDate('2035-06-01')).toBe(shown)
       expect(toIsoDate(shown)).toBe('2035-06-01')
       // Already-stored input is left alone rather than re-read as the pattern.
