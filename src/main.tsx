@@ -7,6 +7,7 @@ import { DEFAULT_SETTINGS } from './store/settingsSlice'
 import { runStartupUpdateCheck } from './services/autoUpdate'
 import { DEFAULT_LOCALE, initI18n } from './i18n'
 import { runSplash } from './lib/splash'
+import { adoptLegacyPrefs } from './lib/legacyPrefs'
 // Design tokens + base (Tailwind v4). Sole stylesheet now the SASS is gone.
 // Type comes from the OS system stack (see --font-sans) — no bundled webfonts.
 import './styles/theme.css'
@@ -31,12 +32,18 @@ const splashSettled = runSplash()
 // and what the lock screen may offer. A dead IPC call must not stop the app
 // starting, so a rejection falls back to the same defaults a fresh install
 // would show, and `app` stays null for everyone reading it.
+//
+// Between the probe and the hydration, a build that kept its preferences in
+// localStorage gets them carried into Rust's file (see lib/legacyPrefs); the
+// locale it chose then takes precedence over the one Rust resolved without it.
 const settled = appStatus()
-  .then(status => {
-    setApp(status)
-    hydrateSettings(status.settings)
-    return status.locale
-  })
+  .then(status =>
+    adoptLegacyPrefs(status.settings).then(settings => {
+      setApp(status)
+      hydrateSettings(settings)
+      return settings.locale ?? status.locale
+    })
+  )
   .catch(() => {
     hydrateSettings(DEFAULT_SETTINGS)
     return DEFAULT_LOCALE
