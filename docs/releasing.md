@@ -96,8 +96,10 @@ pubkey.
 3. Trigger the build by hand: GitHub → Actions → *Release* → *Run workflow*
    (only offered for the default branch). Nothing releases automatically — not
    on merge, not on a pushed tag — so a release only ever happens when you ask
-   for one. The iOS release is a separate manual run
-   ([releasing-ios.md](releasing-ios.md)); run it too if you're shipping iOS.
+   for one. Shipping iOS in the same version is a separate manual run
+   ([releasing-ios.md](releasing-ios.md)) that must come **after** this one:
+   this workflow creates the draft release, and the iOS run only attaches its
+   IPA to a draft that already exists.
 4. Wait for all three platform jobs. They create one **draft** release
    `Rowel v<version>` with the installers, the updater artifacts, their
    `.sig` files, `latest.json` and the SBOMs. The Linux job replaces the
