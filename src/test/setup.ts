@@ -26,19 +26,6 @@ vi.mock('@/api/events', async orig => ({
   on: vi.fn().mockResolvedValue(() => {})
 }))
 
-vi.mock('@tauri-apps/api/window', () => ({
-  getCurrentWindow: () => ({ setSize: vi.fn().mockResolvedValue(undefined) })
-}))
-
-vi.mock('@tauri-apps/api/dpi', () => ({
-  LogicalSize: class {
-    constructor(
-      public width: number,
-      public height: number
-    ) {}
-  }
-}))
-
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn().mockResolvedValue(undefined)
 }))
