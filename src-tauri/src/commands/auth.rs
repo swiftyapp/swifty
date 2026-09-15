@@ -1,10 +1,10 @@
-use crate::commands::{
-    create_vault, derive_key, open_with_key, record_kdf_meta, store_err, unlock_with_password,
-};
 use crate::crypto::{self, KdfParams, PayloadCipher, VaultKey};
 use crate::error::{Error, Result};
 use crate::models::{EntryMetaDto, UnlockResult};
 use crate::secure_store::{self, GateMode, KeyStore};
+use crate::session::{
+    create_vault, derive_key, open_with_key, record_kdf_meta, store_err, unlock_with_password,
+};
 use crate::state::AppState;
 use crate::store::{Record, SqliteStore, VaultStore};
 use crate::{biometrics, storage};
@@ -88,14 +88,6 @@ fn record_failed_attempt(mut state: LockoutState, now_ms: i64) -> LockoutState {
         0
     };
     state
-}
-
-// True only when a SQLite vault DB exists. A legacy `vault.swftx` alone does NOT
-// count: the app starts fresh with an empty vault and offers an explicit
-// "Import from .swftx" instead (see `import_swftx`).
-#[tauri::command]
-pub fn is_initialized(app: AppHandle) -> Result<bool> {
-    Ok(storage::db_exists(&app))
 }
 
 // Create a brand-new, empty encrypted store protected by `password` (Argon2id +
@@ -248,51 +240,6 @@ pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Res
 // problem into a permanent one and force the user to re-enroll for nothing.
 fn unenroll_on(err: &Error) -> bool {
     matches!(err, Error::NotFound)
-}
-
-// True only when the platform supports a biometric-gated store, the biometric
-// hardware is available, and a key has been enrolled (opt-in).
-#[tauri::command]
-pub fn is_biometric_available(app: AppHandle) -> Result<bool> {
-    Ok(secure_store::is_supported()
-        && biometrics::is_available()
-        && storage::biometric_enrolled(&app))
-}
-
-// Whether `enable_biometric` could succeed here: the platform has a gated
-// store and the hardware is present. Enrollment is deliberately not part of
-// it — this is what first-run onboarding asks before *offering* enrollment,
-// where `is_biometric_available` would always say no.
-#[tauri::command]
-pub fn can_enroll_biometric() -> Result<bool> {
-    Ok(secure_store::is_supported() && biometrics::is_available())
-}
-
-// Which biometry this device gates with — "face", "touch" or "none" — so the UI
-// can name it instead of guessing from the platform (a Touch ID iPad is not
-// Face ID). Hardware only: `is_biometric_available` still says whether the user
-// opted in, and the two are asked together at launch.
-#[tauri::command]
-pub fn biometry_type() -> Result<String> {
-    Ok(biometrics::kind().to_string())
-}
-
-// Enrollment state for the settings UI: whether biometric unlock is on, and
-// which gate the key sits behind (so the copy can describe it honestly).
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BiometricStatus {
-    enabled: bool,
-    mode: Option<String>,
-}
-
-#[tauri::command]
-pub fn biometric_status(app: AppHandle) -> Result<BiometricStatus> {
-    let marker = storage::biometric_marker(&app);
-    Ok(BiometricStatus {
-        enabled: is_biometric_available(app.clone())?,
-        mode: marker.map(|m| GateMode::from_marker(&m).as_marker().to_string()),
-    })
 }
 
 // Opt in: store the current session's key material in the OS secure store,

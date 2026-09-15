@@ -8,15 +8,15 @@ use std::fs;
 use std::path::Path;
 
 use serde::Serialize;
-use serde_json::json;
-use tauri::{AppHandle, Emitter, State};
-use tauri_plugin_dialog::DialogExt;
+use tauri::{AppHandle, State};
 
-use crate::commands::{save, store_err};
 use crate::crypto::PayloadCipher;
 use crate::error::{Error, Result};
+use crate::events;
 use crate::import::{self, EntryKind, Format, ImportedEntry, ImportedPasskey, RowError};
-use crate::models::{Entry, ExtraField, Passkey};
+use crate::models::{Entry, EntryMetaDto, ExtraField, Passkey};
+use crate::save;
+use crate::session::{list_metas, live_records, store_err};
 use crate::state::AppState;
 use crate::store::{migrate, Record, VaultStore};
 
@@ -41,7 +41,8 @@ impl From<&RowError> for RowErrorDto {
 }
 
 // Preview (dry_run): `imported` is 0 and `total` is the would-be count. Real run:
-// `imported` is what was written, `skipped` the rows that failed to parse.
+// `imported` is what was written, `skipped` the rows that failed to parse, and
+// `entries` the refreshed vault (empty on a preview, which wrote nothing).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportReport {
@@ -50,24 +51,7 @@ pub struct ImportReport {
     pub skipped: usize,
     pub dry_run: bool,
     pub errors: Vec<RowErrorDto>,
-}
-
-// Open a file picker for a third-party export (JSON / CSV).
-// Async + spawn_blocking so the blocking picker never runs on the main thread
-// (which would deadlock the event loop and hang the window).
-#[tauri::command]
-pub async fn pick_import_file(app: AppHandle) -> Result<Option<String>> {
-    let file = tauri::async_runtime::spawn_blocking(move || {
-        app.dialog()
-            .file()
-            .add_filter("Password exports", &["json", "csv"])
-            .blocking_pick_file()
-    })
-    .await
-    .map_err(|e| Error::Other(e.to_string()))?;
-    Ok(file
-        .and_then(|f| f.into_path().ok())
-        .map(|p| p.to_string_lossy().into_owned()))
+    pub entries: Vec<EntryMetaDto>,
 }
 
 // Parse a foreign export and either preview it (dry_run) or write it into the open
@@ -111,6 +95,7 @@ pub async fn import_entries(
             skipped: parsed.errors.len(),
             dry_run: true,
             errors,
+            entries: Vec::new(),
         });
     }
 
@@ -126,29 +111,26 @@ pub async fn import_entries(
         for (i, entry) in entries.iter().enumerate() {
             let payload = cipher.seal(entry)?;
             records.push(migrate::build_record(entry, payload)?);
-            let _ = emitter.emit("import:progress", json!({ "done": i + 1, "total": total }));
+            events::import_progress(&emitter, i + 1, total);
         }
         Ok(records)
     })
     .await
     .map_err(|e| Error::Other(e.to_string()))??;
 
-    {
-        let session = state.session.lock().unwrap();
-        let store = session.store()?;
-        for record in &records {
-            store.upsert(record).map_err(store_err)?;
-        }
+    let session = state.session.lock().unwrap();
+    let store = session.store()?;
+    for record in &records {
+        store.upsert(record).map_err(store_err)?;
     }
-    let imported = records.len();
-    let _ = app.emit("import:done", json!({ "count": imported }));
 
     Ok(ImportReport {
         total: parsed.entries.len(),
-        imported,
+        imported: records.len(),
         skipped: parsed.errors.len(),
         dry_run: false,
         errors,
+        entries: list_metas(store)?,
     })
 }
 
@@ -164,7 +146,7 @@ pub async fn export_entries(
     let entries = {
         let session = state.session.lock().unwrap();
         let cipher = session.payload_cipher()?;
-        to_imported(&crate::commands::live_records(session.store()?)?, &cipher)?
+        to_imported(&live_records(session.store()?)?, &cipher)?
     };
 
     let (bytes, ext) = match format.to_lowercase().as_str() {
@@ -406,7 +388,7 @@ mod tests {
         let record = migrate::build_record(&entry, cipher.seal(&entry).unwrap()).unwrap();
         store.upsert(&record).unwrap();
 
-        let records = crate::commands::live_records(&store).unwrap();
+        let records = live_records(&store).unwrap();
         let exported = to_imported(&records, &cipher).unwrap();
 
         assert_eq!(exported.len(), 1);

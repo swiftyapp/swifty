@@ -52,11 +52,6 @@ pub fn system_locale() -> String {
         .to_string()
 }
 
-#[tauri::command]
-pub fn os_locale() -> String {
-    system_locale()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

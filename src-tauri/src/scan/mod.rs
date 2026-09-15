@@ -88,11 +88,11 @@ pub fn scan_lines(lines: &[String]) -> Option<ScanResult> {
 /// accepted: both backends load an image by URL/path, and the file is the
 /// user's own, so passing bytes would only add a copy of a card photo to
 /// memory without removing a read of the file.
-#[tauri::command]
-pub async fn scan_image(path: String) -> Result<ScanResult> {
+pub async fn scan(path: String) -> Result<ScanResult> {
     tauri::async_runtime::spawn_blocking(move || {
-        let ocr = platform_ocr()
-            .ok_or_else(|| Error::Unsupported("scanning is not available on this platform".into()))?;
+        let ocr = platform_ocr().ok_or_else(|| {
+            Error::Unsupported("scanning is not available on this platform".into())
+        })?;
         let mut lines = ocr.recognize(&local_path(&path))?;
         let found = scan_lines(&lines);
         // The recognized lines are the card number in the clear; the parsed
@@ -121,7 +121,6 @@ fn local_path(path: &str) -> std::path::PathBuf {
 
 /// Whether this platform can scan at all, so the UI can leave the affordance
 /// out rather than offer a drop target that always fails.
-#[tauri::command]
-pub fn scan_supported() -> bool {
+pub fn is_supported() -> bool {
     platform_ocr().is_some()
 }

@@ -7,8 +7,6 @@ use std::fs;
 use std::path::Path;
 
 use serde::Serialize;
-use tauri::AppHandle;
-use tauri_plugin_dialog::DialogExt;
 
 use crate::error::{Error, Result};
 
@@ -42,20 +40,6 @@ pub fn read_env_text(path: &Path) -> Result<EnvFile> {
 #[tauri::command]
 pub fn read_env_file(path: String) -> Result<EnvFile> {
     read_env_text(Path::new(&path))
-}
-
-// Same shape as `pick_import_file`: async + spawn_blocking keeps the blocking
-// picker off the main thread. No extension filter — a `.env` has no extension
-// for one to match, and `.env.production` is not `.production`.
-#[tauri::command]
-pub async fn pick_env_file(app: AppHandle) -> Result<Option<String>> {
-    let file =
-        tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_file())
-            .await
-            .map_err(|e| Error::Other(e.to_string()))?;
-    Ok(file
-        .and_then(|f| f.into_path().ok())
-        .map(|p| p.to_string_lossy().into_owned()))
 }
 
 #[cfg(test)]

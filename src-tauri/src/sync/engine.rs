@@ -23,8 +23,8 @@ use zeroize::Zeroizing;
 
 use super::pack::{self, PackError};
 use crate::app::APP_NAME;
-use crate::commands::store_err;
 use crate::error::{Error, Result};
+use crate::session::store_err;
 use crate::state::AppState;
 use crate::storage;
 use crate::store::{state_digest, Record, SqliteStore, StoreError, VaultStore};

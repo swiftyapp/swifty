@@ -1,10 +1,10 @@
-use crate::error::Result;
+use crate::events;
 use crate::state::AppState;
 use crate::timer::Timer;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Manager, WindowEvent};
+use tauri::{AppHandle, Manager, WindowEvent};
 
 const DEFAULT_TIMEOUT_SECS: u64 = 60;
 // A day. The row offers far less, but the command is reachable from the
@@ -31,8 +31,7 @@ impl Default for AutoLock {
     }
 }
 
-#[tauri::command]
-pub fn set_autolock_timeout(app: AppHandle, secs: u64) -> Result<()> {
+pub fn set_timeout(app: &AppHandle, secs: u64) {
     let autolock = app.state::<AutoLock>();
     autolock
         .timeout_secs
@@ -40,7 +39,6 @@ pub fn set_autolock_timeout(app: AppHandle, secs: u64) -> Result<()> {
     // Anything already pending was armed against the old value; the next blur
     // arms against the new one.
     autolock.timer.disarm();
-    Ok(())
 }
 
 /// Backgrounding counts as a blur on every platform, so this one hook covers
@@ -88,5 +86,5 @@ pub fn lock(app: &AppHandle) {
     }
     session.clear();
     drop(session);
-    let _ = app.emit("vault:locked", ());
+    events::vault_locked(app);
 }
