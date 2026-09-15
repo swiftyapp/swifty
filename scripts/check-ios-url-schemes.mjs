@@ -7,8 +7,10 @@
 // local script and the release workflow, so both run this first.
 //
 // The scheme that matters here is Google's reversed iOS client id (README,
-// "Drive sync on iOS"). Its committed placeholder contains an underscore, which
-// is exactly the illegal case.
+// "Drive sync on iOS"). Two committed files can carry one: the deep-link block
+// in src-tauri/tauri.ios.conf.json, and the generated (but committed) Xcode
+// Info.plist, which the plugin's build script rewrites only when it runs — so
+// a placeholder left there ships verbatim when it does not.
 //
 // Usage: bun scripts/check-ios-url-schemes.mjs
 
@@ -18,17 +20,19 @@ import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const configPath = join(root, 'src-tauri', 'tauri.ios.conf.json')
+const plistPath = join(root, 'src-tauri', 'gen', 'apple', 'rowel_iOS', 'Info.plist')
 
 const fail = (msg) => {
   console.error(msg)
   process.exit(1)
 }
 
-let config
-try {
-  config = JSON.parse(readFileSync(configPath, 'utf8'))
-} catch (e) {
-  fail(`check-ios-url-schemes: cannot read src-tauri/tauri.ios.conf.json: ${e.message}`)
+const read = (path) => {
+  try {
+    return readFileSync(path, 'utf8')
+  } catch (e) {
+    return fail(`check-ios-url-schemes: cannot read ${path}: ${e.message}`)
+  }
 }
 
 // RFC 1738 as Apple enforces it: leading letter, then letters, digits, '.', '+', '-'.
@@ -36,21 +40,31 @@ const LEGAL = /^[A-Za-z][A-Za-z0-9.+-]*$/
 
 // plugins > deep-link > mobile is a list of entries, each with a `scheme` list.
 // Absent is fine: an iOS build with no deep link registers no URL types.
-const entries = config.plugins?.['deep-link']?.mobile ?? []
-const schemes = entries.flatMap((entry) => entry.scheme ?? [])
+const entries = JSON.parse(read(configPath)).plugins?.['deep-link']?.mobile ?? []
+const configured = entries.flatMap((entry) => entry.scheme ?? [])
 
-const bad = schemes.filter((s) => !LEGAL.test(s))
+// Every <string> inside a CFBundleURLSchemes array. The plist is XML the Tauri
+// CLI writes with one element per line, so a line-based scan is enough.
+const inPlist = [...read(plistPath).matchAll(/<key>CFBundleURLSchemes<\/key>\s*<array>([\s\S]*?)<\/array>/g)]
+  .flatMap(([, body]) => [...body.matchAll(/<string>([^<]*)<\/string>/g)].map(([, s]) => s))
+
+const bad = [
+  ...configured.filter((s) => !LEGAL.test(s)).map((s) => `${s}  (src-tauri/tauri.ios.conf.json)`),
+  ...inPlist.filter((s) => !LEGAL.test(s)).map((s) => `${s}  (src-tauri/gen/apple/rowel_iOS/Info.plist)`),
+]
 if (bad.length > 0) {
-  console.error('check-ios-url-schemes: illegal URL scheme in src-tauri/tauri.ios.conf.json:')
+  console.error('check-ios-url-schemes: illegal URL scheme for the iOS build:')
   for (const s of bad) console.error(`  ${s}`)
   console.error(
     '\nApp Store Connect rejects the upload with error 90158. A scheme must start\n' +
       'with a letter and hold only letters, digits, ".", "+" or "-".\n' +
-      'Put the reversed iOS OAuth client id in (README, "Drive sync on iOS"), or\n' +
-      'delete the "deep-link" block to ship without Drive sign-in on iOS.',
+      'The scheme is the reversed iOS OAuth client id (README, "Drive sync on iOS");\n' +
+      'fix it in the file named, or remove it to ship without Drive sign-in on iOS.',
   )
   process.exit(1)
 }
+
+const schemes = [...new Set([...configured, ...inPlist])]
 
 console.log(
   schemes.length === 0

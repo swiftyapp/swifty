@@ -249,18 +249,29 @@ no biometric data leaves the device or reaches the app.
 - **`src-tauri/gen/apple is missing`** — the Xcode project is committed to the
   repo; regenerate it locally with `bun run tauri ios init` and commit.
 - **90158, "URL schemes found in your app are not in the correct format"** —
-  the deep-link scheme in `src-tauri/tauri.ios.conf.json` is still the
-  `YOUR_IOS_CLIENT_ID` placeholder, and it ships verbatim as
-  `CFBundleURLTypes`. Put the reversed iOS OAuth client id in (README, Drive
-  sync on iOS) or delete the `deep-link` block. The release script now refuses
-  to start on the placeholder.
-- **90737, "Missing Document Configuration"** — `bundle.fileAssociations`
-  declares `CFBundleDocumentTypes`, and iOS then wants
-  `UISupportsDocumentBrowser` or `LSSupportsOpeningDocumentsInPlace` as well.
-  `tauri.ios.conf.json` sets `bundle.fileAssociations` to `null`, which the
-  RFC 7396 merge treats as a delete, so the `.swftx` association is desktop-only:
-  nothing on iOS handles an opened file today. Declare it there (and add one of
-  those keys to `Info.ios.plist`) if that changes.
+  the IPA's `CFBundleURLTypes` holds a scheme that is not a legal URL scheme,
+  typically the `YOUR_IOS_CLIENT_ID` placeholder. The scheme is written into
+  the committed `src-tauri/gen/apple/rowel_iOS/Info.plist` by
+  `tauri-plugin-deep-link`'s build script, and that script does **not** rerun
+  on its own when a config appears: the plugin declares
+  `rerun-if-env-changed` for its config variable only while the variable is
+  set, so a run that saw no config is fingerprinted as up-to-date forever and
+  the plist ships as committed. Both the release script and the workflow now
+  `cargo clean -p tauri-plugin-deep-link` for the iOS target before the build
+  so it re-executes, and `scripts/check-ipa-url-schemes.sh` refuses to upload
+  an IPA whose schemes differ from the scheme the build was given. If the
+  committed plist ever carries a stale scheme again, `check-ios-url-schemes`
+  fails before the build; remove the `CFBundleURLTypes` block from it.
+- **90737, "Missing Document Configuration"** — the IPA declares
+  `CFBundleDocumentTypes`, and iOS then wants `UISupportsDocumentBrowser` or
+  `LSSupportsOpeningDocumentsInPlace` as well. `tauri.ios.conf.json` sets
+  `bundle.fileAssociations` to `null`, which the RFC 7396 merge treats as a
+  delete, so the `.swftx` association is desktop-only: nothing on iOS handles
+  an opened file today. The block was nevertheless left behind in the committed
+  `src-tauri/gen/apple/rowel_iOS/Info.plist` by an earlier `tauri ios init`
+  (the CLI only ever adds to that file) and has been removed. Declare the
+  association in `tauri.ios.conf.json` (and add one of those keys to
+  `Info.ios.plist`) if that changes.
 - **"Cloud signing permission error"** — the API key is not an **Admin** key;
   see step 3. Note that `found cert "Apple Distribution: Tauri (unset)"` just
   above it in the log is *not* the cause: that is a self-signed dummy the CLI
