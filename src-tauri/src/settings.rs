@@ -17,6 +17,13 @@ use tauri::{AppHandle, Manager};
 use crate::error::Result;
 use crate::storage;
 
+pub const DEFAULT_AUTOLOCK_SECS: u64 = 60;
+/// A day. The row offers far less, but `set_settings` is reachable from the
+/// frontend (and `settings.json` is a file on disk), and a timeout measured in
+/// years is indistinguishable from "never" — which is not a setting a password
+/// manager should be talked into.
+pub const MAX_AUTOLOCK_SECS: u64 = 24 * 60 * 60;
+
 /// The seed values for every new password, shared by Settings › Security and
 /// the ⌘G dialog. `uppercase` and `exclude` have no control of their own yet;
 /// they are carried so a future one inherits what is already stored.
@@ -48,8 +55,9 @@ impl Default for GeneratorDefaults {
 ///
 /// The enum-ish fields are plain strings: the frontend's union types narrow
 /// them, and a value from a hand-edited file that no branch matches falls
-/// through to the same arm the default does. Only the auto-lock is clamped,
-/// and that happens where it is enforced (`autolock::set_timeout`).
+/// through to the same arm the default does. The auto-lock is the one field
+/// that is normalised here (`normalize`): it is enforced by Rust, so the value
+/// the file holds and the frontend shows has to be the one the timer runs.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -68,7 +76,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            autolock_secs: 60,
+            autolock_secs: DEFAULT_AUTOLOCK_SECS,
             clipboard_timeout_ms: 30_000,
             date_format: "MM/DD/YYYY".into(),
             sort: "recent".into(),
@@ -80,8 +88,24 @@ impl Default for Settings {
     }
 }
 
+impl Settings {
+    /// Put the durable value where the timer will run it: a zero — the one
+    /// value the type allows that means nothing — goes back to the default,
+    /// and anything past a day is a day. Applied on every read and write, so
+    /// what the file holds, what the frontend shows and what `autolock` arms
+    /// are the same number.
+    fn normalize(mut self) -> Self {
+        self.autolock_secs = match self.autolock_secs {
+            0 => DEFAULT_AUTOLOCK_SECS,
+            secs => secs.min(MAX_AUTOLOCK_SECS),
+        };
+        self
+    }
+}
+
 /// The current settings, so a read is a lock rather than a file open. Written
-/// through `set`, which persists before it swaps.
+/// through `set`, which holds the lock across the merge, the file write and the
+/// swap — two writes landing together must each see the other's keys.
 #[derive(Default)]
 pub struct SettingsState(Mutex<Settings>);
 
@@ -94,10 +118,12 @@ pub fn load(app: &AppHandle) -> Settings {
     let Ok(json) = std::fs::read_to_string(path) else {
         return Settings::default();
     };
-    serde_json::from_str(&json).unwrap_or_else(|error| {
-        log::warn!("settings.json is not readable, using defaults: {error}");
-        Settings::default()
-    })
+    serde_json::from_str::<Settings>(&json)
+        .unwrap_or_else(|error| {
+            log::warn!("settings.json is not readable, using defaults: {error}");
+            Settings::default()
+        })
+        .normalize()
 }
 
 /// The settings as they stand, out of managed state.
@@ -127,10 +153,16 @@ pub fn boot(app: &AppHandle) {
 /// The patch is a partial object keyed the way the struct serializes, so the
 /// merge is a top-level key overwrite on the JSON form. `generator` is replaced
 /// whole — the frontend sends the group it edited, not a single knob.
+///
+/// One transaction under the lock: a slider drag lands several of these at
+/// once, and merging each from its own stale snapshot would let the last write
+/// drop the keys the others carried. A failed write leaves the state as it was.
 pub fn set(app: &AppHandle, patch: &Value) -> Result<Settings> {
-    let merged = merge(&current(app), patch)?;
+    let state = app.state::<SettingsState>();
+    let mut guard = state.0.lock().unwrap();
+    let merged = merge(&guard, patch)?;
     storage::write_settings(app, &serde_json::to_string_pretty(&merged)?)?;
-    hydrate(app, merged.clone());
+    *guard = merged.clone();
     Ok(merged)
 }
 
@@ -141,7 +173,7 @@ fn merge(base: &Settings, patch: &Value) -> Result<Settings> {
             target.insert(key.clone(), value.clone());
         }
     }
-    Ok(serde_json::from_value(json)?)
+    Ok(serde_json::from_value::<Settings>(json)?.normalize())
 }
 
 #[cfg(test)]
@@ -231,5 +263,27 @@ mod tests {
         };
         let merged = merge(&pinned, &serde_json::json!({ "locale": null })).unwrap();
         assert_eq!(merged.locale, None);
+    }
+
+    // The value handed out is the value the timer runs, so a hand-edited file
+    // cannot show one timeout and enforce another.
+    #[test]
+    fn the_auto_lock_is_normalised_on_the_way_in() {
+        let zero = merge(
+            &Settings::default(),
+            &serde_json::json!({ "autolockSecs": 0 }),
+        )
+        .unwrap();
+        assert_eq!(zero.autolock_secs, DEFAULT_AUTOLOCK_SECS);
+
+        let week = merge(
+            &Settings::default(),
+            &serde_json::json!({ "autolockSecs": 7 * 24 * 60 * 60 }),
+        )
+        .unwrap();
+        assert_eq!(week.autolock_secs, MAX_AUTOLOCK_SECS);
+
+        let stored: Settings = serde_json::from_str(r#"{"autolockSecs":0}"#).unwrap();
+        assert_eq!(stored.normalize().autolock_secs, DEFAULT_AUTOLOCK_SECS);
     }
 }

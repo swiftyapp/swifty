@@ -6,12 +6,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Manager, WindowEvent};
 
-const DEFAULT_TIMEOUT_SECS: u64 = 60;
-// A day. The row offers far less, but `set_settings` is reachable from the
-// frontend (and `settings.json` is a file on disk), and a timeout measured in
-// years is indistinguishable from "never" — which is not a setting a password
-// manager should be talked into.
-const MAX_TIMEOUT_SECS: u64 = 24 * 60 * 60;
+// The bounds are the settings module's: it normalises the stored value with
+// the same numbers, so what the file holds is what gets armed here.
+use crate::settings::{
+    DEFAULT_AUTOLOCK_SECS as DEFAULT_TIMEOUT_SECS, MAX_AUTOLOCK_SECS as MAX_TIMEOUT_SECS,
+};
 
 pub struct AutoLock {
     /// The pending lock. One timer for the whole process: a blur re-arms it and

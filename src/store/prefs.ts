@@ -79,10 +79,19 @@ export const hydratePrefs = (settings: Settings): void => {
  * place: the preference still applies for this session, it just won't survive
  * a restart.
  */
+// Which write is the newest. Answers can land out of order — a slider drag
+// issues several in a row — and each one carries the whole file, so only the
+// answer to the latest write may replace the store: an older one would put back
+// a value the user has already moved past.
+let latestWrite = 0
+
 export const setPref = <K extends keyof Settings>(key: K, value: Settings[K]): void => {
+  const write = ++latestWrite
   usePrefs.setState({ [key]: value } as Pick<Settings, K>)
   setSettings({ [key]: value } as Partial<Settings>)
-    .then(merged => usePrefs.setState(sanitize(merged), true))
+    .then(merged => {
+      if (write === latestWrite) usePrefs.setState(sanitize(merged), true)
+    })
     .catch(() => {})
 }
 

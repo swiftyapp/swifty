@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { useApp, flowSetup } from './store'
+import { useApp, flowSetup, refreshApp } from './store'
+import type { AppStatus } from './api/app'
 import { subscribeToEvents } from './store/events'
 import { useLayout } from './hooks/useLayout'
 import Start from './components/Start'
@@ -33,10 +34,17 @@ function Shell() {
 export default function App() {
   useEffect(() => {
     const unsubscribe = subscribeToEvents()
-    // The boot probe already answered (main.tsx). Nothing on disk is the only
-    // answer that sends us somewhere other than the lock screen — which is also
-    // where a probe that failed leaves us, since `flow` starts there.
-    if (useApp.getState().status?.initialized === false) flowSetup()
+    // Nothing on disk is the only answer that sends us somewhere other than the
+    // lock screen. The boot probe usually answered already (main.tsx); when it
+    // did not, ask once more here rather than strand a pristine install on a
+    // lock screen it has nothing to unlock — and stay there if that fails too,
+    // since `flow` starts on it.
+    const route = (status: AppStatus | null) => {
+      if (status?.initialized === false) flowSetup()
+    }
+    const known = useApp.getState().status
+    if (known) route(known)
+    else void refreshApp().then(route)
     return unsubscribe
   }, [])
 

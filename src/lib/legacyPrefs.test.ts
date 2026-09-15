@@ -69,6 +69,18 @@ describe('legacyPatch', () => {
     expect(legacyPatch(DEFAULT_PREFS)).toBeNull()
   })
 
+  // The old storage never checked types. One wrong-typed knob must not fail
+  // Rust's typed decode and take every other preference down with it.
+  it('drops a wrong-typed generator knob and keeps the rest of the patch', () => {
+    localStorage.setItem('rowel:generatorDefaults', '{"length":32,"numbers":"yes","exclude":7}')
+    localStorage.setItem('theme', 'dark')
+
+    expect(legacyPatch(DEFAULT_PREFS)).toEqual({
+      theme: 'dark',
+      generator: { ...DEFAULT_PREFS.generator, length: 32 }
+    })
+  })
+
   it('prefers the post-rebrand key over the pre-rebrand one', () => {
     localStorage.setItem('swifty:autolockSecs', '300')
     localStorage.setItem('rowel:autolockSecs', '900')

@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import i18n from '@/i18n'
+import type { Settings } from '@/api/app'
 import { DEFAULT_PREFS, hydratePrefs, setPref, toggleTheme, usePrefs } from '@/store/prefs'
-import { calls, clearCalls, mockCommand } from './ipc'
+import { calls, clearCalls, mockCommand, mockCommandOnce } from './ipc'
+import { deferred } from './utils'
 
 // The store's half of the preferences contract. What a patch does to the file
 // is Rust's business (`src-tauri/src/settings.rs`); what it does here is land
@@ -65,6 +67,26 @@ describe('prefs', () => {
     await settled()
 
     expect(usePrefs.getState().breachCheck).toBe(true)
+  })
+
+  // Answers can land out of order, and each carries the whole file: the answer
+  // to an older write must not put back a value the user has moved past.
+  it('ignores the answer to a write that is no longer the latest', async () => {
+    const first = deferred<Settings>()
+    const second = deferred<Settings>()
+    mockCommandOnce('set_settings', () => first.promise)
+    mockCommandOnce('set_settings', () => second.promise)
+
+    setPref('autolockSecs', 300)
+    setPref('autolockSecs', 900)
+    expect(usePrefs.getState().autolockSecs).toBe(900)
+
+    second.resolve({ ...DEFAULT_PREFS, autolockSecs: 900 })
+    await settled()
+    first.resolve({ ...DEFAULT_PREFS, autolockSecs: 300 })
+    await settled()
+
+    expect(usePrefs.getState().autolockSecs).toBe(900)
   })
 
   it('flips the theme both ways', async () => {

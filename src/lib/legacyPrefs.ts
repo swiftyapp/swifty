@@ -77,6 +77,31 @@ const perKey = (store: Storage): Record<string, unknown> => ({
   generator: parse(read(store, 'generatorDefaults'))
 })
 
+type Generator = Settings['generator']
+
+/**
+ * The stored generator knobs that are the right type, laid over the current
+ * group; undefined when nothing usable was stored. A wrong-typed field falls
+ * back to the current value rather than poisoning the patch.
+ */
+const legacyGenerator = (raw: unknown, current: Generator): Generator | undefined => {
+  if (!raw || typeof raw !== 'object') return undefined
+  const stored = raw as Record<string, unknown>
+  const merged: Generator = { ...current }
+  let kept = false
+  const take = <K extends keyof Generator>(key: K, ok: (v: unknown) => v is Generator[K]) => {
+    if (ok(stored[key])) {
+      merged[key] = stored[key]
+      kept = true
+    }
+  }
+  take('length', (v): v is number => typeof v === 'number' && Number.isFinite(v))
+  for (const key of ['numbers', 'symbols', 'uppercase', 'excludeSimilarCharacters'] as const)
+    take(key, (v): v is boolean => typeof v === 'boolean')
+  take('exclude', (v): v is string => typeof v === 'string')
+  return kept ? merged : undefined
+}
+
 /** What the old keys say, as a patch — or null when there is nothing to carry over. */
 export const legacyPatch = (current: Settings): Partial<Settings> | null => {
   const store = storage()
@@ -109,12 +134,11 @@ export const legacyPatch = (current: Settings): Partial<Settings> | null => {
   if (locale) patch.locale = locale
 
   // Rust replaces the group whole, so the stored knobs are laid over the
-  // current group rather than sent alone. Same tolerance as before: a partial
-  // or corrupt blob degrades to what is already there.
-  if (raw.generator && typeof raw.generator === 'object') {
-    const merged = { ...current.generator, ...(raw.generator as Partial<Settings['generator']>) }
-    if (Number.isFinite(merged.length)) patch.generator = merged
-  }
+  // current group rather than sent alone — and field by field, because the
+  // old storage never checked types: one `"numbers": "yes"` would otherwise
+  // fail Rust's typed decode and take every other preference down with it.
+  const generator = legacyGenerator(raw.generator, current.generator)
+  if (generator) patch.generator = generator
 
   return Object.keys(patch).length > 0 ? patch : null
 }
