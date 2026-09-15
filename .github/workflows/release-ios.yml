@@ -165,9 +165,17 @@ jobs:
           CONFIG=$(jq -cn --arg build "$BUILD_NUMBER" --arg scheme "$SCHEME" --arg id "$GOOGLE_OAUTH_IOS_CLIENT_ID" \
             '{bundle:{iOS:{bundleVersion:$build}}}
              + (if $id == "" then {} else {plugins:{"deep-link":{mobile:[{scheme:[$scheme]}]}}} end)')
+          # The scheme reaches Info.plist through tauri-plugin-deep-link's build
+          # script, and cargo will not rerun it on its own once rust-cache has
+          # restored a run that saw no config (the plugin only declares
+          # rerun-if-env-changed for its config variable when it is set). Drop
+          # that cached run so it re-executes; see scripts/release-ios.sh.
+          cargo clean --manifest-path src-tauri/Cargo.toml --release \
+            --target aarch64-apple-ios -p tauri-plugin-deep-link
           bun run tauri ios build --ci \
             --export-method app-store-connect \
             --config "$CONFIG"
+          echo "SCHEME=$SCHEME" >> "$GITHUB_ENV"
 
       # Path is src-tauri/gen/apple/build/<arch>/<productName>.ipa; resolved by
       # glob so it does not have to be kept in sync with productName.
@@ -183,6 +191,12 @@ jobs:
           fi
           echo "path=${ipas[0]}" >> "$GITHUB_OUTPUT"
           echo "Built ${ipas[0]}"
+
+      # A stale or placeholder scheme is rejected by App Store Connect only
+      # after the whole upload (90158); a missing one ships a build whose OAuth
+      # redirect cannot come back. SCHEME was exported by the build step.
+      - name: Check the IPA's URL schemes
+        run: scripts/check-ipa-url-schemes.sh "${{ steps.ipa.outputs.path }}" "$SCHEME"
 
       - name: Upload to App Store Connect (TestFlight)
         env:

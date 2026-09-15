@@ -129,6 +129,15 @@ shopt -s nullglob
 # Everything under build/ is generated and gitignored, so clearing it is free.
 rm -f src-tauri/gen/apple/build/*.ipa src-tauri/gen/apple/build/*/*.ipa
 
+# The scheme reaches Info.plist through tauri-plugin-deep-link's build script,
+# and cargo will not rerun that script on its own: the plugin declares
+# `rerun-if-env-changed=TAURI_DEEP_LINK_PLUGIN_CONFIG` only when the variable
+# is set, so a script that last ran without a config is fingerprinted as
+# up-to-date forever and never learns one appeared. Info.plist is then left as
+# committed, whatever that holds. Drop its cached run so it re-executes.
+cargo clean --manifest-path src-tauri/Cargo.toml --release \
+  --target aarch64-apple-ios -p tauri-plugin-deep-link
+
 echo "Building Rowel $SHORT_VERSION build $BUILD_NUMBER (config version $VERSION)…"
 bun run tauri ios build --ci \
   --export-method app-store-connect \
@@ -147,6 +156,12 @@ if [[ ${#ipas[@]} -gt 1 ]]; then
   exit 1
 fi
 IPA="$PWD/${ipas[0]}"
+
+# What the IPA registers has to be exactly the scheme asked for (or none): a
+# stale or placeholder scheme is rejected by App Store Connect only after the
+# whole upload, and a missing one ships a build whose OAuth redirect cannot
+# come back. Check here, before the upload.
+scripts/check-ipa-url-schemes.sh "$IPA" "$SCHEME"
 
 # altool ignores APPLE_API_KEY_PATH and only looks for AuthKey_<id>.p8 inside a
 # `private_keys` directory (cwd, $HOME, or API_PRIVATE_KEYS_DIR). Stage a copy
