@@ -22,9 +22,9 @@ use crate::error::Result;
 use crate::events;
 use crate::models::EntryMetaDto;
 use crate::session::list_metas;
-use crate::state::{AppState, SyncRun, SyncStatus};
 #[cfg(mobile)]
 use crate::state::AuthPurpose;
+use crate::state::{AppState, SyncRun, SyncStatus};
 use crate::sync;
 
 /// Connect a sync provider (OAuth), then publish/adopt straight away so the
@@ -53,8 +53,7 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    start_consent(&app, &state, AuthPurpose::Connect)
-        .inspect_err(|e| failed(&app, e.to_string()))
+    start_consent(&app, &state, AuthPurpose::Connect).inspect_err(|e| failed(&app, e.to_string()))
 }
 
 // Disconnect the sync provider (keeps the refresh token, per legacy).
@@ -113,8 +112,7 @@ pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    start_consent(&app, &state, AuthPurpose::Import)
-        .inspect_err(|e| failed(&app, e.to_string()))
+    start_consent(&app, &state, AuthPurpose::Import).inspect_err(|e| failed(&app, e.to_string()))
 }
 
 /// A connect that fails before the browser even opens (the vault locked under
