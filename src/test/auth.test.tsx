@@ -124,6 +124,22 @@ describe('Auth', () => {
     expect(screen.queryByText('Incorrect Master Password')).not.toBeInTheDocument()
   })
 
+  // The backend keeps I/O and corruption failures out of `invalidPassword` (and
+  // out of the lockout count); the screen must not fold them back in.
+  it('shows the real cause when the vault fails to open for a non-password reason', async () => {
+    mockCommand('unlock', () =>
+      Promise.reject({ kind: 'other', message: 'could not open the vault: io: disk I/O error' })
+    )
+    render(<Auth biometric={false} />)
+
+    await userEvent.type(screen.getByPlaceholderText('Master Password'), 'right{Enter}')
+
+    expect(await screen.findByTestId('unlock-error')).toHaveTextContent(
+      'could not open the vault: io: disk I/O error'
+    )
+    expect(screen.queryByText('Incorrect Master Password')).not.toBeInTheDocument()
+  })
+
   it('disables the input and shows a countdown on too many attempts', async () => {
     mockCommand('unlock', () =>
       Promise.reject({ kind: 'tooManyAttempts', message: 'too many attempts', retryAfterSecs: 2 })

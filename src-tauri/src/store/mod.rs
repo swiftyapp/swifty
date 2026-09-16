@@ -34,6 +34,12 @@ pub enum StoreError {
     #[error("vault schema is newer than this app version")]
     SchemaNewer,
 
+    // The key does not decrypt this database. Kept distinct from the I/O and
+    // corruption failures an open can also hit, so only this one is allowed to
+    // reach the user as "wrong password" (and to count against the lockout).
+    #[error("cannot open database: wrong key")]
+    WrongKey,
+
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
 

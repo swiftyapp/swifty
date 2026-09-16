@@ -23,6 +23,11 @@ pub const DEFAULT_AUTOLOCK_SECS: u64 = 60;
 /// years is indistinguishable from "never" — which is not a setting a password
 /// manager should be talked into.
 pub const MAX_AUTOLOCK_SECS: u64 = 24 * 60 * 60;
+/// An hour. Same reasoning as the auto-lock bound, plus a hard one: the value
+/// becomes a `Duration` added to an `Instant` in the clipboard timer, and that
+/// addition panics on overflow. Clamped here, at the one place the number
+/// enters the app.
+pub const MAX_CLIPBOARD_MS: u64 = 60 * 60 * 1000;
 
 /// The seed values for every new password, shared by Settings › Security and
 /// the ⌘G dialog. `uppercase` and `exclude` have no control of their own yet;
@@ -55,9 +60,9 @@ impl Default for GeneratorDefaults {
 ///
 /// The enum-ish fields are plain strings: the frontend's union types narrow
 /// them, and a value from a hand-edited file that no branch matches falls
-/// through to the same arm the default does. The auto-lock is the one field
-/// that is normalised here (`normalize`): it is enforced by Rust, so the value
-/// the file holds and the frontend shows has to be the one the timer runs.
+/// through to the same arm the default does. The two timeouts are the fields
+/// normalised here (`normalize`): they are enforced by Rust, so the value the
+/// file holds and the frontend shows has to be the one the timers run.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -99,6 +104,10 @@ impl Settings {
             0 => DEFAULT_AUTOLOCK_SECS,
             secs => secs.min(MAX_AUTOLOCK_SECS),
         };
+        // A zero is the frontend's "never clear" (`services/copy.ts` sends no
+        // delay at all for it), so it is left alone; every other value is
+        // capped, because it is armed as a real timer.
+        self.clipboard_timeout_ms = self.clipboard_timeout_ms.min(MAX_CLIPBOARD_MS);
         self
     }
 }
@@ -301,5 +310,21 @@ mod tests {
 
         let stored: Settings = serde_json::from_str(r#"{"autolockSecs":0}"#).unwrap();
         assert_eq!(stored.normalize().autolock_secs, DEFAULT_AUTOLOCK_SECS);
+    }
+
+    // The clipboard delay is armed as a `Duration` on an `Instant`, which
+    // panics if it overflows; a hand-edited file must not be able to reach it.
+    #[test]
+    fn the_clipboard_timeout_is_normalised_on_the_way_in() {
+        let huge = merge(
+            &Settings::default(),
+            &serde_json::json!({ "clipboardTimeoutMs": u64::MAX }),
+        )
+        .unwrap();
+        assert_eq!(huge.clipboard_timeout_ms, MAX_CLIPBOARD_MS);
+
+        // Zero is "never clear", not a timeout to cap or replace.
+        let never: Settings = serde_json::from_str(r#"{"clipboardTimeoutMs":0}"#).unwrap();
+        assert_eq!(never.normalize().clipboard_timeout_ms, 0);
     }
 }

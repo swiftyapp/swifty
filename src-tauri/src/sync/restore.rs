@@ -96,9 +96,13 @@ fn install(
 
     write_private(db_path, &unpacked.snapshot)?;
 
+    // Same split `session::open_with_key` draws: only the key verification is
+    // a wrong password. A snapshot this build cannot write or read for any
+    // other reason is a restore failure, and says so.
     let store = SqliteStore::open(db_path, &key.sqlcipher_key()).map_err(|e| match e {
+        StoreError::WrongKey => Error::InvalidPassword,
         StoreError::SchemaNewer => Error::VaultTooNew,
-        _ => Error::InvalidPassword,
+        e => Error::Other(format!("could not open the restored vault: {e}")),
     })?;
 
     // The snapshot carries the *source* device's sync bookkeeping. Keeping it

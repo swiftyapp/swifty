@@ -36,8 +36,16 @@ impl Timer {
 
     /// Run `fire` once, `after` from now, replacing whatever was pending.
     pub fn arm(&self, after: Duration, fire: impl FnOnce() + Send + 'static) {
+        let now = Instant::now();
+        // `Instant + Duration` panics on overflow, and the delays reaching here
+        // come from settings on disk. A deadline no process outlives is the
+        // honest reading of "later than the clock can express", and it cannot
+        // take the whole app down with it.
+        let at = now
+            .checked_add(after)
+            .unwrap_or_else(|| now + Duration::from_secs(u32::MAX as u64));
         *self.lock() = Some(Armed {
-            at: Instant::now() + after,
+            at,
             fire: Box::new(fire),
         });
         self.wake.notify_all();
@@ -63,7 +71,14 @@ impl Timer {
                     let fire = armed.take().map(|a| a.fire);
                     drop(armed);
                     if let Some(fire) = fire {
-                        fire();
+                        // One worker thread serves every arming for the life of
+                        // the process, so a callback that panics would take
+                        // auto-lock and clipboard clearing down with it — and
+                        // silently, since `arm` only fills a slot nobody reads
+                        // any more. Catching here keeps the loop alive.
+                        if std::panic::catch_unwind(std::panic::AssertUnwindSafe(fire)).is_err() {
+                            log::warn!("timer callback panicked; the timer keeps running");
+                        }
                     }
                     self.lock()
                 }
@@ -138,6 +153,34 @@ mod tests {
         timer.disarm();
 
         assert!(rx.recv_timeout(Duration::from_millis(600)).is_err());
+    }
+
+    // A delay no `Instant` can hold is still an arming, not a crash: the caller
+    // is on the main thread and the number came off disk.
+    #[test]
+    fn an_absurd_delay_does_not_panic() {
+        let timer = Timer::spawn();
+        timer.arm(Duration::MAX, || {});
+    }
+
+    // The worker thread is the only one there is: a callback that panics must
+    // not end it, or every later arming is a silent no-op for the whole process
+    // (no auto-lock, no clipboard clearing). The panic message on stderr is the
+    // caught panic being reported, not a failure.
+    #[test]
+    fn a_panicking_callback_does_not_kill_the_worker() {
+        let timer = Timer::spawn();
+        let (tx, rx) = mpsc::channel();
+        timer.arm(Duration::from_millis(10), || panic!("callback blew up"));
+
+        // Armed after the first is due, so it lands as a fresh arming on a
+        // worker that has just survived the panic rather than replacing it.
+        assert!(rx.recv_timeout(Duration::from_millis(200)).is_err());
+        timer.arm(Duration::from_millis(10), move || {
+            let _ = tx.send(());
+        });
+
+        assert!(rx.recv_timeout(Duration::from_secs(5)).is_ok());
     }
 
     #[test]
