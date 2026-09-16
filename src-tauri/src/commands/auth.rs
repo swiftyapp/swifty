@@ -284,6 +284,9 @@ pub fn change_master_password(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<()> {
+    // This rewrites the KDF sidecar and the database through the workspace
+    // paths, so it holds the same step a workspace switch has to take first.
+    let _step = super::setup::begin_step(&state)?;
     // Hold the session lock throughout: no other command sees the half-open state
     // while the store is out of the session.
     let mut session = state.session.lock().unwrap();

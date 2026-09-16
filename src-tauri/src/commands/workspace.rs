@@ -13,6 +13,7 @@ use tauri::{AppHandle, State};
 
 use crate::error::{Error, Result};
 use crate::models::UnlockResult;
+use crate::session::Session;
 use crate::state::AppState;
 use crate::storage;
 use crate::workspace::{self, Registry, Workspace};
@@ -27,12 +28,18 @@ const SYNC_BUSY: &str = "wait for the sync in progress to finish";
 /// choice is recorded in the registry, not just in memory.
 #[tauri::command]
 pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    guard_sync_idle(&state)?;
+    // The step a create holds while its Argon2 runs, and a master-password
+    // change while it rewrites the sidecar: both write through the paths, so
+    // neither may see them move underneath.
+    let _step = begin_step(&state)?;
     let root = storage::root_dir(&app)?;
     let mut registry = Registry::load(&root);
     if !registry.contains(&id) {
         return Err(Error::NotFound);
     }
+
+    let _paths = state.workspace_lock.lock().unwrap();
+    guard_sync_idle(&state)?;
 
     // Persist first: a save that fails leaves the session open and the paths
     // where they were, so a rejected switch changes nothing. Nothing to record
@@ -51,7 +58,9 @@ pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) 
     Ok(())
 }
 
-/// Refuse to move the paths while a sync flow is using them.
+/// Refuse to move the paths while a sync flow is using them. The caller holds
+/// `workspace_lock`, which is also what every flow raises its flag under — so
+/// what this reads cannot change between the check and the move.
 ///
 /// A consent flow keeps the cryptor of the vault that started it, and a run
 /// writes its scratch and tokens through the *active* workspace's paths — so a
@@ -59,10 +68,22 @@ pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) 
 /// directory, and the next sync from there would publish into the wrong pack.
 fn guard_sync_idle(state: &AppState) -> Result<()> {
     let run = state.sync_run.lock().unwrap();
-    if state.syncing.load(Ordering::SeqCst) || run.pending || run.in_progress {
+    let busy = state.syncing.load(Ordering::SeqCst) || run.pending || run.in_progress;
+    #[cfg(mobile)]
+    let busy = busy || state.pending_auth.lock().unwrap().is_some();
+    if busy {
         return Err(Error::Other(SYNC_BUSY.into()));
     }
     Ok(())
+}
+
+/// Put back what `workspace_create` took out: the session that was open and
+/// the workspace the paths pointed at. Under the lock, as one step, for the
+/// same reason they came out as one.
+fn restore(state: &AppState, active: String, session: Session) {
+    let _paths = state.workspace_lock.lock().unwrap();
+    *state.active_workspace.lock().unwrap() = active;
+    *state.session.lock().unwrap() = session;
 }
 
 /// Create a workspace with its own master password and leave it unlocked.
@@ -84,48 +105,62 @@ pub async fn workspace_create(
     if password.is_empty() {
         return Err(Error::Other("a workspace needs a master password".into()));
     }
-    guard_sync_idle(&state)?;
     // The same exclusion first-run setup takes: this writes a KDF sidecar and a
     // database, and two of those interleaving would pair one with the other's.
+    // Also what keeps `workspace_select` out until the vault below exists.
     let _step = begin_step(&state)?;
 
     let root = storage::root_dir(&app)?;
-    let mut registry = Registry::load(&root);
-    let previous = registry.active.clone();
     let id = new_id();
 
+    // The open session comes out and the paths move as one step under the lock,
+    // so no command sees one workspace's key beside another's directory. The
+    // session is kept rather than dropped: a failure puts it back exactly as it
+    // was, and the frontend — which only changes screens on success — is still
+    // looking at a vault that is still open.
+    let (previous_active, previous_session) = {
+        let _paths = state.workspace_lock.lock().unwrap();
+        guard_sync_idle(&state)?;
+        let session = std::mem::take(&mut *state.session.lock().unwrap());
+        let active = std::mem::replace(&mut *state.active_workspace.lock().unwrap(), id.clone());
+        (active, session)
+    };
+
+    let created = match create_vault_in(&app, &root, &id, password).await {
+        Ok(created) => created,
+        Err(e) => {
+            // Leave no trace of a workspace that never opened: the user is put
+            // back exactly where they pressed the button, free to try again.
+            discard(&root, &id);
+            restore(&state, previous_active, previous_session);
+            return Err(e);
+        }
+    };
+
+    // Registry last: an entry is recorded only once there is a vault behind it,
+    // so a failure anywhere above has nothing on record to undo. If this write
+    // fails the vault goes too — a database no registry names would otherwise
+    // be one with no way back to it.
+    let mut registry = Registry::load(&root);
     registry.workspaces.push(Workspace {
         id: id.clone(),
         name: Some(name),
     });
     registry.active = id.clone();
-    // Registry before anything else: a save that fails leaves the open session
-    // untouched, and a recorded workspace with no database reads as a fresh one
-    // the user can still finish, while a database no registry names is a vault
-    // with no way back to it.
-    registry.save(&root)?;
-    state.session.lock().unwrap().clear();
-    *state.active_workspace.lock().unwrap() = id.clone();
-
-    match create_vault_in(&app, &root, &id, password).await {
-        Ok((key, store)) => {
-            state.session.lock().unwrap().set(key, store, false);
-            Ok(UnlockResult {
-                entries: vec![],
-                sync_configured: false,
-            })
-        }
-        Err(e) => {
-            // Leave no trace of a workspace that never opened: the user is put
-            // back exactly where they pressed the button, free to try again.
-            discard(&root, &id);
-            registry.workspaces.retain(|w| w.id != id);
-            registry.active = previous.clone();
-            *state.active_workspace.lock().unwrap() = previous;
-            let _ = registry.save(&root);
-            Err(e)
-        }
+    if let Err(e) = registry.save(&root) {
+        // The store closes before its files are removed.
+        drop(created);
+        discard(&root, &id);
+        restore(&state, previous_active, previous_session);
+        return Err(e);
     }
+
+    let (key, store) = created;
+    state.session.lock().unwrap().set(key, store, false);
+    Ok(UnlockResult {
+        entries: vec![],
+        sync_configured: false,
+    })
 }
 
 /// Give a workspace a (new) label. Ids never change; only this does.

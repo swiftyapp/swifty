@@ -101,6 +101,12 @@ pub struct AppState {
     /// keeps a switch atomic — the session is cleared and this is set together,
     /// so nothing can address one workspace's database with another's key.
     pub active_workspace: Mutex<String>,
+    /// Held while the paths move (`commands::workspace`) and while a sync run or
+    /// consent flow claims them (`commands::sync`): the flow takes its key and
+    /// raises its flag under this lock, and a switch checks those flags and
+    /// moves `active_workspace` under it, so neither can slip in between the
+    /// other's check and its act. Never held across I/O.
+    pub workspace_lock: Mutex<()>,
     // A sync run is in flight. Held outside `session` on purpose: the run takes
     // and releases the session lock repeatedly (never across a network call),
     // so the "one at a time" guard cannot live behind that same lock.
@@ -137,6 +143,7 @@ impl Default for AppState {
         Self {
             session: Mutex::default(),
             active_workspace: Mutex::new(crate::workspace::PRIMARY_ID.to_string()),
+            workspace_lock: Mutex::default(),
             syncing: AtomicBool::default(),
             sync_run: Mutex::default(),
             pending_drive: Mutex::default(),
