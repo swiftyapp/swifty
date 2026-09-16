@@ -5,8 +5,25 @@ import Start from '@/components/Start'
 import type { SetupDriveFile } from '@/api/setup'
 import { open } from '@tauri-apps/plugin-dialog'
 import { setupDriveProbed, setupDriveFailed, useApp } from '@/store'
+import { evaluate, MIN_LENGTH, type Strength } from '@/services/strength'
 import { calls, mockCommandOnce } from './ipc'
-import { seedApp } from './utils'
+import { deferred, seedApp } from './utils'
+
+// The real `evaluate` awaits an 848 kB zxcvbn chunk. The specs below have to
+// hold that await open, and in one case fail it, so the scoring itself is stood
+// in for — length is the only thing that separates the passwords used here.
+vi.mock('@/services/strength', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/services/strength')>()),
+  evaluate: vi.fn()
+}))
+
+const scored = (password: string): Strength => ({
+  score: password.length >= MIN_LENGTH ? 4 : 0,
+  warning: '',
+  suggestions: [],
+  tooShort: password.length < MIN_LENGTH,
+  acceptable: password.length >= MIN_LENGTH
+})
 
 // Whether the device could enroll a biometric gate at all, which is what
 // decides if the first run asks its last question.
@@ -22,7 +39,10 @@ const REMOTE: SetupDriveFile = {
   modifiedTime: '2024-01-01T00:00:00.000Z'
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(evaluate).mockImplementation(async password => scored(password))
+})
 
 // Welcome -> the merged password screen, filled in and submitted.
 const choosePassword = async (password = STRONG, confirmation = password) => {
@@ -76,6 +96,55 @@ describe('choosing a master password', () => {
 
     expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
     expect(calls('setup_create')).toHaveLength(0)
+  })
+
+  // Going back unmounts this screen. The check landing afterwards must not
+  // carry the abandoned password on into the flow behind it.
+  it('does not create the vault when the user goes back while the check is pending', async () => {
+    const check = deferred<Strength>()
+    vi.mocked(evaluate).mockReturnValue(check.promise)
+    render(<Start />)
+    await choosePassword()
+
+    await userEvent.click(screen.getByTestId('go-back-button'))
+    await act(async () => check.resolve(scored(STRONG)))
+
+    expect(screen.getByTestId('start-setup-button')).toBeInTheDocument()
+    expect(calls('setup_create')).toHaveLength(0)
+  })
+
+  // The screen holds still while the check is out: what it answers about has to
+  // still be what is on screen — and what gets created — when it lands.
+  it('refuses input while the check is pending', async () => {
+    const check = deferred<Strength>()
+    vi.mocked(evaluate).mockReturnValue(check.promise)
+    render(<Start />)
+    await choosePassword()
+
+    expect(screen.getByTestId('setup-password-input')).toBeDisabled()
+    expect(screen.getByTestId('setup-confirm-password-input')).toBeDisabled()
+
+    await act(async () => check.resolve(scored(STRONG)))
+    await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
+
+    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false })
+  })
+
+  // A chunk that will not load leaves nothing to wait for: say so, and take
+  // another press, rather than spinning on it forever.
+  it('recovers when the strength engine fails to load', async () => {
+    render(<Start />)
+    await userEvent.click(screen.getByTestId('start-setup-button'))
+    await userEvent.type(screen.getByTestId('setup-password-input'), STRONG)
+    await userEvent.type(screen.getByTestId('setup-confirm-password-input'), STRONG)
+    // Only the submit's own check fails; the meter has already been scored.
+    await screen.findByText('Very strong')
+    vi.mocked(evaluate).mockRejectedValue(new Error('failed to fetch dynamically imported module'))
+
+    await userEvent.click(screen.getByTestId('setup-continue-button'))
+
+    expect(await screen.findByText('Something went wrong')).toBeInTheDocument()
+    expect(screen.getByTestId('setup-continue-button')).toBeEnabled()
   })
 })
 

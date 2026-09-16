@@ -5,6 +5,7 @@ import Masterpass from '@/components/elements/Masterpass'
 import PasswordStrength from '@/components/elements/PasswordStrength'
 import Button from '@/components/elements/Button'
 import { evaluate, MIN_LENGTH } from '@/services/strength'
+import { useLatestRequest } from '@/hooks/useLatestRequest'
 import StepHeader from '../shared/StepHeader'
 import { COLUMN } from '../shared/layout'
 import { describeError } from '@/api/errors'
@@ -30,12 +31,14 @@ export default function Password({ onBack, onContinue }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [mismatch, setMismatch] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const begin = useLatestRequest()
 
   // Returns the message, so the two entry points (Enter on the first field,
-  // and Continue) agree on what makes a password acceptable.
-  const strengthError = (): string | null => {
+  // and Continue) agree on what makes a password acceptable. Async because the
+  // zxcvbn dictionaries are fetched on first use.
+  const strengthError = async (): Promise<string | null> => {
     if (!password) return t('Fill in the password')
-    const { tooShort, acceptable } = evaluate(password)
+    const { tooShort, acceptable } = await evaluate(password)
     if (tooShort) return t('Use at least {{count}} characters', { count: MIN_LENGTH })
     if (!acceptable) return t('Choose a stronger master password')
     return null
@@ -51,14 +54,47 @@ export default function Password({ onBack, onContinue }: Props) {
     setConfirmation(event.currentTarget.value)
   }
 
-  const submit = () => {
-    if (busy) return
-    const weak = strengthError()
-    if (weak) return setError(weak)
-    if (password !== confirmation) return setMismatch(t('Passwords do not match'))
+  // Enter on the first field reports what is wrong with it; it does not submit.
+  const reportStrength = () => {
+    void strengthError()
+      .then(setError)
+      .catch(() => setError(t('Something went wrong')))
+  }
 
+  // Busy goes up before the check, not after it: the check now awaits a chunk
+  // fetch, and that window must not let a second press through.
+  const submit = async () => {
+    if (busy) return
+    const current = begin()
     setBusy(true)
+
+    let weak: string | null
+    try {
+      weak = await strengthError()
+    } catch {
+      // The chunk never arrived. Say so rather than leaving the form locked on
+      // a check that will never answer.
+      if (current()) {
+        setBusy(false)
+        setError(t('Something went wrong'))
+      }
+      return
+    }
+    // The screen may have been left, or a newer submission started, while the
+    // chunk was in flight: this answer is about a password nobody is waiting on.
+    if (!current()) return
+
+    if (weak) {
+      setBusy(false)
+      return setError(weak)
+    }
+    if (password !== confirmation) {
+      setBusy(false)
+      return setMismatch(t('Passwords do not match'))
+    }
+
     onContinue(password).catch((err: unknown) => {
+      if (!current()) return
       setBusy(false)
       setMismatch(describeError(err) || t('Something went wrong'))
     })
@@ -73,11 +109,15 @@ export default function Password({ onBack, onContinue }: Props) {
       />
 
       <div className={`${COLUMN} mt-9`}>
+        {/* Both fields go inert while a submission is pending: the check awaits
+            a chunk fetch, and the value it validates has to still be the one on
+            screen when it lands. */}
         <Masterpass
           placeholder={t('Master password')}
           testid="setup-password-input"
           error={error}
-          onEnter={() => setError(strengthError())}
+          disabled={busy}
+          onEnter={reportStrength}
           onChange={changePassword}
         />
         <PasswordStrength password={password} />
@@ -88,13 +128,14 @@ export default function Password({ onBack, onContinue }: Props) {
             testid="setup-confirm-password-input"
             autoFocus={false}
             error={mismatch}
-            onEnter={submit}
+            disabled={busy}
+            onEnter={() => void submit()}
             onChange={changeConfirmation}
           />
         </div>
 
         <div className="mt-8">
-          <Button block testid="setup-continue-button" loading={busy} onClick={submit}>
+          <Button block testid="setup-continue-button" loading={busy} onClick={() => void submit()}>
             {t('Continue')}
           </Button>
         </div>
