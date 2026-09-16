@@ -166,7 +166,9 @@ export const setFilterTag = (tag: string | null) => {
 // --- overlays -----------------------------------------------------------------------
 
 /**
- * Whether a modal surface owns the keyboard and the window.
+ * The modal surfaces on screen right now, by the id each registered under
+ * (`hooks/useDialogPresence`, which every dialog frame calls through the
+ * shared focus hook).
  *
  * Window- and document-level accelerators (the detail pane's bare ⏎, the
  * editor's Esc and ⌘⏎, every ⌘ chord in `useShortcuts`) have to stand down
@@ -174,20 +176,29 @@ export const setFilterTag = (tag: string | null) => {
  * would also discard the draft underneath. Drops are the same question: the
  * open modal may have a drop zone of its own (Settings › Import).
  *
- * Every field here is a surface this store opens, so this is the whole list.
- * It used to be a `[role="dialog"]` query, which made a DOM detail of the frame
- * the answer to a question the store already knew.
+ * Presence rather than a list of this store's own fields: a prompt a component
+ * keeps in its own state (the env editor's replace-or-merge question) is as
+ * modal as a Settings dialog, and a list here would not know about it. Kept out
+ * of `useUi` so a lock's reset cannot zero it under frames that are still
+ * mounted and about to unregister themselves.
  */
-export const selectModalOpen = (state: UiState): boolean =>
-  state.palette ||
-  state.settings ||
-  state.addPicker ||
-  state.generator.open ||
-  state.sendFor !== null ||
-  state.receiveOpen
+const useDialogs = create<{ open: ReadonlySet<string> }>()(() => ({ open: new Set() }))
+
+export const registerDialog = (id: string) =>
+  useDialogs.setState(state => ({ open: new Set(state.open).add(id) }))
+
+export const unregisterDialog = (id: string) =>
+  useDialogs.setState(state => {
+    const open = new Set(state.open)
+    open.delete(id)
+    return { open }
+  })
+
+/** Whether a modal surface owns the keyboard and the window. */
+export const useModalOpen = () => useDialogs(state => state.open.size > 0)
 
 /** The same answer outside React, for an event handler. */
-export const isModalOpen = () => selectModalOpen(useUi.getState())
+export const isModalOpen = () => useDialogs.getState().open.size > 0
 
 export const openPalette = () => useUi.setState({ palette: true })
 export const closePalette = () => useUi.setState({ palette: false })

@@ -388,9 +388,15 @@ fn fail(app: &AppHandle, purpose: AuthPurpose, why: String) {
 
 // --- status ------------------------------------------------------------------
 
-/// Change the run state and tell the frontend the whole of it.
+/// Change the run state and tell the frontend the whole of it. Through
+/// `SyncRun::transition`, so the snapshot's sequence advances with the change
+/// and a probe that read the state just before it is recognisably older.
 fn update(app: &AppHandle, change: impl FnOnce(&mut SyncRun)) {
-    change(&mut app.state::<AppState>().sync_run.lock().unwrap());
+    app.state::<AppState>()
+        .sync_run
+        .lock()
+        .unwrap()
+        .transition(change);
     events::sync_status(app, status(app));
 }
 

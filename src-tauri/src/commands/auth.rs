@@ -14,7 +14,7 @@ use crate::secure_store::{self, GateMode, KeyStore};
 use crate::session::{derive_key, open_with_key, unlock_with_password};
 use crate::state::AppState;
 use crate::store::SqliteStore;
-use crate::{autolock, biometrics, crypto, storage};
+use crate::{biometrics, crypto, events, storage};
 use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
@@ -101,9 +101,13 @@ async fn open_off_thread(
 
 // Clear the in-memory key and close the store, and emit `vault:locked` with it
 // — the frontend reacts to the event, not to this promise (see `session::lock`).
+// Announced even when there was nothing left to seal: the user asked for the
+// lock screen, and a webview that somehow still shows the vault gets it.
 #[tauri::command]
 pub fn lock(app: AppHandle) -> Result<()> {
-    crate::session::lock(&app);
+    if !crate::session::lock(&app) {
+        events::vault_locked(&app);
+    }
     Ok(())
 }
 
@@ -269,7 +273,9 @@ pub async fn change_master_password(
                 // Even the rollback could not reopen the vault: there is no
                 // session to hand back, so it ends, and the webview is told
                 // rather than left looking at a vault that is no longer open.
-                None => autolock::lock(&app),
+                None => {
+                    crate::session::lock(&app);
+                }
             }
             return Err(rollback.error);
         }

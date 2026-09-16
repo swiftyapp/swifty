@@ -66,7 +66,14 @@ export const appStatusDefault = (): AppStatus => ({
   version: '1.0.0',
   locale: 'en-US',
   settings,
-  sync: { configured: false, pending: false, inProgress: false, error: null, lastSyncedAt: null },
+  sync: {
+    configured: false,
+    pending: false,
+    inProgress: false,
+    error: null,
+    lastSyncedAt: null,
+    seq: 0
+  },
   // Off by default, so no suite sees a scan affordance it did not ask for.
   scanSupported: false,
   // The desktop's gate, and what every pre-existing spec asserts by name.

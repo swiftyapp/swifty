@@ -1,4 +1,5 @@
 import { useEffect, type RefObject } from 'react'
+import { useDialogPresence } from './useDialogPresence'
 
 const TABBABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -16,8 +17,13 @@ const tabbables = (root: HTMLElement | null) =>
  * the dialog. Only the topmost `[role="dialog"]` reacts, so a stacked one (the
  * generator over Settings) is neither closed from underneath by Escape nor has
  * its focus pulled back down by the trap.
+ *
+ * A frame that traps focus is a modal surface, so it is registered as one here
+ * (`isModalOpen`), which is what tells the accelerators behind it to stand down.
  */
 export function useDialogFocus(dialog: RefObject<HTMLElement | null>, onClose: () => void) {
+  useDialogPresence()
+
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null
     const first = tabbables(dialog.current)[0]

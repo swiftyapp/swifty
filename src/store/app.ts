@@ -74,7 +74,14 @@ export const initialApp: AppState = {
   // biometric is drawn before the probe answers.
   flow: 'auth',
   status: null,
-  sync: { configured: false, pending: false, inProgress: false, error: null, lastSyncedAt: null },
+  sync: {
+    configured: false,
+    pending: false,
+    inProgress: false,
+    error: null,
+    lastSyncedAt: null,
+    seq: 0
+  },
   setupDrive: DRIVE_IDLE,
   update: { readyVersion: null, readyNotes: null, status: null }
 }
@@ -87,9 +94,21 @@ export const useApp = create<AppState>()(() => initialApp)
  * Take the boot probe's answer wholesale (see `boot.ts`). `sync` is lifted out
  * of it into its own slot rather than read off `status`: the probe is only one
  * of the two things that report sync, and the events that report the rest write
- * here too.
+ * here too — so its snapshot goes through the same ordering they do.
  */
-export const setApp = (status: AppStatus) => useApp.setState({ status, sync: status.sync })
+export const setApp = (status: AppStatus) =>
+  useApp.setState(state => ({ status, sync: newer(state.sync, status.sync) }))
+
+/**
+ * Of two sync snapshots, the one the backend produced later. The probe and the
+ * `sync:status` event are two routes for the same fact, and a probe taken just
+ * before a transition can resolve after the event that transition emitted;
+ * without this it would put the older state back on screen. Equal sequence
+ * numbers mean the same transition, and the incoming copy is taken so a
+ * `configured` that changed without a transition still lands.
+ */
+const newer = (held: SyncStatus, incoming: SyncStatus): SyncStatus =>
+  incoming.seq >= held.seq ? incoming : held
 
 /**
  * Whether this platform has a text recognizer at all — a build-time fact about
@@ -190,7 +209,8 @@ export const scheduleSync = () => {
   }, SYNC_DEBOUNCE_MS)
 }
 
-export const setSyncStatus = (sync: SyncStatus) => useApp.setState({ sync })
+export const setSyncStatus = (sync: SyncStatus) =>
+  useApp.setState(state => ({ sync: newer(state.sync, sync) }))
 
 // --- first-run Drive probe ---------------------------------------------------------
 
