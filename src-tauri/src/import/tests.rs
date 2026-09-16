@@ -1440,6 +1440,40 @@ fn round_trip_bitwarden_favorite_dates_and_a_labelled_field() {
     assert!(back.entries[0].extra.is_empty());
 }
 
+// A user may well have named a custom field "Email" themselves. Ours is written
+// first, so the importer's first match is ours and theirs stays a custom field.
+#[test]
+fn a_users_own_field_sharing_our_label_survives_a_bitwarden_round_trip() {
+    let mut login = starred_login();
+    login.extra = vec![("Email".into(), "the user's own note".into())];
+    let entries = vec![login];
+    let bytes = to_bitwarden_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(out["items"][0]["fields"][0]["value"], "neo@acme.test");
+    assert_eq!(out["items"][0]["fields"][1]["value"], "the user's own note");
+
+    let back = parse(Format::Bitwarden, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, entries);
+}
+
+// A CXF `modifiedAt` written as a float or a string is read like `creationAt`
+// is, rather than failing the document.
+#[test]
+fn cxf_reads_a_lenient_modified_at() {
+    let json = br#"{"version":{"major":1,"minor":0},"accounts":[{"items":[
+      {"id":"aQ","title":"Acme","creationAt":1.7e9,"modifiedAt":"1700000001","credentials":[
+        {"type":"basic-auth","username":"neo","password":"trinity"}
+      ]}
+    ]}]}"#;
+    let back = parse(Format::Cxf, json);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(
+        back.entries[0].updated_at.as_deref(),
+        Some("2023-11-14T22:13:21+00:00")
+    );
+}
+
 // The rest of a document: Bitwarden's `ssn` carries the personal number and the
 // dates, authority, nationality and sex travel as labelled fields.
 #[test]

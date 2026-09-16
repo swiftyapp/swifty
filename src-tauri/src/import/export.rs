@@ -137,25 +137,20 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
                 "creationDate": e.created_at,
                 "revisionDate": e.updated_at,
             });
-            // Extras go in Bitwarden's own custom fields, for every kind — and
-            // only when there are some, so an export of a vault without any is
-            // byte-identical to before.
-            if !e.extra.is_empty() {
-                item["fields"] = json!(e
-                    .extra
-                    .iter()
-                    .map(|(label, value)| json!({
-                        "name": label,
-                        "value": value,
-                        "type": FIELD_TEXT,
-                    }))
-                    .collect::<Vec<_>>());
-            }
-            // Everything Bitwarden has no member for follows the user's own
-            // extras as labelled fields, after them so their order is kept.
+            // Everything Bitwarden has no member for goes into its custom
+            // fields under our labels — FIRST, because the importer takes the
+            // first field wearing a label. A user's own extra may share one
+            // ("Email" is a natural thing to call a field); written after ours,
+            // it stays theirs on the way back instead of landing in our slot.
             for (label, value, secret) in labelled_fields(e) {
                 let kind = if secret { FIELD_HIDDEN } else { FIELD_TEXT };
                 push_field(&mut item, label, value, kind);
+            }
+            // Then the user's extras, in their order. `fields` is only ever
+            // written when there is something to write, so an export of a
+            // vault without any is byte-identical to before.
+            for (label, value) in &e.extra {
+                push_field(&mut item, label, value, FIELD_TEXT);
             }
             match e.kind {
                 EntryKind::Login => {

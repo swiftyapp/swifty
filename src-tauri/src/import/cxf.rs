@@ -44,7 +44,11 @@ struct Item {
         deserialize_with = "super::lenient_u64"
     )]
     creation_at: Option<u64>,
-    #[serde(default, rename = "modifiedAt")]
+    #[serde(
+        default,
+        rename = "modifiedAt",
+        deserialize_with = "super::lenient_u64"
+    )]
     modified_at: Option<u64>,
     #[serde(default)]
     scope: Option<Scope>,
