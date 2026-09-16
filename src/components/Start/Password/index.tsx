@@ -130,11 +130,14 @@ export default function Password({ onBack, onContinue }: Props) {
           onEnter={reportStrength}
           onChange={changePassword}
         />
-        <PasswordStrength password={password} error={error} />
+        {/* Inset to the card's own padding so the meter reads as its caption. */}
+        <div className="mt-2 px-1">
+          <PasswordStrength password={password} error={error} />
+        </div>
 
         {confirming && (
           <div className="grid animate-unfold">
-            <div className="min-h-0 overflow-hidden pt-4">
+            <div className="min-h-0 overflow-hidden pt-3">
               <Masterpass
                 placeholder={t('Type it once more')}
                 testid="setup-confirm-password-input"

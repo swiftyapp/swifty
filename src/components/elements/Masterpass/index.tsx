@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -17,9 +18,10 @@ import { biometryLabel } from '@/lib/biometry'
 import BiometryGlyph from '../BiometryGlyph'
 import { verbatimInput } from '../inputProps'
 import Dots, { CELL } from './Dots'
-import KeyCuts from './KeyCuts'
 
 interface Props {
+  // Rendered under the card, in the field's own red. The lock screen says its
+  // piece in the eyebrow instead and passes `invalid`.
   error?: string | null
   /** Draw the biometric end segment: a key is enrolled and usable right now. */
   biometric?: boolean
@@ -34,38 +36,39 @@ interface Props {
   // The field takes focus on mount, which is right for every screen that draws
   // one. The setup screen draws two, and only the first of them should.
   autoFocus?: boolean
-  // `lock` is the signature card presentation of the lock screen; `compact`
-  // (default) is the plain centered field used by setup / restore.
-  variant?: 'compact' | 'lock'
-  // Paint the field as invalid without rendering an inline error, for the
+  // Paint the card as invalid without rendering an inline error, for the
   // screens that surface the message elsewhere: the lock screen in its
   // eyebrow, the setup screen in its strength line.
   invalid?: boolean
-  // Lock only: hold the card on the success tint while the unlock lands.
+  // Hold the card on the success tint while the unlock lands.
   success?: boolean
-  // Lock only: the submitted passphrase is being verified (key derivation is
-  // deliberately slow) — ripple the dots and orbit the halo.
+  // The submitted passphrase is being verified (key derivation is deliberately
+  // slow) — ripple the dots and orbit the halo.
   pending?: boolean
   onEnter?: (value: string) => void
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void
   onBiometric?: () => void
 }
 
-// Shared master-passphrase field. The real value and selection live in the
-// input; mirrored copies drive the dot overlay. Masking is done with a
-// text-transparent input + custom dots so the caret and letter spacing match
-// the design in both themes. Because the input's own glyph geometry never
-// matches the fixed cell grid, clicks are mapped to a character index against
-// the drawn cells rather than left to the browser, and the overlay caret tracks
-// the input's real selection so it always shows where the next edit lands.
+// THE master-passphrase field, one presentation everywhere it is asked for —
+// the lock screen, and the first run's create and restore screens — so the
+// field the user meets on day one is the one they meet every day after. The
+// real value and selection live in the input; mirrored copies drive the dot
+// overlay. Masking is done with a text-transparent input + custom dots so the
+// caret and letter spacing match the design in both themes. Because the
+// input's own glyph geometry never matches the fixed cell grid, clicks are
+// mapped to a character index against the drawn cells rather than left to the
+// browser, and the overlay caret tracks the input's real selection so it
+// always shows where the next edit lands.
 //
-// The lock variant is deliberately unlike every other field in the app: a
-// white card set gently into the window ground (see --lockfield-shadow) with
-// big centered dots, whose border + halo carry the state — accent on focus,
-// red (plus a shake) on a bad passphrase, green while a successful unlock
-// lands — while focus also cuts a touch deeper. Its only chrome is Touch ID
-// (primary) and reveal (secondary, only once there is something to reveal) on
-// the right edge.
+// Deliberately unlike every other field in the app: a white card set gently
+// into the window ground (see --lockfield-shadow) with big centered dots,
+// whose border + halo carry the state — accent on focus, red (plus a shake) on
+// a bad passphrase, green while a successful unlock lands — while focus also
+// cuts a touch deeper. Its only chrome is Touch ID (primary, when offered) and
+// reveal (secondary, only once there is something to reveal) on the right
+// edge. It fills its container: the caller decides how wide a card reads
+// right on its screen.
 export default function Masterpass({
   error,
   biometric,
@@ -74,7 +77,6 @@ export default function Masterpass({
   placeholder,
   testid,
   autoFocus = true,
-  variant = 'compact',
   invalid,
   success,
   pending,
@@ -89,19 +91,29 @@ export default function Masterpass({
   const [selection, setSelection] = useState<[number, number]>([0, 0])
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
+  // Whether focus is anywhere in the card (the input, or one of its buttons).
+  // A ref, not state: it is only ever read at the moment the card goes inert.
+  const within = useRef(false)
+  const heldFocus = useRef(false)
 
-  const lock = variant === 'lock'
   const bad = !!error || !!invalid
   // The input can't accept keystrokes while locked out, verifying, or during
   // the success hold; only the lockout also dims the card.
   const inert = !!disabled || !!success || !!pending
 
   // Disabling the input (verifying / lockout) blurs it; hand focus back the
-  // moment it re-enables so a failed attempt can be retyped immediately.
+  // moment it re-enables so a failed attempt can be retyped immediately. Only
+  // to the card that held focus when it went inert: two of these on one
+  // screen (the setup's password and its confirmation) go inert together, and
+  // the one the user was not typing in must not take over. The snapshot is a
+  // layout effect so it is read before any blur the disabling causes lands.
+  useLayoutEffect(() => {
+    if (inert) heldFocus.current = within.current
+  }, [inert])
   useEffect(() => {
-    if (lock && !inert && document.activeElement !== inputRef.current)
+    if (!inert && heldFocus.current && document.activeElement !== inputRef.current)
       inputRef.current?.focus()
-  }, [lock, inert])
+  }, [inert])
 
   const doSubmit = (val: string) => {
     if (inert || val === '') return
@@ -143,80 +155,19 @@ export default function Masterpass({
     syncSelection()
   }
 
-  const input = (
-    <input
-      ref={inputRef}
-      type={reveal ? 'text' : 'password'}
-      className={cx(
-        // The input's own text never shows: masked dots and the revealed value
-        // are both drawn by the cell overlay (see Dots) so they share one
-        // geometry, including the selection wash. Only the placeholder renders
-        // from here (15px, muted ink).
-        'absolute inset-0 w-full border-0 bg-transparent text-center font-sans text-md tracking-secret text-transparent caret-transparent outline-none selection:bg-transparent placeholder:text-text3',
-        lock && 'rounded-xl px-10'
-      )}
-      placeholder={placeholder || t('Master Password')}
-      // The passphrase is stored exactly as typed, including while revealed —
-      // when `type` is `text` and nothing else would hold the OS off.
-      {...verbatimInput}
-      disabled={inert}
-      data-testid={testid}
-      autoFocus={autoFocus}
-      value={value}
-      onChange={handleChange}
-      onKeyDown={handleKeyDown}
-      onKeyUp={syncSelection}
-      onSelect={syncSelection}
-      onMouseDown={handleMouseDown}
-      onFocus={() => {
-        setFocused(true)
-        syncSelection()
-      }}
-      onBlur={() => setFocused(false)}
-    />
-  )
-
-  const dots = (
-    <Dots
-      count={value.length}
-      caret={focused && !inert}
-      selection={selection}
-      rowRef={rowRef}
-      text={reveal ? value : undefined}
-      busy={pending}
-    />
-  )
-
-  // The crossed eye alone carries the on state — no persistent wash.
-  // Neither string has a catalog entry (pre-existing gap); looked up
-  // opportunistically and falls through to the English text below.
-  const revealButton = (
-    <IconButton
-      label={t((reveal ? 'Hide passphrase' : 'Reveal passphrase') as TKey)}
-      className={
-        lock
-          ? 'animate-fade absolute right-1.5 top-1/2 -translate-y-1/2'
-          : 'absolute right-0'
-      }
-      muted={lock}
-      onClick={() => setReveal(r => !r)}
-    >
-      {reveal ? (
-        <EyeOffGlyph size={lock ? 15 : 16} />
-      ) : (
-        <EyeGlyph size={lock ? 15 : 16} />
-      )}
-    </IconButton>
-  )
-
-  if (lock) {
-    return (
+  return (
+    <div className="w-full">
       <div
+        // Focus events bubble in React, so the card hears about its buttons too.
+        onFocus={() => (within.current = true)}
+        onBlur={event => {
+          if (!event.currentTarget.contains(event.relatedTarget)) within.current = false
+        }}
         className={cx(
           // In-card icon buttons (reveal, Touch ID) share a softened hover
           // wash; the ! outranks IconButton's own hover:bg-hover, in this one
           // place instead of at every button.
-          'relative mx-auto flex h-12 max-w-[380px] items-stretch rounded-xl border bg-detail transition-all duration-300 [&_button:hover]:bg-hover/60!',
+          'relative flex h-12 items-stretch rounded-xl border bg-detail transition-all duration-300 [&_button:hover]:bg-hover/60!',
           // The inset shadow is the cut; focus goes a touch deeper. It and the
           // state halo (ring) are both box-shadow, so Tailwind composes them.
           'shadow-lockfield focus-within:shadow-lockfield-deep',
@@ -239,11 +190,57 @@ export default function Masterpass({
           />
         )}
         <div className="relative flex-1">
-          {input}
-          {dots}
+          <input
+            ref={inputRef}
+            type={reveal ? 'text' : 'password'}
+            // The input's own text never shows: masked dots and the revealed
+            // value are both drawn by the cell overlay (see Dots) so they share
+            // one geometry, including the selection wash. Only the placeholder
+            // renders from here (15px, muted ink).
+            className="absolute inset-0 w-full rounded-xl border-0 bg-transparent px-10 text-center font-sans text-md tracking-secret text-transparent caret-transparent outline-none selection:bg-transparent placeholder:text-text3"
+            placeholder={placeholder || t('Master Password')}
+            // The passphrase is stored exactly as typed, including while
+            // revealed — when `type` is `text` and nothing else would hold the
+            // OS off.
+            {...verbatimInput}
+            disabled={inert}
+            data-testid={testid}
+            autoFocus={autoFocus}
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onKeyUp={syncSelection}
+            onSelect={syncSelection}
+            onMouseDown={handleMouseDown}
+            onFocus={() => {
+              setFocused(true)
+              syncSelection()
+            }}
+            onBlur={() => setFocused(false)}
+          />
+          <Dots
+            count={value.length}
+            caret={focused && !inert}
+            selection={selection}
+            rowRef={rowRef}
+            text={reveal ? value : undefined}
+            busy={pending}
+          />
           {/* Reveal is a secondary modifier of what you're typing, so it only
-              appears once there is something to reveal, small and dim. */}
-          {value.length > 0 && revealButton}
+              appears once there is something to reveal, small and dim. The
+              crossed eye alone carries the on state — no persistent wash.
+              Neither string has a catalog entry (pre-existing gap); looked up
+              opportunistically and falls through to the English text. */}
+          {value.length > 0 && (
+            <IconButton
+              label={t((reveal ? 'Hide passphrase' : 'Reveal passphrase') as TKey)}
+              className="animate-fade absolute right-1.5 top-1/2 -translate-y-1/2"
+              muted
+              onClick={() => setReveal(r => !r)}
+            >
+              {reveal ? <EyeOffGlyph size={15} /> : <EyeGlyph size={15} />}
+            </IconButton>
+          )}
         </div>
 
         {/* Biometrics are the card's own end segment: a taller divider than the
@@ -266,17 +263,6 @@ export default function Masterpass({
           </>
         )}
       </div>
-    )
-  }
-
-  return (
-    <div className="w-full">
-      <div className="relative flex h-14 items-center justify-center">
-        {input}
-        {dots}
-        {revealButton}
-      </div>
-      <KeyCuts count={value.length} tone={bad ? 'bad' : 'idle'} />
       <Error error={error} />
     </div>
   )

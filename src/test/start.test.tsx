@@ -131,6 +131,27 @@ describe('choosing a master password', () => {
     expect(calls('setup_create')).toHaveLength(0)
   })
 
+  // Both cards go inert while the check is out. Focus comes back to the one
+  // the user was typing in, never to the other. (Submitted with Enter: a
+  // click on Continue moves focus to the button on some platforms, and then
+  // neither card has it to get back.)
+  it('returns focus to the field that had it once the check lands', async () => {
+    const check = deferred<Strength>()
+    vi.mocked(evaluate).mockReturnValue(check.promise)
+    render(<Start />)
+    await userEvent.click(screen.getByTestId('start-setup-button'))
+    await userEvent.type(screen.getByTestId('setup-password-input'), STRONG)
+    const confirm = screen.getByTestId('setup-confirm-password-input')
+    await userEvent.type(confirm, 'something-else-entirely{enter}')
+
+    expect(confirm).toBeDisabled()
+    await act(async () => check.resolve(scored(STRONG)))
+
+    expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
+    expect(confirm).toHaveFocus()
+    expect(screen.getByTestId('setup-password-input')).not.toHaveFocus()
+  })
+
   // One verdict at a time: a mismatch is about the pair, so editing the
   // password retires it, and a strength error never lands beside it.
   it('drops a stale mismatch once the password is edited', async () => {

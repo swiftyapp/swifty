@@ -29,9 +29,10 @@ export function Auth({ biometric, biometry = 'touch' }: Props) {
       <Eyebrow tone={eyebrow.tone} busy={eyebrow.busy} testid={eyebrow.testid}>
         {eyebrow.text}
       </Eyebrow>
-      <div className="mt-8">
+      {/* One field alone on a wide ground: capped so it reads as a card, not a
+          bar. */}
+      <div className="mx-auto mt-8 max-w-[380px]">
         <Masterpass
-          variant="lock"
           biometric={biometric}
           biometry={biometry}
           testid="unlock-password-input"

@@ -46,11 +46,10 @@ export default function LockScreen({ biometric, biometry = 'touch' }: Props) {
       </Eyebrow>
 
       {password ? (
-        <div className="mt-8">
+        <div className="mx-auto mt-8 max-w-[380px]">
           {/* The card keeps its own biometric segment, so revealing the
               passphrase never takes the faster way out away. */}
           <Masterpass
-            variant="lock"
             biometric={biometric}
             biometry={biometry}
             testid="unlock-password-input"
