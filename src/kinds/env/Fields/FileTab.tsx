@@ -9,6 +9,7 @@ import IconButton from '@/components/elements/IconButton'
 import Panel from '@/components/elements/Panel'
 import { grow, useField } from '@/components/elements/fields'
 import { requiredError } from '@/components/elements/fields/formats'
+import { verbatimInput } from '@/components/elements/inputProps'
 import { BLOCK_DOTS } from '@/components/elements/tokens'
 import { DownloadGlyph, EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
 import { BOX, BOX_LINE } from './styles'
@@ -51,7 +52,7 @@ export default function FileTab() {
             value={value}
             rows={1}
             placeholder="KEY=value"
-            spellCheck={false}
+            {...verbatimInput}
             ref={grow}
             onChange={event => {
               grow(event.currentTarget)

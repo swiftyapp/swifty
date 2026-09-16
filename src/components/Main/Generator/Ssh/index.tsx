@@ -3,6 +3,7 @@ import type { SshKeyPair } from '@/api/tools'
 import Button from '@/components/elements/Button'
 import { LABEL, META_TYPE } from '@/components/elements/tokens'
 import { inputClass, wellClass } from '@/components/elements/formStyles'
+import { verbatimInput } from '@/components/elements/inputProps'
 import { cx } from '@/utils/cx'
 import Line from './Line'
 import Secret from './Secret'
@@ -64,8 +65,7 @@ export default function Ssh({ pair, pending, error, onRetry, comment, onComment 
           name="comment"
           value={comment}
           maxLength={64}
-          autoComplete="off"
-          spellCheck={false}
+          {...verbatimInput}
           placeholder="alice@laptop"
           data-testid="generator-ssh-comment"
           onChange={event => onComment(event.target.value)}

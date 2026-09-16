@@ -5,6 +5,7 @@ import { cx } from '@/utils/cx'
 import { TrashGlyph } from '../../../Main/icons'
 import CopyButton from '../../CopyButton'
 import IconButton from '../../IconButton'
+import { verbatimInput } from '../../inputProps'
 import { HOVER_ONLY, LABEL, LABEL_TYPE, ROW_HAIRLINE, VALUE } from '../../tokens'
 import { RAIL } from '../Row'
 
@@ -57,8 +58,7 @@ export default function CustomFieldRow({
           aria-label={t('Label')}
           placeholder={t('Label')}
           maxLength={60}
-          autoComplete="off"
-          spellCheck={false}
+          {...verbatimInput}
           onChange={event => onChange({ ...field, label: event.target.value })}
           className={cx('w-32 flex-none text-text', LABEL_TYPE, BOX)}
         />
@@ -81,8 +81,7 @@ export default function CustomFieldRow({
             value={field.value}
             aria-label={t('Value')}
             placeholder={t('Value')}
-            autoComplete="off"
-            spellCheck={false}
+            {...verbatimInput}
             onChange={event => onChange({ ...field, value: event.target.value })}
             onKeyDown={onKeyDown}
             className={cx(INK, BOX)}

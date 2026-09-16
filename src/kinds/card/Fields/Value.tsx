@@ -7,6 +7,7 @@ import type { TKey } from '@/i18n'
 type Mask = '•••' | '••••' | '••/••' | '•••• •••• •••• ••••'
 import { useCopied } from '@/hooks/useCopied'
 import { useFields } from '@/components/elements/fields'
+import { verbatimInput } from '@/components/elements/inputProps'
 import { CheckGlyph, CopyGlyph } from '@/components/Main/icons'
 import { LABEL_TYPE, META_TYPE } from '@/components/elements/tokens'
 
@@ -106,8 +107,7 @@ export default function Value({
           // itself — so both cases go down the same path.
           placeholder={t(placeholder as TKey)}
           maxLength={maxLength}
-          autoComplete="off"
-          spellCheck={false}
+          {...verbatimInput}
           onChange={event => onChange(event.target.value)}
           className={cx(
             'block w-full min-w-0 truncate border-b bg-transparent outline-none transition-colors placeholder:text-white/25',
