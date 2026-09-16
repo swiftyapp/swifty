@@ -37,7 +37,7 @@ pub async fn unlock(
     // Before the lockout check and before anything reads the sidecar: a crash
     // during a password change can leave the DB and the sidecar disagreeing, and
     // the rollback has to land before either is consulted.
-    auth::recover_interrupted_rekey(&app)?;
+    auth::recover_interrupted_rekey(&app, &state)?;
 
     let lockout = LockoutState::load(&app)?;
     let now = auth::now_ms();
@@ -124,7 +124,7 @@ pub fn lock(app: AppHandle) -> Result<()> {
 pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<UnlockResult> {
     // Same reason as in `unlock`: roll back an interrupted password change before
     // the sidecar decides how to read the stored material.
-    auth::recover_interrupted_rekey(&app)?;
+    auth::recover_interrupted_rekey(&app, &state)?;
 
     let Some(marker) = storage::biometric_marker(&app) else {
         return Err(Error::Other("biometric unlock is not enabled".into()));

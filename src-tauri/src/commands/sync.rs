@@ -66,7 +66,15 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[tauri::command]
 pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     let cryptor = state.session.lock().unwrap().cryptor()?;
-    let tokens = sync::disconnect(&app, &cryptor);
+    // Bumped *before* the delete, so a token refresh already awaiting Google
+    // finds the generation changed and skips its write-back rather than
+    // re-creating the file this is about to remove (see `AppState::sync_generation`).
+    state.sync_generation.fetch_add(1, Ordering::SeqCst);
+    // `?`, and before anything below it: if the delete failed the token file —
+    // and the usable refresh token in it — is still on disk, so the vault is
+    // still connected. Flipping the session flag or clearing the run state here
+    // would show the user a disconnected account over a live credential.
+    let tokens = sync::disconnect(&app, &cryptor)?;
     state.session.lock().unwrap().sync_configured = false;
     // The timestamp goes with the connection: the next one is a new pairing,
     // and "synced 3m ago" from a previous one would be a lie about it.

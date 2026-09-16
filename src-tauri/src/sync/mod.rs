@@ -109,8 +109,9 @@ pub fn setup(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
 pub use auth::{begin, complete, parse_redirect, redirect_matches, Redirect};
 
 /// Drop the account locally, handing back the tokens that were stored so the
-/// caller can [`revoke`] them.
-pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
+/// caller can [`revoke`] them. An error means the token file is still on disk
+/// and the account is therefore still connected.
+pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<Option<Tokens>> {
     auth::disconnect(app, cryptor)
 }
 

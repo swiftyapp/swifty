@@ -198,6 +198,11 @@ pub fn with_extension(dest: PathBuf, extension: &str) -> PathBuf {
 /// overwrite leaves the old file whole. `atomic_write_private` is desktop-only —
 /// on mobile the only thing written here is the staging copy inside the app's
 /// own sandbox, which the picker consumes and [`Staged`] then removes.
+///
+/// "Owner-only" is a Unix claim: on Windows there is no chmod analog applied, so
+/// the export inherits the ACL of the folder the user picked in the save dialog
+/// — restricted to that user for a per-user profile folder, and their own choice
+/// if they pick a shared one (same gap as `set_mode` in `store/sqlite.rs`).
 pub(crate) fn write_and_scrub(dest: &Path, mut bytes: Vec<u8>) -> Result<()> {
     #[cfg(desktop)]
     let result = crate::storage::atomic_write_private(dest, &bytes);

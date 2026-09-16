@@ -16,6 +16,7 @@ use tauri::AppHandle;
 use crate::crypto::{KdfParams, PayloadCipher, VaultKey};
 use crate::error::{Error, Result};
 use crate::session::{open_with_key, record_kdf_meta, store_err};
+use crate::state::AppState;
 use crate::storage;
 use crate::store::{Record, SqliteStore, VaultStore};
 
@@ -192,12 +193,25 @@ pub fn rekey(
 ///
 /// One `metadata` call when there is nothing to do, which is every unlock but
 /// the vanishingly rare one.
-pub fn recover_interrupted_rekey(app: &AppHandle) -> Result<()> {
+pub fn recover_interrupted_rekey(app: &AppHandle, state: &AppState) -> Result<()> {
+    // All four paths are built from ONE workspace lookup, taken under the
+    // workspace lock. Resolving them one at a time re-read the active workspace
+    // four times, so a `workspace_select` landing between two of them handed
+    // back paths from two different vaults — and the rollback below would then
+    // copy one workspace's snapshot over another workspace's database.
+    //
+    // The lock is released before any file work, matching its documented
+    // discipline (never held across I/O): all it has to guarantee is that the
+    // four paths agree on which vault they belong to.
+    let dir = {
+        let _paths = state.workspace_lock.lock().unwrap();
+        storage::workspace_dir(app)?
+    };
     let rolled_back = restore_rekey_backup(
-        &storage::db_path(app)?,
-        &storage::db_rekey_backup_path(app)?,
-        &storage::kdf_sidecar_path(app)?,
-        &storage::kdf_sidecar_rekey_backup_path(app)?,
+        &dir.join(storage::DB_FILE),
+        &dir.join(storage::DB_REKEY_BACKUP_FILE),
+        &dir.join(storage::KDF_SIDECAR_FILE),
+        &dir.join(storage::KDF_SIDECAR_REKEY_BACKUP_FILE),
     )?;
     if rolled_back {
         log::warn!(

@@ -59,7 +59,12 @@ pub fn root_dir(app: &AppHandle) -> Result<PathBuf> {
 // The active workspace's own directory — which, for the primary, IS the root
 // (see `workspace::dir_of`). Everything belonging to one vault resolves through
 // here, so switching workspaces moves the whole set of paths at once.
-fn workspace_dir(app: &AppHandle) -> Result<PathBuf> {
+//
+// Crate-visible for callers that need several of one workspace's files to be
+// guaranteed to belong to the *same* workspace: resolving each path separately
+// re-reads the active id each time, so a switch landing between two lookups
+// hands back a mixed set (see `auth::recover_interrupted_rekey`).
+pub(crate) fn workspace_dir(app: &AppHandle) -> Result<PathBuf> {
     Ok(crate::workspace::dir_of(
         &root_dir(app)?,
         &crate::workspace::active_id(app),
@@ -182,6 +187,15 @@ pub fn write_lockout_sidecar(app: &AppHandle, json: &str) -> Result<()> {
 // ends up as either the complete old bytes or the complete new bytes — never a
 // truncated/empty file. `write` is injected so failure after a partial temp
 // write is testable; dropping NamedTempFile removes that partial sibling.
+//
+// `private` is Unix-only, and says exactly that much: on Unix the file is
+// created `0600`, so it is owner-readable whatever the umask says and whatever
+// modes an existing file at `path` had. Off Unix it does nothing — the file
+// inherits the ACL of the directory it is written into. For a per-user profile
+// folder that ACL already restricts it to the signed-in user; for a shared or
+// permissive folder it does not, and that folder is the user's own choice at
+// the save dialog. This is the same gap as the Windows-ACL TODO on `set_mode`
+// in `store/sqlite.rs`, which is where a real DACL would go for both.
 fn atomic_replace_with<F>(path: &Path, private: bool, write: F) -> Result<()>
 where
     F: FnOnce(&mut fs::File) -> std::io::Result<()>,
@@ -218,7 +232,15 @@ pub fn atomic_write_file(path: &Path, data: &str) -> Result<()> {
     atomic_replace_with(path, false, |file| file.write_all(data.as_bytes()))
 }
 
-/// Atomically replace a plaintext secret, owner-readable only on Unix.
+/// Atomically replace a plaintext secret.
+///
+/// On Unix the file is created `0600` — owner-only, regardless of the umask or
+/// of how an existing file at `path` was permissioned. On Windows there is no
+/// chmod analog and none is applied: the file inherits the ACL of the directory
+/// the user chose, which for a per-user profile folder is already restricted to
+/// that user, and for a shared or permissive folder is the user's choice at the
+/// save dialog. Cross-linked with the Windows-ACL TODO on `set_mode` in
+/// `store/sqlite.rs`: the same gap, and the same place a DACL would be set.
 #[cfg(desktop)]
 pub fn atomic_write_private(path: &Path, data: &[u8]) -> Result<()> {
     atomic_replace_with(path, true, |file| file.write_all(data))
@@ -254,11 +276,19 @@ pub fn write_gdrive(app: &AppHandle, data: &str) -> Result<()> {
     write_file(&gdrive_path(app)?, data)
 }
 
-// Remove the token file, whatever state a failed write left it in. Absent is
-// fine: this is the rollback of a first-run setup, where "no file" is the goal.
-pub fn remove_gdrive(app: &AppHandle) {
-    if let Ok(path) = gdrive_path(app) {
-        let _ = fs::remove_file(path);
+// Remove the token file, whatever state a failed write left it in. "No file" is
+// the goal, so an already-absent one is success — but every other failure is
+// reported rather than swallowed: a token file that outlives a disconnect is a
+// live refresh token, and a caller told the delete worked would never know.
+pub fn remove_gdrive(app: &AppHandle) -> Result<()> {
+    remove_if_present(&gdrive_path(app)?)
+}
+
+// The file-level half, on a plain path so it is testable without an `AppHandle`.
+fn remove_if_present(path: &Path) -> Result<()> {
+    match fs::remove_file(path) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.into()),
+        _ => Ok(()),
     }
 }
 
@@ -300,7 +330,7 @@ pub fn sync_configured(app: &AppHandle) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{atomic_replace_with, atomic_write_file};
+    use super::{atomic_replace_with, atomic_write_file, remove_if_present};
     use std::fs;
     use std::io::{self, Write};
     use std::path::{Path, PathBuf};
@@ -374,5 +404,18 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), "complete old bytes");
         assert_eq!(fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
+    }
+
+    // The delete behind a Drive disconnect: gone is the goal, so already-gone is
+    // success — but a delete that actually failed must not read as one, or a
+    // caller would report a disconnect over a token file that is still there.
+    #[test]
+    fn removing_an_absent_file_succeeds_and_a_present_one_goes() {
+        let path = tmp_sidecar().with_file_name("gdrive.swftx");
+        remove_if_present(&path).unwrap();
+
+        fs::write(&path, "sealed tokens").unwrap();
+        remove_if_present(&path).unwrap();
+        assert!(!path.exists());
     }
 }

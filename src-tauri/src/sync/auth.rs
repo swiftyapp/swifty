@@ -245,10 +245,14 @@ pub fn is_configured(app: &AppHandle, cryptor: &Cryptor) -> bool {
 ///
 /// Hands back whatever was stored so the caller can revoke it upstream — the
 /// file is gone by then, and this is the last chance to see it.
-pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
+///
+/// A failed delete is an error, not a shrug: the refresh token is still on disk
+/// and still usable, so the only honest answer is that the account is *not*
+/// disconnected. `Ok(None)` means there was nothing stored to revoke.
+pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<Option<Tokens>> {
     let tokens = read_tokens(app, cryptor);
-    storage::remove_gdrive(app);
-    tokens
+    storage::remove_gdrive(app)?;
+    Ok(tokens)
 }
 
 /// The token to revoke. Google kills the whole grant from either half of the
@@ -388,15 +392,37 @@ pub fn parse_redirect(url: &Url, state: &str) -> Redirect {
 
 // Return a valid access token, refreshing it if expired.
 pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -> Result<String> {
+    // Which connection these tokens belong to, read before they are. A refresh
+    // awaits a network round trip between the read and the write-back, and no
+    // lock is held across it (this codebase never holds one across I/O — see
+    // `AppState::workspace_lock`), so a disconnect can delete the token file in
+    // that window; the generation is what lets the write-back notice.
+    let generation = sync_generation(app);
     let mut tokens = read_tokens(app, cryptor).ok_or(Error::SyncNotConfigured)?;
     // Asked before the call, because that is what says whether the file on
     // disk is now out of date — afterwards the tokens look fresh either way.
     let refreshing = needs_refresh(&tokens);
     let token = fresh_access_token(client, app, &mut tokens).await?;
     if refreshing {
-        write_tokens(app, cryptor, &tokens)?;
+        if sync_generation(app) == generation {
+            write_tokens(app, cryptor, &tokens)?;
+        } else {
+            // Skipping the write is the whole point: re-creating the file would
+            // undo the disconnect. The caller still gets this token for the
+            // request it is in the middle of, which is harmless — the file is
+            // gone, so nothing after this can refresh again.
+            log::info!("Drive disconnected mid-refresh; not writing the refreshed tokens back");
+        }
     }
     Ok(token)
+}
+
+// Which Drive connection is current; see `AppState::sync_generation`.
+fn sync_generation(app: &AppHandle) -> u64 {
+    use tauri::Manager;
+    app.state::<crate::state::AppState>()
+        .sync_generation
+        .load(std::sync::atomic::Ordering::SeqCst)
 }
 
 /// A valid access token for `tokens`, refreshing them *in place* if the one

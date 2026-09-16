@@ -57,7 +57,11 @@ edited entry re-seals only that row's payload. Deletes are **tombstones**
 (`deleted_at` is stamped and the row is retained so a later sync can propagate the
 deletion), not hard deletes. On-disk file and directory modes are tightened on
 Unix (`0600` file / `0700` dir); the Windows ACL equivalent is still a TODO
-(`set_mode` no-ops off Unix in `sqlite.rs`).
+(`set_mode` no-ops off Unix in `sqlite.rs`). The same limit applies to plaintext
+exports written through `storage::atomic_write_private`: `0600` on Unix, but on
+Windows they inherit the ACL of the folder chosen in the save dialog — already
+user-restricted for a per-user profile folder, and the user's own choice if they
+save somewhere shared.
 
 ### Key derivation (KDF)
 
