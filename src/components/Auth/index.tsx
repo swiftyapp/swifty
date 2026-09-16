@@ -21,7 +21,7 @@ export function Auth({ biometric, biometry = 'touch' }: Props) {
   const { mascot, eyebrow, field, submit, biometric: unlock, change } = useUnlock()
 
   return (
-    <AuthShell>
+    <AuthShell footer>
       <div className="mb-7 flex justify-center">
         <Mascot state={mascot.state} gaze={mascot.gaze} />
       </div>

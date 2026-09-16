@@ -37,8 +37,9 @@ interface Props {
   // `lock` is the signature card presentation of the lock screen; `compact`
   // (default) is the plain centered field used by setup / restore.
   variant?: 'compact' | 'lock'
-  // Lock only: paint the card as invalid without rendering an inline error
-  // (the lock screen surfaces the message in its eyebrow instead).
+  // Paint the field as invalid without rendering an inline error, for the
+  // screens that surface the message elsewhere: the lock screen in its
+  // eyebrow, the setup screen in its strength line.
   invalid?: boolean
   // Lock only: hold the card on the success tint while the unlock lands.
   success?: boolean

@@ -8,7 +8,7 @@ import type { BiometryType } from '@/api/types'
 import { enableBiometric } from '@/api/auth'
 import { biometryLabel } from '@/lib/biometry'
 import StepHeader from '../shared/StepHeader'
-import { ACTIONS, FOOTNOTE } from '../shared/layout'
+import { COLUMN, STACK, FOOTNOTE } from '../shared/layout'
 import { describeError } from '@/api/errors'
 
 interface Props {
@@ -57,7 +57,7 @@ export default function Biometric({ biometry, onDone }: Props) {
         )}
       />
 
-      <div className={ACTIONS}>
+      <div className={`${COLUMN} mt-8 ${STACK}`}>
         <Button block testid="setup-enable-biometric-button" loading={busy} onClick={enable}>
           {t('Enable {{name}}', { name })}
         </Button>

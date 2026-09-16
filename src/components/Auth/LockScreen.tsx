@@ -36,7 +36,7 @@ export default function LockScreen({ biometric, biometry = 'touch' }: Props) {
   const keep = () => setRevealed(true)
 
   return (
-    <AuthShell>
+    <AuthShell footer>
       <div className="mb-7 flex justify-center">
         <Mascot state={mascot.state} gaze={mascot.gaze} />
       </div>

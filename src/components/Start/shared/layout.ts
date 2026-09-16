@@ -3,9 +3,13 @@
 // two comfortable lines, and drops to the full width of a phone below it.
 export const COLUMN = 'mx-auto w-full max-w-[420px]'
 
-// The call-to-action stack at the foot of a screen: one or two full-width
-// buttons, always the same rhythm.
-export const ACTIONS = `${COLUMN} mt-4 flex flex-col gap-2.5`
+// One or two full-width buttons, always the same rhythm.
+export const STACK = 'flex flex-col gap-2.5'
+
+// The call-to-action stack at the foot of a screen, close under the card it
+// answers. A screen with no card between its header and its buttons gives them
+// more room (`mt-8`) so the choice does not crowd the sentence that poses it.
+export const ACTIONS = `${COLUMN} mt-4 ${STACK}`
 
 // A footnote under the actions: the thing worth knowing, not worth a sentence
 // in the body.

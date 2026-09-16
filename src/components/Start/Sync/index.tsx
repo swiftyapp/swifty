@@ -5,9 +5,8 @@ import Button from '@/components/elements/Button'
 import { META_TYPE } from '@/components/elements/tokens'
 import { useApp, setupDriveReset } from '@/store'
 import StepHeader from '../shared/StepHeader'
-import BenefitsCard from '../shared/BenefitsCard'
 import SpinnerCard from '../shared/SpinnerCard'
-import { COLUMN, ACTIONS, FOOTNOTE } from '../shared/layout'
+import { COLUMN, STACK, FOOTNOTE } from '../shared/layout'
 import { describeError } from '@/api/errors'
 import { connectDrive } from '../shared/driveSession'
 
@@ -19,9 +18,11 @@ interface Props {
   onConflict: () => void
 }
 
-// Step two of a fresh start: where the backup lives. Connecting is also how we
-// find out whether this Google account already holds data — so the answer to
-// the probe, not the press, is what decides where this goes next.
+// Step two of a fresh start: where the backup lives. One question, two
+// answers, and nothing else on screen that could be mistaken for a third.
+// Connecting is also how we find out whether this Google account already
+// holds data — so the answer to the probe, not the press, is what decides
+// where this goes next.
 export default function Sync({ onBack, onCreate, onConflict }: Props) {
   const { t } = useTranslation()
   const drive = useApp(state => state.setupDrive)
@@ -87,7 +88,7 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
           busy
           title={t('Connecting to Google Drive…')}
         />
-        <div className={`${COLUMN} mt-9`}>
+        <div className={`${COLUMN} mt-8`}>
           <SpinnerCard
             testid="setup-drive-spinner"
             caption={t('Checking for existing data first')}
@@ -101,22 +102,10 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
       <StepHeader
         eyebrow={t('Get started · 2 of 2')}
         title={t('Back up to Google Drive')}
-        body={t(
-          "Your encrypted data syncs to Google Drive, so a lost device isn't lost secrets. Only you can read it: your master password never leaves this device."
-        )}
+        body={t("Your data syncs to Google Drive, so a lost device isn't lost secrets.")}
       />
 
-      <div className={`${COLUMN} mt-9`}>
-        <BenefitsCard
-          items={[
-            t('Encrypted before it leaves this device'),
-            t('Other devices unlock with the same master password'),
-            t('Switch off any time in Settings')
-          ]}
-        />
-      </div>
-
-      <div className={ACTIONS}>
+      <div className={`${COLUMN} mt-8 ${STACK}`}>
         <Button block testid="setup-connect-drive-button" disabled={busy} onClick={connect}>
           {t('Connect Google Drive')}
         </Button>
@@ -131,11 +120,15 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
         </Button>
       </div>
 
-      {error && (
-        <p data-testid="setup-drive-error" className={`${FOOTNOTE} ${META_TYPE} text-bad`}>
-          {error}
-        </p>
-      )}
+      {/* The two things worth knowing before pressing, as a footnote rather
+          than a list: a list of rows here read as three more things to press. */}
+      <p
+        data-testid={error ? 'setup-drive-error' : undefined}
+        className={`${FOOTNOTE} ${META_TYPE} ${error ? 'text-bad' : 'text-text3'}`}
+      >
+        {error ??
+          `${t('Encrypted before it leaves this device')} · ${t('Switch off any time in Settings')}`}
+      </p>
     </AuthShell>
   )
 }

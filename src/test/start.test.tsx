@@ -62,6 +62,17 @@ describe('welcome', () => {
     expect(screen.getByTestId('start-restore-button')).toBeInTheDocument()
   })
 
+  // The footer names the vault about to open. There is none yet, so the first
+  // run draws no footer on any of its screens — the lock screen keeps it.
+  it('draws no footer strip during the first run', async () => {
+    render(<Start />)
+    expect(screen.queryByText(/Vault on this device/)).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('start-setup-button'))
+    expect(screen.queryByText(/Vault on this device/)).not.toBeInTheDocument()
+    expect(screen.getByTestId('go-back-button')).toBeInTheDocument()
+  })
+
   // A phone has no file system to hand a `.swftx` export from, so the option
   // that depends on one is not drawn there at all.
   it('hides the backup-file option on mobile', async () => {
@@ -81,12 +92,34 @@ describe('welcome', () => {
 })
 
 describe('choosing a master password', () => {
+  // The confirmation is a check on a password worth keeping, so it unfolds
+  // only once there is one — and stays once it has.
+  it('asks for the confirmation once the password is long enough', async () => {
+    render(<Start />)
+    await userEvent.click(screen.getByTestId('start-setup-button'))
+    const input = screen.getByTestId('setup-password-input')
+
+    await userEvent.type(input, 'a'.repeat(MIN_LENGTH - 1))
+    expect(screen.queryByTestId('setup-confirm-password-input')).not.toBeInTheDocument()
+
+    await userEvent.type(input, 'a')
+    expect(screen.getByTestId('setup-confirm-password-input')).toBeInTheDocument()
+
+    await userEvent.type(input, '{backspace}{backspace}')
+    expect(screen.getByTestId('setup-confirm-password-input')).toBeInTheDocument()
+  })
+
+  // Too short to confirm: Continue says so on the strength line, once, and
+  // the flow goes nowhere.
   it('blocks a weak password without reaching the next step', async () => {
     render(<Start />)
-    await choosePassword('secret')
+    await userEvent.click(screen.getByTestId('start-setup-button'))
+    await userEvent.type(screen.getByTestId('setup-password-input'), 'secret')
+    await userEvent.click(screen.getByTestId('setup-continue-button'))
 
-    expect((await screen.findAllByText(/Use at least/)).length).toBeGreaterThan(0)
+    expect(await screen.findAllByText(/Use at least/)).toHaveLength(1)
     expect(screen.getByTestId('setup-password-input')).toBeInTheDocument()
+    expect(screen.queryByTestId('setup-confirm-password-input')).not.toBeInTheDocument()
     expect(screen.queryByTestId('setup-skip-drive-button')).not.toBeInTheDocument()
   })
 

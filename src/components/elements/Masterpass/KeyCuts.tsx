@@ -1,7 +1,9 @@
 import { cx } from '@/utils/cx'
 
-// Decorative "key teeth" heights, cycled per character (from the prototype).
-const HEIGHTS = [11, 5, 15, 8, 18, 4, 13, 7, 16, 6, 12, 9, 17, 5, 14, 10, 8, 15, 6, 12]
+// Decorative "key teeth" heights, cycled per character (from the prototype,
+// at half its scale: the cuts mark that something has been typed, they do not
+// fill the space between one field and the next).
+const HEIGHTS = [6, 3, 8, 4, 9, 2, 7, 4, 8, 3, 6, 5, 9, 3, 7, 5, 4, 8, 3, 6]
 const MAX_CUTS = 40
 
 type Tone = 'idle' | 'bad'
@@ -21,7 +23,7 @@ export default function KeyCuts({ count, tone = 'idle' }: Props) {
   const bars = Math.min(count, MAX_CUTS)
 
   return (
-    <div className="relative h-[30px] overflow-hidden">
+    <div className="relative h-[14px] overflow-hidden">
       <div
         className={cx(
           'absolute inset-x-0 top-0 h-px transition-colors duration-300',
