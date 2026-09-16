@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { useTween } from '@/hooks/useTween'
 import AsteriskBody from './Asterisk'
 import { smileEye } from './mascotEyes'
 
@@ -61,7 +62,9 @@ function Mascot({
   const gazeX = ok || bad || checking ? 0 : Math.max(-1, Math.min(1, gaze)) * 3
   const gazeY = checking ? 1.5 : typing ? 2.5 : 0
   const eyeRy = checking ? 3 : typing ? 4.3 : 5
-  const cheer = Math.max(0, Math.min(1, joy))
+  // The smile eases from one level to the next rather than snapping, so a
+  // step forward is seen to brighten it.
+  const cheer = useTween(Math.max(0, Math.min(1, joy)), 360)
 
   return (
     <svg
@@ -71,7 +74,7 @@ function Mascot({
       aria-hidden
       data-testid="lock-mascot"
       data-state={state}
-      data-joy={cheer}
+      data-joy={joy}
       className={bodyAnim}
     >
       <AsteriskBody style={{ fill, transition: 'fill 300ms ease' }} />

@@ -1,7 +1,10 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BiometryType, UnlockResult } from '@/api/types'
 import { setupCreate } from '@/api/setup'
 import { enterMain, useApp } from '@/store'
+import AuthShell from '@/components/elements/AuthShell'
+import Mascot, { type MascotState } from '@/components/elements/Mascot'
+import BiometryGlyph from '@/components/elements/BiometryGlyph'
 import Welcome from './Welcome'
 import Password from './Password'
 import Sync from './Sync'
@@ -13,15 +16,34 @@ import { connectDrive, forgetDrive } from './shared/driveSession'
 
 type Screen = 'welcome' | 'password' | 'sync' | 'conflict' | 'drive' | 'file' | 'biometric'
 
+// How far along each screen is, as the mascot's smile tells it: neutral on
+// the welcome, brightening through the middle, all the way once the vault is
+// about to exist. The restore path sits half way, as the password step does.
+const JOY: Record<Screen, number> = {
+  welcome: 0,
+  password: 0.5,
+  sync: 1,
+  conflict: 0.5,
+  drive: 0.5,
+  file: 0.5,
+  biometric: 1
+}
+
 /**
  * The first run, end to end.
  *
  * Screens are a stack rather than a graph: every one of them is reached from
  * exactly one place, so "back" is "pop" and no screen has to know who sent it.
  * The two screens with nothing behind them — the welcome, and the biometric
- * question once the session is already open — are the two that draw no Go Back,
+ * question once the session is already open — are the two that draw no Back,
  * which falls out of the stack being one deep rather than being decided again
  * per screen.
+ *
+ * The shell, the Back button and the mascot are drawn here, once, and stay
+ * mounted from screen to screen: only the content under the mascot changes,
+ * and it slides in from the side it came from — the right going forward, the
+ * left coming back — while the mascot's smile eases to the new step's level.
+ * Each screen is only its content.
  *
  * Nothing here enters the app until the very end: unlocking is not the last
  * step, enrolling a fingerprint is, and that can only be asked of an open
@@ -30,6 +52,17 @@ type Screen = 'welcome' | 'password' | 'sync' | 'conflict' | 'drive' | 'file' | 
 export function Start() {
   const [stack, setStack] = useState<Screen[]>(['welcome'])
   const screen = stack[stack.length - 1]
+  // Which way the last move went, so the arriving content knows which side
+  // to come in from.
+  const [direction, setDirection] = useState<'forward' | 'back'>('forward')
+
+  // The shell outlives the screens now, and so would its scroll position: a
+  // step read to the bottom on a short screen would hand the next step over
+  // part way down. Every arrival starts at the top.
+  const shell = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (shell.current) shell.current.scrollTop = 0
+  }, [screen])
 
   const [password, setPassword] = useState('')
   // Consent already given, on the way through the restore screen: the create
@@ -38,7 +71,18 @@ export function Start() {
   const [result, setResult] = useState<UnlockResult | null>(null)
   const [biometry, setBiometry] = useState<BiometryType>('touch')
 
-  const go = (next: Screen) => setStack(current => [...current, next])
+  // The Drive probe's state colours the mascot on the screens that are
+  // waiting on it: eyes narrowed while consent is out, a head shake when
+  // Google did not answer.
+  const drive = useApp(state => state.setupDrive.status)
+  const waiting = (screen === 'drive' || screen === 'sync') && drive === 'pending'
+  const failed = screen === 'drive' && drive === 'error'
+  const mood: MascotState = failed ? 'error' : waiting ? 'checking' : 'idle'
+
+  const go = (next: Screen) => {
+    setDirection('forward')
+    setStack(current => [...current, next])
+  }
 
   const back = () => {
     // Stepping out of the Drive screen towards the welcome gives the tokens
@@ -58,6 +102,7 @@ export function Start() {
     // and the next visit to this step would read "empty" and create at once,
     // never having asked.
     if (screen === 'sync') forgetDrive()
+    setDirection('back')
     setStack(current => (current.length > 1 ? current.slice(0, -1) : current))
   }
 
@@ -76,6 +121,7 @@ export function Start() {
     setResult(unlocked)
     setBiometry(biometric.type)
     // Replaces the stack: there is no going back from an unlocked session.
+    setDirection('forward')
     setStack(['biometric'])
   }, [])
 
@@ -106,63 +152,80 @@ export function Start() {
     return Promise.resolve()
   }
 
-  switch (screen) {
-    case 'welcome':
-      return (
-        <Welcome
-          onFresh={() => go('password')}
-          onDrive={openDrive}
-          onFile={() => go('file')}
-        />
-      )
-    case 'password':
-      return <Password onBack={back} onContinue={continueFromPassword} />
-    case 'sync':
-      return (
-        <Sync
-          onBack={back}
-          onCreate={createWithPassword}
-          onConflict={() => go('conflict')}
-        />
-      )
-    case 'conflict':
-      return (
-        <Conflict
-          onBack={back}
-          onUnlockExisting={() => go('drive')}
-          onArchive={archiveAndCreate}
-        />
-      )
-    case 'drive':
-      return (
-        <Drive
-          onBack={back}
-          onStartFresh={() => {
-            setDriveLinked(true)
-            go('password')
-          }}
-          onUseFile={() => {
-            // Restoring from a file is leaving this account behind: the tokens
-            // it holds would otherwise outlive the flow in the backend's memory.
-            forgetDrive()
-            setDriveLinked(false)
-            go('file')
-          }}
-          onRestored={finish}
-        />
-      )
-    case 'file':
-      return <File onBack={back} onRestored={finish} />
-    case 'biometric':
-      return (
-        <Biometric
-          biometry={biometry}
-          onDone={() => {
-            if (result) void enterMain(result)
-          }}
-        />
-      )
+  const content = () => {
+    switch (screen) {
+      case 'welcome':
+        return (
+          <Welcome
+            onFresh={() => go('password')}
+            onDrive={openDrive}
+            onFile={() => go('file')}
+          />
+        )
+      case 'password':
+        return <Password onContinue={continueFromPassword} />
+      case 'sync':
+        return <Sync onCreate={createWithPassword} onConflict={() => go('conflict')} />
+      case 'conflict':
+        return (
+          <Conflict onUnlockExisting={() => go('drive')} onArchive={archiveAndCreate} />
+        )
+      case 'drive':
+        return (
+          <Drive
+            onStartFresh={() => {
+              setDriveLinked(true)
+              go('password')
+            }}
+            onUseFile={() => {
+              // Restoring from a file is leaving this account behind: the
+              // tokens it holds would otherwise outlive the flow in the
+              // backend's memory.
+              forgetDrive()
+              setDriveLinked(false)
+              go('file')
+            }}
+            onRestored={finish}
+          />
+        )
+      case 'file':
+        return <File onRestored={finish} />
+      case 'biometric':
+        return (
+          <Biometric
+            biometry={biometry}
+            onDone={() => {
+              if (result) void enterMain(result)
+            }}
+          />
+        )
+    }
   }
+
+  return (
+    <AuthShell ref={shell} onBack={stack.length > 1 ? back : undefined}>
+      <div className="mb-6 flex justify-center">
+        {/* The last question is about the device's own gate, so that is what
+            sits above it — the mascot has seen the user through. */}
+        {screen === 'biometric' ? (
+          <span className="grid h-16 w-16 place-items-center rounded-xl bg-tile text-touchid">
+            <BiometryGlyph type={biometry} size={30} />
+          </span>
+        ) : (
+          <Mascot state={mood} joy={JOY[screen]} />
+        )}
+      </div>
+      {/* Keyed on the screen: a new key is a fresh element, which is what
+          runs the arrival animation. Content changing within a screen (the
+          Drive probe answering) redraws in place. */}
+      <div
+        key={screen}
+        className={direction === 'back' ? 'animate-step-back' : 'animate-step-forward'}
+      >
+        {content()}
+      </div>
+    </AuthShell>
+  )
 }
 
 export default Start

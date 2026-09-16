@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import AuthShell from '@/components/elements/AuthShell'
 import Button from '@/components/elements/Button'
-import BiometryGlyph from '@/components/elements/BiometryGlyph'
 import { META_TYPE } from '@/components/elements/tokens'
 import type { BiometryType } from '@/api/types'
 import { enableBiometric } from '@/api/auth'
@@ -42,13 +40,8 @@ export default function Biometric({ biometry, onDone }: Props) {
   }
 
   return (
-    <AuthShell>
+    <>
       <StepHeader
-        mark={
-          <span className="grid h-16 w-16 place-items-center rounded-xl bg-tile text-touchid">
-            <BiometryGlyph type={biometry} size={30} />
-          </span>
-        }
         eyebrow={t('One last thing')}
         title={t('Unlock with {{name}}?', { name })}
         body={t(
@@ -70,6 +63,6 @@ export default function Biometric({ biometry, onDone }: Props) {
           {error}
         </p>
       )}
-    </AuthShell>
+    </>
   )
 }

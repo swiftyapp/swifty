@@ -62,6 +62,22 @@ describe('welcome', () => {
     expect(screen.getByTestId('start-restore-button')).toBeInTheDocument()
   })
 
+  // The mascot belongs to the flow, not the screen: the same element stays
+  // mounted from step to step and brightens as the steps go by.
+  it('keeps one mascot through the steps and brightens it', async () => {
+    render(<Start />)
+    const mascot = screen.getByTestId('lock-mascot')
+    expect(mascot).toHaveAttribute('data-joy', '0')
+
+    await userEvent.click(screen.getByTestId('start-setup-button'))
+    expect(screen.getByTestId('lock-mascot')).toBe(mascot)
+    expect(mascot).toHaveAttribute('data-joy', '0.5')
+
+    await userEvent.click(screen.getByTestId('go-back-button'))
+    expect(screen.getByTestId('lock-mascot')).toBe(mascot)
+    expect(mascot).toHaveAttribute('data-joy', '0')
+  })
+
   // The footer names the vault about to open. There is none yet, so the first
   // run draws no footer on any of its screens — the lock screen keeps it.
   it('draws no footer strip during the first run', async () => {

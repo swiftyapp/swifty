@@ -1,6 +1,5 @@
 import { useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import AuthShell from '@/components/elements/AuthShell'
 import Masterpass from '@/components/elements/Masterpass'
 import PasswordStrength from '@/components/elements/PasswordStrength'
 import Button from '@/components/elements/Button'
@@ -11,7 +10,6 @@ import { COLUMN } from '../shared/layout'
 import { describeError } from '@/api/errors'
 
 interface Props {
-  onBack: () => void
   /**
    * Hands the accepted password on. Resolves when the flow has moved; rejects
    * with whatever the backend said if this was the last step (a Drive the user
@@ -25,7 +23,7 @@ interface Props {
 // the screen opens with one field, and the confirmation unfolds under it once
 // the password is long enough to be worth confirming. Until then the strength
 // line is the only other thing on screen, and the one thing to act on.
-export default function Password({ onBack, onContinue }: Props) {
+export default function Password({ onContinue }: Props) {
   const { t } = useTranslation()
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
@@ -110,9 +108,8 @@ export default function Password({ onBack, onContinue }: Props) {
   }
 
   return (
-    <AuthShell onBack={onBack}>
+    <>
       <StepHeader
-        progress={0.5}
         eyebrow={t('Get started · 1 of 2')}
         title={t('Choose a master password')}
         body={t("Rowel can't reset it for you, so pick one you'll remember.")}
@@ -158,6 +155,6 @@ export default function Password({ onBack, onContinue }: Props) {
           </Button>
         </div>
       </div>
-    </AuthShell>
+    </>
   )
 }

@@ -51,6 +51,31 @@
     transform: none;
   }
 }
+/*
+ * A setup step arriving under the mascot: from the right going forward, from
+ * the left coming back. Further and slower than the phone sheet — this is a
+ * change of place, and has to be seen as one.
+ */
+@keyframes step-forward {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes step-back {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 /* A screen arriving from the bottom edge — the phone shell's slide-up form. */
 @keyframes rise {
   from {
@@ -425,6 +450,8 @@
   --animate-fade: fade 160ms var(--ease-swift) both;
   --animate-pop: pop 160ms var(--ease-swift) both;
   --animate-sheet: sheet 160ms var(--ease-swift) both;
+  --animate-step-forward: step-forward 240ms var(--ease-swift) both;
+  --animate-step-back: step-back 240ms var(--ease-swift) both;
   --animate-rise: rise 300ms var(--ease-swift) both;
   --animate-unfold: unfold 300ms var(--ease-swift) both;
 }
