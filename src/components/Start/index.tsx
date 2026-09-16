@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BiometryType, UnlockResult } from '@/api/types'
 import { setupCreate } from '@/api/setup'
 import { enterMain, useApp } from '@/store'
@@ -55,6 +55,14 @@ export function Start() {
   // Which way the last move went, so the arriving content knows which side
   // to come in from.
   const [direction, setDirection] = useState<'forward' | 'back'>('forward')
+
+  // The shell outlives the screens now, and so would its scroll position: a
+  // step read to the bottom on a short screen would hand the next step over
+  // part way down. Every arrival starts at the top.
+  const shell = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (shell.current) shell.current.scrollTop = 0
+  }, [screen])
 
   const [password, setPassword] = useState('')
   // Consent already given, on the way through the restore screen: the create
@@ -195,7 +203,7 @@ export function Start() {
   }
 
   return (
-    <AuthShell onBack={stack.length > 1 ? back : undefined}>
+    <AuthShell ref={shell} onBack={stack.length > 1 ? back : undefined}>
       <div className="mb-6 flex justify-center">
         {/* The last question is about the device's own gate, so that is what
             sits above it — the mascot has seen the user through. */}

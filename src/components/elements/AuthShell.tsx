@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
 import { useAuthMeta } from '@/hooks/useAuthMeta'
@@ -14,6 +14,12 @@ interface Props {
    * no vault yet, so it draws none — and nothing else sits under its content.
    */
   footer?: boolean
+  /**
+   * The scrolling ground itself, for a caller that keeps the shell mounted
+   * across screens and has to put the scroll back at the top when the screen
+   * under it changes (see Start).
+   */
+  ref?: Ref<HTMLDivElement>
 }
 
 // The shared full-height, centered auth ground: a neutral background (via the
@@ -21,7 +27,7 @@ interface Props {
 // behind a max-560px centered column. "Back" sits top-left, where every
 // stepped flow puts it, clear of the content it steps away from; the footer
 // strip is opt-in. Reused by the lock, setup and restore screens.
-export default function AuthShell({ children, onBack, footer }: Props) {
+export default function AuthShell({ children, onBack, footer, ref }: Props) {
   const { t } = useTranslation()
   const meta = useAuthMeta()
   return (
@@ -33,6 +39,7 @@ export default function AuthShell({ children, onBack, footer }: Props) {
     // same 768px the shell switches on — every one of those is off again and
     // the wide layout is what it was.
     <div
+      ref={ref}
       className={cx(
         'relative flex h-full flex-col items-center overflow-x-hidden overflow-y-auto overscroll-contain bg-app px-5 pt-[calc(env(safe-area-inset-top)+2.75rem)] text-text select-none md:px-10 md:pt-0 md:pb-0',
         footer ? 'pb-[calc(env(safe-area-inset-bottom)+3.25rem)]' : 'pb-[env(safe-area-inset-bottom)]'
