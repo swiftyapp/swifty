@@ -538,5 +538,16 @@
   "No API keys yet": "Brak kluczy API",
   "No matches for “{{query}}” in SSH keys": "Brak wyników dla „{{query}}” w kluczach SSH",
   "No matches for “{{query}}” in env files": "Brak wyników dla „{{query}}” w plikach env",
-  "No matches for “{{query}}” in API keys": "Brak wyników dla „{{query}}” w kluczach API"
+  "No matches for “{{query}}” in API keys": "Brak wyników dla „{{query}}” w kluczach API",
+  "Personal": "Osobista",
+  "Workspaces": "Przestrzenie robocze",
+  "Workspace name": "Nazwa przestrzeni roboczej",
+  "New workspace": "Nowa przestrzeń robocza",
+  "Add a workspace": "Dodaj przestrzeń roboczą",
+  "Current": "Bieżąca",
+  "Switch": "Przełącz",
+  "Create": "Utwórz",
+  "Fill in the name": "Wpisz nazwę",
+  "Sync is available in the primary workspace only.": "Synchronizacja działa tylko w głównej przestrzeni roboczej.",
+  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "Każda przestrzeń robocza to osobna zaszyfrowana baza danych z własnym hasłem głównym. Synchronizacja i odblokowanie biometryczne na razie pozostają w głównej przestrzeni roboczej."
 }
