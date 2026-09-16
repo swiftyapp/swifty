@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import * as ts from 'typescript'
 import libRs from '../../src-tauri/src/lib.rs?raw'
 import eventsRs from '../../src-tauri/src/events.rs?raw'
 import errorRs from '../../src-tauri/src/error.rs?raw'
 import errorsTs from './errors.ts?raw'
-import e2eTs from '@/lib/e2e.ts?raw'
 import { EVENTS } from './events'
 
 // The bridge is written by hand on both sides. This is what keeps the two from
@@ -11,21 +11,132 @@ import { EVENTS } from './events'
 // event it listens for must be one Rust can emit, and every kind a rejection
 // can carry must be one the webview knows how to say — and the other way round,
 // so nothing is left registered, emitted or translated that no one uses.
+//
+// "Invokes" means *reached*, not merely *wrapped*. A wrapper in `@/api` that
+// nothing under `src/` calls is exactly as dead as the command behind it, and a
+// dead command is a liability rather than a loose end: `auth::setup` sat
+// registered for a release, skipping the guards `setup_create` applies, and
+// nothing here failed. So "reached" is read off the syntax tree, not the text —
+// a call expression on a name the file imported — because an import left
+// unused, a re-export, a `typeof` or a mention in a comment would otherwise
+// keep a dead wrapper, and its command, alive.
 
-const api = import.meta.glob('./*.ts', { query: '?raw', import: 'default', eager: true })
+// Every source under `src/`, production only. Test files and the test harness
+// count for nothing: a wrapper kept alive by its own test is still dead.
+const sources = (
+  Object.entries(
+    import.meta.glob('../**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true })
+  ) as [string, string][]
+).filter(([path]) => !/\.test\.tsx?$/.test(path) && !path.startsWith('../test/'))
+
+// Vite normalises a glob key against the importing module, so the wrappers —
+// this file's own directory, `@/api` — come back as `./<name>.ts`.
+const isApi = (path: string) => path.startsWith('./')
 
 // A set: one command invoked from two places is still one command.
+const unique = (names: Iterable<string>) => [...new Set(names)].sort()
+
 const names = (source: string, pattern: RegExp) =>
-  [...new Set([...source.matchAll(pattern)].map(m => m[1]))].sort()
+  unique([...source.matchAll(pattern)].map(m => m[1]))
+
+// One module as a tree. Parent links on, so a node can be placed in its scope.
+const parse = (path: string, source: string) =>
+  ts.createSourceFile(
+    path,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    path.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  )
+
+const walk = (root: ts.Node, visit: (node: ts.Node) => void) => {
+  visit(root)
+  ts.forEachChild(root, child => walk(child, visit))
+}
+
+// The command a `<callee>('…')` names, when `node` is one; generics
+// (`invoke<Settings>('…')`) sit beside the callee, not in it.
+const commandNamed = (node: ts.CallExpression, callee: string): string | null => {
+  const [first] = node.arguments
+  return ts.isIdentifier(node.expression) &&
+    node.expression.text === callee &&
+    first !== undefined &&
+    ts.isStringLiteral(first)
+    ? first.text
+    : null
+}
+
+/**
+ * What one module does with the bridge: the value names it imports, the names
+ * it calls, and the commands it hands to `invoke` itself.
+ */
+interface Usage {
+  imported: Set<string>
+  called: Set<string>
+  direct: Set<string>
+}
+
+export const usage = (path: string, source: string): Usage => {
+  const imported = new Set<string>()
+  const called = new Set<string>()
+  const direct = new Set<string>()
+  walk(parse(path, source), node => {
+    if (ts.isImportDeclaration(node) && !node.importClause?.isTypeOnly) {
+      const bindings = node.importClause?.namedBindings
+      if (bindings && ts.isNamedImports(bindings)) {
+        for (const element of bindings.elements) {
+          if (!element.isTypeOnly) imported.add(element.name.text)
+        }
+      }
+    }
+    if (ts.isCallExpression(node)) {
+      const command = commandNamed(node, 'invoke')
+      if (command) direct.add(command)
+      else if (ts.isIdentifier(node.expression)) called.add(node.expression.text)
+    }
+  })
+  return { imported, called, direct }
+}
+
+/**
+ * The command each `@/api` wrapper reaches, and the file that declares it: an
+ * exported `const` whose initializer contains `call('<command>')`. Read per
+ * declaration off the tree, so one with no call of its own cannot borrow the
+ * next one's.
+ */
+const wrappers = () => {
+  const found = new Map<string, { command: string; declaredIn: string }>()
+  for (const [declaredIn, source] of sources.filter(([path]) => isApi(path))) {
+    walk(parse(declaredIn, source), node => {
+      if (!ts.isVariableStatement(node)) return
+      if (!node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) return
+      for (const declaration of node.declarationList.declarations) {
+        if (!ts.isIdentifier(declaration.name) || !declaration.initializer) continue
+        let command: string | null = null
+        walk(declaration.initializer, inner => {
+          if (ts.isCallExpression(inner)) command ??= commandNamed(inner, 'call')
+        })
+        if (command) found.set(declaration.name.text, { command, declaredIn })
+      }
+    })
+  }
+  return found
+}
 
 const invoked = () => {
-  const sources = Object.entries(api)
-    .filter(([path]) => !path.endsWith('.test.ts'))
-    .map(([, source]) => source as string)
-  return names(
-    [...sources, e2eTs].join('\n'),
-    /\b(?:call|invoke)(?:<[^>]*>)?\(\s*'([a-z_0-9]+)'/g
-  )
+  const usages = sources.map(([path, source]) => [path, usage(path, source)] as const)
+  const reached = [...wrappers()]
+    .filter(([wrapper, { declaredIn }]) =>
+      usages.some(
+        ([path, { imported, called }]) =>
+          path !== declaredIn && imported.has(wrapper) && called.has(wrapper)
+      )
+    )
+    .map(([, { command }]) => command)
+  // Commands handed straight to `invoke`, outside the wrappers: the dev-only
+  // E2E bridge is the only one.
+  const direct = usages.filter(([path]) => !isApi(path)).flatMap(([, { direct }]) => [...direct])
+  return unique([...reached, ...direct])
 }
 
 const registered = () => {
@@ -45,7 +156,8 @@ const kinds = () => {
 }
 
 // The `BackendErrorKind` union, up to the blank line that ends it.
-const declared = () => names(errorsTs.match(/BackendErrorKind =([\s\S]*?)\n\n/)?.[1] ?? '', /'(\w+)'/g)
+const declared = () =>
+  names(errorsTs.match(/BackendErrorKind =([\s\S]*?)\n\n/)?.[1] ?? '', /'(\w+)'/g)
 
 // The arms of `describeError`.
 const translated = () => names(errorsTs, /case '(\w+)':/g)
@@ -71,5 +183,42 @@ describe('the Rust/webview contract', () => {
 
   it('translates every kind that is not raw diagnostics', () => {
     expect(translated()).toEqual(kinds().filter(kind => !RAW.includes(kind)))
+  })
+})
+
+// What the tripwire above accepts as "reached", pinned so it cannot quietly
+// widen back into text matching.
+describe('what counts as reaching a wrapper', () => {
+  const probe = (body: string) =>
+    usage('probe.ts', `import { appStatus } from '@/api/app'\n${body}\n`)
+
+  it('a call on the imported name', () => {
+    expect(probe('void appStatus()').called.has('appStatus')).toBe(true)
+  })
+
+  it('not a mention that never calls it', () => {
+    for (const body of [
+      '// appStatus() would go here',
+      "const label = 'appStatus()'",
+      'type Probe = typeof appStatus',
+      'export { appStatus }',
+      'const alias = appStatus',
+      'export default appStatus'
+    ]) {
+      expect(probe(body).called.has('appStatus'), body).toBe(false)
+    }
+  })
+
+  it('a type-only import is not an import of the wrapper', () => {
+    const { imported } = usage('probe.ts', "import type { appStatus } from '@/api/app'\n")
+    expect(imported.has('appStatus')).toBe(false)
+  })
+
+  it('a bare invoke names its command', () => {
+    const { direct } = usage(
+      'e2e.ts',
+      "import { invoke } from '@tauri-apps/api/core'\nvoid invoke<void>('e2e_reset', { mode })\n"
+    )
+    expect([...direct]).toEqual(['e2e_reset'])
   })
 })
