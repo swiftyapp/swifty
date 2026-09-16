@@ -115,12 +115,14 @@ impl SqliteStore {
         )
         .map_err(|e| wrong_key_or(existed, e))?;
 
-        // Force key verification on an existing DB (a wrong key errors only on read).
+        // Force key verification on an existing DB (a wrong key errors only on
+        // read). Same mapping as above: only SQLCipher's "not a database" is the
+        // key's fault; a busy lock or an I/O error here keeps its own cause.
         if existed {
             conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| {
                 r.get::<_, i64>(0)
             })
-            .map_err(|_| StoreError::WrongKey)?;
+            .map_err(|e| wrong_key_or(existed, e))?;
         }
 
         // A vault stamped by a newer build must surface as "update the app",
