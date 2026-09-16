@@ -26,7 +26,6 @@ const DEFAULTS: Record<string, Handler> = {
   app_status: () => ({
     initialized: true,
     version: '1.0.0',
-    locale: 'en-US',
     syncConfigured: false,
     syncPending: false,
     // Off by default, so no suite sees a scan affordance it did not ask for.

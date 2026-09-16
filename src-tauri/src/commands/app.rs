@@ -9,7 +9,7 @@ use tauri::{AppHandle, State};
 use crate::error::Result;
 use crate::secure_store::{self, GateMode};
 use crate::state::AppState;
-use crate::{biometrics, locale, scan, storage};
+use crate::{biometrics, scan, storage};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,6 @@ pub struct AppStatus {
     /// the app starts fresh and offers an explicit import instead.
     initialized: bool,
     version: String,
-    locale: String,
     sync_configured: bool,
     /// A consent flow is out with the browser. Owned here, not by the frontend:
     /// the backend is what starts and ends it, so it is the one that can say.
@@ -71,7 +70,6 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
     Ok(AppStatus {
         initialized: storage::db_exists(&app),
         version: app.package_info().version.to_string(),
-        locale: locale::system_locale(),
         sync_configured,
         sync_pending,
         scan_supported: scan::is_supported(),

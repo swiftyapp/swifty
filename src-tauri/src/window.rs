@@ -31,6 +31,10 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let ready_latch = revealed.clone();
     #[allow(unused_mut)]
     let mut builder = WebviewWindowBuilder::from_config(app, &config)?
+        // The OS locale is known before the window exists, so hand it to the page
+        // up front instead of making the frontend ask for it over IPC — a round
+        // trip that would otherwise sit between startup and the first paint.
+        .initialization_script(locale_script())
         .on_navigation(move |url| navigate(&handle, url))
         // Config creates the window hidden: an empty window would otherwise sit
         // on screen through the whole bundle load, and with an overlay title bar
@@ -69,6 +73,14 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     });
 
     Ok(())
+}
+
+// `window.__ROWEL_LOCALE__ = "de-DE"`, read by src/i18n when no explicit choice
+// is stored. serde_json does the quoting and escaping.
+fn locale_script() -> String {
+    let locale = serde_json::to_string(&crate::locale::system_locale())
+        .unwrap_or_else(|_| "\"en-US\"".to_string());
+    format!("window.__ROWEL_LOCALE__ = {locale};")
 }
 
 // Give the page the whole screen. WKWebView's scroll view inherits UIKit's

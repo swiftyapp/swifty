@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore, changeTheme } from '@/store'
-import { LANGUAGES, type TKey } from '@/i18n'
+import { LANGUAGES, changeLocale, type TKey } from '@/i18n'
 import { getFormat, setFormat, DATE_FORMATS, type DateFormat } from '@/defaults/dateFormat'
 import type { ThemePreference } from '@/theme'
 import SettingsGroup from '@/components/elements/SettingsGroup'
@@ -37,7 +37,7 @@ export default function Language() {
         <RadioList
           name="locale"
           value={i18n.resolvedLanguage ?? ''}
-          onChange={locale => void i18n.changeLanguage(locale)}
+          onChange={locale => void changeLocale(locale)}
           testidPrefix="settings-locale"
           options={Object.keys(LANGUAGES).map(key => ({
             value: key,

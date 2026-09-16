@@ -4,8 +4,9 @@
 //! user's actual system setting — so the OS is the only authority worth asking.
 //!
 //! This is the *system* locale only, used when the user has never chosen one.
-//! An explicit choice is a preference the frontend persists and pushes back
-//! down, the same way the autolock timeout works.
+//! It is injected into the page as a global at window creation (see
+//! `window::create`), so the frontend has it before its first paint. An explicit
+//! choice lives in the webview's localStorage and Rust never sees it.
 
 use sys_locale::get_locale;
 

@@ -3,19 +3,13 @@ import type { BiometricMode, BiometryType } from './types'
 
 /**
  * Everything the shell needs to decide what to draw, in one round trip: is
- * there data on disk, which language, whether sync and scanning exist here, and
- * how the biometric gate stands. It was four probes on boot and three more
- * scattered over the app, all of which raced each other.
+ * there data on disk, whether sync and scanning exist here, and how the
+ * biometric gate stands. It was four probes on boot and three more scattered
+ * over the app, all of which raced each other.
  */
 export interface AppStatus {
   initialized: boolean
   version: string
-  /**
-   * The OS locale, already narrowed to a catalog the app ships. Read from the
-   * system rather than `navigator.language`, which reports the webview engine's
-   * configuration and disagrees with the OS on some Linux and Windows setups.
-   */
-  locale: string
   syncConfigured: boolean
   /** A consent flow is out with the browser (see `sync:pending` in events.ts). */
   syncPending: boolean
