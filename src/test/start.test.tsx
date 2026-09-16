@@ -62,6 +62,17 @@ describe('welcome', () => {
     expect(screen.getByTestId('start-restore-button')).toBeInTheDocument()
   })
 
+  // The footer names the vault about to open. There is none yet, so the first
+  // run draws no footer on any of its screens — the lock screen keeps it.
+  it('draws no footer strip during the first run', async () => {
+    render(<Start />)
+    expect(screen.queryByText(/Vault on this device/)).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('start-setup-button'))
+    expect(screen.queryByText(/Vault on this device/)).not.toBeInTheDocument()
+    expect(screen.getByTestId('go-back-button')).toBeInTheDocument()
+  })
+
   // A phone has no file system to hand a `.swftx` export from, so the option
   // that depends on one is not drawn there at all.
   it('hides the backup-file option on mobile', async () => {
@@ -81,12 +92,34 @@ describe('welcome', () => {
 })
 
 describe('choosing a master password', () => {
+  // The confirmation is a check on a password worth keeping, so it unfolds
+  // only once there is one — and stays once it has.
+  it('asks for the confirmation once the password is long enough', async () => {
+    render(<Start />)
+    await userEvent.click(screen.getByTestId('start-setup-button'))
+    const input = screen.getByTestId('setup-password-input')
+
+    await userEvent.type(input, 'a'.repeat(MIN_LENGTH - 1))
+    expect(screen.queryByTestId('setup-confirm-password-input')).not.toBeInTheDocument()
+
+    await userEvent.type(input, 'a')
+    expect(screen.getByTestId('setup-confirm-password-input')).toBeInTheDocument()
+
+    await userEvent.type(input, '{backspace}{backspace}')
+    expect(screen.getByTestId('setup-confirm-password-input')).toBeInTheDocument()
+  })
+
+  // Too short to confirm: Continue says so on the strength line, once, and
+  // the flow goes nowhere.
   it('blocks a weak password without reaching the next step', async () => {
     render(<Start />)
-    await choosePassword('secret')
+    await userEvent.click(screen.getByTestId('start-setup-button'))
+    await userEvent.type(screen.getByTestId('setup-password-input'), 'secret')
+    await userEvent.click(screen.getByTestId('setup-continue-button'))
 
-    expect((await screen.findAllByText(/Use at least/)).length).toBeGreaterThan(0)
+    expect(await screen.findAllByText(/Use at least/)).toHaveLength(1)
     expect(screen.getByTestId('setup-password-input')).toBeInTheDocument()
+    expect(screen.queryByTestId('setup-confirm-password-input')).not.toBeInTheDocument()
     expect(screen.queryByTestId('setup-skip-drive-button')).not.toBeInTheDocument()
   })
 
@@ -96,6 +129,43 @@ describe('choosing a master password', () => {
 
     expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
     expect(calls('setup_create')).toHaveLength(0)
+  })
+
+  // Both cards go inert while the check is out. Focus comes back to the one
+  // the user was typing in, never to the other. (Submitted with Enter: a
+  // click on Continue moves focus to the button on some platforms, and then
+  // neither card has it to get back.)
+  it('returns focus to the field that had it once the check lands', async () => {
+    const check = deferred<Strength>()
+    vi.mocked(evaluate).mockReturnValue(check.promise)
+    render(<Start />)
+    await userEvent.click(screen.getByTestId('start-setup-button'))
+    await userEvent.type(screen.getByTestId('setup-password-input'), STRONG)
+    const confirm = screen.getByTestId('setup-confirm-password-input')
+    await userEvent.type(confirm, 'something-else-entirely{enter}')
+
+    expect(confirm).toBeDisabled()
+    await act(async () => check.resolve(scored(STRONG)))
+
+    expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
+    expect(confirm).toHaveFocus()
+    expect(screen.getByTestId('setup-password-input')).not.toHaveFocus()
+  })
+
+  // One verdict at a time: a mismatch is about the pair, so editing the
+  // password retires it, and a strength error never lands beside it.
+  it('drops a stale mismatch once the password is edited', async () => {
+    render(<Start />)
+    await choosePassword(STRONG, 'something-else-entirely')
+    await screen.findByText('Passwords do not match')
+
+    await userEvent.clear(screen.getByTestId('setup-password-input'))
+    await userEvent.type(screen.getByTestId('setup-password-input'), 'secret')
+    await userEvent.click(screen.getByTestId('setup-continue-button'))
+
+    expect(await screen.findAllByTestId('form-error')).toHaveLength(1)
+    expect(screen.getByTestId('form-error')).toHaveTextContent(/Use at least/)
+    expect(screen.queryByText('Passwords do not match')).not.toBeInTheDocument()
   })
 
   // Going back unmounts this screen. The check landing afterwards must not

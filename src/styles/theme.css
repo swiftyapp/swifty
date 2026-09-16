@@ -62,6 +62,22 @@
     transform: none;
   }
 }
+/*
+ * A row unfolding under the one above it (the setup screen's confirmation
+ * field): a `grid` container grows from no track to one, so whatever sits
+ * below slides down instead of jumping. The child needs `min-h-0
+ * overflow-hidden` for the track to clip it on the way.
+ */
+@keyframes unfold {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
 
 /*
  * Lock-screen mascot motion (from the Lock v3 prototype): a slow occasional
@@ -410,6 +426,7 @@
   --animate-pop: pop 160ms var(--ease-swift) both;
   --animate-sheet: sheet 160ms var(--ease-swift) both;
   --animate-rise: rise 300ms var(--ease-swift) both;
+  --animate-unfold: unfold 300ms var(--ease-swift) both;
 }
 
 /*

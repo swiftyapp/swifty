@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { cx } from '@/utils/cx'
 import { useAuthMeta } from '@/hooks/useAuthMeta'
 import Back from '@/assets/images/back.svg?react'
 import { LABEL } from './tokens'
@@ -7,25 +8,36 @@ import { LABEL } from './tokens'
 interface Props {
   children: ReactNode
   onBack?: () => void
+  /**
+   * Draw the footer strip (version + where the vault lives, from useAuthMeta).
+   * The lock screen's: it says which vault is about to open. The first run has
+   * no vault yet, so it draws none — and nothing else sits under its content.
+   */
+  footer?: boolean
 }
 
 // The shared full-height, centered auth ground: a neutral background (via the
 // `bg-app` token, so it reads in both light and dark) with a soft radial glow
-// behind a max-560px centered column, an optional bottom "Go Back" link and
-// the footer strip (version + vault home, from useAuthMeta). Reused by
-// the lock, setup and restore screens.
-export default function AuthShell({ children, onBack }: Props) {
+// behind a max-560px centered column. "Back" sits top-left, where every
+// stepped flow puts it, clear of the content it steps away from; the footer
+// strip is opt-in. Reused by the lock, setup and restore screens.
+export default function AuthShell({ children, onBack, footer }: Props) {
   const { t } = useTranslation()
   const meta = useAuthMeta()
   return (
-    // Compact narrows the gutters, pads past the notch and the home indicator,
-    // and reserves the bottom chrome's height so the centered column is never
-    // laid over the "Go Back" link or the footer strip on a short screen. The
-    // column then centers with `my-auto` rather than `justify-center`, which
-    // keeps it scrollable instead of clipped when it still does not fit. At
-    // md: — the same 768px the shell switches on — every one of those is off
-    // again and the wide layout is what it was.
-    <div className="relative flex h-full flex-col items-center overflow-x-hidden overflow-y-auto overscroll-contain bg-app px-5 pt-[env(safe-area-inset-top)] pb-[calc(env(safe-area-inset-bottom)+7rem)] text-text select-none md:px-10 md:pt-0 md:pb-0">
+    // Compact narrows the gutters, pads past the notch by a nav bar's height
+    // (so the centered column never lays over "Back") and past the home
+    // indicator by the footer's height when there is one. The column then
+    // centers with `my-auto` rather than `justify-center`, which keeps it
+    // scrollable instead of clipped when it still does not fit. At md: — the
+    // same 768px the shell switches on — every one of those is off again and
+    // the wide layout is what it was.
+    <div
+      className={cx(
+        'relative flex h-full flex-col items-center overflow-x-hidden overflow-y-auto overscroll-contain bg-app px-5 pt-[calc(env(safe-area-inset-top)+2.75rem)] text-text select-none md:px-10 md:pt-0 md:pb-0',
+        footer ? 'pb-[calc(env(safe-area-inset-bottom)+3.25rem)]' : 'pb-[env(safe-area-inset-bottom)]'
+      )}
+    >
       <div
         aria-hidden
         className="pointer-events-none absolute left-1/2 top-[44%] h-[700px] w-[1200px] max-w-none -translate-x-1/2 -translate-y-1/2"
@@ -47,21 +59,23 @@ export default function AuthShell({ children, onBack }: Props) {
         className="absolute inset-x-0 top-0 h-[38px]"
       />
 
-      <div className="relative my-auto w-[560px] max-w-full">{children}</div>
-
+      {/* Under the drag strip and the traffic lights on desktop; a nav bar's
+          height into the safe area on a phone. */}
       {onBack && (
         <button
           type="button"
           data-testid="go-back-button"
           onClick={onBack}
-          className={`absolute bottom-14 left-1/2 flex -translate-x-1/2 items-center gap-1.5 border-0 bg-transparent ${LABEL} transition-colors hover:text-text`}
+          className={`absolute left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] flex h-7 cursor-pointer items-center gap-1 rounded-sm border-0 bg-transparent pl-1.5 pr-2.5 ${LABEL} transition-colors hover:bg-hover hover:text-text md:left-4 md:top-11`}
         >
-          <Back width="13" className="[&_path]:fill-current" />
-          {t('Go Back')}
+          <Back width="11" className="[&_path]:fill-current" />
+          {t('Back')}
         </button>
       )}
 
-      {meta && (
+      <div className="relative my-auto w-[560px] max-w-full">{children}</div>
+
+      {footer && meta && (
         // A tier below text-xs on purpose: footer chrome, not content.
         <div className="absolute inset-x-0 bottom-0 flex h-13 items-center justify-center text-2xs uppercase tracking-label text-text3">
           {meta}

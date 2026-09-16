@@ -42,6 +42,7 @@ export default function Conflict({ onBack, onUnlockExisting, onArchive }: Props)
   return (
     <AuthShell onBack={onBack}>
       <StepHeader
+        progress={0.5}
         eyebrow={t('Hold on')}
         tone="warn"
         title={t('This Drive already has Rowel data')}
