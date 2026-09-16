@@ -42,13 +42,16 @@ export default function Welcome({ onFresh, onDrive, onFile }: Props) {
         </Button>
       </div>
 
-      <div className={`${COLUMN} mt-6 flex items-center gap-3`}>
+      {/* The rule sits midway between the button above and the rows below:
+          the same air on both sides, and enough of it that the two groups read
+          as two, not as one stack with a caption in it. */}
+      <div className={`${COLUMN} mt-7 flex items-center gap-3`}>
         <span aria-hidden className="h-px flex-1 bg-line" />
         <span className={LABEL}>{t('Already using Rowel?')}</span>
         <span aria-hidden className="h-px flex-1 bg-line" />
       </div>
 
-      <div className={`${COLUMN} mt-3 flex flex-col gap-2`}>
+      <div className={`${COLUMN} mt-7 flex flex-col gap-2`}>
         <RestoreAction
           mark={<GoogleDriveMark size={18} />}
           title={t('Continue with Google Drive')}
