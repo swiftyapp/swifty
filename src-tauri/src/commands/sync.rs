@@ -255,6 +255,7 @@ pub(crate) fn start_consent(app: &AppHandle, state: &AppState, purpose: AuthPurp
         cryptor,
         purpose,
         started: std::time::Instant::now(),
+        generation: sync::connection_generation(app),
     });
     // Onboarding announces itself on its own `setup:drive:*` family, because it
     // runs on a screen that knows nothing about sync settings.
@@ -321,7 +322,7 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
             fail(&app, purpose, "the vault was locked during sign-in".into());
             return;
         };
-        match sync::complete(&app, &cryptor, &code, &pending.verifier).await {
+        match sync::complete(&app, &cryptor, &code, &pending.verifier, pending.generation).await {
             Ok(()) => {
                 // The run is claimed before the consent is marked over, as in
                 // `spawn_consent`; the pull goes to the blocking pool for the

@@ -614,6 +614,9 @@ fn set_mode(path: &Path, mode: u32) {
     let _ = fs::set_permissions(path, fs::Permissions::from_mode(mode));
 }
 
-// TODO: tighten Windows ACLs to the current user; std has no chmod analog.
+// TODO: tighten Windows ACLs to the current user. `owner_only::restrict_to_owner`
+// already does this for plaintext exports; adopting it here means putting a
+// DACL on the user's live vault, which wants a Windows machine to verify the
+// user keeps access before it ships.
 #[cfg(not(unix))]
 fn set_mode(_path: &Path, _mode: u32) {}

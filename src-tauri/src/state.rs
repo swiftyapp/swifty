@@ -39,7 +39,10 @@ pub enum AuthPurpose {
 /// It has an identity and an age. The `state` nonce went out in the consent URL
 /// and must come back on the redirect, so a stray URL on the same scheme cannot
 /// consume this in place of Google's callback; `started` is what lets a flow
-/// nobody finished expire instead of pending forever.
+/// nobody finished expire instead of pending forever. `generation` is the
+/// connection it was started under: a disconnect while the browser is out
+/// bumps it, and the tokens that come back are then revoked rather than stored
+/// (see `AppState::sync_generation`).
 #[cfg(mobile)]
 pub struct PendingAuth {
     pub verifier: String,
@@ -47,6 +50,7 @@ pub struct PendingAuth {
     pub cryptor: Option<Cryptor>,
     pub purpose: AuthPurpose,
     pub started: std::time::Instant,
+    pub generation: u64,
 }
 
 /// Sync as the frontend sees it. Every transition in `commands::sync` updates

@@ -178,14 +178,11 @@ pub fn write_lockout_sidecar(app: &AppHandle, json: &str) -> Result<()> {
 // truncated/empty file. `write` is injected so failure after a partial temp
 // write is testable; dropping NamedTempFile removes that partial sibling.
 //
-// `private` is Unix-only, and says exactly that much: on Unix the file is
-// created `0600`, so it is owner-readable whatever the umask says and whatever
-// modes an existing file at `path` had. Off Unix it does nothing — the file
-// inherits the ACL of the directory it is written into. For a per-user profile
-// folder that ACL already restricts it to the signed-in user; for a shared or
-// permissive folder it does not, and that folder is the user's own choice at
-// the save dialog. This is the same gap as the Windows-ACL TODO on `set_mode`
-// in `store/sqlite.rs`, which is where a real DACL would go for both.
+// `private` makes the temp sibling owner-readable *before* anything is written
+// into it (`owner_only::restrict_to_owner`: `0600` on Unix, a protected DACL on
+// Windows), so the bytes are never readable through the umask or the folder's
+// inherited permissions, and the replaced file keeps that restriction whatever
+// an existing file at `path` allowed.
 fn atomic_replace_with<F>(path: &Path, private: bool, write: F) -> Result<()>
 where
     F: FnOnce(&mut fs::File) -> std::io::Result<()>,
@@ -196,14 +193,9 @@ where
     fs::create_dir_all(parent)?;
 
     let mut temp = tempfile::NamedTempFile::new_in(parent)?;
-    #[cfg(unix)]
     if private {
-        use std::os::unix::fs::PermissionsExt;
-        temp.as_file()
-            .set_permissions(fs::Permissions::from_mode(0o600))?;
+        crate::owner_only::restrict_to_owner(temp.path())?;
     }
-    #[cfg(not(unix))]
-    let _ = private;
 
     write(temp.as_file_mut())?;
     temp.as_file().sync_all()?;
@@ -222,15 +214,10 @@ pub fn atomic_write_file(path: &Path, data: &str) -> Result<()> {
     atomic_replace_with(path, false, |file| file.write_all(data.as_bytes()))
 }
 
-/// Atomically replace a plaintext secret.
-///
-/// On Unix the file is created `0600` — owner-only, regardless of the umask or
-/// of how an existing file at `path` was permissioned. On Windows there is no
-/// chmod analog and none is applied: the file inherits the ACL of the directory
-/// the user chose, which for a per-user profile folder is already restricted to
-/// that user, and for a shared or permissive folder is the user's choice at the
-/// save dialog. Cross-linked with the Windows-ACL TODO on `set_mode` in
-/// `store/sqlite.rs`: the same gap, and the same place a DACL would be set.
+/// Atomically replace a plaintext secret with one only its owner can read:
+/// `0600` on Unix, an owner-and-SYSTEM protected DACL on Windows — regardless
+/// of the umask, of the folder's inheritable permissions, or of how an existing
+/// file at `path` was permissioned.
 #[cfg(desktop)]
 pub fn atomic_write_private(path: &Path, data: &[u8]) -> Result<()> {
     atomic_replace_with(path, true, |file| file.write_all(data))

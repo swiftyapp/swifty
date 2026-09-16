@@ -151,11 +151,17 @@ fn hello_key_store_available() -> bool {
 // the OS, so the wrap/unwrap round trip is testable on the machines we develop
 // on rather than only on Windows.
 
-/// The message the Hello key credential signs. Fixed on purpose: the Hello key
-/// is RSA PKCS#1 v1.5, so signing a constant yields a byte-identical signature
-/// every time, which is what makes the derived wrapping key reproducible across
-/// unlocks. Nothing is secret about the challenge — the secrecy is the private
-/// key, which lives in the TPM/Hello key store and only signs after a prompt.
+/// The message the Hello key credential signs. Fixed on purpose: Hello signs
+/// with RSA PKCS#1 v1.5 over SHA-256 (Microsoft's Windows Hello guide: "We are
+/// using SHA256 as the hash algorithm and Pkcs1 for SignaturePadding"), a
+/// deterministic scheme, so signing a constant yields a byte-identical
+/// signature every time — which is what makes the derived wrapping key
+/// reproducible across unlocks. The `RequestSignAsync` reference itself does
+/// not name the scheme, so enrollment checks it (`assert_pkcs1_signature`)
+/// rather than trust the guide: a probabilistic scheme such as RSA-PSS would
+/// produce a blob no later unlock could open. Nothing is secret about the
+/// challenge — the secrecy is the private key, which lives in the TPM/Hello key
+/// store and only signs after a prompt.
 #[cfg(target_os = "windows")]
 const HELLO_CHALLENGE: &[u8] = b"rowel-biometric-v1";
 
@@ -358,11 +364,64 @@ mod imp {
         .and_then(|op| op.join())
         .map_err(win_err)?;
         let signature = sign_challenge(&created)?;
+        // Before anything is stored: a signature that is not the deterministic
+        // one the design assumes would seal the key under a value no later
+        // prompt can reproduce, and the enrollment would only be found broken
+        // at the first unlock.
+        assert_pkcs1_signature(&created, &signature)?;
         let blob = wrap_master(&signature, key)?;
         entry()?
             .set_secret(&blob)
             .map_err(|e| Error::Other(e.to_string()))?;
         Ok(GateMode::HelloKey)
+    }
+
+    // Verify the enrollment signature as RSA PKCS#1 v1.5 / SHA-256 against the
+    // credential's own public key. PKCS#1 v1.5 is deterministic, so passing this
+    // is what guarantees the next prompt reproduces the same bytes and with them
+    // the wrapping key; a probabilistic scheme (RSA-PSS) fails it, and the
+    // enrollment is refused with a reason instead of stored unopenable. One
+    // public-key operation, no second prompt.
+    fn assert_pkcs1_signature(
+        result: &KeyCredentialRetrievalResult,
+        signature: &[u8],
+    ) -> Result<()> {
+        use windows::Security::Cryptography::Core::{
+            AsymmetricAlgorithmNames, AsymmetricKeyAlgorithmProvider, CryptographicEngine,
+            CryptographicPublicKeyBlobType,
+        };
+
+        let public_key = result
+            .Credential()
+            .map_err(win_err)?
+            .RetrievePublicKeyWithBlobType(CryptographicPublicKeyBlobType::BCryptPublicKey)
+            .map_err(win_err)?;
+        let provider = AsymmetricKeyAlgorithmProvider::OpenAlgorithm(
+            &AsymmetricAlgorithmNames::RsaSignPkcs1Sha256().map_err(win_err)?,
+        )
+        .map_err(win_err)?;
+        let key = provider
+            .ImportPublicKeyWithBlobType(
+                &public_key,
+                CryptographicPublicKeyBlobType::BCryptPublicKey,
+            )
+            .map_err(win_err)?;
+        let verified = CryptographicEngine::VerifySignature(
+            &key,
+            &to_buffer(HELLO_CHALLENGE)?,
+            &to_buffer(signature)?,
+        )
+        .map_err(win_err)?;
+        if verified {
+            Ok(())
+        } else {
+            Err(Error::Other(
+                "Windows Hello on this device does not sign with RSA PKCS#1 v1.5, which \
+                 biometric unlock relies on to reproduce its key; biometric unlock is \
+                 unavailable here"
+                    .into(),
+            ))
+        }
     }
 
     pub fn retrieve(mode: GateMode) -> Result<Zeroizing<Vec<u8>>> {
@@ -392,7 +451,17 @@ mod imp {
             Err(KrError::NoEntry) => return Err(Error::NotFound),
             Err(e) => return Err(Error::Other(e.to_string())),
         };
-        unwrap_master(&signature, &blob)
+        // A GCM failure here means this signature is not the one the blob was
+        // sealed under — a reset Hello key, or a signature scheme that changed
+        // under us. Neither is "the enrollment is gone", so not `NotFound`; the
+        // user re-enrolls and the message says so.
+        unwrap_master(&signature, &blob).map_err(|_| {
+            Error::Other(
+                "Windows Hello did not reproduce the biometric key; re-enable biometric \
+                 unlock to re-enroll"
+                    .into(),
+            )
+        })
     }
 
     pub fn delete() -> Result<()> {

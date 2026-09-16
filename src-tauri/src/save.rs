@@ -192,17 +192,13 @@ pub fn with_extension(dest: PathBuf, extension: &str) -> PathBuf {
 /// Put plaintext on disk and scrub the copy in memory on every exit.
 ///
 /// An export is the whole vault in the clear, so on desktop it goes through the
-/// shared durable writer that a saved `.env` gets: the owner-only (0600) temp
-/// sibling is complete and fsynced before it atomically replaces the
-/// destination, so the bytes are never briefly world-readable and a failed
+/// shared durable writer that a saved `.env` gets: the owner-only temp sibling
+/// (`0600` on Unix, a protected owner-and-SYSTEM DACL on Windows) is complete
+/// and fsynced before it atomically replaces the destination, so the bytes are
+/// never briefly readable through the folder's permissions and a failed
 /// overwrite leaves the old file whole. `atomic_write_private` is desktop-only —
 /// on mobile the only thing written here is the staging copy inside the app's
 /// own sandbox, which the picker consumes and [`Staged`] then removes.
-///
-/// "Owner-only" is a Unix claim: on Windows there is no chmod analog applied, so
-/// the export inherits the ACL of the folder the user picked in the save dialog
-/// — restricted to that user for a per-user profile folder, and their own choice
-/// if they pick a shared one (same gap as `set_mode` in `store/sqlite.rs`).
 pub(crate) fn write_and_scrub(dest: &Path, mut bytes: Vec<u8>) -> Result<()> {
     #[cfg(desktop)]
     let result = crate::storage::atomic_write_private(dest, &bytes);

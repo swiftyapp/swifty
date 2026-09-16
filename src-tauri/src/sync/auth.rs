@@ -326,9 +326,21 @@ fn open_consent(app: &AppHandle, credentials: &Credentials) -> Result<Started> {
 
 /// Desktop: open the browser and block on the loopback listener until Google
 /// redirects to it, then exchange the code.
+///
+/// The tokens land only if no disconnect ran while the browser was out (see
+/// [`persisted_if_current`]); a grant that arrives after one is revoked and
+/// reported instead of recreating the credential the disconnect removed.
 #[cfg(desktop)]
 pub fn authenticate(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
-    write_tokens(app, cryptor, &obtain_tokens(app)?)
+    let generation = connection_generation(app);
+    let tokens = obtain_tokens(app)?;
+    if persisted_if_current(app, cryptor, &tokens, generation)? {
+        return Ok(());
+    }
+    if let Some(token) = revocable(&tokens) {
+        tauri::async_runtime::block_on(revoke(&super::http_client(), token));
+    }
+    Err(disconnected_mid_consent())
 }
 
 /// The consent round trip on its own, handing the tokens back rather than
@@ -360,18 +372,29 @@ pub fn begin(app: &AppHandle) -> Result<Started> {
 
 /// Mobile, second half: exchange a code [`parse_redirect`] accepted and store
 /// the tokens. Async — this runs off the URL-open callback, not on it.
+///
+/// `generation` is the connection generation read when the flow began; as on
+/// desktop, tokens that arrive after a disconnect are revoked, not stored.
 #[cfg(mobile)]
 pub async fn complete(
     app: &AppHandle,
     cryptor: &Cryptor,
     code: &str,
     verifier: &str,
+    generation: u64,
 ) -> Result<()> {
-    write_tokens(
-        app,
-        cryptor,
-        &exchange_for_tokens(app, code, verifier).await?,
-    )
+    let tokens = exchange_for_tokens(app, code, verifier).await?;
+    if persisted_if_current(app, cryptor, &tokens, generation)? {
+        return Ok(());
+    }
+    if let Some(token) = revocable(&tokens) {
+        revoke(&super::http_client(), token).await;
+    }
+    Err(disconnected_mid_consent())
+}
+
+fn disconnected_mid_consent() -> Error {
+    Error::Other("Google Drive was disconnected while signing in; connect again".into())
 }
 
 /// [`complete`] without the writing — the mobile twin of [`obtain_tokens`], for
@@ -428,22 +451,42 @@ pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -
     // disk is now out of date — afterwards the tokens look fresh either way.
     let refreshing = needs_refresh(&tokens);
     let token = fresh_access_token(client, app, &mut tokens).await?;
-    if refreshing {
-        // Compared and written under the guard a disconnect bumps and deletes
-        // under: a bare compare would leave a gap for the disconnect to land in
-        // and have its delete undone by this write.
-        let current = state.sync_generation.lock().unwrap();
-        if *current == generation {
-            write_tokens(app, cryptor, &tokens)?;
-        } else {
-            // Skipping the write is the whole point: re-creating the file would
-            // undo the disconnect. The caller still gets this token for the
-            // request it is in the middle of, which is harmless — the file is
-            // gone, so nothing after this can refresh again.
-            log::info!("Drive disconnected mid-refresh; not writing the refreshed tokens back");
-        }
+    // Skipping the write is the whole point: re-creating the file would undo
+    // the disconnect. The caller still gets this token for the request it is
+    // in the middle of, which is harmless — the file is gone, so nothing after
+    // this can refresh again.
+    if refreshing && !persisted_if_current(app, cryptor, &tokens, generation)? {
+        log::info!("Drive disconnected mid-refresh; not writing the refreshed tokens back");
     }
     Ok(token)
+}
+
+/// Which Drive connection is current — see `AppState::sync_generation`. Read
+/// before any round trip whose result would be written to the token file, so
+/// the write can tell whether a disconnect landed in between.
+pub fn connection_generation(app: &AppHandle) -> u64 {
+    *app_state(app).sync_generation.lock().unwrap()
+}
+
+/// Write the tokens if the connection they belong to is still `generation`,
+/// and say whether they were. Compared and written under the guard a disconnect
+/// bumps and deletes under: a bare compare would leave a gap for the disconnect
+/// to land in and have its delete undone by the write. `false` means the
+/// account was disconnected since `generation` was read, and nothing was
+/// written; whatever the tokens were for is the caller's to wind down.
+fn persisted_if_current(
+    app: &AppHandle,
+    cryptor: &Cryptor,
+    tokens: &Tokens,
+    generation: u64,
+) -> Result<bool> {
+    let state = app_state(app);
+    let current = state.sync_generation.lock().unwrap();
+    if *current != generation {
+        return Ok(false);
+    }
+    write_tokens(app, cryptor, tokens)?;
+    Ok(true)
 }
 
 fn app_state(app: &AppHandle) -> tauri::State<'_, crate::state::AppState> {

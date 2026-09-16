@@ -56,12 +56,12 @@ Writes are **per-row and atomic** (WAL mode), not a whole-file rewrite: saving o
 edited entry re-seals only that row's payload. Deletes are **tombstones**
 (`deleted_at` is stamped and the row is retained so a later sync can propagate the
 deletion), not hard deletes. On-disk file and directory modes are tightened on
-Unix (`0600` file / `0700` dir); the Windows ACL equivalent is still a TODO
-(`set_mode` no-ops off Unix in `sqlite.rs`). The same limit applies to plaintext
-exports written through `storage::atomic_write_private`: `0600` on Unix, but on
-Windows they inherit the ACL of the folder chosen in the save dialog — already
-user-restricted for a per-user profile folder, and the user's own choice if they
-save somewhere shared.
+Unix (`0600` file / `0700` dir); the Windows ACL equivalent for the database is
+still a TODO (`set_mode` no-ops off Unix in `sqlite.rs`). Plaintext exports and
+saved `.env` files, written through `storage::atomic_write_private`, are
+owner-only on both: `0600` on Unix, and on Windows a protected DACL granting the
+current user and SYSTEM alone (`owner_only.rs`), applied to the temp file before
+any bytes are written so the folder's inherited permissions never apply to it.
 
 ### Key derivation (KDF)
 

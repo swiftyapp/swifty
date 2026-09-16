@@ -121,6 +121,14 @@ pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()
     auth::reseal_tokens(app, old, new)
 }
 
+/// Which Drive connection is current. A consent flow reads it when it starts
+/// and hands it back to [`complete`], which refuses to store tokens for a
+/// connection a disconnect has since ended.
+#[cfg(mobile)]
+pub fn connection_generation(app: &AppHandle) -> u64 {
+    auth::connection_generation(app)
+}
+
 /// Retire a disconnected account's grant at Google. Best effort: the local
 /// disconnect stands whatever happens here.
 pub(crate) async fn revoke(tokens: &Tokens) {
