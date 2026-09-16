@@ -530,5 +530,19 @@
   "No API keys yet": "Nenhuma chave de API ainda",
   "No matches for “{{query}}” in SSH keys": "Nenhum resultado para “{{query}}” em chaves SSH",
   "No matches for “{{query}}” in env files": "Nenhum resultado para “{{query}}” em arquivos env",
-  "No matches for “{{query}}” in API keys": "Nenhum resultado para “{{query}}” em chaves de API"
+  "No matches for “{{query}}” in API keys": "Nenhum resultado para “{{query}}” em chaves de API",
+  "This is not a valid share link": "Este não é um link de compartilhamento válido",
+  "This share was made by a newer version of the app": "Este compartilhamento foi criado em uma versão mais recente do {{appName}}",
+  "This share is too large to open": "Este compartilhamento é grande demais para ser aberto",
+  "This entry is too large to share. Shorten its note or fields.": "Este item é grande demais para ser compartilhado. Encurte a nota ou os campos.",
+  "Another setup step is still running": "Outra etapa da configuração ainda está em andamento",
+  "Wait for the sync in progress to finish": "Aguarde a sincronização em andamento terminar",
+  "Connect a Google account first": "Conecte uma conta do Google primeiro",
+  "This Google account has nothing to restore": "Esta conta do Google não tem nada para restaurar",
+  "This device is already set up": "Este dispositivo já está configurado",
+  "Available in the primary workspace only": "Disponível somente no espaço de trabalho principal",
+  "A workspace needs a name": "Um espaço de trabalho precisa de um nome",
+  "A workspace needs a master password": "Um espaço de trabalho precisa de uma senha mestra",
+  "This file is too large": "Este arquivo é grande demais",
+  "This file is not text": "Este arquivo não é um arquivo de texto"
 }

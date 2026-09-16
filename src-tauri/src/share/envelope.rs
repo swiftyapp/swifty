@@ -22,20 +22,11 @@ pub fn expires_at(now_ms: i64) -> i64 {
     now_ms + SHARE_TTL_MS
 }
 
-/// Shown to a recipient who opens a link past its expiry. Deleting the file is
-/// best effort (the sender may be offline), so this check is what actually
-/// enforces the 24 hours on the receiving side.
-pub const SHARE_EXPIRED: &str = "this share has expired";
-
 /// The most a share file may be. An entry is a few kilobytes; an `.env` file
 /// a few hundred at the outside. The id in a pasted link can name any public
 /// file on Drive, so the recipient never buffers more than this — and the
 /// sender is told before upload, since a share over it could never be opened.
 pub const MAX_SHARE_BYTES: usize = 2 * 1024 * 1024;
-
-/// Shown to a sender whose entry seals to more than [`MAX_SHARE_BYTES`].
-pub const SHARE_TOO_LARGE_TO_SEND: &str =
-    "this entry is over 2 MiB and cannot be shared; shorten its note or fields";
 
 /// Every kind this build can store. A share carrying anything else is refused
 /// on receipt rather than saved as a row no view knows how to render.
@@ -81,7 +72,9 @@ pub fn check_shareable(entry: &Entry) -> Result<()> {
         .iter()
         .any(|v| v.as_deref().is_some_and(|s| !s.is_empty()));
     if entry.kind == "login" && has_passkey && !has_secret {
-        return Err(Error::Other(
+        // `Unsupported` rather than a kind of its own: what the sender can do
+        // about it is the sentence, not the category (see `src/api/errors.ts`).
+        return Err(Error::Unsupported(
             "this login holds only a passkey, and passkeys cannot be shared".into(),
         ));
     }
@@ -135,7 +128,7 @@ pub fn seal(key: &ShareKey, entry: &Entry, expires_ms: i64) -> Result<Vec<u8>> {
     // upload fine and then fail everyone it was sent to. Refuse it here, where
     // the sender can still do something about it.
     if sealed.len() > MAX_SHARE_BYTES {
-        return Err(Error::Other(SHARE_TOO_LARGE_TO_SEND.into()));
+        return Err(Error::EntryTooLargeToShare);
     }
     Ok(sealed)
 }
@@ -147,24 +140,22 @@ pub fn unseal(key: &ShareKey, blob: &[u8], now_ms: i64) -> Result<Entry> {
     // A wrong key and a tampered file are the same event to the user: the link
     // they have does not open this share. The AEAD error underneath says
     // nothing they can act on.
-    let plaintext = crate::crypto::unseal_aead(key.as_ref(), blob)
-        .map_err(|_| Error::Other("this link does not open the share".into()))?;
+    let plaintext =
+        crate::crypto::unseal_aead(key.as_ref(), blob).map_err(|_| Error::ShareLinkInvalid)?;
 
     let envelope: Envelope<serde_json::Value> = serde_json::from_slice(&plaintext)?;
     if envelope.v != VERSION {
-        return Err(Error::Other(
-            "this share was made by a newer version of Rowel".into(),
-        ));
+        return Err(Error::ShareTooNew);
     }
     if envelope.expires_at <= now_ms {
-        return Err(Error::Other(SHARE_EXPIRED.into()));
+        return Err(Error::ShareExpired);
     }
 
     let entry: Entry = serde_json::from_value(envelope.entry)?;
+    // A kind this build has no view for can only have come from one that does,
+    // so it reads as the same "made by a newer version" the envelope tag does.
     if !KINDS.contains(&entry.kind.as_str()) {
-        return Err(Error::Other(
-            "this share holds a kind of entry this version of Rowel does not know".into(),
-        ));
+        return Err(Error::ShareTooNew);
     }
     Ok(sanitize(&entry))
 }
@@ -190,7 +181,10 @@ impl Link {
     }
 
     pub fn parse(s: &str) -> Result<Link> {
-        let rest = s.trim().strip_prefix(PREFIX).ok_or_else(not_a_link)?;
+        let rest = s
+            .trim()
+            .strip_prefix(PREFIX)
+            .ok_or(Error::ShareLinkInvalid)?;
         let mut parts = rest.split('.');
 
         let version = parts.next().unwrap_or_default();
@@ -198,33 +192,37 @@ impl Link {
             // A tag whose shape we recognize but whose number we don't can only
             // come from a build that speaks a format this one doesn't.
             return Err(if is_version_tag(version) {
-                newer_version()
+                Error::ShareTooNew
             } else {
-                not_a_link()
+                Error::ShareLinkInvalid
             });
         }
 
         let file_id = parts.next().unwrap_or_default();
-        let key = parts.next().ok_or_else(incomplete)?;
+        let key = parts.next().ok_or(Error::ShareLinkInvalid)?;
         if parts.next().is_some() {
-            return Err(not_a_link());
+            return Err(Error::ShareLinkInvalid);
         }
 
         if file_id.is_empty() {
-            return Err(incomplete());
+            return Err(Error::ShareLinkInvalid);
         }
         if !file_id
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
         {
-            return Err(not_a_link());
+            return Err(Error::ShareLinkInvalid);
         }
 
         // Held zeroized on the way in: this is the key, in the clear, for as
         // long as the decode's buffer lives.
-        let decoded = Zeroizing::new(URL_SAFE_NO_PAD.decode(key).map_err(|_| incomplete())?);
+        let decoded = Zeroizing::new(
+            URL_SAFE_NO_PAD
+                .decode(key)
+                .map_err(|_| Error::ShareLinkInvalid)?,
+        );
         if decoded.len() != KEY_LEN {
-            return Err(incomplete());
+            return Err(Error::ShareLinkInvalid);
         }
         let mut bytes = Zeroizing::new([0u8; KEY_LEN]);
         bytes.copy_from_slice(&decoded);
@@ -238,20 +236,6 @@ impl Link {
 
 fn is_version_tag(s: &str) -> bool {
     matches!(s.strip_prefix('v'), Some(rest) if !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
-}
-
-// These reach the user verbatim, so they say what to do about it rather than
-// what failed.
-fn not_a_link() -> Error {
-    Error::Other("this is not a Rowel share link".into())
-}
-
-fn incomplete() -> Error {
-    Error::Other("this link is incomplete".into())
-}
-
-fn newer_version() -> Error {
-    Error::Other("this link was made by a newer version of Rowel".into())
 }
 
 #[cfg(test)]
@@ -317,10 +301,10 @@ mod tests {
         let mut blob = sealed(&key);
         let last = blob.len() - 1;
         blob[last] ^= 1;
-        assert_eq!(
-            unseal(&key, &blob, NOW).unwrap_err().to_string(),
-            "this link does not open the share"
-        );
+        assert!(matches!(
+            unseal(&key, &blob, NOW).unwrap_err(),
+            Error::ShareLinkInvalid
+        ));
     }
 
     #[test]
@@ -337,10 +321,10 @@ mod tests {
         )
         .unwrap();
         let blob = crate::crypto::seal_aead(key.as_ref(), &plaintext).unwrap();
-        assert_eq!(
-            unseal(&key, &blob, NOW).unwrap_err().to_string(),
-            "this share was made by a newer version of Rowel"
-        );
+        assert!(matches!(
+            unseal(&key, &blob, NOW).unwrap_err(),
+            Error::ShareTooNew
+        ));
     }
 
     // The sender's device may never get to delete the file; the recipient's
@@ -350,12 +334,10 @@ mod tests {
         let key = ShareKey::generate();
         let blob = sealed(&key);
         assert!(unseal(&key, &blob, NOW + SHARE_TTL_MS - 1).is_ok());
-        assert_eq!(
-            unseal(&key, &blob, NOW + SHARE_TTL_MS)
-                .unwrap_err()
-                .to_string(),
-            SHARE_EXPIRED
-        );
+        assert!(matches!(
+            unseal(&key, &blob, NOW + SHARE_TTL_MS).unwrap_err(),
+            Error::ShareExpired
+        ));
     }
 
     // Sealed by hand, the way an attacker would: the plaintext names an
@@ -385,10 +367,10 @@ mod tests {
     fn an_unknown_kind_is_refused_on_receipt() {
         let key = ShareKey::generate();
         let blob = crafted(&key, json!({"id": "", "type": "wallet", "title": "x"}));
-        assert_eq!(
-            unseal(&key, &blob, NOW).unwrap_err().to_string(),
-            "this share holds a kind of entry this version of Rowel does not know"
-        );
+        assert!(matches!(
+            unseal(&key, &blob, NOW).unwrap_err(),
+            Error::ShareTooNew
+        ));
     }
 
     #[test]
@@ -441,9 +423,8 @@ mod tests {
             format!("rowel://share#v1.file!d.{key}"),
             format!("rowel://share#v1.fileId.{key}.extra"),
         ] {
-            assert_eq!(
-                Link::parse(&input).unwrap_err().to_string(),
-                "this is not a Rowel share link",
+            assert!(
+                matches!(Link::parse(&input).unwrap_err(), Error::ShareLinkInvalid),
                 "{input}"
             );
         }
@@ -461,9 +442,8 @@ mod tests {
                 URL_SAFE_NO_PAD.encode([7u8; 64])
             ),
         ] {
-            assert_eq!(
-                Link::parse(&input).unwrap_err().to_string(),
-                "this link is incomplete",
+            assert!(
+                matches!(Link::parse(&input).unwrap_err(), Error::ShareLinkInvalid),
                 "{input}"
             );
         }
@@ -472,12 +452,10 @@ mod tests {
     #[test]
     fn parse_refuses_a_newer_link_version() {
         let key = URL_SAFE_NO_PAD.encode([7u8; KEY_LEN]);
-        assert_eq!(
-            Link::parse(&format!("rowel://share#v2.fileId.{key}"))
-                .unwrap_err()
-                .to_string(),
-            "this link was made by a newer version of Rowel"
-        );
+        assert!(matches!(
+            Link::parse(&format!("rowel://share#v2.fileId.{key}")).unwrap_err(),
+            Error::ShareTooNew
+        ));
     }
 
     #[test]

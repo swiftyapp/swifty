@@ -16,6 +16,21 @@ export type BackendErrorKind =
   | 'syncNotConfigured'
   | 'unsupported'
   | 'unrecognized'
+  | 'shareLinkInvalid'
+  | 'shareExpired'
+  | 'shareTooNew'
+  | 'shareTooLarge'
+  | 'entryTooLargeToShare'
+  | 'setupBusy'
+  | 'syncBusy'
+  | 'driveNotConnected'
+  | 'noRemoteVault'
+  | 'alreadySetUp'
+  | 'primaryWorkspaceOnly'
+  | 'workspaceNameRequired'
+  | 'workspacePasswordRequired'
+  | 'fileTooLarge'
+  | 'fileNotText'
   | 'io'
   | 'serde'
   | 'crypto'
@@ -78,6 +93,36 @@ export const describeError = (error: unknown): string => {
       return t('Sync is not set up')
     case 'unrecognized':
       return t('Nothing recognized')
+    case 'shareLinkInvalid':
+      return t('This is not a valid share link')
+    case 'shareExpired':
+      return t('This share has expired or was revoked')
+    case 'shareTooNew':
+      return t('This share was made by a newer version of the app')
+    case 'shareTooLarge':
+      return t('This share is too large to open')
+    case 'entryTooLargeToShare':
+      return t('This entry is too large to share. Shorten its note or fields.')
+    case 'setupBusy':
+      return t('Another setup step is still running')
+    case 'syncBusy':
+      return t('Wait for the sync in progress to finish')
+    case 'driveNotConnected':
+      return t('Connect a Google account first')
+    case 'noRemoteVault':
+      return t('This Google account has nothing to restore')
+    case 'alreadySetUp':
+      return t('This device is already set up')
+    case 'primaryWorkspaceOnly':
+      return t('Available in the primary workspace only')
+    case 'workspaceNameRequired':
+      return t('A workspace needs a name')
+    case 'workspacePasswordRequired':
+      return t('A workspace needs a master password')
+    case 'fileTooLarge':
+      return t('This file is too large')
+    case 'fileNotText':
+      return t('This file is not text')
     default:
       return messageOf(error)
   }

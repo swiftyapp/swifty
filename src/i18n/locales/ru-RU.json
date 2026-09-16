@@ -538,5 +538,19 @@
   "No API keys yet": "API-ключей пока нет",
   "No matches for “{{query}}” in SSH keys": "Ничего не найдено по запросу «{{query}}» среди SSH-ключей",
   "No matches for “{{query}}” in env files": "Ничего не найдено по запросу «{{query}}» среди env-файлов",
-  "No matches for “{{query}}” in API keys": "Ничего не найдено по запросу «{{query}}» среди API-ключей"
+  "No matches for “{{query}}” in API keys": "Ничего не найдено по запросу «{{query}}» среди API-ключей",
+  "This is not a valid share link": "Недопустимая ссылка",
+  "This share was made by a newer version of the app": "Эта ссылка создана в более новой версии {{appName}}",
+  "This share is too large to open": "Данные по этой ссылке слишком велики",
+  "This entry is too large to share. Shorten its note or fields.": "Эта запись слишком велика, чтобы поделиться ею. Сократите заметку или поля.",
+  "Another setup step is still running": "Другой шаг настройки ещё выполняется",
+  "Wait for the sync in progress to finish": "Дождитесь завершения текущей синхронизации",
+  "Connect a Google account first": "Сначала подключите аккаунт Google",
+  "This Google account has nothing to restore": "В этом аккаунте Google нечего восстанавливать",
+  "This device is already set up": "Это устройство уже настроено",
+  "Available in the primary workspace only": "Доступно только в основном рабочем пространстве",
+  "A workspace needs a name": "Рабочему пространству нужно имя",
+  "A workspace needs a master password": "Рабочему пространству нужен мастер-пароль",
+  "This file is too large": "Этот файл слишком большой",
+  "This file is not text": "Этот файл не текстовый"
 }

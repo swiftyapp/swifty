@@ -349,7 +349,7 @@ impl PublicFetch for FakeShareRemote {
             .get(file_id)
             .filter(|f| f.public)
             .map(|f| f.bytes.clone())
-            .ok_or_else(|| Error::Other(drive::SHARE_GONE.into()))
+            .ok_or(Error::ShareExpired)
     }
 }
 

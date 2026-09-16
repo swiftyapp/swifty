@@ -538,5 +538,19 @@
   "No API keys yet": "API-ключів ще немає",
   "No matches for “{{query}}” in SSH keys": "Немає збігів для «{{query}}» серед SSH-ключів",
   "No matches for “{{query}}” in env files": "Немає збігів для «{{query}}» серед env-файлів",
-  "No matches for “{{query}}” in API keys": "Немає збігів для «{{query}}» серед API-ключів"
+  "No matches for “{{query}}” in API keys": "Немає збігів для «{{query}}» серед API-ключів",
+  "This is not a valid share link": "Некоректне посилання",
+  "This share was made by a newer version of the app": "Це посилання створено в новішій версії {{appName}}",
+  "This share is too large to open": "Дані за цим посиланням завеликі",
+  "This entry is too large to share. Shorten its note or fields.": "Цей запис завеликий, щоб поділитися ним. Скоротіть нотатку або поля.",
+  "Another setup step is still running": "Інший крок налаштування ще триває",
+  "Wait for the sync in progress to finish": "Зачекайте на завершення поточної синхронізації",
+  "Connect a Google account first": "Спочатку підключіть обліковий запис Google",
+  "This Google account has nothing to restore": "У цьому обліковому записі Google немає чого відновлювати",
+  "This device is already set up": "Цей пристрій уже налаштовано",
+  "Available in the primary workspace only": "Доступно лише в основному робочому просторі",
+  "A workspace needs a name": "Робочому простору потрібна назва",
+  "A workspace needs a master password": "Робочому простору потрібен головний пароль",
+  "This file is too large": "Цей файл завеликий",
+  "This file is not text": "Цей файл не текстовий"
 }

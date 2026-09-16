@@ -514,5 +514,19 @@
   "No API keys yet": "还没有 API 密钥",
   "No matches for “{{query}}” in SSH keys": "SSH 密钥中没有找到“{{query}}”",
   "No matches for “{{query}}” in env files": "env 文件中没有找到“{{query}}”",
-  "No matches for “{{query}}” in API keys": "API 密钥中没有找到“{{query}}”"
+  "No matches for “{{query}}” in API keys": "API 密钥中没有找到“{{query}}”",
+  "This is not a valid share link": "这不是有效的分享链接",
+  "This share was made by a newer version of the app": "该分享由更新版本的 {{appName}} 创建",
+  "This share is too large to open": "该分享过大，无法打开",
+  "This entry is too large to share. Shorten its note or fields.": "此条目过大，无法分享。请缩短其备注或字段。",
+  "Another setup step is still running": "另一个设置步骤仍在进行中",
+  "Wait for the sync in progress to finish": "请等待正在进行的同步完成",
+  "Connect a Google account first": "请先连接 Google 账号",
+  "This Google account has nothing to restore": "此 Google 账号没有可恢复的内容",
+  "This device is already set up": "此设备已完成设置",
+  "Available in the primary workspace only": "仅在主工作区中可用",
+  "A workspace needs a name": "工作区需要一个名称",
+  "A workspace needs a master password": "工作区需要一个主密码",
+  "This file is too large": "该文件过大",
+  "This file is not text": "该文件不是文本文件"
 }

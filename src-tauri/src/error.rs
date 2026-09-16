@@ -38,6 +38,60 @@ pub enum Error {
     #[error("nothing recognized")]
     Unrecognized,
 
+    // --- conditions the user can act on --------------------------------------
+    //
+    // Each of these used to be an `Error::Other` carrying English prose, which
+    // the webview had no choice but to print as it stood. As variants they get a
+    // stable `kind`, and the copy lives in the catalogues with the rest of the
+    // UI — see `src/api/errors.ts`, which is pinned against `kind()` by
+    // `src/api/contract.test.ts`. The `#[error(...)]` text below is the English
+    // source the kind is translated from and a line in the log; nobody is shown
+    // it.
+    #[error("this share link is not valid")]
+    ShareLinkInvalid,
+
+    #[error("this share has expired or was revoked")]
+    ShareExpired,
+
+    #[error("this share was made by a newer version of the app")]
+    ShareTooNew,
+
+    #[error("this share is larger than the app allows")]
+    ShareTooLarge,
+
+    #[error("this entry is too large to share")]
+    EntryTooLargeToShare,
+
+    #[error("another setup step is still running")]
+    SetupBusy,
+
+    #[error("wait for the sync in progress to finish")]
+    SyncBusy,
+
+    #[error("connect a Google account first")]
+    DriveNotConnected,
+
+    #[error("this Google account has no data to restore")]
+    NoRemoteVault,
+
+    #[error("this device is already set up")]
+    AlreadySetUp,
+
+    #[error("available in the primary workspace only")]
+    PrimaryWorkspaceOnly,
+
+    #[error("a workspace needs a name")]
+    WorkspaceNameRequired,
+
+    #[error("a workspace needs a master password")]
+    WorkspacePasswordRequired,
+
+    #[error("the file is too large")]
+    FileTooLarge,
+
+    #[error("the file is not text")]
+    FileNotText,
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
@@ -66,6 +120,21 @@ impl Error {
             Error::SyncNotConfigured => "syncNotConfigured",
             Error::Unsupported(_) => "unsupported",
             Error::Unrecognized => "unrecognized",
+            Error::ShareLinkInvalid => "shareLinkInvalid",
+            Error::ShareExpired => "shareExpired",
+            Error::ShareTooNew => "shareTooNew",
+            Error::ShareTooLarge => "shareTooLarge",
+            Error::EntryTooLargeToShare => "entryTooLargeToShare",
+            Error::SetupBusy => "setupBusy",
+            Error::SyncBusy => "syncBusy",
+            Error::DriveNotConnected => "driveNotConnected",
+            Error::NoRemoteVault => "noRemoteVault",
+            Error::AlreadySetUp => "alreadySetUp",
+            Error::PrimaryWorkspaceOnly => "primaryWorkspaceOnly",
+            Error::WorkspaceNameRequired => "workspaceNameRequired",
+            Error::WorkspacePasswordRequired => "workspacePasswordRequired",
+            Error::FileTooLarge => "fileTooLarge",
+            Error::FileNotText => "fileNotText",
             Error::Io(_) => "io",
             Error::Serde(_) => "serde",
             Error::Crypto(_) => "crypto",

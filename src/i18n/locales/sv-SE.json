@@ -522,5 +522,19 @@
   "No API keys yet": "Inga API-nycklar än",
   "No matches for “{{query}}” in SSH keys": "Inga träffar för ”{{query}}” bland SSH-nycklar",
   "No matches for “{{query}}” in env files": "Inga träffar för ”{{query}}” bland env-filer",
-  "No matches for “{{query}}” in API keys": "Inga träffar för ”{{query}}” bland API-nycklar"
+  "No matches for “{{query}}” in API keys": "Inga träffar för ”{{query}}” bland API-nycklar",
+  "This is not a valid share link": "Det här är inte en giltig delningslänk",
+  "This share was made by a newer version of the app": "Den här delningen skapades i en nyare version av {{appName}}",
+  "This share is too large to open": "Den här delningen är för stor för att öppnas",
+  "This entry is too large to share. Shorten its note or fields.": "Den här posten är för stor för att delas. Korta ner dess anteckning eller fält.",
+  "Another setup step is still running": "Ett annat konfigurationssteg pågår fortfarande",
+  "Wait for the sync in progress to finish": "Vänta tills den pågående synkningen är klar",
+  "Connect a Google account first": "Anslut ett Google-konto först",
+  "This Google account has nothing to restore": "Det här Google-kontot har inget att återställa",
+  "This device is already set up": "Den här enheten är redan konfigurerad",
+  "Available in the primary workspace only": "Endast tillgängligt i den primära arbetsytan",
+  "A workspace needs a name": "En arbetsyta behöver ett namn",
+  "A workspace needs a master password": "En arbetsyta behöver ett huvudlösenord",
+  "This file is too large": "Den här filen är för stor",
+  "This file is not text": "Den här filen är inte en textfil"
 }
