@@ -1,4 +1,5 @@
 import { call } from './client'
+import type { SyncStatus } from './sync'
 import type { GeneratorOptions } from './tools'
 import type { BiometricMode, BiometryType, Workspace } from './types'
 import type { ThemePreference } from '@/theme'
@@ -58,9 +59,12 @@ export interface AppStatus {
    * configuration and disagrees with the OS on some Linux and Windows setups.
    */
   locale: string
-  syncConfigured: boolean
-  /** A consent flow is out with the browser (see `sync:pending` in events.ts). */
-  syncPending: boolean
+  /**
+   * Sync exactly as `sync:status` carries it (see `api/sync`), so the store has
+   * one value to hold whether it came from the probe or from an event — and one
+   * place for every screen to read "does this vault sync" from.
+   */
+  sync: SyncStatus
   /**
    * Whether this platform has a text recognizer at all. False on Linux and on a
    * Windows without an OCR language pack, where the UI offers no scanning.

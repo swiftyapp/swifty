@@ -130,7 +130,7 @@ TAURI_SIGNING_PRIVATE_KEY="$(cat /tmp/test.key)" bun run tauri build --bundles a
 
 ## How the in-app updater behaves
 
-`src/services/autoUpdate.ts` runs once at launch. It is a no-op in dev builds,
+`src/api/autoUpdate.ts` runs once at launch. It is a no-op in dev builds,
 calls `check()`, and on an available update downloads, installs and relaunches.
 Failures (offline, endpoint down) are logged and swallowed so they never block
 startup. Required capabilities live in `src-tauri/capabilities/desktop.json`

@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react'
-import { useVault, setCurrentEntry, setNoEntry, saveEntry, clearPrefill } from '@/store'
+import {
+  useVault,
+  setCurrentEntry,
+  setNoEntry,
+  saveEntry,
+  clearPrefill,
+  isModalOpen
+} from '@/store'
 import { kindOf } from '@/kinds'
 import { pruneExtra } from '@/components/elements/fields'
 import { mergeFields } from '@/components/Main/Scan/fields'
-import { dialogOpen } from '@/utils/dialogOpen'
 import type { DraftValue, EntryDraft } from '@/kinds/draft'
 import type { Entry, EntryType } from '@/api/types'
 import { t } from '@/i18n'
@@ -109,7 +115,7 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
   // edit session, and ⌘⏎ inside it would save the draft behind it.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (dialogOpen()) return
+      if (isModalOpen()) return
       if (event.key === 'Escape') return cancel()
       if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault()

@@ -1,5 +1,4 @@
-import { useVault, useUi, startEntry, closeAddPicker } from '@/store'
-import { dialogOpen } from '@/utils/dialogOpen'
+import { useVault, useUi, startEntry, closeAddPicker, isModalOpen } from '@/store'
 import { ingestDroppedEnvFile, type IngestedEnv } from '@/kinds/env/ingest'
 
 /**
@@ -17,7 +16,7 @@ const idleDropContext = (): boolean | null => {
   const { creating, editing } = useVault.getState()
   const { addPicker } = useUi.getState()
   if (creating || editing) return null
-  if (dialogOpen() && !addPicker) return null
+  if (isModalOpen() && !addPicker) return null
   return addPicker
 }
 

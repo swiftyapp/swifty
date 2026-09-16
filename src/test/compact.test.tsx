@@ -523,7 +523,8 @@ describe('overlay frames', () => {
     act(() => openGenerator())
     const card = screen.getByTestId('generator-dialog')
     expect(card).not.toHaveAttribute('data-frame')
-    // The e2e suite and `utils/dialogOpen` both read the card off the DOM.
+    // The e2e suite and the dialogs' own topmost check (`useDialogFocus`,
+    // `Generator/useDialogKeys`) both read the card off the DOM.
     expect(card).toHaveAttribute('role', 'dialog')
     expect(card).toHaveAttribute('aria-labelledby', 'generator-title')
   })

@@ -9,7 +9,7 @@ use tauri::{AppHandle, Manager};
 use crate::error::Result;
 use crate::secure_store::{self, GateMode};
 use crate::settings::Settings;
-use crate::state::AppState;
+use crate::state::{AppState, SyncStatus};
 use crate::{biometrics, locale, scan, settings, storage, window, workspace};
 
 #[derive(Serialize)]
@@ -24,10 +24,11 @@ pub struct AppStatus {
     locale: String,
     /// Every preference, hydrated into the frontend's prefs store at boot.
     settings: Settings,
-    sync_configured: bool,
-    /// A consent flow is out with the browser. Owned here, not by the frontend:
-    /// the backend is what starts and ends it, so it is the one that can say.
-    sync_pending: bool,
+    /// Sync exactly as `sync:status` carries it, so a webview that has just
+    /// booted and one that has been listening hold the same value — and the
+    /// frontend has one place to read "does this vault sync" from instead of
+    /// two that drift apart.
+    sync: SyncStatus,
     scan_supported: bool,
     biometric: Biometric,
     /// Every vault on this install — exactly one until the user makes a second,
@@ -89,9 +90,8 @@ pub fn snapshot(app: &AppHandle) -> Result<AppStatus> {
     };
     drop(session);
 
-    // The same answer `sync:status` carries, so a fresh webview and one that
-    // has been listening agree.
-    let sync_pending = state.sync_run.lock().unwrap().pending;
+    // The same snapshot `sync:status` carries, built the same way.
+    let sync = state.sync_run.lock().unwrap().status(sync_configured);
 
     let settings = settings::current(app);
 
@@ -106,8 +106,7 @@ pub fn snapshot(app: &AppHandle) -> Result<AppStatus> {
         version: app.package_info().version.to_string(),
         locale: locale::resolve_preferred(settings.locale.as_deref()),
         settings,
-        sync_configured,
-        sync_pending,
+        sync,
         scan_supported: scan::is_supported(),
         biometric: Biometric {
             available: hardware && storage::biometric_enrolled(app),

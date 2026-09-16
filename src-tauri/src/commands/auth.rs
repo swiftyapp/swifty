@@ -99,10 +99,11 @@ async fn open_off_thread(
     .await
 }
 
-// Clear the in-memory key and close the store.
+// Clear the in-memory key and close the store, and emit `vault:locked` with it
+// — the frontend reacts to the event, not to this promise (see `session::lock`).
 #[tauri::command]
-pub fn lock(state: State<'_, AppState>) -> Result<()> {
-    state.session.lock().unwrap().clear();
+pub fn lock(app: AppHandle) -> Result<()> {
+    crate::session::lock(&app);
     Ok(())
 }
 

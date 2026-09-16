@@ -1,4 +1,4 @@
-import { useUi } from '@/store'
+import { useScanSupported } from '@/store'
 import Overlay from './Overlay'
 import Status from './Status'
 import { useDropScan } from './useDropScan'
@@ -14,7 +14,7 @@ import { useDropScan } from './useDropScan'
  * renders — and listens — for nothing at all.
  */
 export default function Scan() {
-  const supported = useUi(state => state.scanSupported)
+  const supported = useScanSupported()
   const over = useDropScan(supported)
 
   if (!supported) return null

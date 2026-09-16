@@ -8,7 +8,8 @@ import { loadArchive, setNoEntry, useVault, selectCurrent } from './vault'
  * The surfaces open over the vault and how the list is narrowed. Everything
  * here is session data — a lock drops it with the rows (`clearSession`): a
  * share dialog's link is live credentials that must not stay on screen behind
- * whoever unlocks next, and a scan probe is re-asked per unlock.
+ * whoever unlocks next. Nothing that outlives a session belongs here, which is
+ * why what the *platform* can do (scanning) is read off the launch probe.
  */
 
 // `tags` is the vault by one tag (`filterTag`): every item carrying it, from
@@ -61,9 +62,15 @@ export interface UiState {
    * is taken back, and every share surface retries on the way in.
    */
   orphans: string[]
-  // Image scanning: whether the platform can do it at all (asked once per
-  // unlock — no affordance is shown when it cannot), and the current run.
-  scanSupported: boolean
+  /**
+   * A request to put the caret in the list's search field, as a tick rather
+   * than a flag: ⌘F pressed twice running is two requests, and a flag that is
+   * already raised is not a second one. `ListColumn/Search` watches it and
+   * nothing ever lowers it.
+   */
+  searchFocus: number
+  // Image scanning: the current run. Whether the platform can scan at all is
+  // the probe's answer, not session state (`useScanSupported` in `store/app`).
   scanBusy: boolean
   scanError: ScanError | null
   // The app-level "Copied to Clipboard" pill is up. Raised by `flashCopied`
@@ -93,7 +100,7 @@ export const initialUi: UiState = {
   sendFor: null,
   receiveOpen: false,
   orphans: [],
-  scanSupported: false,
+  searchFocus: 0,
   scanBusy: false,
   scanError: null,
   copied: false
@@ -132,6 +139,12 @@ export const showTag = (tag: string) => {
 
 export const setFilterQuery = (query: string) => useUi.setState({ query })
 
+// ⌘F comes off the window, where there is no ref to the field. Asked of the
+// store rather than of the DOM: the field is one of ours, so what it should be
+// doing is state like everything else on this screen.
+export const focusSearch = () =>
+  useUi.setState(state => ({ searchFocus: state.searchFocus + 1 }))
+
 // A selection the new filter still shows is kept — narrowing to the kind you
 // are already reading shouldn't close it. Only a selection the filter would
 // hide is dropped, along with any in-progress new/edit.
@@ -151,6 +164,30 @@ export const setFilterTag = (tag: string | null) => {
 }
 
 // --- overlays -----------------------------------------------------------------------
+
+/**
+ * Whether a modal surface owns the keyboard and the window.
+ *
+ * Window- and document-level accelerators (the detail pane's bare ⏎, the
+ * editor's Esc and ⌘⏎, every ⌘ chord in `useShortcuts`) have to stand down
+ * while something modal is up, or they fire *behind* it — dismissing a dialog
+ * would also discard the draft underneath. Drops are the same question: the
+ * open modal may have a drop zone of its own (Settings › Import).
+ *
+ * Every field here is a surface this store opens, so this is the whole list.
+ * It used to be a `[role="dialog"]` query, which made a DOM detail of the frame
+ * the answer to a question the store already knew.
+ */
+export const selectModalOpen = (state: UiState): boolean =>
+  state.palette ||
+  state.settings ||
+  state.addPicker ||
+  state.generator.open ||
+  state.sendFor !== null ||
+  state.receiveOpen
+
+/** The same answer outside React, for an event handler. */
+export const isModalOpen = () => selectModalOpen(useUi.getState())
 
 export const openPalette = () => useUi.setState({ palette: true })
 export const closePalette = () => useUi.setState({ palette: false })
@@ -204,7 +241,6 @@ export const revokeOrphans = async () => {
 
 // --- scanning ---------------------------------------------------------------------
 
-export const setScanSupported = (scanSupported: boolean) => useUi.setState({ scanSupported })
 // A new run replaces the previous run's complaint: the user is answering it.
 export const scanStarted = () => useUi.setState({ scanBusy: true, scanError: null })
 export const scanFinished = (error?: ScanError | null) =>

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
-import { isOpenableUrl, openLink } from '@/services/openLink'
+import { isOpenableUrl, openLink } from '@/api/openLink'
 import { useFavicon } from '@/hooks/useFavicon'
 import { ExternalGlyph, GlobeGlyph } from '../../Main/icons'
 import IconButton from '../IconButton'

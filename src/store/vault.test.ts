@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { Entry, EntryMeta, Passkey } from '@/api/types'
 import { calls, mockCommand } from '../test/ipc'
 import { toEntryMeta } from '../test/meta'
+import { subscribeToEvents } from './events'
 import {
   useApp,
   useUi,
@@ -29,6 +30,8 @@ const connected = () => setSyncStatus({ ...initialApp.sync, configured: true })
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
+  // A lock is an event: nothing reacts to one without the subscription.
+  subscribeToEvents()
   // Echo back the saved entry's metadata, as the real backend does.
   mockCommand('save_entry', ({ entry }) => toEntryMeta(entry as Entry))
 })
@@ -158,6 +161,9 @@ describe('auto-sync', () => {
 
     await saveEntry({ type: 'login', title: 'One', username: 'u', password: 'p' })
     await lockVault()
+    // The waiting write is dropped by the reaction to `vault:locked`, which
+    // lands after the command resolves — as it does in the real app.
+    await vi.waitFor(() => expect(useApp.getState().flow).toBe('auth'))
 
     // The key is gone: a push fired now could only fail, and the next unlock
     // syncs anyway.

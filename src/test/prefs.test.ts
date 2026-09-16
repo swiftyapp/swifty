@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import i18n from '@/i18n'
 import type { Settings } from '@/api/app'
 import { DEFAULT_PREFS, hydratePrefs, setPref, toggleTheme, usePrefs } from '@/store/prefs'
-import { calls, clearCalls, mockCommand, mockCommandOnce } from './ipc'
+import { appStatusDefault, calls, clearCalls, mockCommand, mockCommandOnce } from './ipc'
 import { deferred } from './utils'
 
 // The store's half of the preferences contract. What a patch does to the file
@@ -14,6 +14,14 @@ const settled = () => new Promise(resolve => setTimeout(resolve, 0))
 describe('prefs', () => {
   it('starts on the same defaults Rust does', () => {
     expect(usePrefs.getState()).toEqual(DEFAULT_PREFS)
+  })
+
+  // The fake backend cannot import the store (its mock is what the store's own
+  // IPC seam loads), so a fresh install is spelled out in both places. This is
+  // what keeps the two copies the same one: they had already drifted by a
+  // generator flag, which is a preference the app would have read as unset.
+  it('is the same fresh install the fake backend hands back', () => {
+    expect(appStatusDefault().settings).toEqual(DEFAULT_PREFS)
   })
 
   it('takes the boot probe wholesale', () => {

@@ -1,11 +1,13 @@
 //! The unlocked vault: the in-memory session, and the vault-opening helpers
 //! every command reaches for.
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use crate::crypto::{self, Cryptor, KdfParams, PayloadCipher, VaultKey};
 use crate::error::{Error, Result};
+use crate::events;
 use crate::models::EntryMetaDto;
+use crate::state::AppState;
 use crate::storage;
 use crate::store::{EntryMeta, Record, SqliteStore, StoreError, VaultStore};
 
@@ -189,6 +191,20 @@ impl Session {
         let (key, store, sync_configured, claim) = lease.split();
         self.adopt(claim, key, store, sync_configured)
     }
+}
+
+/// End the session and say so.
+///
+/// Sealing the vault and announcing it are one act: the `lock` command, the
+/// inactivity auto-lock, the tray and the E2E reset all end here, and a
+/// workspace switch emits the same event once its paths have moved. So
+/// `vault:locked` is the one signal the frontend reacts to. Before this, only
+/// the auto-lock announced itself and each of the others left the webview to
+/// guess it had happened — which is how the same "drop everything and show the
+/// lock screen" ended up written three times over there.
+pub fn lock(app: &AppHandle) {
+    app.state::<AppState>().session.lock().unwrap().clear();
+    events::vault_locked(app);
 }
 
 pub fn store_err(e: StoreError) -> Error {

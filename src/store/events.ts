@@ -35,8 +35,10 @@ export const subscribeToEvents = (): (() => void) => {
     on(EVENTS.setupDrivePending, () => setupDrivePending()),
     on(EVENTS.setupDriveProbed, payload => setupDriveProbed(payload.file)),
     on(EVENTS.setupDriveError, payload => setupDriveFailed(payload.error)),
-    // Autolock: the same path as a manual `lockVault`, minus the lock command
-    // the backend has already run.
+    // The one reaction to a lock, whoever asked for it: the lock command, the
+    // inactivity autolock, the tray, a workspace switch. Every one of them ends
+    // in `session::lock` on the Rust side, so none of them has to hand-roll
+    // this — and none of them can forget half of it.
     on(EVENTS.vaultLocked, () => {
       clearSession()
       void showLockScreen()

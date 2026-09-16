@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useUi, setFilterQuery } from '@/store'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
@@ -24,6 +24,15 @@ export default function Search({ className = DESKTOP }: { className?: string }) 
   const query = useUi(state => state.query)
   const empty = query === ''
   const input = useRef<HTMLInputElement>(null)
+
+  // ⌘F is a window-level chord, so it asks the store for the caret rather than
+  // reaching into the DOM for a field it holds no ref to (`focusSearch`). The
+  // request is a tick, so two presses running are two requests; the 0 it starts
+  // at is the one value that is nobody asking.
+  const requested = useUi(state => state.searchFocus)
+  useEffect(() => {
+    if (requested > 0) input.current?.focus()
+  }, [requested])
 
   // Clearing hands the caret back to the field: the button that was clicked
   // is about to fade out and leave the tab order, and a focus left on it would

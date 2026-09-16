@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import ListColumn from '@/components/Main/Body/ListColumn'
 import SortMenu from '@/components/Main/Body/List/SortMenu'
 import { type Audit } from '@/api/tools'
-import { useVault, setFilterType } from '@/store'
+import { useVault, setFilterType, clearSession } from '@/store'
 import { resetFavicons } from '@/hooks/useFavicon'
 import { withEntries, loginEntry, loginMeta } from './utils'
 import { calls, mockCommand, clearCalls } from './ipc'
@@ -80,6 +80,24 @@ describe('Entry list', () => {
     )
     // All four rows share one host — the lookup is deduped across them.
     expect(calls('fetch_favicon')).toHaveLength(1)
+  })
+
+  // The cache is keyed by hostname and holds the icons of whatever was on
+  // screen, so it is session data like the rows themselves: leaving it would
+  // carry one vault's sites into the next unlock, or into another workspace's.
+  it('forgets the icons it cached when the vault locks', async () => {
+    mockCommand('fetch_favicon', () => 'data:image/png;base64,AAAA')
+    seed()
+    const { unmount } = render(<ListColumn />)
+    await waitFor(() => expect(calls('fetch_favicon')).toHaveLength(1))
+    unmount()
+
+    clearSession()
+    seed()
+    render(<ListColumn />)
+
+    // A cache that survived would answer this host from memory.
+    await waitFor(() => expect(calls('fetch_favicon')).toHaveLength(2))
   })
 
   it('keeps the type glyph when the host has no favicon', async () => {

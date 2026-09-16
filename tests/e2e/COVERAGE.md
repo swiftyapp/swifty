@@ -76,7 +76,7 @@ These are not gaps in the suite; the coverage lives elsewhere and belongs there.
 | Drive sync loop | Needs a live Google account + OAuth consent; a WebDriver run cannot hold credentials. | Rust tests around `sync::engine` against a fake `Remote`, plus the pack/restore round-trip tests. |
 | Biometric unlock | Gated by the OS (Touch ID prompt); no WebDriver surface, and the secure store is machine-bound. | `secure_store` / `biometrics` are behind a platform trait; unit-tested through it. |
 | `.swftx` import / export, backup restore, third-party imports | Every import tile and the portable export open a **native** file dialog outside the webview — the driver cannot reach it. The drop zone needs a real OS drag. | `import::` and `store::` Rust tests cover parse, reseal-on-import and the export round-trip; `settings.test.tsx` drives the tile → password → import flow against mocked commands. |
-| Updater | Talks to the release endpoint and stages a signed bundle. | `services/autoUpdate.test.ts` against a mocked plugin. |
+| Updater | Talks to the release endpoint and stages a signed bundle. | `api/autoUpdate.test.ts` against a mocked plugin. |
 | HIBP breach check | Network call to the k-anonymity range API. | `hibp` Rust unit tests; the audit spec runs with the breach check off. |
 | Site favicons | Fetches from each entry's own host. | E2E asserts only the **glyph fallback**; fetching/caching is covered in `favicon` Rust tests. |
 
