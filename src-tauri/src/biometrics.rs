@@ -16,20 +16,16 @@ mod imp {
 
     const POLICY: LAPolicy = LAPolicy::DeviceOwnerAuthenticationWithBiometrics;
 
-    pub fn is_available() -> bool {
-        unsafe { LAContext::new().canEvaluatePolicy_error(POLICY).is_ok() }
-    }
-
     // `biometryType` is only populated once the context has been asked whether
-    // it can evaluate the policy, so the check is not an availability guard we
-    // could skip — it is what fills the property in.
-    pub fn kind() -> &'static str {
+    // it can evaluate the policy, so the evaluation answers both halves at once
+    // — which is why they are asked for together.
+    pub fn probe() -> super::Probe {
         let ctx = unsafe { LAContext::new() };
         if unsafe { ctx.canEvaluatePolicy_error(POLICY) }.is_err() {
-            return super::NONE;
+            return super::Probe::UNAVAILABLE;
         }
         let biometry = unsafe { ctx.biometryType() };
-        if biometry == LABiometryType::FaceID {
+        let kind = if biometry == LABiometryType::FaceID {
             super::FACE
         } else if biometry == LABiometryType::TouchID {
             super::TOUCH
@@ -37,6 +33,10 @@ mod imp {
             // Optic ID and anything Apple adds later: we have no name for it, so
             // say nothing rather than name the wrong gate.
             super::NONE
+        };
+        super::Probe {
+            available: true,
+            kind,
         }
     }
 
@@ -66,11 +66,19 @@ mod imp {
 
     // `join` is windows-rs 0.62's name for what used to be `get`: block the
     // calling thread until the WinRT async operation completes.
-    pub fn is_available() -> bool {
-        UserConsentVerifier::CheckAvailabilityAsync()
+    pub fn probe() -> super::Probe {
+        let available = UserConsentVerifier::CheckAvailabilityAsync()
             .and_then(|op| op.join())
             .map(|a| a == UserConsentVerifierAvailability::Available)
-            .unwrap_or(false)
+            .unwrap_or(false);
+        if available {
+            super::Probe {
+                available,
+                kind: super::TOUCH,
+            }
+        } else {
+            super::Probe::UNAVAILABLE
+        }
     }
 
     pub fn authenticate() -> Result<()> {
@@ -91,8 +99,8 @@ mod imp {
 mod imp {
     use super::*;
 
-    pub fn is_available() -> bool {
-        false
+    pub fn probe() -> super::Probe {
+        super::Probe::UNAVAILABLE
     }
 
     #[allow(dead_code)]
@@ -106,34 +114,44 @@ mod imp {
 // What the UI calls the gate. Kept as the three wire strings the frontend's
 // `BiometryType` union already names, so neither side has a mapping table.
 
-// Only Apple can report a face.
+// Only Apple can report a face — everywhere else the gate has always been a
+// fingerprint (Windows Hello's).
 #[cfg_attr(not(target_vendor = "apple"), allow(dead_code))]
 const FACE: &str = "face";
+#[cfg_attr(
+    not(any(target_vendor = "apple", target_os = "windows")),
+    allow(dead_code)
+)]
 const TOUCH: &str = "touch";
 const NONE: &str = "none";
 
-pub fn is_available() -> bool {
-    imp::is_available()
-}
-
-/// Which biometry this device gates with: `"face"`, `"touch"` or `"none"`.
+/// What this device's biometric gate is, and whether it can be used at all.
 ///
-/// The hardware, not the opt-in — `is_available` still says whether it can be
-/// used at all. Only Apple platforms distinguish the two kinds; everywhere else
-/// the gate has always been a fingerprint (Windows Hello's), so availability is
-/// the whole answer.
-#[cfg(target_vendor = "apple")]
-pub fn kind() -> &'static str {
-    imp::kind()
+/// One value rather than two calls: on Apple both answers fall out of a single
+/// `LAContext` policy evaluation, which is the expensive part — and the launch
+/// probe wants both.
+pub struct Probe {
+    /// The hardware is there and the OS will evaluate the policy. Not the
+    /// opt-in: whether a key is enrolled is `storage::biometric_enrolled`.
+    pub available: bool,
+    /// `"face"`, `"touch"` or `"none"`, so the UI can name the gate rather than
+    /// guess it from the platform (a Touch ID iPad is not Face ID).
+    pub kind: &'static str,
 }
 
-#[cfg(not(target_vendor = "apple"))]
-pub fn kind() -> &'static str {
-    if imp::is_available() {
-        TOUCH
-    } else {
-        NONE
-    }
+impl Probe {
+    const UNAVAILABLE: Self = Self {
+        available: false,
+        kind: NONE,
+    };
+}
+
+pub fn probe() -> Probe {
+    imp::probe()
+}
+
+pub fn is_available() -> bool {
+    probe().available
 }
 
 // The verify-then-read gate: Windows always, and macOS/iOS in `GateMode::Prompt`

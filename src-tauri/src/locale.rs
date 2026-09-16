@@ -7,6 +7,7 @@
 //! That choice lives in `settings.json`; `resolve_preferred` is the one place
 //! the two are weighed against each other.
 
+use std::sync::OnceLock;
 use sys_locale::get_locale;
 
 /// Locales the app ships a catalogue for. A system locale outside this list
@@ -45,10 +46,15 @@ fn resolve(raw: &str) -> &'static str {
         .unwrap_or(DEFAULT)
 }
 
+/// The OS's language, narrowed to a catalogue we ship.
+///
+/// Resolved once per process: the setting cannot change under a running app,
+/// and every launch path asks for it (the injected boot object first, then the
+/// probe behind it).
 pub fn system_locale() -> String {
-    get_locale()
-        .map(|raw| resolve(&raw))
-        .unwrap_or(DEFAULT)
+    static RESOLVED: OnceLock<&'static str> = OnceLock::new();
+    RESOLVED
+        .get_or_init(|| get_locale().map(|raw| resolve(&raw)).unwrap_or(DEFAULT))
         .to_string()
 }
 

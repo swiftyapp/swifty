@@ -4,13 +4,13 @@
 //! why it can be one round trip instead of the eight commands it replaces.
 
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager};
 
 use crate::error::Result;
 use crate::secure_store::{self, GateMode};
 use crate::settings::Settings;
 use crate::state::AppState;
-use crate::{biometrics, locale, scan, settings, storage, workspace};
+use crate::{biometrics, locale, scan, settings, storage, window, workspace};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,10 +56,20 @@ pub struct Biometric {
     mode: Option<String>,
 }
 
-#[tauri::command]
-pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatus> {
-    let hardware = secure_store::is_supported() && biometrics::is_available();
-    let marker = storage::biometric_marker(&app);
+/// Run the probe off the main thread: it stats a handful of files and asks the
+/// OS about biometrics, none of which needs the UI thread and all of which the
+/// window would otherwise wait behind.
+#[tauri::command(async)]
+pub fn app_status(app: AppHandle) -> Result<AppStatus> {
+    snapshot(&app)
+}
+
+/// The probe's answer, callable from Rust as well as over IPC.
+pub fn snapshot(app: &AppHandle) -> Result<AppStatus> {
+    let state = app.state::<AppState>();
+    let gate = biometrics::probe();
+    let hardware = secure_store::is_supported() && gate.available;
+    let marker = storage::biometric_marker(app);
 
     // The session flag only exists after an unlock; while locked, answer from
     // the persisted (non-secret) settings so e.g. the lock screen can say
@@ -68,7 +78,7 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
     let sync_configured = if session.is_unlocked() {
         session.sync_configured
     } else {
-        storage::sync_configured(&app)
+        storage::sync_configured(app)
     };
     drop(session);
 
@@ -76,16 +86,16 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
     // has been listening agree.
     let sync_pending = state.sync_run.lock().unwrap().pending;
 
-    let settings = settings::current(&app);
+    let settings = settings::current(app);
 
-    let registry = workspace::Registry::load(&storage::root_dir(&app)?);
+    let registry = workspace::Registry::load(&storage::root_dir(app)?);
     // The in-memory id, not the registry's: it is what every path above was
     // resolved through, so it is what `initialized` and the rest are about.
-    let active_workspace = workspace::active_id(&app);
+    let active_workspace = workspace::active_id(app);
     let primary = active_workspace == workspace::PRIMARY_ID;
 
     Ok(AppStatus {
-        initialized: storage::db_exists(&app),
+        initialized: storage::db_exists(app),
         version: app.package_info().version.to_string(),
         locale: locale::resolve_preferred(settings.locale.as_deref()),
         settings,
@@ -93,16 +103,59 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
         sync_pending,
         scan_supported: scan::is_supported(),
         biometric: Biometric {
-            available: hardware && storage::biometric_enrolled(&app),
+            available: hardware && storage::biometric_enrolled(app),
             // One keychain item for the whole install, so enrolling is the
             // primary workspace's to offer (see `workspace::guard_primary`).
             can_enroll: hardware && primary,
-            kind: biometrics::kind(),
+            kind: gate.kind,
             mode: marker.map(|m| GateMode::from_marker(&m).as_marker().to_string()),
         },
         workspaces: registry.workspaces,
         active_workspace,
     })
+}
+
+/// What the webview is handed before its own scripts run, as
+/// `window.__ROWEL_BOOT__`.
+///
+/// Only the two answers the *first painted frame* needs: the theme (inside the
+/// settings) and the language the catalogue is loaded for. Everything else stays
+/// in `app_status`, which the frontend probes for anyway — an injected script is
+/// frozen at window creation, so anything that can change while the app runs
+/// would be stale after a webview reload.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Boot {
+    /// The stored choice narrowed to a shipped catalogue, or the OS's.
+    locale: String,
+    settings: Settings,
+}
+
+/// The `window.__ROWEL_BOOT__` assignment to inject into the main window.
+pub fn boot_script(app: &AppHandle) -> String {
+    let settings = settings::current(app);
+    script(&Boot {
+        locale: locale::resolve_preferred(settings.locale.as_deref()),
+        settings,
+    })
+}
+
+/// Serialised twice on purpose: once to JSON, then that JSON string again to
+/// get a JS string literal. Parsing the literal back at runtime is what keeps a
+/// quote, a backslash or a line separator inside a user-typed value (the
+/// generator's exclude list) from ending the expression it sits in.
+fn script(boot: &Boot) -> String {
+    let json = serde_json::to_string(boot).unwrap_or_else(|_| "{}".into());
+    let literal = serde_json::to_string(&json).unwrap_or_else(|_| "\"{}\"".into());
+    format!("window.__ROWEL_BOOT__ = Object.freeze(JSON.parse({literal}));")
+}
+
+/// The frontend saying its first frame is up. The window is hidden until this
+/// lands (or the fallback fires), so the reveal and the splash choreography
+/// start together instead of racing.
+#[tauri::command]
+pub fn app_ready(app: AppHandle) {
+    window::reveal(&app);
 }
 
 /// Apply a partial settings object and hand the whole merged result back, so a
@@ -112,4 +165,39 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
 #[tauri::command]
 pub fn set_settings(app: AppHandle, patch: serde_json::Value) -> Result<Settings> {
     settings::set(&app, &patch)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The payload is pasted into a JS statement, so the one thing that can go
+    // wrong is a value escaping its literal. Anything a user can type ends up
+    // in `generator.exclude`.
+    #[test]
+    fn the_boot_script_round_trips_through_a_json_parse() {
+        let mut settings = Settings::default();
+        settings.generator.exclude = "'\"\\\n</script>\u{2028}".into();
+        let boot = Boot {
+            locale: "uk-UA".into(),
+            settings,
+        };
+
+        let generated = script(&boot);
+        let literal = generated
+            .strip_prefix("window.__ROWEL_BOOT__ = Object.freeze(JSON.parse(")
+            .and_then(|rest| rest.strip_suffix("));"))
+            .expect("the assignment keeps its shape");
+
+        // What the webview does: read the literal, then parse what it holds.
+        let json: String = serde_json::from_str(literal).expect("a valid JS string literal");
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON inside");
+
+        assert_eq!(parsed["locale"], "uk-UA");
+        assert_eq!(parsed["settings"]["theme"], "light");
+        assert_eq!(
+            parsed["settings"]["generator"]["exclude"],
+            boot.settings.generator.exclude
+        );
+    }
 }

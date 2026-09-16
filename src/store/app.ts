@@ -35,7 +35,7 @@ export interface AppState {
    * lock screen's gate (`biometric.available`, `biometric.type`) is read off it
    * rather than copied out at each flow change.
    *
-   * Null until the boot probe lands (`main.tsx`), and on a host where that call
+   * Null until the boot probe lands (`boot.ts`), and on a host where that call
    * failed outright; every reader treats that as "nothing known yet".
    */
   status: AppStatus | null
@@ -76,7 +76,7 @@ export const useApp = create<AppState>()(() => initialApp)
 
 // --- launch probe -----------------------------------------------------------------
 
-/** Take the boot probe's answer wholesale (see `main.tsx`). */
+/** Take the boot probe's answer wholesale (see `boot.ts`). */
 export const setApp = (status: AppStatus) => useApp.setState({ status })
 
 /**

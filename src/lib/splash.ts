@@ -1,44 +1,28 @@
-// The startup splash lives as static markup in index.html: the mascot at rest
-// where the lock screen will draw it, with a wake-up choreography that only
-// applies once `splash-live` is on <html>. Gating it on the bundle means it
-// starts when the bundle is live — which is also when window.rs reveals the
-// window — instead of running unseen behind a hidden one, and that a bundle
-// which never runs leaves a whole mascot for window.rs's fallback reveal, not
-// a blank frame. This flips the gate and reports when the last animation has
-// ended, so the first React frame can take over from the resting pose rather
-// than mid-motion.
+// The startup splash lives as static markup in index.html: the mascot at rest,
+// on screen from the very first frame, with the choreography behind a class so
+// it only plays once the bundle is live. Two calls drive it — one to start the
+// motion, one to hand the screen to React — and neither of them makes the app
+// wait: the lock screen draws the same mascot in the same pixels, so the fade
+// covers a swap mid-animation as readily as one from the resting pose.
 
-const LAST = '[data-splash-last]'
-// The choreography ends around 1.4s; past this the app renders regardless, so
-// a missed `animationend` can never hold the UI hostage.
-const CAP_MS = 1600
+const SPLASH = 'splash'
+// Long enough to cover the fade in index.html, plus slack: a node that is never
+// transitioned (reduced motion, a hidden window) fires no `transitionend`, and
+// an abandoned overlay would swallow nothing but would still be in the tree.
+const REMOVE_AFTER_MS = 600
 
-const reducedMotion = (): boolean => {
-  try {
-    return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-  } catch {
-    return false
-  }
+/** Arm the choreography. Synchronous, so the first revealed frame is its first. */
+export const startSplash = (): void => {
+  document.documentElement.classList.add('splash-live')
 }
 
-/**
- * Start the splash and resolve once it has settled. Resolves at once when
- * there is no splash to wait for (tests, a reduced-motion user who sees the
- * resting pose immediately).
- */
-export const runSplash = (): Promise<void> => {
-  document.documentElement.classList.add('splash-live')
-  const last = document.querySelector(LAST)
-  if (!last || reducedMotion()) return Promise.resolve()
+/** Fade the splash out over whatever React has just committed, then drop it. */
+export const finishSplash = (): void => {
+  document.documentElement.classList.add('splash-done')
+  const node = document.getElementById(SPLASH)
+  if (!node) return
 
-  return new Promise(resolve => {
-    const timer = setTimeout(resolve, CAP_MS)
-    // `animationend` bubbles, so the descendants' animations would arrive here
-    // too; only the marked element's own end counts.
-    last.addEventListener('animationend', event => {
-      if (event.target !== last) return
-      clearTimeout(timer)
-      resolve()
-    })
-  })
+  const remove = () => node.remove()
+  node.addEventListener('transitionend', remove, { once: true })
+  setTimeout(remove, REMOVE_AFTER_MS)
 }

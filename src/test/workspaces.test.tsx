@@ -14,7 +14,7 @@ beforeEach(() => {
 const PRIMARY: Workspace = { id: 'default', name: null }
 const WORK: Workspace = { id: 'w2', name: 'Work' }
 
-// What the boot probe said about workspaces, as main.tsx would have stored it.
+// What the boot probe said about workspaces, as boot.ts would have stored it.
 const seed = (workspaces: Workspace[], activeWorkspace = 'default') =>
   seedApp({ workspaces, activeWorkspace })
 
