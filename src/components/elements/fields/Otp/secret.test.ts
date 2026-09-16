@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { otpSecret } from './secret'
+import { otpSecret, otpStored } from './secret'
 
 const SECRET = 'JBSWY3DPEHPK3PXP'
 
@@ -26,5 +26,33 @@ describe('otpSecret', () => {
 
   for (const [what, input, expected] of cases) {
     it(`reads ${what}`, () => expect(otpSecret(input)).toBe(expected))
+  }
+})
+
+// What the field saves. A link whose parameters are the ones we would have
+// assumed anyway collapses to its seed; one that asks for anything else is kept
+// whole, because the seed alone would generate codes its site rejects.
+describe('otpStored', () => {
+  const uri = (query: string) => `otpauth://totp/Acme:me@acme.io?secret=${SECRET}&${query}`
+
+  const cases: [string, string, string][] = [
+    ['nothing', '', ''],
+    ['a bare secret', SECRET, SECRET],
+    ['a secret typed in groups', 'JBSW Y3DP EHPK 3PXP', SECRET],
+    ['a link with nothing but the secret', `otpauth://totp/Acme?secret=${SECRET}`, SECRET],
+    ['a link spelling out the defaults', uri('digits=6&period=30&algorithm=SHA1'), SECRET],
+    ['a link naming only the issuer', uri('issuer=Acme'), SECRET],
+    ['a link asking for 8 digits', uri('digits=8'), uri('digits=8')],
+    ['a link asking for a 60s window', uri('period=60'), uri('period=60')],
+    ['a link asking for SHA-256', uri('algorithm=SHA256'), uri('algorithm=SHA256')],
+    // The parameter names are no more case-sensitive here than in `otpSecret`.
+    ['a link shouting DIGITS', uri('DIGITS=8'), uri('DIGITS=8')],
+    // A link we cannot read a seed out of is no more storable than junk.
+    ['a link with no secret', 'otpauth://totp/Acme?digits=8', ''],
+    ['a non-base32 string', 'not-a-secret', '']
+  ]
+
+  for (const [what, input, expected] of cases) {
+    it(`stores ${what}`, () => expect(otpStored(input)).toBe(expected))
   }
 })

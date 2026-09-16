@@ -48,7 +48,7 @@ export interface LoginEntry extends BaseEntry {
   password: string
   email: string
   note: string
-  otp: string // base32 TOTP secret
+  otp: string // base32 TOTP secret, or an otpauth:// URI when the parameters are not the defaults
   password_updated_at?: string
   // Absent on entries with no passkeys, so a pre-passkey vault is unchanged.
   passkeys?: Passkey[]

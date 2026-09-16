@@ -13,6 +13,9 @@ mod hibp;
 mod import;
 mod locale;
 mod models;
+// How a stored `otp` value is spelled — read by the generator, the importers
+// and the exporters alike, so it sits below all three.
+mod otp;
 // The WebAuthn authenticator core. Declared only: its caller is the browser
 // extension host a later PR adds, so no command is registered below yet.
 mod passkey;

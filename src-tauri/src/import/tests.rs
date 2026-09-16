@@ -1117,3 +1117,37 @@ fn env_never_exports_as_a_login() {
         .collect();
     assert!(!kinds.contains(&"basic-auth"), "{kinds:?}");
 }
+
+// The bug this guards against: a seed's digits, period and algorithm were
+// exported as the defaults and ignored on the way back in, so a re-imported
+// 8-digit SHA-256 enrolment generated codes its site would refuse.
+#[test]
+fn cxf_round_trips_non_default_totp_parameters() {
+    let stored = "otpauth://totp/?secret=JBSWY3DPEHPK3PXP&digits=8&period=60&algorithm=SHA256";
+    let entries = [ImportedEntry {
+        kind: EntryKind::Login,
+        title: "Acme".into(),
+        password: Some("pw".into()),
+        otp: Some(stored.into()),
+        ..Default::default()
+    }];
+    let bytes = to_cxf_json(&entries).unwrap();
+
+    // CXF spells the parameters out beside the seed rather than in a URI.
+    let doc: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let totp = doc["accounts"][0]["items"][0]["credentials"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["type"] == "totp")
+        .unwrap()
+        .clone();
+    assert_eq!(totp["secret"], "JBSWY3DPEHPK3PXP");
+    assert_eq!(totp["digits"], 8);
+    assert_eq!(totp["period"], 60);
+    assert_eq!(totp["algorithm"], "sha256");
+
+    let back = parse(Format::Cxf, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries[0].otp.as_deref(), Some(stored));
+}
