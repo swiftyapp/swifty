@@ -1,4 +1,4 @@
-import { useStore } from '@/store'
+import { useUi, useVault } from '@/store'
 import { useRows, useVisibleEntries } from '../List/useVisibleEntries'
 
 /**
@@ -24,9 +24,9 @@ export const isWholeView = (variant: Variant) => WHOLE_VIEW.includes(variant)
 // Which empty state the app is in, or `null` when there is real content to
 // show — which, for the surfaces that ask, only ever means a scored audit.
 export const useVariant = (): Variant | null => {
-  const view = useStore(state => state.ui.view)
-  const audit = useStore(state => state.audit)
-  const query = useStore(state => state.filters.query)
+  const view = useUi(state => state.view)
+  const audit = useVault(state => state.audit)
+  const query = useUi(state => state.query)
   const rows = useRows()
   // The same filtered set the list renders, rather than a second pass over it:
   // only its size matters here.

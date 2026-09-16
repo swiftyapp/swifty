@@ -3,18 +3,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FieldsProvider } from '@/components/elements/fields'
-import type { DraftValue, EntryDraft } from '@/defaults/entries'
+import type { DraftValue, EntryDraft } from '@/kinds/draft'
 import { open } from '@tauri-apps/plugin-dialog'
 import Fields from '@/kinds/env/Fields'
 import { useEnvIngest } from '@/kinds/env/useIngest'
 import Main from '@/components/Main'
-import { makeStore, useStore, startEntry, openAddPicker } from '@/store'
-import { renderWithStore, withEntries, loginMeta, deferred } from './utils'
+import { useUi, useVault, startEntry, openAddPicker } from '@/store'
+import { withEntries, loginMeta, deferred } from './utils'
 import { calls, mockCommand } from './ipc'
 
-// The webview's drag-drop stream, replaced by a hand that can drop a file. The
-// hook subscribes after a lazy import, so a test waits for the listener before
-// it drops; `unlisten` takes it back out.
+// The webview's drag-drop stream, replaced by a hand that can drop a file —
+// setup.ts's mock is the inert one. A test waits for the listener before it
+// drops; `unlisten` takes it back out.
 type Handler = (event: { payload: { type: string; paths: string[] } }) => void
 let handlers: Handler[] = []
 vi.mock('@tauri-apps/api/webview', () => ({
@@ -251,78 +251,77 @@ describe('interactive env ingestion', () => {
 })
 
 describe('a .env dropped on the idle window', () => {
-  const seed = () => {
-    const store = makeStore()
-    withEntries([loginMeta({ id: 'l1', title: 'Google' })])
-    return store
-  }
+  const seed = () => withEntries([loginMeta({ id: 'l1', title: 'Google' })])
 
   it('opens a new env draft with the file already in it', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await drop('/Users/me/code/api/.env.production')
 
-    await waitFor(() => expect(useStore.getState().entries.new).toBe('env'))
+    await waitFor(() => expect(useVault.getState().creating).toBe('env'))
     await waitFor(() => expect(keyInputs()).toEqual(['DB_POOL', 'STRIPE_KEY']))
     // Seeded through the same prefill a scan uses, and consumed the same way.
-    expect(useStore.getState().entries.prefill).toBeNull()
+    expect(useVault.getState().prefill).toBeNull()
     expect(document.querySelector('input[name="title"]')).toHaveValue('api · production')
   })
 
   it('takes a file that only reads like one', async () => {
     mockCommand('read_env_file', () => ({ fileName: 'keys.txt', body: 'A=1\nB=2\n' }))
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await drop('/Users/me/keys.txt')
 
-    await waitFor(() => expect(useStore.getState().entries.new).toBe('env'))
+    await waitFor(() => expect(useVault.getState().creating).toBe('env'))
   })
 
   it('ignores anything that is neither named nor written like one', async () => {
     mockCommand('read_env_file', () => ({ fileName: 'notes.txt', body: 'hello\nworld\n' }))
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await drop('/Users/me/notes.txt')
     await drop('/Users/me/card.png')
 
-    expect(useStore.getState().entries.new).toBeNull()
+    expect(useVault.getState().creating).toBeNull()
     // The scanner's, so not even read.
     expect(calls('read_env_file')).not.toContainEqual({ path: '/Users/me/card.png' })
   })
 
   it('leaves an open editor alone', async () => {
-    const store = seed()
+    seed()
     startEntry('login')
-    renderWithStore(<Main />, { store })
+    render(<Main />)
 
     await drop('/Users/me/code/api/.env')
 
-    expect(useStore.getState().entries.new).toBe('login')
+    expect(useVault.getState().creating).toBe('login')
     expect(calls('read_env_file')).toHaveLength(0)
   })
 
   it('does not replace an editor opened while the file is still being read', async () => {
     const reading = deferred<typeof FILE>()
     mockCommand('read_env_file', () => reading.promise)
-    const store = seed()
-    renderWithStore(<Main />, { store })
+    seed()
+    render(<Main />)
 
     await drop('/Users/me/code/api/.env')
     act(() => startEntry('login'))
     await act(async () => reading.resolve(FILE))
 
-    expect(useStore.getState().entries.new).toBe('login')
+    expect(useVault.getState().creating).toBe('login')
   })
 
   it('answers the Add picker and closes it', async () => {
-    const store = seed()
-    renderWithStore(<Main />, { store })
+    seed()
+    render(<Main />)
     act(() => openAddPicker())
     expect(screen.getByTestId('add-env-file')).toHaveTextContent('Drop a .env file')
 
     await drop('/Users/me/code/api/.env')
 
-    await waitFor(() => expect(useStore.getState().entries.new).toBe('env'))
-    expect(useStore.getState().ui.addPicker).toBe(false)
+    await waitFor(() => expect(useVault.getState().creating).toBe('env'))
+    expect(useUi.getState().addPicker).toBe(false)
   })
 })

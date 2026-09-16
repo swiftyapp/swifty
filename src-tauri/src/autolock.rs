@@ -6,19 +6,19 @@ use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Manager, WindowEvent};
 
-const DEFAULT_TIMEOUT_SECS: u64 = 60;
-// A day. The row offers far less, but the command is reachable from the
-// frontend, and a timeout measured in years is indistinguishable from "never" —
-// which is not a setting a password manager should be talked into.
-const MAX_TIMEOUT_SECS: u64 = 24 * 60 * 60;
+// The bounds are the settings module's: it normalises the stored value with
+// the same numbers, so what the file holds is what gets armed here.
+use crate::settings::{
+    DEFAULT_AUTOLOCK_SECS as DEFAULT_TIMEOUT_SECS, MAX_AUTOLOCK_SECS as MAX_TIMEOUT_SECS,
+};
 
 pub struct AutoLock {
     /// The pending lock. One timer for the whole process: a blur re-arms it and
     /// a focus disarms it, so alt-tabbing cannot pile up pending locks.
     timer: Arc<Timer>,
-    /// Idle seconds before an unfocused, unlocked vault seals itself. Set from
-    /// the frontend on unlock and whenever the Settings row changes, so the
-    /// value the user picked survives a focus cycle without a restart.
+    /// Idle seconds before an unfocused, unlocked vault seals itself. Seeded
+    /// from `settings.json` at startup and re-set whenever the Settings row
+    /// changes, so the value the user picked is in force from the first blur.
     timeout_secs: AtomicU64,
 }
 

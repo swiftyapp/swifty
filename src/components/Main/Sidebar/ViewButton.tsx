@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
-import { useStore, setView } from '@/store'
-import type { View } from '@/store/uiSlice'
+import { useUi, setView, type View } from '@/store'
 import RailButton from '@/components/elements/RailButton'
 
 // One rail tile per `ui.view`. Every view button is the same button — which one
@@ -17,7 +16,7 @@ export default function ViewButton({
   testid: string
   children: ReactNode
 }) {
-  const selected = useStore(state => state.ui.view === view)
+  const selected = useUi(state => state.view === view)
 
   return (
     <RailButton label={label} selected={selected} onClick={() => setView(view)} testid={testid}>

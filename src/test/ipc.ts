@@ -1,4 +1,5 @@
 import type { BackendError } from '@/api/errors'
+import type { AppStatus, Settings } from '@/api/app'
 
 /**
  * The fake Rust backend. One mock of `@tauri-apps/api/core` stands in for every
@@ -22,18 +23,50 @@ const meta = (id: string, type = 'login', title = '', favorite = false) => ({
 
 const session = { entries: [], syncConfigured: false }
 
+// The preferences Rust would hand back on a fresh install, and the file it
+// would hand them back from: `set_settings` merges into this the way the real
+// command merges into `settings.json`, so a component sees its own write come
+// back round. Reset with the rest of the fakes between tests.
+const DEFAULT_SETTINGS: Settings = {
+  autolockSecs: 60,
+  clipboardTimeoutMs: 30000,
+  dateFormat: 'MM/DD/YYYY',
+  sort: 'recent',
+  theme: 'light',
+  locale: null,
+  breachCheck: false,
+  generator: {
+    length: 20,
+    numbers: true,
+    symbols: true,
+    uppercase: true,
+    exclude: '',
+    excludeSimilarCharacters: false
+  }
+}
+
+let settings: Settings = DEFAULT_SETTINGS
+
+/**
+ * The launch probe's answer on a plain desktop with nothing enrolled. Exported
+ * because the store now holds it too: `renderWithStore` seeds the same object
+ * `main.tsx` would have put there (see test/utils).
+ */
+export const appStatusDefault = (): AppStatus => ({
+  initialized: true,
+  version: '1.0.0',
+  locale: 'en-US',
+  settings,
+  syncConfigured: false,
+  syncPending: false,
+  // Off by default, so no suite sees a scan affordance it did not ask for.
+  scanSupported: false,
+  // The desktop's gate, and what every pre-existing spec asserts by name.
+  biometric: { available: false, canEnroll: false, type: 'touch', mode: null }
+})
+
 const DEFAULTS: Record<string, Handler> = {
-  app_status: () => ({
-    initialized: true,
-    version: '1.0.0',
-    locale: 'en-US',
-    syncConfigured: false,
-    syncPending: false,
-    // Off by default, so no suite sees a scan affordance it did not ask for.
-    scanSupported: false,
-    // The desktop's gate, and what every pre-existing spec asserts by name.
-    biometric: { available: false, canEnroll: false, type: 'touch', mode: null }
-  }),
+  app_status: appStatusDefault,
 
   setup: () => undefined,
   unlock: () => session,
@@ -88,8 +121,12 @@ const DEFAULTS: Record<string, Handler> = {
   get_audit: () => ({}),
   fetch_favicon: () => null,
   copy_to_clipboard: () => undefined,
-  set_autolock_timeout: () => undefined,
   scan_image: reject({ kind: 'unrecognized', message: 'nothing recognized' }),
+
+  set_settings: ({ patch }) => {
+    settings = { ...settings, ...(patch as Partial<Settings>) }
+    return settings
+  },
 
   sync_connect: () => undefined,
   sync_disconnect: () => undefined,
@@ -162,4 +199,5 @@ export const resetIpc = (): void => {
   overrides.clear()
   queued.clear()
   recorded.clear()
+  settings = DEFAULT_SETTINGS
 }

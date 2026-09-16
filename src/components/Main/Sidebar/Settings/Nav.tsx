@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
-import type { Section } from '@/store/uiSlice'
+import type { Section } from '@/store'
 import Footer from './Footer'
 import { SECTIONS } from './sections'
 

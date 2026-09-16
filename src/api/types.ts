@@ -23,9 +23,6 @@ interface BaseEntry {
   extra?: ExtraField[]
   createdAt?: string
   updatedAt?: string
-  // snake_case aliases kept for backward compatibility with legacy vaults
-  created_at?: string
-  updated_at?: string
 }
 
 // A WebAuthn credential held by a login entry. Only P-256 ECDSA is supported,

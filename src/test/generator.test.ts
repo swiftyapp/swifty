@@ -9,6 +9,7 @@ import {
   type GeneratorSettings
 } from '@/services/generator'
 import WORDS from '@/services/wordlist'
+import { usePrefs } from '@/store'
 import { calls } from './ipc'
 
 const settings = (overrides: Partial<GeneratorSettings> = {}): GeneratorSettings => ({
@@ -16,10 +17,7 @@ const settings = (overrides: Partial<GeneratorSettings> = {}): GeneratorSettings
   ...overrides
 })
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  localStorage.clear()
-})
+beforeEach(() => vi.clearAllMocks())
 
 describe('wordlist', () => {
   it('is 256 distinct words, so each carries exactly 8 bits', () => {
@@ -124,10 +122,9 @@ describe('entropy', () => {
 
 describe('defaultSettings', () => {
   it('clamps the stored default length into the slider range', () => {
-    localStorage.setItem(
-      'rowel:generatorDefaults',
-      JSON.stringify({ length: 60, numbers: false, symbols: true, uppercase: true })
-    )
+    usePrefs.setState({
+      generator: { length: 60, numbers: false, symbols: true, uppercase: true, exclude: '' }
+    })
     const initial = defaultSettings()
     expect(initial.length).toBe(48)
     expect(initial.numbers).toBe(false)

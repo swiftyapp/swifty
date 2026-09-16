@@ -136,10 +136,11 @@ keeps biometrics as its end segment; the phone leads with an 88px biometric
 tile when a key is enrolled and reveals the same card under "Enter Master
 Password". Which biometry the copy names is `lib/biometry` — `biometryLabel(type)`
 and `biometryGlyph(type)`, from `app_status.biometric.type` (`LAContext.biometryType`
-on Apple, the fingerprint everywhere else), carried alongside `touchID` in the
-`flowAuth` payload — so `Masterpass` says the same thing wherever it is drawn.
-The card also survives a late probe: once the user has typed into it, it stays
-even if `touchID` flips true underneath (`src/test/lock.test.tsx`).
+on Apple, the fingerprint everywhere else), read off the app store's `status`
+by `App` and handed down as `biometric` / `biometry` — so `Masterpass` says the
+same thing wherever it is drawn. The card also survives a late probe: once the
+user has typed into it, it stays even if `biometric` flips true underneath
+(`src/test/lock.test.tsx`).
 
 Overlays that stay overlays on a phone: the add picker (`fit="content"`, so a
 bottom sheet) and the generator opened from a password row (a page sheet). Both

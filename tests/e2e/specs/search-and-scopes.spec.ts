@@ -27,10 +27,10 @@ const LOGINS = ["Aurora Mail", "Basalt Bank", "Zephyr Cloud"];
 const NOTE = "Recovery Codes";
 const CARD = "Travel Card";
 
-// The default sort is "recent" (updatedAt descending — defaults/list.ts), so
-// with the seeds created in LOGINS order the list renders newest-first. The
-// suite clears localStorage on reset, so the default is guaranteed here; the
-// alpha mode has its own spec in the content-kinds batch.
+// The default sort is "recent" (updatedAt descending — `sort` in
+// settings.json), so with the seeds created in LOGINS order the list renders
+// newest-first. A reset wipes the settings file, so the default is guaranteed
+// here; the alpha mode has its own spec in the content-kinds batch.
 const LOGINS_BY_RECENCY = [...LOGINS].reverse();
 
 const searchInput = () => $('[data-testid="search-input"]');

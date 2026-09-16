@@ -73,6 +73,3 @@ export const fetchFavicon = (host: string): Promise<string | null> =>
 
 export const copyToClipboard = (value: string, clearAfterMs?: number): Promise<void> =>
   call('copy_to_clipboard', { value, clearAfterMs })
-
-export const setAutolockTimeout = (secs: number): Promise<void> =>
-  call('set_autolock_timeout', { secs })

@@ -77,8 +77,8 @@ describe("card entries", () => {
 
   it("copies the number on click and confirms with the toast", async () => {
     const toast = $('[data-testid="copy-toast"]');
-    // The toast lives in the DOM permanently and is toggled with `hidden`, so
-    // "not displayed" is the resting state, not a missing element.
+    // The toast is mounted only while a copy is fresh, so at rest there is no
+    // element at all — which `not.toBeDisplayed` covers either way.
     await expect(toast).not.toBeDisplayed();
 
     await waitFor("entry-value-number");

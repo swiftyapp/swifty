@@ -1,4 +1,4 @@
-import { useStore } from '@/store'
+import { useVault, useCurrentEntry } from '@/store'
 import { useVariant } from '../Empty/variant'
 import { DetailEmpty } from '../Empty'
 import Show from './Show'
@@ -8,9 +8,9 @@ import Audit from './Audit'
 // `Show` renders the kind's fields either way, read or write.
 export default function Aside() {
   // The kind being created, or null. An edit takes its kind from the entry.
-  const draftType = useStore(state => state.entries.new)
-  const editing = useStore(state => state.entries.edit)
-  const entry = useStore(state => state.entries.current)
+  const draftType = useVault(state => state.creating)
+  const editing = useVault(state => state.editing)
+  const entry = useCurrentEntry()
   const variant = useVariant()
 
   // Distinct keys: a draft and an entry must never share a `Show` instance, or

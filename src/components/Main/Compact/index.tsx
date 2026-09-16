@@ -1,4 +1,4 @@
-import { useStore } from '@/store'
+import { useVault, useUi } from '@/store'
 import { useVisualViewport, viewportStyle } from '@/hooks/useVisualViewport'
 import Attached from '../Generator/Attached'
 import Entry from './Entry'
@@ -26,13 +26,13 @@ import TabBar from './TabBar'
  * inside one would drop the selection, and any draft, out from under it.
  */
 export default function Compact() {
-  const writing = useStore(state => state.entries.new !== null || state.entries.edit)
-  const entry = useStore(state => state.entries.current !== null)
-  const settings = useStore(state => state.ui.settings)
+  const writing = useVault(state => state.creating !== null || state.editing)
+  const entry = useVault(state => state.currentId !== null)
+  const settings = useUi(state => state.settings)
   // The standalone generator is a root here. Opened from a password row it
   // carries somewhere to put the value, and stays the overlay it is on the
   // desktop — that one is `Attached`, below.
-  const generator = useStore(
+  const generator = useUi(
     state => state.generator.open && !state.generator.apply && !state.generator.ssh
   )
   const viewport = useVisualViewport()

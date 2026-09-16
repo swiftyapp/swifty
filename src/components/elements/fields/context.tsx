@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { DraftValue, EntryDraft } from '@/defaults/entries'
+import type { DraftValue, EntryDraft } from '@/kinds/draft'
 
 export interface FieldsState {
   /** The live draft while editing, the decrypted entry while reading. */

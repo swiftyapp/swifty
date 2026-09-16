@@ -13,6 +13,7 @@
   "Cancelled": "Отменено",
   "Sync is not set up": "Синхронизация не настроена",
   "Nothing recognized": "Ничего не распознано",
+  "This share has expired or was revoked": "Срок действия этой ссылки истёк или её отозвали",
   "Passwords do not match": "Пароли не совпадают",
   "Successfully changed password": "Пароль изменён",
   "Fill in the password": "Введите пароль",

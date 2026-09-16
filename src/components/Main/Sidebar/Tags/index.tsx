@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useStore } from '@/store'
+import { useUi } from '@/store'
 import RailButton from '@/components/elements/RailButton'
 import { TagsRailGlyph } from '../../icons'
 import Menu from './Menu'
@@ -12,7 +12,7 @@ import Menu from './Menu'
 export default function Tags({ className, menu }: { className?: string; menu?: string }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const selected = useStore(state => state.ui.view === 'tags')
+  const selected = useUi(state => state.view === 'tags')
 
   return (
     <div className="relative flex-none">

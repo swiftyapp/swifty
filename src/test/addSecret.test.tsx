@@ -1,15 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
-import { makeStore, useStore, setView } from '@/store'
-import { renderWithStore, withEntries, loginMeta } from './utils'
+import { useUi, useVault, setView } from '@/store'
+import { withEntries, loginMeta } from './utils'
 
-const seed = () => {
-  const store = makeStore()
-  withEntries([loginMeta({ id: 'l1', title: 'Google' })])
-  return store
-}
+const seed = () => withEntries([loginMeta({ id: 'l1', title: 'Google' })])
 
 const openFromRail = () => userEvent.click(screen.getByTestId('add-entry-button'))
 const modal = () => screen.queryByTestId('add-secret-modal')
@@ -18,7 +14,8 @@ beforeEach(() => vi.clearAllMocks())
 
 describe('add a secret', () => {
   it('opens the picker from the rail button', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     expect(modal()).not.toBeInTheDocument()
 
     await openFromRail()
@@ -28,11 +25,12 @@ describe('add a secret', () => {
     // The dialog is named by its own title, not a duplicated aria-label.
     expect(dialog).toHaveAccessibleName('Add a secret')
     // The rail button no longer starts an entry by itself.
-    expect(useStore.getState().entries.new).toBeNull()
+    expect(useVault.getState().creating).toBeNull()
   })
 
   it('offers one tile per kind', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await openFromRail()
 
     const dialog = within(screen.getByTestId('add-secret-modal'))
@@ -48,18 +46,20 @@ describe('add a secret', () => {
   })
 
   it('starts an entry of the chosen kind and closes', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await openFromRail()
 
     await userEvent.click(screen.getByTestId('add-kind-card'))
 
-    expect(useStore.getState().entries.new).toBe('card')
-    expect(useStore.getState().ui.addPicker).toBe(false)
+    expect(useVault.getState().creating).toBe('card')
+    expect(useUi.getState().addPicker).toBe(false)
     expect(modal()).not.toBeInTheDocument()
   })
 
   it('focuses the first tile and moves focus with the arrow keys', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await openFromRail()
 
     expect(screen.getByTestId('add-kind-login')).toHaveFocus()
@@ -80,27 +80,30 @@ describe('add a secret', () => {
   })
 
   it('picks the nth kind by digit', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await openFromRail()
 
     await userEvent.keyboard('3')
 
-    expect(useStore.getState().entries.new).toBe('note')
+    expect(useVault.getState().creating).toBe('note')
     expect(modal()).not.toBeInTheDocument()
   })
 
   it('closes on Escape without starting anything', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await openFromRail()
 
     await userEvent.keyboard('{Escape}')
 
     expect(modal()).not.toBeInTheDocument()
-    expect(useStore.getState().entries.new).toBeNull()
+    expect(useVault.getState().creating).toBeNull()
   })
 
   it('opens on ⌘N', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.keyboard('{Meta>}n{/Meta}')
 
@@ -108,31 +111,32 @@ describe('add a secret', () => {
   })
 
   it('stays where it was when the picker is dismissed', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     setView('archive')
 
     await openFromRail()
     await userEvent.keyboard('{Escape}')
 
     // Only committing to a kind leaves the view; asking does not.
-    expect(useStore.getState().ui.view).toBe('archive')
+    expect(useUi.getState().view).toBe('archive')
   })
 
   it('leaves the health view so the new form has a list to land in', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     setView('health')
 
     await openFromRail()
     await userEvent.click(screen.getByTestId('add-kind-login'))
 
-    expect(useStore.getState().ui.view).toBe('items')
-    expect(useStore.getState().entries.new).toBe('login')
+    expect(useUi.getState().view).toBe('items')
+    expect(useVault.getState().creating).toBe('login')
   })
 
   it('is reachable from the empty detail pane', async () => {
-    const store = makeStore()
     withEntries([])
-    renderWithStore(<Main />, { store })
+    render(<Main />)
 
     const button = screen.getByTestId('create-first-entry-button')
     expect(button).toHaveTextContent('Add a secret')
@@ -145,7 +149,8 @@ describe('add a secret', () => {
     const openPalette = () => userEvent.keyboard('{Meta>}k{/Meta}')
 
     it('lists a command per kind', async () => {
-      renderWithStore(<Main />, { store: seed() })
+      seed()
+    render(<Main />)
       await openPalette()
 
       const palette = within(screen.getByTestId('command-palette'))
@@ -158,20 +163,22 @@ describe('add a secret', () => {
     })
 
     it('starts the entry directly, without the picker', async () => {
-      renderWithStore(<Main />, { store: seed() })
+      seed()
+    render(<Main />)
       await openPalette()
 
       // "Add a secure note" also names an empty-state action, so scope it.
       const palette = within(screen.getByTestId('command-palette'))
       await userEvent.click(palette.getByText('Add a secure note'))
 
-      expect(useStore.getState().entries.new).toBe('note')
-      expect(useStore.getState().ui.addPicker).toBe(false)
+      expect(useVault.getState().creating).toBe('note')
+      expect(useUi.getState().addPicker).toBe(false)
       expect(modal()).not.toBeInTheDocument()
     })
 
     it('opens the picker from "Add a secret"', async () => {
-      renderWithStore(<Main />, { store: seed() })
+      seed()
+    render(<Main />)
       await openPalette()
 
       // The rail tooltip carries the same words, so scope to the palette.
@@ -180,7 +187,7 @@ describe('add a secret', () => {
 
       expect(screen.getByTestId('add-secret-modal')).toBeInTheDocument()
       expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument()
-      expect(useStore.getState().entries.new).toBeNull()
+      expect(useVault.getState().creating).toBeNull()
     })
   })
 })

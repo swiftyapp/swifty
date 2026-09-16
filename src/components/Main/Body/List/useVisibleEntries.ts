@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { EntryMeta } from '@/api/types'
-import { useStore } from '@/store'
+import { useUi, useVault, usePrefs } from '@/store'
 import { filterEntries } from '@/services/entries'
 import { byTitle, byRecency } from './order'
 
@@ -13,9 +13,9 @@ import { byTitle, byRecency } from './order'
  * the whole vault: a tag gathers items from across it, not from one view.
  */
 export const useRows = (): EntryMeta[] => {
-  const view = useStore(state => state.ui.view)
-  const items = useStore(state => state.entries.items)
-  const archive = useStore(state => state.entries.archive)
+  const view = useUi(state => state.view)
+  const items = useVault(state => state.items)
+  const archive = useVault(state => state.archive)
   // Memoized so every branch hands back a stable reference — callers put these
   // rows in `useMemo` deps (see `Header/KindChips`).
   const favorites = useMemo(() => items.filter(entry => entry.favorite), [items])
@@ -30,12 +30,12 @@ export const useRows = (): EntryMeta[] => {
 // Memoized because the whole column (the list, the empty states) reads it — one
 // pass per keystroke.
 export const useVisibleEntries = () => {
-  const type = useStore(state => state.filters.type)
+  const type = useUi(state => state.filterType)
   // A tag narrows the Tags view and nothing else — `setView` already drops it
   // on the way out, and this is what makes the other views immune regardless.
-  const tag = useStore(state => (state.ui.view === 'tags' ? state.filters.tag : null))
-  const query = useStore(state => state.filters.query)
-  const sort = useStore(state => state.sort)
+  const tag = useUi(state => (state.view === 'tags' ? state.filterTag : null))
+  const query = useUi(state => state.query)
+  const sort = usePrefs(state => state.sort)
   const rows = useRows()
 
   return useMemo(() => {

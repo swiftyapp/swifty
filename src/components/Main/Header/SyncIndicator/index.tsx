@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useStore, openSettings } from '@/store'
+import { useApp, openSettings } from '@/store'
 import { cx } from '@/utils/cx'
 import Tooltip from '@/components/elements/Tooltip'
 import { CloudGlyph, DiskGlyph, CheckGlyph, AlertGlyph } from '../../icons'
@@ -39,7 +39,7 @@ export default function SyncIndicator({ className, onClick }: Props) {
   // The hook, not the bare `t` -- only it re-renders the chip when the language
   // changes, and the chip can sit untouched in the chrome for a whole session.
   const { t } = useTranslation()
-  const sync = useStore(state => state.sync)
+  const sync = useApp(state => state.sync)
   const { tone, message, detail } = syncView(sync)
   // The backend's message wins when there is one; it is already prose, in no
   // catalogue, and translating it is not on offer.
