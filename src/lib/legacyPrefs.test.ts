@@ -8,9 +8,12 @@ beforeEach(() => localStorage.clear())
 // What the boot probe answered before anything was imported.
 const booted = () => appStatusDefault()
 
+// The same probe, with the locale Rust resolved the current settings to.
+const probe = (locale = booted().locale) => ({ ...booted(), locale, settings: DEFAULT_PREFS })
+
 describe('legacyPatch', () => {
   it('is null on a clean install', () => {
-    expect(legacyPatch(DEFAULT_PREFS)).toBeNull()
+    expect(legacyPatch(probe())).toBeNull()
   })
 
   it('reads every per-key value, validated the way its getter was', () => {
@@ -23,7 +26,7 @@ describe('legacyPatch', () => {
     localStorage.setItem('theme', 'dark')
     localStorage.setItem('locale', 'de-DE')
 
-    expect(legacyPatch(DEFAULT_PREFS)).toEqual({
+    expect(legacyPatch(probe())).toEqual({
       autolockSecs: 900,
       clipboardTimeoutMs: 0,
       dateFormat: 'DD.MM.YYYY',
@@ -47,7 +50,7 @@ describe('legacyPatch', () => {
       })
     )
 
-    expect(legacyPatch(DEFAULT_PREFS)).toEqual({
+    expect(legacyPatch(probe())).toEqual({
       autolockSecs: 300,
       clipboardTimeoutMs: 15000,
       sort: 'alpha',
@@ -66,7 +69,7 @@ describe('legacyPatch', () => {
     localStorage.setItem('theme', 'purple')
     localStorage.setItem('locale', 'xx-XX')
 
-    expect(legacyPatch(DEFAULT_PREFS)).toBeNull()
+    expect(legacyPatch(probe())).toBeNull()
   })
 
   // The old storage never checked types. One wrong-typed knob must not fail
@@ -75,10 +78,31 @@ describe('legacyPatch', () => {
     localStorage.setItem('rowel:generatorDefaults', '{"length":32,"numbers":"yes","exclude":7}')
     localStorage.setItem('theme', 'dark')
 
-    expect(legacyPatch(DEFAULT_PREFS)).toEqual({
+    expect(legacyPatch(probe())).toEqual({
       theme: 'dark',
       generator: { ...DEFAULT_PREFS.generator, length: 32 }
     })
+  })
+
+  // The old i18n module persisted `locale` on every `languageChanged`, which
+  // i18next emits during `init` — so a value matching what Rust resolves to
+  // today says nothing, and importing it would pin the user to a stale OS
+  // language instead of following the one they are on.
+  it('skips a bare locale that matches the resolved one', () => {
+    localStorage.setItem('locale', 'de-DE')
+
+    expect(legacyPatch(probe('de-DE'))).toBeNull()
+
+    // Skipped is not forgotten: whenever an import does run, the sweep still
+    // removes the key along with the rest.
+    clearLegacyPrefs()
+    expect(localStorage.getItem('locale')).toBeNull()
+  })
+
+  it('imports a bare locale that differs from the resolved one', () => {
+    localStorage.setItem('locale', 'fr-FR')
+
+    expect(legacyPatch(probe('de-DE'))).toEqual({ locale: 'fr-FR' })
   })
 
   it('prefers the post-rebrand key over the pre-rebrand one', () => {
@@ -86,7 +110,7 @@ describe('legacyPatch', () => {
     localStorage.setItem('rowel:autolockSecs', '900')
     localStorage.setItem('swifty:listSort', 'alpha')
 
-    expect(legacyPatch(DEFAULT_PREFS)).toEqual({ autolockSecs: 900, sort: 'alpha' })
+    expect(legacyPatch(probe())).toEqual({ autolockSecs: 900, sort: 'alpha' })
   })
 })
 
@@ -110,7 +134,7 @@ describe('adoptLegacyPrefs', () => {
     expect(localStorage.getItem('swifty:breachCheck')).toBeNull()
     expect(localStorage.getItem('locale')).toBeNull()
     // Nothing left to import: the next boot is a no-op.
-    expect(legacyPatch(DEFAULT_PREFS)).toBeNull()
+    expect(legacyPatch(probe())).toBeNull()
   })
 
   it('keeps the keys for the next boot when the write fails', async () => {

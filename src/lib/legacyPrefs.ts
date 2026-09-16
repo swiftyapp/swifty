@@ -15,7 +15,8 @@ import { LANGUAGES } from '@/i18n'
  *   from the builds just before this one;
  * - `rowel:<name>` per-key values from the builds after the rebrand;
  * - `swifty:<name>` per-key values from before it.
- * `theme` and `locale` were never prefixed.
+ * `theme` and `locale` were never prefixed, and `locale` is only carried over
+ * when it disagrees with what Rust currently resolves to (see `legacyPatch`).
  */
 
 const BLOB = 'rowel:prefs'
@@ -103,9 +104,10 @@ const legacyGenerator = (raw: unknown, current: Generator): Generator | undefine
 }
 
 /** What the old keys say, as a patch — or null when there is nothing to carry over. */
-export const legacyPatch = (current: Settings): Partial<Settings> | null => {
+export const legacyPatch = (status: AppStatus): Partial<Settings> | null => {
   const store = storage()
   if (!store) return null
+  const current = status.settings
 
   // The blob is the newest generation, so its fields win over the per-key ones.
   const blob = parse(store.getItem(BLOB))?.state
@@ -130,8 +132,15 @@ export const legacyPatch = (current: Settings): Partial<Settings> | null => {
   if (raw.breachCheck === true) patch.breachCheck = true
   const theme = oneOf(raw.theme, ['light', 'dark', 'system'] as const)
   if (theme) patch.theme = theme
+  // The old builds wrote `locale` on every `languageChanged`, which i18next
+  // emits during `init` — so the key holds an OS-derived value nobody picked
+  // as often as a real choice, and the value alone cannot tell them apart.
+  // One that matches `status.locale`, Rust's resolution of the settings as
+  // they stand, means today what `null` means and would only pin the user to
+  // a stale OS language; one that differs is either a choice or a since-
+  // changed OS, and importing it keeps what the user sees now.
   const locale = oneOf(raw.locale, Object.keys(LANGUAGES))
-  if (locale) patch.locale = locale
+  if (locale && locale !== status.locale) patch.locale = locale
 
   // Rust replaces the group whole, so the stored knobs are laid over the
   // current group rather than sent alone — and field by field, because the
@@ -159,7 +168,7 @@ export const clearLegacyPrefs = (): void => {
  * anything to import — or when the write failed — `status` comes back as it was.
  */
 export const adoptLegacyPrefs = (status: AppStatus): Promise<AppStatus> => {
-  const patch = legacyPatch(status.settings)
+  const patch = legacyPatch(status)
   if (!patch) return Promise.resolve(status)
   return setSettings(patch)
     .then(() => {
