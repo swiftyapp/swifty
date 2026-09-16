@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import type { Section as Key } from '@/store/uiSlice'
 import Sync from './Sections/Sync'
 import Security from './Sections/Security'
+import Workspaces from './Sections/Workspaces'
 import Audit from './Sections/Audit'
 import Import from './Sections/Import'
 import Language from './Sections/Language'
@@ -11,6 +12,7 @@ import Language from './Sections/Language'
 const PANES: Record<Key, ComponentType> = {
   sync: Sync,
   security: Security,
+  workspaces: Workspaces,
   audit: Audit,
   import: Import,
   language: Language

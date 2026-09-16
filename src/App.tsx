@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { appStatus } from '@/api/app'
-import { useStore, flowAuth, flowSetup } from './store'
+import { useStore, flowAuth, flowSetup, applyWorkspaces } from './store'
 import { subscribeToEvents } from './store/events'
 import { useLayout } from './hooks/useLayout'
 import Start from './components/Start'
@@ -35,9 +35,13 @@ export default function App() {
     // Which biometry, not just whether: the same iOS build runs on Face ID
     // phones and Touch ID iPads.
     appStatus()
-      .then(({ initialized, biometric }) =>
-        initialized ? flowAuth(biometric.available, biometric.type) : flowSetup()
-      )
+      .then(status => {
+        // Which workspace the app was left in, and what else there is to
+        // switch to — the lock screen draws its picker from this.
+        applyWorkspaces(status)
+        const { initialized, biometric } = status
+        return initialized ? flowAuth(biometric.available, biometric.type) : flowSetup()
+      })
       .catch(() => {})
     return unsubscribe
   }, [])

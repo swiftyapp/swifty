@@ -5,7 +5,7 @@ import App from '@/App'
 import LockScreen from '@/components/Auth/LockScreen'
 import { renderWithStore } from './utils'
 import { setLayout } from './layout'
-import { calls, mockCommand } from './ipc'
+import { appStatusResponse, calls, mockCommand } from './ipc'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -81,10 +81,9 @@ describe('lock screen on compact', () => {
   })
 
   it('is what the auth flow renders on a phone', async () => {
-    mockCommand('app_status', () => ({
-      initialized: true,
-      biometric: { available: true, type: 'touch' }
-    }))
+    mockCommand('app_status', () =>
+      appStatusResponse({ biometric: { available: true, type: 'touch' } })
+    )
     renderWithStore(<App />)
 
     expect(await screen.findByTestId('biometric-tile')).toBeInTheDocument()

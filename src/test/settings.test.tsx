@@ -8,7 +8,7 @@ import { getSecs } from '@/defaults/autolock'
 import { dateTime } from '@/utils/time'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { renderWithStore } from './utils'
-import { calls, mockCommand, mockCommandOnce } from './ipc'
+import { appStatusResponse, calls, mockCommand, mockCommandOnce } from './ipc'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -22,9 +22,8 @@ beforeEach(() => {
 afterEach(() => changeLocale('en-US'))
 
 // Only the biometric leaf of app_status matters here; the row reads nothing else.
-const enrolled = (available: boolean, mode: 'protected' | 'prompt' | null) => ({
-  biometric: { available, canEnroll: available, type: 'touch', mode }
-})
+const enrolled = (available: boolean, mode: 'protected' | 'prompt' | null) =>
+  appStatusResponse({ biometric: { available, canEnroll: available, mode } })
 
 const open = async () => {
   const { container, store } = renderWithStore(<Settings />)

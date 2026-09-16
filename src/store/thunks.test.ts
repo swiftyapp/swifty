@@ -7,10 +7,13 @@ import {
   enterMain,
   syncInit,
   setFilterType,
-  lockVault
+  lockVault,
+  flowMain,
+  switchWorkspace,
+  createWorkspace
 } from './index'
 import type { Entry, EntryMeta, Passkey } from '@/api/types'
-import { calls, mockCommand } from '../test/ipc'
+import { appStatusResponse, calls, mockCommand } from '../test/ipc'
 import { toEntryMeta } from '../test/meta'
 
 const meta = (id: string, title = id): EntryMeta =>
@@ -175,5 +178,54 @@ describe('enterMain', () => {
 
     expect(store.getState().sync.enabled).toBe(false)
     expect(calls('sync_now')).toHaveLength(0)
+  })
+})
+
+describe('workspaces', () => {
+  const two = [
+    { id: 'default', name: null },
+    { id: 'w2', name: 'Work' }
+  ]
+
+  it('switches by marking the other active and landing on its lock screen', async () => {
+    const store = makeStore()
+    flowMain()
+
+    await switchWorkspace('w2')
+
+    expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
+    // Only one workspace is unlocked at a time, so a switch is a lock.
+    expect(calls('lock')).toHaveLength(1)
+    expect(store.getState().flow.name).toBe('auth')
+  })
+
+  it('creates a workspace and enters it', async () => {
+    const store = makeStore()
+    setEntries([meta('a')])
+    mockCommand('app_status', () =>
+      appStatusResponse({ workspaces: two, activeWorkspace: 'w2' })
+    )
+
+    await createWorkspace('Work', 'hunter2hunter2')
+
+    expect(calls('workspace_create')).toEqual([
+      { name: 'Work', password: 'hunter2hunter2' }
+    ])
+    const state = store.getState()
+    expect(state.flow.name).toBe('main')
+    // The workspace left behind takes its rows with it.
+    expect(state.entries.items).toEqual([])
+    expect(state.workspaces).toEqual({ list: two, active: 'w2' })
+  })
+
+  it('reports a rejected create to the caller', async () => {
+    makeStore()
+    mockCommand('workspace_create', () =>
+      Promise.reject({ kind: 'other', message: 'name already taken' })
+    )
+
+    await expect(createWorkspace('Work', 'hunter2hunter2')).rejects.toMatchObject({
+      message: 'name already taken'
+    })
   })
 })

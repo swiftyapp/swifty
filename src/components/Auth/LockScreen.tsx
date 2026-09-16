@@ -7,6 +7,7 @@ import Masterpass from '@/components/elements/Masterpass'
 import type { BiometryType } from '@/api/types'
 import BiometricTile from './BiometricTile'
 import { useUnlock } from './useUnlock'
+import WorkspacePicker from './WorkspacePicker'
 
 interface Props {
   touchID: boolean
@@ -38,6 +39,7 @@ export default function LockScreen({ touchID, biometry = 'touch' }: Props) {
       <div className="mb-7 flex justify-center">
         <Mascot state={mascot.state} gaze={mascot.gaze} />
       </div>
+      <WorkspacePicker />
       <Eyebrow tone={eyebrow.tone} busy={eyebrow.busy} testid={eyebrow.testid}>
         {eyebrow.text}
       </Eyebrow>

@@ -4,7 +4,7 @@ import AuthShell from '@/components/elements/AuthShell'
 import Masterpass from '@/components/elements/Masterpass'
 import PasswordStrength from '@/components/elements/PasswordStrength'
 import Button from '@/components/elements/Button'
-import { evaluate, MIN_LENGTH } from '@/services/strength'
+import { masterPasswordError } from '@/services/strength'
 import StepHeader from '../shared/StepHeader'
 import { COLUMN } from '../shared/layout'
 import { messageOf } from '@/api/errors'
@@ -33,13 +33,7 @@ export default function Password({ onBack, onContinue }: Props) {
 
   // Returns the message, so the two entry points (Enter on the first field,
   // and Continue) agree on what makes a password acceptable.
-  const strengthError = (): string | null => {
-    if (!password) return t('Fill in the password')
-    const { tooShort, acceptable } = evaluate(password)
-    if (tooShort) return t('Use at least {{count}} characters', { count: MIN_LENGTH })
-    if (!acceptable) return t('Choose a stronger master password')
-    return null
-  }
+  const strengthError = () => masterPasswordError(password, t)
 
   const changePassword = (event: ChangeEvent<HTMLInputElement>) => {
     setError(null)

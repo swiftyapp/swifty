@@ -388,7 +388,7 @@ describe('compact shell', () => {
 
     act(() => openSettings())
     // Every section is a row, in the desktop nav's order.
-    expect(screen.getAllByTestId(/^settings-nav-/)).toHaveLength(5)
+    expect(screen.getAllByTestId(/^settings-nav-/)).toHaveLength(6)
 
     await userEvent.click(screen.getByTestId('settings-nav-security'))
     expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument()

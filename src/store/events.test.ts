@@ -3,7 +3,7 @@ import { on, EVENTS, type EventName, type EventPayloads } from '@/api/events'
 import type { EntryMeta } from '@/api/types'
 import { subscribeToEvents } from './events'
 import { makeStore, setEntries, setView, setCurrentEntry } from './index'
-import { calls, clearCalls, mockCommand } from '../test/ipc'
+import { appStatusResponse, calls, clearCalls, mockCommand } from '../test/ipc'
 
 const meta = (id: string): EntryMeta => ({
   id,
@@ -159,7 +159,9 @@ describe('the pending connect', () => {
 
 describe('vault:locked', () => {
   it('shows the Touch ID button when a key is enrolled, not a hardcoded false', async () => {
-    mockCommand('app_status', () => ({ biometric: { available: true, type: 'touch' } }))
+    mockCommand('app_status', () =>
+      appStatusResponse({ biometric: { available: true, type: 'touch' } })
+    )
     const store = makeStore()
     subscribeToEvents()
     store.getState().flowMain()

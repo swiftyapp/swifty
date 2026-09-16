@@ -47,9 +47,15 @@ pub struct PendingAuth {
     pub started: std::time::Instant,
 }
 
-#[derive(Default)]
 pub struct AppState {
     pub session: Mutex<Session>,
+    /// Which workspace every vault path resolves to right now.
+    ///
+    /// Held in memory rather than read from the registry on each path lookup:
+    /// it is consulted on essentially every file access, and it is also what
+    /// keeps a switch atomic — the session is cleared and this is set together,
+    /// so nothing can address one workspace's database with another's key.
+    pub active_workspace: Mutex<String>,
     // A sync run is in flight. Held outside `session` on purpose: the run takes
     // and releases the session lock repeatedly (never across a network call),
     // so the "one at a time" guard cannot live behind that same lock.
@@ -74,4 +80,21 @@ pub struct AppState {
     pub setup_attempt: AtomicU64,
     #[cfg(mobile)]
     pub pending_auth: Mutex<Option<PendingAuth>>,
+}
+
+// Hand-written only because `active_workspace` starts at the primary rather than
+// at `String::default()`. `lib.rs` overwrites it from the registry at startup.
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            session: Mutex::default(),
+            active_workspace: Mutex::new(crate::workspace::PRIMARY_ID.to_string()),
+            syncing: AtomicBool::default(),
+            pending_drive: Mutex::default(),
+            setup_busy: AtomicBool::default(),
+            setup_attempt: AtomicU64::default(),
+            #[cfg(mobile)]
+            pending_auth: Mutex::default(),
+        }
+    }
 }

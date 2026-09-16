@@ -6,7 +6,13 @@ import type { StoreState } from './index'
 export type View = 'items' | 'favorites' | 'health' | 'archive' | 'tags'
 
 // The Settings sections, in nav order.
-export type Section = 'sync' | 'security' | 'audit' | 'import' | 'language'
+export type Section =
+  | 'sync'
+  | 'security'
+  | 'workspaces'
+  | 'audit'
+  | 'import'
+  | 'language'
 
 /** Why a scan produced no fields. The copy for each lives in `Scan/Status`. */
 export type ScanError = 'unreadable' | 'unsupported' | 'failed'

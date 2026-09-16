@@ -279,7 +279,11 @@ async fn archive(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<()> {
 }
 
 // Argon2id + creating the encrypted DB: CPU-bound, same as the restore path.
-async fn create_off_thread(app: &AppHandle, password: String) -> Result<(VaultKey, SqliteStore)> {
+// Shared with `commands::workspace`, which creates a vault the same way.
+pub(crate) async fn create_off_thread(
+    app: &AppHandle,
+    password: String,
+) -> Result<(VaultKey, SqliteStore)> {
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || create_vault(&app, &password))
         .await
@@ -373,9 +377,10 @@ fn ensure_idle(state: &AppState) -> Result<()> {
 /// writes in between. Two overlapping requests would each write their own
 /// KDF sidecar and database, and whichever finished second would pair a
 /// database with the other's descriptor — a vault nobody's password opens.
-struct SetupStep<'a>(&'a AppState);
+pub(crate) struct SetupStep<'a>(&'a AppState);
 
-fn begin_step(state: &AppState) -> Result<SetupStep<'_>> {
+// Also held by `workspace_create`, which writes the same two files.
+pub(crate) fn begin_step(state: &AppState) -> Result<SetupStep<'_>> {
     state
         .setup_busy
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)

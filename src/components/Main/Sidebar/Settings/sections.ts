@@ -4,6 +4,7 @@ import type { Section } from '@/store/uiSlice'
 import {
   RefreshGlyph,
   ShieldGlyph,
+  LayersGlyph,
   ActivityGlyph,
   DownloadGlyph,
   GlobeGlyph
@@ -15,6 +16,7 @@ type Glyph = (props: { size?: number }) => React.ReactElement
 export const SECTIONS: { key: Section; label: TKey; Glyph: Glyph }[] = [
   { key: 'sync', label: 'Sync & devices', Glyph: RefreshGlyph },
   { key: 'security', label: 'Security', Glyph: ShieldGlyph },
+  { key: 'workspaces', label: 'Workspaces', Glyph: LayersGlyph },
   { key: 'audit', label: 'Vault audit', Glyph: ActivityGlyph },
   { key: 'import', label: 'Import', Glyph: DownloadGlyph },
   { key: 'language', label: 'Language & region', Glyph: GlobeGlyph }

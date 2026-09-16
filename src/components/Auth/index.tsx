@@ -5,6 +5,7 @@ import Eyebrow from '@/components/elements/Eyebrow'
 import Mascot from '@/components/elements/Mascot'
 import type { BiometryType } from '@/api/types'
 import { useUnlock } from './useUnlock'
+import WorkspacePicker from './WorkspacePicker'
 
 interface Props {
   touchID: boolean
@@ -26,6 +27,7 @@ export function Auth({ touchID, biometry = 'touch' }: Props) {
         <div className="mb-7 flex justify-center">
           <Mascot state={mascot.state} gaze={mascot.gaze} />
         </div>
+        <WorkspacePicker />
         <Eyebrow tone={eyebrow.tone} busy={eyebrow.busy} testid={eyebrow.testid}>
           {eyebrow.text}
         </Eyebrow>

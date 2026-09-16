@@ -1,4 +1,5 @@
 import type { BackendError } from '@/api/errors'
+import type { AppStatus } from '@/api/app'
 
 /**
  * The fake Rust backend. One mock of `@tauri-apps/api/core` stands in for every
@@ -22,18 +23,39 @@ const meta = (id: string, type = 'login', title = '', favorite = false) => ({
 
 const session = { entries: [], syncConfigured: false }
 
+const STATUS: AppStatus = {
+  initialized: true,
+  version: '1.0.0',
+  locale: 'en-US',
+  syncConfigured: false,
+  syncPending: false,
+  // Off by default, so no suite sees a scan affordance it did not ask for.
+  scanSupported: false,
+  // One workspace: the ordinary install, where nothing about workspaces is on
+  // screen. A suite about them asks for a second entry.
+  workspaces: [{ id: 'default', name: null }],
+  activeWorkspace: 'default',
+  // The desktop's gate, and what every pre-existing spec asserts by name.
+  biometric: { available: false, canEnroll: false, type: 'touch', mode: null }
+}
+
+type StatusOverrides = Partial<Omit<AppStatus, 'biometric'>> & {
+  biometric?: Partial<AppStatus['biometric']>
+}
+
+/**
+ * The launch probe's answer with `overrides` merged in. A spec cares about one
+ * leaf of it — which gate is enrolled, which workspaces exist — but the shell
+ * reads the whole thing, so naming a leaf must not drop the rest.
+ */
+export const appStatusResponse = (overrides: StatusOverrides = {}): AppStatus => ({
+  ...STATUS,
+  ...overrides,
+  biometric: { ...STATUS.biometric, ...overrides.biometric }
+})
+
 const DEFAULTS: Record<string, Handler> = {
-  app_status: () => ({
-    initialized: true,
-    version: '1.0.0',
-    locale: 'en-US',
-    syncConfigured: false,
-    syncPending: false,
-    // Off by default, so no suite sees a scan affordance it did not ask for.
-    scanSupported: false,
-    // The desktop's gate, and what every pre-existing spec asserts by name.
-    biometric: { available: false, canEnroll: false, type: 'touch', mode: null }
-  }),
+  app_status: () => appStatusResponse(),
 
   setup: () => undefined,
   unlock: () => session,
@@ -50,6 +72,11 @@ const DEFAULTS: Record<string, Handler> = {
   setup_create: () => session,
   setup_restore_from_drive: () => ({ entries: [], syncConfigured: true }),
   setup_restore_from_file: () => session,
+
+  // A new workspace arrives active and unlocked, so it answers like an unlock.
+  workspace_create: () => session,
+  workspace_select: () => undefined,
+  workspace_rename: () => undefined,
 
   reveal_entry: ({ id }) => ({ id, type: 'login', title: '' }),
   save_entry: ({ entry }) => {

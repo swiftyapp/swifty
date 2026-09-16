@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 import { ZxcvbnFactory } from '@zxcvbn-ts/core'
 import * as common from '@zxcvbn-ts/language-common'
 import * as en from '@zxcvbn-ts/language-en'
@@ -33,4 +34,18 @@ export const evaluate = (password: string): Strength => {
     tooShort,
     acceptable: !tooShort && score >= MIN_SCORE
   }
+}
+
+/**
+ * Why a chosen master password cannot be used, as the message to show — `null`
+ * when it can. Every place that creates a vault (the first run, a new
+ * workspace) asks this, so the bar is the same wherever a password is set
+ * rather than typed.
+ */
+export const masterPasswordError = (password: string, t: TFunction): string | null => {
+  if (!password) return t('Fill in the password')
+  const { tooShort, acceptable } = evaluate(password)
+  if (tooShort) return t('Use at least {{count}} characters', { count: MIN_LENGTH })
+  if (!acceptable) return t('Choose a stronger master password')
+  return null
 }

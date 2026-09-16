@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import type { EntryType } from '@/api/types'
-import { appStatus } from '@/api/app'
+import { appStatus, type AppStatus } from '@/api/app'
 import { lock } from '@/api/auth'
+import { workspaceCreate, workspaceSelect } from '@/api/workspace'
 import { createFlowSlice, type FlowSlice } from './flowSlice'
 import { createGeneratorSlice, type GeneratorSlice } from './generatorSlice'
 import { createFiltersSlice, type FiltersSlice } from './filtersSlice'
@@ -14,6 +15,7 @@ import { createUpdateSlice, type UpdateSlice } from './updateSlice'
 import { createUiSlice, type UiSlice } from './uiSlice'
 import { createShareSlice, type ShareSlice } from './shareSlice'
 import { createSetupSlice, type SetupSlice } from './setupSlice'
+import { createWorkspaceSlice, type WorkspaceSlice } from './workspaceSlice'
 import { createAsyncSlice, cancelScheduledSync, type AsyncSlice } from './thunks'
 
 export type StoreState = FlowSlice &
@@ -28,6 +30,7 @@ export type StoreState = FlowSlice &
   UiSlice &
   ShareSlice &
   SetupSlice &
+  WorkspaceSlice &
   AsyncSlice
 
 export const useStore = create<StoreState>()((...a) => ({
@@ -43,6 +46,7 @@ export const useStore = create<StoreState>()((...a) => ({
   ...createUiSlice(...a),
   ...createShareSlice(...a),
   ...createSetupSlice(...a),
+  ...createWorkspaceSlice(...a),
   ...createAsyncSlice(...a)
 }))
 
@@ -58,6 +62,7 @@ const pickData = (s: StoreState) => ({
   ui: s.ui,
   share: s.share,
   setup: s.setup,
+  workspaces: s.workspaces,
   // Both read a persisted preference at slice creation, so a test that changes
   // one has to have it put back like everything else.
   sort: s.sort,
@@ -153,7 +158,8 @@ export const {
   setupDrivePending,
   setupDriveProbed,
   setupDriveFailed,
-  setupDriveReset
+  setupDriveReset,
+  setWorkspaces
 } = useStore.getState()
 
 // Starts a new entry of `type` from anywhere (kind picker, palette command,
@@ -175,8 +181,38 @@ export const startEntry = (type: EntryType, prefill?: Record<string, string>) =>
 export const lockVault = () =>
   lock().finally(() => {
     resetVaultData()
-    // Which gate it is comes along for the ride: the lock screen names it.
+    // Which gate it is comes along for the ride: the lock screen names it, and
+    // which workspaces exist comes with it so the screen can offer the others.
     return appStatus()
-      .then(({ biometric }) => flowAuth(biometric.available, biometric.type))
+      .then(status => {
+        applyWorkspaces(status)
+        flowAuth(status.biometric.available, status.biometric.type)
+      })
       .catch(() => flowAuth(false))
   })
+
+// The workspace list off a probe already in hand (launch, a lock), so neither
+// has to ask twice for one answer.
+export const applyWorkspaces = ({ workspaces, activeWorkspace }: AppStatus) =>
+  setWorkspaces(workspaces, activeWorkspace)
+
+// Ask again where nothing else was being probed for: after a rename or a
+// create, which are the two things that change the list from inside the app.
+export const refreshWorkspaces = () => appStatus().then(applyWorkspaces)
+
+// Move to another workspace. Only one is ever unlocked, so this is a lock:
+// mark the other active, then take the ordinary lock path, which lands on that
+// workspace's lock screen with the picker still offering the way back.
+export const switchWorkspace = (id: string) => workspaceSelect(id).then(lockVault)
+
+// Create a workspace and open it. It arrives active and unlocked, so this is an
+// unlock rather than a first run — but of a different database, so the session
+// data of the one being left has to go first, exactly as a lock would drop it.
+export const createWorkspace = async (name: string, password: string) => {
+  const result = await workspaceCreate(name, password)
+  resetVaultData()
+  // A failed re-read leaves a stale list, not a broken session; the new
+  // workspace is open either way.
+  await refreshWorkspaces().catch(() => {})
+  await enterMain(result)
+}

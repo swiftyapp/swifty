@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { useStore, syncFailed } from '@/store'
 import { syncConnect, syncDisconnect, syncNow } from '@/api/sync'
 import { messageOf } from '@/api/errors'
+import { PRIMARY_WORKSPACE } from '@/lib/workspace'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
@@ -18,6 +19,10 @@ const ErrorNote = ({ message }: { message: string }) => (
 export default function Sync() {
   const { t } = useTranslation()
   const sync = useStore(state => state.sync)
+  // One vault owns the Drive folder, and the backend refuses connect/import
+  // from anywhere else — so a second workspace is not offered the controls that
+  // could only fail. Backup and export are per-workspace and stay.
+  const primary = useStore(state => state.workspaces.active) === PRIMARY_WORKSPACE
 
   // Consent happens in the browser: the backend says `sync:pending` when it
   // opens it and `sync:connected` / `sync:error` when it hears back, so nothing
@@ -33,6 +38,22 @@ export default function Sync() {
     : sync.success
       ? t('Up to date')
       : t('Last attempt failed')
+
+  if (!primary)
+    return (
+      <>
+        <SettingsGroup label={t('Account')}>
+          <SettingsRow
+            label={t('Sync is available in the primary workspace only.')}
+            testid="settings-sync-primary-only"
+          />
+        </SettingsGroup>
+        <SettingsGroup label={t('Backup')}>
+          <BackupRow />
+          <ExportRow />
+        </SettingsGroup>
+      </>
+    )
 
   return (
     <>

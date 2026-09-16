@@ -6,14 +6,12 @@ import type { SetupDriveFile } from '@/api/setup'
 import { open } from '@tauri-apps/plugin-dialog'
 import { setupDriveProbed, setupDriveFailed } from '@/store'
 import { renderWithStore } from './utils'
-import { calls, mockCommand, mockCommandOnce } from './ipc'
+import { appStatusResponse, calls, mockCommand, mockCommandOnce } from './ipc'
 
 // Whether the device could enroll a biometric gate at all, which is what
 // decides if the first run asks its last question.
-const biometricStatus = (canEnroll: boolean) => ({
-  initialized: true,
-  biometric: { available: false, canEnroll, type: 'touch', mode: null }
-})
+const biometricStatus = (canEnroll: boolean) =>
+  appStatusResponse({ biometric: { canEnroll } })
 
 // Must satisfy the setup strength gate (>= 12 chars, zxcvbn score >= 2).
 const STRONG = 'my-strong-vault-passphrase-2026'

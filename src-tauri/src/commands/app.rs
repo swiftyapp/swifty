@@ -9,7 +9,7 @@ use tauri::{AppHandle, State};
 use crate::error::Result;
 use crate::secure_store::{self, GateMode};
 use crate::state::AppState;
-use crate::{biometrics, locale, scan, storage};
+use crate::{biometrics, locale, scan, storage, workspace};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +25,12 @@ pub struct AppStatus {
     sync_pending: bool,
     scan_supported: bool,
     biometric: Biometric,
+    /// Every vault on this install — exactly one until the user makes a second,
+    /// which is what lets the frontend leave the whole feature out of the UI
+    /// until there is something to switch between.
+    workspaces: Vec<workspace::Workspace>,
+    /// Which of them the fields above describe.
+    active_workspace: String,
 }
 
 #[derive(Serialize)]
@@ -68,6 +74,12 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
     #[cfg(desktop)]
     let sync_pending = false;
 
+    let registry = workspace::Registry::load(&storage::root_dir(&app)?);
+    // The in-memory id, not the registry's: it is what every path above was
+    // resolved through, so it is what `initialized` and the rest are about.
+    let active_workspace = workspace::active_id(&app);
+    let primary = active_workspace == workspace::PRIMARY_ID;
+
     Ok(AppStatus {
         initialized: storage::db_exists(&app),
         version: app.package_info().version.to_string(),
@@ -77,9 +89,13 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
         scan_supported: scan::is_supported(),
         biometric: Biometric {
             available: hardware && storage::biometric_enrolled(&app),
-            can_enroll: hardware,
+            // One keychain item for the whole install, so enrolling is the
+            // primary workspace's to offer (see `workspace::guard_primary`).
+            can_enroll: hardware && primary,
             kind: biometrics::kind(),
             mode: marker.map(|m| GateMode::from_marker(&m).as_marker().to_string()),
         },
+        workspaces: registry.workspaces,
+        active_workspace,
     })
 }

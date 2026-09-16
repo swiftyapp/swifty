@@ -1,5 +1,6 @@
 import SyncIndicator from './SyncIndicator'
 import LockButton from './LockButton'
+import WorkspaceLabel from './WorkspaceLabel'
 import Controls from '@/components/elements/Controls'
 
 // Top chrome bar (38px): window controls · sync pill + lock. Search is not
@@ -26,6 +27,7 @@ export default function Header() {
       <Controls />
       <div className="flex-1" />
       <div className="flex flex-none items-center gap-1.5">
+        <WorkspaceLabel />
         <SyncIndicator />
         <LockButton />
       </div>

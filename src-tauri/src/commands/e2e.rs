@@ -98,6 +98,9 @@ pub fn e2e_reset(
     state.session.lock().unwrap().clear();
 
     wipe_dir(&dir)?;
+    // The wipe took `workspaces.json` with it, so the app is back to one
+    // workspace — and the vault created below has to land in the root.
+    *state.active_workspace.lock().unwrap() = crate::workspace::PRIMARY_ID.to_string();
 
     match mode {
         ResetMode::Pristine => Ok(()),

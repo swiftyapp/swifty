@@ -1,5 +1,5 @@
 import { call } from './client'
-import type { BiometricMode, BiometryType } from './types'
+import type { BiometricMode, BiometryType, Workspace } from './types'
 
 /**
  * Everything the shell needs to decide what to draw, in one round trip: is
@@ -24,6 +24,14 @@ export interface AppStatus {
    * Windows without an OCR language pack, where the UI offers no scanning.
    */
   scanSupported: boolean
+  /**
+   * Every workspace on this install, primary first, and which one is active.
+   * One entry is the ordinary case — the UI shows nothing about workspaces
+   * until there are two. Read on every probe: a rename or a create changes it,
+   * and so does a relaunch, which lands on whichever was left active.
+   */
+  workspaces: Workspace[]
+  activeWorkspace: string
   biometric: {
     /** Enrolled *and* usable right now. */
     available: boolean
@@ -31,6 +39,8 @@ export interface AppStatus {
      * Whether enrolling would work on this device (gated store + hardware),
      * before anyone has enrolled. `available` also demands an enrollment, so on
      * a fresh install it can only ever say no — this is what onboarding asks.
+     * Always false outside the primary workspace, which holds the one
+     * enrollment.
      */
     canEnroll: boolean
     type: BiometryType
