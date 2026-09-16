@@ -46,7 +46,7 @@ export default function PasswordStrength({ password, error }: Props) {
       >
         {score !== null ? t(LABELS[score]) : ''}
       </span>
-      <span className={cx('ml-auto min-w-0 truncate text-right', error && 'text-bad')}>
+      <span className={cx('ml-auto min-w-0 break-words text-right', error && 'text-bad')}>
         {error ?? hint}
       </span>
     </div>
