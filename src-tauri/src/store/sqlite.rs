@@ -112,14 +112,15 @@ impl SqliteStore {
              PRAGMA synchronous = NORMAL;
              PRAGMA temp_store = MEMORY;
              PRAGMA busy_timeout = 5000;",
-        )?;
+        )
+        .map_err(|e| wrong_key_or(existed, e))?;
 
         // Force key verification on an existing DB (a wrong key errors only on read).
         if existed {
             conn.query_row("SELECT count(*) FROM sqlite_master", [], |r| {
                 r.get::<_, i64>(0)
             })
-            .map_err(|_| StoreError::Other("cannot open database (wrong key?)".into()))?;
+            .map_err(|_| StoreError::WrongKey)?;
         }
 
         // A vault stamped by a newer build must surface as "update the app",
@@ -582,6 +583,23 @@ fn row_to_meta(row: &Row) -> rusqlite::Result<EntryMeta> {
         file_name: row.get(11)?,
         var_count: row.get(12)?,
     })
+}
+
+// SQLCipher cannot tell a wrongly-keyed file from a corrupt one: both come back
+// as SQLITE_NOTADB from the first read of the header. On a database that
+// already existed, a key we chose ourselves is by far the likelier cause, so it
+// is named as such — and on a fresh file the header is ours, so it is not.
+// Every other failure keeps its own error and stays out of "wrong password".
+fn wrong_key_or(existed: bool, e: rusqlite::Error) -> StoreError {
+    let not_a_db = matches!(
+        &e,
+        rusqlite::Error::SqliteFailure(err, _) if err.code == rusqlite::ErrorCode::NotADatabase
+    );
+    if existed && not_a_db {
+        StoreError::WrongKey
+    } else {
+        StoreError::Sqlite(e)
+    }
 }
 
 fn hex(bytes: &[u8]) -> String {

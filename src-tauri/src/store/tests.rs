@@ -527,6 +527,8 @@ fn meta_get_set() {
     assert_eq!(store.meta_get("schema_version").unwrap(), None);
 }
 
+// The one open failure that may reach the user as "wrong password": it is the
+// only one that names the key, and the only one the unlock lockout counts.
 #[test]
 fn wrong_key_fails() {
     let path = tmp_db();
@@ -534,7 +536,11 @@ fn wrong_key_fails() {
         .unwrap()
         .upsert(&rec("1", b"x"))
         .unwrap();
-    assert!(SqliteStore::open(&path, &[0x22; 32]).is_err());
+    match SqliteStore::open(&path, &[0x22; 32]) {
+        Err(StoreError::WrongKey) => {}
+        Err(other) => panic!("expected WrongKey, got error: {other}"),
+        Ok(_) => panic!("expected WrongKey, but the open succeeded"),
+    }
 }
 
 #[test]

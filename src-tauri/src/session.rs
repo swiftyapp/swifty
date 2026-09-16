@@ -241,16 +241,20 @@ pub fn derive_key(app: &AppHandle, password: &str) -> Result<VaultKey> {
     }
 }
 
-// Open the existing store with `key` and return its handle + entry metadata. A
-// wrong key fails SQLCipher's open verification -> surfaced as invalid password.
+// Open the existing store with `key` and return its handle + entry metadata.
+// Only the store's own key-verification failure is reported as a wrong
+// password.
 pub fn open_with_key(app: &AppHandle, key: &VaultKey) -> Result<(SqliteStore, Vec<EntryMetaDto>)> {
-    // Everything else that fails an open IS a key problem (SQLCipher can't
-    // read a byte of a wrongly-keyed file) — but a schema from a newer build
-    // must say so, not send the user doubting their master password.
+    // An open fails for reasons that have nothing to do with the key — an I/O
+    // error, a truncated file, a lock that outlasts `busy_timeout`, a
+    // permissions problem — and `unlock` throttles on `InvalidPassword`. Saying
+    // "wrong password" to someone whose disk is failing both misdiagnoses it
+    // and locks them out for guessing right, so each cause keeps its own name.
     let store =
         SqliteStore::open(&storage::db_path(app)?, &key.sqlcipher_key()).map_err(|e| match e {
+            StoreError::WrongKey => Error::InvalidPassword,
             StoreError::SchemaNewer => Error::VaultTooNew,
-            _ => Error::InvalidPassword,
+            e => Error::Other(format!("could not open the vault: {e}")),
         })?;
     backfill_derived_columns(&store, key);
     let metas = list_metas(&store)?;
