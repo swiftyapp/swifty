@@ -113,12 +113,21 @@ pub struct Rollback {
 /// payload under `new_key`, re-key the database, rewrite the KDF sidecar.
 /// Correct even if slow: touches every row once.
 ///
-/// Crash-consistency: the three destructive on-disk steps (import -> rekey ->
-/// sidecar) are guarded by the recovery snapshot taken first. The sidecar (the
-/// single source of truth for opening) is written last and atomically, so it
-/// only ever names a DB already re-keyed to match. On any failure the
-/// pre-change, old-keyed DB is restored from the snapshot and the OLD sidecar is
-/// left in place, so the vault still opens under the unchanged current password.
+/// Crash-consistency: the destructive on-disk steps (import -> rekey -> sidecar)
+/// are guarded by snapshots of *both* files that decide whether the vault opens —
+/// the DB and its KDF sidecar — taken before the first of them. The presence of
+/// the DB snapshot is itself the "a change was in flight" marker, so it is the
+/// last thing written before the sequence starts and the first thing removed
+/// after it commits; [`recover_interrupted_rekey`] rolls the pair back on the
+/// next unlock if a crash left it behind. An in-process failure rolls back the
+/// same way, so either path leaves the vault open under the unchanged current
+/// password.
+///
+/// The one accepted edge: a crash in the window between the sidecar write and
+/// the removal of the snapshots rolls back a change that had actually completed.
+/// The OLD password then works and the user repeats the change — a deliberate
+/// trade for a single, simple recovery rule ("snapshot present ⇒ roll back")
+/// over a commit marker nobody can test.
 ///
 /// Blocking from end to end — a whole-vault re-seal plus two whole-file copies —
 /// so it only ever runs on the blocking pool, never on a command thread.
@@ -131,11 +140,17 @@ pub fn rekey(
     params: &KdfParams,
     backup: &Path,
 ) -> std::result::Result<(VaultKey, SqliteStore), Rollback> {
-    // Recovery point: snapshot the pre-change (old-keyed) DB to a sibling file.
-    if let Err(e) = store.snapshot_to(backup, &old_key.sqlcipher_key()) {
+    // Recovery point: snapshot the pre-change (old-keyed) DB to a sibling file,
+    // and the sidecar that names its key beside it.
+    let snapshot = store
+        .snapshot_to(backup, &old_key.sqlcipher_key())
+        .map_err(store_err)
+        .and_then(|()| snapshot_kdf_sidecar(app));
+    if let Err(error) = snapshot {
         let _ = fs::remove_file(backup);
+        let _ = remove_kdf_sidecar_backup(app);
         return Err(Rollback {
-            error: store_err(e),
+            error,
             restored: Some((old_key, store)),
         });
     }
@@ -152,12 +167,85 @@ pub fn rekey(
             .and_then(|()| open_with_key(app, &old_key))
             .ok()
             .map(|(store, _)| (old_key, store));
+        // The sidecar itself was never rewritten on this path (that is the last
+        // step, and it did not run), so only its snapshot has to go.
+        let _ = remove_kdf_sidecar_backup(app);
         return Err(Rollback { error, restored });
     }
 
-    // Success: the change is committed on disk. Drop the recovery point.
+    // Success: the change is committed on disk. Drop the recovery point — the DB
+    // snapshot first, since its presence alone is what triggers a rollback.
     let _ = fs::remove_file(backup);
+    let _ = remove_kdf_sidecar_backup(app);
     Ok((new_key, store))
+}
+
+/// Roll back a master-password change a crash left half-applied, before anything
+/// tries to open the vault. Called at the top of every unlock path.
+///
+/// The rule is deliberately blunt: a leftover DB snapshot means [`rekey`] never
+/// reached its cleanup, so whatever the DB and sidecar say now is discarded in
+/// favour of the pre-change pair — which is the only pair guaranteed to open
+/// together. Without it, a crash mid-sequence bricks the vault (a DB re-keyed
+/// under params that only ever existed in memory) while a perfectly good
+/// snapshot sits beside it.
+///
+/// One `metadata` call when there is nothing to do, which is every unlock but
+/// the vanishingly rare one.
+pub fn recover_interrupted_rekey(app: &AppHandle) -> Result<()> {
+    let rolled_back = restore_rekey_backup(
+        &storage::db_path(app)?,
+        &storage::db_rekey_backup_path(app)?,
+        &storage::kdf_sidecar_path(app)?,
+        &storage::kdf_sidecar_rekey_backup_path(app)?,
+    )?;
+    if rolled_back {
+        log::warn!(
+            "rolled back an interrupted master-password change; the previous password applies"
+        );
+    }
+    Ok(())
+}
+
+// The file-level half of the recovery, on plain paths so it is testable without
+// an `AppHandle`. Reports whether anything was rolled back; the usual answer is
+// "no", for the cost of the single `metadata` call below.
+fn restore_rekey_backup(
+    db: &Path,
+    db_backup: &Path,
+    sidecar: &Path,
+    sidecar_backup: &Path,
+) -> Result<bool> {
+    if fs::metadata(db_backup).is_err() {
+        return Ok(false);
+    }
+    restore_db_file(db, db_backup)?;
+    // Absent only for a vault that had no sidecar to snapshot (legacy/dev); then
+    // the DB snapshot is the whole rollback.
+    if sidecar_backup.exists() {
+        fs::copy(sidecar_backup, sidecar)?;
+    }
+    // Both go only once the pair is back in place: until then a second crash has
+    // to find the marker still there and try again.
+    fs::remove_file(db_backup)?;
+    let _ = fs::remove_file(sidecar_backup);
+    Ok(true)
+}
+
+// Copy the KDF sidecar next to the DB snapshot. A vault created before sidecars
+// existed has none, and then there is nothing to roll back.
+fn snapshot_kdf_sidecar(app: &AppHandle) -> Result<()> {
+    let sidecar = storage::kdf_sidecar_path(app)?;
+    if !sidecar.exists() {
+        return Ok(());
+    }
+    fs::copy(sidecar, storage::kdf_sidecar_rekey_backup_path(app)?)?;
+    Ok(())
+}
+
+fn remove_kdf_sidecar_backup(app: &AppHandle) -> Result<()> {
+    let _ = fs::remove_file(storage::kdf_sidecar_rekey_backup_path(app)?);
+    Ok(())
 }
 
 // The destructive on-disk sequence, isolated so a single `?` failure triggers the
@@ -186,16 +274,20 @@ fn rekey_vault(
 }
 
 // Roll the DB file back to the pre-change snapshot. The connection must already be
-// closed. Stale WAL/SHM sidecars are removed so they can't overlay the restored
-// (old-keyed) file with new-keyed frames.
+// closed.
 fn restore_db_from_backup(app: &AppHandle, backup: &Path) -> Result<()> {
-    let db = storage::db_path(app)?;
+    restore_db_file(&storage::db_path(app)?, backup)
+}
+
+// Stale WAL/SHM sidecars are removed so they can't overlay the restored
+// (old-keyed) file with new-keyed frames.
+fn restore_db_file(db: &Path, backup: &Path) -> Result<()> {
     for suffix in ["-wal", "-shm"] {
-        let mut sidecar = db.clone().into_os_string();
+        let mut sidecar = db.to_path_buf().into_os_string();
         sidecar.push(suffix);
         let _ = fs::remove_file(std::path::PathBuf::from(sidecar));
     }
-    fs::copy(backup, &db)?;
+    fs::copy(backup, db)?;
     Ok(())
 }
 
@@ -299,5 +391,117 @@ mod lockout_tests {
         // fails open (no lockout) rather than erroring the whole unlock flow.
         let parsed: std::result::Result<LockoutState, _> = serde_json::from_str("not json");
         assert!(parsed.is_err());
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+    use crate::models::Entry;
+    use crate::store::migrate;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    // The four paths recovery works on, in a fresh dir.
+    fn paths() -> (TempDir, PathBuf, PathBuf, PathBuf, PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let p = |name: &str| dir.path().join(name);
+        let (db, sidecar) = (p(storage::DB_FILE), p(storage::KDF_SIDECAR_FILE));
+        let db_backup = p(storage::DB_REKEY_BACKUP_FILE);
+        let sidecar_backup = p(storage::KDF_SIDECAR_REKEY_BACKUP_FILE);
+        (dir, db, db_backup, sidecar, sidecar_backup)
+    }
+
+    #[test]
+    fn a_leftover_backup_pair_rolls_both_files_back() {
+        let (_dir, db, db_backup, sidecar, sidecar_backup) = paths();
+        fs::write(&db, "new-keyed").unwrap();
+        fs::write(&db_backup, "old-keyed").unwrap();
+        fs::write(&sidecar, "new-params").unwrap();
+        fs::write(&sidecar_backup, "old-params").unwrap();
+        // WAL/SHM from the interrupted run: new-keyed frames that must not
+        // overlay the restored old-keyed file.
+        let (wal, shm) = (db.with_extension("db-wal"), db.with_extension("db-shm"));
+        fs::write(&wal, "frames").unwrap();
+        fs::write(&shm, "index").unwrap();
+
+        assert!(restore_rekey_backup(&db, &db_backup, &sidecar, &sidecar_backup).unwrap());
+
+        assert_eq!(fs::read_to_string(&db).unwrap(), "old-keyed");
+        assert_eq!(fs::read_to_string(&sidecar).unwrap(), "old-params");
+        assert!(!db_backup.exists() && !sidecar_backup.exists());
+        assert!(!wal.exists() && !shm.exists());
+    }
+
+    #[test]
+    fn a_sidecar_less_vault_rolls_back_the_db_alone() {
+        // A legacy/dev vault had no sidecar to snapshot, so there is none to
+        // restore — and nothing beside the DB to touch either.
+        let (_dir, db, db_backup, sidecar, sidecar_backup) = paths();
+        fs::write(&db, "new-keyed").unwrap();
+        fs::write(&db_backup, "old-keyed").unwrap();
+
+        assert!(restore_rekey_backup(&db, &db_backup, &sidecar, &sidecar_backup).unwrap());
+
+        assert_eq!(fs::read_to_string(&db).unwrap(), "old-keyed");
+        assert!(!sidecar.exists());
+        assert!(!db_backup.exists());
+    }
+
+    #[test]
+    fn no_backup_is_a_no_op() {
+        // The hot path: every unlock that did not follow a crashed change.
+        let (_dir, db, db_backup, sidecar, sidecar_backup) = paths();
+        fs::write(&db, "live").unwrap();
+        fs::write(&sidecar, "params").unwrap();
+
+        assert!(!restore_rekey_backup(&db, &db_backup, &sidecar, &sidecar_backup).unwrap());
+
+        assert_eq!(fs::read_to_string(&db).unwrap(), "live");
+        assert_eq!(fs::read_to_string(&sidecar).unwrap(), "params");
+    }
+
+    #[test]
+    fn a_crash_before_the_sidecar_write_leaves_the_old_password_working() {
+        // The bricking window, end to end on a real store: payloads re-sealed
+        // and the DB re-keyed, but the new params never reached disk, so they
+        // died with the process. Recovery has to undo all of it.
+        let (_dir, db, db_backup, sidecar, sidecar_backup) = paths();
+        fs::write(&sidecar, "old-params").unwrap();
+        let old = VaultKey::legacy_from_password("old-pw");
+        let new = VaultKey::legacy_from_password("new-pw");
+        let entry = Entry {
+            id: "1".into(),
+            title: "before".into(),
+            ..Default::default()
+        };
+
+        {
+            let store = SqliteStore::open(&db, &old.sqlcipher_key()).unwrap();
+            let payload = old.payload_cipher().seal(&entry).unwrap();
+            store
+                .upsert(&migrate::build_record(&entry, payload).unwrap())
+                .unwrap();
+            // The saga: snapshot the pair, re-seal every payload, re-key — then
+            // "crash" instead of writing the sidecar.
+            store.snapshot_to(&db_backup, &old.sqlcipher_key()).unwrap();
+            fs::copy(&sidecar, &sidecar_backup).unwrap();
+            let resealed: Vec<Record> = store
+                .export_for_sync()
+                .unwrap()
+                .into_iter()
+                .map(|r| reseal_record(r, &old.payload_cipher(), &new.payload_cipher()).unwrap())
+                .collect();
+            store.import(&resealed).unwrap();
+            store.rekey(&new.sqlcipher_key()).unwrap();
+        }
+
+        assert!(restore_rekey_backup(&db, &db_backup, &sidecar, &sidecar_backup).unwrap());
+
+        let store = SqliteStore::open(&db, &old.sqlcipher_key()).unwrap();
+        let record = store.get("1").unwrap().unwrap();
+        let revealed = old.payload_cipher().unseal(&record.payload).unwrap();
+        assert_eq!(revealed.title, "before");
+        assert_eq!(fs::read_to_string(&sidecar).unwrap(), "old-params");
     }
 }

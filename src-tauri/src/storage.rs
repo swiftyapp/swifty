@@ -16,6 +16,10 @@ pub const DB_REKEY_BACKUP_FILE: &str = "vault.db.rekey-backup";
 // salt (public by design) and is read *before* deriving the key — the salt/params
 // cannot live inside the encrypted DB, since deriving the key is what opens it.
 pub const KDF_SIDECAR_FILE: &str = "vault.kdf.json";
+// Pre-change recovery snapshot of the KDF sidecar, taken alongside the DB one.
+// Rolling the DB back to its old key is only half a rollback: the descriptor that
+// says how to derive that key has to roll back with it, or nothing opens.
+pub const KDF_SIDECAR_REKEY_BACKUP_FILE: &str = "vault.kdf.json.rekey-backup";
 // Plaintext failed-unlock backoff state (T-AUTH-3), stored next to the DB for the
 // same reason as the KDF sidecar: a wrong password never opens the encrypted DB,
 // so the attempt counter cannot live in the `meta` table. Public by design —
@@ -86,6 +90,11 @@ pub fn icons_dir(app: &AppHandle) -> Result<PathBuf> {
 // Sibling recovery snapshot of the DB (change-master-password rollback point).
 pub fn db_rekey_backup_path(app: &AppHandle) -> Result<PathBuf> {
     Ok(workspace_dir(app)?.join(DB_REKEY_BACKUP_FILE))
+}
+
+// Sibling recovery snapshot of the KDF sidecar, taken with the DB one above.
+pub fn kdf_sidecar_rekey_backup_path(app: &AppHandle) -> Result<PathBuf> {
+    Ok(workspace_dir(app)?.join(KDF_SIDECAR_REKEY_BACKUP_FILE))
 }
 
 // Whether the SQLite store has been created (non-empty file present).

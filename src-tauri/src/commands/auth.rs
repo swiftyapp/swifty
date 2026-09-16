@@ -34,6 +34,11 @@ pub async fn unlock(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
+    // Before the lockout check and before anything reads the sidecar: a crash
+    // during a password change can leave the DB and the sidecar disagreeing, and
+    // the rollback has to land before either is consulted.
+    auth::recover_interrupted_rekey(&app)?;
+
     let lockout = LockoutState::load(&app)?;
     let now = auth::now_ms();
     if lockout.locked_until_ms > now {
@@ -117,6 +122,10 @@ pub fn lock(app: AppHandle) -> Result<()> {
 // store then opens off the UI thread. No migration on unlock.
 #[tauri::command]
 pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<UnlockResult> {
+    // Same reason as in `unlock`: roll back an interrupted password change before
+    // the sidecar decides how to read the stored material.
+    auth::recover_interrupted_rekey(&app)?;
+
     let Some(marker) = storage::biometric_marker(&app) else {
         return Err(Error::Other("biometric unlock is not enabled".into()));
     };
@@ -281,18 +290,11 @@ pub async fn change_master_password(
         }
     };
 
-    // Re-encrypt the Drive token file under the new key if present (sync parity).
-    let token = storage::read_gdrive(&app).unwrap_or_default();
-    if !token.is_empty() {
-        if let Ok(plain) = old_cryptor.decrypt(&token) {
-            storage::write_gdrive(&app, &new_key.cryptor().encrypt(&plain)?)?;
-        }
-    }
-
-    // Taken before the key is handed to the session, so the re-enrollment below
-    // needs no second lock to read it back.
+    // Both taken before the key is handed to the session, so what follows needs
+    // no second lock to read them back.
     let stale_enrollment = storage::biometric_enrolled(&app)
         .then(|| Zeroizing::new(new_key.biometric_material().to_vec()));
+    let new_cryptor = new_key.cryptor();
 
     // Adopt the new key + store as the continuation of the session the lease
     // came from. Refused when a lock landed while the saga ran: the change is
@@ -307,6 +309,23 @@ pub async fn change_master_password(
         log::info!(
             "vault locked during the password change; the new key waits for the next unlock"
         );
+    }
+
+    // Re-encrypt the Drive token file under the new key if present (sync parity).
+    // After the adopt and best-effort on purpose: the password change is already
+    // committed on disk, so failing out here would strand the session held-out
+    // with no `vault:locked` event and leave the biometric enrollment stale. The
+    // worst case is a token the user has to reconnect.
+    let token = storage::read_gdrive(&app).unwrap_or_default();
+    if !token.is_empty() {
+        if let Ok(plain) = old_cryptor.decrypt(&token) {
+            if let Err(e) = new_cryptor
+                .encrypt(&plain)
+                .and_then(|sealed| storage::write_gdrive(&app, &sealed))
+            {
+                log::warn!("could not re-seal the Drive token under the new key: {e}");
+            }
+        }
     }
 
     // The biometric-stored key is now stale; re-store the new material or clear
