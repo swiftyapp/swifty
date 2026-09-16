@@ -20,7 +20,8 @@ import KeyCuts from './KeyCuts'
 
 interface Props {
   error?: string | null
-  touchID?: boolean
+  /** Draw the biometric end segment: a key is enrolled and usable right now. */
+  biometric?: boolean
   // Which gate the end segment names, from the backend (see lib/biometry). The
   // fingerprint is the default because it is the only kind every non-Apple
   // platform has, and what this card said before the type was asked for.
@@ -45,7 +46,7 @@ interface Props {
   pending?: boolean
   onEnter?: (value: string) => void
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void
-  onTouchID?: () => void
+  onBiometric?: () => void
 }
 
 // Shared master-passphrase field. The real value and selection live in the
@@ -65,7 +66,7 @@ interface Props {
 // the right edge.
 export default function Masterpass({
   error,
-  touchID,
+  biometric,
   biometry = 'touch',
   disabled,
   placeholder,
@@ -77,7 +78,7 @@ export default function Masterpass({
   pending,
   onEnter,
   onChange,
-  onTouchID
+  onBiometric
 }: Props) {
   const { t } = useTranslation()
   const [value, setValue] = useState('')
@@ -244,13 +245,13 @@ export default function Masterpass({
             reveal tier, and the glyph in the macOS Touch ID rose, sized to
             nearly fill the 28px button. Which glyph and name — Touch ID or Face
             ID — is `lib/biometry`'s call, from what the device reports. */}
-        {touchID && (
+        {biometric && (
           <>
             <span aria-hidden className="my-auto h-7 w-px bg-line" />
             <IconButton
               label={t(biometryLabel(biometry))}
               className="mx-1.5 my-auto"
-              onClick={onTouchID}
+              onClick={onBiometric}
             >
               {/* Child span so the rose survives IconButton's hover ink. */}
               <span className="text-touchid">

@@ -1,5 +1,6 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { SetupDriveFile } from './setup'
+import type { SyncStatus } from './sync'
 import type { EntryMeta } from './types'
 
 /**
@@ -7,13 +8,13 @@ import type { EntryMeta } from './types'
  * background work (sync, auto-lock, a long import) that is not a direct
  * request/response command.
  *
- * `sync:pending` → `sync:connected` | `sync:error` is a consent flow out with
- * the browser. The backend owns all three: it is what opens the browser and what
- * hears back from it, so the frontend mirrors these rather than guessing from a
- * click — the command itself resolves the moment the browser is on screen.
- * `setup:drive:*` is the same trio against an account there is no vault behind
- * yet; `file: null` there is an account with no Rowel data in it, a fact rather
- * than a failure, so it is not an error event.
+ * `setup:drive:pending` → `setup:drive:probed` | `setup:drive:error` is a
+ * consent flow out with the browser against an account there is no vault behind
+ * yet. The backend owns all three: it is what opens the browser and what hears
+ * back from it, so the frontend mirrors these rather than guessing from a click
+ * — the command itself resolves the moment the browser is on screen. `file:
+ * null` there is an account with no Rowel data in it, a fact rather than a
+ * failure, so it is not an error event.
  */
 export interface EventPayloads {
   'vault:locked': void
@@ -23,13 +24,12 @@ export interface EventPayloads {
    * because the backend has already paid for the query.
    */
   'vault:merged': { entries: EntryMeta[] }
-  'sync:started': void
-  /** `error: null` is a run that succeeded. */
-  'sync:stopped': { error: string | null }
-  'sync:pending': void
-  'sync:connected': void
-  'sync:disconnected': void
-  'sync:error': { error: string }
+  /**
+   * The whole of sync, every time anything about it changes: a consent flow
+   * opening or closing, a run starting or ending. The frontend stores it as-is
+   * — there is no sequence of events to reconstruct state from.
+   */
+  'sync:status': SyncStatus
   'import:progress': { done: number; total: number }
   'setup:drive:pending': void
   'setup:drive:probed': { file: SetupDriveFile | null }
@@ -50,12 +50,7 @@ type Camel<S extends string> = S extends `${infer Head}:${infer Tail}`
 export const EVENTS: { [K in EventName as Camel<K>]: K } = {
   vaultLocked: 'vault:locked',
   vaultMerged: 'vault:merged',
-  syncStarted: 'sync:started',
-  syncStopped: 'sync:stopped',
-  syncPending: 'sync:pending',
-  syncConnected: 'sync:connected',
-  syncDisconnected: 'sync:disconnected',
-  syncError: 'sync:error',
+  syncStatus: 'sync:status',
   importProgress: 'import:progress',
   setupDrivePending: 'setup:drive:pending',
   setupDriveProbed: 'setup:drive:probed',

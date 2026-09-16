@@ -1,10 +1,10 @@
-import { useStore, startEntry, closeAddPicker } from '@/store'
+import { useVault, useUi, startEntry, closeAddPicker } from '@/store'
 import { dialogOpen } from '@/utils/dialogOpen'
 import { ingestDroppedEnvFile, type IngestedEnv } from '@/kinds/env/ingest'
 
 /**
  * Open the env editor as a new draft with the file already in it — the same
- * `entries.prefill` road a scan takes, so `useDraft` seeds the body, the file
+ * vault `prefill` road a scan takes, so `useDraft` seeds the body, the file
  * name and the proposed title as the initial model rather than as typing.
  */
 export const openEnvDraft = ({ body, fileName, title }: IngestedEnv) => {
@@ -14,10 +14,11 @@ export const openEnvDraft = ({ body, fileName, title }: IngestedEnv) => {
 
 /** The exact idle surface that owned a drop, used as a lease across the read. */
 const idleDropContext = (): boolean | null => {
-  const { entries, ui } = useStore.getState()
-  if (entries.new || entries.edit) return null
-  if (dialogOpen() && !ui.addPicker) return null
-  return ui.addPicker
+  const { creating, editing } = useVault.getState()
+  const { addPicker } = useUi.getState()
+  if (creating || editing) return null
+  if (dialogOpen() && !addPicker) return null
+  return addPicker
 }
 
 /**

@@ -1,35 +1,36 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import i18n, { changeLocale } from '@/i18n'
-import { getTimeout } from '@/defaults/clipboard'
-import { getSecs } from '@/defaults/autolock'
-import { dateTime } from '@/utils/time'
+import { dates } from '@/utils/time'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { renderWithStore } from './utils'
-import { calls, mockCommand, mockCommandOnce } from './ipc'
+import type { SyncStatus } from '@/api/sync'
+import { initialApp, openSettings, setSyncStatus, useApp, usePrefs, useUi } from '@/store'
+import DateField from '@/components/elements/fields/DateField'
+import { FieldsProvider } from '@/components/elements/fields/context'
+import Footer from '@/components/Main/Body/Aside/Show/Footer'
+import { appStatusDefault, calls, mockCommand, mockCommandOnce } from './ipc'
+import { seedApp } from './utils'
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  // Every panel reads its initial value from localStorage, so leftovers from an
-  // earlier case would decide which segment starts selected.
-  localStorage.removeItem('rowel:clipboardTimeout')
-  localStorage.removeItem('rowel:autolockSecs')
-  localStorage.removeItem('rowel:dateFormat')
-})
+beforeEach(() => vi.clearAllMocks())
+
+const report = (s: Partial<SyncStatus>) => setSyncStatus({ ...initialApp.sync, ...s })
 
 afterEach(() => changeLocale('en-US'))
 
-// Only the biometric leaf of app_status matters here; the row reads nothing else.
+// Only the biometric leaf of app_status matters here; the row reads nothing
+// else. Seeded into the store as what the boot probe said, and returned by the
+// mocked probe as what a re-run after a toggle says.
 const enrolled = (available: boolean, mode: 'protected' | 'prompt' | null) => ({
-  biometric: { available, canEnroll: available, type: 'touch', mode }
+  ...appStatusDefault(),
+  biometric: { available, canEnroll: true, type: 'touch' as const, mode }
 })
 
 const open = async () => {
-  const { container, store } = renderWithStore(<Settings />)
+  const { container } = render(<Settings />)
   await userEvent.click(container.querySelector('.settings-button')!)
-  return { container, store }
+  return { container }
 }
 
 const go = (section: string) =>
@@ -44,11 +45,11 @@ describe('Settings shell', () => {
   })
 
   it('switches sections from the nav and remembers the last one', async () => {
-    const { store } = await open()
+    await open()
 
     await go('audit')
     expect(screen.getByRole('heading', { name: 'Vault audit' })).toBeInTheDocument()
-    expect(store.getState().ui.settingsSection).toBe('audit')
+    expect(useUi.getState().settingsSection).toBe('audit')
 
     await go('language')
     expect(
@@ -61,15 +62,15 @@ describe('Settings shell', () => {
   })
 
   it('deep-links to a section through openSettings', async () => {
-    const { store } = renderWithStore(<Settings />)
-    store.getState().openSettings('security')
+    render(<Settings />)
+    openSettings('security')
     expect(await screen.findByRole('heading', { name: 'Security' })).toBeInTheDocument()
   })
 
   it('closes from the header X', async () => {
-    const { store } = await open()
+    await open()
     await userEvent.click(screen.getByTestId('modal-close'))
-    expect(store.getState().ui.settings).toBe(false)
+    expect(useUi.getState().settings).toBe(false)
   })
 })
 
@@ -84,37 +85,38 @@ describe('Settings › sync', () => {
   // Safari has the screen, so the row waits on the backend's events — the
   // click itself claims nothing.
   it('waits for Google after a connect that resolved early', async () => {
-    const { store } = await open()
+    await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
-    expect(store.getState().sync.pending).toBe(false)
+    expect(useApp.getState().sync.pending).toBe(false)
 
-    store.getState().syncPending()
+    report({ pending: true })
     expect(await screen.findByText('Waiting for Google…')).toBeInTheDocument()
 
-    store.getState().syncConnected()
+    report({ configured: true })
     expect(await screen.findByText('Connected')).toBeInTheDocument()
   })
 
   it('reports a consent that failed, and stays disconnected', async () => {
-    const { store } = await open()
+    await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
-    store.getState().syncPending()
-    store.getState().syncFailed('access_denied')
+    report({ pending: true })
+    report({ error: 'access_denied' })
 
     expect(await screen.findByTestId('settings-sync-error')).toHaveTextContent(
       'access_denied'
     )
-    expect(store.getState().sync.enabled).toBe(false)
+    expect(useApp.getState().sync.configured).toBe(false)
   })
 
   it('surfaces a connect that could not even start', async () => {
-    mockCommandOnce('sync_connect', () =>
-      Promise.reject({ kind: 'other', message: 'no OAuth client configured' })
-    )
-    const { store } = await open()
+    mockCommandOnce('sync_connect', () => {
+      report({ error: 'no OAuth client configured' })
+      return Promise.reject({ kind: 'other', message: 'no OAuth client configured' })
+    })
+    await open()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
 
-    await waitFor(() => expect(store.getState().sync.pending).toBe(false))
+    await waitFor(() => expect(useApp.getState().sync.pending).toBe(false))
     expect(screen.getByTestId('settings-sync-error')).toHaveTextContent(
       'no OAuth client configured'
     )
@@ -183,8 +185,10 @@ describe('Settings › security', () => {
     expect(await screen.findByTestId('change-password-error')).toBeInTheDocument()
   })
 
-  it('enables biometric unlock from the toggle', async () => {
-    mockCommand('app_status', () => enrolled(false, null))
+  // The row is redrawn from a fresh probe after the toggle, not from a guess.
+  it('enables biometric unlock and redraws from the refreshed status', async () => {
+    seedApp(enrolled(false, null))
+    mockCommand('app_status', () => enrolled(true, 'protected'))
     mockCommand('enable_biometric', () => 'protected')
     await open()
     await go('security')
@@ -201,7 +205,8 @@ describe('Settings › security', () => {
   })
 
   it('disables biometric unlock from the toggle', async () => {
-    mockCommand('app_status', () => enrolled(true, 'prompt'))
+    seedApp(enrolled(true, 'prompt'))
+    mockCommand('app_status', () => enrolled(false, null))
     mockCommand('disable_biometric', () => undefined)
     await open()
     await go('security')
@@ -209,16 +214,18 @@ describe('Settings › security', () => {
     await userEvent.click(await screen.findByTestId('settings-biometric-toggle'))
 
     expect(calls('disable_biometric')).toHaveLength(1)
-    expect(screen.getByTestId('settings-biometric-toggle')).toHaveAttribute(
-      'aria-checked',
-      'false'
+    await waitFor(() =>
+      expect(screen.getByTestId('settings-biometric-toggle')).toHaveAttribute(
+        'aria-checked',
+        'false'
+      )
     )
   })
 
   // The copy must name the gate actually in force: an OS-enforced Secure Enclave
   // item and an app-enforced verify-then-read item are different promises.
   it('describes the OS-enforced gate when enrolled in protected mode', async () => {
-    mockCommand('app_status', () => enrolled(true, 'protected'))
+    seedApp(enrolled(true, 'protected'))
     await open()
     await go('security')
     expect(await screen.findByText(/Secure Enclave/)).toBeInTheDocument()
@@ -227,7 +234,8 @@ describe('Settings › security', () => {
   it('switches the copy to the mode enrollment settled on', async () => {
     // An unentitled build falls back to prompt mode; the description must follow
     // the enable response rather than keep advertising the generic offer.
-    mockCommand('app_status', () => enrolled(false, null))
+    seedApp(enrolled(false, null))
+    mockCommand('app_status', () => enrolled(true, 'prompt'))
     mockCommand('enable_biometric', () => 'prompt')
     await open()
     await go('security')
@@ -238,13 +246,15 @@ describe('Settings › security', () => {
     ).toBeInTheDocument()
   })
 
-  it('stores the auto-lock choice and pushes it to the backend', async () => {
+  // One write: Rust owns the file and re-arms the auto-lock from it, so there
+  // is no second command to push the value with.
+  it('stores the auto-lock choice through the settings file', async () => {
     await open()
     await go('security')
     await userEvent.click(screen.getByTestId('settings-autolock-300'))
 
-    expect(getSecs()).toBe(300)
-    expect(calls('set_autolock_timeout')).toContainEqual({ secs: 300 })
+    expect(usePrefs.getState().autolockSecs).toBe(300)
+    expect(calls('set_settings')).toContainEqual({ patch: { autolockSecs: 300 } })
   })
 
   it('stores the clipboard delay, "Never" included', async () => {
@@ -252,10 +262,10 @@ describe('Settings › security', () => {
     await go('security')
 
     await userEvent.click(screen.getByTestId('settings-clipboard-15000'))
-    expect(getTimeout()).toBe(15000)
+    expect(usePrefs.getState().clipboardTimeoutMs).toBe(15000)
 
     await userEvent.click(screen.getByTestId('settings-clipboard-0'))
-    expect(getTimeout()).toBe(0)
+    expect(usePrefs.getState().clipboardTimeoutMs).toBe(0)
   })
 
   it('names both session radiogroups after their rows', async () => {
@@ -272,20 +282,19 @@ describe('Settings › security', () => {
 
     await userEvent.click(screen.getByTestId('settings-generator-symbols'))
 
-    const stored = JSON.parse(localStorage.getItem('rowel:generatorDefaults')!)
-    expect(stored.symbols).toBe(false)
+    expect(usePrefs.getState().generator.symbols).toBe(false)
   })
 })
 
 describe('Settings › vault audit', () => {
   it('toggles breach monitoring and re-runs the audit', async () => {
-    const { store } = await open()
+    await open()
     await go('audit')
 
-    expect(store.getState().breachCheck).toBe(false)
+    expect(usePrefs.getState().breachCheck).toBe(false)
     await userEvent.click(screen.getByTestId('settings-breach-toggle'))
 
-    expect(store.getState().breachCheck).toBe(true)
+    expect(usePrefs.getState().breachCheck).toBe(true)
     expect(calls('get_audit')).toContainEqual({ checkBreaches: true })
   })
 
@@ -299,12 +308,12 @@ describe('Settings › vault audit', () => {
   })
 
   it('jumps to the Vault Health view and closes', async () => {
-    const { store } = await open()
+    await open()
     await go('audit')
     await userEvent.click(screen.getByTestId('settings-open-health'))
 
-    expect(store.getState().ui.view).toBe('health')
-    expect(store.getState().ui.settings).toBe(false)
+    expect(useUi.getState().view).toBe('health')
+    expect(useUi.getState().settings).toBe(false)
   })
 })
 
@@ -379,19 +388,19 @@ describe('Settings › language & region', () => {
   })
 
   it('sets the theme from the segmented control', async () => {
-    const { store } = await open()
+    await open()
     await go('language')
     await userEvent.click(screen.getByTestId('settings-theme-dark'))
 
-    expect(store.getState().theme).toBe('dark')
+    expect(usePrefs.getState().theme).toBe('dark')
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
   it('offers System as a theme', async () => {
-    const { store } = await open()
+    await open()
     await go('language')
     await userEvent.click(screen.getByTestId('settings-theme-system'))
-    expect(store.getState().theme).toBe('system')
+    expect(usePrefs.getState().theme).toBe('system')
   })
 
   it('names both region radiogroups after their rows', async () => {
@@ -407,12 +416,53 @@ describe('Settings › language & region', () => {
     await open()
     await go('language')
 
-    expect(dateTime(iso)).toMatch(/^01\/02\/2024/)
+    expect(dates(usePrefs.getState().dateFormat).dateTime(iso)).toMatch(/^01\/02\/2024/)
 
     await userEvent.click(screen.getByTestId('settings-date-format-DD.MM.YYYY'))
-    expect(dateTime(iso)).toMatch(/^02\.01\.2024/)
+    expect(dates(usePrefs.getState().dateFormat).dateTime(iso)).toMatch(/^02\.01\.2024/)
 
     await userEvent.click(screen.getByTestId('settings-date-format-YYYY-MM-DD'))
-    expect(dateTime(iso)).toMatch(/^2024-01-02/)
+    expect(dates(usePrefs.getState().dateFormat).dateTime(iso)).toMatch(/^2024-01-02/)
+  })
+})
+
+describe('Settings › date format', () => {
+  // Not just stored: a date already on screen has to be re-read in the new
+  // pattern. The format used to be read at call time by helpers nothing
+  // subscribed to, so every rendered date kept the pattern it was first drawn
+  // in. Two consumers, on purpose: the date field, and the entry footer's
+  // "Created" stamp, which formats a timestamp through `shortDate` rather than
+  // through a field.
+  it('re-renders every shown date when the format changes', async () => {
+    render(
+      <>
+        <Settings />
+        <FieldsProvider
+          value={{
+            entry: { type: 'apikey', title: '', expiry_date: '2035-06-01' },
+            set: null,
+            attempted: false
+          }}
+        >
+          <DateField name="expiry_date" label="Expires" />
+        </FieldsProvider>
+        {/* Midday UTC, so the local date is the 15th in every zone a test runs in. */}
+        <Footer tags={[]} createdAt="2024-01-15T12:00:00.000Z" />
+      </>
+    )
+    await userEvent.click(document.querySelector('.settings-button')!)
+    await go('language')
+
+    expect(screen.getByText('06/01/2035')).toBeInTheDocument()
+    expect(screen.getByText('01/15/2024')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-date-format-DD.MM.YYYY'))
+    expect(await screen.findByText('01.06.2035')).toBeInTheDocument()
+    expect(screen.getByText('15.01.2024')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-date-format-YYYY-MM-DD'))
+    expect(await screen.findByText('2035-06-01')).toBeInTheDocument()
+    expect(screen.getByText('2024-01-15')).toBeInTheDocument()
+    expect(usePrefs.getState().dateFormat).toBe('YYYY-MM-DD')
   })
 })

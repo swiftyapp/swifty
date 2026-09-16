@@ -19,13 +19,24 @@ const stubMedia = () => {
 
 const theme = () => document.documentElement.getAttribute('data-theme')
 
+// A fresh load, as main.tsx does it: the store only reacts to changes, so the
+// initial preference is painted once at boot.
+const boot = async () => {
+  vi.resetModules()
+  const [{ usePrefs, setPref }, { applyTheme }] = await Promise.all([
+    import('@/store/prefs'),
+    import('@/theme')
+  ])
+  applyTheme(usePrefs.getState().theme)
+  return setPref
+}
+
 describe('theme', () => {
   it('follows the OS while the preference is system', async () => {
     const emit = stubMedia()
-    vi.resetModules()
-    const { setTheme } = await import('@/theme')
+    const setPref = await boot()
 
-    setTheme('system')
+    setPref('theme', 'system')
     expect(theme()).toBe('light')
 
     emit(true)
@@ -34,10 +45,9 @@ describe('theme', () => {
 
   it('ignores the OS once an explicit theme is picked', async () => {
     const emit = stubMedia()
-    vi.resetModules()
-    const { setTheme } = await import('@/theme')
+    const setPref = await boot()
 
-    setTheme('light')
+    setPref('theme', 'light')
     emit(true)
 
     expect(theme()).toBe('light')

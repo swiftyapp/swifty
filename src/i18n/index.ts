@@ -1,7 +1,6 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import resourcesToBackend from 'i18next-resources-to-backend'
-import { appStatus } from '@/api/app'
 import { APP_NAME } from '@/lib/app'
 import enUS from './locales/en-US.json'
 
@@ -21,7 +20,6 @@ export const LANGUAGES: Record<string, string> = {
 
 export const DEFAULT_LOCALE = 'en-US'
 const SUPPORTED = Object.keys(LANGUAGES)
-const STORAGE_KEY = 'locale'
 
 /**
  * Every key the catalog defines. Label data that gets handed to `t()` later
@@ -29,21 +27,6 @@ const STORAGE_KEY = 'locale'
  * with no catalog entry fails the build instead of rendering in English.
  */
 export type TKey = keyof typeof enUS
-
-/**
- * An explicit choice wins; otherwise the OS decides. Asking Rust rather than
- * reading `navigator.language` keeps one authority for the locale — the same
- * one the tray menu has to use, since it is built before the webview exists.
- */
-const resolveInitial = async (): Promise<string> => {
-  const stored = localStorage.getItem(STORAGE_KEY)
-  if (stored && SUPPORTED.includes(stored)) return stored
-
-  // A dead IPC call must not stop the app from starting.
-  return appStatus()
-    .then(status => status.locale)
-    .catch(() => DEFAULT_LOCALE)
-}
 
 /**
  * Keys are the English source strings, so both separators have to be off:
@@ -58,7 +41,12 @@ const catalogues = import.meta.glob<Record<string, string>>(
   { import: 'default' }
 )
 
-export const i18nReady = resolveInitial().then(lng =>
+/**
+ * Start i18next in `lng`. The caller decides what that is — `main.tsx` takes it
+ * from the one `app_status` probe it already runs — so the catalogue is loaded
+ * before the first paint and nothing here has to ask the backend anything.
+ */
+export const initI18n = (lng: string) =>
   i18n
     .use(
       resourcesToBackend((language: string) =>
@@ -92,11 +80,12 @@ export const i18nReady = resolveInitial().then(lng =>
       document.documentElement.lang = i18n.resolvedLanguage ?? DEFAULT_LOCALE
       return translate
     })
-)
 
-// Persist the choice so the next launch skips the OS lookup, and tell the
-// document what language it is in. Registered once, rather than wrapping
-// `changeLanguage`, so a change from anywhere is picked up.
+// Tell the document what language it is in. Registered once, rather than
+// wrapping `changeLanguage`, so a change from anywhere is picked up. Persisting
+// the choice is the store's half of the same event (see `settingsSlice`), which
+// keeps this module free of everything behind the store — it is what the api
+// layer and a handful of leaf helpers reach for when they need a string.
 //
 // `lang` is not decoration: the micro labels are uppercased by CSS
 // (`text-transform`, see LABEL_TYPE), and casing is language-dependent. Under
@@ -105,11 +94,6 @@ export const i18nReady = resolveInitial().then(lng =>
 // and line breaking.
 i18n.on('languageChanged', locale => {
   document.documentElement.lang = locale
-  try {
-    localStorage.setItem(STORAGE_KEY, locale)
-  } catch {
-    // A locked-down webview can throw on storage; the language still applied.
-  }
 })
 
 export const getLocale = () => i18n.resolvedLanguage ?? DEFAULT_LOCALE

@@ -1,0 +1,133 @@
+import { create } from 'zustand'
+import { DATE_FORMATS, setSettings, type DateFormat, type Settings } from '@/api/app'
+import i18n from '@/i18n'
+import { applyTheme, resolveTheme, type Theme, type ThemePreference } from '@/theme'
+
+/**
+ * User preferences: everything that outlives a session and a lock.
+ *
+ * Rust owns the file (`settings.json` beside the other sidecars, see
+ * `src-tauri/src/settings.rs`); this is the webview's copy of it, hydrated once
+ * at boot from `app_status` and written back through `set_settings`. One store,
+ * so a preference is read like any other state (`usePrefs(s => s.sort)`) and a
+ * change re-renders whoever shows it — nothing copies a preference into local
+ * state, and nothing reads it from disk at call time.
+ */
+
+export type { DateFormat, SortMode, Settings as Prefs } from '@/api/app'
+export { DATE_FORMATS } from '@/api/app'
+
+// The same defaults as Rust, so a test store — and the split second before
+// hydration lands — reads like a fresh install rather than like `undefined`.
+export const DEFAULT_PREFS: Settings = {
+  theme: 'light',
+  sort: 'recent',
+  breachCheck: false,
+  autolockSecs: 60,
+  clipboardTimeoutMs: 30_000,
+  dateFormat: 'MM/DD/YYYY',
+  locale: null,
+  generator: { length: 20, numbers: true, symbols: true, uppercase: true, exclude: '' }
+}
+
+const isTheme = (value: unknown): value is ThemePreference =>
+  value === 'light' || value === 'dark' || value === 'system'
+
+const isPositive = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0
+
+/**
+ * The file is user-writable and may predate a knob added since, so each field
+ * is checked and falls back to its default rather than trusted as a whole
+ * shape. `generator` is merged one level deep for the same reason. Rust stores
+ * the enum-ish fields as plain strings; this is where they are narrowed.
+ */
+const sanitize = (raw: Partial<Settings>): Settings => {
+  const generator = { ...DEFAULT_PREFS.generator, ...(raw.generator ?? {}) }
+  return {
+    theme: isTheme(raw.theme) ? raw.theme : DEFAULT_PREFS.theme,
+    sort: raw.sort === 'alpha' ? 'alpha' : 'recent',
+    breachCheck: raw.breachCheck === true,
+    autolockSecs: isPositive(raw.autolockSecs) ? raw.autolockSecs : DEFAULT_PREFS.autolockSecs,
+    clipboardTimeoutMs:
+      typeof raw.clipboardTimeoutMs === 'number' &&
+      Number.isFinite(raw.clipboardTimeoutMs) &&
+      raw.clipboardTimeoutMs >= 0
+        ? raw.clipboardTimeoutMs
+        : DEFAULT_PREFS.clipboardTimeoutMs,
+    dateFormat: DATE_FORMATS.includes(raw.dateFormat as DateFormat)
+      ? (raw.dateFormat as DateFormat)
+      : DEFAULT_PREFS.dateFormat,
+    locale: typeof raw.locale === 'string' ? raw.locale : null,
+    generator: Number.isFinite(generator.length)
+      ? generator
+      : { ...generator, length: DEFAULT_PREFS.generator.length }
+  }
+}
+
+export const usePrefs = create<Settings>()(() => DEFAULT_PREFS)
+
+/** Take the boot probe's answer wholesale (see `main.tsx`). */
+export const hydratePrefs = (settings: Settings): void => {
+  usePrefs.setState(sanitize(settings), true)
+}
+
+/**
+ * Patch one preference. The new value lands immediately — a toggle must not
+ * wait on a file write to look pressed — and is then replaced by what Rust
+ * merged, which is authoritative. A failed write leaves the optimistic value in
+ * place: the preference still applies for this session, it just won't survive
+ * a restart.
+ */
+// Which write is the newest. Answers can land out of order — a slider drag
+// issues several in a row — and each one carries the whole file, so only the
+// answer to the latest write may replace the store: an older one would put back
+// a value the user has already moved past.
+let latestWrite = 0
+
+export const setPref = <K extends keyof Settings>(key: K, value: Settings[K]): void => {
+  const write = ++latestWrite
+  usePrefs.setState({ [key]: value } as Pick<Settings, K>)
+  setSettings({ [key]: value } as Partial<Settings>)
+    .then(merged => {
+      if (write === latestWrite) usePrefs.setState(sanitize(merged), true)
+    })
+    .catch(() => {})
+}
+
+// The palette command is a flip, so it resolves "system" first and then lands
+// on a concrete light/dark preference.
+export const toggleTheme = () => {
+  const next: Theme = resolveTheme(usePrefs.getState().theme) === 'dark' ? 'light' : 'dark'
+  setPref('theme', next)
+}
+
+// The theme is the one preference with a side effect outside React: the
+// document root's `data-theme`, which theme.css keys its tokens off.
+usePrefs.subscribe((state, previous) => {
+  if (state.theme !== previous.theme) applyTheme(state.theme)
+})
+
+// "System" has to keep following the OS, not just read it once at startup. No
+// matchMedia (jsdom) or a locked-down webview simply means the preference stops
+// tracking, which is what it did before anyway.
+try {
+  window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (usePrefs.getState().theme === 'system') applyTheme('system')
+  })
+} catch {
+  // No subscription; "system" stays on whatever it resolved to at load.
+}
+
+// The language is changed through i18next rather than through a row, so this
+// is where that choice becomes a stored preference — one listener, so a change
+// from anywhere is persisted the same way. The document's own `lang` is i18n's
+// half of the same event.
+//
+// Not during init: i18next fires the same event while starting in the locale
+// Rust resolved, and writing that back would pin an OS-following install
+// (`locale: null`) to whatever the OS said on first boot. Only a change made
+// once the app is up is a choice worth keeping.
+i18n.on('languageChanged', locale => {
+  if (i18n.isInitialized && locale !== usePrefs.getState().locale) setPref('locale', locale)
+})

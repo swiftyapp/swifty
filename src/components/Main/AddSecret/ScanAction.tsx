@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useStore, closeAddPicker } from '@/store'
+import { useUi, closeAddPicker } from '@/store'
 import { isMobile } from '@/lib/platform'
 import { pickAndScan } from '../Scan/pick'
 import { ScanGlyph } from '../icons'
@@ -16,7 +16,7 @@ import { ScanGlyph } from '../icons'
  */
 export default function ScanAction() {
   const { t } = useTranslation()
-  const supported = useStore(state => state.ui.scan.supported)
+  const supported = useUi(state => state.scanSupported)
 
   if (!supported) return null
 

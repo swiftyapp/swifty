@@ -37,8 +37,8 @@ export default function Body({ draft, type, revealed }: Props) {
       <Footer
         tags={tags}
         onTags={next => draft.set('tags', next)}
-        createdAt={revealed?.createdAt ?? revealed?.created_at}
-        updatedAt={revealed?.updatedAt ?? revealed?.updated_at}
+        createdAt={revealed?.createdAt}
+        updatedAt={revealed?.updatedAt}
       />
 
       {draft.saveError && (

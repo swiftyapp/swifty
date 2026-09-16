@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { useStore } from '@/store'
+import { useUi } from '@/store'
 import { useVariant, type Variant } from './variant'
 import {
   KindEmpty,
@@ -16,8 +16,8 @@ import {
 // saying it, and a second empty state next to it would just be noise.
 export default function ListEmpty() {
   const variant = useVariant()
-  const type = useStore(state => state.filters.type)
-  const query = useStore(state => state.filters.query)
+  const type = useUi(state => state.filterType)
+  const query = useUi(state => state.query)
 
   if (variant === 'search') return <SearchEmpty query={query.trim()} type={type} />
   // `kind` is unreachable without a filter, but the type still has to narrow.

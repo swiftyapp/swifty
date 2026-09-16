@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useCopied } from '@/hooks/useCopied'
+import { useDates } from '@/hooks/useDates'
 import { cx } from '@/utils/cx'
-import { formatDate } from '@/utils/time'
 import Paper from '@/components/elements/Face'
 import Cell from '@/components/elements/Face/Cell'
 import FaceIconButton from '@/components/elements/Face/IconButton'
@@ -24,6 +24,7 @@ import { hostPath, splitKey } from '../keyInfo'
 export default function Face() {
   const { t } = useTranslation()
   const { copied, copy } = useCopied()
+  const { formatDate } = useDates()
   const [shown, setShown] = useState(false)
   const key = useField('apiKey').value
   const environment = environmentOf(useField('environment').value.trim())

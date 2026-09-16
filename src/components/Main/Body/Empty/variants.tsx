@@ -1,17 +1,15 @@
 import type { EntryType } from '@/api/types'
 import { syncImport } from '@/api/sync'
-import { messageOf } from '@/api/errors'
 import {
-  useStore,
+  useApp,
   openAddPicker,
   openSettings,
   startEntry,
   setFilterQuery,
-  setFilterType,
-  syncFailed
+  setFilterType
 } from '@/store'
 import { kindOf } from '@/kinds'
-import { chord } from '@/utils/platform'
+import { chord } from '@/lib/platform'
 import { useTranslation } from 'react-i18next'
 import Logo from '@/assets/images/logo.svg?react'
 import EmptyState from '@/components/elements/EmptyState'
@@ -29,16 +27,16 @@ const Mark = ({ size }: { size: number }) => (
 // thing on screen worth looking at and it gets the full treatment.
 export function VaultEmpty() {
   const { t } = useTranslation()
-  const sync = useStore(state => state.sync)
+  const sync = useApp(state => state.sync)
 
   // The spinner runs off the store, not off the promise: the backend reports
-  // `sync:pending` when the consent page opens and `sync:connected`/`sync:error`
-  // when it hears back, then the pull's own events. On mobile `sync_import`
-  // resolves the moment Safari is on screen. On success the restored entries
-  // replace this screen; on failure the button has to come back rather than
-  // spin forever.
+  // every step through `sync:status` — the consent page opening, the answer,
+  // the pull. On mobile `sync_import` resolves the moment Safari is on screen,
+  // and a rejection has already been reported as status. On success the
+  // restored entries replace this screen; on failure the button comes back
+  // rather than spinning forever.
   const restore = () => {
-    syncImport().catch((error: unknown) => syncFailed(messageOf(error)))
+    syncImport().catch(() => {})
   }
 
   return (
@@ -53,7 +51,7 @@ export function VaultEmpty() {
         testid: 'create-first-entry-button'
       }}
       secondary={
-        sync.enabled
+        sync.configured
           ? {
               label: t('Restore from Google Drive'),
               onClick: restore,

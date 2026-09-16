@@ -8,16 +8,12 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
 use crate::models::EntryMetaDto;
+use crate::state::SyncStatus;
 use crate::sync::setup::PackInfo;
 
 pub const VAULT_LOCKED: &str = "vault:locked";
 pub const VAULT_MERGED: &str = "vault:merged";
-pub const SYNC_STARTED: &str = "sync:started";
-pub const SYNC_STOPPED: &str = "sync:stopped";
-pub const SYNC_PENDING: &str = "sync:pending";
-pub const SYNC_CONNECTED: &str = "sync:connected";
-pub const SYNC_DISCONNECTED: &str = "sync:disconnected";
-pub const SYNC_ERROR: &str = "sync:error";
+pub const SYNC_STATUS: &str = "sync:status";
 pub const IMPORT_PROGRESS: &str = "import:progress";
 pub const SETUP_DRIVE_PENDING: &str = "setup:drive:pending";
 pub const SETUP_DRIVE_PROBED: &str = "setup:drive:probed";
@@ -31,13 +27,6 @@ struct Entries {
 #[derive(Serialize, Clone)]
 struct ErrorText<'a> {
     error: &'a str,
-}
-
-/// A run that ended. `None` is the success: there is nothing else to say about
-/// one, and a separate flag would only be a second way to ask the same thing.
-#[derive(Serialize, Clone)]
-struct Ended {
-    error: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -60,28 +49,11 @@ pub fn vault_merged(app: &AppHandle, entries: Vec<EntryMetaDto>) {
     let _ = app.emit(VAULT_MERGED, Entries { entries });
 }
 
-pub fn sync_started(app: &AppHandle) {
-    let _ = app.emit(SYNC_STARTED, ());
-}
-
-pub fn sync_stopped(app: &AppHandle, error: Option<String>) {
-    let _ = app.emit(SYNC_STOPPED, Ended { error });
-}
-
-pub fn sync_pending(app: &AppHandle) {
-    let _ = app.emit(SYNC_PENDING, ());
-}
-
-pub fn sync_connected(app: &AppHandle) {
-    let _ = app.emit(SYNC_CONNECTED, ());
-}
-
-pub fn sync_disconnected(app: &AppHandle) {
-    let _ = app.emit(SYNC_DISCONNECTED, ());
-}
-
-pub fn sync_error(app: &AppHandle, error: &str) {
-    let _ = app.emit(SYNC_ERROR, ErrorText { error });
+/// The whole of sync, every time anything about it changes. One snapshot
+/// rather than one event per transition: the frontend stores it as-is, and
+/// neither side has to agree on an order of events.
+pub fn sync_status(app: &AppHandle, status: SyncStatus) {
+    let _ = app.emit(SYNC_STATUS, status);
 }
 
 pub fn import_progress(app: &AppHandle, done: usize, total: usize) {
