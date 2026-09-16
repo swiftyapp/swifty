@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import AuthShell from '@/components/elements/AuthShell'
 import Button from '@/components/elements/Button'
 import { META_TYPE } from '@/components/elements/tokens'
 import { useApp, setupDriveReset } from '@/store'
@@ -11,7 +10,6 @@ import { describeError } from '@/api/errors'
 import { connectDrive } from '../shared/driveSession'
 
 interface Props {
-  onBack: () => void
   /** Create the data here and now, with sync on if consent already landed. */
   onCreate: () => Promise<void>
   /** The probe found data in this Drive: that is a decision, not a step. */
@@ -23,7 +21,7 @@ interface Props {
 // Connecting is also how we find out whether this Google account already
 // holds data — so the answer to the probe, not the press, is what decides
 // where this goes next.
-export default function Sync({ onBack, onCreate, onConflict }: Props) {
+export default function Sync({ onCreate, onConflict }: Props) {
   const { t } = useTranslation()
   const drive = useApp(state => state.setupDrive)
   const [error, setError] = useState<string | null>(null)
@@ -82,9 +80,8 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
 
   if (drive.status === 'pending')
     return (
-      <AuthShell onBack={onBack}>
+      <>
         <StepHeader
-          progress={1}
           eyebrow={t('Get started · 2 of 2')}
           busy
           title={t('Connecting to Google Drive…')}
@@ -95,13 +92,12 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
             caption={t('Checking for existing data first')}
           />
         </div>
-      </AuthShell>
+      </>
     )
 
   return (
-    <AuthShell onBack={onBack}>
+    <>
       <StepHeader
-        progress={1}
         eyebrow={t('Get started · 2 of 2')}
         title={t('Back up to Google Drive')}
         body={t("Your data syncs to Google Drive, so a lost device isn't lost secrets.")}
@@ -131,6 +127,6 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
         {error ??
           `${t('Encrypted before it leaves this device')} · ${t('Switch off any time in Settings')}`}
       </p>
-    </AuthShell>
+    </>
   )
 }

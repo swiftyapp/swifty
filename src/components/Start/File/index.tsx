@@ -1,6 +1,5 @@
 import { useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import AuthShell from '@/components/elements/AuthShell'
 import Masterpass from '@/components/elements/Masterpass'
 import Button from '@/components/elements/Button'
 import type { UnlockResult } from '@/api/types'
@@ -14,7 +13,6 @@ import { unsealError } from '../shared/errors'
 import { fileNameOf } from '../shared/describe'
 
 interface Props {
-  onBack: () => void
   onRestored: (result: UnlockResult) => Promise<void>
 }
 
@@ -22,7 +20,7 @@ interface Props {
 // master password it was sealed under. Desktop only — a phone has nowhere to
 // drag a file from, and the backup it would need was saved on a machine that
 // does.
-export default function File({ onBack, onRestored }: Props) {
+export default function File({ onRestored }: Props) {
   const { t } = useTranslation()
   const [path, setPath] = useState<string | null>(null)
   const [password, setPassword] = useState('')
@@ -48,9 +46,8 @@ export default function File({ onBack, onRestored }: Props) {
 
   if (path === null)
     return (
-      <AuthShell onBack={onBack}>
+      <>
         <StepHeader
-          progress={0.5}
           eyebrow={t('Restore · Backup file')}
           title={t('Pick your backup')}
           body={t('Exported from Settings on another device.')}
@@ -58,13 +55,12 @@ export default function File({ onBack, onRestored }: Props) {
         <div className={`${COLUMN} mt-9`}>
           <DropZone onPick={setPath} />
         </div>
-      </AuthShell>
+      </>
     )
 
   return (
-    <AuthShell onBack={onBack}>
+    <>
       <StepHeader
-        progress={0.5}
         eyebrow={t('Restore · Backup file')}
         title={t('Unlock your backup')}
         body={t('Use the master password you had when this backup was made.')}
@@ -101,6 +97,6 @@ export default function File({ onBack, onRestored }: Props) {
           {t('Pick another file')}
         </TextLink>
       </div>
-    </AuthShell>
+    </>
   )
 }

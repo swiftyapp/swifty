@@ -51,6 +51,17 @@
     transform: none;
   }
 }
+/* The same arrival from the left: a step the user has come back to. */
+@keyframes sheet-back {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 /* A screen arriving from the bottom edge — the phone shell's slide-up form. */
 @keyframes rise {
   from {
@@ -425,6 +436,7 @@
   --animate-fade: fade 160ms var(--ease-swift) both;
   --animate-pop: pop 160ms var(--ease-swift) both;
   --animate-sheet: sheet 160ms var(--ease-swift) both;
+  --animate-sheet-back: sheet-back 160ms var(--ease-swift) both;
   --animate-rise: rise 300ms var(--ease-swift) both;
   --animate-unfold: unfold 300ms var(--ease-swift) both;
 }

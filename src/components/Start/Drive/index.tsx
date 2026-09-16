@@ -1,6 +1,5 @@
 import { useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import AuthShell from '@/components/elements/AuthShell'
 import Masterpass from '@/components/elements/Masterpass'
 import Button from '@/components/elements/Button'
 import { isMobile } from '@/lib/platform'
@@ -18,7 +17,6 @@ import { useDates } from '@/hooks/useDates'
 import { connectDrive, switchDriveAccount } from '../shared/driveSession'
 
 interface Props {
-  onBack: () => void
   /** Nothing in this account: go and make some, with sync already wired up. */
   onStartFresh: () => void
   /** Desktop's other route in, for a Drive that is not where the data is. */
@@ -30,7 +28,7 @@ interface Props {
 // store — pending while consent is out with the browser, then one of found,
 // empty or failed — so a result that arrives while the user is reading simply
 // redraws the screen.
-export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: Props) {
+export default function Drive({ onStartFresh, onUseFile, onRestored }: Props) {
   const { t } = useTranslation()
   const dates = useDates()
   const drive = useApp(state => state.setupDrive)
@@ -79,9 +77,8 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
 
   if (drive.status === 'error')
     return (
-      <AuthShell onBack={onBack}>
+      <>
         <StepHeader
-          progress={0.5}
           eyebrow={t('Restore · Google Drive')}
           tone="bad"
           title={t('Google Drive did not answer')}
@@ -93,14 +90,13 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
           </Button>
         </div>
         {links}
-      </AuthShell>
+      </>
     )
 
   if (drive.status === 'empty')
     return (
-      <AuthShell onBack={onBack}>
+      <>
         <StepHeader
-          progress={0.5}
           eyebrow={t('Restore · Google Drive')}
           title={t('Nothing here yet')}
           body={t('This Google account has no Rowel data. Start fresh and it will sync here.')}
@@ -111,14 +107,13 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
           </Button>
         </div>
         {links}
-      </AuthShell>
+      </>
     )
 
   if (drive.status !== 'found')
     return (
-      <AuthShell onBack={onBack}>
+      <>
         <StepHeader
-          progress={0.5}
           eyebrow={t('Restore · Google Drive')}
           busy
           title={t('Looking for your data…')}
@@ -126,13 +121,12 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
         <div className={`${COLUMN} mt-9`}>
           <SpinnerCard testid="drive-spinner" caption={t('Waiting for Google…')} />
         </div>
-      </AuthShell>
+      </>
     )
 
   return (
-    <AuthShell onBack={onBack}>
+    <>
       <StepHeader
-        progress={0.5}
         eyebrow={t('Restore · Google Drive')}
         title={t('Welcome back.')}
         body={t('Enter your master password to unlock on this device.')}
@@ -168,6 +162,6 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
       </div>
 
       {links}
-    </AuthShell>
+    </>
   )
 }

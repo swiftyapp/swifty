@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next'
-import AuthShell from '@/components/elements/AuthShell'
 import Button from '@/components/elements/Button'
 import GoogleDriveMark from '@/components/elements/GoogleDriveMark'
 import { LABEL } from '@/components/elements/tokens'
@@ -24,7 +23,7 @@ export default function Welcome({ onFresh, onDrive, onFile }: Props) {
   const { t } = useTranslation()
 
   return (
-    <AuthShell>
+    <>
       <StepHeader
         eyebrow={t('Welcome')}
         title={t('Keep your secrets to yourself.')}
@@ -65,6 +64,6 @@ export default function Welcome({ onFresh, onDrive, onFile }: Props) {
           />
         )}
       </div>
-    </AuthShell>
+    </>
   )
 }
