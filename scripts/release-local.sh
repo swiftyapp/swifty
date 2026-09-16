@@ -27,6 +27,11 @@ set +a
 # Same npm/crate agreement check the release build enforces, but fails fast.
 bun scripts/check-tauri-versions.mjs
 
+# Same preflight the release workflow runs. An entitlement no embedded profile
+# grants produces a bundle that signs and notarizes but cannot be launched, so
+# catch it here rather than after the notary service round-trip.
+bun scripts/check-macos-entitlements.mjs
+
 # Ensure both arch targets exist for the universal lipo.
 rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null 2>&1 || true
 
