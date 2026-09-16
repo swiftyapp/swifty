@@ -538,5 +538,16 @@
   "No API keys yet": "API-ключей пока нет",
   "No matches for “{{query}}” in SSH keys": "Ничего не найдено по запросу «{{query}}» среди SSH-ключей",
   "No matches for “{{query}}” in env files": "Ничего не найдено по запросу «{{query}}» среди env-файлов",
-  "No matches for “{{query}}” in API keys": "Ничего не найдено по запросу «{{query}}» среди API-ключей"
+  "No matches for “{{query}}” in API keys": "Ничего не найдено по запросу «{{query}}» среди API-ключей",
+  "Personal": "Личное",
+  "Workspaces": "Рабочие пространства",
+  "Workspace name": "Название пространства",
+  "New workspace": "Новое рабочее пространство",
+  "Add a workspace": "Добавить рабочее пространство",
+  "Current": "Текущее",
+  "Switch": "Переключиться",
+  "Create": "Создать",
+  "Fill in the name": "Введите название",
+  "Sync is available in the primary workspace only.": "Синхронизация доступна только в основном рабочем пространстве.",
+  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "Каждое рабочее пространство — это отдельная зашифрованная база данных со своим мастер-паролем. Синхронизация и разблокировка по биометрии пока остаются в основном рабочем пространстве."
 }

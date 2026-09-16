@@ -522,5 +522,16 @@
   "No API keys yet": "Henüz API anahtarı yok",
   "No matches for “{{query}}” in SSH keys": "SSH anahtarlarında “{{query}}” için sonuç yok",
   "No matches for “{{query}}” in env files": "Env dosyalarında “{{query}}” için sonuç yok",
-  "No matches for “{{query}}” in API keys": "API anahtarlarında “{{query}}” için sonuç yok"
+  "No matches for “{{query}}” in API keys": "API anahtarlarında “{{query}}” için sonuç yok",
+  "Personal": "Kişisel",
+  "Workspaces": "Çalışma alanları",
+  "Workspace name": "Çalışma alanı adı",
+  "New workspace": "Yeni çalışma alanı",
+  "Add a workspace": "Çalışma alanı ekle",
+  "Current": "Şu anki",
+  "Switch": "Geçiş yap",
+  "Create": "Oluştur",
+  "Fill in the name": "Bir ad girin",
+  "Sync is available in the primary workspace only.": "Eşitleme yalnızca birincil çalışma alanında kullanılabilir.",
+  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "Her çalışma alanı, kendi ana şifresi olan ayrı bir şifreli veritabanıdır. Eşitleme ve biyometrik kilit açma şimdilik birincil çalışma alanınızda kalır."
 }
