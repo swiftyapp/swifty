@@ -17,12 +17,18 @@ export function useStrength(password: string): Strength | null {
       return
     }
     // `evaluate` is async now, so a result can land after the password moved on;
-    // the flag drops anything the cleanup has already disowned.
+    // the flag drops anything the cleanup has already disowned. A load that
+    // fails leaves the meter empty — the field still works without it, and the
+    // next keystroke asks again.
     let alive = true
     const id = setTimeout(() => {
-      void evaluate(password).then(result => {
-        if (alive) setStrength(result)
-      })
+      evaluate(password)
+        .then(result => {
+          if (alive) setStrength(result)
+        })
+        .catch(() => {
+          if (alive) setStrength(null)
+        })
     }, 0)
     return () => {
       alive = false

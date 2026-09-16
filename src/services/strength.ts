@@ -14,10 +14,16 @@ export interface Strength {
 }
 
 // One promise for the process: the first caller pays for the chunk, everyone
-// after gets the already-resolved module.
+// after gets the already-resolved module. A failed load is forgotten rather
+// than kept, so the next caller asks again instead of inheriting the rejection
+// for the rest of the session.
 let engine: Promise<typeof import('./strengthEngine')> | null = null
 
-const load = () => (engine ??= import('./strengthEngine'))
+const load = () =>
+  (engine ??= import('./strengthEngine').catch((error: unknown) => {
+    engine = null
+    throw error
+  }))
 
 export const evaluate = async (password: string): Promise<Strength> => {
   const { zxcvbn } = await load()
