@@ -14,7 +14,7 @@ use crate::secure_store::{self, GateMode, KeyStore};
 use crate::session::{derive_key, open_with_key, unlock_with_password};
 use crate::state::AppState;
 use crate::store::SqliteStore;
-use crate::{biometrics, crypto, storage};
+use crate::{autolock, biometrics, crypto, storage};
 use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
@@ -227,17 +227,19 @@ pub async fn change_master_password(
     // single most expensive thing this app does.
     let (current_key, new_key, params) = derive_both(&app, current, new).await?;
 
-    // Own the open store + key for the duration so we can drop and restore them.
-    let (store, old_key) = {
+    // Take the key and store out on a lease for the duration. A lock that lands
+    // while they are away — the user's, or the auto-lock's, which sees the
+    // vault as live throughout — ends the session, and `adopt` below refuses
+    // to put the vault back on top of it.
+    let lease = {
         let mut session = state.session.lock().unwrap();
         // Verify the current password reproduces the unlocked session key.
         if current_key.sqlcipher_key() != session.key()?.sqlcipher_key() {
             return Err(Error::InvalidPassword);
         }
-        let store = session.store.take().ok_or(Error::Locked)?;
-        let old_key = session.key.take().ok_or(Error::Locked)?;
-        (store, old_key)
+        session.take_out()?
     };
+    let (old_key, store, sync_configured, claim) = lease.split();
     // The Drive token is sealed under the *old* key and has to be re-sealed
     // after the change; the key itself is about to be moved into the saga.
     let old_cryptor = old_key.cryptor();
@@ -253,10 +255,20 @@ pub async fn change_master_password(
     let (new_key, store) = match rekeyed {
         Ok(changed) => changed,
         Err(rollback) => {
-            let mut session = state.session.lock().unwrap();
             match rollback.restored {
-                Some((key, store)) => session.set_keyed(key, store),
-                None => session.clear(),
+                // Back as it was — unless a lock landed meanwhile, in which
+                // case the vault stays locked and the reopened store is dropped.
+                Some((key, store)) => {
+                    state
+                        .session
+                        .lock()
+                        .unwrap()
+                        .adopt(claim, key, store, sync_configured);
+                }
+                // Even the rollback could not reopen the vault: there is no
+                // session to hand back, so it ends, and the webview is told
+                // rather than left looking at a vault that is no longer open.
+                None => autolock::lock(&app),
             }
             return Err(rollback.error);
         }
@@ -275,8 +287,20 @@ pub async fn change_master_password(
     let stale_enrollment = storage::biometric_enrolled(&app)
         .then(|| Zeroizing::new(new_key.biometric_material().to_vec()));
 
-    // Adopt the new key + store for the live session.
-    state.session.lock().unwrap().set_keyed(new_key, store);
+    // Adopt the new key + store as the continuation of the session the lease
+    // came from. Refused when a lock landed while the saga ran: the change is
+    // on disk either way and the next unlock takes the new password, but the
+    // vault stays locked rather than reopening behind the user's back.
+    let adopted = state
+        .session
+        .lock()
+        .unwrap()
+        .adopt(claim, new_key, store, sync_configured);
+    if !adopted {
+        log::info!(
+            "vault locked during the password change; the new key waits for the next unlock"
+        );
+    }
 
     // The biometric-stored key is now stale; re-store the new material or clear
     // it. Re-storing is a fresh enrollment, so the gate is decided again and the

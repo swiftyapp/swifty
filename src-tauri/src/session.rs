@@ -9,23 +9,89 @@ use crate::models::EntryMetaDto;
 use crate::storage;
 use crate::store::{EntryMeta, Record, SqliteStore, StoreError, VaultStore};
 
+/// Which session the vault is in.
+///
+/// Advanced every time the key changes hands — an unlock, a lock, a password
+/// change, a workspace switch, a whole-vault operation taking the store out —
+/// so work prepared against one session can tell, at the moment it writes,
+/// that the session it was prepared for is no longer the one in front of it.
+/// The alternative, holding the session mutex from preparation to write, is
+/// what stalled every single-row command behind an import or a rekey.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Epoch(u64);
+
+/// The key and store, out of the session for a whole-vault operation (a
+/// password change, a workspace being created beside it).
+///
+/// While a lease is out the session reads as locked to every other command
+/// and as *live* to the auto-lock (`Session::is_live`), so a blur still arms
+/// the timer and a lock still ends the session. Handing the lease back —
+/// [`Session::restore`] as it was, or [`Session::adopt`] as what it became —
+/// only succeeds if nothing ended the session in between; otherwise the vault
+/// stays as the lock left it and the key is dropped, not re-installed.
+pub struct Lease {
+    pub key: VaultKey,
+    pub store: SqliteStore,
+    sync_configured: bool,
+    claim: Claim,
+}
+
+/// Proof that a lease was taken from a particular session, kept by the
+/// operation while the key and store themselves are away being worked on.
+pub struct Claim {
+    epoch: Epoch,
+}
+
+impl Lease {
+    /// The key and store to work on, and the claim to hand the result back with.
+    pub fn split(self) -> (VaultKey, SqliteStore, bool, Claim) {
+        (self.key, self.store, self.sync_configured, self.claim)
+    }
+}
+
 // In-memory session. The vault key never leaves Rust; the frontend only ever
 // receives non-secret entry metadata for the list and one decrypted entry at a
 // time (reveal). The open, encrypted store handle lives here — not a decrypted
 // vault — so plaintext secrets are never all held in memory.
+//
+// The key and store are private on purpose: the only way to take them out of a
+// live session is a [`Lease`], which is what lets a lock that lands while they
+// are away win over the operation that took them.
 #[derive(Default)]
 pub struct Session {
     // The active vault key (Argon2id master or legacy secret). It owns its own
     // zeroize-on-drop, so the material is scrubbed on lock/clear/replace.
-    pub key: Option<VaultKey>,
+    key: Option<VaultKey>,
     // The open SQLCipher store. Dropped (connection closed) on lock.
-    pub store: Option<SqliteStore>,
+    store: Option<SqliteStore>,
     pub sync_configured: bool,
+    epoch: u64,
+    // A lease is out. Reads as locked to commands, as live to the auto-lock.
+    held_out: bool,
 }
 
 impl Session {
     pub fn is_unlocked(&self) -> bool {
         self.key.is_some()
+    }
+
+    /// Unlocked, or held out by an operation that means to hand it back: there
+    /// is a session to lock. What the auto-lock asks, so a blur during a rekey
+    /// still arms the timer, and a timer that fires still ends the session the
+    /// rekey would otherwise have restored past its timeout.
+    pub fn is_live(&self) -> bool {
+        self.key.is_some() || self.held_out
+    }
+
+    pub fn epoch(&self) -> Epoch {
+        Epoch(self.epoch)
+    }
+
+    // The key is changing hands: whatever was prepared against the old session
+    // is stale, and any lease out is orphaned.
+    fn advance(&mut self) {
+        self.epoch += 1;
+        self.held_out = false;
     }
 
     // The held vault key, or fail if locked.
@@ -49,26 +115,79 @@ impl Session {
         self.store.as_ref().ok_or(Error::Locked)
     }
 
+    /// The open store, provided this is still the session `epoch` was read
+    /// from. What a write that was prepared outside the lock — records sealed
+    /// under a cipher captured earlier — asks for: a password change that
+    /// landed in between re-keyed the vault, and rows sealed under the old key
+    /// would be accepted by the new store and never open again.
+    pub fn store_at(&self, epoch: Epoch) -> Result<&SqliteStore> {
+        if self.epoch() != epoch {
+            return Err(Error::StaleSession);
+        }
+        self.store()
+    }
+
     // Adopt the derived key and open store for this session.
     pub fn set(&mut self, key: VaultKey, store: SqliteStore, sync_configured: bool) {
+        self.advance();
         self.key = Some(key);
         self.store = Some(store);
         self.sync_configured = sync_configured;
     }
 
-    // Re-adopt a key + store, leaving sync_configured untouched. Used by
-    // change-master-password's success and rollback paths, where the store is
-    // taken out of the session and later put back (or replaced by a restore).
-    pub fn set_keyed(&mut self, key: VaultKey, store: SqliteStore) {
-        self.key = Some(key);
-        self.store = Some(store);
-    }
-
-    // Drop the in-memory key and close the store. Used by the inactivity auto-lock.
+    // Drop the in-memory key and close the store. Every lock path ends here,
+    // including one that lands while a lease is out: the lease then has nothing
+    // to come back to.
     pub fn clear(&mut self) {
+        self.advance();
         self.key = None;
         self.store = None;
         self.sync_configured = false;
+    }
+
+    /// Take the key and store out for a whole-vault operation. Fails if locked.
+    pub fn take_out(&mut self) -> Result<Lease> {
+        let key = self.key.take().ok_or(Error::Locked)?;
+        let store = self.store.take().ok_or(Error::Locked)?;
+        let sync_configured = self.sync_configured;
+        self.advance();
+        self.held_out = true;
+        Ok(Lease {
+            key,
+            store,
+            sync_configured,
+            claim: Claim {
+                epoch: self.epoch(),
+            },
+        })
+    }
+
+    /// Install `key` and `store` as the continuation of the session `claim` was
+    /// taken from — a rekeyed vault, or a new one created beside it. Only if
+    /// nothing ended that session in between: a lock that landed while the
+    /// lease was out wins, the material is dropped here, and the vault stays
+    /// locked. Returns whether it was adopted.
+    pub fn adopt(
+        &mut self,
+        claim: Claim,
+        key: VaultKey,
+        store: SqliteStore,
+        sync_configured: bool,
+    ) -> bool {
+        if !self.held_out || self.epoch() != claim.epoch {
+            return false;
+        }
+        self.held_out = false;
+        self.key = Some(key);
+        self.store = Some(store);
+        self.sync_configured = sync_configured;
+        true
+    }
+
+    /// Put a lease back exactly as it was taken, under the same rule as `adopt`.
+    pub fn restore(&mut self, lease: Lease) -> bool {
+        let (key, store, sync_configured, claim) = lease.split();
+        self.adopt(claim, key, store, sync_configured)
     }
 }
 
@@ -393,5 +512,118 @@ mod lock_scope {
             at(&body, "super::blocking(") < at(&body, "to_imported"),
             "unsealing every entry is a pass over the whole vault — off the worker"
         );
+    }
+}
+
+// The rule every whole-vault operation relies on: a lock that lands while the
+// key is out wins, and a write prepared against an earlier session is refused.
+#[cfg(test)]
+mod epoch_tests {
+    use super::*;
+
+    fn key(password: &str) -> VaultKey {
+        VaultKey::legacy_from_password(password)
+    }
+
+    fn store_in(dir: &tempfile::TempDir, key: &VaultKey) -> SqliteStore {
+        SqliteStore::open(&dir.path().join("vault.db"), &key.sqlcipher_key()).unwrap()
+    }
+
+    fn unlocked(dir: &tempfile::TempDir) -> Session {
+        let key = key("first");
+        let store = store_in(dir, &key);
+        let mut session = Session::default();
+        session.set(key, store, true);
+        session
+    }
+
+    #[test]
+    fn an_undisturbed_lease_comes_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut session = unlocked(&dir);
+        let before = session.epoch();
+
+        let lease = session.take_out().unwrap();
+        assert!(
+            !session.is_unlocked(),
+            "reads as locked while the key is out"
+        );
+        assert!(session.is_live(), "but as live to the auto-lock");
+        assert!(matches!(session.store(), Err(Error::Locked)));
+
+        assert!(session.restore(lease));
+        assert!(session.is_unlocked());
+        assert!(session.sync_configured, "restored as it was");
+        assert_ne!(
+            session.epoch(),
+            before,
+            "taking the key out is a change of hands"
+        );
+    }
+
+    #[test]
+    fn a_lock_while_the_key_is_out_wins() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut session = unlocked(&dir);
+        let lease = session.take_out().unwrap();
+
+        // The user, or the auto-lock, ends the session meanwhile.
+        session.clear();
+        assert!(!session.is_live());
+
+        assert!(!session.restore(lease), "nothing to come back to");
+        assert!(!session.is_unlocked());
+        assert!(!session.is_live());
+    }
+
+    #[test]
+    fn a_rekeyed_vault_continues_the_session_only_if_it_is_still_there() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut session = unlocked(&dir);
+        let (_, store, sync_configured, claim) = session.take_out().unwrap().split();
+        let rekeyed = key("second");
+
+        assert!(session.adopt(claim, rekeyed, store, sync_configured));
+        assert_eq!(
+            session.key().unwrap().sqlcipher_key(),
+            key("second").sqlcipher_key()
+        );
+
+        let (_, store, sync_configured, claim) = session.take_out().unwrap().split();
+        session.clear();
+        assert!(!session.adopt(claim, key("third"), store, sync_configured));
+        assert!(!session.is_unlocked());
+    }
+
+    #[test]
+    fn a_write_prepared_against_an_earlier_session_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut session = unlocked(&dir);
+        let prepared = session.epoch();
+        assert!(session.store_at(prepared).is_ok());
+
+        // A password change: the key goes out and a new one comes back.
+        let (_, store, sync_configured, claim) = session.take_out().unwrap().split();
+        session.adopt(claim, key("second"), store, sync_configured);
+
+        assert!(matches!(
+            session.store_at(prepared),
+            Err(Error::StaleSession)
+        ));
+        assert!(session.store_at(session.epoch()).is_ok());
+
+        // A lock and a fresh unlock are a new session too. (A different vault:
+        // the file above is still keyed with "first", and SQLCipher will not
+        // open it under another key.)
+        let prepared = session.epoch();
+        session.clear();
+        let other = tempfile::tempdir().unwrap();
+        let key = key("first");
+        let store = store_in(&other, &key);
+        session.set(key, store, false);
+        assert!(matches!(
+            session.store_at(prepared),
+            Err(Error::StaleSession)
+        ));
     }
 }

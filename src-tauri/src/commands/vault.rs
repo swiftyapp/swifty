@@ -109,7 +109,14 @@ pub async fn import_swftx(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SwftxReport> {
-    let cur_cipher = state.session.lock().unwrap().payload_cipher()?;
+    // The cipher and the session it belongs to: the merge below is accepted
+    // only by that session (`Session::store_at`), so a password change landing
+    // during the re-seal cannot leave rows sealed under a key the vault no
+    // longer has.
+    let (cur_cipher, epoch) = {
+        let session = state.session.lock().unwrap();
+        (session.payload_cipher()?, session.epoch())
+    };
 
     // The file read, the source decrypt and the re-seal loop are one hop onto
     // the blocking pool: a backup is the whole vault, and both halves are as
@@ -136,7 +143,7 @@ pub async fn import_swftx(
 
     // Merge into the open store (upsert by id).
     let session = state.session.lock().unwrap();
-    let store = session.store()?;
+    let store = session.store_at(epoch)?;
     for record in &records {
         store.upsert(record).map_err(store_err)?;
     }

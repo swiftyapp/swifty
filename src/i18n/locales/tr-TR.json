@@ -547,5 +547,6 @@
   "A workspace needs a name": "Çalışma alanının bir adı olmalı",
   "A workspace needs a master password": "Çalışma alanının bir ana şifresi olmalı",
   "This file is too large": "Bu dosya çok büyük",
-  "This file is not text": "Bu dosya bir metin dosyası değil"
+  "This file is not text": "Bu dosya bir metin dosyası değil",
+  "The vault changed while this was running. Try again.": "İşlem sırasında kasa değişti. Yeniden deneyin."
 }

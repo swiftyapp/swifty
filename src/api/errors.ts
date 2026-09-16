@@ -11,6 +11,7 @@ export type BackendErrorKind =
   | 'vaultTooNew'
   | 'tooManyAttempts'
   | 'locked'
+  | 'staleSession'
   | 'notFound'
   | 'cancelled'
   | 'syncNotConfigured'
@@ -85,6 +86,8 @@ export const describeError = (error: unknown): string => {
       })
     case 'locked':
       return t('Vault is locked')
+    case 'staleSession':
+      return t('The vault changed while this was running. Try again.')
     case 'notFound':
       return t('Item not found')
     case 'cancelled':

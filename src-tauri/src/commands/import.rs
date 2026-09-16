@@ -78,17 +78,22 @@ pub async fn import_entries(
 ) -> Result<ImportReport> {
     // Taken before the file work, so a locked vault is turned away at once
     // instead of after parsing. A preview writes nothing and needs no cipher,
-    // which is what lets it run on a vault that is not open.
-    let cipher = match dry_run {
-        true => None,
-        false => Some(state.session.lock().unwrap().payload_cipher()?),
+    // which is what lets it run on a vault that is not open. The epoch comes
+    // with the cipher: the write below is only accepted by the session the
+    // cipher belongs to (see `Session::store_at`).
+    let (cipher, epoch) = match dry_run {
+        true => (None, None),
+        false => {
+            let session = state.session.lock().unwrap();
+            (Some(session.payload_cipher()?), Some(session.epoch()))
+        }
     };
 
     let emitter = app.clone();
     let parsed = super::blocking(move || -> Result<Parsed> {
         let meta = fs::metadata(&path)?;
         if meta.len() > MAX_BYTES {
-            return Err(Error::Other("file too large to import".into()));
+            return Err(Error::FileTooLarge);
         }
         let bytes = fs::read(&path)?;
 
@@ -143,7 +148,10 @@ pub async fn import_entries(
     }
 
     let session = state.session.lock().unwrap();
-    let store = session.store()?;
+    let store = match epoch {
+        Some(epoch) => session.store_at(epoch)?,
+        None => session.store()?,
+    };
     for record in &parsed.records {
         store.upsert(record).map_err(store_err)?;
     }
