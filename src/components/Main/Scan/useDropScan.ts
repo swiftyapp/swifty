@@ -1,16 +1,14 @@
-import { useEffect, useState } from 'react'
-import { getCurrentWebview } from '@tauri-apps/api/webview'
-import { isMobile } from '@/lib/platform'
-import { dialogOpen } from '@/utils/dialogOpen'
+import { useState } from 'react'
+import { isModalOpen } from '@/store'
+import { useWebviewDragDrop } from '@/hooks/useWebviewDragDrop'
 import { firstImage } from './fields'
 import { runScan } from './run'
 
 /**
  * The whole unlocked window as a drop target for card and document photos.
  *
- * Files arrive as OS paths through the webview's drag-drop event rather than as
- * a browser DataTransfer, so this is the same listener the Import drop zone
- * uses (see `Settings/Sections/Import/DropZone`) — one per surface, each
+ * The same webview stream the Import drop zone listens on (see
+ * `Settings/Sections/Import/DropZone`) — one subscription per surface, each
  * minding its own file types. Only images are ours; an export file dropped
  * anywhere still belongs to Import.
  *
@@ -20,45 +18,26 @@ import { runScan } from './run'
 export function useDropScan(enabled: boolean): boolean {
   const [over, setOver] = useState(false)
 
-  useEffect(() => {
-    // Nothing drags a photo onto a phone; there the way in is the picker in
-    // `AddSecret/ScanAction`, which opens the Photos library (see `pick.ts`).
-    if (!enabled || isMobile) return
-    let alive = true
-    let unlisten: (() => void) | undefined
+  useWebviewDragDrop(payload => {
+    // A modal owns the window while it is up, and the one with a drop zone in
+    // it (Settings › Import) means something else by a drop.
+    if (isModalOpen()) return
 
-    getCurrentWebview()
-      .onDragDropEvent(({ payload }) => {
-        // A modal owns the window while it is up, and the one with a drop
-        // zone in it (Settings › Import) means something else by a drop.
-        if (dialogOpen()) return
-
-        if (payload.type === 'enter') {
-          setOver(!!firstImage(payload.paths))
-          return
-        }
-        if (payload.type === 'leave') {
-          setOver(false)
-          return
-        }
-        if (payload.type === 'drop') {
-          setOver(false)
-          const image = firstImage(payload.paths)
-          if (image) void runScan(image)
-        }
-        // `over` fires without paths, so what `enter` decided still stands.
-      })
-      .then(stop => {
-        if (alive) unlisten = stop
-        else stop()
-      })
-      .catch(() => {})
-
-    return () => {
-      alive = false
-      unlisten?.()
+    if (payload.type === 'enter') {
+      setOver(!!firstImage(payload.paths))
+      return
     }
-  }, [enabled])
+    if (payload.type === 'leave') {
+      setOver(false)
+      return
+    }
+    if (payload.type === 'drop') {
+      setOver(false)
+      const image = firstImage(payload.paths)
+      if (image) void runScan(image)
+    }
+    // `over` fires without paths, so what `enter` decided still stands.
+  }, enabled)
 
   return over
 }

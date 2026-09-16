@@ -2,8 +2,8 @@ import { useEffect } from 'react'
 import type { Entry, EntryMeta } from '@/api/types'
 import type { TKey } from '@/i18n'
 import { kindOf } from '@/kinds'
+import { isModalOpen } from '@/store'
 import { useCopied } from '@/hooks/useCopied'
-import { dialogOpen } from '@/utils/dialogOpen'
 
 // Enter is the detail's accelerator for the primary action, but only as a bare
 // press outside any interactive control or open dialog — anywhere else the key
@@ -52,7 +52,7 @@ export function usePrimaryAction(entry: EntryMeta, revealed: Entry | null): Prim
   useEffect(() => {
     if (!secret) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!isPlainEnter(e) || inInteractive(e.target) || dialogOpen()) return
+      if (!isPlainEnter(e) || inInteractive(e.target) || isModalOpen()) return
       e.preventDefault()
       copy(secret)
     }

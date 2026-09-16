@@ -4,9 +4,10 @@ import { appStatus, type AppStatus } from '@/api/app'
 import { lock } from '@/api/auth'
 import type { SetupDriveFile } from '@/api/setup'
 import { syncNow, type SyncStatus } from '@/api/sync'
-import { checkForUpdate } from '@/services/autoUpdate'
+import { checkForUpdate } from '@/api/autoUpdate'
+import { resetFavicons } from '@/hooks/useFavicon'
 import { setEntries, resetVault, runAudit } from './vault'
-import { setScanSupported, resetUi } from './ui'
+import { resetUi } from './ui'
 
 /**
  * State that lives as long as the app does, across locks: which flow is on
@@ -42,7 +43,13 @@ export interface AppState {
   /**
    * The backend's sync status, verbatim. It owns every flow — it opens the
    * browser, hears back from it, runs the sync — so it is the one that can say;
-   * every change arrives whole as `sync:status` and is stored as-is.
+   * every change arrives whole as `sync:status` and is stored as-is, and the
+   * launch probe carries the same snapshot to start from (`status.sync`).
+   *
+   * The one place "does this vault sync" is read from. It used to be two — a
+   * copy on `status` that only the probe refreshed, and this — so connecting
+   * Drive in Settings left the footer on the same screen saying the vault was
+   * local until the next lock.
    */
   sync: SyncStatus
   /**
@@ -67,7 +74,14 @@ export const initialApp: AppState = {
   // biometric is drawn before the probe answers.
   flow: 'auth',
   status: null,
-  sync: { configured: false, pending: false, inProgress: false, error: null, lastSyncedAt: null },
+  sync: {
+    configured: false,
+    pending: false,
+    inProgress: false,
+    error: null,
+    lastSyncedAt: null,
+    seq: 0
+  },
   setupDrive: DRIVE_IDLE,
   update: { readyVersion: null, readyNotes: null, status: null }
 }
@@ -76,8 +90,32 @@ export const useApp = create<AppState>()(() => initialApp)
 
 // --- launch probe -----------------------------------------------------------------
 
-/** Take the boot probe's answer wholesale (see `boot.ts`). */
-export const setApp = (status: AppStatus) => useApp.setState({ status })
+/**
+ * Take the boot probe's answer wholesale (see `boot.ts`). `sync` is lifted out
+ * of it into its own slot rather than read off `status`: the probe is only one
+ * of the two things that report sync, and the events that report the rest write
+ * here too — so its snapshot goes through the same ordering they do.
+ */
+export const setApp = (status: AppStatus) =>
+  useApp.setState(state => ({ status, sync: newer(state.sync, status.sync) }))
+
+/**
+ * Of two sync snapshots, the one the backend produced later. The probe and the
+ * `sync:status` event are two routes for the same fact, and a probe taken just
+ * before a transition can resolve after the event that transition emitted;
+ * without this it would put the older state back on screen. Equal sequence
+ * numbers mean the same transition, and the incoming copy is taken so a
+ * `configured` that changed without a transition still lands.
+ */
+const newer = (held: SyncStatus, incoming: SyncStatus): SyncStatus =>
+  incoming.seq >= held.seq ? incoming : held
+
+/**
+ * Whether this platform has a text recognizer at all — a build-time fact about
+ * the OS, so it is read off the probe rather than copied into the session's own
+ * state and re-asked on every unlock.
+ */
+export const useScanSupported = () => useApp(state => state.status?.scanSupported ?? false)
 
 /**
  * Ask again, after something that can change the answer: an unlock, a lock, an
@@ -108,30 +146,31 @@ export const showLockScreen = () => refreshApp().then(() => flowAuth())
 // it — it outlives the session otherwise, and the next unlock (of this or any
 // other vault) opens onto the previous one's rows. Session-shaped state (flow,
 // sync, update, prefs, locale) is deliberately kept.
+//
+// The favicon cache goes with them: it is keyed by hostname and holds the icons
+// of the rows that were on screen, so leaving it would carry one vault's sites
+// into the next unlock — of this vault or of another workspace.
 export const clearSession = () => {
   resetVault()
   resetUi()
+  resetFavicons()
   cancelScheduledSync()
 }
 
-// Manual lock, from anywhere (top chrome, Settings, palette). Autolock takes
-// the same path via the vault:locked event (events.ts).
-export const lockVault = () =>
-  lock().finally(() => {
-    clearSession()
-    return showLockScreen()
-  })
+// Manual lock, from anywhere (top chrome, Settings, palette). Nothing to do
+// here but ask: the backend emits `vault:locked` for every lock there is, and
+// the single reaction to it (events.ts) drops the session and shows the lock
+// screen — for this, for the autolock, for the tray and for a workspace switch.
+export const lockVault = () => lock().catch(() => {})
 
 export const enterMain = async (result: UnlockResult) => {
   setEntries(result.entries)
   flowMain()
   // The unlock result carries whether this vault syncs; everything else about
-  // sync arrives as `sync:status` once a flow or a run happens.
+  // sync arrives as `sync:status` once a flow or a run happens. No re-probe:
+  // `initialized` and `scanSupported` cannot have changed, and this is the one
+  // answer an unlock does change.
   useApp.setState(state => ({ sync: { ...state.sync, configured: result.syncConfigured } }))
-  // The session just changed what the probe says (sync, initialized), and it
-  // carries whether the OS can read a card off a photo — asked once per unlock,
-  // it decides whether any scan affordance is offered at all.
-  void refreshApp().then(status => status && setScanSupported(status.scanSupported))
   // One run on unlock: this device may have been off while another pushed,
   // and it may itself be holding writes a previous session never published.
   if (result.syncConfigured) syncNow().catch(() => {})
@@ -170,7 +209,8 @@ export const scheduleSync = () => {
   }, SYNC_DEBOUNCE_MS)
 }
 
-export const setSyncStatus = (sync: SyncStatus) => useApp.setState({ sync })
+export const setSyncStatus = (sync: SyncStatus) =>
+  useApp.setState(state => ({ sync: newer(state.sync, sync) }))
 
 // --- first-run Drive probe ---------------------------------------------------------
 

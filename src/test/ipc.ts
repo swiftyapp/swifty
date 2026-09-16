@@ -1,5 +1,7 @@
 import type { BackendError } from '@/api/errors'
 import type { AppStatus, Settings } from '@/api/app'
+import { EVENTS } from '@/api/events'
+import { emitEventSoon } from './events'
 
 /**
  * The fake Rust backend. One mock of `@tauri-apps/api/core` stands in for every
@@ -27,6 +29,13 @@ const session = { entries: [], syncConfigured: false }
 // would hand them back from: `set_settings` merges into this the way the real
 // command merges into `settings.json`, so a component sees its own write come
 // back round. Reset with the rest of the fakes between tests.
+//
+// Spelled out rather than imported from `store/prefs`: this file is what the
+// `@tauri-apps/api/core` mock loads, and anything in the store reaches that
+// same module through `api/client` — the mock factory would be re-entered
+// while it is still resolving. It is Rust's `settings.rs` both copies mirror,
+// and `prefs.test` asserts the two agree, which is what caught them drifting
+// by a generator flag.
 const DEFAULT_SETTINGS: Settings = {
   autolockSecs: 60,
   clipboardTimeoutMs: 30000,
@@ -57,8 +66,14 @@ export const appStatusDefault = (): AppStatus => ({
   version: '1.0.0',
   locale: 'en-US',
   settings,
-  syncConfigured: false,
-  syncPending: false,
+  sync: {
+    configured: false,
+    pending: false,
+    inProgress: false,
+    error: null,
+    lastSyncedAt: null,
+    seq: 0
+  },
   // Off by default, so no suite sees a scan affordance it did not ask for.
   scanSupported: false,
   // The desktop's gate, and what every pre-existing spec asserts by name.
@@ -75,7 +90,10 @@ const DEFAULTS: Record<string, Handler> = {
 
   setup: () => undefined,
   unlock: () => session,
-  lock: () => undefined,
+  // Rust seals the vault and says so (`session::lock`); the frontend does
+  // nothing about a lock until the event lands, so the fake has to emit it too
+  // — after this promise resolves, as the real one does.
+  lock: () => emitEventSoon(EVENTS.vaultLocked, undefined),
   unlock_biometric: () => session,
   enable_biometric: () => 'protected',
   disable_biometric: () => undefined,
@@ -83,7 +101,8 @@ const DEFAULTS: Record<string, Handler> = {
 
   // A new workspace arrives active and unlocked, so it answers like an unlock.
   workspace_create: () => session,
-  workspace_select: () => undefined,
+  // Switching is locking what is open, and Rust announces it as one.
+  workspace_select: () => emitEventSoon(EVENTS.vaultLocked, undefined),
   workspace_rename: () => undefined,
 
   // First run. The probe's result never comes back through these promises —

@@ -1,19 +1,26 @@
 import { useEffect } from 'react'
-import { useVault, selectCurrent, openPalette, openGenerator, openAddPicker, editEntry } from '@/store'
-import { dialogOpen } from '@/utils/dialogOpen'
-import { focusSearch } from '@/utils/focusSearch'
-import { lockVault } from './Palette/commands'
+import {
+  useVault,
+  selectCurrent,
+  openPalette,
+  openGenerator,
+  openAddPicker,
+  editEntry,
+  focusSearch,
+  isModalOpen,
+  lockVault
+} from '@/store'
 
 // The app-level shortcut surface. One listener, one record — a new chord is
 // one line here. Mounted from Main, so chords are live only while unlocked.
 const BINDINGS: Record<string, () => void> = {
   k: openPalette,
   l: lockVault,
-  // Re-pressing ⌘G must not drop the callback the generator was opened with.
-  // Guarded on the store as well as the DOM: the flag flips before the card
-  // mounts, so one press cannot queue a second open.
+  // Re-pressing ⌘G must not drop the callback the generator was opened with:
+  // the flag flips before the card mounts, so one press cannot queue a second
+  // open.
   g: () => {
-    if (!dialogOpen()) openGenerator()
+    if (!isModalOpen()) openGenerator()
   },
   n: openAddPicker,
   f: focusSearch,
@@ -33,7 +40,7 @@ export const useShortcuts = () => {
       // A dialog owns the keyboard while it is up: every chord here would
       // otherwise act on the shell behind the scrim — opening a second modal,
       // pulling focus into the list column, or editing what the dialog covers.
-      if (dialogOpen()) return
+      if (isModalOpen()) return
       run()
     }
 

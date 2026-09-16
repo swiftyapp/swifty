@@ -27,7 +27,14 @@ export const DEFAULT_PREFS: Settings = {
   clipboardTimeoutMs: 30_000,
   dateFormat: 'MM/DD/YYYY',
   locale: null,
-  generator: { length: 20, numbers: true, symbols: true, uppercase: true, exclude: '' }
+  generator: {
+    length: 20,
+    numbers: true,
+    symbols: true,
+    uppercase: true,
+    exclude: '',
+    excludeSimilarCharacters: false
+  }
 }
 
 const isTheme = (value: unknown): value is ThemePreference =>

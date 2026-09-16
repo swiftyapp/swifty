@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { beforeEach, vi } from 'vitest'
+import { resetEvents } from './events'
 import { resetIpc } from './ipc'
 import { setLayout } from './layout'
 import { resetStores } from './utils'
@@ -26,10 +27,15 @@ vi.mock('@tauri-apps/api/core', async () => {
 
 beforeEach(resetIpc)
 
-vi.mock('@/api/events', async orig => ({
-  ...(await orig<typeof import('@/api/events')>()),
-  on: vi.fn().mockResolvedValue(() => {})
-}))
+// The backend's event stream, faked as a bus (see `./events`): a subscription
+// from a previous test would otherwise still be on it, so it is emptied with
+// everything else — before the per-file hooks that subscribe.
+beforeEach(resetEvents)
+
+vi.mock('@/api/events', async orig => {
+  const { onMock } = await import('./events')
+  return { ...(await orig<typeof import('@/api/events')>()), on: onMock }
+})
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn().mockResolvedValue(undefined)

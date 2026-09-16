@@ -2,8 +2,9 @@
 //!
 //! Only one workspace is ever unlocked, so every command here starts by
 //! clearing the session: switching *is* locking what is open and pointing the
-//! paths somewhere else. None of them emit events — the frontend drives the
-//! switch and re-probes `app_status` afterwards.
+//! paths somewhere else. A switch therefore announces itself as the lock it is
+//! (`vault:locked`), which is what re-probes `app_status` on the frontend;
+//! creating one ends unlocked and has nothing to announce.
 
 use std::fs;
 use std::path::Path;
@@ -56,6 +57,11 @@ pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) 
     // one workspace's key against another's database.
     state.session.lock().unwrap().clear();
     *state.active_workspace.lock().unwrap() = id;
+    // Announced like any other lock, so the frontend takes the one path it
+    // takes for all of them. After the repoint rather than inside the clear
+    // (`session::lock`): the reaction re-probes `app_status`, which must find
+    // the new workspace already active.
+    crate::events::vault_locked(&app);
     Ok(())
 }
 

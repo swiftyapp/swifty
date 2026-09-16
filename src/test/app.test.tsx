@@ -1,9 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import App from '@/App'
 import { useApp } from '@/store'
+import { unlistens } from './events'
 import { appStatusDefault, calls, mockCommand } from './ipc'
 import { seedApp } from './utils'
+
+// Each `unlisten` the fake event bus handed out is a spy (see `test/events`).
+const isCalled = (fn: () => void) => vi.mocked(fn).mock.calls.length > 0
 
 // How the shell decides where to open: off the boot probe's answer, already in
 // the store — or, when that never came, off one more probe of its own.
@@ -28,6 +32,24 @@ describe('App', () => {
 
     await waitFor(() => expect(useApp.getState().flow).toBe('setup'))
     expect(useApp.getState().status?.initialized).toBe(false)
+  })
+
+  // `subscribeToEvents` hands back a cleanup that has to reach every one of the
+  // subscriptions it started — each of which is a promise that may land after
+  // the unmount. A shell that dropped one would, on the second mount, react to
+  // every event twice.
+  it('releases every event listener it took when it unmounts', async () => {
+    const { unmount } = render(<App />)
+    await waitFor(() => expect(unlistens).not.toHaveLength(0))
+    const first = unlistens.length
+    unmount()
+
+    await waitFor(() => expect(unlistens.slice(0, first).every(fn => isCalled(fn))).toBe(true))
+
+    render(<App />).unmount()
+    await waitFor(() => expect(unlistens.every(fn => isCalled(fn))).toBe(true))
+    // Both mounts subscribed, and neither left anything listening.
+    expect(unlistens).toHaveLength(first * 2)
   })
 
   it('stays on the lock screen when the probe keeps failing', async () => {

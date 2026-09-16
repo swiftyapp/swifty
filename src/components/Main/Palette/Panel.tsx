@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { closePalette } from '@/store'
+import { useDialogPresence } from '@/hooks/useDialogPresence'
 import Input from './Input'
 import CommandRow from './CommandRow'
 import { useResults } from './useResults'
@@ -17,6 +18,9 @@ export default function Panel() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [focus, setFocus] = useState(0)
+  // The palette keeps its own keyboard handling rather than the shared focus
+  // hook, so it says for itself that it is a modal surface.
+  useDialogPresence()
 
   const commands = useResults(query)
 

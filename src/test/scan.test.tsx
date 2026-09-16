@@ -3,7 +3,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { open } from '@tauri-apps/plugin-dialog'
 import Main from '@/components/Main'
-import { useUi, useVault, setScanSupported, startEntry } from '@/store'
+import { useUi, useVault, startEntry } from '@/store'
 import {
   cleanFields,
   firstImage,
@@ -11,7 +11,7 @@ import {
   mergeFields
 } from '@/components/Main/Scan/fields'
 import { runScan } from '@/components/Main/Scan/run'
-import { withEntries, loginMeta } from './utils'
+import { withEntries, loginMeta, seedApp } from './utils'
 import { calls, mockCommand } from './ipc'
 
 const CARD = { number: '4242424242424242', month: '04', year: '27', name: 'ADA LOVELACE' }
@@ -128,7 +128,7 @@ describe('scan routing', () => {
 describe('a scanned draft', () => {
   it('opens the editor with the fields already in it', async () => {
     seed()
-    setScanSupported(true)
+    seedApp({ scanSupported: true })
     mockCommand('scan_image', () => ({ kind: 'identity', fields: PASSPORT }))
     render(<Main />)
 
@@ -144,7 +144,7 @@ describe('a scanned draft', () => {
 
   it('fills the blanks of an editor that is already open', async () => {
     seed()
-    setScanSupported(true)
+    seedApp({ scanSupported: true })
     startEntry('identity')
     render(<Main />)
 
@@ -174,7 +174,7 @@ describe('scanning from the picker', () => {
 
   it('offers the action where it can', async () => {
     seed()
-    setScanSupported(true)
+    seedApp({ scanSupported: true })
     render(<Main />)
     await openFromRail()
 
@@ -184,7 +184,7 @@ describe('scanning from the picker', () => {
 
   it('routes a picked file like a drop', async () => {
     seed()
-    setScanSupported(true)
+    seedApp({ scanSupported: true })
     vi.mocked(open).mockResolvedValue('/Users/me/card.png')
     mockCommand('scan_image', () => ({ kind: 'card', fields: CARD }))
     render(<Main />)
@@ -199,7 +199,7 @@ describe('scanning from the picker', () => {
 
   it('leaves the picker alone when the dialog is cancelled', async () => {
     seed()
-    setScanSupported(true)
+    seedApp({ scanSupported: true })
     vi.mocked(open).mockResolvedValue(null)
     render(<Main />)
     await openFromRail()
@@ -212,7 +212,7 @@ describe('scanning from the picker', () => {
 
   it('keeps the tiles answering to the digits', async () => {
     seed()
-    setScanSupported(true)
+    seedApp({ scanSupported: true })
     render(<Main />)
     await openFromRail()
 

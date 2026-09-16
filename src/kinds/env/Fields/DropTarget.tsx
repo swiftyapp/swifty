@@ -2,9 +2,9 @@ import { useRef, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
 import { isMobile } from '@/lib/platform'
+import { isModalOpen } from '@/store'
 import { useFileDrop } from '@/hooks/useFileDrop'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
-import { dialogOpen } from '@/utils/dialogOpen'
 import Button from '@/components/elements/Button'
 import IconButton from '@/components/elements/IconButton'
 import { useFields } from '@/components/elements/fields'
@@ -101,7 +101,7 @@ export default function DropTarget() {
   // Settings › Import is a dialog with a drop zone of its own; while it is up
   // a drop means an export, not an env file for the draft behind it.
   useFileDrop(([path]) => {
-    if (path && !dialogOpen()) void ingest.drop(path)
+    if (path && !isModalOpen()) void ingest.drop(path)
   }, !!set)
 
   if (!set) return null

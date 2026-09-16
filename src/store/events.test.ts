@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { on, EVENTS, type EventName, type EventPayloads } from '@/api/events'
 import type { EntryMeta } from '@/api/types'
-import { calls, clearCalls, mockCommand } from '../test/ipc'
+import { appStatusDefault, calls, clearCalls, mockCommand } from '../test/ipc'
 import { subscribeToEvents } from './events'
 import {
   useApp,
@@ -13,7 +13,9 @@ import {
   setView,
   setCurrentEntry,
   flowMain,
-  initialApp
+  initialApp,
+  lockVault,
+  setApp
 } from './index'
 
 const meta = (id: string): EntryMeta => ({
@@ -39,12 +41,7 @@ const handlerFor = <E extends EventName>(event: E) => {
 // What `app_status` answers about the biometric gate.
 const gate = (available: boolean) =>
   mockCommand('app_status', () => ({
-    initialized: true,
-    version: '1.0.0',
-    locale: 'en-US',
-    syncConfigured: false,
-    syncPending: false,
-    scanSupported: false,
+    ...appStatusDefault(),
     biometric: { available, canEnroll: available, type: 'touch', mode: null }
   }))
 
@@ -118,7 +115,8 @@ describe('sync:status', () => {
       pending: false,
       inProgress: false,
       error: 'Drive API 403',
-      lastSyncedAt: '2024-01-01T00:00:00.000Z'
+      lastSyncedAt: '2024-01-01T00:00:00.000Z',
+      seq: 1
     }
 
     handlerFor(EVENTS.syncStatus)(status)
@@ -127,12 +125,36 @@ describe('sync:status', () => {
   })
 
   it('replaces the previous status rather than merging into it', () => {
-    handlerFor(EVENTS.syncStatus)({ ...initialApp.sync, pending: true })
-    handlerFor(EVENTS.syncStatus)({ ...initialApp.sync, configured: true })
+    handlerFor(EVENTS.syncStatus)({ ...initialApp.sync, pending: true, seq: 1 })
+    handlerFor(EVENTS.syncStatus)({ ...initialApp.sync, configured: true, seq: 2 })
 
     const { pending, configured } = useApp.getState().sync
     expect(pending).toBe(false)
     expect(configured).toBe(true)
+  })
+
+  // The probe and the event are two routes for one fact, and a probe taken
+  // just before a transition can resolve after the event it emitted. The
+  // backend's sequence number, not arrival order, decides which is newer.
+  it('is not put back by a probe that read the state before it', () => {
+    handlerFor(EVENTS.syncStatus)({ ...initialApp.sync, inProgress: true, seq: 3 })
+
+    setApp({ ...appStatusDefault(), sync: { ...initialApp.sync, seq: 2 } })
+    expect(useApp.getState().sync.inProgress).toBe(true)
+
+    // A probe that saw the later state does land.
+    setApp({
+      ...appStatusDefault(),
+      sync: { ...initialApp.sync, lastSyncedAt: '2024-01-01T00:00:00.000Z', seq: 4 }
+    })
+    expect(useApp.getState().sync.inProgress).toBe(false)
+    expect(useApp.getState().sync.lastSyncedAt).toBe('2024-01-01T00:00:00.000Z')
+  })
+
+  it('takes the same transition again, so a configured that changed without one lands', () => {
+    handlerFor(EVENTS.syncStatus)({ ...initialApp.sync, seq: 5 })
+    setApp({ ...appStatusDefault(), sync: { ...initialApp.sync, configured: true, seq: 5 } })
+    expect(useApp.getState().sync.configured).toBe(true)
   })
 })
 
@@ -178,5 +200,36 @@ describe('vault:locked', () => {
     await vi.waitFor(() => expect(useApp.getState().flow).toBe('auth'))
     // A failed re-probe keeps the last known answer, and there was none.
     expect(useApp.getState().status).toBeNull()
+  })
+})
+
+// Every lock — this command, the autolock, the tray, a workspace switch — ends
+// in `session::lock` on the Rust side and is announced as `vault:locked`. The
+// event is what the frontend acts on, so asking and reacting are no longer two
+// copies of the same three lines in three places.
+describe('lockVault', () => {
+  it('asks the backend and lets the event it answers with do the rest', async () => {
+    flowMain()
+    setEntries([meta('a')])
+
+    await lockVault()
+    await vi.waitFor(() => expect(useApp.getState().flow).toBe('auth'))
+
+    expect(calls('lock')).toHaveLength(1)
+    expect(useVault.getState().items).toEqual([])
+  })
+
+  it('leaves the screen alone when the backend never announced the lock', async () => {
+    flowMain()
+    setEntries([meta('a')])
+    // The command resolving is not the lock happening: a backend that answered
+    // without emitting has not sealed anything, and the rows stay on screen.
+    mockCommand('lock', () => undefined)
+
+    await lockVault()
+    await Promise.resolve()
+
+    expect(useApp.getState().flow).toBe('main')
+    expect(useVault.getState().items.map(e => e.id)).toEqual(['a'])
   })
 })

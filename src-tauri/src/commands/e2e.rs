@@ -96,8 +96,10 @@ pub fn e2e_reset(
     // Drop the session BEFORE touching the files. It owns the open SQLCipher
     // connection; deleting the DB out from under a live handle leaves the
     // connection writing WAL frames for a file that no longer exists, and the
-    // next `create_vault` would open beside them.
-    state.session.lock().unwrap().clear();
+    // next `create_vault` would open beside them. Through `session::lock`, so a
+    // suite whose spec ran against an unlocked app sees the same `vault:locked`
+    // a real lock emits rather than a webview left pointing at a gone vault.
+    crate::session::lock(&app);
 
     wipe_dir(&dir)?;
     // The preferences file went with it, so the copy held in memory has to

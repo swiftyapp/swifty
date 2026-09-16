@@ -16,6 +16,13 @@ export interface SyncStatus {
   error: string | null
   /** ISO time of the last run that succeeded in this process, or null. */
   lastSyncedAt: string | null
+  /**
+   * The backend's count of transitions so far, monotonic within the process.
+   * Two snapshots reach the store by different routes — the `sync:status`
+   * event and the `app_status` probe — and can arrive out of order; the store
+   * keeps whichever has the higher `seq` (`setSyncStatus`).
+   */
+  seq: number
 }
 
 /**

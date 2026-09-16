@@ -1,4 +1,4 @@
-use crate::events;
+use crate::session;
 use crate::state::AppState;
 use crate::timer::Timer;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -75,13 +75,11 @@ fn arm(app: &AppHandle) {
     state.timer.arm(timeout, move || lock(&app));
 }
 
+/// The lock an idle timer or the tray asks for, which may well find the vault
+/// already sealed — a timer that comes due after a manual lock, the tray item
+/// pressed twice. `session::lock` checks and seals under one guard and says
+/// whether there was anything to seal, so a timer that comes due while a fresh
+/// unlock is landing cannot clear the session that unlock just opened.
 pub fn lock(app: &AppHandle) {
-    let state = app.state::<AppState>();
-    let mut session = state.session.lock().unwrap();
-    if !session.is_live() {
-        return;
-    }
-    session.clear();
-    drop(session);
-    events::vault_locked(app);
+    session::lock(app);
 }

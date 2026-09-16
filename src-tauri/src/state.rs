@@ -62,9 +62,19 @@ pub struct SyncRun {
     pub error: Option<String>,
     /// RFC 3339 time of the last run that succeeded in this process.
     pub last_synced_at: Option<String>,
+    /// How many transitions this run state has been through. Every snapshot
+    /// carries it, so two of them can be put in order by whoever holds them.
+    pub seq: u64,
 }
 
 impl SyncRun {
+    /// Record a transition. Every change goes through here so the sequence
+    /// advances with it; a snapshot taken before the change reads as older.
+    pub fn transition(&mut self, change: impl FnOnce(&mut SyncRun)) {
+        change(self);
+        self.seq += 1;
+    }
+
     /// The snapshot the frontend gets. `configured` is the session's to answer,
     /// so the caller supplies it.
     pub fn status(&self, configured: bool) -> SyncStatus {
@@ -74,13 +84,19 @@ impl SyncRun {
             in_progress: self.in_progress,
             error: self.error.clone(),
             last_synced_at: self.last_synced_at.clone(),
+            seq: self.seq,
         }
     }
 }
 
 /// The whole of what the frontend knows about sync, carried by every
-/// `sync:status` event. Owned here, not by the frontend — the backend is what
-/// starts and ends every flow, so it is the one that can say.
+/// `sync:status` event and by the launch probe. Owned here, not by the
+/// frontend — the backend is what starts and ends every flow, so it is the one
+/// that can say.
+///
+/// Two snapshots can reach the frontend out of order: a probe taken just
+/// before a transition, resolving after the event that transition emitted.
+/// `seq` is what lets the frontend keep the newer one without guessing.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncStatus {
@@ -90,6 +106,8 @@ pub struct SyncStatus {
     pub in_progress: bool,
     pub error: Option<String>,
     pub last_synced_at: Option<String>,
+    /// Monotonic within the process; see [`SyncRun::seq`].
+    pub seq: u64,
 }
 
 pub struct AppState {

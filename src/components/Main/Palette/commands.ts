@@ -1,11 +1,4 @@
-import {
-  usePrefs,
-  lockVault as lockVaultAction,
-  openAddPicker,
-  openSettings,
-  startEntry,
-  toggleTheme
-} from '@/store'
+import { usePrefs, lockVault, openAddPicker, openSettings, startEntry, toggleTheme } from '@/store'
 import { KINDS, addLabel } from '@/kinds'
 import { t } from '@/i18n'
 import { GearGlyph, LockGlyph, MoonGlyph, PlusGlyph, SunGlyph } from '../icons'
@@ -19,12 +12,6 @@ export interface Command {
   shortcut?: string
   glyph: Glyph
   run: () => void
-}
-
-// Locks the vault and drops back to the auth flow — the same path as the
-// header's lock button.
-export const lockVault = () => {
-  void lockVaultAction()
 }
 
 // The palette's fixed command list. Order here is the order shown for an empty

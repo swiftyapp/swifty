@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useUi } from '@/store'
+import { useScanSupported } from '@/store'
 import { isMobile } from '@/lib/platform'
 import { useEnvIngest } from '@/kinds/env/useIngest'
 import { openEnvDraft } from '../EnvDrop/open'
@@ -16,7 +16,7 @@ import { EnvGlyph } from '../icons'
  */
 export default function EnvAction() {
   const { t } = useTranslation()
-  const scan = useUi(state => state.scanSupported)
+  const scan = useScanSupported()
   const { pick, error } = useEnvIngest(openEnvDraft)
 
   // A cancelled dialog leaves the picker as it was; a chosen file hands the

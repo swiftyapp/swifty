@@ -109,7 +109,7 @@ export const changeLocale = (locale: string) => i18n.changeLanguage(locale)
 
 /**
  * For the handful of non-React modules that need a string outside a component
- * (`utils/time`, `services/openLink`, field validators, the kind registry).
+ * (`utils/time`, `api/openLink`, field validators, the kind registry).
  * Components use `useTranslation()` instead — only the hook re-renders.
  */
 export const t = i18n.t.bind(i18n)

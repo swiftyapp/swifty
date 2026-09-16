@@ -3,9 +3,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import UpdateToast from '@/components/elements/UpdateToast'
 import { useApp, setUpdateReady } from '@/store'
-import { restartForUpdate } from '@/services/autoUpdate'
+import { restartForUpdate } from '@/api/autoUpdate'
 
-vi.mock('@/services/autoUpdate', () => ({ restartForUpdate: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/api/autoUpdate', () => ({ restartForUpdate: vi.fn().mockResolvedValue(undefined) }))
 
 beforeEach(() => {
   vi.clearAllMocks()
