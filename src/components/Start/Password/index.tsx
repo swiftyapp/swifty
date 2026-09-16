@@ -48,9 +48,12 @@ export default function Password({ onBack, onContinue }: Props) {
     return null
   }
 
+  // A mismatch is about the pair, so a change to either half retires it: the
+  // screen never says two things about the password at once.
   const changePassword = (event: ChangeEvent<HTMLInputElement>) => {
     const value = event.currentTarget.value
     setError(null)
+    setMismatch(null)
     setPassword(value)
     if (value.length >= MIN_LENGTH) setConfirming(true)
   }

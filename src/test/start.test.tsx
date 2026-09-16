@@ -131,6 +131,22 @@ describe('choosing a master password', () => {
     expect(calls('setup_create')).toHaveLength(0)
   })
 
+  // One verdict at a time: a mismatch is about the pair, so editing the
+  // password retires it, and a strength error never lands beside it.
+  it('drops a stale mismatch once the password is edited', async () => {
+    render(<Start />)
+    await choosePassword(STRONG, 'something-else-entirely')
+    await screen.findByText('Passwords do not match')
+
+    await userEvent.clear(screen.getByTestId('setup-password-input'))
+    await userEvent.type(screen.getByTestId('setup-password-input'), 'secret')
+    await userEvent.click(screen.getByTestId('setup-continue-button'))
+
+    expect(await screen.findAllByTestId('form-error')).toHaveLength(1)
+    expect(screen.getByTestId('form-error')).toHaveTextContent(/Use at least/)
+    expect(screen.queryByText('Passwords do not match')).not.toBeInTheDocument()
+  })
+
   // Going back unmounts this screen. The check landing afterwards must not
   // carry the abandoned password on into the flow behind it.
   it('does not create the vault when the user goes back while the check is pending', async () => {
