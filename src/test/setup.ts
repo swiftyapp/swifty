@@ -13,7 +13,6 @@ Element.prototype.scrollIntoView = vi.fn()
 setLayout('wide')
 beforeEach(() => {
   setLayout('wide')
-  localStorage.clear()
   resetStores()
 })
 

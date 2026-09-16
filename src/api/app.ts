@@ -50,7 +50,7 @@ export const setSettings = (patch: Partial<Settings>): Promise<Settings> =>
 export interface AppStatus {
   initialized: boolean
   version: string
-  /** Every preference, hydrated into the prefs store at boot (`main.tsx`). */
+  /** Every preference, hydrated into the prefs store at boot (`boot.ts`). */
   settings: Settings
   /**
    * The OS locale, already narrowed to a catalog the app ships. Read from the
@@ -89,3 +89,12 @@ export interface AppStatus {
 }
 
 export const appStatus = (): Promise<AppStatus> => call('app_status')
+
+/**
+ * Tell Rust the shell is on screen, which is what reveals the window (see
+ * `src-tauri/src/window.rs`). Called the moment the splash is armed, so the
+ * window appears on the first frame of the choreography rather than at some
+ * page-load milestone the animation knows nothing about. A fallback timer
+ * reveals it anyway, so failing to call this costs a delay, not a window.
+ */
+export const appReady = (): Promise<void> => call('app_ready')

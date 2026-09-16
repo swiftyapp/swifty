@@ -1,18 +1,32 @@
-use crate::autolock;
+use crate::{autolock, commands};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Manager, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
 const MAIN: &str = "main";
 
-// How long to wait for the first page load before showing the window anyway, so
-// a webview that never finishes (dev server down, a throwing bundle) degrades to
-// a blank window rather than no window at all.
+// How long to wait for the frontend to say it is up before showing the window
+// anyway, so a bundle that never runs (dev server down, a throwing script)
+// degrades to the resting mascot index.html paints on its own rather than to no
+// window at all.
 const SHOW_FALLBACK: std::time::Duration = std::time::Duration::from_secs(3);
 
-// Build the main window from the frozen config, adding the reveal timing, the
-// per-OS tweaks and the navigation locking that tauri.conf.json can't express
-// (config sets create:false). Chrome itself is native everywhere: Windows and
-// Linux get the system frame, macOS the hidden-inset title bar from config.
+// One-shot latch, one main window per process: whichever reveal path wins —
+// `app_ready` or the fallback timer — the other becomes a no-op, so a window the
+// user has since closed to the tray never pops back up on its own.
+static REVEALED: AtomicBool = AtomicBool::new(false);
+
+// Build the main window from the frozen config, adding the boot payload, the
+// reveal timing, the per-OS tweaks and the navigation locking that
+// tauri.conf.json can't express (config sets create:false). Chrome itself is
+// native everywhere: Windows and Linux get the system frame, macOS the
+// hidden-inset title bar from config.
+//
+// Config also creates the window hidden — an empty window would otherwise sit on
+// screen through the whole bundle load, and with an overlay title bar that reads
+// as bare traffic lights floating over nothing. The frontend calls `app_ready`
+// the moment it has armed the splash, so the window appears exactly when the
+// choreography starts rather than at some unrelated page-load milestone.
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let config = app
         .config()
@@ -23,25 +37,13 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .expect("main window missing from tauri.conf.json")
         .clone();
 
-    // One-shot latch: whichever of the two reveal paths (page load, fallback
-    // timer) wins, the other becomes a no-op, so a window the user has since
-    // closed to the tray never pops back up on its own.
-    let revealed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-
     let handle = app.clone();
-    let ready = app.clone();
-    let ready_latch = revealed.clone();
     let builder = WebviewWindowBuilder::from_config(app, &config)?
         .on_navigation(move |url| navigate(&handle, url))
-        // Config creates the window hidden: an empty window would otherwise sit
-        // on screen through the whole bundle load, and with an overlay title bar
-        // that reads as bare traffic lights floating over nothing. Reveal it once
-        // the webview has painted the first frame instead.
-        .on_page_load(move |_, payload| {
-            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
-                reveal(&ready, &ready_latch);
-            }
-        });
+        // The theme and the language, before any script of ours runs, so the
+        // first frame is themed and the catalogue starts loading without a round
+        // trip in front of it (see `commands::app::boot_script`).
+        .initialization_script(commands::app::boot_script(app));
 
     let window = builder.build()?;
     #[cfg(target_os = "ios")]
@@ -60,7 +62,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let fallback = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(SHOW_FALLBACK);
-        reveal(&fallback, &revealed);
+        reveal(&fallback);
     });
 
     Ok(())
@@ -96,9 +98,10 @@ fn navigate(app: &AppHandle, url: &tauri::Url) -> bool {
     true
 }
 
-// First reveal at startup, run at most once (see the latch in `create`).
-fn reveal(app: &AppHandle, revealed: &std::sync::atomic::AtomicBool) {
-    if !revealed.swap(true, std::sync::atomic::Ordering::SeqCst) {
+/// First reveal at startup, run at most once (see `REVEALED`). Called by the
+/// `app_ready` command and by the fallback timer in `create`.
+pub fn reveal(app: &AppHandle) {
+    if !REVEALED.swap(true, Ordering::SeqCst) {
         show(app);
     }
 }

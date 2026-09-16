@@ -19,7 +19,7 @@ const stubMedia = () => {
 
 const theme = () => document.documentElement.getAttribute('data-theme')
 
-// A fresh load, as main.tsx does it: the store only reacts to changes, so the
+// A fresh load, as boot.ts does it: the store only reacts to changes, so the
 // initial preference is painted once at boot.
 const boot = async () => {
   vi.resetModules()

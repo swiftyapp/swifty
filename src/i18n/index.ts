@@ -42,44 +42,51 @@ const catalogues = import.meta.glob<Record<string, string>>(
 )
 
 /**
- * Start i18next in `lng`. The caller decides what that is — `main.tsx` takes it
- * from the one `app_status` probe it already runs — so the catalogue is loaded
- * before the first paint and nothing here has to ask the backend anything.
+ * Start i18next in `lng`. The caller decides what that is — `boot.ts` takes it
+ * from the payload Rust injects before the bundle runs — so the catalogue is
+ * loaded before the first paint and nothing here has to ask the backend
+ * anything.
+ *
+ * A second call switches language instead: i18next drops `lng` when it is
+ * already running, and silently staying in the first call's language is the
+ * kind of bug that only shows up in a translated build.
  */
 export const initI18n = (lng: string) =>
-  i18n
-    .use(
-      resourcesToBackend((language: string) =>
-        catalogues[`./locales/${language}.json`]?.() ?? Promise.resolve({})
-      )
-    )
-    .use(initReactI18next)
-    .init({
-      lng,
-      resources: { [DEFAULT_LOCALE]: { translation: enUS } },
-      partialBundledLanguages: true,
-      fallbackLng: DEFAULT_LOCALE,
-      supportedLngs: SUPPORTED,
-      load: 'currentOnly',
-      keySeparator: false,
-      nsSeparator: false,
-      returnNull: false,
-      interpolation: {
-        // React escapes for us; double-escaping would render raw entities.
-        escapeValue: false,
-        // No locale file spells the app name. Values interpolate `{{appName}}`
-        // and every call site gets it for free, so a rename stays one constant.
-        // Keys stay plain English, so a locale missing the key still renders
-        // what the caller passed.
-        defaultVariables: { appName: APP_NAME }
-      }
-    })
-    .then(translate => {
-      // The listener below covers every later change; this covers the first
-      // paint, which it does not fire for.
-      document.documentElement.lang = i18n.resolvedLanguage ?? DEFAULT_LOCALE
-      return translate
-    })
+  (i18n.isInitialized
+    ? i18n.changeLanguage(lng)
+    : i18n
+        .use(
+          resourcesToBackend((language: string) =>
+            catalogues[`./locales/${language}.json`]?.() ?? Promise.resolve({})
+          )
+        )
+        .use(initReactI18next)
+        .init({
+          lng,
+          resources: { [DEFAULT_LOCALE]: { translation: enUS } },
+          partialBundledLanguages: true,
+          fallbackLng: DEFAULT_LOCALE,
+          supportedLngs: SUPPORTED,
+          load: 'currentOnly',
+          keySeparator: false,
+          nsSeparator: false,
+          returnNull: false,
+          interpolation: {
+            // React escapes for us; double-escaping would render raw entities.
+            escapeValue: false,
+            // No locale file spells the app name. Values interpolate
+            // `{{appName}}` and every call site gets it for free, so a rename
+            // stays one constant. Keys stay plain English, so a locale missing
+            // the key still renders what the caller passed.
+            defaultVariables: { appName: APP_NAME }
+          }
+        })
+  ).then(translate => {
+    // The listener below covers every later change; this covers the first
+    // paint, which it does not fire for.
+    document.documentElement.lang = i18n.resolvedLanguage ?? DEFAULT_LOCALE
+    return translate
+  })
 
 // Tell the document what language it is in. Registered once, rather than
 // wrapping `changeLanguage`, so a change from anywhere is picked up. Persisting
