@@ -161,6 +161,9 @@ pub fn boot(app: &AppHandle) {
 /// The auto-lock is re-armed here too, still under the lock, so the timer
 /// always runs the value the file ends up holding: two overlapping changes
 /// persist in one order and would otherwise be allowed to arm in the other.
+/// The tray menu is relabelled the same way and for the same reason: it is the
+/// one piece of UI i18next cannot reach, so Rust has to be told the language
+/// changed.
 pub fn set(app: &AppHandle, patch: &Value) -> Result<Settings> {
     let state = app.state::<SettingsState>();
     let mut guard = state.0.lock().unwrap();
@@ -168,6 +171,12 @@ pub fn set(app: &AppHandle, patch: &Value) -> Result<Settings> {
     storage::write_settings(app, &serde_json::to_string_pretty(&merged)?)?;
     if merged.autolock_secs != guard.autolock_secs {
         crate::autolock::set_timeout(app, merged.autolock_secs);
+    }
+    // Handed the new choice rather than left to read it back: this still holds
+    // the lock the settings live behind.
+    #[cfg(desktop)]
+    if merged.locale != guard.locale {
+        crate::tray::relabel(app, merged.locale.as_deref());
     }
     *guard = merged.clone();
     Ok(merged)
