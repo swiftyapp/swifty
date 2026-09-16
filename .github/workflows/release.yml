@@ -94,6 +94,14 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      # Fail before the 20-minute build if the macOS entitlements ask for
+      # something no embedded provisioning profile grants. That combination
+      # produces a bundle which signs, notarizes and passes Gatekeeper but
+      # cannot be launched at all (alpha.1 and alpha.2 both shipped that way).
+      - name: Check macOS entitlements against the provisioning profile
+        if: matrix.platform == 'macos-latest'
+        run: bun scripts/check-macos-entitlements.mjs
+
       - name: Build, sign, notarize and upload to the draft release
         uses: tauri-apps/tauri-action@v1
         env:
@@ -124,6 +132,41 @@ jobs:
           uploadUpdaterJson: true
           tauriScript: bun run tauri
           args: ${{ matrix.args }}
+
+      # The check the previous two releases needed: actually start the signed
+      # app. An entitlement the profile does not grant makes AMFI refuse the
+      # spawn, and the process dies on SIGKILL before `main` — invisible to
+      # codesign, notarization and spctl alike. Only launching it shows this.
+      #
+      # Deliberately narrow: a runner has no real window server, so the app is
+      # allowed to exit for its own reasons. The single failure condition is
+      # being killed outright.
+      - name: Smoke-test that the signed app can launch
+        if: matrix.platform == 'macos-latest'
+        run: |
+          APP="${{ matrix.bundlePath }}/macos/Rowel.app/Contents/MacOS/rowel"
+          if [ ! -x "$APP" ]; then
+            echo "::error::No built executable at $APP"
+            exit 1
+          fi
+          "$APP" > /tmp/smoke.out 2> /tmp/smoke.err &
+          PID=$!
+          sleep 15
+          if kill -0 "$PID" 2>/dev/null; then
+            echo "Still running after 15s — the spawn was allowed."
+            kill -9 "$PID" 2>/dev/null || true
+            exit 0
+          fi
+          set +e; wait "$PID"; RC=$?; set -e
+          if [ "$RC" -eq 137 ]; then
+            echo "::error::SIGKILL on launch. macOS refused to spawn the signed app."
+            echo "::error::Almost always an entitlement no embedded.provisionprofile grants."
+            echo "--- stdout ---"; cat /tmp/smoke.out
+            echo "--- stderr ---"; cat /tmp/smoke.err
+            exit 1
+          fi
+          echo "Exited with $RC — started fine, then stopped for its own reasons."
+          cat /tmp/smoke.err || true
 
       # Replace the placeholder release body with GitHub's auto-generated
       # release notes (the same "What's Changed" list the UI button produces),

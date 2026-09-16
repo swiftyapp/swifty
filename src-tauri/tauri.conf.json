@@ -43,7 +43,10 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "entitlements": "./Entitlements.plist"
+      "entitlements": "./Entitlements.plist",
+      "files": {
+        "embedded.provisionprofile": "./embedded.provisionprofile"
+      }
     },
     "iOS": {
       "developmentTeam": "UFBL3F444A",
