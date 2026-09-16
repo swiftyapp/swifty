@@ -43,13 +43,12 @@ export default function Biometric({ biometry, onDone }: Props) {
 
   return (
     <AuthShell>
-      <div className="mb-7 flex justify-center">
-        <span className="grid h-16 w-16 place-items-center rounded-xl bg-tile text-touchid">
-          <BiometryGlyph type={biometry} size={30} />
-        </span>
-      </div>
-
       <StepHeader
+        mark={
+          <span className="grid h-16 w-16 place-items-center rounded-xl bg-tile text-touchid">
+            <BiometryGlyph type={biometry} size={30} />
+          </span>
+        }
         eyebrow={t('One last thing')}
         title={t('Unlock with {{name}}?', { name })}
         body={t(
