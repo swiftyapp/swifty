@@ -522,5 +522,16 @@
   "No API keys yet": "Inga API-nycklar än",
   "No matches for “{{query}}” in SSH keys": "Inga träffar för ”{{query}}” bland SSH-nycklar",
   "No matches for “{{query}}” in env files": "Inga träffar för ”{{query}}” bland env-filer",
-  "No matches for “{{query}}” in API keys": "Inga träffar för ”{{query}}” bland API-nycklar"
+  "No matches for “{{query}}” in API keys": "Inga träffar för ”{{query}}” bland API-nycklar",
+  "Personal": "Personlig",
+  "Workspaces": "Arbetsytor",
+  "Workspace name": "Arbetsytans namn",
+  "New workspace": "Ny arbetsyta",
+  "Add a workspace": "Lägg till en arbetsyta",
+  "Current": "Aktuell",
+  "Switch": "Byt",
+  "Create": "Skapa",
+  "Fill in the name": "Fyll i namnet",
+  "Sync is available in the primary workspace only.": "Synkronisering är bara tillgänglig i den primära arbetsytan.",
+  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "Varje arbetsyta är en separat krypterad databas med ett eget huvudlösenord. Synkronisering och biometrisk upplåsning stannar tills vidare i din primära arbetsyta."
 }

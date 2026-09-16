@@ -514,5 +514,16 @@
   "No API keys yet": "还没有 API 密钥",
   "No matches for “{{query}}” in SSH keys": "SSH 密钥中没有找到“{{query}}”",
   "No matches for “{{query}}” in env files": "env 文件中没有找到“{{query}}”",
-  "No matches for “{{query}}” in API keys": "API 密钥中没有找到“{{query}}”"
+  "No matches for “{{query}}” in API keys": "API 密钥中没有找到“{{query}}”",
+  "Personal": "个人",
+  "Workspaces": "工作区",
+  "Workspace name": "工作区名称",
+  "New workspace": "新建工作区",
+  "Add a workspace": "添加工作区",
+  "Current": "当前",
+  "Switch": "切换",
+  "Create": "创建",
+  "Fill in the name": "请填写名称",
+  "Sync is available in the primary workspace only.": "同步仅在主工作区可用。",
+  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "每个工作区都是一个独立的加密数据库，各自使用自己的主密码。同步和生物识别解锁目前仅保留在主工作区。"
 }
