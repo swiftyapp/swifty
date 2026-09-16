@@ -2,14 +2,20 @@ import '@testing-library/jest-dom/vitest'
 import { beforeEach, vi } from 'vitest'
 import { resetIpc } from './ipc'
 import { setLayout } from './layout'
+import { resetStores } from './utils'
 
 // jsdom implements no layout, so it ships no scrollIntoView.
 Element.prototype.scrollIntoView = vi.fn()
 
 // Every suite starts on the wide shell — the one the desktop window and all the
-// pre-existing tests assume. A compact test calls `setLayout('compact')` itself.
+// pre-existing tests assume — with pristine stores and preferences. A compact
+// test calls `setLayout('compact')` itself.
 setLayout('wide')
-beforeEach(() => setLayout('wide'))
+beforeEach(() => {
+  setLayout('wide')
+  localStorage.clear()
+  resetStores()
+})
 
 // The Rust backend is built in parallel, so the one seam that reaches it is
 // faked here and every command answers out of `./ipc`. A spec overrides the
@@ -26,19 +32,6 @@ vi.mock('@/api/events', async orig => ({
   on: vi.fn().mockResolvedValue(() => {})
 }))
 
-vi.mock('@tauri-apps/api/window', () => ({
-  getCurrentWindow: () => ({ setSize: vi.fn().mockResolvedValue(undefined) })
-}))
-
-vi.mock('@tauri-apps/api/dpi', () => ({
-  LogicalSize: class {
-    constructor(
-      public width: number,
-      public height: number
-    ) {}
-  }
-}))
-
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn().mockResolvedValue(undefined)
 }))
@@ -48,7 +41,20 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn().mockResolvedValue(null)
 }))
 
+// The app store imports the updater at module load.
+vi.mock('@tauri-apps/plugin-updater', () => ({ check: vi.fn() }))
+vi.mock('@tauri-apps/plugin-process', () => ({ relaunch: vi.fn() }))
+
+// The drag-drop stream `useFileDrop` subscribes to. Nothing drops a file by
+// default; a suite that needs to replaces this with a mock that keeps the
+// handlers (see envIngest.test.tsx).
+vi.mock('@tauri-apps/api/webview', () => ({
+  getCurrentWebview: () => ({
+    onDragDropEvent: vi.fn().mockResolvedValue(() => {})
+  })
+}))
+
 // Components under test call useTranslation(); the singleton must be
 // initialized once before any of them render.
-const { i18nReady } = await import('@/i18n')
-await i18nReady
+const { initI18n } = await import('@/i18n')
+await initI18n('en-US')

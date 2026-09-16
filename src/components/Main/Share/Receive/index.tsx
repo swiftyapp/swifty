@@ -1,4 +1,4 @@
-import { useStore } from '@/store'
+import { useUi } from '@/store'
 import ReceiveDialog from './ReceiveDialog'
 
 /**
@@ -7,7 +7,7 @@ import ReceiveDialog from './ReceiveDialog'
  * empty field because there is nothing left to start from.
  */
 export default function Receive() {
-  const open = useStore(state => state.share.receiveOpen)
+  const open = useUi(state => state.receiveOpen)
 
   return open ? <ReceiveDialog /> : null
 }

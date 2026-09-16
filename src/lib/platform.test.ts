@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isAndroid, isIOS, isMobile } from './platform'
+import { chord, isAndroid, isIOS, isMobile, isPC } from './platform'
 
 // The `define` in vite.config.ts is what makes `__TAURI_PLATFORM__` exist at
 // all: drop it and importing this module throws a ReferenceError rather than
@@ -11,5 +11,12 @@ describe('platform', () => {
     expect(isIOS).toBe(false)
     expect(isAndroid).toBe(false)
     expect(isMobile).toBe(false)
+  })
+
+  // Not a PC either, so the hint chips read the Apple way — the same default a
+  // macOS build gets.
+  it('spells shortcut hints with ⌘', () => {
+    expect(isPC).toBe(false)
+    expect(chord('F')).toBe('⌘F')
   })
 })

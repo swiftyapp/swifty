@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useStore } from '@/store'
+import { useVault } from '@/store'
 
 export interface TagCount {
   tag: string
@@ -12,7 +12,7 @@ export interface TagCount {
 // the Tags view on every item carrying it, so a count says how many that will
 // be whichever view the menu was opened from.
 export const useTagCounts = (): TagCount[] => {
-  const items = useStore(state => state.entries.items)
+  const items = useVault(state => state.items)
 
   return useMemo(() => {
     const totals = new Map<string, number>()

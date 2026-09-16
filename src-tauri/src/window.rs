@@ -9,8 +9,10 @@ const MAIN: &str = "main";
 // a blank window rather than no window at all.
 const SHOW_FALLBACK: std::time::Duration = std::time::Duration::from_secs(3);
 
-// Build the main window from the frozen config, adding the per-OS chrome and
-// navigation locking that tauri.conf.json can't express (config sets create:false).
+// Build the main window from the frozen config, adding the reveal timing, the
+// per-OS tweaks and the navigation locking that tauri.conf.json can't express
+// (config sets create:false). Chrome itself is native everywhere: Windows and
+// Linux get the system frame, macOS the hidden-inset title bar from config.
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let config = app
         .config()
@@ -29,8 +31,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let handle = app.clone();
     let ready = app.clone();
     let ready_latch = revealed.clone();
-    #[allow(unused_mut)]
-    let mut builder = WebviewWindowBuilder::from_config(app, &config)?
+    let builder = WebviewWindowBuilder::from_config(app, &config)?
         .on_navigation(move |url| navigate(&handle, url))
         // Config creates the window hidden: an empty window would otherwise sit
         // on screen through the whole bundle load, and with an overlay title bar
@@ -41,12 +42,6 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
                 reveal(&ready, &ready_latch);
             }
         });
-
-    // Frameless on Windows; macOS keeps the hidden-inset title bar from config.
-    #[cfg(target_os = "windows")]
-    {
-        builder = builder.decorations(false);
-    }
 
     let window = builder.build()?;
     #[cfg(target_os = "ios")]

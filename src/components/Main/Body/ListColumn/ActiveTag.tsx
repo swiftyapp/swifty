@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useStore, setView } from '@/store'
+import { useUi, setView } from '@/store'
 import Chip from './Chip'
 
 // The tag the Tags view is showing, and the way out of it: the Tags view is
@@ -8,7 +8,7 @@ export default function ActiveTag() {
   const { t } = useTranslation()
   // Only the Tags view shows a tag, so only it has one to name (see
   // `useVisibleEntries` for the same scoping of the filter itself).
-  const tag = useStore(state => (state.ui.view === 'tags' ? state.filters.tag : null))
+  const tag = useUi(state => (state.view === 'tags' ? state.filterTag : null))
   if (!tag) return null
 
   return (

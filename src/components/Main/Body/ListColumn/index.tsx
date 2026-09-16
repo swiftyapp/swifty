@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useStore } from '@/store'
+import { useUi } from '@/store'
 import { cx } from '@/utils/cx'
 import KindChips from './KindChips'
 import ActiveTag from './ActiveTag'
@@ -53,7 +53,7 @@ export default function ListColumn({
   scroller,
   footer
 }: Props) {
-  const view = useStore(state => state.ui.view)
+  const view = useUi(state => state.view)
   const health = view === 'health'
   const onKeyDown = useListKeys()
   const title = useListTitle()

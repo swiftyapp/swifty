@@ -1,5 +1,5 @@
 import { generatePassword, type GeneratorOptions } from '@/api/tools'
-import { getProps, setProps } from '@/defaults/generator'
+import { usePrefs, setPref } from '@/store/prefs'
 import type { TKey } from '@/i18n'
 import WORDS from './wordlist'
 
@@ -67,7 +67,7 @@ const randomIndex = (bound: number): number => {
 // Seeded from the shared generator defaults so the Settings page's preferences
 // carry into the dialog.
 export const defaultSettings = (): GeneratorSettings => {
-  const stored = getProps()
+  const stored = usePrefs.getState().generator
   return {
     mode: 'random',
     length: clamp(stored.length, LENGTH_RANGE),
@@ -84,8 +84,8 @@ export const defaultSettings = (): GeneratorSettings => {
 // Write the shared knobs back so the dialog and Settings › Security agree.
 // Everything else in the stored props (uppercase, exclude) is left untouched.
 export const persistDefaults = (settings: GeneratorSettings) =>
-  setProps({
-    ...getProps(),
+  setPref('generator', {
+    ...usePrefs.getState().generator,
     length: settings.length,
     symbols: settings.symbols,
     numbers: settings.numbers,

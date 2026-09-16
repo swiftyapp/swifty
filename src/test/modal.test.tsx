@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import Modal from '@/components/elements/Modal'
 import Sheet from '@/components/elements/Sheet'
-import { renderWithStore } from './utils'
 
 const openSettings = async () => {
   await userEvent.click(screen.getByTestId('settings-button'))
@@ -13,14 +12,14 @@ const openSettings = async () => {
 
 describe('Modal focus management', () => {
   it('moves focus inside the card when it opens', async () => {
-    renderWithStore(<Settings />)
+    render(<Settings />)
     const modal = await openSettings()
 
     expect(modal.contains(document.activeElement)).toBe(true)
   })
 
   it('keeps Tab from leaving the card', async () => {
-    renderWithStore(<Settings />)
+    render(<Settings />)
     const modal = await openSettings()
 
     const tabbables = modal.querySelectorAll<HTMLElement>('button, input, select')
@@ -31,7 +30,7 @@ describe('Modal focus management', () => {
   })
 
   it('returns focus to the trigger on close', async () => {
-    renderWithStore(<Settings />)
+    render(<Settings />)
     const trigger = screen.getByTestId('settings-button')
     await openSettings()
     // Park focus deep inside the card, so passing can only mean it was restored.

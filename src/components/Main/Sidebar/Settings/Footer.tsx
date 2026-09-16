@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useStore } from '@/store'
+import { useApp, runUpdateCheck } from '@/store'
 import { APP_NAME } from '@/lib/app'
 import { isMobile } from '@/lib/platform'
 import { useVaultMeta, vaultHome } from '@/hooks/useAuthMeta'
@@ -12,8 +12,7 @@ import { META } from '@/components/elements/tokens'
 export default function Footer() {
   const { t } = useTranslation()
   const meta = useVaultMeta()
-  const update = useStore(state => state.update)
-  const runUpdateCheck = useStore(state => state.runUpdateCheck)
+  const update = useApp(state => state.update)
 
   const status = update.readyVersion
     ? t('update ready')

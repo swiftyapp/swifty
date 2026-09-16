@@ -1,5 +1,5 @@
 import type { Entry, EntryMeta } from '@/api/types'
-import type { EntryDraft } from '@/defaults/entries'
+import type { EntryDraft } from '@/kinds/draft'
 import { emailError, filled } from '@/components/elements/fields/formats'
 
 export const defaults: EntryDraft = {

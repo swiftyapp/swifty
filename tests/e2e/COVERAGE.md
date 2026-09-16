@@ -57,13 +57,13 @@ runs one app process against one data dir, so nothing may depend on file order.
 | Password generator | PR 4 | `generator-mode-random` / `-memorable`, `generator-amount`, `generator-regenerate`, `generator-output`, `generator-use-button` |
 | Change master password | PR 4 | `change-password-submit`, `change-password-error`, `change-password-success` |
 | Settings shell: nav + section titles | PR 4 | `settings-modal`, `settings-nav-<sync\|security\|audit\|import\|language>` (`aria-current="page"` on the active item), `settings-version` / `settings-update-status` in the pinned footer, `modal-close` |
-| Session preferences | PR 4 | `settings-autolock-<secs>` and `settings-clipboard-<ms>` segments, asserted through `rowel:autolockSecs` / `rowel:clipboardTimeout` in localStorage. |
-| Generator defaults | PR 4 | `settings-generator-symbols`, asserted through `rowel:generatorDefaults`. `settings-generator-length` and `-numbers` exist but nothing asserts them yet. |
+| Session preferences | PR 4 | `settings-autolock-<secs>` and `settings-clipboard-<ms>` segments, asserted through `autolockSecs` / `clipboardTimeoutMs` in the persisted settings (`readSettings()`). |
+| Generator defaults | PR 4 | `settings-generator-symbols`, asserted through the persisted `generator` record. `settings-generator-length` and `-numbers` exist but nothing asserts them yet. |
 | Breach monitoring switch | PR 4 | `settings-breach-toggle`; weak/reused are informational rows with no control, so the section holds exactly one `role="switch"` |
 | Import tiles | PR 4 | `import-tile-<bitwarden\|chrome\|lastpass\|keepass\|csv\|swftx>`, `import-dropzone`; the format `<select>` is gone |
-| Theme and date format | PR 4 | `settings-theme-light` / `-dark` (asserted on `<html data-theme>`), `settings-date-format-<pattern>` (asserted through `rowel:dateFormat`). `settings-theme-system` resolves against the OS, so the suite leaves it alone. |
+| Theme and date format | PR 4 | `settings-theme-light` / `-dark` (asserted on `<html data-theme>`), `settings-date-format-<pattern>` (asserted through the persisted `dateFormat`). `settings-theme-system` resolves against the OS, so the suite leaves it alone. |
 | Sync indicator reports a local-only vault | PR 4 | `sync-indicator`; the chip is mounted in every state, so with no provider configured `sync-indicator.spec.ts` asserts `data-tone="local"` rather than an absence. The tone, not the label — the label is localised. A connected reading is not e2e-able (see below). |
-| Copy toast | PR 4 | `copy-toast` — always in the DOM, toggled via the `hidden` class, so assert *visibility* |
+| Copy toast | PR 4 | `copy-toast` — mounted only while `ui.copied` holds (2s after a copy), so it is absent at rest; assert *visibility* either way |
 
 ---
 
@@ -84,9 +84,11 @@ These are not gaps in the suite; the coverage lives elsewhere and belongs there.
 
 ## Harness reference
 
-- `helpers/reset.ts` — `resetPristine()`, `resetEmpty(password)` (both clear webview
-  localStorage and then re-seed `locale = "en-US"`, so every spec selects on English labels
-  without pinning it itself)
+- `helpers/reset.ts` — `resetPristine()`, `resetEmpty(password)` (the backend wipe takes
+  `settings.json` with it; both then re-seed `locale = "en-US"`, so every spec selects on
+  English labels without pinning it itself)
+- `helpers/settings.ts` — `readSettings()`, `setSettings(patch)` over the dev-only
+  `window.__e2eSettings` bridge; preferences are Rust's, not localStorage's
 - `helpers/vault.ts` — `setupVault(password)`, `unlock(password)`, `lockVault()`
 - `helpers/entries.ts` — `createLogin`, `createCard`, `createNote`, `entryItems()`,
   `visibleTitles()`, `expectTitles(titles)`, `openEntry(title)`, `toggleFavorite()`

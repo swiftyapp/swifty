@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react'
-import { useStore, setCurrentEntry } from '@/store'
+import { useVault, setCurrentEntry } from '@/store'
 import { copySecret } from '@/services/entries'
 import { useVisibleEntries } from '../List/useVisibleEntries'
 
@@ -10,7 +10,7 @@ import { useVisibleEntries } from '../List/useVisibleEntries'
 // (the editor sheet, Settings, the palette, the generator dialog).
 export const useListKeys = () => {
   const entries = useVisibleEntries()
-  const currentId = useStore(state => state.entries.current?.id)
+  const currentId = useVault(state => state.currentId)
   // Where the keyboard sits in the list: -1 when nothing is selected, or when a
   // query has filtered the selection out from under it.
   const index = entries.findIndex(entry => entry.id === currentId)

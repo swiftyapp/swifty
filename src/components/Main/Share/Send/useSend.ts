@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { shareCreate, shareRevoke, type ShareCreated } from '@/api/share'
 import { describeError } from '@/api/errors'
-import { useStore, closeSend, queueOrphan, revokeOrphans } from '@/store'
+import { useApp, closeSend, queueOrphan, revokeOrphans } from '@/store'
 import { useCopied } from '@/hooks/useCopied'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
 
@@ -39,7 +39,7 @@ export interface Send {
  * the one thing this dialog does.
  */
 export function useSend(entryId: string): Send {
-  const connected = useStore(state => state.sync.enabled)
+  const connected = useApp(state => state.sync.configured)
   const [share, setShare] = useState<ShareCreated | null>(null)
   const [failed, setFailed] = useState<Failure | null>(null)
   const [busy, setBusy] = useState(false)
@@ -74,9 +74,9 @@ export function useSend(entryId: string): Send {
         setShare(created)
         setBusy(false)
       })
-      // Backend messages are written to be read ("sync is not configured", "a
-      // passkey cannot be shared"), so they are shown as they arrive rather
-      // than mapped to copy of our own.
+      // Said in the user's own language where the kind has a settled meaning
+      // ("sync is not configured"); the ones Rust writes per call site ("a
+      // passkey cannot be shared") still come through as they arrive.
       .catch(reason => {
         if (!current()) return
         setFailed({ op: 'create', message: describeError(reason) })

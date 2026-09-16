@@ -1,20 +1,20 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { t } from '@/i18n'
 
 // Only http/https are handed to the OS opener; anything else (file:, custom
 // schemes, javascript:) is refused. Defense in depth with the scoped
 // `opener:allow-open-url` capability.
-export const openLink = (raw: string) => {
-  let url: URL
+export const isOpenableUrl = (raw: string): boolean => {
   try {
-    url = new URL(raw)
+    const { protocol } = new URL(raw)
+    return protocol === 'http:' || protocol === 'https:'
   } catch {
-    window.alert(t('Invalid link'))
-    return
+    return false
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    window.alert(t('Only http and https links can be opened'))
-    return
-  }
-  openUrl(url.href)
+}
+
+// Call sites hide the affordance for a link that fails the check, so an
+// unopenable URL getting this far is a bug, not something to tell the user
+// about: it stays a no-op.
+export const openLink = (raw: string) => {
+  if (isOpenableUrl(raw)) openUrl(new URL(raw).href)
 }

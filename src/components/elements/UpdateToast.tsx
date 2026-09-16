@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
-import { useStore } from '@/store'
+import { useApp, dismissUpdate } from '@/store'
 import { restartForUpdate } from '@/services/autoUpdate'
 import Button from './Button'
 import { TOAST } from './tokens'
@@ -11,7 +11,7 @@ import { DownloadGlyph } from '../Main/icons'
 // is staged; otherwise shows transient feedback from a manual check. Renders
 // nothing when there is neither.
 export default function UpdateToast() {
-  const { readyVersion, readyNotes, status } = useStore(state => state.update)
+  const { readyVersion, readyNotes, status } = useApp(state => state.update)
 
   if (readyVersion) return <ReadyToast version={readyVersion} notes={readyNotes} />
   if (status) return <StatusToast status={status} />
@@ -22,7 +22,6 @@ const shell = `${TOAST} bottom-5 right-5`
 
 function ReadyToast({ version, notes }: { version: string; notes: string | null }) {
   const { t } = useTranslation()
-  const dismiss = useStore(state => state.dismissUpdate)
   const [restarting, setRestarting] = useState(false)
 
   const onRestart = async () => {
@@ -51,7 +50,7 @@ function ReadyToast({ version, notes }: { version: string; notes: string | null 
           <Button
             variant="pale"
             size="md"
-            onClick={restarting ? undefined : dismiss}
+            onClick={restarting ? undefined : dismissUpdate}
           >
             {t('Later')}
           </Button>
