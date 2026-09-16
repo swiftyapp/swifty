@@ -1,5 +1,6 @@
-import { memo, useId } from 'react'
+import { memo } from 'react'
 import AsteriskBody from './Asterisk'
+import { smileEye } from './mascotEyes'
 
 export type MascotState = 'idle' | 'typing' | 'checking' | 'success' | 'error'
 
@@ -8,10 +9,10 @@ interface Props {
   // Where the eyes look horizontally, -1 (left) .. 1 (right). The lock screen
   // maps the passphrase caret position onto this so the mascot reads along.
   gaze?: number
-  // How pleased it is, 0 .. 1. The open eyes squint into happy crescents as
-  // this rises — the bottom of each eye flattens and lifts until only the top
-  // is left — so the first run can brighten it a notch per step. Success and
-  // error keep their own eyes regardless.
+  // How pleased it is, 0 .. 1. The open eyes smile as this rises — from round,
+  // through a dome, to the arch with a soft underside that emoji use (😊) —
+  // so the first run can brighten it a notch per step. Success and error keep
+  // their own eyes regardless.
   joy?: number
   // Body color. The brand ink by default (shared with the rail mark, themed in
   // theme.css); a vault-personalization setting will feed this eventually.
@@ -19,13 +20,14 @@ interface Props {
   size?: number
 }
 
-// The eyes' shared vertical centre; the clip that makes them squint is cut
-// against it.
-const EYE_CY = 27.1
-
 const BRAND_INK = 'var(--c-brand)'
 // Eyes and expression strokes: paper on ink, so they flip with the theme too.
 const EYE = 'var(--c-brand-eye)'
+
+// The two open eyes: centre and half-width. Height varies with the state.
+const LEFT_EYE = { cx: 27.6, cy: 27.4 }
+const RIGHT_EYE = { cx: 37.2, cy: 26.8 }
+const EYE_RX = 3.5
 
 // The Rowel mascot: the brand asterisk (a secret value, redacted) with eyes.
 // It sits still and blinks every once in a while, follows typing with its
@@ -39,7 +41,6 @@ function Mascot({
   color = BRAND_INK,
   size = 96
 }: Props) {
-  const clipId = useId()
   const ok = state === 'success'
   const bad = state === 'error'
   const typing = state === 'typing'
@@ -60,13 +61,7 @@ function Mascot({
   const gazeX = ok || bad || checking ? 0 : Math.max(-1, Math.min(1, gaze)) * 3
   const gazeY = checking ? 1.5 : typing ? 2.5 : 0
   const eyeRy = checking ? 3 : typing ? 4.3 : 5
-
-  // Joy is a squint from below: the clip's floor rises from just under the
-  // eyes (nothing cut) to half way up them (a crescent), and the eyes lift a
-  // touch with it, the way cheeks push them up.
   const cheer = Math.max(0, Math.min(1, joy))
-  const eyeFloor = EYE_CY + eyeRy * (1 - 1.5 * cheer) + 0.5 * (1 - cheer)
-  const eyeLift = -1.5 * cheer
 
   return (
     <svg
@@ -79,11 +74,6 @@ function Mascot({
       data-joy={cheer}
       className={bodyAnim}
     >
-      <defs>
-        <clipPath id={clipId}>
-          <rect x="0" y="0" width="64" height={eyeFloor} />
-        </clipPath>
-      </defs>
       <AsteriskBody style={{ fill, transition: 'fill 300ms ease' }} />
 
       <g
@@ -98,31 +88,13 @@ function Mascot({
             ok || bad ? undefined : 'animate-[blink_6.8s_ease-in-out_infinite]'
           }
         >
-          {/* Open eyes (idle / typing), squinted by joy */}
+          {/* Open eyes (idle / typing), smiling to the degree of `joy` */}
           <g
-            clipPath={`url(#${clipId})`}
-            style={{
-              opacity: ok || bad ? 0 : 1,
-              transform: `translateY(${eyeLift}px)`,
-              transition: 'opacity 190ms ease, transform 300ms ease'
-            }}
+            style={{ opacity: ok || bad ? 0 : 1, transition: 'opacity 190ms ease' }}
+            fill={EYE}
           >
-            <ellipse
-              cx="27.6"
-              cy="27.4"
-              rx="3.5"
-              ry={eyeRy}
-              fill={EYE}
-              style={{ transition: 'ry 300ms ease' }}
-            />
-            <ellipse
-              cx="37.2"
-              cy="26.8"
-              rx="3.5"
-              ry={eyeRy}
-              fill={EYE}
-              style={{ transition: 'ry 300ms ease' }}
-            />
+            <path d={smileEye(LEFT_EYE.cx, LEFT_EYE.cy, EYE_RX, eyeRy, cheer)} />
+            <path d={smileEye(RIGHT_EYE.cx, RIGHT_EYE.cy, EYE_RX, eyeRy, cheer)} />
           </g>
           {/* Happy arcs (success) */}
           <g
