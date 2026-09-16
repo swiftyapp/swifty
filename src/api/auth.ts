@@ -1,8 +1,6 @@
 import { call } from './client'
 import type { BiometricMode, UnlockResult } from './types'
 
-export const setup = (password: string): Promise<void> => call('setup', { password })
-
 export const unlock = (password: string): Promise<UnlockResult> =>
   call('unlock', { password })
 

@@ -7,6 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use futures_util::stream::{self, StreamExt};
 use reqwest::Client;
 use ring::digest;
 use tauri::async_runtime::block_on;
@@ -15,6 +16,12 @@ use crate::error::{Error, Result};
 
 const RANGE_URL: &str = "https://api.pwnedpasswords.com/range/";
 const PREFIX_LEN: usize = 5;
+
+// How many range requests are in flight at once. A vault can easily hold a few
+// hundred distinct passwords, and one sequential round trip each is what made
+// the breach check feel like it had hung; the bound is there so a large vault
+// does not open a socket per password, nor hammer a public API.
+const MAX_IN_FLIGHT: usize = 8;
 
 // SHA-1 hex (uppercase, 40 chars) of the password. SHA-1 is required by the
 // HIBP range API and is not used here for any security property.
@@ -62,19 +69,26 @@ async fn is_pwned(client: &Client, password: &str) -> Result<bool> {
     Ok(is_breached(suffix, &body))
 }
 
-// Check each unique password once. A network/API failure maps to `false`
-// (not breached) so the rest of the audit still works offline.
+// Check each unique password once, `MAX_IN_FLIGHT` at a time. A network/API
+// failure maps to `false` (not breached) so the rest of the audit still works
+// offline — which is also why the results are collected rather than short
+// circuited: one prefix the CDN refuses must not cost the others their answer.
+//
+// Runs inside `block_on` on a blocking thread (see `commands::audit`), so the
+// concurrency here is all on this one thread: nothing is spawned, the futures
+// are simply polled together.
 pub fn check_all(passwords: &[&str]) -> HashMap<String, bool> {
     let client = crate::sync::http_client();
     let unique: HashSet<&str> = passwords.iter().copied().collect();
-    block_on(async {
-        let mut out = HashMap::with_capacity(unique.len());
-        for pw in unique {
-            let breached = is_pwned(&client, pw).await.unwrap_or(false);
-            out.insert(pw.to_string(), breached);
-        }
-        out
-    })
+    block_on(
+        stream::iter(unique)
+            .map(|pw| {
+                let client = &client;
+                async move { (pw.to_string(), is_pwned(client, pw).await.unwrap_or(false)) }
+            })
+            .buffer_unordered(MAX_IN_FLIGHT)
+            .collect(),
+    )
 }
 
 #[cfg(test)]

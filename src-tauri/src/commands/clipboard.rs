@@ -1,9 +1,40 @@
 use crate::error::Result;
 use std::time::Duration;
 use tauri::AppHandle;
-// iOS neither writes through the plugin nor reads the pasteboard back.
+// The delayed clear is everywhere but iOS, which neither writes through the
+// plugin nor reads the pasteboard back — so none of it is compiled there.
+#[cfg(not(target_os = "ios"))]
+use std::sync::Arc;
+#[cfg(not(target_os = "ios"))]
+use tauri::Manager;
 #[cfg(not(target_os = "ios"))]
 use tauri_plugin_clipboard_manager::ClipboardExt;
+
+/// The pending clipboard clear.
+///
+/// One re-armable timer for the whole process rather than a thread that sleeps
+/// for the delay: copying ten fields in a row used to park ten OS threads, each
+/// holding on to the secret it was armed with. Last copy wins, which is also
+/// what the compare-before-clear wants — an earlier value is no longer on the
+/// clipboard, so there is nothing left for its deadline to clear.
+///
+/// Managed in `lib.rs`, and not on iOS: nothing arms it there.
+#[cfg(not(target_os = "ios"))]
+pub struct ClipboardClear(Arc<crate::timer::Timer>);
+
+#[cfg(not(target_os = "ios"))]
+impl Default for ClipboardClear {
+    fn default() -> Self {
+        Self(crate::timer::Timer::spawn())
+    }
+}
+
+#[cfg(not(target_os = "ios"))]
+impl ClipboardClear {
+    fn arm(&self, after: Duration, fire: impl FnOnce() + Send + 'static) {
+        self.0.arm(after, fire);
+    }
+}
 
 // Copy text to the clipboard, optionally clearing it after `clear_after_ms`.
 //
@@ -23,8 +54,7 @@ pub fn copy_to_clipboard(app: AppHandle, value: String, clear_after_ms: Option<u
     #[cfg(not(target_os = "ios"))]
     if let Some(delay) = clear_after {
         let handle = app.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(delay);
+        app.state::<ClipboardClear>().arm(delay, move || {
             let current = handle.clipboard().read_text().ok();
             if should_clear(&value, current.as_deref()) {
                 let _ = handle.clipboard().clear();
@@ -35,7 +65,7 @@ pub fn copy_to_clipboard(app: AppHandle, value: String, clear_after_ms: Option<u
 }
 
 // Only clear when the clipboard still holds exactly what we wrote. Nothing but
-// the delayed-clear thread consults it, and iOS has no such thread.
+// the delayed clear consults it, and iOS arms no such callback.
 #[cfg_attr(target_os = "ios", allow(dead_code))]
 fn should_clear(written: &str, current: Option<&str>) -> bool {
     current == Some(written)

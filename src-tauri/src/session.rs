@@ -108,6 +108,24 @@ pub fn open_with_key(app: &AppHandle, key: &VaultKey) -> Result<(SqliteStore, Ve
     Ok((store, metas))
 }
 
+// Open a second connection to the live database, keyed the same way, for one
+// long read.
+//
+// The session's own store may not be borrowed for the length of a pack: a pack
+// copies the whole database page by page, and holding the session mutex for that
+// blocks every command that only wants a single row — which is what made
+// `reveal_entry` stall behind a sync. SQLCipher is happy with a second reader
+// (the database is in WAL mode), so the pack reads through one of its own and
+// the guard is released the moment this returns.
+//
+// The caller took the key from the session under the lock, so the connection is
+// keyed to the vault as it was at that instant; a re-key landing afterwards
+// fails this connection's reads rather than producing a snapshot nobody can
+// open.
+pub fn open_snapshot_source(app: &AppHandle, key: &[u8]) -> Result<SqliteStore> {
+    SqliteStore::open(&storage::db_path(app)?, key).map_err(store_err)
+}
+
 // Derivation for the metadata columns added after a row was written: unseal each
 // candidate once and stamp what its payload says. Best-effort — a failure just
 // leaves the row for the next unlock.
@@ -228,4 +246,152 @@ pub fn live_records(store: &SqliteStore) -> Result<Vec<Record>> {
         .into_iter()
         .filter(|r| r.deleted_at.is_none())
         .collect())
+}
+
+/// Where the session guard may not be held — asserted on the source itself.
+///
+/// The rule this module exists for: [`Session`]'s mutex is held around memory
+/// only, never across a KDF, a pack, a network call or a modal prompt. Every
+/// command in this app shares that one lock, so a guard alive across any of them
+/// stalls all of them — that is what made `reveal_entry` queue behind a sync's
+/// VACUUM and behind Argon2id on an export.
+///
+/// Nothing in the type system says so: a guard is just a value, and holding one
+/// too long is a shape, not an error. So these are tripwires rather than proofs.
+/// They read the source of the four functions that had it wrong and assert the
+/// order their statements are in, so re-introducing the old shape fails the
+/// build with the reason attached.
+#[cfg(test)]
+mod lock_scope {
+    // Everything above the test module: the fakes below it borrow nothing from
+    // the real session and would only confuse the search.
+    fn production(source: &str) -> &str {
+        match source.find("#[cfg(test)]") {
+            Some(at) => &source[..at],
+            None => source,
+        }
+    }
+
+    // The brace-matched body of the function `signature` introduces, with
+    // full-line comments dropped so prose about a lock never reads as one.
+    fn body_of(source: &str, signature: &str) -> String {
+        let source = production(source);
+        let start = source
+            .find(signature)
+            .unwrap_or_else(|| panic!("`{signature}` is gone — keep this guard in step with it"));
+        let open = start + source[start..].find('{').expect("a function has a body");
+        let mut depth = 0usize;
+        let mut end = None;
+        for (i, c) in source[open..].char_indices() {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = Some(open + i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        source[open..=end.expect("balanced braces")]
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    // Where `needle` occurs in `body`, or a failure naming what went missing.
+    fn at(body: &str, needle: &str) -> usize {
+        body.find(needle)
+            .unwrap_or_else(|| panic!("`{needle}` is gone — keep this guard in step with the code"))
+    }
+
+    #[test]
+    fn the_sync_pack_does_not_borrow_the_session_store() {
+        let engine = include_str!("sync/engine.rs");
+        // The trailing brace tells the implementation apart from the trait
+        // method it implements, which is a declaration and has no body.
+        let pack = body_of(
+            engine,
+            "fn pack(&self, cutoff_ms: i64) -> Result<Vec<u8>> {",
+        );
+        at(&pack, "pack_store");
+        assert!(
+            !pack.contains("with_store") && !pack.contains("with_session"),
+            "the pack copies the whole database; it must not run inside the \
+             session guard — take the lock for the reclaim and again for the \
+             key re-check instead"
+        );
+
+        // ...and the step that *does* take the lock stays short.
+        let reclaim = body_of(engine, "fn reclaim_and_open(&self, cutoff_ms: i64)");
+        at(&reclaim, "with_store");
+        assert!(
+            !reclaim.contains("pack_store"),
+            "the reclaim runs under the guard, so the pack may not move into it"
+        );
+    }
+
+    #[test]
+    fn a_password_change_derives_and_re_keys_outside_the_guard() {
+        let body = body_of(
+            include_str!("commands/auth.rs"),
+            "pub async fn change_master_password(",
+        );
+        assert!(
+            at(&body, "derive_both") < at(&body, "session.lock()"),
+            "both Argon2id derives belong before the lock is taken"
+        );
+        assert!(
+            at(&body, "session.lock()") < at(&body, "blocking("),
+            "the lock is taken to check the key and take the store out, and \
+             released before the saga runs"
+        );
+        assert!(
+            at(&body, "blocking(") < at(&body, "auth::rekey"),
+            "the rekey saga runs on the blocking pool, not on a worker"
+        );
+    }
+
+    #[test]
+    fn the_vault_export_derives_and_packs_outside_the_guard() {
+        let body = body_of(
+            include_str!("commands/vault.rs"),
+            "pub async fn export_vault(",
+        );
+        assert!(
+            at(&body, "derive_key") < at(&body, "session.lock()"),
+            "the export's Argon2id derive belongs before the lock is taken"
+        );
+        assert!(
+            at(&body, "session.lock()") < at(&body, "pack_store"),
+            "the lock is taken to check the key and open a connection of the \
+             pack's own; the pack itself runs after it is released"
+        );
+        at(&body, "open_snapshot_source");
+    }
+
+    #[test]
+    fn the_entry_export_unseals_from_a_cipher_clone() {
+        let import = include_str!("commands/import.rs");
+        // The helper takes an owned cipher, which is what lets the unseal leave
+        // the guard's scope with the records.
+        assert!(
+            production(import)
+                .contains("fn to_imported(records: &[Record], cipher: &PayloadCipher)"),
+            "the export helper must take a cipher, not a session or a guard"
+        );
+
+        let body = body_of(import, "pub async fn export_entries(");
+        assert!(
+            at(&body, "session.lock()") < at(&body, "super::blocking("),
+            "the rows and the cipher come out under the lock; the unseal does not"
+        );
+        assert!(
+            at(&body, "super::blocking(") < at(&body, "to_imported"),
+            "unsealing every entry is a pass over the whole vault — off the worker"
+        );
+    }
 }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::hibp;
 use crate::models::{Audit, AuditItem, Entry};
 use crate::session::live_records;
@@ -28,7 +28,7 @@ pub async fn get_audit(state: State<'_, AppState>, check_breaches: bool) -> Resu
             .collect();
         (s.payload_cipher()?, payloads)
     };
-    tauri::async_runtime::spawn_blocking(move || {
+    super::blocking(move || {
         let entries: Vec<Entry> = payloads
             .iter()
             .map(|p| cipher.unseal(p))
@@ -36,7 +36,6 @@ pub async fn get_audit(state: State<'_, AppState>, check_breaches: bool) -> Resu
         audit(&entries, check_breaches)
     })
     .await
-    .map_err(|e| Error::Crypto(e.to_string()))?
 }
 
 // Flag each non-empty password as weak / reused / breached. Entries arrive

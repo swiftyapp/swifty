@@ -1,4 +1,6 @@
 mod app;
+// The master-password domain: the failed-unlock backoff and the rekey saga.
+mod auth;
 mod autolock;
 mod biometrics;
 mod cards;
@@ -67,6 +69,14 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_deep_link::init());
     }
 
+    // The timer behind the delayed clipboard clear. Not on iOS, where the
+    // pasteboard's own expiry does the clearing and no timer is armed (see
+    // `commands::clipboard`).
+    #[cfg(not(target_os = "ios"))]
+    {
+        builder = builder.manage(commands::clipboard::ClipboardClear::default());
+    }
+
     // In-app W3C WebDriver server (port 4445) for the E2E smoke suite. Never
     // compiled into a release binary, and desktop-only — the suite drives the
     // desktop app.
@@ -123,7 +133,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::auth::setup,
             commands::auth::unlock,
             commands::auth::lock,
             commands::auth::unlock_biometric,
