@@ -1,6 +1,6 @@
 import { setupDriveConnect, setupDriveDisconnect } from '@/api/setup'
 import { setupDrivePending, setupDriveFailed, setupDriveReset } from '@/store'
-import { messageOf } from '@/api/errors'
+import { describeError } from '@/api/errors'
 
 /**
  * Open the Google consent flow for a device that has no data yet.
@@ -13,7 +13,7 @@ import { messageOf } from '@/api/errors'
  */
 export const connectDrive = (): void => {
   setupDrivePending()
-  setupDriveConnect().catch((error: unknown) => setupDriveFailed(messageOf(error)))
+  setupDriveConnect().catch((error: unknown) => setupDriveFailed(describeError(error)))
 }
 
 /** Drop the pending tokens and everything the probe said about them. */
@@ -28,5 +28,5 @@ export const switchDriveAccount = (): void => {
   setupDriveDisconnect()
     .catch(() => {})
     .then(() => setupDriveConnect())
-    .catch((error: unknown) => setupDriveFailed(messageOf(error)))
+    .catch((error: unknown) => setupDriveFailed(describeError(error)))
 }

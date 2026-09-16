@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { exportEntries, type ExportFormat } from '@/api/imports'
-import { messageOf } from '@/api/errors'
+import { describeError } from '@/api/errors'
 import type { TKey } from '@/i18n'
 import Button from '@/components/elements/Button'
 import Select from '@/components/elements/Select'
@@ -31,7 +31,7 @@ export default function ExportRow() {
     setError(null)
     exportEntries(format)
       .then(path => setSaved(path))
-      .catch((e: unknown) => setError(messageOf(e)))
+      .catch((e: unknown) => setError(describeError(e)))
       .finally(() => setRunning(false))
   }
 

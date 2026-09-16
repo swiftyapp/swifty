@@ -144,7 +144,7 @@ describe('sharing an entry', () => {
     expect(useStore.getState().share.sendFor).toBeNull()
   })
 
-  it('shows what the backend said when the seal fails', async () => {
+  it('says in the app’s own words why the seal failed', async () => {
     mockCommandOnce('share_create', () =>
       Promise.reject({ kind: 'syncNotConfigured', message: 'sync is not configured' })
     )
@@ -152,9 +152,7 @@ describe('sharing an entry', () => {
 
     openSend('l1')
 
-    expect(await screen.findByTestId('share-send-error')).toHaveTextContent(
-      'sync is not configured'
-    )
+    expect(await screen.findByTestId('share-send-error')).toHaveTextContent('Sync is not set up')
     await userEvent.click(screen.getByTestId('share-retry-button'))
     expect(await screen.findByTestId('share-link')).toHaveValue(LINK)
   })
@@ -224,7 +222,7 @@ describe('receiving a shared entry', () => {
     expect(useStore.getState().ui.addPicker).toBe(false)
   })
 
-  it('shows a backend refusal verbatim', async () => {
+  it('says in the app’s own words that the share is gone', async () => {
     mockCommandOnce('share_open', () =>
       Promise.reject({ kind: 'notFound', message: 'this share has expired or was revoked' })
     )
@@ -232,9 +230,7 @@ describe('receiving a shared entry', () => {
 
     await paste('not-a-link')
 
-    expect(await screen.findByTestId('share-receive-error')).toHaveTextContent(
-      'this share has expired or was revoked'
-    )
+    expect(await screen.findByTestId('share-receive-error')).toHaveTextContent('Item not found')
     expect(screen.queryByTestId('share-preview')).not.toBeInTheDocument()
   })
 

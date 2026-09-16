@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Entry } from '@/api/types'
 import { shareOpen } from '@/api/share'
-import { messageOf } from '@/api/errors'
+import { describeError } from '@/api/errors'
 import type { EntryDraft } from '@/defaults/entries'
 import { saveEntry, closeReceive } from '@/store'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
@@ -79,7 +79,7 @@ export function useReceive(): Receive {
       // not a Rowel share link", expired, revoked), and only it can tell.
       .catch(reason => {
         if (!current()) return
-        setError(messageOf(reason))
+        setError(describeError(reason))
         setBusy(false)
       })
   }
@@ -92,7 +92,7 @@ export function useReceive(): Receive {
       .then(() => current() && closeReceive())
       .catch(reason => {
         if (!current()) return
-        setError(messageOf(reason))
+        setError(describeError(reason))
         setBusy(false)
       })
   }

@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next'
 import type { BiometricMode } from '@/api/types'
 import { appStatus } from '@/api/app'
 import { enableBiometric, disableBiometric } from '@/api/auth'
-import { messageOf } from '@/api/errors'
+import { describeError } from '@/api/errors'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Toggle from '@/components/elements/Toggle'
@@ -51,7 +51,7 @@ export default function BiometricRow() {
           setEnabled(false)
           setMode(null)
         })
-        .catch((err: unknown) => setError(messageOf(err)))
+        .catch((err: unknown) => setError(describeError(err)))
         .finally(done)
       return
     }
@@ -60,7 +60,7 @@ export default function BiometricRow() {
         setEnabled(true)
         setMode(next)
       })
-      .catch((err: unknown) => setError(messageOf(err)))
+      .catch((err: unknown) => setError(describeError(err)))
       .finally(done)
   }
 

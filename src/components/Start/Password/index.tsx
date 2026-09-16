@@ -7,7 +7,7 @@ import Button from '@/components/elements/Button'
 import { evaluate, MIN_LENGTH } from '@/services/strength'
 import StepHeader from '../shared/StepHeader'
 import { COLUMN } from '../shared/layout'
-import { messageOf } from '@/api/errors'
+import { describeError } from '@/api/errors'
 
 interface Props {
   onBack: () => void
@@ -60,7 +60,7 @@ export default function Password({ onBack, onContinue }: Props) {
     setBusy(true)
     onContinue(password).catch((err: unknown) => {
       setBusy(false)
-      setMismatch(messageOf(err) || t('Something went wrong'))
+      setMismatch(describeError(err) || t('Something went wrong'))
     })
   }
 
