@@ -244,7 +244,9 @@ describe('receiving a shared entry', () => {
 
     await paste('not-a-link')
 
-    expect(await screen.findByTestId('share-receive-error')).toHaveTextContent('Item not found')
+    expect(await screen.findByTestId('share-receive-error')).toHaveTextContent(
+      'This share has expired or was revoked'
+    )
     expect(screen.queryByTestId('share-preview')).not.toBeInTheDocument()
   })
 
