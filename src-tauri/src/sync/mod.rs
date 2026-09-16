@@ -108,8 +108,18 @@ pub fn setup(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
 #[cfg(mobile)]
 pub use auth::{begin, complete, parse_redirect, redirect_matches, Redirect};
 
-pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
+/// Drop the account locally, handing back the tokens that were stored so the
+/// caller can [`revoke`] them.
+pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
     auth::disconnect(app, cryptor)
+}
+
+/// Retire a disconnected account's grant at Google. Best effort: the local
+/// disconnect stands whatever happens here.
+pub(crate) async fn revoke(tokens: &Tokens) {
+    if let Some(token) = auth::revocable(tokens) {
+        auth::revoke(&http_client(), token).await;
+    }
 }
 
 /// One full sync against Drive. Blocking: call it on a dedicated thread.

@@ -23,7 +23,6 @@
 use std::io::{BufRead, BufReader, Write};
 #[cfg(desktop)]
 use std::net::TcpListener;
-#[cfg(desktop)]
 use std::time::Duration;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -50,6 +49,7 @@ const CALLBACK: &str = "/auth/callback";
 const SCOPE: &str = "https://www.googleapis.com/auth/drive.file";
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
+const REVOKE_URL: &str = "https://oauth2.googleapis.com/revoke";
 
 // Supply your own Google OAuth client at build or run time.
 const CLIENT_ID_PLACEHOLDER: &str = "YOUR_GOOGLE_OAUTH_CLIENT_ID";
@@ -238,17 +238,45 @@ pub fn is_configured(app: &AppHandle, cryptor: &Cryptor) -> bool {
     read_tokens(app, cryptor).is_some_and(|t| t.access_token.is_some() || t.refresh_token.is_some())
 }
 
-// Keep only the refresh token (parity with legacy disconnect).
-pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
-    let refresh_token = read_tokens(app, cryptor).and_then(|t| t.refresh_token);
-    write_tokens(
-        app,
-        cryptor,
-        &Tokens {
-            refresh_token,
-            ..Default::default()
-        },
-    )
+/// Forget the account: the token file goes, so nothing survives to mint a new
+/// access token with. Keeping the refresh token here (as the legacy client did)
+/// meant the next unlock read the file back as "configured" and auto-sync
+/// uploaded to an account the user had just disconnected.
+///
+/// Hands back whatever was stored so the caller can revoke it upstream — the
+/// file is gone by then, and this is the last chance to see it.
+pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
+    let tokens = read_tokens(app, cryptor);
+    storage::remove_gdrive(app);
+    tokens
+}
+
+/// The token to revoke. Google kills the whole grant from either half of the
+/// pair, so this prefers the one that outlives the session.
+pub fn revocable(tokens: &Tokens) -> Option<&str> {
+    tokens
+        .refresh_token
+        .as_deref()
+        .or(tokens.access_token.as_deref())
+}
+
+/// Ask Google to invalidate the grant. Best effort, and deliberately bounded:
+/// the local disconnect has already happened and must not be held up by a
+/// network that never answers.
+pub async fn revoke(client: &Client, token: &str) {
+    let sent = client
+        .post(REVOKE_URL)
+        .timeout(Duration::from_secs(10))
+        .form(&[("token", token)])
+        .send()
+        .await;
+    match sent {
+        Ok(resp) if !resp.status().is_success() => {
+            log::warn!("Drive token revocation refused: {}", resp.status())
+        }
+        Err(e) => log::warn!("Drive token revocation failed: {e}"),
+        _ => {}
+    }
 }
 
 // --- OAuth flow ---
@@ -554,6 +582,22 @@ mod tests {
             challenge(verifier),
             "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
         );
+    }
+
+    #[test]
+    fn revocation_prefers_the_refresh_token() {
+        let both = Tokens {
+            access_token: Some("at".into()),
+            refresh_token: Some("rt".into()),
+            expires_at: None,
+        };
+        assert_eq!(revocable(&both), Some("rt"));
+        let access_only = Tokens {
+            access_token: Some("at".into()),
+            ..Default::default()
+        };
+        assert_eq!(revocable(&access_only), Some("at"));
+        assert_eq!(revocable(&Tokens::default()), None);
     }
 
     #[test]

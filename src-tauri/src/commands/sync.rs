@@ -56,11 +56,17 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     start_consent(&app, &state, AuthPurpose::Connect).inspect_err(|e| failed(&app, e.to_string()))
 }
 
-// Disconnect the sync provider (keeps the refresh token, per legacy).
+/// Disconnect the sync provider: the token file is deleted and the grant is
+/// retired at Google.
+///
+/// The local half runs first and synchronously, and the revocation goes to a
+/// detached task afterwards — a user who disconnects on a plane is still
+/// disconnected, and nothing on this device can reconnect without fresh consent
+/// whether or not Google ever hears about it.
 #[tauri::command]
 pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     let cryptor = state.session.lock().unwrap().cryptor()?;
-    sync::disconnect(&app, &cryptor)?;
+    let tokens = sync::disconnect(&app, &cryptor);
     state.session.lock().unwrap().sync_configured = false;
     // The timestamp goes with the connection: the next one is a new pairing,
     // and "synced 3m ago" from a previous one would be a lie about it.
@@ -69,6 +75,9 @@ pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()>
         run.error = None;
         run.last_synced_at = None;
     });
+    if let Some(tokens) = tokens {
+        tauri::async_runtime::spawn(async move { sync::revoke(&tokens).await });
+    }
     Ok(())
 }
 
