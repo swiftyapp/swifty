@@ -6,6 +6,7 @@
 //! switch and re-probes `app_status` afterwards.
 
 use std::fs;
+use std::path::Path;
 use std::sync::atomic::Ordering;
 
 use rand::RngCore;
@@ -33,12 +34,14 @@ pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) 
     // neither may see them move underneath.
     let _step = begin_step(&state)?;
     let root = storage::root_dir(&app)?;
+
+    // Read under the lock too: every writer of the registry holds it, so what is
+    // saved below is a change to the current file, never to a stale copy.
+    let _paths = state.workspace_lock.lock().unwrap();
     let mut registry = Registry::load(&root);
     if !registry.contains(&id) {
         return Err(Error::NotFound);
     }
-
-    let _paths = state.workspace_lock.lock().unwrap();
     guard_sync_idle(&state)?;
 
     // Persist first: a save that fails leaves the session open and the paths
@@ -75,6 +78,22 @@ fn guard_sync_idle(state: &AppState) -> Result<()> {
         return Err(Error::Other(SYNC_BUSY.into()));
     }
     Ok(())
+}
+
+/// Load, change and save the registry as one step under the workspace lock, so
+/// two writers can never each save a copy that lacks the other's change — a
+/// rename landing beside a create would otherwise drop the new workspace from
+/// the file and leave its vault with no way back to it after a relaunch.
+fn update_registry<T>(
+    state: &AppState,
+    root: &Path,
+    change: impl FnOnce(&mut Registry) -> Result<T>,
+) -> Result<T> {
+    let _paths = state.workspace_lock.lock().unwrap();
+    let mut registry = Registry::load(root);
+    let out = change(&mut registry)?;
+    registry.save(root)?;
+    Ok(out)
 }
 
 /// Put back what `workspace_create` took out: the session that was open and
@@ -141,13 +160,15 @@ pub async fn workspace_create(
     // so a failure anywhere above has nothing on record to undo. If this write
     // fails the vault goes too — a database no registry names would otherwise
     // be one with no way back to it.
-    let mut registry = Registry::load(&root);
-    registry.workspaces.push(Workspace {
-        id: id.clone(),
-        name: Some(name),
+    let recorded = update_registry(&state, &root, |registry| {
+        registry.workspaces.push(Workspace {
+            id: id.clone(),
+            name: Some(name),
+        });
+        registry.active = id.clone();
+        Ok(())
     });
-    registry.active = id.clone();
-    if let Err(e) = registry.save(&root) {
+    if let Err(e) = recorded {
         // The store closes before its files are removed.
         drop(created);
         discard(&root, &id);
@@ -165,21 +186,27 @@ pub async fn workspace_create(
 
 /// Give a workspace a (new) label. Ids never change; only this does.
 #[tauri::command]
-pub fn workspace_rename(id: String, name: String, app: AppHandle) -> Result<()> {
+pub fn workspace_rename(
+    id: String,
+    name: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<()> {
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err(Error::Other("a workspace needs a name".into()));
     }
 
     let root = storage::root_dir(&app)?;
-    let mut registry = Registry::load(&root);
-    let workspace = registry
-        .workspaces
-        .iter_mut()
-        .find(|w| w.id == id)
-        .ok_or(Error::NotFound)?;
-    workspace.name = Some(name);
-    registry.save(&root)
+    update_registry(&state, &root, |registry| {
+        let workspace = registry
+            .workspaces
+            .iter_mut()
+            .find(|w| w.id == id)
+            .ok_or(Error::NotFound)?;
+        workspace.name = Some(name);
+        Ok(())
+    })
 }
 
 // Argon2id + creating the encrypted DB, off the command thread. The directory
@@ -187,7 +214,7 @@ pub fn workspace_rename(id: String, name: String, app: AppHandle) -> Result<()> 
 // anything, and the sidecar must land in the new workspace, not beside it.
 async fn create_vault_in(
     app: &AppHandle,
-    root: &std::path::Path,
+    root: &Path,
     id: &str,
     password: String,
 ) -> Result<(crate::crypto::VaultKey, crate::store::SqliteStore)> {
@@ -203,7 +230,7 @@ async fn create_vault_in(
 }
 
 // Undo everything `create_vault_in` may have written.
-fn discard(root: &std::path::Path, id: &str) {
+fn discard(root: &Path, id: &str) {
     let dir = workspace::dir_of(root, id);
     storage::remove_db_files(&dir.join(storage::DB_FILE));
     let _ = fs::remove_file(dir.join(storage::KDF_SIDECAR_FILE));

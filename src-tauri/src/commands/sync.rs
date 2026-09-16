@@ -153,13 +153,14 @@ fn spawn_consent(app: &AppHandle, state: &State<'_, AppState>, follow: Follow) -
     };
     let app = app.clone();
     std::thread::spawn(move || match sync::setup(&app, &cryptor) {
+        // Either way the run is claimed before the consent is marked over, so
+        // the flags overlap rather than leave a gap a workspace switch could
+        // use — and the first upload cannot be skipped by one landing there.
         Ok(()) => match follow {
             Follow::Run => {
-                connected(&app);
                 start_run(&app);
+                connected(&app);
             }
-            // In flight before the consent is over, so `pending` and
-            // `in_progress` overlap rather than leave a gap a switch could use.
             Follow::Pull => {
                 started(&app);
                 connected(&app);
@@ -307,16 +308,17 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
         };
         match sync::complete(&app, &cryptor, &code, &pending.verifier).await {
             Ok(()) => {
+                // The run is claimed before the consent is marked over, as in
+                // `spawn_consent`; the pull gets a plain thread for the same
+                // reason `start_run` uses one.
                 if purpose == AuthPurpose::Import {
-                    // In flight before the consent is over (see `spawn_consent`),
-                    // then a plain thread, for the same reason `start_run` uses one.
                     started(&app);
                     connected(&app);
                     let handle = app.clone();
                     std::thread::spawn(move || pull(&handle, cryptor));
                 } else {
-                    connected(&app);
                     start_run(&app);
+                    connected(&app);
                 }
             }
             Err(e) => fail(&app, purpose, e.to_string()),
