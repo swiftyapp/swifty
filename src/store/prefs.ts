@@ -67,7 +67,7 @@ const sanitize = (raw: Partial<Settings>): Settings => {
 
 export const usePrefs = create<Settings>()(() => DEFAULT_PREFS)
 
-/** Take the boot probe's answer wholesale (see `main.tsx`). */
+/** Take the boot probe's answer wholesale (see `boot.ts`). */
 export const hydratePrefs = (settings: Settings): void => {
   usePrefs.setState(sanitize(settings), true)
 }

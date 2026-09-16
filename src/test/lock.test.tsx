@@ -82,7 +82,7 @@ describe('lock screen on compact', () => {
   })
 
   it('is what the auth flow renders on a phone', async () => {
-    // What the boot probe said, as main.tsx would have stored it.
+    // What the boot probe said, as boot.ts would have stored it.
     seedApp({ biometric: { available: true, canEnroll: true, type: 'touch', mode: 'prompt' } })
     render(<App />)
 

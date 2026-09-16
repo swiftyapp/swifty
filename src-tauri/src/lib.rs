@@ -131,6 +131,7 @@ pub fn run() {
             commands::auth::disable_biometric,
             commands::auth::change_master_password,
             commands::app::app_status,
+            commands::app::app_ready,
             commands::app::set_settings,
             commands::vault::reveal_entry,
             commands::vault::save_entry,

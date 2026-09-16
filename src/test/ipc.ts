@@ -50,7 +50,7 @@ let settings: Settings = DEFAULT_SETTINGS
 /**
  * The launch probe's answer on a plain desktop with nothing enrolled. Exported
  * because the store now holds it too: `renderWithStore` seeds the same object
- * `main.tsx` would have put there (see test/utils).
+ * `boot.ts` would have put there (see test/utils).
  */
 export const appStatusDefault = (): AppStatus => ({
   initialized: true,
@@ -71,6 +71,7 @@ export const appStatusDefault = (): AppStatus => ({
 
 const DEFAULTS: Record<string, Handler> = {
   app_status: appStatusDefault,
+  app_ready: () => undefined,
 
   setup: () => undefined,
   unlock: () => session,

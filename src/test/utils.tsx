@@ -17,7 +17,7 @@ import type { Audit } from '@/api/tools'
 import { appStatusDefault } from './ipc'
 
 /**
- * The launch probe's answer, as the store holds it after `main.tsx` has run.
+ * The launch probe's answer, as the store holds it after `boot.ts` has run.
  * Every suite starts booted (see `resetStores`); a spec about one leaf of it
  * overrides that leaf.
  */
