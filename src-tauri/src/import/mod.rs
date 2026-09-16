@@ -78,6 +78,23 @@ impl EntryKind {
             EntryKind::ApiKey => "apikey",
         }
     }
+
+    /// The inverse of [`EntryKind::as_str`]. The `type` column of our own CSV
+    /// and `models::Entry.kind` both name a kind this way, so both read it back
+    /// through here rather than each keeping its own match to drift.
+    pub fn parse(name: &str) -> Option<EntryKind> {
+        [
+            EntryKind::Login,
+            EntryKind::Note,
+            EntryKind::Card,
+            EntryKind::Identity,
+            EntryKind::Ssh,
+            EntryKind::Env,
+            EntryKind::ApiKey,
+        ]
+        .into_iter()
+        .find(|k| k.as_str() == name)
+    }
 }
 
 /// A normalized, plaintext entry — the shared intermediate for both import and
@@ -93,19 +110,33 @@ pub struct ImportedEntry {
     pub notes: Option<String>,
     pub otp: Option<String>,
     pub tags: Vec<String>,
-    // Card fields (only meaningful when kind == Card).
+    // The address a login signs in with when it is not the username (only
+    // meaningful when kind == Login). No format has a member for it, so it
+    // travels as a labelled field (see `export::labelled_fields`).
+    pub email: Option<String>,
+    // Card fields (only meaningful when kind == Card). The PIN has no member in
+    // Bitwarden or CXF either and travels the same labelled way.
     pub card_number: Option<String>,
     pub card_month: Option<String>,
     pub card_year: Option<String>,
     pub card_cvc: Option<String>,
     pub cardholder: Option<String>,
-    // ID-document fields (only meaningful when kind == Identity). Only the four
-    // a foreign format can actually carry — the rest of the document (dates,
-    // authority, nationality) has nowhere to go in Bitwarden or CXF.
+    pub card_pin: Option<String>,
+    // ID-document fields (only meaningful when kind == Identity). The first four
+    // are the ones a foreign format has a member for; the rest of the document
+    // rides as labelled fields, so the whole document survives a round-trip
+    // through any of the three formats we write.
     pub doc_type: Option<String>,
     pub doc_number: Option<String>,
     pub doc_country: Option<String>,
     pub holder_name: Option<String>,
+    pub doc_nationality: Option<String>,
+    pub doc_birth_date: Option<String>,
+    pub doc_sex: Option<String>,
+    pub doc_issue_date: Option<String>,
+    pub doc_expiry_date: Option<String>,
+    pub doc_authority: Option<String>,
+    pub doc_personal_number: Option<String>,
     // SSH key fields (only meaningful when kind == Ssh). The private key is the
     // credential; the public line and fingerprint are derivable from it but are
     // carried where a format has room, so a round-trip needs no key parsing.
@@ -134,6 +165,14 @@ pub struct ImportedEntry {
     // Empty when the source carries none; only Bitwarden has somewhere to put
     // them (its custom `fields`), so CSV and CXF always leave this empty.
     pub extra: Vec<(String, String)>,
+    // Entry state that belongs to no kind. The star and the three timestamps
+    // are carried so an export is a faithful copy and a re-import is not
+    // mistaken for a fresh edit — an entry stamped "now" on the way in wins
+    // every last-writer-wins sync race against the copy it came from.
+    pub favorite: bool,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub password_updated_at: Option<String>,
 }
 
 /// The two environments the app's switch has; anything else has no segment.

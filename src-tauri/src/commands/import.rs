@@ -298,7 +298,14 @@ pub async fn export_entries(
 fn to_imported(records: &[Record], cipher: &PayloadCipher) -> Result<Vec<ImportedEntry>> {
     records
         .iter()
-        .map(|r| Ok(entry_to_imported(&cipher.unseal(&r.payload)?)))
+        .map(|r| {
+            // The star lives in a column, not in the sealed payload, so it is
+            // re-attached here — the same move `migrate::export_entry` makes
+            // for a `.swftx` backup.
+            let mut entry = cipher.unseal(&r.payload)?;
+            entry.favorite = r.favorite;
+            Ok(entry_to_imported(&entry))
+        })
         .collect()
 }
 
@@ -324,8 +331,14 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
                 })
                 .collect()
         }),
-        created_at: Some(now.clone()),
-        updated_at: Some(now),
+        // The star and the stamps the source carried, not this moment: an entry
+        // stamped "now" on the way in is a newer copy of itself and wins every
+        // last-writer-wins sync race against the vault it came from. Only a
+        // source that has no dates of its own falls back to now.
+        favorite: imp.favorite,
+        created_at: imp.created_at.clone().or_else(|| Some(now.clone())),
+        updated_at: imp.updated_at.clone().or(Some(now)),
+        password_updated_at: imp.password_updated_at.clone(),
         ..Default::default()
     };
     match imp.kind {
@@ -333,6 +346,7 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
             e.username = imp.username.clone();
             e.password = imp.password.clone();
             e.website = imp.url.clone();
+            e.email = imp.email.clone();
             e.otp = imp.otp.clone();
             e.passkeys =
                 (!imp.passkeys.is_empty()).then(|| imp.passkeys.iter().map(to_passkey).collect());
@@ -343,12 +357,22 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
             e.year = imp.card_year.clone();
             e.cvc = imp.card_cvc.clone();
             e.name = imp.cardholder.clone();
+            e.pin = imp.card_pin.clone();
         }
         EntryKind::Identity => {
             e.doc_type = imp.doc_type.clone();
             e.number = imp.doc_number.clone();
             e.country = imp.doc_country.clone();
             e.name = imp.holder_name.clone();
+            e.nationality = imp.doc_nationality.clone();
+            e.birth_date = imp.doc_birth_date.clone();
+            e.sex = imp.doc_sex.clone();
+            e.issue_date = imp.doc_issue_date.clone();
+            // `expiry_date` is the slot an API key uses too, so it is only
+            // written here for the kind it belongs to.
+            e.expiry_date = imp.doc_expiry_date.clone();
+            e.authority = imp.doc_authority.clone();
+            e.personal_number = imp.doc_personal_number.clone();
         }
         EntryKind::Ssh => {
             e.private_key = imp.ssh_private_key.clone();
@@ -374,15 +398,9 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
 
 // A plaintext (exposed) models::Entry -> ImportedEntry for export.
 fn entry_to_imported(e: &Entry) -> ImportedEntry {
-    let kind = match e.kind.as_str() {
-        "note" => EntryKind::Note,
-        "card" => EntryKind::Card,
-        "identity" => EntryKind::Identity,
-        "ssh" => EntryKind::Ssh,
-        "env" => EntryKind::Env,
-        "apikey" => EntryKind::ApiKey,
-        _ => EntryKind::Login,
-    };
+    // A kind the app does not know is exported as the login it most resembles,
+    // rather than refused — the same fallback the editor makes.
+    let kind = EntryKind::parse(&e.kind).unwrap_or(EntryKind::Login);
     // `number` and `name` are shared slots, so they are only read into the
     // identity columns for an identity — a card must not export as one.
     let identity = kind == EntryKind::Identity;
@@ -401,15 +419,26 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
         notes: e.note.clone(),
         otp: e.otp.clone(),
         tags: e.tags.clone().unwrap_or_default(),
+        email: e.email.clone(),
         card_number: (!identity).then(|| e.number.clone()).flatten(),
         card_month: e.month.clone(),
         card_year: e.year.clone(),
         card_cvc: e.cvc.clone(),
         cardholder: (!identity).then(|| e.name.clone()).flatten(),
+        card_pin: e.pin.clone(),
         doc_type: e.doc_type.clone(),
         doc_number: identity.then(|| e.number.clone()).flatten(),
         doc_country: e.country.clone(),
         holder_name: identity.then(|| e.name.clone()).flatten(),
+        doc_nationality: e.nationality.clone(),
+        doc_birth_date: e.birth_date.clone(),
+        doc_sex: e.sex.clone(),
+        doc_issue_date: e.issue_date.clone(),
+        // The other half of the shared `expiry_date`: a passport's, read only
+        // for a passport (see `api_expires` below).
+        doc_expiry_date: identity.then(|| e.expiry_date.clone()).flatten(),
+        doc_authority: e.authority.clone(),
+        doc_personal_number: e.personal_number.clone(),
         ssh_private_key: e.private_key.clone(),
         ssh_public_key: e.public_key.clone(),
         ssh_fingerprint: e.fingerprint.clone(),
@@ -436,6 +465,10 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
             .iter()
             .map(|f| (f.label.clone(), f.value.clone()))
             .collect(),
+        favorite: e.favorite,
+        created_at: e.created_at.clone(),
+        updated_at: e.updated_at.clone(),
+        password_updated_at: e.password_updated_at.clone(),
     }
 }
 

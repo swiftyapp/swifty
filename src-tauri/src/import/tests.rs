@@ -687,6 +687,9 @@ fn round_trip_cxf() {
             otp: Some("SEED".into()),
             tags: vec!["Work".into()],
             passkeys: vec![passkey()],
+            // CXF dates the item, and the passkeys on it with it — so the entry
+            // needs a date of its own for there to be one to inherit.
+            created_at: Some("2024-01-02T03:04:05+00:00".into()),
             ..Default::default()
         },
         ImportedEntry {
@@ -719,7 +722,7 @@ fn round_trip_cxf() {
             for p in &mut e.passkeys {
                 p.rp_name = None;
                 p.counter = 0;
-                // The item is dated at export time, and its passkeys with it.
+                // The passkey takes the item's date, which is the entry's.
                 p.created_at = None;
             }
             e
@@ -1252,4 +1255,242 @@ fn cxf_totp_parameters_default_only_when_absent() {
         r.entries[0].otp.as_deref(),
         Some("otpauth://totp/?secret=JBSWY3DPEHPK3PXP&digits=8&period=60&algorithm=SHA512")
     );
+}
+
+// --- every field, every kind, through our own CSV ----------------------------
+
+// What a Rowel row carries whatever its kind is. Every entry below starts from
+// this, so a column that belongs to no kind is proven on all seven.
+fn shared() -> ImportedEntry {
+    ImportedEntry {
+        notes: Some("what it is for".into()),
+        tags: vec!["Work".into(), "2FA".into()],
+        favorite: true,
+        created_at: Some("2024-01-02T03:04:05+00:00".into()),
+        updated_at: Some("2025-06-07T08:09:10+00:00".into()),
+        ..Default::default()
+    }
+}
+
+// One entry per kind, with every column that kind owns filled in.
+fn one_of_every_kind() -> Vec<ImportedEntry> {
+    vec![
+        ImportedEntry {
+            kind: EntryKind::Login,
+            title: "Acme".into(),
+            username: Some("neo".into()),
+            password: Some("trinity".into()),
+            url: Some("https://acme.test".into()),
+            otp: Some("SEED".into()),
+            email: Some("neo@acme.test".into()),
+            password_updated_at: Some("2025-05-04T03:02:01+00:00".into()),
+            ..shared()
+        },
+        ImportedEntry {
+            kind: EntryKind::Note,
+            title: "Wifi".into(),
+            ..shared()
+        },
+        ImportedEntry {
+            kind: EntryKind::Card,
+            title: "Visa".into(),
+            card_number: Some("4111111111111111".into()),
+            card_month: Some("01".into()),
+            card_year: Some("2030".into()),
+            card_cvc: Some("123".into()),
+            cardholder: Some("NEO ANDERSON".into()),
+            card_pin: Some("4321".into()),
+            ..shared()
+        },
+        ImportedEntry {
+            kind: EntryKind::Identity,
+            title: "Passport".into(),
+            doc_type: Some("passport".into()),
+            doc_number: Some("X1234567".into()),
+            doc_country: Some("GBR".into()),
+            holder_name: Some("ADA LOVELACE".into()),
+            doc_nationality: Some("British".into()),
+            doc_birth_date: Some("1815-12-10".into()),
+            doc_sex: Some("F".into()),
+            doc_issue_date: Some("2020-03-04".into()),
+            doc_expiry_date: Some("2030-03-04".into()),
+            doc_authority: Some("HMPO".into()),
+            doc_personal_number: Some("PN-42".into()),
+            ..shared()
+        },
+        ImportedEntry {
+            kind: EntryKind::Ssh,
+            title: "Deploy key".into(),
+            // No trailing newline: every column but the file body is trimmed on
+            // the way in, as it has always been.
+            ssh_private_key: Some("-----BEGIN OPENSSH PRIVATE KEY-----\nc2VjcmV0".into()),
+            ssh_public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5 alice@laptop".into()),
+            ssh_fingerprint: Some("SHA256:abc".into()),
+            ssh_passphrase: Some("hunter2".into()),
+            ..shared()
+        },
+        ImportedEntry {
+            kind: EntryKind::Env,
+            title: "api · production".into(),
+            env_body: Some(ENV_BODY.into()),
+            env_file_name: Some(".env.production".into()),
+            ..shared()
+        },
+        ImportedEntry {
+            kind: EntryKind::ApiKey,
+            title: "Coupler.io".into(),
+            url: Some("https://api.coupler.io/v1".into()),
+            api_key: Some("cpl_live_4f9a0b3c".into()),
+            api_environment: Some("production".into()),
+            api_scopes: Some("read:data write:data".into()),
+            api_expires: Some("2027-01-01".into()),
+            ..shared()
+        },
+    ]
+}
+
+// The acceptance test for the whole export: our own sheet names every row's
+// kind and has a column for every field, so every kind comes back as itself
+// with nothing dropped. A card used to come back as a login with no number.
+#[test]
+fn round_trip_generic_csv_every_kind() {
+    let entries = one_of_every_kind();
+    let bytes = to_generic_csv(&entries).unwrap();
+    let back = super::csv::GenericCsv.parse(&bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, entries);
+}
+
+// A row of ours naming a kind we do not have is reported rather than quietly
+// filed as a login — guessing is only for a sheet that is not ours.
+#[test]
+fn generic_csv_rejects_an_unknown_kind_on_a_rowel_row() {
+    let bytes = format!(
+        "type,title,{}\nwidget,Thing,3\n",
+        super::export::CSV_VERSION_HEADER
+    );
+    let back = super::csv::GenericCsv.parse(bytes.as_bytes());
+    assert!(back.entries.is_empty());
+    assert_eq!(back.errors.len(), 1);
+    assert_eq!(back.errors[0].row, 2);
+}
+
+// Version 3 only appended columns, so a version-2 sheet — any marked sheet —
+// still comes back as what it was, the columns it never had reading as absent.
+#[test]
+fn generic_csv_version_2_still_round_trips() {
+    let bytes =
+        b"type,title,username,password,url,notes,otp,body,file_name,tags,_rowel_csv_version\n\
+login,Acme,neo,trinity,https://acme.test,hi,SEED,,,Work,2\n\
+env,api,,,,rotated,,\"A=1\n\",.env,,2\n";
+    let back = super::csv::GenericCsv.parse(bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries.len(), 2);
+
+    let login = &back.entries[0];
+    assert_eq!(login.kind, EntryKind::Login);
+    assert_eq!(login.username.as_deref(), Some("neo"));
+    assert_eq!(login.otp.as_deref(), Some("SEED"));
+    assert_eq!(login.tags, vec!["Work".to_string()]);
+    // Absent, not empty: version 2 had no column for any of these.
+    assert_eq!(login.email, None);
+    assert_eq!(login.created_at, None);
+    assert!(!login.favorite);
+
+    let env = &back.entries[1];
+    assert_eq!(env.kind, EntryKind::Env);
+    assert_eq!(env.env_body.as_deref(), Some("A=1\n"));
+    assert_eq!(env.env_file_name.as_deref(), Some(".env"));
+}
+
+// --- the star, the dates and the labelled fields -----------------------------
+
+fn starred_login() -> ImportedEntry {
+    ImportedEntry {
+        kind: EntryKind::Login,
+        title: "Acme".into(),
+        username: Some("neo".into()),
+        password: Some("trinity".into()),
+        email: Some("neo@acme.test".into()),
+        favorite: true,
+        created_at: Some("2024-01-02T03:04:05+00:00".into()),
+        updated_at: Some("2025-06-07T08:09:10+00:00".into()),
+        ..Default::default()
+    }
+}
+
+// Bitwarden has members for the star and both dates; the email has none there,
+// so it rides as a labelled custom field and is taken back out of the extras.
+#[test]
+fn round_trip_bitwarden_favorite_dates_and_a_labelled_field() {
+    let entries = vec![starred_login()];
+    let bytes = to_bitwarden_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let item = &out["items"][0];
+    assert_eq!(item["favorite"], true);
+    assert_eq!(item["creationDate"], "2024-01-02T03:04:05+00:00");
+    assert_eq!(item["revisionDate"], "2025-06-07T08:09:10+00:00");
+    assert_eq!(item["fields"][0]["name"], "Email");
+    assert_eq!(item["fields"][0]["value"], "neo@acme.test");
+
+    let back = parse(Format::Bitwarden, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, entries);
+    // The label was ours, so it did not also stay on as a custom field.
+    assert!(back.entries[0].extra.is_empty());
+}
+
+// The rest of a document: Bitwarden's `ssn` carries the personal number and the
+// dates, authority, nationality and sex travel as labelled fields.
+#[test]
+fn round_trip_bitwarden_whole_identity() {
+    let entries = vec![ImportedEntry {
+        kind: EntryKind::Identity,
+        title: "Passport".into(),
+        doc_type: Some("passport".into()),
+        doc_number: Some("X1234567".into()),
+        doc_country: Some("GBR".into()),
+        holder_name: Some("ADA LOVELACE".into()),
+        doc_nationality: Some("British".into()),
+        doc_birth_date: Some("1815-12-10".into()),
+        doc_sex: Some("F".into()),
+        doc_issue_date: Some("2020-03-04".into()),
+        doc_expiry_date: Some("2030-03-04".into()),
+        doc_authority: Some("HMPO".into()),
+        doc_personal_number: Some("PN-42".into()),
+        ..Default::default()
+    }];
+    let bytes = to_bitwarden_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(out["items"][0]["identity"]["ssn"], "PN-42");
+
+    let back = parse(Format::Bitwarden, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, entries);
+}
+
+// CXF dates the item itself, in Unix seconds; the star and the email have no
+// member there and travel in the same kind of custom-fields credential the SSH
+// key's extra parts use.
+#[test]
+fn round_trip_cxf_favorite_dates_and_a_labelled_field() {
+    let entries = vec![starred_login()];
+    let bytes = to_cxf_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let item = &out["accounts"][0]["items"][0];
+    assert_eq!(item["creationAt"], 1_704_164_645_i64);
+    assert_eq!(item["modifiedAt"], 1_749_283_750_i64);
+    let labels: Vec<&str> = item["credentials"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["type"] == "custom-fields")
+        .flat_map(|c| c["fields"].as_array().unwrap())
+        .map(|f| f["label"].as_str().unwrap())
+        .collect();
+    assert_eq!(labels, vec!["Email", "Favorite"]);
+
+    let back = parse(Format::Cxf, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, entries);
 }
