@@ -105,8 +105,10 @@ pub fn record_failed_attempt(mut state: LockoutState, now_ms: i64) -> LockoutSta
 /// before the error is returned.
 pub struct Rollback {
     pub error: Error,
-    /// The vault, reopened under the unchanged old key. `None` when even the
-    /// rollback could not reopen it, in which case the session must be cleared.
+    /// The vault, reopened under the unchanged old key. `None` when the
+    /// rollback could not reopen it, or could not retire the recovery marker
+    /// that would overwrite it at the next unlock; either way the session must
+    /// be cleared rather than continue on state recovery is going to replace.
     pub restored: Option<(VaultKey, SqliteStore)>,
 }
 
@@ -172,8 +174,15 @@ impl RekeyPaths {
 /// the removal of the snapshots rolls back a change that had actually completed.
 /// The OLD password then works and the user repeats the change — a deliberate
 /// trade for a single, simple recovery rule ("snapshot present ⇒ roll back")
-/// over a commit marker nobody can test. A marker that cannot be removed after
-/// a commit falls into the same edge on purpose (see [`discard_snapshot`]).
+/// over a commit marker nobody can test.
+///
+/// The invariant every exit keeps: **a store is handed back only when no marker
+/// is on disk.** Recovery rolls the vault back to the snapshot at the next
+/// unlock, and a snapshot that outlives a live session would take every edit
+/// made in that session with it. So a marker that cannot be removed after the
+/// commit undoes the change instead (see [`discard_snapshot`]), and a marker
+/// that cannot be removed even then ends the session (`restored: None`) rather
+/// than hand back a vault the next unlock is going to overwrite.
 ///
 /// Blocking from end to end — a whole-vault re-seal plus two whole-file copies —
 /// so it only ever runs on the blocking pool, never on a command thread. The
@@ -191,41 +200,75 @@ pub fn rekey(
     // Recovery point: snapshot the pre-change (old-keyed) DB and the sidecar
     // that names its key, and publish the pair.
     if let Err(error) = publish_snapshot(&store, &old_key, paths) {
-        // Nothing destructive has run. Whatever the failed snapshot left behind
-        // must not read as a recovery point on the next unlock.
+        // Nothing destructive has run, so the store itself is fine to hand
+        // back — but only under the invariant: whatever the failed publish left
+        // behind must not stand as a recovery point over a live session.
         let _ = fs::remove_file(&paths.staging);
-        discard_snapshot(paths);
-        return Err(Rollback {
-            error,
-            restored: Some((old_key, store)),
-        });
+        let restored = match discard_snapshot(paths) {
+            Ok(()) => Some((old_key, store)),
+            Err(e) => {
+                log::error!("a rekey snapshot could not be retired; locking the vault: {e}");
+                None
+            }
+        };
+        return Err(Rollback { error, restored });
     }
 
     // Destructive sequence. On any error, roll back to the snapshot.
     if let Err(error) = rekey_vault(&store, &old_key, &new_key, params, &paths.sidecar) {
-        // Close the (possibly re-keyed) connection, copy the old-keyed snapshot
-        // back over the DB, and reopen under the OLD key (the current password is
-        // unchanged). The OLD sidecar is still on disk (it is rewritten only on a
-        // successful rekey), so the restored DB opens.
+        // Close the (possibly re-keyed) connection before the file it holds is
+        // replaced. The current password is unchanged, so the restored pair
+        // opens under the OLD key.
         drop(store);
-        let restored = restore_db_file(&paths.db, &paths.db_backup)
-            .and_then(|()| open_with_key(app, &old_key))
-            .ok()
-            .map(|(store, _)| (old_key, store));
-        // The vault is back on the pre-change pair and about to be adopted as a
-        // live, writable session, so the marker has to go with it: left behind,
-        // the next unlock would roll back to this snapshot again and discard
-        // every edit made since. Kept only when even the rollback failed, as a
-        // last-resort artifact for the recovery on the next unlock.
-        if restored.is_some() {
-            discard_snapshot(paths);
-        }
-        return Err(Rollback { error, restored });
+        return Err(Rollback {
+            error,
+            restored: roll_back(app, old_key, paths),
+        });
     }
 
-    // Success: the change is committed on disk. Drop the recovery point.
-    discard_snapshot(paths);
-    Ok((new_key, store))
+    // Success: the change is committed on disk. Drop the recovery point — and
+    // if the marker will not go, undo the change while nothing has been edited
+    // since, instead of reporting a success the next unlock would revert.
+    match discard_snapshot(paths) {
+        Ok(()) => Ok((new_key, store)),
+        Err(e) => {
+            drop(store);
+            Err(Rollback {
+                error: Error::Other(format!(
+                    "the password change could not be finalized and was undone; \
+                     the previous password still applies ({e})"
+                )),
+                restored: roll_back(app, old_key, paths),
+            })
+        }
+    }
+}
+
+// Put the pre-change pair back and reopen it under the old key. The connection
+// must already be closed. `None` — the session ends — when the pair could not
+// be restored, or was restored but its marker could not be retired: either way
+// there is no state a writable session could safely sit on top of, and the
+// next unlock's recovery gets another go at the same snapshot.
+fn roll_back(
+    app: &AppHandle,
+    old_key: VaultKey,
+    paths: &RekeyPaths,
+) -> Option<(VaultKey, SqliteStore)> {
+    match restore_rekey_backup(paths) {
+        Ok(true) => open_with_key(app, &old_key)
+            .ok()
+            .map(|(store, _)| (old_key, store)),
+        Ok(false) => {
+            log::error!("the rekey snapshot vanished before the rollback; locking the vault");
+            None
+        }
+        Err(e) => {
+            log::error!(
+                "could not roll the vault back to its rekey snapshot; locking the vault: {e}"
+            );
+            None
+        }
+    }
 }
 
 // Build the recovery point and publish it in the one order a crash cannot
@@ -258,21 +301,35 @@ fn publish_snapshot(store: &SqliteStore, old_key: &VaultKey, paths: &RekeyPaths)
 // Retire the recovery point, marker first. The sidecar snapshot goes only once
 // the marker is gone: recovery reads "marker without sidecar snapshot" as a
 // vault that had no sidecar, and removing the sidecar snapshot from under a
-// marker that stubbornly stays (a sharing violation on Windows, say) would turn
-// that reading into a rollback that pairs the old DB with the new sidecar. With
-// the pair left intact, the worst case is the accepted edge: the next unlock
-// rolls a completed change back and the previous password applies.
-fn discard_snapshot(paths: &RekeyPaths) {
-    match fs::remove_file(&paths.db_backup) {
-        Ok(()) => {
-            let _ = fs::remove_file(&paths.sidecar_backup);
+// marker that stays would turn that reading into a rollback that pairs the old
+// DB with the new sidecar. A marker that stays is an error the caller acts on
+// (see [`rekey`]); the pair is left intact for the next unlock's recovery.
+fn discard_snapshot(paths: &RekeyPaths) -> Result<()> {
+    remove_marker(&paths.db_backup)?;
+    let _ = fs::remove_file(&paths.sidecar_backup);
+    Ok(())
+}
+
+// Removing the marker is the one file operation whose failure costs the user
+// something (an undone change, or a locked vault), and the realistic cause is
+// transient — a virus scanner holding a freshly written multi-megabyte file
+// open on Windows. So it is retried, briefly, before it is reported. Already
+// absent is success: gone is the goal.
+const MARKER_REMOVE_ATTEMPTS: u32 = 5;
+const MARKER_REMOVE_RETRY: std::time::Duration = std::time::Duration::from_millis(50);
+
+fn remove_marker(marker: &Path) -> Result<()> {
+    let mut attempt = 1;
+    loop {
+        match fs::remove_file(marker) {
+            Ok(()) => return Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) if attempt >= MARKER_REMOVE_ATTEMPTS => return Err(e.into()),
+            Err(_) => {
+                attempt += 1;
+                std::thread::sleep(MARKER_REMOVE_RETRY);
+            }
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            let _ = fs::remove_file(&paths.sidecar_backup);
-        }
-        Err(e) => log::warn!(
-            "could not remove the rekey snapshot; the next unlock will roll the change back: {e}"
-        ),
     }
 }
 
@@ -320,8 +377,10 @@ fn restore_rekey_backup(paths: &RekeyPaths) -> Result<bool> {
         let _ = fs::remove_file(&paths.sidecar);
     }
     // Both go only once the pair is back in place: until then a second crash has
-    // to find the marker still there and try again.
-    fs::remove_file(&paths.db_backup)?;
+    // to find the marker still there and try again. A marker that will not go
+    // is an error — the vault is on the restored pair, but must not open as a
+    // writable session while recovery still has a snapshot to apply over it.
+    remove_marker(&paths.db_backup)?;
     let _ = fs::remove_file(&paths.sidecar_backup);
     let _ = fs::remove_file(&paths.staging);
     Ok(true)
@@ -603,11 +662,43 @@ mod recovery_tests {
         fs::write(&p.db_backup, "old-keyed").unwrap();
         fs::write(&p.sidecar_backup, "old-params").unwrap();
 
-        discard_snapshot(&p);
+        discard_snapshot(&p).unwrap();
 
         assert!(!p.db_backup.exists() && !p.sidecar_backup.exists());
         // Idempotent: nothing to retire is not a failure.
-        discard_snapshot(&p);
+        discard_snapshot(&p).unwrap();
+    }
+
+    // The marker is the one file whose removal failing has to be reported, not
+    // shrugged off: a marker that outlives a live session rolls that session's
+    // edits back at the next unlock. And the sidecar snapshot has to stay with
+    // it, or recovery would read the lone marker as a sidecar-less vault.
+    #[cfg(unix)]
+    #[test]
+    fn a_marker_that_will_not_go_is_an_error_and_keeps_its_pair() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let (dir, p) = paths();
+        fs::write(&p.db_backup, "old-keyed").unwrap();
+        fs::write(&p.sidecar_backup, "old-params").unwrap();
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o555)).unwrap();
+
+        let result = discard_snapshot(&p);
+
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(
+            result.is_err(),
+            "a read-only directory should refuse the removal"
+        );
+        assert!(p.db_backup.exists() && p.sidecar_backup.exists());
+        // And the same marker blocks recovery from claiming the vault is clean.
+        fs::write(&p.db, "new-keyed").unwrap();
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o555)).unwrap();
+        // The restore itself writes into the directory too, so the failure here
+        // is the directory's; what matters is that it is an error, not `Ok`.
+        let recovered = restore_rekey_backup(&p);
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(recovered.is_err());
     }
 
     #[test]
@@ -653,12 +744,12 @@ mod recovery_tests {
         publish_snapshot(&store, &old, &p).unwrap();
         drop(store);
 
-        // What `rekey`'s error branch does once the restore and reopen succeed.
-        restore_db_file(&p.db, &p.db_backup).unwrap();
-        discard_snapshot(&p);
+        // The file half of `roll_back`: the pair goes back and the marker goes.
+        assert!(restore_rekey_backup(&p).unwrap());
 
         assert!(!p.db_backup.exists() && !p.sidecar_backup.exists());
         assert!(!restore_rekey_backup(&p).unwrap());
         assert_eq!(title_under(&p.db, &old), "before");
+        assert_eq!(fs::read_to_string(&p.sidecar).unwrap(), "old-params");
     }
 }
