@@ -15,6 +15,7 @@ import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
 import type { BiometryType } from '@/api/types'
 import { biometryLabel } from '@/lib/biometry'
 import BiometryGlyph from '../BiometryGlyph'
+import { verbatimInput } from '../inputProps'
 import Dots, { CELL } from './Dots'
 import KeyCuts from './KeyCuts'
 
@@ -154,6 +155,9 @@ export default function Masterpass({
         lock && 'rounded-xl px-10'
       )}
       placeholder={placeholder || t('Master Password')}
+      // The passphrase is stored exactly as typed, including while revealed —
+      // when `type` is `text` and nothing else would hold the OS off.
+      {...verbatimInput}
       disabled={inert}
       data-testid={testid}
       autoFocus={autoFocus}

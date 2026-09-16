@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'
 import { inputClass } from '@/components/elements/formStyles'
+import { verbatimInput } from '@/components/elements/inputProps'
 import { CARD, META } from '@/components/elements/tokens'
 import Progress from './Progress'
 import RowErrors from './RowErrors'
@@ -27,6 +28,7 @@ export default function Result({ flow }: { flow: ReturnType<typeof useImport> })
           <input
             type="password"
             name="import_password"
+            {...verbatimInput}
             placeholder={t('Vault File Password')}
             className={`${inputClass} max-w-xs`}
             value={password}
