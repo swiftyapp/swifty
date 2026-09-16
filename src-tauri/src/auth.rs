@@ -283,8 +283,14 @@ fn publish_snapshot(store: &SqliteStore, old_key: &VaultKey, paths: &RekeyPaths)
         .snapshot_to(&paths.staging, &old_key.sqlcipher_key())
         .map_err(store_err)?;
     // Durable before the rename, so the marker never points at bytes that a
-    // power loss could still take back.
-    fs::File::open(&paths.staging)?.sync_all()?;
+    // power loss could still take back. Opened for write, not read: on Windows
+    // the flush behind `sync_all` (`FlushFileBuffers`) needs a write handle and
+    // fails with access denied on a read-only one. `write` without `truncate`
+    // leaves the bytes alone.
+    fs::OpenOptions::new()
+        .write(true)
+        .open(&paths.staging)?
+        .sync_all()?;
     // A vault created before sidecars existed has none; recovery reads the
     // absence of this snapshot as "restore to no sidecar".
     match fs::read_to_string(&paths.sidecar) {
