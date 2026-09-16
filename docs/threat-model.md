@@ -151,8 +151,10 @@ carries them as part of the opaque payload and never sees them.
    - **macOS:** a data-protection Keychain item with a `SecAccessControl` of
      `kSecAccessControlBiometryCurrentSet`. Touch ID is enforced by the OS on
      *read*, and the item auto-invalidates if the enrolled fingerprints change.
-   - **Windows:** Credential Manager, with a Windows Hello prompt required before
-     the read (verify-then-read).
+   - **Windows:** only an AES-256-GCM blob goes into Credential Manager, sealed
+     under a key derived from a Windows Hello key-credential signature, so
+     opening it requires passing the Hello prompt rather than merely being the
+     logged-in user.
    - **Linux and others:** unsupported; the app reports biometrics unavailable
      rather than store an ungated key.
 
