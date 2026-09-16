@@ -1,15 +1,18 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useStore, switchWorkspace } from '@/store'
+import { useApp, selectWorkspaces, selectActiveWorkspace, switchWorkspace } from '@/store'
+import { messageOf } from '@/api/errors'
 import { workspaceLabel } from '@/lib/workspace'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
 
-// Every workspace on this install, the open one marked. Switching locks the
-// vault, so the button hands the app to the other workspace's lock screen —
-// there is nothing to confirm afterwards, and nothing more this row can say.
 export default function WorkspaceList() {
   const { t } = useTranslation()
-  const { list, active } = useStore(state => state.workspaces)
+  const list = useApp(selectWorkspaces)
+  const active = useApp(selectActiveWorkspace)
+  // The one way a switch is refused: a sync flow is mid-flight in this
+  // workspace, and moving the paths under it would land its files elsewhere.
+  const [error, setError] = useState<string | null>(null)
 
   return (
     <>
@@ -27,7 +30,11 @@ export default function WorkspaceList() {
                   variant="pale"
                   size="md"
                   testid={`workspace-switch-${workspace.id}`}
-                  onClick={() => void switchWorkspace(workspace.id)}
+                  onClick={() =>
+                    switchWorkspace(workspace.id).catch((err: unknown) =>
+                      setError(messageOf(err))
+                    )
+                  }
                 >
                   {t('Switch')}
                 </Button>
@@ -36,6 +43,11 @@ export default function WorkspaceList() {
           />
         )
       })}
+      {error && (
+        <div data-testid="workspace-switch-error" className="px-4 py-3 text-base text-bad">
+          {error}
+        </div>
+      )}
     </>
   )
 }

@@ -10,7 +10,8 @@ import { useUnlock } from './useUnlock'
 import WorkspacePicker from './WorkspacePicker'
 
 interface Props {
-  touchID: boolean
+  /** Whether biometric unlock is enrolled *and* usable (see `appSlice`). */
+  biometric: boolean
   /** Which gate the tile and the card's end segment name (see lib/biometry). */
   biometry?: BiometryType
 }
@@ -19,14 +20,14 @@ interface Props {
 // ordered for a thumb instead of a keyboard: the biometric tile leads when a
 // key is enrolled and the passphrase card is one tap away under it. Without an
 // enrollment there is nothing to lead with, so the card shows straight away.
-export default function LockScreen({ touchID, biometry = 'touch' }: Props) {
+export default function LockScreen({ biometric, biometry = 'touch' }: Props) {
   const { t } = useTranslation()
-  const { mascot, eyebrow, field, submit, biometric, change } = useUnlock()
-  // Derived, not seeded: `touchID` only becomes true once the launch probe
-  // (`isBiometricAvailable`) answers, which is after this mounts — a card
-  // seeded from the first render would never give way to the tile.
+  const { mascot, eyebrow, field, submit, biometric: unlock, change } = useUnlock()
+  // Derived, not seeded: `biometric` only becomes true once the launch probe
+  // answers, which is after this mounts — a card seeded from the first render
+  // would never give way to the tile.
   const [revealed, setRevealed] = useState(false)
-  const password = revealed || !touchID
+  const password = revealed || !biometric
 
   // ...but that probe can also land *between* two keystrokes, and swapping the
   // card for the tile then would throw away a passphrase already being typed.
@@ -50,7 +51,7 @@ export default function LockScreen({ touchID, biometry = 'touch' }: Props) {
               passphrase never takes the faster way out away. */}
           <Masterpass
             variant="lock"
-            touchID={touchID}
+            biometric={biometric}
             biometry={biometry}
             testid="unlock-password-input"
             invalid={field.invalid}
@@ -65,13 +66,13 @@ export default function LockScreen({ touchID, biometry = 'touch' }: Props) {
               keep()
               submit(value)
             }}
-            onTouchID={biometric}
+            onBiometric={unlock}
           />
         </div>
       ) : (
         <>
           <div className="mt-8 flex justify-center">
-            <BiometricTile biometry={biometry} onUnlock={biometric} />
+            <BiometricTile biometry={biometry} onUnlock={unlock} />
           </div>
           {/* 52px, the phone's secondary tier: bordered rather than filled, so
               the tile above stays the one thing being offered. */}

@@ -4,14 +4,14 @@ import userEvent from '@testing-library/user-event'
 import Start from '@/components/Start'
 import type { SetupDriveFile } from '@/api/setup'
 import { open } from '@tauri-apps/plugin-dialog'
-import { setupDriveProbed, setupDriveFailed } from '@/store'
-import { renderWithStore } from './utils'
-import { appStatusResponse, calls, mockCommand, mockCommandOnce } from './ipc'
+import { setupDriveProbed, setupDriveFailed, useApp } from '@/store'
+import { calls, mockCommandOnce } from './ipc'
+import { seedApp } from './utils'
 
 // Whether the device could enroll a biometric gate at all, which is what
 // decides if the first run asks its last question.
 const biometricStatus = (canEnroll: boolean) =>
-  appStatusResponse({ biometric: { canEnroll } })
+  seedApp({ biometric: { available: false, canEnroll, type: 'touch', mode: null } })
 
 // Must satisfy the setup strength gate (>= 12 chars, zxcvbn score >= 2).
 const STRONG = 'my-strong-vault-passphrase-2026'
@@ -34,7 +34,7 @@ const choosePassword = async (password = STRONG, confirmation = password) => {
 
 describe('welcome', () => {
   it('offers a fresh start and both ways back into existing data', () => {
-    renderWithStore(<Start />)
+    render(<Start />)
 
     expect(screen.getByText('Keep your secrets to yourself.')).toBeInTheDocument()
     expect(screen.getByTestId('start-setup-button')).toBeInTheDocument()
@@ -62,7 +62,7 @@ describe('welcome', () => {
 
 describe('choosing a master password', () => {
   it('blocks a weak password without reaching the next step', async () => {
-    renderWithStore(<Start />)
+    render(<Start />)
     await choosePassword('secret')
 
     expect((await screen.findAllByText(/Use at least/)).length).toBeGreaterThan(0)
@@ -71,7 +71,7 @@ describe('choosing a master password', () => {
   })
 
   it('refuses a confirmation that does not match', async () => {
-    renderWithStore(<Start />)
+    render(<Start />)
     await choosePassword(STRONG, 'something-else-entirely')
 
     expect(await screen.findByText('Passwords do not match')).toBeInTheDocument()
@@ -81,17 +81,17 @@ describe('choosing a master password', () => {
 
 describe('the backup step', () => {
   it('creates local-only data when the backup is declined', async () => {
-    const { store } = renderWithStore(<Start />)
+    render(<Start />)
     await choosePassword()
 
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
 
     expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false })
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   it('creates with sync on once the probe finds the account bare', async () => {
-    const { store } = renderWithStore(<Start />)
+    render(<Start />)
     await choosePassword()
 
     await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
@@ -101,7 +101,7 @@ describe('the backup step', () => {
     await act(async () => setupDriveProbed(null))
 
     expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false })
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   // A double-click must not ask the backend to create twice: while the first
@@ -109,7 +109,7 @@ describe('the backup step', () => {
   it('creates once however many times the button is pressed', async () => {
     let finish: (result: { entries: never[]; syncConfigured: boolean }) => void = () => {}
     mockCommandOnce('setup_create', () => new Promise(resolve => (finish = resolve)))
-    const { store } = renderWithStore(<Start />)
+    render(<Start />)
     await choosePassword()
 
     const skip = await screen.findByTestId('setup-skip-drive-button')
@@ -121,13 +121,13 @@ describe('the backup step', () => {
     expect(calls('setup_drive_connect')).toHaveLength(0)
 
     await act(async () => finish({ entries: [], syncConfigured: false }))
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   // Leaving while consent is still out with the browser disowns it: a late
   // answer must not be waiting in the store the next time this step is shown.
   it('abandons a consent in flight when the user backs out', async () => {
-    const { store } = renderWithStore(<Start />)
+    render(<Start />)
     await choosePassword()
 
     await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
@@ -136,12 +136,12 @@ describe('the backup step', () => {
     await userEvent.click(screen.getByTestId('go-back-button'))
 
     expect(calls('setup_drive_disconnect')).toHaveLength(1)
-    expect(store.getState().setup.drive).toEqual({ status: 'idle', file: null, error: null })
+    expect(useApp.getState().setupDrive).toEqual({ status: 'idle', file: null, error: null })
     expect(screen.getByTestId('setup-password-input')).toBeInTheDocument()
   })
 
   it('surfaces a failed connection and leaves the choice standing', async () => {
-    renderWithStore(<Start />)
+    render(<Start />)
     await choosePassword()
 
     await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
@@ -163,7 +163,7 @@ describe('a Drive that already holds data', () => {
   }
 
   it('stops to ask rather than writing over the existing pack', async () => {
-    renderWithStore(<Start />)
+    render(<Start />)
     await reachConflict()
 
     expect(await screen.findByText('This Drive already has Rowel data')).toBeInTheDocument()
@@ -172,17 +172,17 @@ describe('a Drive that already holds data', () => {
   })
 
   it('archives the old one when the new password is kept', async () => {
-    const { store } = renderWithStore(<Start />)
+    render(<Start />)
     await reachConflict()
 
     await userEvent.click(await screen.findByTestId('setup-archive-button'))
 
     expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: true })
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   it('hands over to the restore screen without asking Google again', async () => {
-    renderWithStore(<Start />)
+    render(<Start />)
     await reachConflict()
 
     await userEvent.click(await screen.findByTestId('setup-unlock-existing-button'))
@@ -199,7 +199,7 @@ describe('restoring from Google Drive', () => {
   }
 
   it('waits on consent, then unlocks the pack the probe found', async () => {
-    const { store } = renderWithStore(<Start />)
+    render(<Start />)
     await openDrive()
 
     expect(calls('setup_drive_connect')).toHaveLength(1)
@@ -212,7 +212,7 @@ describe('restoring from Google Drive', () => {
     await userEvent.click(screen.getByTestId('drive-unlock-button'))
 
     expect(calls('setup_restore_from_drive')).toContainEqual({ password: STRONG })
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   // Once the unlock is running, the account it runs against is spoken for:
@@ -220,7 +220,7 @@ describe('restoring from Google Drive', () => {
   it('withdraws account switching while the unlock is running', async () => {
     let finish: (result: { entries: never[]; syncConfigured: boolean }) => void = () => {}
     mockCommandOnce('setup_restore_from_drive', () => new Promise(resolve => (finish = resolve)))
-    const { store } = renderWithStore(<Start />)
+    render(<Start />)
     await openDrive()
     await act(async () => setupDriveProbed(REMOTE))
     expect(screen.getByTestId('drive-switch-account')).toBeInTheDocument()
@@ -232,14 +232,14 @@ describe('restoring from Google Drive', () => {
     expect(screen.queryByTestId('drive-use-file')).not.toBeInTheDocument()
 
     await act(async () => finish({ entries: [], syncConfigured: true }))
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   it('names the password as the problem when the pack will not open', async () => {
     mockCommandOnce('setup_restore_from_drive', () =>
       Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })
     )
-    const { store } = renderWithStore(<Start />)
+    render(<Start />)
     await openDrive()
     await act(async () => setupDriveProbed(REMOTE))
 
@@ -247,11 +247,11 @@ describe('restoring from Google Drive', () => {
     await userEvent.click(screen.getByTestId('drive-unlock-button'))
 
     expect(await screen.findByText(/isn't the password this was sealed with/)).toBeInTheDocument()
-    expect(store.getState().flow.name).not.toBe('main')
+    expect(useApp.getState().flow).not.toBe('main')
   })
 
   it('sends a bare account back to the create flow, keeping the connection', async () => {
-    const { store } = renderWithStore(<Start />)
+    render(<Start />)
     await openDrive()
     await act(async () => setupDriveProbed(null))
 
@@ -264,25 +264,25 @@ describe('restoring from Google Drive', () => {
     await userEvent.click(screen.getByTestId('setup-continue-button'))
 
     expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false })
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   it('gives the pending tokens back when the user walks away', async () => {
-    const { store } = renderWithStore(<Start />)
+    render(<Start />)
     await openDrive()
     await act(async () => setupDriveProbed(REMOTE))
 
     await userEvent.click(screen.getByTestId('go-back-button'))
 
     expect(calls('setup_drive_disconnect')).toHaveLength(1)
-    expect(store.getState().setup.drive).toEqual({ status: 'idle', file: null, error: null })
+    expect(useApp.getState().setupDrive).toEqual({ status: 'idle', file: null, error: null })
     expect(screen.getByTestId('start-setup-button')).toBeInTheDocument()
   })
 
   // Switching to a backup file is leaving the account behind too — the tokens
   // must not sit in the backend for a flow that will never use them.
   it('forgets the account when the user switches to a backup file', async () => {
-    renderWithStore(<Start />)
+    render(<Start />)
     await openDrive()
     await act(async () => setupDriveProbed(REMOTE))
 
@@ -298,7 +298,7 @@ describe('restoring from Google Drive', () => {
     mockCommandOnce('setup_restore_from_drive', () =>
       Promise.reject({ kind: 'io', message: 'sync file is truncated' })
     )
-    renderWithStore(<Start />)
+    render(<Start />)
     await openDrive()
     await act(async () => setupDriveProbed(REMOTE))
 
@@ -312,7 +312,7 @@ describe('restoring from Google Drive', () => {
 describe('restoring from a backup file', () => {
   it('picks a file, then unseals it with the master password', async () => {
     vi.mocked(open).mockResolvedValue('/tmp/Rowel backup 2026-09-15.rowel')
-    const { store } = renderWithStore(<Start />)
+    render(<Start />)
 
     await userEvent.click(screen.getByTestId('start-restore-button'))
     await userEvent.click(screen.getByTestId('restore-dropzone'))
@@ -327,7 +327,7 @@ describe('restoring from a backup file', () => {
     expect(calls('setup_restore_from_file')).toContainEqual(
       { path: '/tmp/Rowel backup 2026-09-15.rowel', password: STRONG }
     )
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   // The pack is what says whether the password was wrong; anything else it
@@ -337,7 +337,7 @@ describe('restoring from a backup file', () => {
     mockCommandOnce('setup_restore_from_file', () =>
       Promise.reject({ kind: 'io', message: 'sync file is truncated' })
     )
-    renderWithStore(<Start />)
+    render(<Start />)
 
     await userEvent.click(screen.getByTestId('start-restore-button'))
     await userEvent.click(screen.getByTestId('restore-dropzone'))
@@ -352,40 +352,39 @@ describe('restoring from a backup file', () => {
 
 describe('the biometric step', () => {
   const reachBiometric = async () => {
-    mockCommand('app_status', () => biometricStatus(true))
-    const rendered = renderWithStore(<Start />)
+    biometricStatus(true)
+    render(<Start />)
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
     await screen.findByTestId('setup-enable-biometric-button')
-    return rendered
   }
 
   it('is only offered where the device has a gate to offer', async () => {
-    mockCommand('app_status', () => biometricStatus(false))
-    const { store } = renderWithStore(<Start />)
+    biometricStatus(false)
+    render(<Start />)
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
 
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
     expect(screen.queryByTestId('setup-enable-biometric-button')).not.toBeInTheDocument()
   })
 
   it('enrolls and then opens the app', async () => {
-    const { store } = await reachBiometric()
+    await reachBiometric()
 
-    expect(store.getState().flow.name).not.toBe('main')
+    expect(useApp.getState().flow).not.toBe('main')
     await userEvent.click(screen.getByTestId('setup-enable-biometric-button'))
 
     expect(calls('enable_biometric')).toHaveLength(1)
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   it('opens the app just the same when it is declined', async () => {
-    const { store } = await reachBiometric()
+    await reachBiometric()
 
     await userEvent.click(screen.getByTestId('setup-skip-biometric-button'))
 
     expect(calls('enable_biometric')).toHaveLength(0)
-    await waitFor(() => expect(store.getState().flow.name).toBe('main'))
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 })

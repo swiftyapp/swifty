@@ -1,6 +1,6 @@
 import { t } from '@/i18n'
 import type { TKey } from '@/i18n'
-import type { Section } from '@/store/uiSlice'
+import type { Section } from '@/store'
 import {
   RefreshGlyph,
   ShieldGlyph,

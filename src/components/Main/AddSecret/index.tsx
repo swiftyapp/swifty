@@ -1,7 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { EntryType } from '@/api/types'
-import { useStore, closeAddPicker, startEntry } from '@/store'
+import { useUi, closeAddPicker, startEntry } from '@/store'
 import { KINDS } from '@/kinds'
 import Frame from '@/components/elements/Frame'
 import KindTile from './KindTile'
@@ -28,7 +28,7 @@ const STEP: Record<string, number> = {
 // saving. Mounted once from Main; renders nothing until `ui.addPicker`.
 export default function AddSecret() {
   const { t } = useTranslation()
-  const open = useStore(state => state.ui.addPicker)
+  const open = useUi(state => state.addPicker)
   const grid = useRef<HTMLDivElement>(null)
 
   const tiles = () => Array.from(grid.current?.querySelectorAll('button') ?? [])

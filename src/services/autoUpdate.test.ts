@@ -2,9 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { check } from '@tauri-apps/plugin-updater'
 import { checkForUpdate } from './autoUpdate'
 
-vi.mock('@tauri-apps/plugin-updater', () => ({ check: vi.fn() }))
-vi.mock('@tauri-apps/plugin-process', () => ({ relaunch: vi.fn() }))
-
 const mockUpdate = (version: string, body?: string) => ({
   version,
   body,

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useStore, setFilterType } from '@/store'
+import { useUi, setFilterType } from '@/store'
 import { KINDS } from '@/kinds'
 import { useTranslation } from 'react-i18next'
 import { useRows } from '../List/useVisibleEntries'
@@ -10,7 +10,7 @@ import Chip from './Chip'
 // list, not navigating away from it.
 export default function KindChips() {
   const { t } = useTranslation()
-  const type = useStore(state => state.filters.type)
+  const type = useUi(state => state.filterType)
   // The current view's rows, not the whole vault, so the counts tell the truth
   // in Favorites and the Archive as well as in All Items. `useRows` hands back
   // stable references for exactly this memo.

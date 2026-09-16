@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useStore, refreshWorkspaces } from '@/store'
+import { useApp, selectWorkspaces, selectActiveWorkspace, refreshApp } from '@/store'
 import { workspaceRename } from '@/api/workspace'
 import { messageOf } from '@/api/errors'
 import { workspaceLabel } from '@/lib/workspace'
@@ -8,15 +8,10 @@ import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
 import { inputClass } from '@/components/elements/formStyles'
 
-// Renames the workspace currently open — the only one a rename is ever asked
-// about, since reaching the others means locking this one first.
-//
-// The field starts empty with the current label as its placeholder rather than
-// seeded with the name: the primary workspace has no name to seed it with, and
-// clearing the box after a save is then how the new name shows up.
 export default function RenameRow() {
   const { t } = useTranslation()
-  const { list, active } = useStore(state => state.workspaces)
+  const list = useApp(selectWorkspaces)
+  const active = useApp(selectActiveWorkspace)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,12 +21,14 @@ export default function RenameRow() {
 
   const next = name.trim()
 
+  // The probe is what carries names, so a rename is complete once it has been
+  // re-read — the list and the header both redraw from it.
   const save = () => {
     if (!next || busy) return
     setBusy(true)
     setError(null)
     workspaceRename(current.id, next)
-      .then(refreshWorkspaces)
+      .then(refreshApp)
       .then(() => setName(''))
       .catch((err: unknown) => setError(messageOf(err)))
       .finally(() => setBusy(false))

@@ -6,7 +6,8 @@ import { PlusGlyph } from '@/components/Main/icons'
 import TagsInput from '@/components/elements/TagsInput'
 import { TAG_CHIP } from '@/components/elements/fields/chip'
 import { LABEL, META, META_TYPE } from '@/components/elements/tokens'
-import { dateTime, relativeLong, shortDate, toTime } from '@/utils/time'
+import { useDates } from '@/hooks/useDates'
+import { toTime } from '@/utils/time'
 
 interface Props {
   tags: string[]
@@ -23,13 +24,6 @@ interface Props {
 }
 
 type Stamp = [label: TKey, iso: string, spell: (iso: string) => string]
-
-// Creation is a fact, so it reads as a date; a modification is about recency,
-// so it reads as how long ago (and as a date once that stops being useful).
-const absolute = (iso: string): string => {
-  const at = toTime(iso)
-  return at === null ? '' : shortDate(at)
-}
 
 const stamp = (label: TKey, iso: string | undefined, spell: Stamp[2]): Stamp | null =>
   iso ? [label, iso, spell] : null
@@ -50,6 +44,13 @@ export default function Footer({
   deletedAt
 }: Props) {
   const { t } = useTranslation()
+  const { dateTime, relativeLong, shortDate } = useDates()
+  // Creation is a fact, so it reads as a date; a modification is about recency,
+  // so it reads as how long ago (and as a date once that stops being useful).
+  const absolute = (iso: string): string => {
+    const at = toTime(iso)
+    return at === null ? '' : shortDate(at)
+  }
   const stamps = [
     stamp('Deleted', deletedAt, relativeLong),
     stamp('Modified', updatedAt, relativeLong),

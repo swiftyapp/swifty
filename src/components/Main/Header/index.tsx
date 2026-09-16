@@ -1,13 +1,12 @@
 import SyncIndicator from './SyncIndicator'
 import LockButton from './LockButton'
 import WorkspaceLabel from './WorkspaceLabel'
-import Controls from '@/components/elements/Controls'
 
-// Top chrome bar (38px): window controls · sync pill + lock. Search is not
-// here — it filters the list column, so it lives in it. With search gone the
-// bar carries only 28px controls, so it sits just clear of them and of the
-// macOS traffic lights, which the Overlay title-bar style pins ~8-20px from
-// the window top and which nothing here can move.
+// Top chrome bar (38px): sync pill + lock, pushed to the right. Search is not
+// here — it filters the list column, so it lives in it. Window controls are
+// native on every OS, so the bar only has to keep clear of the macOS traffic
+// lights, which the Overlay title-bar style pins ~8-20px from the window top
+// and which nothing here can move (hence the left padding).
 //
 // `data-tauri-drag-region="deep"` makes the whole bar and its subtree a native
 // window drag region: Tauri's injected handler starts a window drag on
@@ -24,7 +23,6 @@ export default function Header() {
       data-tauri-drag-region="deep"
       className="relative z-10 flex h-[38px] flex-none items-center gap-3.5 border-b border-line bg-chrome pl-[78px] pr-3 backdrop-blur-[14px]"
     >
-      <Controls />
       <div className="flex-1" />
       <div className="flex flex-none items-center gap-1.5">
         <WorkspaceLabel />

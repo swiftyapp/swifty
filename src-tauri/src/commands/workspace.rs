@@ -6,6 +6,7 @@
 //! switch and re-probes `app_status` afterwards.
 
 use std::fs;
+use std::sync::atomic::Ordering;
 
 use rand::RngCore;
 use tauri::{AppHandle, State};
@@ -18,29 +19,48 @@ use crate::workspace::{self, Registry, Workspace};
 
 use super::setup::{begin_step, create_off_thread};
 
+const SYNC_BUSY: &str = "wait for the sync in progress to finish";
+
 /// Lock whatever is open and make `id` the workspace the app addresses.
 ///
 /// The next unlock opens its database, and a relaunch comes back to it: the
 /// choice is recorded in the registry, not just in memory.
 #[tauri::command]
 pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    guard_sync_idle(&state)?;
     let root = storage::root_dir(&app)?;
     let mut registry = Registry::load(&root);
     if !registry.contains(&id) {
         return Err(Error::NotFound);
     }
 
+    // Persist first: a save that fails leaves the session open and the paths
+    // where they were, so a rejected switch changes nothing. Nothing to record
+    // when the choice did not change, which on a single-workspace install is
+    // the only case there is — so selecting the primary never conjures a
+    // registry file for a user who has no second vault.
+    if registry.active != id {
+        registry.active = id.clone();
+        registry.save(&root)?;
+    }
+
     // Together, and in this order: a session outliving the switch would hold
     // one workspace's key against another's database.
     state.session.lock().unwrap().clear();
-    *state.active_workspace.lock().unwrap() = id.clone();
+    *state.active_workspace.lock().unwrap() = id;
+    Ok(())
+}
 
-    // Nothing to record when the choice did not change, which on a
-    // single-workspace install is the only case there is — so selecting the
-    // primary never conjures a registry file for a user who has no second vault.
-    if registry.active != id {
-        registry.active = id;
-        registry.save(&root)?;
+/// Refuse to move the paths while a sync flow is using them.
+///
+/// A consent flow keeps the cryptor of the vault that started it, and a run
+/// writes its scratch and tokens through the *active* workspace's paths — so a
+/// switch mid-flight would seal one workspace's account under another's
+/// directory, and the next sync from there would publish into the wrong pack.
+fn guard_sync_idle(state: &AppState) -> Result<()> {
+    let run = state.sync_run.lock().unwrap();
+    if state.syncing.load(Ordering::SeqCst) || run.pending || run.in_progress {
+        return Err(Error::Other(SYNC_BUSY.into()));
     }
     Ok(())
 }
@@ -64,6 +84,7 @@ pub async fn workspace_create(
     if password.is_empty() {
         return Err(Error::Other("a workspace needs a master password".into()));
     }
+    guard_sync_idle(&state)?;
     // The same exclusion first-run setup takes: this writes a KDF sidecar and a
     // database, and two of those interleaving would pair one with the other's.
     let _step = begin_step(&state)?;
@@ -73,16 +94,17 @@ pub async fn workspace_create(
     let previous = registry.active.clone();
     let id = new_id();
 
-    state.session.lock().unwrap().clear();
     registry.workspaces.push(Workspace {
         id: id.clone(),
         name: Some(name),
     });
     registry.active = id.clone();
-    // Registry before vault: a recorded workspace with no database reads as a
-    // fresh one the user can still finish, while a database no registry names
-    // is a vault with no way back to it.
+    // Registry before anything else: a save that fails leaves the open session
+    // untouched, and a recorded workspace with no database reads as a fresh one
+    // the user can still finish, while a database no registry names is a vault
+    // with no way back to it.
     registry.save(&root)?;
+    state.session.lock().unwrap().clear();
     *state.active_workspace.lock().unwrap() = id.clone();
 
     match create_vault_in(&app, &root, &id, password).await {

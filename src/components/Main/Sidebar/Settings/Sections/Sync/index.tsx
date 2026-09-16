@@ -1,8 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { useStore, syncFailed } from '@/store'
+import { useApp, useIsPrimaryWorkspace } from '@/store'
 import { syncConnect, syncDisconnect, syncNow } from '@/api/sync'
-import { messageOf } from '@/api/errors'
-import { PRIMARY_WORKSPACE } from '@/lib/workspace'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
@@ -18,24 +16,23 @@ const ErrorNote = ({ message }: { message: string }) => (
 
 export default function Sync() {
   const { t } = useTranslation()
-  const sync = useStore(state => state.sync)
+  const sync = useApp(state => state.sync)
   // One vault owns the Drive folder, and the backend refuses connect/import
   // from anywhere else — so a second workspace is not offered the controls that
   // could only fail. Backup and export are per-workspace and stay.
-  const primary = useStore(state => state.workspaces.active) === PRIMARY_WORKSPACE
+  const primary = useIsPrimaryWorkspace()
 
-  // Consent happens in the browser: the backend says `sync:pending` when it
-  // opens it and `sync:connected` / `sync:error` when it hears back, so nothing
-  // here touches the store — on mobile the promise resolves as soon as Safari is
-  // on screen. A rejection is the call itself failing (no client configured,
-  // vault locked), which no event will report.
+  // Consent happens in the browser, and the backend reports every step of it
+  // through `sync:status` — the browser opening, the answer, a failure — so
+  // nothing here touches the store. On mobile the promise resolves as soon as
+  // Safari is on screen, and a rejection has already been reported as status.
   const onConnect = () => {
-    syncConnect().catch((error: unknown) => syncFailed(messageOf(error)))
+    syncConnect().catch(() => {})
   }
 
   const lastSynced = sync.inProgress
     ? t('Syncing…')
-    : sync.success
+    : sync.error === null
       ? t('Up to date')
       : t('Last attempt failed')
 
@@ -63,13 +60,13 @@ export default function Sync() {
           description={
             sync.pending
               ? t('Waiting for Google…')
-              : sync.enabled
+              : sync.configured
                 ? t('Connected')
                 : t('Not connected')
           }
           testid="settings-drive-row"
           control={
-            sync.enabled ? (
+            sync.configured ? (
               <Button
                 variant="pale"
                 size="md"
@@ -94,10 +91,10 @@ export default function Sync() {
         />
         {/* A connect that never got as far as being connected has no Sync
             group to report itself in, so it says so here instead. */}
-        {!sync.enabled && sync.error && <ErrorNote message={sync.error} />}
+        {!sync.configured && sync.error && <ErrorNote message={sync.error} />}
       </SettingsGroup>
 
-      {sync.enabled && (
+      {sync.configured && (
         <SettingsGroup label={t('Sync')}>
           <SettingsRow
             label={t('Last synced')}

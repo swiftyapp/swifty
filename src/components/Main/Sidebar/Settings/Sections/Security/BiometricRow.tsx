@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import type { BiometricMode } from '@/api/types'
-import { appStatus } from '@/api/app'
 import { enableBiometric, disableBiometric } from '@/api/auth'
 import { messageOf } from '@/api/errors'
+import { useApp, refreshApp } from '@/store'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Toggle from '@/components/elements/Toggle'
@@ -27,52 +27,31 @@ const description = (t: TFunction, mode: BiometricMode | null) => {
 
 export default function BiometricRow() {
   const { t } = useTranslation()
-  const [enabled, setEnabled] = useState(false)
-  const [mode, setMode] = useState<BiometricMode | null>(null)
+  // The launch probe owns both halves of this row; the failure is ours alone.
+  const biometric = useApp(state => state.status?.biometric)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    appStatus()
-      .then(({ biometric }) => {
-        setEnabled(biometric.available)
-        setMode(biometric.mode)
-      })
-      .catch(() => setEnabled(false))
-  }, [])
 
   const toggle = () => {
     setBusy(true)
     setError(null)
-    const done = () => setBusy(false)
-    if (enabled) {
-      disableBiometric()
-        .then(() => {
-          setEnabled(false)
-          setMode(null)
-        })
-        .catch((err: unknown) => setError(messageOf(err)))
-        .finally(done)
-      return
-    }
-    enableBiometric()
-      .then(next => {
-        setEnabled(true)
-        setMode(next)
-      })
-      .catch((err: unknown) => setError(messageOf(err)))
-      .finally(done)
+    const op = biometric?.available ? disableBiometric() : enableBiometric()
+    op.catch((err: unknown) => setError(messageOf(err)))
+      // Whichever way it went, the row is redrawn from a fresh probe rather
+      // than from a guess: an unentitled build settles on a different mode
+      // than it was offered, and a refusal changes nothing at all.
+      .finally(() => refreshApp().finally(() => setBusy(false)))
   }
 
   return (
     <SettingsGroup label={t('Biometrics')}>
       <SettingsRow
         label={t('Unlock with Touch ID or Windows Hello')}
-        description={description(t, enabled ? mode : null)}
+        description={description(t, biometric?.available ? biometric.mode : null)}
         control={
           <Toggle
             name="biometric"
-            checked={enabled}
+            checked={!!biometric?.available}
             disabled={busy}
             onChange={toggle}
             aria-label={t('Unlock with Touch ID or Windows Hello')}

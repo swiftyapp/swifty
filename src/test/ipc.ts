@@ -1,5 +1,5 @@
 import type { BackendError } from '@/api/errors'
-import type { AppStatus } from '@/api/app'
+import type { AppStatus, Settings } from '@/api/app'
 
 /**
  * The fake Rust backend. One mock of `@tauri-apps/api/core` stands in for every
@@ -23,39 +23,54 @@ const meta = (id: string, type = 'login', title = '', favorite = false) => ({
 
 const session = { entries: [], syncConfigured: false }
 
-const STATUS: AppStatus = {
+// The preferences Rust would hand back on a fresh install, and the file it
+// would hand them back from: `set_settings` merges into this the way the real
+// command merges into `settings.json`, so a component sees its own write come
+// back round. Reset with the rest of the fakes between tests.
+const DEFAULT_SETTINGS: Settings = {
+  autolockSecs: 60,
+  clipboardTimeoutMs: 30000,
+  dateFormat: 'MM/DD/YYYY',
+  sort: 'recent',
+  theme: 'light',
+  locale: null,
+  breachCheck: false,
+  generator: {
+    length: 20,
+    numbers: true,
+    symbols: true,
+    uppercase: true,
+    exclude: '',
+    excludeSimilarCharacters: false
+  }
+}
+
+let settings: Settings = DEFAULT_SETTINGS
+
+/**
+ * The launch probe's answer on a plain desktop with nothing enrolled. Exported
+ * because the store now holds it too: `renderWithStore` seeds the same object
+ * `main.tsx` would have put there (see test/utils).
+ */
+export const appStatusDefault = (): AppStatus => ({
   initialized: true,
   version: '1.0.0',
   locale: 'en-US',
+  settings,
   syncConfigured: false,
   syncPending: false,
   // Off by default, so no suite sees a scan affordance it did not ask for.
   scanSupported: false,
-  // One workspace: the ordinary install, where nothing about workspaces is on
-  // screen. A suite about them asks for a second entry.
-  workspaces: [{ id: 'default', name: null }],
-  activeWorkspace: 'default',
   // The desktop's gate, and what every pre-existing spec asserts by name.
-  biometric: { available: false, canEnroll: false, type: 'touch', mode: null }
-}
-
-type StatusOverrides = Partial<Omit<AppStatus, 'biometric'>> & {
-  biometric?: Partial<AppStatus['biometric']>
-}
-
-/**
- * The launch probe's answer with `overrides` merged in. A spec cares about one
- * leaf of it — which gate is enrolled, which workspaces exist — but the shell
- * reads the whole thing, so naming a leaf must not drop the rest.
- */
-export const appStatusResponse = (overrides: StatusOverrides = {}): AppStatus => ({
-  ...STATUS,
-  ...overrides,
-  biometric: { ...STATUS.biometric, ...overrides.biometric }
+  biometric: { available: false, canEnroll: false, type: 'touch', mode: null },
+  // One workspace: the ordinary install, where nothing about workspaces is on
+  // screen. A suite about them seeds a second entry.
+  workspaces: [{ id: 'default', name: null }],
+  activeWorkspace: 'default'
 })
 
 const DEFAULTS: Record<string, Handler> = {
-  app_status: () => appStatusResponse(),
+  app_status: appStatusDefault,
 
   setup: () => undefined,
   unlock: () => session,
@@ -65,6 +80,11 @@ const DEFAULTS: Record<string, Handler> = {
   disable_biometric: () => undefined,
   change_master_password: () => undefined,
 
+  // A new workspace arrives active and unlocked, so it answers like an unlock.
+  workspace_create: () => session,
+  workspace_select: () => undefined,
+  workspace_rename: () => undefined,
+
   // First run. The probe's result never comes back through these promises —
   // it arrives as `setup:drive:*`, which a spec drives through the store.
   setup_drive_connect: () => undefined,
@@ -72,11 +92,6 @@ const DEFAULTS: Record<string, Handler> = {
   setup_create: () => session,
   setup_restore_from_drive: () => ({ entries: [], syncConfigured: true }),
   setup_restore_from_file: () => session,
-
-  // A new workspace arrives active and unlocked, so it answers like an unlock.
-  workspace_create: () => session,
-  workspace_select: () => undefined,
-  workspace_rename: () => undefined,
 
   reveal_entry: ({ id }) => ({ id, type: 'login', title: '' }),
   save_entry: ({ entry }) => {
@@ -115,8 +130,12 @@ const DEFAULTS: Record<string, Handler> = {
   get_audit: () => ({}),
   fetch_favicon: () => null,
   copy_to_clipboard: () => undefined,
-  set_autolock_timeout: () => undefined,
   scan_image: reject({ kind: 'unrecognized', message: 'nothing recognized' }),
+
+  set_settings: ({ patch }) => {
+    settings = { ...settings, ...(patch as Partial<Settings>) }
+    return settings
+  },
 
   sync_connect: () => undefined,
   sync_disconnect: () => undefined,
@@ -189,4 +208,5 @@ export const resetIpc = (): void => {
   overrides.clear()
   queued.clear()
   recorded.clear()
+  settings = DEFAULT_SETTINGS
 }

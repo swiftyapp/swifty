@@ -1,6 +1,8 @@
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Mutex;
 
+use serde::Serialize;
+
 #[cfg(mobile)]
 use crate::crypto::Cryptor;
 use crate::session::Session;
@@ -47,6 +49,49 @@ pub struct PendingAuth {
     pub started: std::time::Instant,
 }
 
+/// Sync as the frontend sees it. Every transition in `commands::sync` updates
+/// this and re-emits the whole thing as `sync:status`, so the frontend mirrors
+/// one value instead of reconstructing it from an order of events. Process
+/// lifetime, not session: a lock does not un-happen the last successful run.
+#[derive(Default)]
+pub struct SyncRun {
+    /// A consent flow is out with the browser.
+    pub pending: bool,
+    pub in_progress: bool,
+    /// What the last connect or run failed with, until the next one starts.
+    pub error: Option<String>,
+    /// RFC 3339 time of the last run that succeeded in this process.
+    pub last_synced_at: Option<String>,
+}
+
+impl SyncRun {
+    /// The snapshot the frontend gets. `configured` is the session's to answer,
+    /// so the caller supplies it.
+    pub fn status(&self, configured: bool) -> SyncStatus {
+        SyncStatus {
+            configured,
+            pending: self.pending,
+            in_progress: self.in_progress,
+            error: self.error.clone(),
+            last_synced_at: self.last_synced_at.clone(),
+        }
+    }
+}
+
+/// The whole of what the frontend knows about sync, carried by every
+/// `sync:status` event. Owned here, not by the frontend — the backend is what
+/// starts and ends every flow, so it is the one that can say.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncStatus {
+    /// This vault has a provider connected.
+    pub configured: bool,
+    pub pending: bool,
+    pub in_progress: bool,
+    pub error: Option<String>,
+    pub last_synced_at: Option<String>,
+}
+
 pub struct AppState {
     pub session: Mutex<Session>,
     /// Which workspace every vault path resolves to right now.
@@ -60,6 +105,9 @@ pub struct AppState {
     // and releases the session lock repeatedly (never across a network call),
     // so the "one at a time" guard cannot live behind that same lock.
     pub syncing: AtomicBool,
+    /// Sync as reported to the frontend; also what `commands::workspace` reads
+    /// to refuse a switch while a consent flow or a run is out.
+    pub sync_run: Mutex<SyncRun>,
     /// Drive tokens for an account connected during first-run onboarding.
     ///
     /// Memory only, and deliberately so: they are sealed under the vault key,
@@ -90,6 +138,7 @@ impl Default for AppState {
             session: Mutex::default(),
             active_workspace: Mutex::new(crate::workspace::PRIMARY_ID.to_string()),
             syncing: AtomicBool::default(),
+            sync_run: Mutex::default(),
             pending_drive: Mutex::default(),
             setup_busy: AtomicBool::default(),
             setup_attempt: AtomicU64::default(),

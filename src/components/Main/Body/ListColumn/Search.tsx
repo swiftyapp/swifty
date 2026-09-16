@@ -1,8 +1,8 @@
 import { useRef } from 'react'
-import { useStore, setFilterQuery } from '@/store'
+import { useUi, setFilterQuery } from '@/store'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
-import { chord } from '@/utils/platform'
+import { chord } from '@/lib/platform'
 import Kbd from '@/components/elements/Kbd'
 import SearchBox from '@/components/elements/SearchBox'
 import { CloseGlyph } from '../../icons'
@@ -21,7 +21,7 @@ const DESKTOP = 'mt-3 h-8 gap-2.5 rounded-sm pl-3 pr-1.5'
 // in the 44px touch one.
 export default function Search({ className = DESKTOP }: { className?: string }) {
   const { t } = useTranslation()
-  const query = useStore(state => state.filters.query)
+  const query = useUi(state => state.query)
   const empty = query === ''
   const input = useRef<HTMLInputElement>(null)
 

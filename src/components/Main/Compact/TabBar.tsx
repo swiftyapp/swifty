@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  useStore,
+  useUi,
   setView,
   openGenerator,
   openSettings,
   closeSettings,
-  closeGenerator
+  closeGenerator,
+  type View
 } from '@/store'
-import type { View } from '@/store/uiSlice'
 import { cx } from '@/utils/cx'
 import { DicesRailGlyph, GearRailGlyph, GridRailGlyph, StarRailGlyph } from '../icons'
 import { TAB_BAR, TAB_BAR_FADE, TAB_BAR_NOTCH } from './chrome'
@@ -47,11 +47,11 @@ const SLOT: Record<'items' | 'favorites' | 'generator' | 'settings', number> = {
  */
 export default function TabBar() {
   const { t } = useTranslation()
-  const view = useStore(state => state.ui.view)
-  const settings = useStore(state => state.ui.settings)
+  const view = useUi(state => state.view)
+  const settings = useUi(state => state.settings)
   // The standalone generator only. Opened from a password row it carries an
   // apply callback and is an overlay over the form, not a root.
-  const generator = useStore(
+  const generator = useUi(
     state => state.generator.open && !state.generator.apply && !state.generator.ssh
   )
 

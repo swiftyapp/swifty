@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useStore } from '@/store'
-import { PRIMARY_WORKSPACE } from '@/lib/workspace'
+import { useIsPrimaryWorkspace } from '@/store'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import MasterPasswordRow from './MasterPasswordRow'
 import BiometricRow from './BiometricRow'
@@ -12,7 +11,7 @@ export default function Security() {
   // There is one enrolled key and it opens the primary vault, so a second
   // workspace has no biometric question to ask. The row asks it unconditionally
   // (it reads `available`, not `canEnroll`), so the gate is here.
-  const primary = useStore(state => state.workspaces.active) === PRIMARY_WORKSPACE
+  const primary = useIsPrimaryWorkspace()
 
   return (
     <>

@@ -20,6 +20,7 @@ mod save;
 pub mod scan;
 mod secure_store;
 mod session;
+mod settings;
 mod share;
 mod state;
 mod storage;
@@ -95,7 +96,10 @@ pub fn run() {
         )
         .manage(AppState::default())
         .manage(autolock::AutoLock::default())
+        .manage(settings::SettingsState::default())
         .setup(|app| {
+            // Preferences first: the shell and the auto-lock both open on them.
+            settings::boot(app.handle());
             // Which workspace was open last. Read before the window exists, so
             // the lock screen the user lands on is that workspace's.
             let registry = workspace::Registry::load(&storage::root_dir(app.handle())?);
@@ -127,6 +131,7 @@ pub fn run() {
             commands::auth::disable_biometric,
             commands::auth::change_master_password,
             commands::app::app_status,
+            commands::app::set_settings,
             commands::vault::reveal_entry,
             commands::vault::save_entry,
             commands::vault::delete_entry,
@@ -147,7 +152,6 @@ pub fn run() {
             commands::tools::scan_image,
             commands::tools::fetch_favicon,
             commands::clipboard::copy_to_clipboard,
-            commands::tools::set_autolock_timeout,
             commands::setup::setup_drive_connect,
             commands::setup::setup_drive_disconnect,
             commands::setup::setup_restore_from_drive,

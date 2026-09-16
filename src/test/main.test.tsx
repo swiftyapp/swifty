@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { act, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Main from '@/components/Main'
 import type { EntryMeta } from '@/api/types'
-import { makeStore, useStore, setView } from '@/store'
-import { renderWithStore, withEntries, loginEntry, loginMeta } from './utils'
+import { useUi, useVault, setView } from '@/store'
+import { withEntries, loginEntry, loginMeta } from './utils'
 import { mockCommand } from './ipc'
 
 const note = (id: string, title: string): EntryMeta =>
@@ -15,14 +15,12 @@ const card = (id: string, title: string): EntryMeta =>
 beforeEach(() => vi.clearAllMocks())
 
 describe('Main', () => {
-  const seed = () => {
-    const store = makeStore()
+  const seed = () =>
     withEntries([loginMeta({ id: 'l1', title: 'Google' }), note('n1', 'Journal'), card('c1', 'Visa')])
-    return store
-  }
 
   it('lists every kind together by default', () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     // "All Items" is the landing view now — one flat, mixed-kind list.
     expect(screen.getByTestId('list-title')).toHaveTextContent('All Items')
     expect(screen.getByText('Google')).toBeInTheDocument()
@@ -34,7 +32,8 @@ describe('Main', () => {
   it('selects an entry and shows its details', async () => {
     // Details are revealed (decrypted) on demand for the selected entry.
     mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     await userEvent.click(screen.getByText('Google'))
     expect(screen.getByRole('heading', { name: 'Google' })).toBeInTheDocument()
     // email only appears in the details pane, not the list row
@@ -42,9 +41,8 @@ describe('Main', () => {
   })
 
   it('filters entries by search query', async () => {
-    const store = makeStore()
     withEntries([loginMeta({ id: 'a', title: 'Airbnb' }), loginMeta({ id: 'g', title: 'Google' })])
-    renderWithStore(<Main />, { store })
+    render(<Main />)
 
     await userEvent.type(screen.getByPlaceholderText('Search'), 'air')
     expect(screen.getByText('Airbnb')).toBeInTheDocument()
@@ -52,7 +50,8 @@ describe('Main', () => {
   })
 
   it('focuses the one search field on ⌘F', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
     expect(screen.getAllByTestId('search-input')).toHaveLength(1)
 
     await userEvent.keyboard('{Meta>}f{/Meta}')
@@ -60,7 +59,8 @@ describe('Main', () => {
   })
 
   it('lets the open generator dialog swallow the shell chords', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.keyboard('{Meta>}g{/Meta}')
     expect(screen.getByTestId('generator-dialog')).toBeInTheDocument()
@@ -70,20 +70,21 @@ describe('Main', () => {
     expect(screen.getByTestId('search-input')).not.toHaveFocus()
 
     await userEvent.keyboard('{Meta>}n{/Meta}')
-    expect(useStore.getState().ui.addPicker).toBe(false)
+    expect(useUi.getState().addPicker).toBe(false)
   })
 
   it('edits the selected entry on ⌘E, and needs a selection to do it', async () => {
     mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     // Nothing selected: the chord has nothing to edit.
     await userEvent.keyboard('{Meta>}e{/Meta}')
-    expect(useStore.getState().entries.edit).toBe(false)
+    expect(useVault.getState().editing).toBe(false)
 
     await userEvent.click(screen.getByText('Google'))
     await userEvent.keyboard('{Meta>}e{/Meta}')
-    expect(useStore.getState().entries.edit).toBe(true)
+    expect(useVault.getState().editing).toBe(true)
   })
 
   // jsdom implements no `inert` semantics, so the attribute itself is the
@@ -91,14 +92,15 @@ describe('Main', () => {
   // browser's keyboard and pointer reach while a draft is open.
   it('takes the list column out of the keyboard while a draft is open', async () => {
     mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     const column = screen.getByTestId('list-column')
     expect(column).not.toHaveAttribute('inert')
 
     await userEvent.click(screen.getByText('Google'))
     await userEvent.keyboard('{Meta>}e{/Meta}')
-    expect(useStore.getState().entries.edit).toBe(true)
+    expect(useVault.getState().editing).toBe(true)
 
     expect(column).toHaveAttribute('inert')
     // `pointer-events-none` only ever stopped the mouse.
@@ -106,7 +108,8 @@ describe('Main', () => {
   })
 
   it('narrows the list to one kind through the filter chips', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByTestId('filter-note'))
     expect(screen.getByText('Journal')).toBeInTheDocument()
@@ -122,7 +125,8 @@ describe('Main', () => {
   })
 
   it('counts each kind on its chip', () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     const count = (testid: string) =>
       screen.getByTestId(`${testid}-count`).textContent
@@ -136,7 +140,8 @@ describe('Main', () => {
   // The health tile is parked (Settings › Audit deep-links into it now), so the
   // view is entered through the store rather than a rail press.
   it('switches to the vault health view and back to the rail', async () => {
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     act(() => setView('health'))
     expect(screen.getByTestId('list-title')).toHaveTextContent('Vault Health')
@@ -150,24 +155,24 @@ describe('Main', () => {
 
   it('keeps the selected entry when the kind filter still admits it', async () => {
     mockCommand('reveal_entry', () => loginEntry({ id: 'l1', title: 'Google' }))
-    renderWithStore(<Main />, { store: seed() })
+    seed()
+    render(<Main />)
 
     await userEvent.click(screen.getByText('Google'))
-    expect(useStore.getState().entries.current?.id).toBe('l1')
+    expect(useVault.getState().currentId).toBe('l1')
 
     // Narrowing to the kind you are already reading must not close it.
     await userEvent.click(screen.getByTestId('filter-login'))
-    expect(useStore.getState().entries.current?.id).toBe('l1')
+    expect(useVault.getState().currentId).toBe('l1')
 
     // Narrowing to a kind that would hide it does clear the selection.
     await userEvent.click(screen.getByTestId('filter-card'))
-    expect(useStore.getState().entries.current).toBeNull()
+    expect(useVault.getState().currentId).toBeNull()
   })
 
   it('shows the empty-vault hero in the detail pane when there are no entries', () => {
-    const store = makeStore()
     withEntries([])
-    renderWithStore(<Main />, { store })
+    render(<Main />)
     expect(screen.getByText('Your vault is empty')).toBeInTheDocument()
     expect(screen.getByTestId('create-first-entry-button')).toBeInTheDocument()
   })

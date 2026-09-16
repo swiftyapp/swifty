@@ -8,8 +8,9 @@ use tauri::{AppHandle, State};
 
 use crate::error::Result;
 use crate::secure_store::{self, GateMode};
+use crate::settings::Settings;
 use crate::state::AppState;
-use crate::{biometrics, locale, scan, storage, workspace};
+use crate::{biometrics, locale, scan, settings, storage, workspace};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +19,11 @@ pub struct AppStatus {
     /// the app starts fresh and offers an explicit import instead.
     initialized: bool,
     version: String,
+    /// The locale to open in: the stored choice narrowed to a shipped
+    /// catalogue, or the OS's (see `locale::resolve_preferred`).
     locale: String,
+    /// Every preference, hydrated into the frontend's prefs store at boot.
+    settings: Settings,
     sync_configured: bool,
     /// A consent flow is out with the browser. Owned here, not by the frontend:
     /// the backend is what starts and ends it, so it is the one that can say.
@@ -67,12 +72,11 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
     };
     drop(session);
 
-    #[cfg(mobile)]
-    let sync_pending = state.pending_auth.lock().unwrap().is_some();
-    // Desktop's consent flow is started and forgotten, so the frontend learns
-    // of it from `sync:pending` rather than by asking.
-    #[cfg(desktop)]
-    let sync_pending = false;
+    // The same answer `sync:status` carries, so a fresh webview and one that
+    // has been listening agree.
+    let sync_pending = state.sync_run.lock().unwrap().pending;
+
+    let settings = settings::current(&app);
 
     let registry = workspace::Registry::load(&storage::root_dir(&app)?);
     // The in-memory id, not the registry's: it is what every path above was
@@ -83,7 +87,8 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
     Ok(AppStatus {
         initialized: storage::db_exists(&app),
         version: app.package_info().version.to_string(),
-        locale: locale::system_locale(),
+        locale: locale::resolve_preferred(settings.locale.as_deref()),
+        settings,
         sync_configured,
         sync_pending,
         scan_supported: scan::is_supported(),
@@ -98,4 +103,13 @@ pub fn app_status(app: AppHandle, state: State<'_, AppState>) -> Result<AppStatu
         workspaces: registry.workspaces,
         active_workspace,
     })
+}
+
+/// Apply a partial settings object and hand the whole merged result back, so a
+/// caller that patched one key ends up holding exactly what is on disk. The
+/// auto-lock is re-armed inside `settings::set`, under its lock, rather than by
+/// the frontend: the file is the only place the value changes.
+#[tauri::command]
+pub fn set_settings(app: AppHandle, patch: serde_json::Value) -> Result<Settings> {
+    settings::set(&app, &patch)
 }

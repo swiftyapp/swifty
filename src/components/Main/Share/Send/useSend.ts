@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { shareCreate, shareRevoke, type ShareCreated } from '@/api/share'
 import { messageOf } from '@/api/errors'
-import { useStore, closeSend, queueOrphan, revokeOrphans } from '@/store'
+import { useApp, closeSend, queueOrphan, revokeOrphans } from '@/store'
 import { useCopied } from '@/hooks/useCopied'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
 
@@ -39,7 +39,7 @@ export interface Send {
  * the one thing this dialog does.
  */
 export function useSend(entryId: string): Send {
-  const connected = useStore(state => state.sync.enabled)
+  const connected = useApp(state => state.sync.configured)
   const [share, setShare] = useState<ShareCreated | null>(null)
   const [failed, setFailed] = useState<Failure | null>(null)
   const [busy, setBusy] = useState(false)

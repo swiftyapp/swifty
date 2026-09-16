@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import type { Section as Key } from '@/store/uiSlice'
+import type { Section as Key } from '@/store'
 import Sync from './Sections/Sync'
 import Security from './Sections/Security'
 import Workspaces from './Sections/Workspaces'

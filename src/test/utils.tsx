@@ -1,22 +1,37 @@
-import type { ReactElement } from 'react'
-import { render } from '@testing-library/react'
-import { makeStore, setEntries, flowMain, auditDone } from '@/store'
+import {
+  setEntries,
+  flowMain,
+  auditDone,
+  useApp,
+  useUi,
+  useVault,
+  usePrefs,
+  initialApp,
+  initialUi,
+  initialVault,
+  DEFAULT_PREFS
+} from '@/store'
+import type { AppStatus } from '@/api/app'
 import type { Entry, EntryMeta } from '@/api/types'
 import type { Audit } from '@/api/tools'
+import { appStatusDefault } from './ipc'
 
-interface Options {
-  store?: ReturnType<typeof makeStore>
+/**
+ * The launch probe's answer, as the store holds it after `main.tsx` has run.
+ * Every suite starts booted (see `resetStores`); a spec about one leaf of it
+ * overrides that leaf.
+ */
+export const seedApp = (overrides: Partial<AppStatus> = {}) =>
+  useApp.setState({ status: { ...appStatusDefault(), ...overrides } })
+
+// Puts every store back to its initial shape so tests never share state.
+export const resetStores = () => {
+  useApp.setState({ ...initialApp, status: appStatusDefault() }, true)
+  useUi.setState(initialUi, true)
+  useVault.setState(initialVault, true)
+  usePrefs.setState(DEFAULT_PREFS)
 }
 
-// Renders a component against a freshly reset store so tests never share state.
-export const renderWithStore = (ui: ReactElement, { store = makeStore() }: Options = {}) => ({
-  store,
-  ...render(ui)
-})
-
-// Puts the (singleton) store into the unlocked "main" flow with the given entry
-// metadata. Acts on the store the bound actions already point at, so there is
-// nothing to hand it.
 // A promise a test settles by hand, for specs about what happens between the
 // call and the answer — two in flight at once, or one that lands too late.
 export const deferred = <T,>() => {
@@ -29,6 +44,7 @@ export const deferred = <T,>() => {
   return { promise, resolve, reject }
 }
 
+// Puts the stores into the unlocked "main" flow with the given entry metadata.
 export const withEntries = (entries: EntryMeta[], audit?: Audit) => {
   setEntries(entries)
   flowMain()

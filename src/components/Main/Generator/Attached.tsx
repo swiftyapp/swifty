@@ -1,4 +1,4 @@
-import { useStore, closeGenerator } from '@/store'
+import { useUi, closeGenerator } from '@/store'
 import Dialog from './Dialog'
 
 /**
@@ -11,7 +11,7 @@ import Dialog from './Dialog'
  * dialog. Both read the same store; neither is told which shell it is in.
  */
 export default function Attached() {
-  const generator = useStore(state => state.generator)
+  const generator = useUi(state => state.generator)
 
   if (!generator.open || (!generator.apply && !generator.ssh)) return null
   return <Dialog apply={generator.apply} ssh={generator.ssh} onClose={closeGenerator} />
