@@ -178,6 +178,15 @@ export interface UnlockResult {
   syncConfigured: boolean
 }
 
+// One encrypted database, with its own master password. Optional: an install
+// has exactly one until the user makes a second. `name` is null for the primary
+// workspace until it is renamed — `workspaceLabel` (see `@/lib/workspace`) is
+// what the UI shows for it.
+export interface Workspace {
+  id: string
+  name: string | null
+}
+
 // Which biometry this device gates with, straight from the OS (Apple reads
 // `LAContext.biometryType`; everywhere else a fingerprint is the only kind
 // there has ever been). The platform alone cannot answer it — iPhones and Touch

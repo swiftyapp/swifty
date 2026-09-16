@@ -16,7 +16,7 @@ import { loadArchive, setNoEntry, useVault, selectCurrent } from './vault'
 export type View = 'items' | 'favorites' | 'health' | 'archive' | 'tags'
 
 // The Settings sections, in nav order.
-export type Section = 'sync' | 'security' | 'audit' | 'import' | 'language'
+export type Section = 'sync' | 'security' | 'audit' | 'import' | 'language' | 'workspaces'
 
 /** Why a scan produced no fields. The copy for each lives in `Scan/Status`. */
 export type ScanError = 'unreadable' | 'unsupported' | 'failed'

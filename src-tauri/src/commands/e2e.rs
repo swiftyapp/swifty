@@ -104,6 +104,9 @@ pub fn e2e_reset(
     // follow — otherwise the next `app_status` hands the frontend the theme and
     // sort order the previous spec left behind.
     settings::boot(&app);
+    // The wipe took `workspaces.json` with it, so the app is back to one
+    // workspace — and the vault created below has to land in the root.
+    *state.active_workspace.lock().unwrap() = crate::workspace::PRIMARY_ID.to_string();
 
     match mode {
         ResetMode::Pristine => Ok(()),

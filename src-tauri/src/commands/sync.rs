@@ -36,6 +36,7 @@ use crate::sync;
 #[cfg(desktop)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    crate::workspace::guard_primary(&app)?;
     let cryptor = cryptor_or_report(&app, &state)?;
     spawn_consent(&app, cryptor, Follow::Run);
     Ok(())
@@ -53,6 +54,7 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    crate::workspace::guard_primary(&app)?;
     start_consent(&app, &state, AuthPurpose::Connect).inspect_err(|e| failed(&app, e.to_string()))
 }
 
@@ -103,6 +105,7 @@ pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(desktop)]
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    crate::workspace::guard_primary(&app)?;
     let cryptor = cryptor_or_report(&app, &state)?;
     spawn_consent(&app, cryptor, Follow::Pull);
     Ok(())
@@ -112,6 +115,7 @@ pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    crate::workspace::guard_primary(&app)?;
     start_consent(&app, &state, AuthPurpose::Import).inspect_err(|e| failed(&app, e.to_string()))
 }
 

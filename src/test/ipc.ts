@@ -62,7 +62,11 @@ export const appStatusDefault = (): AppStatus => ({
   // Off by default, so no suite sees a scan affordance it did not ask for.
   scanSupported: false,
   // The desktop's gate, and what every pre-existing spec asserts by name.
-  biometric: { available: false, canEnroll: false, type: 'touch', mode: null }
+  biometric: { available: false, canEnroll: false, type: 'touch', mode: null },
+  // One workspace: the ordinary install, where nothing about workspaces is on
+  // screen. A suite about them seeds a second entry.
+  workspaces: [{ id: 'default', name: null }],
+  activeWorkspace: 'default'
 })
 
 const DEFAULTS: Record<string, Handler> = {
@@ -75,6 +79,11 @@ const DEFAULTS: Record<string, Handler> = {
   enable_biometric: () => 'protected',
   disable_biometric: () => undefined,
   change_master_password: () => undefined,
+
+  // A new workspace arrives active and unlocked, so it answers like an unlock.
+  workspace_create: () => session,
+  workspace_select: () => undefined,
+  workspace_rename: () => undefined,
 
   // First run. The probe's result never comes back through these promises —
   // it arrives as `setup:drive:*`, which a spec drives through the store.

@@ -247,6 +247,7 @@ fn unenroll_on(err: &Error) -> bool {
 // settled on — recorded here and honoured verbatim by every later retrieval.
 #[tauri::command]
 pub fn enable_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<String> {
+    crate::workspace::guard_primary(&app)?;
     if !secure_store::is_supported() || !biometrics::is_available() {
         return Err(Error::Other("biometrics not available".into()));
     }

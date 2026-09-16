@@ -31,7 +31,9 @@ pub const GDRIVE_FILE: &str = "auth/gdrive.swftx";
 // — not a secret: it says *how* the key is gated, never anything about the key.
 pub const BIOMETRIC_FILE: &str = "biometric.enabled";
 
-fn app_dir(app: &AppHandle) -> Result<PathBuf> {
+// The data dir for the whole install: what every workspace hangs off, and where
+// the workspace registry itself lives.
+pub fn root_dir(app: &AppHandle) -> Result<PathBuf> {
     // E2E test isolation: point the whole data dir at a fresh temp dir per run.
     if let Ok(dir) = std::env::var("ROWEL_DB_DIR") {
         return Ok(PathBuf::from(dir));
@@ -50,9 +52,19 @@ fn app_dir(app: &AppHandle) -> Result<PathBuf> {
     })
 }
 
+// The active workspace's own directory — which, for the primary, IS the root
+// (see `workspace::dir_of`). Everything belonging to one vault resolves through
+// here, so switching workspaces moves the whole set of paths at once.
+fn workspace_dir(app: &AppHandle) -> Result<PathBuf> {
+    Ok(crate::workspace::dir_of(
+        &root_dir(app)?,
+        &crate::workspace::active_id(app),
+    ))
+}
+
 // The SQLCipher database that supersedes the JSON vault.
 pub fn db_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(app_dir(app)?.join(DB_FILE))
+    Ok(workspace_dir(app)?.join(DB_FILE))
 }
 
 // Working space for the sync engine: the snapshot it packs for upload and the
@@ -61,17 +73,19 @@ pub fn db_path(app: &AppHandle) -> Result<PathBuf> {
 // inherit the 0700 directory mode. Everything written here is SQLCipher
 // ciphertext, and every writer removes its own files (see `pack::Scratch`).
 pub fn sync_scratch_dir(app: &AppHandle) -> Result<PathBuf> {
-    Ok(app_dir(app)?.join("sync-scratch"))
+    Ok(workspace_dir(app)?.join("sync-scratch"))
 }
 
 // Cached website favicons (list-row identity). Safe to wipe; refetched lazily.
+// On the root, not per workspace: a favicon is public web content, so caching it
+// once serves every workspace and leaks nothing about which of them uses it.
 pub fn icons_dir(app: &AppHandle) -> Result<PathBuf> {
-    Ok(app_dir(app)?.join("icons"))
+    Ok(root_dir(app)?.join("icons"))
 }
 
 // Sibling recovery snapshot of the DB (change-master-password rollback point).
 pub fn db_rekey_backup_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(app_dir(app)?.join(DB_REKEY_BACKUP_FILE))
+    Ok(workspace_dir(app)?.join(DB_REKEY_BACKUP_FILE))
 }
 
 // Whether the SQLite store has been created (non-empty file present).
@@ -84,13 +98,13 @@ pub fn db_exists(app: &AppHandle) -> bool {
 }
 
 fn gdrive_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(app_dir(app)?.join(GDRIVE_FILE))
+    Ok(workspace_dir(app)?.join(GDRIVE_FILE))
 }
 
 // Public because the sync restore path addresses the sidecar by path (its core
 // runs without an `AppHandle`) rather than duplicating the layout constants.
 pub fn kdf_sidecar_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(app_dir(app)?.join(KDF_SIDECAR_FILE))
+    Ok(workspace_dir(app)?.join(KDF_SIDECAR_FILE))
 }
 
 // The KDF descriptor JSON, or `None` when absent (a sidecar-less legacy/dev DB).
@@ -122,8 +136,10 @@ pub fn remove_db_files(path: &Path) {
     }
 }
 
+// Preferences belong to the install, not to a vault, so they sit on the root
+// and follow the user across workspaces.
 pub fn settings_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(app_dir(app)?.join(SETTINGS_FILE))
+    Ok(root_dir(app)?.join(SETTINGS_FILE))
 }
 
 // Write (or overwrite) the preferences file. Atomic like the sidecars: a torn
@@ -133,7 +149,7 @@ pub fn write_settings(app: &AppHandle, json: &str) -> Result<()> {
 }
 
 fn lockout_sidecar_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(app_dir(app)?.join(LOCKOUT_SIDECAR_FILE))
+    Ok(workspace_dir(app)?.join(LOCKOUT_SIDECAR_FILE))
 }
 
 // The failed-unlock backoff state JSON, or `None` when absent (no failed
@@ -241,20 +257,20 @@ pub fn remove_gdrive(app: &AppHandle) {
 // Enrollment decides the gate once; every later retrieval reads it back from
 // here rather than re-probing what the platform would do today.
 pub fn biometric_marker(app: &AppHandle) -> Option<String> {
-    let path = app_dir(app).ok()?.join(BIOMETRIC_FILE);
+    let path = workspace_dir(app).ok()?.join(BIOMETRIC_FILE);
     fs::read_to_string(path).ok()
 }
 
 // Whether the user opted into biometric unlock (marker file present).
 pub fn biometric_enrolled(app: &AppHandle) -> bool {
-    app_dir(app)
+    workspace_dir(app)
         .map(|d| d.join(BIOMETRIC_FILE).exists())
         .unwrap_or(false)
 }
 
 // Record the enrolled gate, or clear the marker entirely with `None`. Idempotent.
 pub fn set_biometric_marker(app: &AppHandle, marker: Option<&str>) -> Result<()> {
-    let path = app_dir(app)?.join(BIOMETRIC_FILE);
+    let path = workspace_dir(app)?.join(BIOMETRIC_FILE);
     match marker {
         Some(marker) => write_file(&path, marker),
         None if path.exists() => {
