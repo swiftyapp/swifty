@@ -15,3 +15,5 @@ pub mod share;
 pub mod sync;
 pub mod tools;
 pub mod vault;
+// Creating, switching and renaming the optional additional vaults.
+pub mod workspace;

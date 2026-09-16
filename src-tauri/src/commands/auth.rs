@@ -247,6 +247,7 @@ fn unenroll_on(err: &Error) -> bool {
 // settled on — recorded here and honoured verbatim by every later retrieval.
 #[tauri::command]
 pub fn enable_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<String> {
+    crate::workspace::guard_primary(&app)?;
     if !secure_store::is_supported() || !biometrics::is_available() {
         return Err(Error::Other("biometrics not available".into()));
     }
@@ -283,6 +284,9 @@ pub fn change_master_password(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<()> {
+    // This rewrites the KDF sidecar and the database through the workspace
+    // paths, so it holds the same step a workspace switch has to take first.
+    let _step = super::setup::begin_step(&state)?;
     // Hold the session lock throughout: no other command sees the half-open state
     // while the store is out of the session.
     let mut session = state.session.lock().unwrap();

@@ -31,8 +31,11 @@ mod timer;
 #[cfg(desktop)]
 mod tray;
 mod window;
+// The optional additional vaults, and which of them the app is addressing.
+mod workspace;
 
 use state::AppState;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -97,6 +100,10 @@ pub fn run() {
         .setup(|app| {
             // Preferences first: the shell and the auto-lock both open on them.
             settings::boot(app.handle());
+            // Which workspace was open last. Read before the window exists, so
+            // the lock screen the user lands on is that workspace's.
+            let registry = workspace::Registry::load(&storage::root_dir(app.handle())?);
+            *app.state::<AppState>().active_workspace.lock().unwrap() = registry.active;
 
             window::create(app.handle())?;
             #[cfg(desktop)]
@@ -158,6 +165,9 @@ pub fn run() {
             commands::share::share_open,
             commands::share::share_revoke,
             commands::share::share_list,
+            commands::workspace::workspace_select,
+            commands::workspace::workspace_create,
+            commands::workspace::workspace_rename,
             // E2E-only vault reset. `generate_handler!` honours per-command
             // attributes, so in a release build the match arm — and with it the
             // only reference to the (also cfg'd-out) module — simply is not

@@ -1,6 +1,6 @@
 import { call } from './client'
 import type { GeneratorOptions } from './tools'
-import type { BiometricMode, BiometryType } from './types'
+import type { BiometricMode, BiometryType, Workspace } from './types'
 import type { ThemePreference } from '@/theme'
 
 export type DateFormat = 'MM/DD/YYYY' | 'DD.MM.YYYY' | 'YYYY-MM-DD'
@@ -78,6 +78,14 @@ export interface AppStatus {
     type: BiometryType
     mode: BiometricMode | null
   }
+  /**
+   * Every workspace on this install, primary first — exactly one until the
+   * user makes a second, which is what keeps the whole feature off screen
+   * until there is something to switch between.
+   */
+  workspaces: Workspace[]
+  /** Which of them the fields above describe. */
+  activeWorkspace: string
 }
 
 export const appStatus = (): Promise<AppStatus> => call('app_status')

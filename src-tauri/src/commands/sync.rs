@@ -36,9 +36,8 @@ use crate::sync;
 #[cfg(desktop)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    let cryptor = cryptor_or_report(&app, &state)?;
-    spawn_consent(&app, cryptor, Follow::Run);
-    Ok(())
+    crate::workspace::guard_primary(&app)?;
+    spawn_consent(&app, &state, Follow::Run)
 }
 
 /// Start the consent flow and return — see [`on_redirect`] for the other half.
@@ -53,6 +52,7 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    crate::workspace::guard_primary(&app)?;
     start_consent(&app, &state, AuthPurpose::Connect).inspect_err(|e| failed(&app, e.to_string()))
 }
 
@@ -103,15 +103,15 @@ pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(desktop)]
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    let cryptor = cryptor_or_report(&app, &state)?;
-    spawn_consent(&app, cryptor, Follow::Pull);
-    Ok(())
+    crate::workspace::guard_primary(&app)?;
+    spawn_consent(&app, &state, Follow::Pull)
 }
 
 /// The mobile twin of [`sync_import`]: start consent, adopt on the redirect.
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    crate::workspace::guard_primary(&app)?;
     start_consent(&app, &state, AuthPurpose::Import).inspect_err(|e| failed(&app, e.to_string()))
 }
 
@@ -141,19 +141,35 @@ enum Follow {
 /// a loopback listener and drives Drive with `block_on`, so it may never run on
 /// the command thread nor on an async worker.
 #[cfg(desktop)]
-fn spawn_consent(app: &AppHandle, cryptor: Cryptor, follow: Follow) {
-    pending(app);
+fn spawn_consent(app: &AppHandle, state: &State<'_, AppState>, follow: Follow) -> Result<()> {
+    // Key and flag under the workspace lock, as one step: a switch cannot land
+    // between taking this workspace's key and announcing the flow that will
+    // write with it (see `commands::workspace::guard_sync_idle`).
+    let cryptor = {
+        let _paths = state.workspace_lock.lock().unwrap();
+        let cryptor = cryptor_or_report(app, state)?;
+        pending(app);
+        cryptor
+    };
     let app = app.clone();
     std::thread::spawn(move || match sync::setup(&app, &cryptor) {
-        Ok(()) => {
-            connected(&app);
-            match follow {
-                Follow::Run => start_run(&app),
-                Follow::Pull => pull(&app, cryptor),
+        // Either way the run is claimed before the consent is marked over, so
+        // the flags overlap rather than leave a gap a workspace switch could
+        // use — and the first upload cannot be skipped by one landing there.
+        Ok(()) => match follow {
+            Follow::Run => {
+                start_run(&app);
+                connected(&app);
             }
-        }
+            Follow::Pull => {
+                started(&app);
+                connected(&app);
+                pull(&app, cryptor);
+            }
+        },
         Err(e) => failed(&app, e.to_string()),
     });
+    Ok(())
 }
 
 /// Take on whatever the account holds. The refreshed list always goes out on a
@@ -161,9 +177,10 @@ fn spawn_consent(app: &AppHandle, cryptor: Cryptor, follow: Follow) {
 /// new" is an answer worth rendering.
 ///
 /// Blocking, and deliberately: `sync::run` drives Drive with `block_on`, so
-/// every caller has to be a plain thread (see [`start_run`]).
+/// every caller has to be a plain thread (see [`start_run`]). The caller has
+/// already announced the run (`started`) — before the consent it follows was
+/// marked over, so a workspace switch never finds a moment with neither flag up.
 fn pull(app: &AppHandle, cryptor: Cryptor) {
-    started(app);
     match sync::run(app, cryptor) {
         Ok(_) => {
             events::vault_merged(app, entry_metas(app));
@@ -206,6 +223,9 @@ const RESUME_GRACE: Duration = Duration::from_secs(3);
 /// different purpose, and must not fork the bookkeeping.
 #[cfg(mobile)]
 pub(crate) fn start_consent(app: &AppHandle, state: &AppState, purpose: AuthPurpose) -> Result<()> {
+    // Key and pending flow recorded under the workspace lock, as one step, for
+    // the reason `spawn_consent` gives on desktop.
+    let _paths = state.workspace_lock.lock().unwrap();
     // Setup runs before any vault exists, so there is no session to take a
     // cryptor from — and nothing to seal the tokens with until the restore or
     // create that follows makes a key.
@@ -288,13 +308,17 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
         };
         match sync::complete(&app, &cryptor, &code, &pending.verifier).await {
             Ok(()) => {
-                connected(&app);
+                // The run is claimed before the consent is marked over, as in
+                // `spawn_consent`; the pull gets a plain thread for the same
+                // reason `start_run` uses one.
                 if purpose == AuthPurpose::Import {
-                    // A plain thread, for the same reason `start_run` uses one.
+                    started(&app);
+                    connected(&app);
                     let handle = app.clone();
                     std::thread::spawn(move || pull(&handle, cryptor));
                 } else {
                     start_run(&app);
+                    connected(&app);
                 }
             }
             Err(e) => fail(&app, purpose, e.to_string()),
@@ -453,6 +477,10 @@ pub(crate) fn status(app: &AppHandle) -> SyncStatus {
 /// of network latency can reach the command or main thread.
 fn start_run(app: &AppHandle) {
     let state = app.state::<AppState>();
+    // Claim and key under the workspace lock, so a switch cannot land between
+    // them: the run either starts against the paths it was keyed for, or finds
+    // them already moved and does not start at all.
+    let paths = state.workspace_lock.lock().unwrap();
     if state
         .syncing
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -471,6 +499,7 @@ fn start_run(app: &AppHandle) {
             return;
         }
     };
+    drop(paths);
 
     let app = app.clone();
     std::thread::spawn(move || {

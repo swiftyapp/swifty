@@ -35,6 +35,7 @@ import {
   IdCard,
   KeyRound,
   KeySquare,
+  Layers,
   LayoutGrid,
   Lock,
   Moon,
@@ -158,6 +159,7 @@ export const ScanGlyph = glyph(ScanLine, 16)
 export const ShieldGlyph = glyph(ShieldCheck, 16)
 export const GlobeGlyph = glyph(Globe, 16)
 export const ActivityGlyph = glyph(Activity, 16)
+export const LayersGlyph = glyph(Layers, 16)
 // The iOS disclosure mark: a row that pushes a screen rather than doing a thing.
 export const ChevronRightGlyph = glyph(ChevronRight, 16)
 
