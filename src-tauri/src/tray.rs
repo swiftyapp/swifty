@@ -186,15 +186,33 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 
 /// Put the menu back in the user's language after Settings › Language changes
 /// it. A no-op before the tray exists, so an early `settings::set` is harmless.
+///
+/// A label the platform refuses to change is logged, not propagated: the
+/// preference is the user's and has to be saved either way, and the tray is
+/// the only thing that could be left behind — the next language change, or the
+/// next launch (`create` reads the same table), relabels it again.
 pub fn relabel(app: &AppHandle, preferred: Option<&str>) {
     let Some(items) = app.try_state::<TrayItems>() else {
         return;
     };
     let labels = labels(preferred);
-    let _ = items.show.set_text(labels.show.replace("{}", APP_NAME));
-    let _ = items.lock.set_text(labels.lock);
-    let _ = items.about.set_text(labels.about);
-    let _ = items.quit.set_text(labels.quit);
+    let updates = [
+        (
+            "show",
+            items.show.set_text(labels.show.replace("{}", APP_NAME)),
+        ),
+        ("lock", items.lock.set_text(labels.lock)),
+        ("about", items.about.set_text(labels.about)),
+        ("quit", items.quit.set_text(labels.quit)),
+    ];
+    for (item, result) in updates {
+        if let Err(error) = result {
+            log::warn!(
+                "tray item '{item}' kept its previous label; could not relabel for {}: {error}",
+                preferred.unwrap_or("the OS locale")
+            );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -206,12 +224,13 @@ mod tests {
     // here would silently fall back to English in the menu bar alone.
     #[test]
     fn every_shipped_locale_has_a_tray_menu() {
-        // `resolve_preferred` only hands a tag back when it is one of
-        // `locale::SUPPORTED`, so this is that list, checked from the outside.
-        for (tag, _) in LABELS {
-            assert_eq!(locale::resolve_preferred(Some(tag)), tag);
-        }
-        assert_eq!(LABELS.len(), 10, "one entry per locale::SUPPORTED tag");
+        // The same set, exactly: a duplicate here could otherwise stand in for
+        // a locale the table forgot, and the count alone would not notice.
+        let mut tags: Vec<&str> = LABELS.iter().map(|(tag, _)| *tag).collect();
+        tags.sort_unstable();
+        let mut shipped = locale::SUPPORTED.to_vec();
+        shipped.sort_unstable();
+        assert_eq!(tags, shipped);
         assert_eq!(LABELS[0].0, "en-US", "en-US is the fallback");
     }
 
