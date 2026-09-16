@@ -45,7 +45,9 @@ export default function NewWorkspace() {
 
   // Busy goes up before the strength check, not after: the check awaits a chunk
   // fetch, and that window must not let a second press through. The fields are
-  // read once here, so typing during the wait cannot change what is created.
+  // read once here and disabled while busy, so what is created is exactly what
+  // is on screen — an edit during the wait cannot leave the form showing a
+  // password other than the one the workspace got.
   const submit = async () => {
     if (busy) return
     const label = name.trim()
@@ -83,12 +85,14 @@ export default function NewWorkspace() {
           data-testid="workspace-new-name"
           placeholder={t('Workspace name')}
           value={name}
+          disabled={busy}
           onChange={event => setName(event.target.value)}
         />
         <Masterpass
           placeholder={t('Master password')}
           testid="workspace-new-password"
           autoFocus={false}
+          disabled={busy}
           error={error}
           onEnter={reportStrength}
           onChange={changePassword}
@@ -97,6 +101,7 @@ export default function NewWorkspace() {
           placeholder={t('Type it once more')}
           testid="workspace-new-confirm"
           autoFocus={false}
+          disabled={busy}
           error={mismatch}
           onEnter={() => void submit()}
           onChange={changeConfirmation}
