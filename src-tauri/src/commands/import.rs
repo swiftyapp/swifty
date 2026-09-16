@@ -206,8 +206,9 @@ pub async fn import_entries(
 // after a crash, or simply by accident — must not double the vault; but a row
 // that merely resembles one already there (the password has since changed) is a
 // real import, so the test is equality of the whole normalized entry and
-// nothing fuzzier. `ImportedEntry` carries neither ids nor timestamps, which is
-// what lets `==` mean "the same data".
+// nothing fuzzier. `ImportedEntry` carries no ids; its bookkeeping (timestamps,
+// the star) is cleared on both sides first, since a foreign file rarely has
+// them and the vault always does — without that, `==` would never match.
 //
 // Candidates are narrowed on plaintext columns first — `list` reads no payload
 // — so the only rows unsealed are the handful sharing a kind and a title with
@@ -230,7 +231,9 @@ fn duplicate_flags(
             candidates
                 .entry(key)
                 .or_default()
-                .push(entry_to_imported(&cipher.unseal(&record.payload)?));
+                .push(without_bookkeeping(entry_to_imported(
+                    &cipher.unseal(&record.payload)?,
+                )));
         }
     }
     Ok(entries
@@ -238,9 +241,18 @@ fn duplicate_flags(
         .map(|imported| {
             candidates
                 .get(&dedupe_key(imported))
-                .is_some_and(|rows| rows.contains(imported))
+                .is_some_and(|rows| rows.contains(&without_bookkeeping(imported.clone())))
         })
         .collect())
+}
+
+// The fields that say when and how an entry was kept, not what it is.
+fn without_bookkeeping(mut entry: ImportedEntry) -> ImportedEntry {
+    entry.favorite = false;
+    entry.created_at = None;
+    entry.updated_at = None;
+    entry.password_updated_at = None;
+    entry
 }
 
 // The plaintext columns a duplicate must share before it is worth unsealing.
