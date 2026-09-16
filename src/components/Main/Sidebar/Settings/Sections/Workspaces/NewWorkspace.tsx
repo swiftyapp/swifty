@@ -35,18 +35,37 @@ export default function NewWorkspace() {
     setConfirmation(event.currentTarget.value)
   }
 
-  const submit = () => {
-    if (busy) return
-    if (!name.trim()) return setMismatch(t('Fill in the name'))
-    const weak = masterPasswordError(password, t)
-    if (weak) return setError(weak)
-    if (password !== confirmation) return setMismatch(t('Passwords do not match'))
+  // Enter on the password field reports what is wrong with it; it does not
+  // submit. The check awaits the zxcvbn chunk on first use.
+  const reportStrength = () => {
+    void masterPasswordError(password, t)
+      .then(setError)
+      .catch(() => setError(t('Something went wrong')))
+  }
 
+  // Busy goes up before the strength check, not after: the check awaits a chunk
+  // fetch, and that window must not let a second press through. The fields are
+  // read once here, so typing during the wait cannot change what is created.
+  const submit = async () => {
+    if (busy) return
+    const label = name.trim()
+    if (!label) return setMismatch(t('Fill in the name'))
     setBusy(true)
-    createWorkspace(name.trim(), password).catch((err: unknown) => {
+    try {
+      const weak = await masterPasswordError(password, t)
+      if (weak) {
+        setBusy(false)
+        return setError(weak)
+      }
+      if (password !== confirmation) {
+        setBusy(false)
+        return setMismatch(t('Passwords do not match'))
+      }
+      await createWorkspace(label, password)
+    } catch (err: unknown) {
       setBusy(false)
       setMismatch(messageOf(err) || t('Something went wrong'))
-    })
+    }
   }
 
   return (
@@ -71,7 +90,7 @@ export default function NewWorkspace() {
           testid="workspace-new-password"
           autoFocus={false}
           error={error}
-          onEnter={() => setError(masterPasswordError(password, t))}
+          onEnter={reportStrength}
           onChange={changePassword}
         />
         <Masterpass
@@ -79,11 +98,11 @@ export default function NewWorkspace() {
           testid="workspace-new-confirm"
           autoFocus={false}
           error={mismatch}
-          onEnter={submit}
+          onEnter={() => void submit()}
           onChange={changeConfirmation}
         />
         <div>
-          <Button size="md" testid="workspace-create" loading={busy} onClick={submit}>
+          <Button size="md" testid="workspace-create" loading={busy} onClick={() => void submit()}>
             {t('Create')}
           </Button>
         </div>
