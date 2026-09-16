@@ -34,6 +34,12 @@ pub async fn unlock(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
+    // Held for the whole unlock, like `change_master_password` holds it for the
+    // whole change. Without it an unlock could land while a change is still
+    // re-keying (an auto-lock during a long change ends the session but not the
+    // saga), and the recovery below would read that change's snapshot as an
+    // interrupted one and copy it over a database the saga still has open.
+    let _step = super::setup::begin_step(&state)?;
     // Before the lockout check and before anything reads the sidecar: a crash
     // during a password change can leave the DB and the sidecar disagreeing, and
     // the rollback has to land before either is consulted.
@@ -122,8 +128,10 @@ pub fn lock(app: AppHandle) -> Result<()> {
 // store then opens off the UI thread. No migration on unlock.
 #[tauri::command]
 pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<UnlockResult> {
-    // Same reason as in `unlock`: roll back an interrupted password change before
-    // the sidecar decides how to read the stored material.
+    // Same two reasons as in `unlock`: no unlock while a change is re-keying,
+    // and an interrupted change rolled back before the sidecar decides how to
+    // read the stored material.
+    let _step = super::setup::begin_step(&state)?;
     auth::recover_interrupted_rekey(&app, &state)?;
 
     let Some(marker) = storage::biometric_marker(&app) else {
@@ -230,11 +238,13 @@ pub async fn change_master_password(
     state: State<'_, AppState>,
 ) -> Result<()> {
     // This rewrites the KDF sidecar and the database through the workspace
-    // paths, so it holds the same step a workspace switch has to take first.
+    // paths, so it holds the same step a workspace switch has to take first —
+    // and that every unlock takes, so no unlock can run recovery against the
+    // snapshot this change is about to publish.
     let _step = super::setup::begin_step(&state)?;
     // Resolved before anything is taken out of the session, so a path that
     // cannot be resolved leaves the vault open and unchanged.
-    let backup = storage::db_rekey_backup_path(&app)?;
+    let paths = auth::RekeyPaths::resolve(&app, &state)?;
 
     // Deriving needs only the app handle and the passwords, so it happens off
     // the session entirely — and off the main thread, since Argon2id is the
@@ -261,7 +271,7 @@ pub async fn change_master_password(
     let handle = app.clone();
     let rekeyed = blocking(move || {
         Ok(auth::rekey(
-            &handle, store, old_key, new_key, &params, &backup,
+            &handle, store, old_key, new_key, &params, &paths,
         ))
     })
     .await?;
@@ -316,16 +326,8 @@ pub async fn change_master_password(
     // committed on disk, so failing out here would strand the session held-out
     // with no `vault:locked` event and leave the biometric enrollment stale. The
     // worst case is a token the user has to reconnect.
-    let token = storage::read_gdrive(&app).unwrap_or_default();
-    if !token.is_empty() {
-        if let Ok(plain) = old_cryptor.decrypt(&token) {
-            if let Err(e) = new_cryptor
-                .encrypt(&plain)
-                .and_then(|sealed| storage::write_gdrive(&app, &sealed))
-            {
-                log::warn!("could not re-seal the Drive token under the new key: {e}");
-            }
-        }
+    if let Err(e) = crate::sync::reseal_tokens(&app, &old_cryptor, &new_cryptor) {
+        log::warn!("could not re-seal the Drive token under the new key: {e}");
     }
 
     // The biometric-stored key is now stale; re-store the new material or clear

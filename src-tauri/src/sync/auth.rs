@@ -249,10 +249,30 @@ pub fn is_configured(app: &AppHandle, cryptor: &Cryptor) -> bool {
 /// A failed delete is an error, not a shrug: the refresh token is still on disk
 /// and still usable, so the only honest answer is that the account is *not*
 /// disconnected. `Ok(None)` means there was nothing stored to revoke.
+///
+/// The connection generation is bumped and the file deleted under one hold of
+/// the token-file guard, so a refresh's write-back and a password change's
+/// re-seal (both of which take the same guard) either see the old generation
+/// and finish before this runs, or see the new one and leave the file gone.
 pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<Option<Tokens>> {
+    let state = app_state(app);
+    let mut generation = state.sync_generation.lock().unwrap();
+    *generation += 1;
     let tokens = read_tokens(app, cryptor);
     storage::remove_gdrive(app)?;
     Ok(tokens)
+}
+
+/// Re-seal the token file under `new` — a password change moved the vault key
+/// it was sealed with. Read and write under the token-file guard, so a
+/// disconnect cannot land between them and have its delete undone by the write.
+pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()> {
+    let state = app_state(app);
+    let _generation = state.sync_generation.lock().unwrap();
+    let Some(tokens) = read_tokens(app, old) else {
+        return Ok(());
+    };
+    write_tokens(app, new, &tokens)
 }
 
 /// The token to revoke. Google kills the whole grant from either half of the
@@ -394,17 +414,26 @@ pub fn parse_redirect(url: &Url, state: &str) -> Redirect {
 pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -> Result<String> {
     // Which connection these tokens belong to, read before they are. A refresh
     // awaits a network round trip between the read and the write-back, and no
-    // lock is held across it (this codebase never holds one across I/O — see
-    // `AppState::workspace_lock`), so a disconnect can delete the token file in
-    // that window; the generation is what lets the write-back notice.
-    let generation = sync_generation(app);
-    let mut tokens = read_tokens(app, cryptor).ok_or(Error::SyncNotConfigured)?;
+    // lock is held across it (this codebase never holds one across a network
+    // call — see `AppState::workspace_lock`), so a disconnect can delete the
+    // token file in that window; the generation is what lets the write-back
+    // notice.
+    let state = app_state(app);
+    let (generation, mut tokens) = {
+        let generation = state.sync_generation.lock().unwrap();
+        let tokens = read_tokens(app, cryptor).ok_or(Error::SyncNotConfigured)?;
+        (*generation, tokens)
+    };
     // Asked before the call, because that is what says whether the file on
     // disk is now out of date — afterwards the tokens look fresh either way.
     let refreshing = needs_refresh(&tokens);
     let token = fresh_access_token(client, app, &mut tokens).await?;
     if refreshing {
-        if sync_generation(app) == generation {
+        // Compared and written under the guard a disconnect bumps and deletes
+        // under: a bare compare would leave a gap for the disconnect to land in
+        // and have its delete undone by this write.
+        let current = state.sync_generation.lock().unwrap();
+        if *current == generation {
             write_tokens(app, cryptor, &tokens)?;
         } else {
             // Skipping the write is the whole point: re-creating the file would
@@ -417,12 +446,9 @@ pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -
     Ok(token)
 }
 
-// Which Drive connection is current; see `AppState::sync_generation`.
-fn sync_generation(app: &AppHandle) -> u64 {
+fn app_state(app: &AppHandle) -> tauri::State<'_, crate::state::AppState> {
     use tauri::Manager;
     app.state::<crate::state::AppState>()
-        .sync_generation
-        .load(std::sync::atomic::Ordering::SeqCst)
 }
 
 /// A valid access token for `tokens`, refreshing them *in place* if the one

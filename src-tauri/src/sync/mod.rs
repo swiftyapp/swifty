@@ -115,6 +115,12 @@ pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<Option<Tokens>> 
     auth::disconnect(app, cryptor)
 }
 
+/// Re-seal the stored tokens under a new vault key (a password change). A
+/// missing token file is a no-op, not an error.
+pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()> {
+    auth::reseal_tokens(app, old, new)
+}
+
 /// Retire a disconnected account's grant at Google. Best effort: the local
 /// disconnect stands whatever happens here.
 pub(crate) async fn revoke(tokens: &Tokens) {

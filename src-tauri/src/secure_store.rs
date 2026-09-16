@@ -373,7 +373,10 @@ mod imp {
             // process running as this user could read it. Delete it rather than
             // read it: the caller treats NotFound as "the enrollment is gone"
             // and un-enrolls, so re-enabling biometrics produces a wrapped one.
-            let _ = delete();
+            // A failed delete propagates as itself: reporting NotFound over a
+            // key that is still there would clear the marker and with it the
+            // only path that ever retries the removal.
+            delete()?;
             return Err(Error::NotFound);
         }
         // Opening and signing *is* the verification — the wrapping key cannot

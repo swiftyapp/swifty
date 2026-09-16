@@ -129,16 +129,19 @@ pub struct AppState {
     // and releases the session lock repeatedly (never across a network call),
     // so the "one at a time" guard cannot live behind that same lock.
     pub syncing: AtomicBool,
-    /// Which Drive connection is current. Bumped by `sync_disconnect` *before*
-    /// it deletes the token file.
+    /// Which Drive connection is current, and the guard on the token file.
     ///
     /// A token refresh reads the file, awaits a network round trip, and writes
     /// the refreshed tokens back — and cannot hold a lock across that await
     /// (see `workspace_lock`). A disconnect landing in that window would
     /// otherwise have its delete undone by the write-back, leaving the account
-    /// connected again at the next unlock. The refresh compares this before and
-    /// after, and skips the write when it changed.
-    pub sync_generation: AtomicU64,
+    /// connected again at the next unlock. So the refresh reads this before the
+    /// round trip and writes back only if it is unchanged — with the compare and
+    /// the write under this lock, as are the disconnect's bump and delete, and
+    /// the password change's re-seal. A bare compare would leave a gap between
+    /// it and the write for the disconnect to land in. Held across local file
+    /// operations only, never a network call.
+    pub sync_generation: Mutex<u64>,
     /// Sync as reported to the frontend; also what `commands::workspace` reads
     /// to refuse a switch while a consent flow or a run is out.
     pub sync_run: Mutex<SyncRun>,
@@ -178,7 +181,7 @@ impl Default for AppState {
             active_workspace: Mutex::new(crate::workspace::PRIMARY_ID.to_string()),
             workspace_lock: Mutex::default(),
             syncing: AtomicBool::default(),
-            sync_generation: AtomicU64::default(),
+            sync_generation: Mutex::default(),
             sync_run: Mutex::default(),
             pending_drive: Mutex::default(),
             setup_busy: AtomicBool::default(),

@@ -92,16 +92,6 @@ pub fn icons_dir(app: &AppHandle) -> Result<PathBuf> {
     Ok(root_dir(app)?.join("icons"))
 }
 
-// Sibling recovery snapshot of the DB (change-master-password rollback point).
-pub fn db_rekey_backup_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(workspace_dir(app)?.join(DB_REKEY_BACKUP_FILE))
-}
-
-// Sibling recovery snapshot of the KDF sidecar, taken with the DB one above.
-pub fn kdf_sidecar_rekey_backup_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(workspace_dir(app)?.join(KDF_SIDECAR_REKEY_BACKUP_FILE))
-}
-
 // Whether the SQLite store has been created (non-empty file present).
 pub fn db_exists(app: &AppHandle) -> bool {
     db_path(app)
