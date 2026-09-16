@@ -20,6 +20,15 @@ const SUPPORTED: Record<string, (param: string) => boolean> = {
 }
 
 /**
+ * The parameters that decide which code comes out. Each is read once: with two
+ * `secret`s, a first-wins reader and a last-wins reader pass the same link and
+ * generate different codes from it — this check used to read the first and the
+ * backend the last, so a good seed followed by junk was green here and empty
+ * on the dial. A link that repeats one is refused, as `otp.rs` refuses it.
+ */
+const DECISIVE = ['secret', ...Object.keys(SUPPORTED)]
+
+/**
  * The TOTP secret carried by whatever was pasted: a bare base32 string, or the
  * `otpauth://totp/...?secret=...` URI behind every enrolment QR code. Returns
  * '' when there is no usable secret in there — the field's validity test. A
@@ -34,8 +43,14 @@ export const otpSecret = (value: string): string => {
     const type = raw.slice('otpauth://'.length).split(/[/?]/, 1)[0] ?? ''
     if (type.toLowerCase() !== 'totp') return ''
     const query = raw.includes('?') ? raw.slice(raw.indexOf('?') + 1) : ''
+    const seen = new Set<string>()
     for (const [key, param] of new URLSearchParams(query)) {
-      const accepts = SUPPORTED[key.toLowerCase()]
+      const name = key.toLowerCase()
+      if (DECISIVE.includes(name)) {
+        if (seen.has(name)) return ''
+        seen.add(name)
+      }
+      const accepts = SUPPORTED[name]
       if (accepts && !accepts(param.trim())) return ''
     }
     return otpSecret(secretParam(query))

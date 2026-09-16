@@ -22,8 +22,8 @@ pub const DEFAULT_PERIOD: u64 = 30;
 
 /// What we will generate for. Wider than any real issuer uses on purpose —
 /// the point is to refuse nonsense (0 digits, a 0-second window) rather than
-/// to have an opinion. Importers clamp to these too, so a stored value is
-/// never something `parse` would later refuse.
+/// to have an opinion. Importers refuse anything outside them too, so a stored
+/// value is never something `parse` would later refuse.
 pub const DIGITS: RangeInclusive<u32> = 6..=10;
 pub const PERIOD: RangeInclusive<u64> = 1..=300;
 
@@ -135,9 +135,22 @@ pub fn parse(value: &str) -> Result<OtpParams, OtpError> {
     }
     let mut params = OtpParams::default();
     let mut seed = String::new();
+    // A parameter that decides the code is read once. With two `secret`s, a
+    // first-wins reader and a last-wins reader accept the same link and
+    // generate different codes from it — so the field's check upstream could
+    // pass a link this generator then refuses, or worse, both accept it and
+    // disagree. Repeating one is an error, not a tie to break.
+    let mut seen: Vec<String> = Vec::new();
     // Parameter names are not keywords, and exporters disagree about their case.
     for (key, val) in uri.query_pairs() {
-        match key.to_ascii_lowercase().as_str() {
+        let key = key.to_ascii_lowercase();
+        if matches!(key.as_str(), "secret" | "digits" | "period" | "algorithm") {
+            if seen.contains(&key) {
+                return Err(OtpError(format!("repeated otp parameter: {key}")));
+            }
+            seen.push(key.clone());
+        }
+        match key.as_str() {
             "secret" => seed = val.into_owned(),
             "digits" => {
                 params.digits = val
@@ -277,5 +290,25 @@ mod tests {
         ] {
             assert!(parse(&bad).is_err(), "{bad}");
         }
+    }
+
+    // The bug this guards against: the field checked the first `secret` and the
+    // generator read the last, so a link with a good one followed by junk was
+    // green in the field and empty on the dial. Whichever parameter is repeated,
+    // and whether or not the copies agree, the link is refused; an `issuer`
+    // twice over decides nothing and is let through.
+    #[test]
+    fn rejects_a_repeated_parameter_that_decides_the_code() {
+        for bad in [
+            format!("otpauth://totp/A?secret={SEED}&secret=NOTBASE32&digits=8"),
+            format!("otpauth://totp/A?secret={SEED}&secret={SEED}"),
+            format!("otpauth://totp/A?secret={SEED}&Secret={SEED}"),
+            format!("otpauth://totp/A?secret={SEED}&digits=6&digits=8"),
+            format!("otpauth://totp/A?secret={SEED}&period=30&period=60"),
+            format!("otpauth://totp/A?secret={SEED}&algorithm=SHA1&algorithm=SHA256"),
+        ] {
+            assert!(parse(&bad).is_err(), "{bad}");
+        }
+        assert!(parse(&format!("otpauth://totp/A?secret={SEED}&issuer=A&issuer=B")).is_ok());
     }
 }

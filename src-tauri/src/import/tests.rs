@@ -1151,3 +1151,65 @@ fn cxf_round_trips_non_default_totp_parameters() {
     assert!(back.errors.is_empty(), "{:?}", back.errors);
     assert_eq!(back.entries[0].otp.as_deref(), Some(stored));
 }
+
+fn cxf_login_with_totp(totp_members: &str) -> Vec<u8> {
+    format!(
+        r#"{{"version":{{"major":1,"minor":0}},"accounts":[{{"items":[
+          {{"id":"aQ","title":"Acme","credentials":[
+            {{"type":"basic-auth","username":{{"fieldType":"string","value":"alice"}}}},
+            {{"type":"totp","secret":"JBSWY3DPEHPK3PXP"{totp_members}}}
+          ]}}
+        ]}}]}}"#
+    )
+    .into_bytes()
+}
+
+// The bug this guards against: a `totp` whose `algorithm`, `period` or
+// `digits` we could not generate for was imported with the defaults in their
+// place — a seed that produces plausible codes the site refuses. CXF has the
+// importer ignore a TOTP with an algorithm it does not know; an unreadable or
+// out-of-range period or digit count is treated the same. The credential is
+// skipped and reported, and the rest of the item still imports.
+#[test]
+fn cxf_skips_a_totp_with_parameters_it_cannot_generate_for() {
+    for (what, member) in [
+        ("algorithm", r#","algorithm":"md5""#),
+        ("algorithm", r#","algorithm":1"#),
+        ("period", r#","period":301"#),
+        ("period", r#","period":"0""#),
+        ("period", r#","period":true"#),
+        ("digits", r#","digits":4"#),
+        ("digits", r#","digits":"eight""#),
+        ("digits", r#","digits":[8]"#),
+    ] {
+        let r = parse(Format::Cxf, &cxf_login_with_totp(member));
+        assert_eq!(r.entries.len(), 1, "{member}");
+        assert_eq!(r.entries[0].username.as_deref(), Some("alice"), "{member}");
+        assert_eq!(r.entries[0].otp, None, "{member}");
+        assert_eq!(r.errors.len(), 1, "{member}: {:?}", r.errors);
+        assert_eq!(r.errors[0].row, 1);
+        let message = &r.errors[0].message;
+        assert!(message.contains("totp"), "{message}");
+        assert!(message.contains(what), "{message}");
+    }
+}
+
+// Absence is a different matter: the spec gives each parameter a default, and
+// a seed with none spelled out is the bare seed. A readable string number is
+// as good as a number.
+#[test]
+fn cxf_totp_parameters_default_only_when_absent() {
+    let r = parse(Format::Cxf, &cxf_login_with_totp(""));
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(r.entries[0].otp.as_deref(), Some("JBSWY3DPEHPK3PXP"));
+
+    let r = parse(
+        Format::Cxf,
+        &cxf_login_with_totp(r#","digits":"8","period":"60","algorithm":"SHA512""#),
+    );
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
+    assert_eq!(
+        r.entries[0].otp.as_deref(),
+        Some("otpauth://totp/?secret=JBSWY3DPEHPK3PXP&digits=8&period=60&algorithm=SHA512")
+    );
+}
