@@ -1,9 +1,11 @@
 //! Import/export commands — the boundary between the pure `import` parser and the
 //! app's crypto/store. Parsing produces plaintext `ImportedEntry` values; writing
 //! seals each with the session payload cipher (`PayloadCipher::seal` +
-//! `migrate::build_record`) and upserts — the same seal/record convention as
+//! `migrate::build_record`) and writes the lot in one transaction — the same
+//! seal/record convention as
 //! `import_swftx`, so payload sealing is never reimplemented here.
 
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
@@ -18,7 +20,7 @@ use crate::models::{Entry, EntryMetaDto, ExtraField, Passkey};
 use crate::save;
 use crate::session::{list_metas, live_records, store_err};
 use crate::state::AppState;
-use crate::store::{migrate, Record, VaultStore};
+use crate::store::{migrate, Record, SqliteStore, VaultStore};
 
 // Bound the input: a foreign export should never be gigabytes or millions of rows.
 const MAX_BYTES: u64 = 25 * 1024 * 1024;
@@ -41,24 +43,30 @@ impl From<&RowError> for RowErrorDto {
 }
 
 // Preview (dry_run): `imported` is 0 and `total` is the would-be count. Real run:
-// `imported` is what was written, `skipped` the rows that failed to parse, and
-// `entries` the refreshed vault (empty on a preview, which wrote nothing).
+// `imported` is what was written, `skipped` the rows that failed to parse,
+// `duplicates` the rows dropped because the vault already held them verbatim,
+// and `entries` the refreshed vault (empty on a preview, which wrote nothing).
+// A preview counts duplicates too, so what it shows is what a real run does.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportReport {
     pub total: usize,
     pub imported: usize,
     pub skipped: usize,
+    pub duplicates: usize,
     pub dry_run: bool,
     pub errors: Vec<RowErrorDto>,
     pub entries: Vec<EntryMetaDto>,
 }
 
 // What one blocking pass over the file produced: the parse, plus the sealed rows
-// when it was a real run (a preview seals nothing).
+// when it was a real run (a preview seals nothing). The plaintext rows are kept
+// alongside the sealed ones because the duplicate check compares plaintext, and
+// it can only run later — under the session lock, where the store is.
 struct Parsed {
     total: usize,
     errors: Vec<RowErrorDto>,
+    entries: Vec<ImportedEntry>,
     records: Vec<Record>,
 }
 
@@ -131,39 +139,113 @@ pub async fn import_entries(
         Ok(Parsed {
             total,
             errors,
+            entries: parsed.entries,
             records,
         })
     })
     .await?;
 
+    // The store lives behind the session mutex and is only reachable from this
+    // thread, so the duplicate check and the write happen together, here.
+    let session = state.session.lock().unwrap();
+
     if dry_run {
+        // A preview is allowed on a locked vault — it writes nothing and needs
+        // no cipher. There is then nothing to compare against, so it reports no
+        // duplicates rather than refusing a preview that used to work.
+        let duplicates = match (session.store(), session.payload_cipher()) {
+            (Ok(store), Ok(cipher)) => duplicate_flags(store, &cipher, &parsed.entries)?
+                .iter()
+                .filter(|dup| **dup)
+                .count(),
+            _ => 0,
+        };
         return Ok(ImportReport {
             total: parsed.total,
             imported: 0,
             skipped: parsed.errors.len(),
+            duplicates,
             dry_run: true,
             errors: parsed.errors,
             entries: Vec::new(),
         });
     }
 
-    let session = state.session.lock().unwrap();
     let store = match epoch {
         Some(epoch) => session.store_at(epoch)?,
         None => session.store()?,
     };
-    for record in &parsed.records {
-        store.upsert(record).map_err(store_err)?;
-    }
+    let flags = duplicate_flags(store, &session.payload_cipher()?, &parsed.entries)?;
+    let fresh: Vec<Record> = parsed
+        .records
+        .into_iter()
+        .zip(flags)
+        .filter(|(_, duplicate)| !*duplicate)
+        .map(|(record, _)| record)
+        .collect();
+    // One transaction for the whole file: a crash partway through must leave the
+    // vault as it was, not half-imported. `import` writes each record's own
+    // timestamps verbatim, which is what we want — `build_record` already
+    // stamped every row when it was sealed above.
+    store.import(&fresh).map_err(store_err)?;
 
     Ok(ImportReport {
         total: parsed.total,
-        imported: parsed.records.len(),
+        imported: fresh.len(),
         skipped: parsed.errors.len(),
+        // Every parsed row was sealed, so whatever `total` did not survive the
+        // filter was dropped as a duplicate.
+        duplicates: parsed.total - fresh.len(),
         dry_run: false,
         errors: parsed.errors,
         entries: list_metas(store)?,
     })
+}
+
+// Which of `entries` the vault already holds, verbatim. Re-running an import —
+// after a crash, or simply by accident — must not double the vault; but a row
+// that merely resembles one already there (the password has since changed) is a
+// real import, so the test is equality of the whole normalized entry and
+// nothing fuzzier. `ImportedEntry` carries neither ids nor timestamps, which is
+// what lets `==` mean "the same data".
+//
+// Candidates are narrowed on plaintext columns first — `list` reads no payload
+// — so the only rows unsealed are the handful sharing a kind and a title with
+// something in the file. (The url is not part of the key: it is compared in the
+// equality below anyway, and the store's host derivation is private to it.)
+fn duplicate_flags(
+    store: &SqliteStore,
+    cipher: &PayloadCipher,
+    entries: &[ImportedEntry],
+) -> Result<Vec<bool>> {
+    let metas = store.list().map_err(store_err)?;
+    let wanted: HashSet<(&str, &str)> = entries.iter().map(dedupe_key).collect();
+    let mut candidates: HashMap<(&str, &str), Vec<ImportedEntry>> = HashMap::new();
+    for meta in &metas {
+        let key = (meta.kind.as_str(), meta.title.as_str());
+        if !wanted.contains(&key) {
+            continue;
+        }
+        if let Some(record) = store.get(&meta.id).map_err(store_err)? {
+            candidates
+                .entry(key)
+                .or_default()
+                .push(entry_to_imported(&cipher.unseal(&record.payload)?));
+        }
+    }
+    Ok(entries
+        .iter()
+        .map(|imported| {
+            candidates
+                .get(&dedupe_key(imported))
+                .is_some_and(|rows| rows.contains(imported))
+        })
+        .collect())
+}
+
+// The plaintext columns a duplicate must share before it is worth unsealing.
+fn dedupe_key(entry: &ImportedEntry) -> (&str, &str) {
+    (entry.kind.as_str(), entry.title.as_str())
 }
 
 // Export the open vault to a third-party format. `path` may be supplied directly;
@@ -438,5 +520,79 @@ mod tests {
 
         drop(store);
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    fn login(password: &str) -> ImportedEntry {
+        ImportedEntry {
+            kind: EntryKind::Login,
+            title: "Site".into(),
+            username: Some("alice".into()),
+            password: Some(password.into()),
+            url: Some("https://ex.com".into()),
+            ..Default::default()
+        }
+    }
+
+    // Re-running the same import — after a crash, or by accident — must not
+    // double the vault. Ids are fresh on every pass, so only the content can
+    // say that a row is already there.
+    #[test]
+    fn a_second_import_of_the_same_rows_writes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let (key, store) = argon2_vault(&dir.path().join("vault.db"));
+        let cipher = key.payload_cipher();
+        let rows = vec![
+            login("s3cret"),
+            ImportedEntry {
+                kind: EntryKind::Note,
+                title: "Note".into(),
+                notes: Some("body".into()),
+                ..Default::default()
+            },
+        ];
+        let seal = |rows: &[ImportedEntry]| -> Vec<Record> {
+            rows.iter()
+                .map(|row| {
+                    let entry = imported_to_entry(row);
+                    migrate::build_record(&entry, cipher.seal(&entry).unwrap()).unwrap()
+                })
+                .collect()
+        };
+
+        assert_eq!(
+            duplicate_flags(&store, &cipher, &rows).unwrap(),
+            [false, false]
+        );
+        store.import(&seal(&rows)).unwrap();
+
+        // Second pass: both rows are already there, so nothing is written.
+        let flags = duplicate_flags(&store, &cipher, &rows).unwrap();
+        assert_eq!(flags, [true, true]);
+        let fresh: Vec<Record> = seal(&rows)
+            .into_iter()
+            .zip(flags)
+            .filter(|(_, duplicate)| !*duplicate)
+            .map(|(record, _)| record)
+            .collect();
+        store.import(&fresh).unwrap();
+        assert_eq!(store.list().unwrap().len(), 2);
+    }
+
+    // A near match is a real import: the same account with a rotated password is
+    // news, not a re-run of the file it came from.
+    #[test]
+    fn a_row_that_only_resembles_a_stored_one_is_not_a_duplicate() {
+        let dir = tempfile::tempdir().unwrap();
+        let (key, store) = argon2_vault(&dir.path().join("vault.db"));
+        let cipher = key.payload_cipher();
+        let entry = imported_to_entry(&login("s3cret"));
+        store
+            .import(&[migrate::build_record(&entry, cipher.seal(&entry).unwrap()).unwrap()])
+            .unwrap();
+
+        assert_eq!(
+            duplicate_flags(&store, &cipher, &[login("rotated")]).unwrap(),
+            [false]
+        );
     }
 }

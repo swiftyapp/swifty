@@ -16,6 +16,43 @@ pub mod export;
 #[cfg(test)]
 mod tests;
 
+use serde::{Deserialize, Deserializer};
+
+/// Read a number a foreign exporter may have written as anything: an integer, a
+/// string holding one, a float, or a member it simply left out. Never an error.
+///
+/// A strict `u64` member makes one odd value fail `from_slice` for the whole
+/// document, which costs every entry in the file — the opposite of the contract
+/// [`ImportResult`] states, where a bad row is recorded and the batch goes on.
+/// So anything unreadable becomes `None` here and the caller decides what an
+/// absent value means for its row.
+pub(crate) fn lenient_u64<'de, D>(d: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(match serde_json::Value::deserialize(d)? {
+        serde_json::Value::Number(n) => n.as_u64().or_else(|| {
+            // `1.5e9` is a whole number in exponent form — a timestamp written
+            // by a JavaScript exporter, not a fraction, so it is read too.
+            n.as_f64()
+                .filter(|f| f.fract() == 0.0 && *f >= 0.0 && *f <= u64::MAX as f64)
+                .map(|f| f as u64)
+        }),
+        serde_json::Value::String(s) => s.trim().parse().ok(),
+        _ => None,
+    })
+}
+
+/// [`lenient_u64`] narrowed to a byte. A number too large to be one of the
+/// small enumerations a format defines says no more than a non-numeric value
+/// does, so it reads as absent as well.
+pub(crate) fn lenient_u8<'de, D>(d: D) -> Result<Option<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(lenient_u64(d)?.and_then(|n| u8::try_from(n).ok()))
+}
+
 /// The kind of a normalized entry; maps 1:1 onto `models::Entry.kind`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum EntryKind {

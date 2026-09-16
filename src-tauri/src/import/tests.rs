@@ -42,6 +42,28 @@ fn bitwarden_maps_every_item_type_and_flags_unsupported() {
     assert_eq!(identity.holder_name.as_deref(), Some("Ada Lovelace"));
 }
 
+// The per-row error contract covers the item type itself: an unknown number and
+// a missing member each cost their own row, not the file. A type written as a
+// string is still a type — Bitwarden-shaped exports come from many producers.
+#[test]
+fn bitwarden_reports_an_odd_item_type_per_row() {
+    let json = br#"{"items":[
+      {"type":1,"name":"GitHub","login":{"username":"octo"}},
+      {"type":300,"name":"Odd"},
+      {"name":"Typeless"},
+      {"type":"2","name":"Stringly"}
+    ]}"#;
+    let r = parse(Format::Bitwarden, json);
+    assert_eq!(r.entries.len(), 2);
+    assert_eq!(r.entries[0].title, "GitHub");
+    assert_eq!(r.entries[1].kind, EntryKind::Note);
+    assert_eq!(r.entries[1].title, "Stringly");
+    assert_eq!(r.errors.len(), 2);
+    assert_eq!(r.errors[0].row, 2);
+    assert!(r.errors[0].message.contains("300"));
+    assert_eq!(r.errors[1].row, 3);
+}
+
 // A licence number is the only thing in a Bitwarden identity that says what the
 // document is, so it also decides the type.
 #[test]
@@ -594,6 +616,24 @@ fn cxf_skips_a_bad_passkey_but_imports_the_item() {
     assert_eq!(r.errors.len(), 1);
     assert_eq!(r.errors[0].row, 1);
     assert!(r.errors[0].message.contains("passkey"));
+}
+
+// `creationAt` reaches us from JavaScript exporters as `1.5e9` — a whole number
+// in exponent form. Reading it is the point; failing the document over it is not.
+#[test]
+fn cxf_reads_a_float_creation_date() {
+    let json = br#"{"version":{"major":1,"minor":0},"accounts":[{"items":[
+      {"id":"aQ","title":"Acme","creationAt":1.5e9,"credentials":[
+        {"type":"passkey","credentialId":"Y3JlZDE","rpId":"acme.test","key":"cGsx"}
+      ]}
+    ]}]}"#;
+    let r = parse(Format::Cxf, json);
+    assert!(r.errors.is_empty());
+    assert_eq!(r.entries.len(), 1);
+    assert!(r.entries[0].passkeys[0]
+        .created_at
+        .as_deref()
+        .is_some_and(|d| d.starts_with("2017-")));
 }
 
 // Older drafts wrote bare strings where 1.0 wraps values in an EditableField,

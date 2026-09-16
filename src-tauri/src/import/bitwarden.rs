@@ -22,8 +22,10 @@ struct Export {
 
 #[derive(Deserialize)]
 struct Item {
-    #[serde(rename = "type")]
-    kind: u8,
+    // Lenient: an item whose `type` is missing, unknown or written as a string
+    // is one bad row, and a strict member would fail the whole document.
+    #[serde(default, rename = "type", deserialize_with = "super::lenient_u64")]
+    kind: Option<u64>,
     #[serde(default)]
     name: Option<String>,
     #[serde(default)]
@@ -62,8 +64,8 @@ struct Field {
     name: Option<String>,
     #[serde(default)]
     value: Option<String>,
-    #[serde(default, rename = "type")]
-    kind: u8,
+    #[serde(default, rename = "type", deserialize_with = "super::lenient_u8")]
+    kind: Option<u8>,
 }
 
 pub const FIELD_TEXT: u8 = 0;
@@ -73,7 +75,7 @@ pub const FIELD_HIDDEN: u8 = 1;
 fn extras(fields: Vec<Field>) -> Vec<(String, String)> {
     fields
         .into_iter()
-        .filter(|f| matches!(f.kind, FIELD_TEXT | FIELD_HIDDEN))
+        .filter(|f| matches!(f.kind.unwrap_or(FIELD_TEXT), FIELD_TEXT | FIELD_HIDDEN))
         .map(|f| (f.name.unwrap_or_default(), f.value.unwrap_or_default()))
         .filter(|(name, value)| !name.is_empty() || !value.is_empty())
         .collect()
@@ -240,7 +242,7 @@ impl Importer for Bitwarden {
             // carry them, so they are read once, before the kind is decided.
             let extra = extras(item.fields);
             match item.kind {
-                1 => {
+                Some(1) => {
                     let login = item.login.unwrap_or(Login {
                         username: None,
                         password: None,
@@ -271,14 +273,14 @@ impl Importer for Bitwarden {
                         ..Default::default()
                     });
                 }
-                2 => result.entries.push(ImportedEntry {
+                Some(2) => result.entries.push(ImportedEntry {
                     kind: EntryKind::Note,
                     title,
                     notes: opt(item.notes),
                     extra,
                     ..Default::default()
                 }),
-                3 => {
+                Some(3) => {
                     let card = item.card.unwrap_or(Card {
                         cardholder_name: None,
                         number: None,
@@ -299,7 +301,7 @@ impl Importer for Bitwarden {
                         ..Default::default()
                     });
                 }
-                4 => {
+                Some(4) => {
                     let identity = item.identity.unwrap_or_default();
                     // A licence number says "driver_license"; anything else —
                     // including an item with neither number — is a passport,
@@ -322,7 +324,7 @@ impl Importer for Bitwarden {
                         ..Default::default()
                     });
                 }
-                5 => {
+                Some(5) => {
                     let key = item.ssh_key.unwrap_or_default();
                     // The passphrase is the one field that is ours, not the
                     // user's: it is taken back out of the extras it rode in.
@@ -344,7 +346,8 @@ impl Importer for Bitwarden {
                         ..Default::default()
                     });
                 }
-                other => result.push_err(row, format!("unsupported item type {other}")),
+                None => result.push_err(row, "item has no type"),
+                Some(other) => result.push_err(row, format!("unsupported item type {other}")),
             }
         }
         result

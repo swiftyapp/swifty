@@ -36,7 +36,13 @@ struct Account {
 struct Item {
     #[serde(default)]
     title: Option<String>,
-    #[serde(default, rename = "creationAt")]
+    // Lenient: exporters write this epoch second as a float or a string often
+    // enough, and a date nobody reads is no reason to fail the whole document.
+    #[serde(
+        default,
+        rename = "creationAt",
+        deserialize_with = "super::lenient_u64"
+    )]
     creation_at: Option<u64>,
     #[serde(default)]
     scope: Option<Scope>,
