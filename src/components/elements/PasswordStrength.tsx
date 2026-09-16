@@ -50,7 +50,7 @@ export default function PasswordStrength({ password, error }: Props) {
           shown where the field's guidance already is. */}
       <span
         data-testid={error ? 'form-error' : undefined}
-        className={cx('ml-auto min-w-0 truncate text-right', error && 'text-bad')}
+        className={cx('ml-auto min-w-0 break-words text-right', error && 'text-bad')}
       >
         {error ?? hint}
       </span>
