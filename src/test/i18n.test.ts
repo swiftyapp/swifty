@@ -8,9 +8,15 @@ import enUS from '@/i18n/locales/en-US.json'
  * missing there still renders — it just renders untranslatable, invisible to
  * every other locale. This is the producer-side check for that.
  *
- * The translated locales are deliberately *not* required to be complete;
- * translating is its own task. But any key they do carry has to keep en-US's
- * placeholders, or the interpolation silently drops a value.
+ * The translated locales are expected to be complete. The gate below is looser
+ * than that on purpose: it fails only when a key has *no* translation in any of
+ * the nine, so a PR that adds a key and translates it into some of them can
+ * still land. Tightening it to per-locale parity is a one-line change — drop
+ * the `every` in favour of a per-locale filter. The per-run coverage line says
+ * how far each locale has drifted meanwhile.
+ *
+ * Any key a locale does carry has to keep en-US's placeholders, or the
+ * interpolation silently drops a value.
  *
  * Sources are read through `import.meta.glob` rather than node:fs so the suite
  * needs no Node types in the app's tsconfig.
@@ -74,6 +80,11 @@ const knownKey = (key: string) => {
 
 const translated = Object.entries(locales).filter(([path]) => !path.endsWith('en-US.json'))
 
+// The unit a key belongs to: a plural set collapses to its base, so en-US's
+// `X_one`/`X_other` is one unit `X` that a locale covers by carrying any
+// `X_<suffix>` form — Polish `X_few` and zh-CN's lone `X_other` both count.
+const unit = (key: string) => key.replace(PLURAL_SUFFIX, '')
+
 describe('i18n', () => {
   it('has an en-US entry for every literal t() key in src/', () => {
     const missing = [...literalKeys()]
@@ -104,6 +115,26 @@ describe('i18n', () => {
     )
 
     expect(mismatched).toEqual([])
+  })
+
+  it('has a translation for every en-US key in at least one locale', () => {
+    const units = [...new Set(Object.keys(catalogue).map(unit))]
+    const carried = translated.map(([path, locale]) => ({
+      name: path.slice(path.lastIndexOf('/') + 1).replace('.json', ''),
+      units: new Set(Object.keys(locale).map(unit))
+    }))
+
+    const percent = (locale: (typeof carried)[number]) =>
+      Math.round((units.filter(key => locale.units.has(key)).length / units.length) * 100)
+
+    const coverage =
+      `i18n coverage of ${units.length} en-US keys — ` +
+      carried.map(locale => `${locale.name} ${percent(locale)}%`).join(', ')
+    console.info(coverage)
+
+    const untranslated = units.filter(key => carried.every(locale => !locale.units.has(key)))
+
+    expect(untranslated, coverage).toEqual([])
   })
 
   it('carries no keys en-US has dropped', () => {
