@@ -237,7 +237,7 @@ describe('receiving a shared entry', () => {
 
   it('says in the app’s own words that the share is gone', async () => {
     mockCommandOnce('share_open', () =>
-      Promise.reject({ kind: 'notFound', message: 'this share has expired or was revoked' })
+      Promise.reject({ kind: 'shareExpired', message: 'this share has expired or was revoked' })
     )
     seed()
     render(<Main />)

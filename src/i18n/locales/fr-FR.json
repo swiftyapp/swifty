@@ -541,5 +541,19 @@
   "Create": "Créer",
   "Fill in the name": "Saisissez un nom",
   "Sync is available in the primary workspace only.": "La synchronisation n’est disponible que dans l’espace de travail principal.",
-  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "Chaque espace de travail est une base de données chiffrée distincte, avec son propre mot de passe principal. La synchronisation et le déverrouillage biométrique restent pour l’instant réservés à votre espace de travail principal."
+  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "Chaque espace de travail est une base de données chiffrée distincte, avec son propre mot de passe principal. La synchronisation et le déverrouillage biométrique restent pour l’instant réservés à votre espace de travail principal.",
+  "This is not a valid share link": "Ce n’est pas un lien de partage valide",
+  "This share was made by a newer version of the app": "Ce partage a été créé avec une version plus récente de {{appName}}",
+  "This share is too large to open": "Ce partage est trop volumineux pour être ouvert",
+  "This entry is too large to share. Shorten its note or fields.": "Cette entrée est trop volumineuse pour être partagée. Raccourcissez sa note ou ses champs.",
+  "Another setup step is still running": "Une autre étape de configuration est encore en cours",
+  "Wait for the sync in progress to finish": "Attendez la fin de la synchronisation en cours",
+  "Connect a Google account first": "Connectez d’abord un compte Google",
+  "This Google account has nothing to restore": "Ce compte Google n’a rien à restaurer",
+  "This device is already set up": "Cet appareil est déjà configuré",
+  "Available in the primary workspace only": "Disponible uniquement dans l’espace de travail principal",
+  "A workspace needs a name": "Un espace de travail doit avoir un nom",
+  "A workspace needs a master password": "Un espace de travail doit avoir un mot de passe principal",
+  "This file is too large": "Ce fichier est trop volumineux",
+  "This file is not text": "Ce fichier n’est pas un fichier texte"
 }

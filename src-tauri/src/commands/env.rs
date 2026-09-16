@@ -26,10 +26,9 @@ pub struct EnvFile {
 pub fn read_env_text(path: &Path) -> Result<EnvFile> {
     let meta = fs::metadata(path)?;
     if meta.len() > MAX_BYTES {
-        return Err(Error::Other("file is larger than 1 MiB".into()));
+        return Err(Error::FileTooLarge);
     }
-    let body = String::from_utf8(fs::read(path)?)
-        .map_err(|_| Error::Other("file is not UTF-8 text".into()))?;
+    let body = String::from_utf8(fs::read(path)?).map_err(|_| Error::FileNotText)?;
     let file_name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -64,16 +63,16 @@ mod tests {
     #[test]
     fn refuses_a_file_over_the_cap() {
         let path = scratch("big.env", &vec![b'x'; (MAX_BYTES + 1) as usize]);
-        let err = read_env_text(&path).unwrap_err().to_string();
-        assert!(err.contains("1 MiB"), "{err}");
+        let err = read_env_text(&path).unwrap_err();
+        assert!(matches!(err, Error::FileTooLarge), "{err}");
         let _ = fs::remove_file(path);
     }
 
     #[test]
     fn refuses_bytes_that_are_not_utf8() {
         let path = scratch("binary.env", &[0xff, 0xfe, b'A', b'=', b'1']);
-        let err = read_env_text(&path).unwrap_err().to_string();
-        assert!(err.contains("UTF-8"), "{err}");
+        let err = read_env_text(&path).unwrap_err();
+        assert!(matches!(err, Error::FileNotText), "{err}");
         let _ = fs::remove_file(path);
     }
 }

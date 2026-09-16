@@ -392,15 +392,6 @@ pub async fn delete_file(client: &Client, token: &str, id: &str) -> Result<()> {
     check(resp).await.map(|_| ())
 }
 
-/// What a recipient is told when the file behind their link is gone. Shared so
-/// the test doubles in `share::remote` fail the same way the real client does.
-pub(crate) const SHARE_GONE: &str = "this share has expired or was revoked";
-
-/// Download a link-shared file with only an API key — the recipient side, which
-/// has no Google account and therefore no bearer token. The key identifies the
-/// calling project for quota; it grants nothing on its own.
-pub(crate) const SHARE_TOO_LARGE: &str = "this share is larger than Rowel allows";
-
 /// Fetch a link-shared file with no account, refusing anything over
 /// `max_bytes`.
 ///
@@ -425,7 +416,7 @@ pub async fn download_public(
         // The only two ways a share the recipient was given disappears, and
         // Drive cannot tell them apart — nor could the recipient act on the
         // difference.
-        return Err(Error::Other(SHARE_GONE.into()));
+        return Err(Error::ShareExpired);
     }
     if !status.is_success() {
         let body = read_capped(&mut resp, max_bytes).await.unwrap_or_default();
@@ -438,7 +429,7 @@ pub async fn download_public(
         .content_length()
         .is_some_and(|len| len > max_bytes as u64)
     {
-        return Err(Error::Other(SHARE_TOO_LARGE.into()));
+        return Err(Error::ShareTooLarge);
     }
     read_capped(&mut resp, max_bytes).await
 }
@@ -447,7 +438,7 @@ async fn read_capped(resp: &mut reqwest::Response, max_bytes: usize) -> Result<V
     let mut body = Vec::new();
     while let Some(chunk) = resp.chunk().await.map_err(other)? {
         if body.len() + chunk.len() > max_bytes {
-            return Err(Error::Other(SHARE_TOO_LARGE.into()));
+            return Err(Error::ShareTooLarge);
         }
         body.extend_from_slice(&chunk);
     }

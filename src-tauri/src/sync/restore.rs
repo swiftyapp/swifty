@@ -53,9 +53,9 @@ pub fn restore_at(
     // ignores a zero-length file): if anything at all sits at the vault path,
     // this install is not the fresh install this path is for.
     if db_path.exists() {
-        return Err(Error::Other(
-            "a local vault already exists on this device".into(),
-        ));
+        // The same refusal `setup::guard_no_vault` gives, reached from the
+        // other side: a vault is here, so this install is not a fresh one.
+        return Err(Error::AlreadySetUp);
     }
 
     // Validated before the first write, so a bad file never touches the disk.

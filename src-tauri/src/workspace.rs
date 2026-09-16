@@ -137,9 +137,7 @@ pub fn guard_primary(app: &AppHandle) -> Result<()> {
     if is_primary(app) {
         Ok(())
     } else {
-        Err(Error::Other(
-            "available in the primary workspace only".into(),
-        ))
+        Err(Error::PrimaryWorkspaceOnly)
     }
 }
 

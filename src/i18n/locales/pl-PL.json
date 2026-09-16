@@ -549,5 +549,19 @@
   "Create": "Utwórz",
   "Fill in the name": "Wpisz nazwę",
   "Sync is available in the primary workspace only.": "Synchronizacja działa tylko w głównej przestrzeni roboczej.",
-  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "Każda przestrzeń robocza to osobna zaszyfrowana baza danych z własnym hasłem głównym. Synchronizacja i odblokowanie biometryczne na razie pozostają w głównej przestrzeni roboczej."
+  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "Każda przestrzeń robocza to osobna zaszyfrowana baza danych z własnym hasłem głównym. Synchronizacja i odblokowanie biometryczne na razie pozostają w głównej przestrzeni roboczej.",
+  "This is not a valid share link": "To nie jest prawidłowy link do udostępniania",
+  "This share was made by a newer version of the app": "To udostępnienie utworzono w nowszej wersji aplikacji {{appName}}",
+  "This share is too large to open": "To udostępnienie jest zbyt duże, aby je otworzyć",
+  "This entry is too large to share. Shorten its note or fields.": "Ten wpis jest zbyt duży, aby go udostępnić. Skróć jego notatkę lub pola.",
+  "Another setup step is still running": "Inny krok konfiguracji jest wciąż w toku",
+  "Wait for the sync in progress to finish": "Poczekaj na zakończenie trwającej synchronizacji",
+  "Connect a Google account first": "Najpierw połącz konto Google",
+  "This Google account has nothing to restore": "To konto Google nie ma nic do przywrócenia",
+  "This device is already set up": "To urządzenie jest już skonfigurowane",
+  "Available in the primary workspace only": "Dostępne tylko w głównym obszarze roboczym",
+  "A workspace needs a name": "Obszar roboczy musi mieć nazwę",
+  "A workspace needs a master password": "Obszar roboczy musi mieć hasło główne",
+  "This file is too large": "Ten plik jest zbyt duży",
+  "This file is not text": "Ten plik nie jest plikiem tekstowym"
 }

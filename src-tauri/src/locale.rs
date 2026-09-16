@@ -11,8 +11,9 @@ use std::sync::OnceLock;
 use sys_locale::get_locale;
 
 /// Locales the app ships a catalogue for. A system locale outside this list
-/// falls back to en-US rather than leaving the UI half-translated.
-const SUPPORTED: [&str; 10] = [
+/// falls back to en-US rather than leaving the UI half-translated. Crate-visible
+/// so the tray's label table can be checked against it.
+pub(crate) const SUPPORTED: [&str; 10] = [
     "en-US", "de-DE", "fr-FR", "pl-PL", "pt-BR", "ru-RU", "sv-SE", "tr-TR", "uk-UA", "zh-CN",
 ];
 

@@ -21,8 +21,6 @@ use crate::workspace::{self, Registry, Workspace};
 
 use super::setup::{begin_step, create_off_thread};
 
-const SYNC_BUSY: &str = "wait for the sync in progress to finish";
-
 /// Lock whatever is open and make `id` the workspace the app addresses.
 ///
 /// The next unlock opens its database, and a relaunch comes back to it: the
@@ -75,7 +73,7 @@ fn guard_sync_idle(state: &AppState) -> Result<()> {
     #[cfg(mobile)]
     let busy = busy || state.pending_auth.lock().unwrap().is_some();
     if busy {
-        return Err(Error::Other(SYNC_BUSY.into()));
+        return Err(Error::SyncBusy);
     }
     Ok(())
 }
@@ -119,10 +117,10 @@ pub async fn workspace_create(
 ) -> Result<UnlockResult> {
     let name = name.trim().to_string();
     if name.is_empty() {
-        return Err(Error::Other("a workspace needs a name".into()));
+        return Err(Error::WorkspaceNameRequired);
     }
     if password.is_empty() {
-        return Err(Error::Other("a workspace needs a master password".into()));
+        return Err(Error::WorkspacePasswordRequired);
     }
     // The same exclusion first-run setup takes: this writes a KDF sidecar and a
     // database, and two of those interleaving would pair one with the other's.
@@ -194,7 +192,7 @@ pub fn workspace_rename(
 ) -> Result<()> {
     let name = name.trim().to_string();
     if name.is_empty() {
-        return Err(Error::Other("a workspace needs a name".into()));
+        return Err(Error::WorkspaceNameRequired);
     }
 
     let root = storage::root_dir(&app)?;

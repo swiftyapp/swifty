@@ -185,13 +185,15 @@ describe('the editor drop zone', () => {
   })
 
   it('shows why a file was refused', async () => {
-    mockCommand('read_env_file', () => Promise.reject({ kind: 'io', message: 'file is larger than 1 MiB' }))
+    mockCommand('read_env_file', () =>
+      Promise.reject({ kind: 'fileTooLarge', message: 'the file is too large' })
+    )
     const onSet = vi.fn()
     render(<Editor body="" onSet={onSet} />)
 
     await drop('/Users/me/huge.env')
 
-    expect(await screen.findByTestId('env-drop-error')).toHaveTextContent('1 MiB')
+    expect(await screen.findByTestId('env-drop-error')).toHaveTextContent('This file is too large')
     expect(onSet).not.toHaveBeenCalled()
   })
 
@@ -213,13 +215,13 @@ describe('the editor drop zone', () => {
 
 describe('interactive env ingestion', () => {
   it('surfaces picker failures through the shared request lifecycle', async () => {
-    vi.mocked(open).mockRejectedValue({ kind: 'io', message: 'file is larger than 1 MiB' })
+    vi.mocked(open).mockRejectedValue({ kind: 'fileTooLarge', message: 'the file is too large' })
     const consume = vi.fn()
     const { result } = renderHook(() => useEnvIngest(consume))
 
     await act(() => result.current.pick())
 
-    expect(result.current.error).toContain('1 MiB')
+    expect(result.current.error).toContain('This file is too large')
     expect(consume).not.toHaveBeenCalled()
   })
 

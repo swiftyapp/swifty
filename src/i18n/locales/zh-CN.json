@@ -525,5 +525,19 @@
   "Create": "创建",
   "Fill in the name": "请填写名称",
   "Sync is available in the primary workspace only.": "同步仅在主工作区可用。",
-  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "每个工作区都是一个独立的加密数据库，各自使用自己的主密码。同步和生物识别解锁目前仅保留在主工作区。"
+  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "每个工作区都是一个独立的加密数据库，各自使用自己的主密码。同步和生物识别解锁目前仅保留在主工作区。",
+  "This is not a valid share link": "这不是有效的分享链接",
+  "This share was made by a newer version of the app": "该分享由更新版本的 {{appName}} 创建",
+  "This share is too large to open": "该分享过大，无法打开",
+  "This entry is too large to share. Shorten its note or fields.": "此条目过大，无法分享。请缩短其备注或字段。",
+  "Another setup step is still running": "另一个设置步骤仍在进行中",
+  "Wait for the sync in progress to finish": "请等待正在进行的同步完成",
+  "Connect a Google account first": "请先连接 Google 账号",
+  "This Google account has nothing to restore": "此 Google 账号没有可恢复的内容",
+  "This device is already set up": "此设备已完成设置",
+  "Available in the primary workspace only": "仅在主工作区中可用",
+  "A workspace needs a name": "工作区需要一个名称",
+  "A workspace needs a master password": "工作区需要一个主密码",
+  "This file is too large": "该文件过大",
+  "This file is not text": "该文件不是文本文件"
 }

@@ -26,12 +26,6 @@ use crate::storage;
 use crate::store::SqliteStore;
 use crate::sync::{self, restore, setup::PackInfo};
 
-// User-facing, so deliberately plain about what to do next.
-const NOT_CONNECTED: &str = "connect a Google account first";
-const NO_REMOTE_VAULT: &str = "this Google account has no Rowel data to restore";
-const ALREADY_SET_UP: &str = "this device is already set up";
-const SETUP_BUSY: &str = "another setup step is still running";
-
 // --- connect ---------------------------------------------------------------
 
 /// Connect an account and report what it holds. Onboarding only.
@@ -215,7 +209,7 @@ async fn download(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Vec<u8>>
     let token = sync::fresh_access_token(&client, app, tokens).await?;
     let file = sync::setup::find_pack(&client, &token)
         .await?
-        .ok_or_else(|| Error::Other(NO_REMOTE_VAULT.into()))?;
+        .ok_or(Error::NoRemoteVault)?;
     sync::setup::download_pack(&client, &token, &file.id).await
 }
 
@@ -366,7 +360,7 @@ fn discard_fresh_vault(app: &AppHandle) {
 /// under one.
 fn ensure_idle(state: &AppState) -> Result<()> {
     if state.setup_busy.load(Ordering::SeqCst) {
-        return Err(Error::Other(SETUP_BUSY.into()));
+        return Err(Error::SetupBusy);
     }
     Ok(())
 }
@@ -384,7 +378,7 @@ pub(crate) fn begin_step(state: &AppState) -> Result<SetupStep<'_>> {
     state
         .setup_busy
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .map_err(|_| Error::Other(SETUP_BUSY.into()))?;
+        .map_err(|_| Error::SetupBusy)?;
     Ok(SetupStep(state))
 }
 
@@ -414,7 +408,7 @@ fn current_attempt(state: &AppState) -> u64 {
 /// that could overwrite a vault this device already has.
 fn guard_no_vault(app: &AppHandle) -> Result<()> {
     if storage::db_exists(app) {
-        return Err(Error::Other(ALREADY_SET_UP.into()));
+        return Err(Error::AlreadySetUp);
     }
     Ok(())
 }
@@ -426,7 +420,7 @@ fn peek_pending(state: &AppState) -> Result<sync::Tokens> {
         .lock()
         .unwrap()
         .clone()
-        .ok_or_else(|| Error::Other(NOT_CONNECTED.into()))
+        .ok_or(Error::DriveNotConnected)
 }
 
 /// Forget the connected account, if there is one.
@@ -451,10 +445,10 @@ mod tests {
     #[test]
     fn nothing_is_pending_until_an_account_is_connected() {
         let state = AppState::default();
-        match peek_pending(&state) {
-            Err(Error::Other(why)) => assert_eq!(why, NOT_CONNECTED),
-            other => panic!("{:?}", other.map(|_| ())),
-        }
+        assert!(matches!(
+            peek_pending(&state),
+            Err(Error::DriveNotConnected)
+        ));
         assert!(take_pending(&state).is_none());
     }
 
@@ -501,10 +495,7 @@ mod tests {
     fn only_one_setup_step_writes_at_a_time() {
         let state = AppState::default();
         let step = begin_step(&state).unwrap();
-        match begin_step(&state) {
-            Err(Error::Other(why)) => assert_eq!(why, SETUP_BUSY),
-            other => panic!("{:?}", other.map(|_| ())),
-        }
+        assert!(matches!(begin_step(&state), Err(Error::SetupBusy)));
         drop(step);
         assert!(begin_step(&state).is_ok());
     }
@@ -518,10 +509,7 @@ mod tests {
         assert!(ensure_idle(&state).is_ok());
 
         let step = begin_step(&state).unwrap();
-        match ensure_idle(&state) {
-            Err(Error::Other(why)) => assert_eq!(why, SETUP_BUSY),
-            other => panic!("{other:?}"),
-        }
+        assert!(matches!(ensure_idle(&state), Err(Error::SetupBusy)));
 
         drop(step);
         assert!(ensure_idle(&state).is_ok());

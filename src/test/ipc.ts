@@ -114,7 +114,7 @@ const DEFAULTS: Record<string, Handler> = {
     entries: []
   }),
   export_entries: () => null,
-  read_env_file: reject({ kind: 'io', message: 'file is not UTF-8 text' }),
+  read_env_file: reject({ kind: 'fileNotText', message: 'the file is not text' }),
 
   import_swftx: () => ({ count: 0, entries: [] }),
   export_vault: () => null,

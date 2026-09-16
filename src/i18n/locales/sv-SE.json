@@ -533,5 +533,19 @@
   "Create": "Skapa",
   "Fill in the name": "Fyll i namnet",
   "Sync is available in the primary workspace only.": "Synkronisering är bara tillgänglig i den primära arbetsytan.",
-  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "Varje arbetsyta är en separat krypterad databas med ett eget huvudlösenord. Synkronisering och biometrisk upplåsning stannar tills vidare i din primära arbetsyta."
+  "Each workspace is a separate encrypted database with its own master password. Sync and biometric unlock stay with your primary workspace for now.": "Varje arbetsyta är en separat krypterad databas med ett eget huvudlösenord. Synkronisering och biometrisk upplåsning stannar tills vidare i din primära arbetsyta.",
+  "This is not a valid share link": "Det här är inte en giltig delningslänk",
+  "This share was made by a newer version of the app": "Den här delningen skapades i en nyare version av {{appName}}",
+  "This share is too large to open": "Den här delningen är för stor för att öppnas",
+  "This entry is too large to share. Shorten its note or fields.": "Den här posten är för stor för att delas. Korta ner dess anteckning eller fält.",
+  "Another setup step is still running": "Ett annat konfigurationssteg pågår fortfarande",
+  "Wait for the sync in progress to finish": "Vänta tills den pågående synkningen är klar",
+  "Connect a Google account first": "Anslut ett Google-konto först",
+  "This Google account has nothing to restore": "Det här Google-kontot har inget att återställa",
+  "This device is already set up": "Den här enheten är redan konfigurerad",
+  "Available in the primary workspace only": "Endast tillgängligt i den primära arbetsytan",
+  "A workspace needs a name": "En arbetsyta behöver ett namn",
+  "A workspace needs a master password": "En arbetsyta behöver ett huvudlösenord",
+  "This file is too large": "Den här filen är för stor",
+  "This file is not text": "Den här filen är inte en textfil"
 }

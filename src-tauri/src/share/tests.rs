@@ -1,8 +1,9 @@
 use serde_json::json;
 
-use super::envelope::{MAX_SHARE_BYTES, SHARE_EXPIRED, SHARE_TOO_LARGE_TO_SEND};
+use super::envelope::MAX_SHARE_BYTES;
 use super::remote::FakeShareRemote;
 use super::*;
+use crate::error::Error;
 
 // 2023-11-14T22:13:20Z. A fixed clock so the RFC 3339 strings the frontend
 // renders can be asserted literally rather than recomputed by the code
@@ -65,7 +66,7 @@ fn an_entry_no_recipient_could_download_is_refused_before_upload() {
     huge.note = Some("x".repeat(MAX_SHARE_BYTES));
 
     let err = create(&remote, &huge, NOW).unwrap_err();
-    assert_eq!(err.to_string(), SHARE_TOO_LARGE_TO_SEND);
+    assert!(matches!(err, Error::EntryTooLargeToShare));
     // Nothing went to Drive: the sender is told, not the recipient later.
     assert!(remote.ids().is_empty());
 }
@@ -93,12 +94,10 @@ fn a_link_stops_opening_when_the_share_expires_even_if_the_file_remains() {
     let created = create(&remote, &entry(), NOW).unwrap();
 
     assert!(open(&remote, &created.link, NOW + SHARE_TTL_MS - 1).is_ok());
-    assert_eq!(
-        open(&remote, &created.link, NOW + SHARE_TTL_MS)
-            .unwrap_err()
-            .to_string(),
-        SHARE_EXPIRED
-    );
+    assert!(matches!(
+        open(&remote, &created.link, NOW + SHARE_TTL_MS).unwrap_err(),
+        Error::ShareExpired
+    ));
     assert!(remote.is_public(&created.file_id));
 }
 
@@ -125,10 +124,10 @@ fn a_link_carrying_the_wrong_key_does_not_open_the_share() {
     }
     .format();
 
-    assert_eq!(
-        open(&remote, &impostor, NOW).unwrap_err().to_string(),
-        "this link does not open the share"
-    );
+    assert!(matches!(
+        open(&remote, &impostor, NOW).unwrap_err(),
+        Error::ShareLinkInvalid
+    ));
 }
 
 #[test]
@@ -138,22 +137,20 @@ fn a_revoked_share_reads_as_gone() {
 
     revoke(&remote, &created.file_id).unwrap();
     assert!(remote.ids().is_empty());
-    assert_eq!(
-        open(&remote, &created.link, NOW).unwrap_err().to_string(),
-        crate::sync::drive::SHARE_GONE
-    );
+    assert!(matches!(
+        open(&remote, &created.link, NOW).unwrap_err(),
+        Error::ShareExpired
+    ));
 }
 
-// The fake answers an unknown id with SHARE_GONE, so getting the parse error
-// back is the proof that nothing was fetched.
+// The fake answers an unknown id with `ShareExpired`, so getting the parse
+// failure back is the proof that nothing was fetched.
 #[test]
 fn a_link_that_is_not_a_link_fails_before_anything_is_fetched() {
-    assert_eq!(
-        open(&FakeShareRemote::new(), "https://example.com/share", NOW)
-            .unwrap_err()
-            .to_string(),
-        "this is not a Rowel share link"
-    );
+    assert!(matches!(
+        open(&FakeShareRemote::new(), "https://example.com/share", NOW).unwrap_err(),
+        Error::ShareLinkInvalid
+    ));
 }
 
 #[test]
