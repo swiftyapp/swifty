@@ -3,14 +3,5 @@
   "identifier": "app.rowel.mobile",
   "bundle": {
     "fileAssociations": null
-  },
-  "app": {
-    "windows": [
-      {
-        "label": "main",
-        "title": "Rowel",
-        "create": false
-      }
-    ]
   }
 }
