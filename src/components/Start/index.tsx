@@ -210,7 +210,10 @@ export function Start() {
       {/* Keyed on the screen: a new key is a fresh element, which is what
           runs the arrival animation. Content changing within a screen (the
           Drive probe answering) redraws in place. */}
-      <div key={screen} className={direction === 'back' ? 'animate-sheet-back' : 'animate-sheet'}>
+      <div
+        key={screen}
+        className={direction === 'back' ? 'animate-step-back' : 'animate-step-forward'}
+      >
         {content()}
       </div>
     </AuthShell>

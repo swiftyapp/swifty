@@ -51,11 +51,25 @@
     transform: none;
   }
 }
-/* The same arrival from the left: a step the user has come back to. */
-@keyframes sheet-back {
+/*
+ * A setup step arriving under the mascot: from the right going forward, from
+ * the left coming back. Further and slower than the phone sheet — this is a
+ * change of place, and has to be seen as one.
+ */
+@keyframes step-forward {
   from {
     opacity: 0;
-    transform: translateX(-24px);
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes step-back {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
   }
   to {
     opacity: 1;
@@ -436,7 +450,8 @@
   --animate-fade: fade 160ms var(--ease-swift) both;
   --animate-pop: pop 160ms var(--ease-swift) both;
   --animate-sheet: sheet 160ms var(--ease-swift) both;
-  --animate-sheet-back: sheet-back 160ms var(--ease-swift) both;
+  --animate-step-forward: step-forward 240ms var(--ease-swift) both;
+  --animate-step-back: step-back 240ms var(--ease-swift) both;
   --animate-rise: rise 300ms var(--ease-swift) both;
   --animate-unfold: unfold 300ms var(--ease-swift) both;
 }
