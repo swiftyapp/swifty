@@ -224,21 +224,58 @@ for (const key of requestedGated) {
     problems.push(`profile does not grant "${key}"`)
     continue
   }
-  // For the group-valued entitlements every requested value must be covered.
-  const requestedValues = entitlements[key]
-  if (!Array.isArray(requestedValues)) continue
-  const grantedValues = profileEntitlements[key]
-  if (!Array.isArray(grantedValues)) {
-    problems.push(`profile grants "${key}" but not as a list of groups`)
+  const requested = entitlements[key]
+  const grantedValue = profileEntitlements[key]
+  const describe = (v) => (Array.isArray(v) ? v.join(', ') : String(v))
+
+  // Group-valued (keychain-access-groups, application-groups): the profile must
+  // cover every group asked for.
+  if (Array.isArray(requested)) {
+    if (!Array.isArray(grantedValue)) {
+      problems.push(`profile grants "${key}" but not as a list of groups`)
+      continue
+    }
+    for (const value of requested) {
+      if (typeof value !== 'string') {
+        problems.push(`cannot verify a non-string value under "${key}"`)
+      } else if (!granted(value, grantedValue)) {
+        problems.push(
+          `profile does not grant "${value}" under "${key}" (it grants: ${describe(grantedValue)})`,
+        )
+      }
+    }
     continue
   }
-  for (const value of requestedValues) {
-    if (!granted(value, grantedValues)) {
+
+  // Scalar-valued (application-identifier, team-identifier). Comparing these
+  // matters as much as the groups: a profile issued for a different App ID
+  // grants the key but not the value, and the app is refused the same way.
+  if (typeof requested === 'string') {
+    const grantedList = Array.isArray(grantedValue) ? grantedValue : [grantedValue]
+    if (!grantedList.every((g) => typeof g === 'string')) {
+      problems.push(`profile grants "${key}" as a value this check cannot compare`)
+    } else if (!granted(requested, grantedList)) {
       problems.push(
-        `profile does not grant "${value}" under "${key}" (it grants: ${grantedValues.join(', ')})`,
+        `profile does not grant "${requested}" under "${key}" (it grants: ${describe(grantedValue)})`,
       )
     }
+    continue
   }
+
+  if (typeof requested === 'boolean') {
+    if (grantedValue !== requested) {
+      problems.push(
+        `entitlements ask for "${key}" = ${requested}, profile grants ${describe(grantedValue)}`,
+      )
+    }
+    continue
+  }
+
+  // Anything else is unverifiable, and unverifiable means fail — the whole point
+  // of this check is that an entitlement the profile does not back is fatal.
+  problems.push(
+    `cannot verify "${key}": unsupported entitlement value type "${typeof requested}"`,
+  )
 }
 
 if (problems.length > 0) {
