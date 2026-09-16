@@ -81,6 +81,64 @@ release, so the updater sees a version only once you publish it. Integrity is
 enforced by the minisign signature the app verifies against the embedded
 pubkey.
 
+## The macOS provisioning profile
+
+`src-tauri/Entitlements.plist` requests `keychain-access-groups`, which the
+data-protection keychain needs before it will accept a biometry-protected item
+(`secure_store::GateMode::Protected`). That entitlement is **provisioning-profile
+gated**: macOS checks it against a profile embedded in the bundle, and if no
+profile grants it the kernel refuses to spawn the app. The process dies on
+SIGKILL before `main` — no crash report — while codesign, notarization and
+`spctl` all still report success. This is exactly how 1.0.0-alpha.1 and
+1.0.0-alpha.2 shipped unlaunchable, and why both were withdrawn.
+
+So the entitlement and the profile are a matched pair. `src-tauri/embedded.provisionprofile`
+is committed to the repo (a Developer ID profile is not a secret — it carries
+public certificates, the team id, and an ~18-year expiry), and
+`bundle.macOS.files` in `tauri.conf.json` copies it to `Contents/embedded.provisionprofile`
+before signing.
+
+### Creating or renewing it
+
+The profile can only be made in the Apple Developer portal — it cannot be
+generated from CI or from the signing certificate alone.
+
+The current profile — App ID `app.rowel.desktop` (`HP35R6KD98`), profile
+"Rowel Desktop Developer ID" (`4G56YBHLB4`) — expires **2044-09-11**, so this is
+a once-a-decade chore. It grants `keychain-access-groups = ['UFBL3F444A.*']`,
+which covers any group under the team prefix.
+
+1. **Register the App ID.** [Identifiers](https://developer.apple.com/account/resources/identifiers/list)
+   → **+** → *App IDs* → *App*. Bundle ID **explicit**, `app.rowel.desktop`,
+   matching `identifier` in `tauri.conf.json` exactly.
+2. **Create the profile.** [Profiles](https://developer.apple.com/account/resources/profiles/list)
+   → **+** → under *Distribution* pick **Developer ID** — not Development, not
+   Mac App Store. Select the App ID and the *Developer ID Application*
+   certificate, and download the `.provisionprofile`.
+
+   You do not need to tick a "Keychain Sharing" capability on the App ID.
+   Developer ID profiles grant `TEAMID.*` for keychain access groups by
+   default, and the capability is not one the App Store Connect API can set.
+3. **Commit it** as `src-tauri/embedded.provisionprofile`.
+4. **Verify** before building anything:
+
+   ```sh
+   bun scripts/check-macos-entitlements.mjs
+   ```
+
+   It fails if the profile is missing, expired, not a Developer ID profile, or
+   does not grant every group the entitlements ask for. The release workflow
+   runs it before the build, and smoke-tests that the signed app actually
+   launches afterwards.
+
+Renewing is step 2 onwards — the App ID persists. If the team id ever changes,
+update the group in `Entitlements.plist` too.
+
+This can also be driven through the App Store Connect API
+(`POST /v1/bundleIds`, then `POST /v1/profiles` with
+`profileType: MAC_APP_DIRECT` and the Developer ID certificate ids), which is
+how the current profile was made.
+
 ## Per-release procedure
 
 1. **Bump the version** in all three files (keep them identical):
@@ -139,9 +197,7 @@ startup. Required capabilities live in `src-tauri/capabilities/desktop.json`
 ## Known limitations
 
 - Windows installers are unsigned; SmartScreen will warn on first launch.
-- `src-tauri/Entitlements.plist` requests `keychain-access-groups` with an
-  `$(AppIdentifierPrefix)` placeholder. Tauri passes the file to `codesign`
-  verbatim and does not expand Xcode-style variables, so the signed app may
-  carry the literal string. The secure-store code falls back to the
-  verify-then-read gate when the entitlement is not honoured; verify Touch ID
-  enrolment on the first notarized build.
+- **Always launch the signed build before publishing the draft release.**
+  Notarization does not check entitlements against a provisioning profile, so a
+  bundle can pass signing, notarization and Gatekeeper and still be incapable of
+  starting. The release workflow now smoke-tests this, but do it yourself too.

@@ -2,24 +2,43 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   macOS entitlements, applied only when the bundle is code-signed at package
-  time. `tauri dev` and unsigned/ad-hoc builds ignore this file entirely, so it
-  is inert until release signing is configured.
+  time. `tauri dev` and unsigned/ad-hoc builds ignore this file entirely.
 
   keychain-access-groups is what the data-protection keychain requires before it
-  will accept a biometry-protected item (see secure_store::GateMode::Protected).
-  Without it SecItemAdd returns errSecMissingEntitlement (-34018) and enrollment
+  will accept a biometry-protected item (secure_store::GateMode::Protected).
+  Without it SecItemAdd returns errSecMissingEntitlement (-34018) and enrolment
   falls back to the verify-then-read gate.
 
-  Release signing itself — bundle.macOS.signingIdentity, a Developer ID
-  certificate, and notarization credentials — is an owner task; this file only
-  pre-stages the entitlement so the protected gate starts working the moment a
-  real identity is wired up.
+  THIS ENTITLEMENT ONLY WORKS ALONGSIDE src-tauri/embedded.provisionprofile.
+  It is provisioning-profile-gated: AMFI checks it against the profile embedded
+  in the bundle, and if no profile grants it the kernel refuses to spawn the
+  process — SIGKILL before any of our code runs, no crash report, and Finder
+  showing only "The application "Rowel" can't be opened". Signing, notarization
+  and Gatekeeper all still pass, which is why this shipped twice unnoticed
+  (1.0.0-alpha.1 and 1.0.0-alpha.2). `bun scripts/check-macos-entitlements.mjs`
+  now fails the release build rather than letting that recur.
+
+  Verified on macOS 27 against the shipped alpha.2 binary, re-signed with the
+  real Developer ID Application cert and hardened runtime, varying only the
+  entitlements — note that the *value* made no difference, only the presence of
+  the key:
+
+    $(AppIdentifierPrefix)app.rowel.desktop  -> SIGKILL   (what alpha.2 shipped)
+    UFBL3F444A.app.rowel.desktop             -> SIGKILL
+    app.rowel.desktop  (no prefix at all)    -> SIGKILL
+    + com.apple.application-identifier       -> SIGKILL
+    no entitlements                          -> launches
+
+  Never write Xcode's `$(AppIdentifierPrefix)` here. Tauri hands this file to
+  `codesign` verbatim and expands nothing, so the variable ships as a literal
+  group name. Use the team id, UFBL3F444A. The group must also be one the
+  profile grants; a Developer ID profile typically grants `UFBL3F444A.*`.
 -->
 <plist version="1.0">
   <dict>
     <key>keychain-access-groups</key>
     <array>
-      <string>$(AppIdentifierPrefix)app.rowel.desktop</string>
+      <string>UFBL3F444A.app.rowel.desktop</string>
     </array>
   </dict>
 </plist>
