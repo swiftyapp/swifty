@@ -112,6 +112,7 @@ export default function Password({ onBack, onContinue }: Props) {
   return (
     <AuthShell onBack={onBack}>
       <StepHeader
+        progress={0.5}
         eyebrow={t('Get started · 1 of 2')}
         title={t('Choose a master password')}
         body={t("Rowel can't reset it for you, so pick one you'll remember.")}

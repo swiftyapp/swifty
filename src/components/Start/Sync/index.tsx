@@ -84,6 +84,7 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
     return (
       <AuthShell onBack={onBack}>
         <StepHeader
+          progress={1}
           eyebrow={t('Get started · 2 of 2')}
           busy
           title={t('Connecting to Google Drive…')}
@@ -100,7 +101,8 @@ export default function Sync({ onBack, onCreate, onConflict }: Props) {
   return (
     <AuthShell onBack={onBack}>
       <StepHeader
-        eyebrow={t('Get started · 2 of 2')}
+        progress={1}
+          eyebrow={t('Get started · 2 of 2')}
         title={t('Back up to Google Drive')}
         body={t("Your data syncs to Google Drive, so a lost device isn't lost secrets.")}
       />

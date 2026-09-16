@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useId } from 'react'
 import AsteriskBody from './Asterisk'
 
 export type MascotState = 'idle' | 'typing' | 'checking' | 'success' | 'error'
@@ -8,11 +8,20 @@ interface Props {
   // Where the eyes look horizontally, -1 (left) .. 1 (right). The lock screen
   // maps the passphrase caret position onto this so the mascot reads along.
   gaze?: number
+  // How pleased it is, 0 .. 1. The open eyes squint into happy crescents as
+  // this rises — the bottom of each eye flattens and lifts until only the top
+  // is left — so the first run can brighten it a notch per step. Success and
+  // error keep their own eyes regardless.
+  joy?: number
   // Body color. The brand ink by default (shared with the rail mark, themed in
   // theme.css); a vault-personalization setting will feed this eventually.
   color?: string
   size?: number
 }
+
+// The eyes' shared vertical centre; the clip that makes them squint is cut
+// against it.
+const EYE_CY = 27.1
 
 const BRAND_INK = 'var(--c-brand)'
 // Eyes and expression strokes: paper on ink, so they flip with the theme too.
@@ -26,9 +35,11 @@ const EYE = 'var(--c-brand-eye)'
 function Mascot({
   state = 'idle',
   gaze = 0,
+  joy = 0,
   color = BRAND_INK,
   size = 96
 }: Props) {
+  const clipId = useId()
   const ok = state === 'success'
   const bad = state === 'error'
   const typing = state === 'typing'
@@ -50,6 +61,13 @@ function Mascot({
   const gazeY = checking ? 1.5 : typing ? 2.5 : 0
   const eyeRy = checking ? 3 : typing ? 4.3 : 5
 
+  // Joy is a squint from below: the clip's floor rises from just under the
+  // eyes (nothing cut) to half way up them (a crescent), and the eyes lift a
+  // touch with it, the way cheeks push them up.
+  const cheer = Math.max(0, Math.min(1, joy))
+  const eyeFloor = EYE_CY + eyeRy * (1 - 1.5 * cheer) + 0.5 * (1 - cheer)
+  const eyeLift = -1.5 * cheer
+
   return (
     <svg
       width={size}
@@ -58,8 +76,14 @@ function Mascot({
       aria-hidden
       data-testid="lock-mascot"
       data-state={state}
+      data-joy={cheer}
       className={bodyAnim}
     >
+      <defs>
+        <clipPath id={clipId}>
+          <rect x="0" y="0" width="64" height={eyeFloor} />
+        </clipPath>
+      </defs>
       <AsteriskBody style={{ fill, transition: 'fill 300ms ease' }} />
 
       <g
@@ -74,9 +98,14 @@ function Mascot({
             ok || bad ? undefined : 'animate-[blink_6.8s_ease-in-out_infinite]'
           }
         >
-          {/* Open eyes (idle / typing) */}
+          {/* Open eyes (idle / typing), squinted by joy */}
           <g
-            style={{ opacity: ok || bad ? 0 : 1, transition: 'opacity 190ms ease' }}
+            clipPath={`url(#${clipId})`}
+            style={{
+              opacity: ok || bad ? 0 : 1,
+              transform: `translateY(${eyeLift}px)`,
+              transition: 'opacity 190ms ease, transform 300ms ease'
+            }}
           >
             <ellipse
               cx="27.6"

@@ -16,20 +16,35 @@ interface Props {
    * its own emblem (the biometric question's gate) passes that instead.
    */
   mark?: ReactNode
+  /**
+   * How far along the first run this screen is, 0 .. 1: the mascot's eyes
+   * brighten a notch per step (see Mascot's `joy`). The welcome leaves it at 0.
+   */
+  progress?: number
 }
 
 // Mark, eyebrow, headline and lead paragraph — the top of every first-run
 // screen, in the type the auth screens have always used (see the lock/setup
 // headings). Set tight, as one block: the eyebrow captions the headline rather
 // than floating above it, and the lead is a line or two, never a paragraph.
-export default function StepHeader({ eyebrow, tone, busy, title, body, mark }: Props) {
+export default function StepHeader({
+  eyebrow,
+  tone,
+  busy,
+  title,
+  body,
+  mark,
+  progress = 0
+}: Props) {
   // The mascot reads the room: it concentrates while something is in flight
   // and shakes its head at a failure, the same cues it gives on the lock screen.
   const state = tone === 'bad' ? 'error' : busy ? 'checking' : 'idle'
 
   return (
     <>
-      <div className="mb-6 flex justify-center">{mark ?? <Mascot state={state} />}</div>
+      <div className="mb-6 flex justify-center">
+        {mark ?? <Mascot state={state} joy={progress} />}
+      </div>
       <Eyebrow tone={tone} busy={busy}>
         {eyebrow}
       </Eyebrow>

@@ -81,6 +81,7 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
     return (
       <AuthShell onBack={onBack}>
         <StepHeader
+          progress={0.5}
           eyebrow={t('Restore · Google Drive')}
           tone="bad"
           title={t('Google Drive did not answer')}
@@ -99,6 +100,7 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
     return (
       <AuthShell onBack={onBack}>
         <StepHeader
+          progress={0.5}
           eyebrow={t('Restore · Google Drive')}
           title={t('Nothing here yet')}
           body={t('This Google account has no Rowel data. Start fresh and it will sync here.')}
@@ -115,7 +117,8 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
   if (drive.status !== 'found')
     return (
       <AuthShell onBack={onBack}>
-        <StepHeader eyebrow={t('Restore · Google Drive')} busy title={t('Looking for your data…')} />
+        <StepHeader progress={0.5}
+          eyebrow={t('Restore · Google Drive')} busy title={t('Looking for your data…')} />
         <div className={`${COLUMN} mt-9`}>
           <SpinnerCard testid="drive-spinner" caption={t('Waiting for Google…')} />
         </div>
@@ -125,7 +128,8 @@ export default function Drive({ onBack, onStartFresh, onUseFile, onRestored }: P
   return (
     <AuthShell onBack={onBack}>
       <StepHeader
-        eyebrow={t('Restore · Google Drive')}
+        progress={0.5}
+          eyebrow={t('Restore · Google Drive')}
         title={t('Welcome back.')}
         body={t('Enter your master password to unlock on this device.')}
       />
