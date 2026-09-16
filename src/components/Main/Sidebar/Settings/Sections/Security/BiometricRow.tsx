@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import type { BiometricMode } from '@/api/types'
 import { enableBiometric, disableBiometric } from '@/api/auth'
-import { messageOf } from '@/api/errors'
+import { describeError } from '@/api/errors'
 import { useApp, refreshApp } from '@/store'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
@@ -36,7 +36,7 @@ export default function BiometricRow() {
     setBusy(true)
     setError(null)
     const op = biometric?.available ? disableBiometric() : enableBiometric()
-    op.catch((err: unknown) => setError(messageOf(err)))
+    op.catch((err: unknown) => setError(describeError(err)))
       // Whichever way it went, the row is redrawn from a fresh probe rather
       // than from a guess: an unentitled build settles on a different mode
       // than it was offered, and a refusal changes nothing at all.

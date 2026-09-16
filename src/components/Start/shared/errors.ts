@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next'
-import { errorKind, messageOf } from '@/api/errors'
+import { describeError, errorKind } from '@/api/errors'
 
 /**
  * What to say when a pack refuses to open. The password is blamed only when the
@@ -16,6 +16,6 @@ export const unsealError = (t: TFunction, error: unknown, wrongPassword: string)
     case 'vaultTooNew':
       return t('Vault needs a newer version of the app')
     default:
-      return messageOf(error) || t('Something went wrong')
+      return describeError(error) || t('Something went wrong')
   }
 }

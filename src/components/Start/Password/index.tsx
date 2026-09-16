@@ -8,7 +8,7 @@ import { evaluate, MIN_LENGTH } from '@/services/strength'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
 import StepHeader from '../shared/StepHeader'
 import { COLUMN } from '../shared/layout'
-import { messageOf } from '@/api/errors'
+import { describeError } from '@/api/errors'
 
 interface Props {
   onBack: () => void
@@ -96,7 +96,7 @@ export default function Password({ onBack, onContinue }: Props) {
     onContinue(password).catch((err: unknown) => {
       if (!current()) return
       setBusy(false)
-      setMismatch(messageOf(err) || t('Something went wrong'))
+      setMismatch(describeError(err) || t('Something went wrong'))
     })
   }
 

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { Entry } from '@/api/types'
 import { shareOpen } from '@/api/share'
-import { messageOf } from '@/api/errors'
+import { describeError, errorKind } from '@/api/errors'
+import { t } from '@/i18n'
 import type { EntryDraft } from '@/kinds/draft'
 import { saveEntry, closeReceive } from '@/store'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
@@ -75,11 +76,17 @@ export function useReceive(): Receive {
         setEntry(opened)
         setBusy(false)
       })
-      // Verbatim: the backend already says which of the three it is ("this is
-      // not a Rowel share link", expired, revoked), and only it can tell.
+      // `notFound` is the one kind named here rather than left to `describeError`:
+      // opening a link is the only place it means the share itself is gone —
+      // expired or revoked — and the app-wide "Item not found" drops exactly the
+      // part the user can act on. Every other kind reads the same here as anywhere.
       .catch(reason => {
         if (!current()) return
-        setError(messageOf(reason))
+        setError(
+          errorKind(reason) === 'notFound'
+            ? t('This share has expired or was revoked')
+            : describeError(reason)
+        )
         setBusy(false)
       })
   }
@@ -92,7 +99,7 @@ export function useReceive(): Receive {
       .then(() => current() && closeReceive())
       .catch(reason => {
         if (!current()) return
-        setError(messageOf(reason))
+        setError(describeError(reason))
         setBusy(false)
       })
   }

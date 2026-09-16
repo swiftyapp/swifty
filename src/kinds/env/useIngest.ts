@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { pickEnvFile } from '@/api/pickers'
-import { messageOf } from '@/api/errors'
+import { describeError } from '@/api/errors'
 import { ingestDroppedEnvFile, ingestEnvFile, type IngestedEnv } from './ingest'
 
 /**
@@ -37,7 +37,7 @@ export function useEnvIngest(onFile: (file: IngestedEnv) => void) {
       const file = await load()
       if (mine === request.current && file) consumer.current(file)
     } catch (cause) {
-      if (mine === request.current) setError(messageOf(cause))
+      if (mine === request.current) setError(describeError(cause))
     }
   }
 

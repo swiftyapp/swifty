@@ -9,7 +9,7 @@ import FoundFileCard from '../shared/FoundFileCard'
 import { COLUMN, ACTIONS, FOOTNOTE } from '../shared/layout'
 import { describeDriveFile } from '../shared/describe'
 import { useDates } from '@/hooks/useDates'
-import { messageOf } from '@/api/errors'
+import { describeError } from '@/api/errors'
 
 interface Props {
   onBack: () => void
@@ -35,7 +35,7 @@ export default function Conflict({ onBack, onUnlockExisting, onArchive }: Props)
     setError(null)
     onArchive().catch((err: unknown) => {
       setBusy(false)
-      setError(messageOf(err) || t('Something went wrong'))
+      setError(describeError(err) || t('Something went wrong'))
     })
   }
 

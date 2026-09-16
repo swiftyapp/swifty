@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { shareCreate, shareRevoke, type ShareCreated } from '@/api/share'
-import { messageOf } from '@/api/errors'
+import { describeError } from '@/api/errors'
 import { useApp, closeSend, queueOrphan, revokeOrphans } from '@/store'
 import { useCopied } from '@/hooks/useCopied'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
@@ -74,12 +74,12 @@ export function useSend(entryId: string): Send {
         setShare(created)
         setBusy(false)
       })
-      // Backend messages are written to be read ("sync is not configured", "a
-      // passkey cannot be shared"), so they are shown as they arrive rather
-      // than mapped to copy of our own.
+      // Said in the user's own language where the kind has a settled meaning
+      // ("sync is not configured"); the ones Rust writes per call site ("a
+      // passkey cannot be shared") still come through as they arrive.
       .catch(reason => {
         if (!current()) return
-        setFailed({ op: 'create', message: messageOf(reason) })
+        setFailed({ op: 'create', message: describeError(reason) })
         setBusy(false)
       })
   }, [entryId, begin])
@@ -103,7 +103,7 @@ export function useSend(entryId: string): Send {
         if (!current()) return
         // The link is still live, so it stays on screen with the complaint
         // under it — the only honest thing to show after a failed revoke.
-        setFailed({ op: 'revoke', message: messageOf(reason) })
+        setFailed({ op: 'revoke', message: describeError(reason) })
         setBusy(false)
       })
   }, [share, busy, begin])

@@ -9,7 +9,7 @@ import { enableBiometric } from '@/api/auth'
 import { biometryLabel } from '@/lib/biometry'
 import StepHeader from '../shared/StepHeader'
 import { ACTIONS, FOOTNOTE } from '../shared/layout'
-import { messageOf } from '@/api/errors'
+import { describeError } from '@/api/errors'
 
 interface Props {
   /** Which gate this device has, so the screen uses the OS's own word for it. */
@@ -37,7 +37,7 @@ export default function Biometric({ biometry, onDone }: Props) {
         setBusy(false)
         // "Not now" is still right there, so a failed enrollment is a note
         // rather than a dead end.
-        setError(messageOf(err) || t('Could not enable {{name}}', { name }))
+        setError(describeError(err) || t('Could not enable {{name}}', { name }))
       })
   }
 

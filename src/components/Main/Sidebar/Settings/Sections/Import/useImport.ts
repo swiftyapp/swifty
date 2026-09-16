@@ -4,7 +4,7 @@ import { importSwftx } from '@/api/vault'
 import { importEntries, type ImportFormat, type ImportReport } from '@/api/imports'
 import { syncNow } from '@/api/sync'
 import { pickImportFile, pickBackup } from '@/api/pickers'
-import { errorKind, messageOf } from '@/api/errors'
+import { describeError, errorKind } from '@/api/errors'
 import { t } from '@/i18n'
 import { useProgress } from './useProgress'
 
@@ -36,7 +36,7 @@ export function useImport() {
     setRunning(true)
     importEntries(next.path, next.format, true)
       .then(setPreview)
-      .catch((e: unknown) => setError(messageOf(e)))
+      .catch((e: unknown) => setError(describeError(e)))
       .finally(() => setRunning(false))
   }, [])
 
@@ -73,7 +73,7 @@ export function useImport() {
         setResult(report)
         setPreview(null)
       })
-      .catch((e: unknown) => setError(messageOf(e)))
+      .catch((e: unknown) => setError(describeError(e)))
       .finally(() => setRunning(false))
   }
 
@@ -92,7 +92,7 @@ export function useImport() {
       })
       .catch((e: unknown) =>
         setError(
-          errorKind(e) === 'invalidPassword' ? t('Invalid password for backup') : messageOf(e)
+          errorKind(e) === 'invalidPassword' ? t('Invalid password for backup') : describeError(e)
         )
       )
       .finally(() => setRunning(false))
