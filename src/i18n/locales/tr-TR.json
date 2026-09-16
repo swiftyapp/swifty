@@ -293,6 +293,7 @@
   "Copy": "Kopyala",
   "Copy code": "Kodu kopyala",
   "Could not delete. Please try again.": "Silinemedi. Lütfen tekrar deneyin.",
+  "Could not open this entry. Please try again.": "Bu kayıt açılamadı. Lütfen tekrar deneyin.",
   "Could not save. Please try again.": "Kaydedilemedi. Lütfen tekrar deneyin.",
   "Create a new vault or restore from an existing backup.": "Yeni bir kasa oluşturun veya mevcut bir yedekten geri yükleyin.",
   "Edit": "Düzenle",

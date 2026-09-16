@@ -68,6 +68,10 @@ export function useUnlock(): Unlock {
   const [count, setCount] = useState(0)
   const [phase, setPhase] = useState<Phase>('idle')
   const holdTimer = useRef(0)
+  // The unlock the hold is sitting on. The backend has already opened the vault
+  // by the time this is set, so it must reach `enterMain` whatever happens to
+  // this hook — see the unmount cleanup below.
+  const pending = useRef<UnlockResult | null>(null)
 
   // Countdown ticks once a second while locked out; re-enables the input at 0.
   useEffect(() => {
@@ -80,15 +84,27 @@ export function useUnlock(): Unlock {
     return () => clearTimeout(id)
   }, [retryAfter, t])
 
-  useEffect(() => () => clearTimeout(holdTimer.current), [])
+  // An unmount mid-hold hands the unlock on at once rather than dropping it.
+  // The wide and compact lock screens are different components, so a window
+  // resized across the layout breakpoint during the hold remounts this hook —
+  // and dropping the timer with it left Rust unlocked behind a UI still asking
+  // for the password.
+  useEffect(
+    () => () => {
+      clearTimeout(holdTimer.current)
+      if (pending.current) void enterMain(pending.current)
+    },
+    []
+  )
 
   // Let the mascot celebrate before the vault takes over.
   const holdThenEnter = (result: UnlockResult) => {
     setPhase('success')
-    holdTimer.current = window.setTimeout(
-      () => enterMain(result),
-      SUCCESS_HOLD_MS
-    )
+    pending.current = result
+    holdTimer.current = window.setTimeout(() => {
+      pending.current = null
+      void enterMain(result)
+    }, SUCCESS_HOLD_MS)
   }
 
   const handleEnter = (value: string) => {

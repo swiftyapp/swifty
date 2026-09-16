@@ -4,7 +4,7 @@ import { LABEL_TYPE } from './tokens'
 type Tone = 'muted' | 'warn' | 'bad'
 
 const TONES: Record<Tone, string> = {
-  muted: 'text-text3',
+  muted: 'text-text2',
   warn: 'text-warn',
   bad: 'text-bad'
 }

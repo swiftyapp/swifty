@@ -23,7 +23,7 @@ interface Props {
 // The same value column in both modes, so switching does not move the row.
 const INK = `${VALUE} w-full text-text`
 const BOX =
-  'border-b border-line2 bg-transparent outline-none transition-colors placeholder:text-text3 focus:border-accent-line'
+  'border-b border-line2 bg-transparent outline-none transition-colors placeholder:text-text2 focus:border-accent-line'
 
 // One label/value pair, in the detail row's geometry: the label takes the w-32
 // label column the fixed rows use, the value the rest. Reading, the value gets a

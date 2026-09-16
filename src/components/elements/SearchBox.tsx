@@ -77,7 +77,7 @@ export default function SearchBox({
         spellCheck={false}
         onChange={e => onChange(e.target.value)}
         onKeyDown={onKeyDown}
-        className="min-w-0 flex-1 border-0 bg-transparent text-base text-text caret-accent outline-none placeholder:text-text3 [&::-webkit-search-cancel-button]:hidden"
+        className="min-w-0 flex-1 border-0 bg-transparent text-base text-text caret-accent outline-none placeholder:text-text2 [&::-webkit-search-cancel-button]:hidden"
       />
       {trailing}
     </div>

@@ -53,7 +53,7 @@ export default function OtpField({
           // A pasted otpauth:// link collapses to the secret it carries, so the
           // vault only ever stores the thing the generator needs.
           onBlur={() => set(parsed || value.trim())}
-          className={`mt-2.5 h-6 w-full self-stretch truncate border-b bg-transparent text-center text-base text-text outline-none transition-colors placeholder:text-text3 ${
+          className={`mt-2.5 h-6 w-full self-stretch truncate border-b bg-transparent text-center text-base text-text outline-none transition-colors placeholder:text-text2 ${
             value && !parsed ? 'border-bad' : 'border-line2 focus:border-accent-line'
           }`}
         />

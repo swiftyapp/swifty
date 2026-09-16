@@ -2,7 +2,7 @@
 
 // Everything a field shares; the per-control classes below only add the sizing.
 const controlBase =
-  'w-full rounded-sm border border-line2 bg-field px-3 text-base text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line'
+  'w-full rounded-sm border border-line2 bg-field px-3 text-base text-text outline-none transition-colors placeholder:text-text2 focus:border-accent-line'
 
 // 36px — the ruled tier for inputs, CTAs and rail tiles.
 export const inputClass = `${controlBase} h-9`

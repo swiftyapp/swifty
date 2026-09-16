@@ -1,4 +1,5 @@
 import type { ReactNode, Ref } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
 import { useForwardedRef } from '@/hooks/useForwardedRef'
@@ -34,6 +35,7 @@ export default function Modal({
   ref,
   children
 }: Props) {
+  const { t } = useTranslation()
   const [card, setCard] = useForwardedRef<HTMLDivElement>(ref)
   useDialogFocus(card, onClose)
 
@@ -58,10 +60,13 @@ export default function Modal({
         )}
         onClick={e => e.stopPropagation()}
       >
+        {/* Named like the sheet's close control: a bare glyph button reads as
+            "button" to a screen reader, in every dialog that inherits it. */}
         {!hideClose && (
           <IconButton
             muted
             testid="modal-close"
+            label={t('Close')}
             onClick={onClose}
             className="absolute right-3 top-3 z-10"
           >

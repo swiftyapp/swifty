@@ -3,8 +3,11 @@ import * as ts from 'typescript'
 import libRs from '../../src-tauri/src/lib.rs?raw'
 import eventsRs from '../../src-tauri/src/events.rs?raw'
 import errorRs from '../../src-tauri/src/error.rs?raw'
+import modelsRs from '../../src-tauri/src/models.rs?raw'
 import errorsTs from './errors.ts?raw'
 import { EVENTS } from './events'
+import { KINDS, completeEntry } from '@/kinds'
+import type { Entry, LoginEntry } from './types'
 
 // The bridge is written by hand on both sides. This is what keeps the two from
 // drifting: every command the webview invokes must be one Rust registers, every
@@ -184,7 +187,50 @@ const translated = () => names(errorsTs, /case '(\w+)':/g)
 // user can read in their own language.
 const RAW = ['unsupported', 'io', 'serde', 'crypto', 'other']
 
+// The wire name of every text field Rust's `Entry` may leave off: an
+// `Option<String>` under `skip_serializing_if`, sent under its `rename` when it
+// has one. Read off the struct body, so a field added to Rust shows up here
+// without anyone remembering to list it.
+const omittableStrings = () => {
+  const body = modelsRs.match(/pub struct Entry \{([\s\S]*?)\n\}/)?.[1] ?? ''
+  const fields = body.matchAll(
+    /#\[serde\(([^\]]*?)\)\]\s*pub (\w+): Option<String>/g
+  )
+  return unique(
+    [...fields]
+      .filter(([, attrs]) => attrs.includes('skip_serializing_if'))
+      .map(([, attrs, name]) => attrs.match(/rename = "(\w+)"/)?.[1] ?? name)
+  )
+}
+
+// Optional on the webview side as well, so nothing has to fill them in.
+const OPTIONAL_IN_TS = ['createdAt', 'updatedAt', 'password_updated_at']
+
 describe('the Rust/webview contract', () => {
+  // The TS entry types promise a string for every field of a kind, while Rust
+  // sends `Option<String>` and drops the `None`s — so `completeEntry` fills the
+  // gaps from the kind's empty draft. This is what keeps the two shapes in step:
+  // a text field Rust can omit has to have a default in some kind, or it arrives
+  // as `undefined` where a string was typed.
+  it('has a default for every text field Rust may leave off an entry', () => {
+    const fields = omittableStrings()
+    expect(fields.length).toBeGreaterThan(20)
+    const defaulted = new Set(KINDS.flatMap(kind => Object.keys(kind.defaults)))
+    const orphans = fields.filter(f => !OPTIONAL_IN_TS.includes(f) && !defaulted.has(f))
+    expect(orphans).toEqual([])
+  })
+
+  it('completes a bare entry the way the kind types describe it', () => {
+    const bare = { id: 'l1', type: 'login', title: 'Site', password: 'pw' } as Entry
+    const login = completeEntry(bare) as LoginEntry
+    expect(login.password).toBe('pw')
+    expect(login.username).toBe('')
+    expect(login.email).toBe('')
+    expect(login.otp).toBe('')
+    expect(login.website).toBe('')
+    expect(login.note).toBe('')
+  })
+
   it('invokes exactly the commands Rust registers', () => {
     expect(invoked()).toEqual(registered())
   })

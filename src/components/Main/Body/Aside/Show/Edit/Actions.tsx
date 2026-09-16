@@ -27,7 +27,13 @@ export default function Actions({ draft }: { draft: Draft }) {
       >
         {draft.confirmDiscard ? t('Discard changes?') : t('Cancel')}
       </button>
-      <Button size="md" kbd="⌘⏎" testid="save-entry-button" onClick={draft.save}>
+      <Button
+        size="md"
+        kbd="⌘⏎"
+        testid="save-entry-button"
+        loading={draft.saving}
+        onClick={draft.save}
+      >
         {t('Save')}
       </Button>
     </div>

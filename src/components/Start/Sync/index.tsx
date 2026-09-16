@@ -122,7 +122,7 @@ export default function Sync({ onCreate, onConflict }: Props) {
           than a list: a list of rows here read as three more things to press. */}
       <p
         data-testid={error ? 'setup-drive-error' : undefined}
-        className={`${FOOTNOTE} ${META_TYPE} ${error ? 'text-bad' : 'text-text3'}`}
+        className={`${FOOTNOTE} ${META_TYPE} ${error ? 'text-bad' : 'text-text2'}`}
       >
         {error ??
           `${t('Encrypted before it leaves this device')} · ${t('Switch off any time in Settings')}`}

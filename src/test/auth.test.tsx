@@ -93,6 +93,24 @@ describe('Auth', () => {
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
+  // The wide and compact lock screens are different components, so a resize
+  // across the layout breakpoint during the celebration hold remounts the hook.
+  // Rust has already opened the vault by then; the UI must follow it in.
+  it('still enters the vault when unmounted during the success hold', async () => {
+    mockCommand('unlock', () => ({ entries: [], syncConfigured: false }))
+    const { unmount } = render(<Auth biometric={false} />)
+
+    await userEvent.type(screen.getByPlaceholderText('Master Password'), 'right{Enter}')
+    await waitFor(() =>
+      expect(screen.getByTestId('lock-mascot')).toHaveAttribute('data-state', 'success')
+    )
+    expect(useApp.getState().flow).not.toBe('main')
+
+    unmount()
+
+    expect(useApp.getState().flow).toBe('main')
+  })
+
   it('unlocks the vault on Enter', async () => {
     mockCommand('unlock', () => ({ entries: [], syncConfigured: false }))
     render(<Auth biometric={false} />)

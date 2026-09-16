@@ -24,6 +24,8 @@ export interface Draft {
   attempted: boolean
   /** Cancel is armed: the next request discards. */
   confirmDiscard: boolean
+  /** A save is out with the backend; further requests are ignored until it lands. */
+  saving: boolean
   saveError: string | null
   save: () => void
   cancel: () => void
@@ -52,6 +54,7 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
   const [attempted, setAttempted] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [model, setModel] = useState<EntryDraft>(initial)
   // What the model looked like when it was loaded — the dirty baseline.
   const [pristine] = useState<EntryDraft>(initial)
@@ -88,7 +91,11 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
     setConfirmDiscard(true)
   }
 
+  // One write at a time. A new entry has no id until the backend answers, so a
+  // second press while the first is in flight minted a second id — and a second
+  // row — for the same draft.
   const save = () => {
+    if (saving) return
     if (!kind.isValid(model)) {
       setAttempted(true)
       return
@@ -102,8 +109,11 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
         ? { ...model, password_updated_at: new Date().toISOString() }
         : model
     setModel(stamped)
+    setSaving(true)
     // Never imply success on a failed write: surface the error, stay in edit.
-    saveEntry(pruneExtra(stamped)).catch(() => setSaveError(t('Could not save. Please try again.')))
+    saveEntry(pruneExtra(stamped))
+      .catch(() => setSaveError(t('Could not save. Please try again.')))
+      .finally(() => setSaving(false))
   }
 
   // Bound fresh every render: both handlers close over the current draft.
@@ -126,5 +136,5 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
     return () => document.removeEventListener('keydown', onKey)
   })
 
-  return { model, set, dirty, attempted, confirmDiscard, saveError, save, cancel }
+  return { model, set, dirty, attempted, confirmDiscard, saving, saveError, save, cancel }
 }

@@ -142,7 +142,7 @@ export default function Field({
           onBlur={normalize ? () => set(normalize(value)) : undefined}
           className={cx(
             ink,
-            'w-full border-b bg-transparent text-text outline-none transition-colors placeholder:text-text3',
+            'w-full border-b bg-transparent text-text outline-none transition-colors placeholder:text-text2',
             error ? 'border-bad' : 'border-line2 focus:border-accent-line'
           )}
         />

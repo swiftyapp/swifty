@@ -293,6 +293,7 @@
   "Copy": "Kopieren",
   "Copy code": "Code kopieren",
   "Could not delete. Please try again.": "Löschen nicht möglich. Bitte versuchen Sie es erneut.",
+  "Could not open this entry. Please try again.": "Eintrag konnte nicht geöffnet werden. Bitte versuche es erneut.",
   "Could not save. Please try again.": "Speichern nicht möglich. Bitte versuchen Sie es erneut.",
   "Create a new vault or restore from an existing backup.": "Erstellen Sie einen neuen Tresor oder stellen Sie ihn aus einer vorhandenen Sicherung wieder her.",
   "Edit": "Bearbeiten",

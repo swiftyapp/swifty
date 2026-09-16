@@ -15,7 +15,7 @@ export default function TextLink({ children, onClick, testid }: Props) {
       type="button"
       data-testid={testid}
       onClick={onClick}
-      className={`cursor-pointer border-0 bg-transparent ${META_TYPE} text-text3 transition-colors hover:text-text`}
+      className={`cursor-pointer border-0 bg-transparent ${META_TYPE} text-text2 transition-colors hover:text-text`}
     >
       {children}
     </button>
