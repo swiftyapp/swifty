@@ -16,10 +16,11 @@ import { EVENTS } from './events'
 // nothing under `src/` calls is exactly as dead as the command behind it, and a
 // dead command is a liability rather than a loose end: `auth::setup` sat
 // registered for a release, skipping the guards `setup_create` applies, and
-// nothing here failed. So "reached" is read off the syntax tree, not the text —
-// a call expression on a name the file imported — because an import left
-// unused, a re-export, a `typeof` or a mention in a comment would otherwise
-// keep a dead wrapper, and its command, alive.
+// nothing here failed. So "reached" is read off the syntax tree, not the text:
+// a file imports the wrapper as a value and uses that binding where a value
+// goes — calls it, or hands it on as a callback. A re-export, a `typeof`, a
+// type position or a mention in a comment or a string would otherwise keep a
+// dead wrapper, and its command, alive.
 
 // Every source under `src/`, production only. Test files and the test harness
 // count for nothing: a wrapper kept alive by its own test is still dead.
@@ -66,21 +67,37 @@ const commandNamed = (node: ts.CallExpression, callee: string): string | null =>
     : null
 }
 
+// An identifier standing where a value goes. Not the name in an import or
+// export specifier, not a `typeof`, not a type, not the `.name` half of a
+// property access — those name the binding without reaching it.
+const isValueUse = (node: ts.Identifier) => {
+  const parent = node.parent
+  if (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent)) return false
+  if (ts.isTypeQueryNode(parent) || ts.isTypeReferenceNode(parent)) return false
+  if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false
+  // `{ appStatus: 1 }` names a key; the shorthand `{ appStatus }` is the value.
+  if (ts.isPropertyAssignment(parent) && parent.name === node) return false
+  if (ts.isQualifiedName(parent)) return false
+  return true
+}
+
 /**
- * What one module does with the bridge: the value names it imports, the names
- * it calls, and the commands it hands to `invoke` itself.
+ * What one module does with the bridge: the names it imports as values, the
+ * imported names it then uses as values, and the commands it hands to `invoke`
+ * itself.
  */
 interface Usage {
   imported: Set<string>
-  called: Set<string>
+  used: Set<string>
   direct: Set<string>
 }
 
 export const usage = (path: string, source: string): Usage => {
   const imported = new Set<string>()
-  const called = new Set<string>()
+  const used = new Set<string>()
   const direct = new Set<string>()
-  walk(parse(path, source), node => {
+  const tree = parse(path, source)
+  walk(tree, node => {
     if (ts.isImportDeclaration(node) && !node.importClause?.isTypeOnly) {
       const bindings = node.importClause?.namedBindings
       if (bindings && ts.isNamedImports(bindings)) {
@@ -89,13 +106,15 @@ export const usage = (path: string, source: string): Usage => {
         }
       }
     }
+  })
+  walk(tree, node => {
+    if (ts.isIdentifier(node) && imported.has(node.text) && isValueUse(node)) used.add(node.text)
     if (ts.isCallExpression(node)) {
       const command = commandNamed(node, 'invoke')
       if (command) direct.add(command)
-      else if (ts.isIdentifier(node.expression)) called.add(node.expression.text)
     }
   })
-  return { imported, called, direct }
+  return { imported, used, direct }
 }
 
 /**
@@ -127,10 +146,7 @@ const invoked = () => {
   const usages = sources.map(([path, source]) => [path, usage(path, source)] as const)
   const reached = [...wrappers()]
     .filter(([wrapper, { declaredIn }]) =>
-      usages.some(
-        ([path, { imported, called }]) =>
-          path !== declaredIn && imported.has(wrapper) && called.has(wrapper)
-      )
+      usages.some(([path, { used }]) => path !== declaredIn && used.has(wrapper))
     )
     .map(([, { command }]) => command)
   // Commands handed straight to `invoke`, outside the wrappers: the dev-only
@@ -190,28 +206,39 @@ describe('the Rust/webview contract', () => {
 // widen back into text matching.
 describe('what counts as reaching a wrapper', () => {
   const probe = (body: string) =>
-    usage('probe.ts', `import { appStatus } from '@/api/app'\n${body}\n`)
+    usage('probe.ts', `import { appStatus } from '@/api/app'\n${body}\n`).used.has('appStatus')
 
-  it('a call on the imported name', () => {
-    expect(probe('void appStatus()').called.has('appStatus')).toBe(true)
+  it('using the imported name as a value: a call, or handed on as one', () => {
+    for (const body of [
+      'void appStatus()',
+      'void refresh().then(appStatus)',
+      'const probe = { appStatus }',
+      'const run = useLatestRequest(appStatus)'
+    ]) {
+      expect(probe(body), body).toBe(true)
+    }
   })
 
-  it('not a mention that never calls it', () => {
+  it('not a mention that never reaches it', () => {
     for (const body of [
       '// appStatus() would go here',
       "const label = 'appStatus()'",
       'type Probe = typeof appStatus',
+      'let probe: appStatus',
       'export { appStatus }',
-      'const alias = appStatus',
-      'export default appStatus'
+      'const other = { appStatus: 1 }; void other.appStatus'
     ]) {
-      expect(probe(body).called.has('appStatus'), body).toBe(false)
+      expect(probe(body), body).toBe(false)
     }
   })
 
   it('a type-only import is not an import of the wrapper', () => {
-    const { imported } = usage('probe.ts', "import type { appStatus } from '@/api/app'\n")
+    const { imported, used } = usage(
+      'probe.ts',
+      "import type { appStatus } from '@/api/app'\nlet probe: typeof appStatus\n"
+    )
     expect(imported.has('appStatus')).toBe(false)
+    expect(used.has('appStatus')).toBe(false)
   })
 
   it('a bare invoke names its command', () => {
