@@ -19,6 +19,13 @@ describe('otpSecret', () => {
     ['an otpauth link with a padded secret', `otpauth://totp/Acme?secret=${SECRET}%3D%3D`, SECRET],
     ['an otpauth link with no secret', 'otpauth://totp/Acme?issuer=Acme', ''],
     ['an otpauth link with no query at all', 'otpauth://totp/Acme', ''],
+    ['a counter-based link', `otpauth://hotp/Acme?secret=${SECRET}&counter=0`, ''],
+    ['a link of a type nobody supports', `otpauth://steam/Acme?secret=${SECRET}`, ''],
+    ['a link shouting TOTP', `otpauth://TOTP/Acme?secret=${SECRET}`, SECRET],
+    ['a link asking for too few digits', `otpauth://totp/Acme?secret=${SECRET}&digits=4`, ''],
+    ['a link with a zero-second window', `otpauth://totp/Acme?secret=${SECRET}&period=0`, ''],
+    ['a link naming an unknown hash', `otpauth://totp/Acme?secret=${SECRET}&algorithm=md5`, ''],
+    ['a link with a supported non-default set', `otpauth://totp/Acme?secret=${SECRET}&digits=8&period=60&algorithm=SHA512`, SECRET],
     ['a too-short secret', 'JBSWY3D', ''],
     ['a non-base32 string', 'not-a-secret', ''],
     ['base32 with the digits base32 has no room for', 'JBSWY3DPEHPK3PX1', '']
@@ -49,6 +56,8 @@ describe('otpStored', () => {
     ['a link shouting DIGITS', uri('DIGITS=8'), uri('DIGITS=8')],
     // A link we cannot read a seed out of is no more storable than junk.
     ['a link with no secret', 'otpauth://totp/Acme?digits=8', ''],
+    ['a link the backend would refuse', uri('digits=4'), ''],
+    ['a counter-based link', `otpauth://hotp/Acme?secret=${SECRET}`, ''],
     ['a non-base32 string', 'not-a-secret', '']
   ]
 

@@ -9,15 +9,36 @@ const secretParam = (query: string): string => {
 }
 
 /**
+ * What the backend will generate for (`otp.rs`: DIGITS, PERIOD, the three RFC
+ * 6238 hashes). Mirrored here so a link the backend would refuse is red in the
+ * field instead of saved and shown as an empty dial with no explanation.
+ */
+const SUPPORTED: Record<string, (param: string) => boolean> = {
+  digits: p => /^\d+$/.test(p) && Number(p) >= 6 && Number(p) <= 10,
+  period: p => /^\d+$/.test(p) && Number(p) >= 1 && Number(p) <= 300,
+  algorithm: p => ['sha1', 'sha256', 'sha512'].includes(p.toLowerCase())
+}
+
+/**
  * The TOTP secret carried by whatever was pasted: a bare base32 string, or the
  * `otpauth://totp/...?secret=...` URI behind every enrolment QR code. Returns
- * '' when there is no usable secret in there — the field's validity test.
+ * '' when there is no usable secret in there — the field's validity test. A
+ * link is usable only if it is time-based (an `hotp` seed run through the
+ * clock gives plausible, wrong codes) and every parameter it spells out is one
+ * the backend accepts.
  */
 export const otpSecret = (value: string): string => {
   const raw = value.trim().replace(/\s+/g, '')
   if (!raw) return ''
   if (/^otpauth:\/\//i.test(raw)) {
-    return otpSecret(secretParam(raw.slice(raw.indexOf('?') + 1)))
+    const type = raw.slice('otpauth://'.length).split(/[/?]/, 1)[0] ?? ''
+    if (type.toLowerCase() !== 'totp') return ''
+    const query = raw.includes('?') ? raw.slice(raw.indexOf('?') + 1) : ''
+    for (const [key, param] of new URLSearchParams(query)) {
+      const accepts = SUPPORTED[key.toLowerCase()]
+      if (accepts && !accepts(param.trim())) return ''
+    }
+    return otpSecret(secretParam(query))
   }
   // The backend decodes with base32 RFC4648 padding *off* (totp-rs
   // `Secret::Encoded`), which rejects '=' outright — so padding is dropped

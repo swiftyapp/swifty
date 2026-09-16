@@ -126,6 +126,13 @@ pub fn parse(value: &str) -> Result<OtpParams, OtpError> {
     }
 
     let uri = Url::parse(value).map_err(|e| OtpError(format!("invalid otpauth uri: {e}")))?;
+    // The "host" of an otpauth URI is its type. Only `totp` is time-based; an
+    // `hotp` seed run through the clock yields a plausible, wrong code every
+    // time, so it is refused here rather than stored as something it is not.
+    let kind = uri.host_str().unwrap_or_default();
+    if !kind.eq_ignore_ascii_case("totp") {
+        return Err(OtpError(format!("unsupported otp type: {kind}")));
+    }
     let mut params = OtpParams::default();
     let mut seed = String::new();
     // Parameter names are not keywords, and exporters disagree about their case.
@@ -204,6 +211,13 @@ mod tests {
         ] {
             assert_eq!(parse(spelling).unwrap().secret, SEED, "{spelling}");
         }
+    }
+
+    #[test]
+    fn only_a_totp_uri_is_accepted() {
+        assert!(parse(&format!("otpauth://hotp/Acme?secret={SEED}&counter=0")).is_err());
+        assert!(parse(&format!("otpauth://steam/Acme?secret={SEED}")).is_err());
+        assert!(parse(&format!("otpauth://TOTP/Acme?secret={SEED}")).is_ok());
     }
 
     #[test]
