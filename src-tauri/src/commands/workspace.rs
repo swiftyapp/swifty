@@ -14,7 +14,7 @@ use tauri::{AppHandle, State};
 
 use crate::error::{Error, Result};
 use crate::models::UnlockResult;
-use crate::session::Session;
+use crate::session::Lease;
 use crate::state::AppState;
 use crate::storage;
 use crate::workspace::{self, Registry, Workspace};
@@ -96,11 +96,13 @@ fn update_registry<T>(
 
 /// Put back what `workspace_create` took out: the session that was open and
 /// the workspace the paths pointed at. Under the lock, as one step, for the
-/// same reason they came out as one.
-fn restore(state: &AppState, active: String, session: Session) {
+/// same reason they came out as one. The session only goes back if nothing
+/// locked it while the lease was out (`Session::restore`); the paths go back
+/// regardless, since they are what a later unlock resolves through.
+fn restore(state: &AppState, active: String, previous: Lease) {
     let _paths = state.workspace_lock.lock().unwrap();
     *state.active_workspace.lock().unwrap() = active;
-    *state.session.lock().unwrap() = session;
+    state.session.lock().unwrap().restore(previous);
 }
 
 /// Create a workspace with its own master password and leave it unlocked.
@@ -130,17 +132,18 @@ pub async fn workspace_create(
     let root = storage::root_dir(&app)?;
     let id = new_id();
 
-    // The open session comes out and the paths move as one step under the lock,
-    // so no command sees one workspace's key beside another's directory. The
-    // session is kept rather than dropped: a failure puts it back exactly as it
-    // was, and the frontend — which only changes screens on success — is still
-    // looking at a vault that is still open.
-    let (previous_active, previous_session) = {
+    // The open session comes out on a lease and the paths move as one step
+    // under the lock, so no command sees one workspace's key beside another's
+    // directory. The session is kept rather than dropped: a failure puts it
+    // back exactly as it was, and the frontend — which only changes screens on
+    // success — is still looking at a vault that is still open. A lock that
+    // lands while the lease is out wins over both outcomes (`Session::adopt`).
+    let (previous_active, previous) = {
         let _paths = state.workspace_lock.lock().unwrap();
         guard_sync_idle(&state)?;
-        let session = std::mem::take(&mut *state.session.lock().unwrap());
+        let lease = state.session.lock().unwrap().take_out()?;
         let active = std::mem::replace(&mut *state.active_workspace.lock().unwrap(), id.clone());
-        (active, session)
+        (active, lease)
     };
 
     let created = match create_vault_in(&app, &root, &id, password).await {
@@ -149,7 +152,7 @@ pub async fn workspace_create(
             // Leave no trace of a workspace that never opened: the user is put
             // back exactly where they pressed the button, free to try again.
             discard(&root, &id);
-            restore(&state, previous_active, previous_session);
+            restore(&state, previous_active, previous);
             return Err(e);
         }
     };
@@ -170,12 +173,24 @@ pub async fn workspace_create(
         // The store closes before its files are removed.
         drop(created);
         discard(&root, &id);
-        restore(&state, previous_active, previous_session);
+        restore(&state, previous_active, previous);
         return Err(e);
     }
 
+    // The new vault continues the session the previous one was taken from. If
+    // that session was locked while the vault was being created, it stays
+    // locked: the workspace exists and is recorded, and the next unlock opens
+    // it, but it does not open itself behind a lock the user asked for.
     let (key, store) = created;
-    state.session.lock().unwrap().set(key, store, false);
+    let (_, _, _, claim) = previous.split();
+    if !state
+        .session
+        .lock()
+        .unwrap()
+        .adopt(claim, key, store, false)
+    {
+        return Err(Error::Locked);
+    }
     Ok(UnlockResult {
         entries: vec![],
         sync_configured: false,

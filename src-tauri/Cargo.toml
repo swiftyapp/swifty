@@ -50,6 +50,11 @@ chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "form", "query", "rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "tls12"] }
 url = "2"
+# Only for `StreamExt::buffer_unordered`, which is what gives the HIBP breach
+# check its bounded fan-out (`hibp::check_all`). Already in the locked graph
+# under reqwest, and `std` is the single feature `buffer_unordered` needs — the
+# async-await macros the default set adds are not used here.
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 zeroize = "1.8.2"
 tempfile = "3"
 argon2 = "0.6"

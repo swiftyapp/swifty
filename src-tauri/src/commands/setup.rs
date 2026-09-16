@@ -31,9 +31,8 @@ use crate::sync::{self, restore, setup::PackInfo};
 /// Connect an account and report what it holds. Onboarding only.
 ///
 /// Desktop: the consent flow waits on a loopback listener and the probe is a
-/// network round trip, so both go to a thread of their own — the command
-/// returns as soon as its guards have passed, and the frontend listens for the
-/// events.
+/// network round trip, so both go to the blocking pool — the command returns as
+/// soon as its guards have passed, and the frontend listens for the events.
 #[cfg(desktop)]
 #[tauri::command]
 pub fn setup_drive_connect(app: AppHandle) -> Result<()> {
@@ -42,9 +41,9 @@ pub fn setup_drive_connect(app: AppHandle) -> Result<()> {
     let attempt = begin_attempt(&app.state::<AppState>());
     events::setup_drive_pending(&app);
 
-    std::thread::spawn(move || {
+    super::detached(move || {
         let probed = sync::obtain_tokens(&app).and_then(|mut tokens| {
-            // `block_on` is legal here and only here: a plain thread is not one
+            // `block_on` is legal here because a blocking-pool thread is not one
             // of the async runtime's workers. Same rule as a sync run.
             let file = tauri::async_runtime::block_on(probe(&app, &mut tokens))?;
             Ok((tokens, file))
@@ -192,12 +191,11 @@ pub async fn setup_restore_from_file(
     let _step = begin_step(&state)?;
 
     let handle = app.clone();
-    let (key, store) = tauri::async_runtime::spawn_blocking(move || {
+    let (key, store) = super::blocking(move || {
         let bytes = std::fs::read(&path)?;
         restore::restore_from_pack(&handle, &bytes, &password)
     })
-    .await
-    .map_err(|e| Error::Other(e.to_string()))??;
+    .await?;
     adopt(&app, &state, key, store, None)
 }
 
@@ -220,11 +218,7 @@ async fn restore_off_thread(
     password: String,
 ) -> Result<(VaultKey, SqliteStore)> {
     let app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        restore::restore_from_pack(&app, &bytes, &password)
-    })
-    .await
-    .map_err(|e| Error::Other(e.to_string()))?
+    super::blocking(move || restore::restore_from_pack(&app, &bytes, &password)).await
 }
 
 // --- create ----------------------------------------------------------------
@@ -279,9 +273,7 @@ pub(crate) async fn create_off_thread(
     password: String,
 ) -> Result<(VaultKey, SqliteStore)> {
     let app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || create_vault(&app, &password))
-        .await
-        .map_err(|e| Error::Other(e.to_string()))?
+    super::blocking(move || create_vault(&app, &password)).await
 }
 
 // --- shared ----------------------------------------------------------------

@@ -134,6 +134,11 @@ pub struct AppState {
     pub setup_attempt: AtomicU64,
     #[cfg(mobile)]
     pub pending_auth: Mutex<Option<PendingAuth>>,
+    /// How long a resumed app waits for a redirect before writing the pending
+    /// consent flow off (`commands::sync::on_resume`). One re-armable timer
+    /// rather than a sleeping thread per activation; the latest resume wins.
+    #[cfg(mobile)]
+    pub consent_grace: std::sync::Arc<crate::timer::Timer>,
 }
 
 // Hand-written only because `active_workspace` starts at the primary rather than
@@ -151,6 +156,8 @@ impl Default for AppState {
             setup_attempt: AtomicU64::default(),
             #[cfg(mobile)]
             pending_auth: Mutex::default(),
+            #[cfg(mobile)]
+            consent_grace: crate::timer::Timer::spawn(),
         }
     }
 }

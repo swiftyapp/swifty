@@ -3,11 +3,13 @@
 //!
 //! Two rules shape every command here. The session lock is taken, read and
 //! released before anything touches the network — a mutex held across an await
-//! would stall every other command for a round trip. And the Drive work runs on
-//! `spawn_blocking`, because the transport drives async calls with `block_on`,
-//! which deadlocks on a runtime worker (see `commands::sync::start_run`).
+//! would stall every other command for a round trip. And the Drive work goes to
+//! the blocking pool through [`super::blocking`], which is where the reasoning
+//! for that lives.
 
 use tauri::{AppHandle, State};
+
+use super::blocking;
 
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
@@ -83,15 +85,4 @@ fn sender_cryptor(state: &State<'_, AppState>) -> Result<Cryptor> {
     let session = state.session.lock().unwrap();
     sendable(&session)?;
     session.cryptor()
-}
-
-// A join error means the blocking thread panicked or was cancelled; there is no
-// inner result to report, so surface the join failure itself (as `sync_import`
-// does).
-async fn blocking<T: Send + 'static>(
-    work: impl FnOnce() -> Result<T> + Send + 'static,
-) -> Result<T> {
-    tauri::async_runtime::spawn_blocking(work)
-        .await
-        .map_err(|e| Error::Other(e.to_string()))?
 }

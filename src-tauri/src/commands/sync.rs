@@ -137,9 +137,9 @@ enum Follow {
     Pull,
 }
 
-/// Run the desktop consent flow on a thread of its own. `sync::setup` waits on
-/// a loopback listener and drives Drive with `block_on`, so it may never run on
-/// the command thread nor on an async worker.
+/// Run the desktop consent flow on the blocking pool. `sync::setup` waits on a
+/// loopback listener and drives Drive with `block_on`, so it may never run on
+/// the command thread nor on an async worker — see [`super::detached`].
 #[cfg(desktop)]
 fn spawn_consent(app: &AppHandle, state: &State<'_, AppState>, follow: Follow) -> Result<()> {
     // Key and flag under the workspace lock, as one step: a switch cannot land
@@ -152,7 +152,7 @@ fn spawn_consent(app: &AppHandle, state: &State<'_, AppState>, follow: Follow) -
         cryptor
     };
     let app = app.clone();
-    std::thread::spawn(move || match sync::setup(&app, &cryptor) {
+    super::detached(move || match sync::setup(&app, &cryptor) {
         // Either way the run is claimed before the consent is marked over, so
         // the flags overlap rather than leave a gap a workspace switch could
         // use — and the first upload cannot be skipped by one landing there.
@@ -177,8 +177,8 @@ fn spawn_consent(app: &AppHandle, state: &State<'_, AppState>, follow: Follow) -
 /// new" is an answer worth rendering.
 ///
 /// Blocking, and deliberately: `sync::run` drives Drive with `block_on`, so
-/// every caller has to be a plain thread (see [`start_run`]). The caller has
-/// already announced the run (`started`) — before the consent it follows was
+/// every caller has to be on the blocking pool (see [`start_run`]). The caller
+/// has already announced the run (`started`) — before the consent it follows was
 /// marked over, so a workspace switch never finds a moment with neither flag up.
 fn pull(app: &AppHandle, cryptor: Cryptor) {
     match sync::run(app, cryptor) {
@@ -309,13 +309,13 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
         match sync::complete(&app, &cryptor, &code, &pending.verifier).await {
             Ok(()) => {
                 // The run is claimed before the consent is marked over, as in
-                // `spawn_consent`; the pull gets a plain thread for the same
-                // reason `start_run` uses one.
+                // `spawn_consent`; the pull goes to the blocking pool for the
+                // same reason `start_run` does.
                 if purpose == AuthPurpose::Import {
                     started(&app);
                     connected(&app);
                     let handle = app.clone();
-                    std::thread::spawn(move || pull(&handle, cryptor));
+                    crate::commands::detached(move || pull(&handle, cryptor));
                 } else {
                     start_run(&app);
                     connected(&app);
@@ -347,25 +347,31 @@ pub fn on_resume(app: &AppHandle) {
     else {
         return;
     };
-    let app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        std::thread::sleep(RESUME_GRACE);
-        let abandoned = {
-            let state = app.state::<AppState>();
-            let mut slot = state.pending_auth.lock().unwrap();
-            match slot.as_ref() {
-                Some(p) if p.state == nonce => slot.take(),
-                _ => None,
+    // The process's one re-armable timer for this, not a thread that sleeps:
+    // every activation would otherwise park an OS thread for the grace period,
+    // and a user flicking between apps produces a run of them. Re-arming is
+    // also the behaviour we want — the latest resume is the one whose grace
+    // period counts.
+    let handle = app.clone();
+    app.state::<AppState>()
+        .consent_grace
+        .arm(RESUME_GRACE, move || {
+            let abandoned = {
+                let state = handle.state::<AppState>();
+                let mut slot = state.pending_auth.lock().unwrap();
+                match slot.as_ref() {
+                    Some(p) if p.state == nonce => slot.take(),
+                    _ => None,
+                }
+            };
+            if let Some(abandoned) = abandoned {
+                fail(
+                    &handle,
+                    abandoned.purpose,
+                    "Google sign-in was cancelled".into(),
+                );
             }
-        };
-        if let Some(abandoned) = abandoned {
-            fail(
-                &app,
-                abandoned.purpose,
-                "Google sign-in was cancelled".into(),
-            );
-        }
-    });
+        });
 }
 
 /// The consent flow ended without a connection. One place, so every ending
@@ -471,10 +477,11 @@ pub(crate) fn status(app: &AppHandle) -> SyncStatus {
 /// full-state and the run already underway will publish whatever the caller
 /// wanted published.
 ///
-/// The run gets a dedicated OS thread rather than `async_runtime::spawn`. The
+/// The run goes to the blocking pool rather than `async_runtime::spawn`. The
 /// Drive calls are driven with `block_on`, which is only legal off the async
-/// runtime's own worker threads; a plain thread also guarantees that no amount
-/// of network latency can reach the command or main thread.
+/// runtime's own worker threads — a blocking-pool thread is not one of them —
+/// and it also guarantees that no amount of network latency can reach the
+/// command or main thread.
 fn start_run(app: &AppHandle) {
     let state = app.state::<AppState>();
     // Claim and key under the workspace lock, so a switch cannot land between
@@ -502,7 +509,7 @@ fn start_run(app: &AppHandle) {
     drop(paths);
 
     let app = app.clone();
-    std::thread::spawn(move || {
+    super::detached(move || {
         let _guard = RunGuard(app.clone());
         started(&app);
         report(&app, sync::run(&app, cryptor));

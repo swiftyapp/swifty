@@ -24,7 +24,7 @@ use zeroize::Zeroizing;
 use super::pack::{self, PackError};
 use crate::app::APP_NAME;
 use crate::error::{Error, Result};
-use crate::session::store_err;
+use crate::session::{store_err, Session};
 use crate::state::AppState;
 use crate::storage;
 use crate::store::{state_digest, Record, SqliteStore, StoreError, VaultStore};
@@ -199,17 +199,40 @@ impl SessionVault {
         })
     }
 
-    // Borrow the session's store for one operation. The captured key is checked
+    // Hold the session lock for one operation. The captured key is checked
     // against the live one first: a change-master-password that landed mid-run
     // re-keyed the database, and packing it under the old key would produce a
     // snapshot nobody can open.
-    fn with_store<T>(&self, f: impl FnOnce(&SqliteStore) -> Result<T>) -> Result<T> {
+    fn with_session<T>(&self, f: impl FnOnce(&Session) -> Result<T>) -> Result<T> {
         let state = self.app.state::<AppState>();
         let session = state.session.lock().unwrap();
         if *self.key != session.key()?.sqlcipher_key() {
             return Err(Error::Other("the vault key changed during sync".into()));
         }
-        f(session.store()?)
+        f(&session)
+    }
+
+    // Borrow the session's store for one operation. Only ever used for work
+    // measured in rows — a merge, a digest, a `meta` write.
+    fn with_store<T>(&self, f: impl FnOnce(&SqliteStore) -> Result<T>) -> Result<T> {
+        self.with_session(|session| f(session.store()?))
+    }
+
+    // The key check on its own, for the step that runs outside the lock and has
+    // to be told afterwards whether the vault it read is still the live one.
+    fn check_key(&self) -> Result<()> {
+        self.with_session(|_| Ok(()))
+    }
+
+    // Reclaim expired tombstones (one statement, under the lock) and hand back a
+    // connection of the pack's own to read the snapshot through.
+    fn reclaim_and_open(&self, cutoff_ms: i64) -> Result<SqliteStore> {
+        self.with_store(|store| {
+            store
+                .purge_tombstones_before(cutoff_ms)
+                .map_err(store_err)?;
+            crate::session::open_snapshot_source(&self.app, &self.key)
+        })
     }
 }
 
@@ -226,16 +249,22 @@ impl LocalVault for SessionVault {
         self.with_store(|store| store.state_digest().map_err(store_err))
     }
 
+    // The one step of a run that is not measured in rows: the pack copies the
+    // whole database into scratch, and the session guard is deliberately not
+    // alive for any of it — `reveal_entry`, `save_entry` and `app_status` all
+    // used to queue behind this.
+    //
+    // The guard the borrow used to provide is kept by taking the lock twice
+    // instead: once to reclaim and open (so the connection is keyed to the vault
+    // as it stood), and once afterwards to confirm the key never moved. A
+    // password change landing in between fails the second check, so a snapshot
+    // taken under a key that is no longer the vault's is never uploaded.
     fn pack(&self, cutoff_ms: i64) -> Result<Vec<u8>> {
-        self.with_store(|store| {
-            purge_and_pack(
-                store,
-                &self.key,
-                &self.kdf_params_json,
-                &self.scratch,
-                cutoff_ms,
-            )
-        })
+        let source = self.reclaim_and_open(cutoff_ms)?;
+        let bytes = pack::pack_store(&source, &self.key, &self.kdf_params_json, &self.scratch)?;
+        drop(source);
+        self.check_key()?;
+        Ok(bytes)
     }
 
     fn note_push(&self, revision: &str, at_ms: i64) -> Result<()> {
@@ -294,19 +323,6 @@ fn remote_pack_error(e: PackError) -> Error {
         PackError::Io(e) => Error::Io(e),
         _ => Error::Other("Remote vault file is invalid".into()),
     }
-}
-
-fn purge_and_pack(
-    store: &SqliteStore,
-    key: &[u8],
-    kdf_params_json: &str,
-    scratch_dir: &Path,
-    cutoff_ms: i64,
-) -> Result<Vec<u8>> {
-    store
-        .purge_tombstones_before(cutoff_ms)
-        .map_err(store_err)?;
-    Ok(pack::pack_store(store, key, kdf_params_json, scratch_dir)?)
 }
 
 fn note_push(store: &SqliteStore, revision: &str, at_ms: i64) -> Result<()> {
@@ -437,7 +453,15 @@ mod tests {
             self.store.state_digest().map_err(store_err)
         }
         fn pack(&self, cutoff_ms: i64) -> Result<Vec<u8>> {
-            purge_and_pack(&self.store, KEY, &kdf_json(), &self.scratch, cutoff_ms)
+            self.store
+                .purge_tombstones_before(cutoff_ms)
+                .map_err(store_err)?;
+            Ok(pack::pack_store(
+                &self.store,
+                KEY,
+                &kdf_json(),
+                &self.scratch,
+            )?)
         }
         fn note_push(&self, revision: &str, at_ms: i64) -> Result<()> {
             note_push(&self.store, revision, at_ms)

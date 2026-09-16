@@ -62,14 +62,11 @@ pub fn handle_event(app: &AppHandle, event: &WindowEvent) {
     }
 }
 
+// `is_live`, not `is_unlocked`: a vault whose key is out with a password
+// change or a workspace create is still a vault to lock, and the operation
+// finds out when it tries to hand the key back (`Session::adopt`).
 fn arm(app: &AppHandle) {
-    if !app
-        .state::<AppState>()
-        .session
-        .lock()
-        .unwrap()
-        .is_unlocked()
-    {
+    if !app.state::<AppState>().session.lock().unwrap().is_live() {
         return;
     }
     let state = app.state::<AutoLock>();
@@ -81,7 +78,7 @@ fn arm(app: &AppHandle) {
 pub fn lock(app: &AppHandle) {
     let state = app.state::<AppState>();
     let mut session = state.session.lock().unwrap();
-    if !session.is_unlocked() {
+    if !session.is_live() {
         return;
     }
     session.clear();

@@ -20,6 +20,12 @@ pub enum Error {
     #[error("vault is locked")]
     Locked,
 
+    /// The vault changed hands — a lock, an unlock, a password change — after
+    /// this work was prepared against it, so the write was refused rather than
+    /// landed in a vault it was not sealed for. Trying again prepares it afresh.
+    #[error("the vault changed while this was running")]
+    StaleSession,
+
     #[error("entry not found")]
     NotFound,
 
@@ -115,6 +121,7 @@ impl Error {
             Error::VaultTooNew => "vaultTooNew",
             Error::TooManyAttempts { .. } => "tooManyAttempts",
             Error::Locked => "locked",
+            Error::StaleSession => "staleSession",
             Error::NotFound => "notFound",
             Error::Cancelled => "cancelled",
             Error::SyncNotConfigured => "syncNotConfigured",

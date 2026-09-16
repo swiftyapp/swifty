@@ -36,9 +36,12 @@ pub fn read_env_text(path: &Path) -> Result<EnvFile> {
     Ok(EnvFile { file_name, body })
 }
 
+// Small as `.env` files are, this is still a `stat` and a read of a path the
+// user just pointed at — which may be a network mount. Off the IPC thread with
+// everything else that touches the disk.
 #[tauri::command]
-pub fn read_env_file(path: String) -> Result<EnvFile> {
-    read_env_text(Path::new(&path))
+pub async fn read_env_file(path: String) -> Result<EnvFile> {
+    super::blocking(move || read_env_text(Path::new(&path))).await
 }
 
 #[cfg(test)]

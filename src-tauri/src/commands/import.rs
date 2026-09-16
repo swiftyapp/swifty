@@ -54,8 +54,20 @@ pub struct ImportReport {
     pub entries: Vec<EntryMetaDto>,
 }
 
+// What one blocking pass over the file produced: the parse, plus the sealed rows
+// when it was a real run (a preview seals nothing).
+struct Parsed {
+    total: usize,
+    errors: Vec<RowErrorDto>,
+    records: Vec<Record>,
+}
+
 // Parse a foreign export and either preview it (dry_run) or write it into the open
 // vault. `format` is an explicit name or "auto" to detect by extension/content.
+//
+// The read, the parse and the seal loop are one hop onto the blocking pool: a
+// 25 MB export is disk I/O followed by a CPU-bound pass over every row, and
+// neither belongs on the IPC thread or on an async worker.
 #[tauri::command]
 pub async fn import_entries(
     path: String,
@@ -64,72 +76,92 @@ pub async fn import_entries(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<ImportReport> {
-    let meta = fs::metadata(&path)?;
-    if meta.len() > MAX_BYTES {
-        return Err(Error::Other("file too large to import".into()));
-    }
-    let bytes = fs::read(&path)?;
-
-    let fmt = if format.eq_ignore_ascii_case("auto") {
-        let name = Path::new(&path)
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-        import::detect(&name, &bytes)
-            .ok_or_else(|| Error::Other("could not detect format".into()))?
-    } else {
-        Format::from_name(&format)
-            .ok_or_else(|| Error::Other(format!("unknown format: {format}")))?
+    // Taken before the file work, so a locked vault is turned away at once
+    // instead of after parsing. A preview writes nothing and needs no cipher,
+    // which is what lets it run on a vault that is not open. The epoch comes
+    // with the cipher: the write below is only accepted by the session the
+    // cipher belongs to (see `Session::store_at`).
+    let (cipher, epoch) = match dry_run {
+        true => (None, None),
+        false => {
+            let session = state.session.lock().unwrap();
+            (Some(session.payload_cipher()?), Some(session.epoch()))
+        }
     };
 
-    let parsed = fmt.importer().parse(&bytes);
-    if parsed.entries.len() > MAX_ENTRIES {
-        return Err(Error::Other("too many entries to import".into()));
-    }
-    let errors: Vec<RowErrorDto> = parsed.errors.iter().map(RowErrorDto::from).collect();
+    let emitter = app.clone();
+    let parsed = super::blocking(move || -> Result<Parsed> {
+        let meta = fs::metadata(&path)?;
+        if meta.len() > MAX_BYTES {
+            return Err(Error::FileTooLarge);
+        }
+        let bytes = fs::read(&path)?;
+
+        let fmt = if format.eq_ignore_ascii_case("auto") {
+            let name = Path::new(&path)
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            import::detect(&name, &bytes)
+                .ok_or_else(|| Error::Other("could not detect format".into()))?
+        } else {
+            Format::from_name(&format)
+                .ok_or_else(|| Error::Other(format!("unknown format: {format}")))?
+        };
+
+        let parsed = fmt.importer().parse(&bytes);
+        if parsed.entries.len() > MAX_ENTRIES {
+            return Err(Error::Other("too many entries to import".into()));
+        }
+        let total = parsed.entries.len();
+        let errors: Vec<RowErrorDto> = parsed.errors.iter().map(RowErrorDto::from).collect();
+
+        // Seal every plaintext entry (seal payload + build a Record), emitting
+        // progress — the same seal helper the rest of the app uses.
+        let mut records = Vec::new();
+        if let Some(cipher) = cipher {
+            records.reserve(total);
+            for (i, imported) in parsed.entries.iter().enumerate() {
+                let entry = imported_to_entry(imported);
+                let payload = cipher.seal(&entry)?;
+                records.push(migrate::build_record(&entry, payload)?);
+                events::import_progress(&emitter, i + 1, total);
+            }
+        }
+        Ok(Parsed {
+            total,
+            errors,
+            records,
+        })
+    })
+    .await?;
 
     if dry_run {
         return Ok(ImportReport {
-            total: parsed.entries.len(),
+            total: parsed.total,
             imported: 0,
             skipped: parsed.errors.len(),
             dry_run: true,
-            errors,
+            errors: parsed.errors,
             entries: Vec::new(),
         });
     }
 
-    let cipher = state.session.lock().unwrap().payload_cipher()?;
-    let entries: Vec<Entry> = parsed.entries.iter().map(imported_to_entry).collect();
-
-    // Seal every plaintext entry off the UI thread (seal payload + build a
-    // Record), emitting progress — the same seal helper the rest of the app uses.
-    let emitter = app.clone();
-    let records = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<Record>> {
-        let total = entries.len();
-        let mut records = Vec::with_capacity(total);
-        for (i, entry) in entries.iter().enumerate() {
-            let payload = cipher.seal(entry)?;
-            records.push(migrate::build_record(entry, payload)?);
-            events::import_progress(&emitter, i + 1, total);
-        }
-        Ok(records)
-    })
-    .await
-    .map_err(|e| Error::Other(e.to_string()))??;
-
     let session = state.session.lock().unwrap();
-    let store = session.store()?;
-    for record in &records {
+    let store = match epoch {
+        Some(epoch) => session.store_at(epoch)?,
+        None => session.store()?,
+    };
+    for record in &parsed.records {
         store.upsert(record).map_err(store_err)?;
     }
 
     Ok(ImportReport {
-        total: parsed.entries.len(),
-        imported: records.len(),
+        total: parsed.total,
+        imported: parsed.records.len(),
         skipped: parsed.errors.len(),
         dry_run: false,
-        errors,
+        errors: parsed.errors,
         entries: list_metas(store)?,
     })
 }
@@ -143,21 +175,29 @@ pub async fn export_entries(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Option<String>> {
-    let entries = {
+    // Under the guard: read the sealed rows and take a *copy* of the payload
+    // cipher. Unsealing every one of them is a pass over the whole vault, and
+    // the session lock may not be held across that — the cipher is an owned
+    // value precisely so it can leave with the records.
+    let (cipher, records) = {
         let session = state.session.lock().unwrap();
-        let cipher = session.payload_cipher()?;
-        to_imported(&live_records(session.store()?)?, &cipher)?
+        (session.payload_cipher()?, live_records(session.store()?)?)
     };
 
-    let (bytes, ext) = match format.to_lowercase().as_str() {
-        "bitwarden" => (import::export::to_bitwarden_json(&entries)?, "json"),
-        "cxf" | "fido" => (import::export::to_cxf_json(&entries)?, "json"),
-        "csv" => (
-            import::export::to_generic_csv(&entries).map_err(|e| Error::Other(e.to_string()))?,
-            "csv",
-        ),
-        other => return Err(Error::Other(format!("unknown export format: {other}"))),
-    };
+    let (bytes, ext) = super::blocking(move || {
+        let entries = to_imported(&records, &cipher)?;
+        Ok(match format.to_lowercase().as_str() {
+            "bitwarden" => (import::export::to_bitwarden_json(&entries)?, "json"),
+            "cxf" | "fido" => (import::export::to_cxf_json(&entries)?, "json"),
+            "csv" => (
+                import::export::to_generic_csv(&entries)
+                    .map_err(|e| Error::Other(e.to_string()))?,
+                "csv",
+            ),
+            other => return Err(Error::Other(format!("unknown export format: {other}"))),
+        })
+    })
+    .await?;
 
     // An explicit path skips the dialog (the E2E suite exports to a temp file).
     let dest = match path {

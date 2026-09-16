@@ -109,18 +109,28 @@ pub async fn import_swftx(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SwftxReport> {
-    let blob = storage::read_backup(&path)?;
-    let src_cryptor = crypto::Cryptor::new(&crypto::hash_secret(&password));
-    // Validate the source password before touching the store.
-    let src: VaultData = src_cryptor
-        .decrypt_data(&blob)
-        .map_err(|_| Error::InvalidPassword)?;
-    let cur_cipher = state.session.lock().unwrap().payload_cipher()?;
+    // The cipher and the session it belongs to: the merge below is accepted
+    // only by that session (`Session::store_at`), so a password change landing
+    // during the re-seal cannot leave rows sealed under a key the vault no
+    // longer has.
+    let (cur_cipher, epoch) = {
+        let session = state.session.lock().unwrap();
+        (session.payload_cipher()?, session.epoch())
+    };
 
-    // Re-seal every entry off the UI thread: expose under the source key, re-seal
+    // The file read, the source decrypt and the re-seal loop are one hop onto
+    // the blocking pool: a backup is the whole vault, and both halves are as
+    // expensive as the loop they lead into. Expose under the source key, re-seal
     // under the current payload key — emitting progress as it goes.
     let emitter = app.clone();
-    let records = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<Record>> {
+    let records = super::blocking(move || -> Result<Vec<Record>> {
+        let blob = storage::read_backup(&path)?;
+        let src_cryptor = crypto::Cryptor::new(&crypto::hash_secret(&password));
+        // Validate the source password before touching the store.
+        let src: VaultData = src_cryptor
+            .decrypt_data(&blob)
+            .map_err(|_| Error::InvalidPassword)?;
+
         let total = src.entries.len();
         let mut records = Vec::with_capacity(total);
         for (i, obscured) in src.entries.iter().enumerate() {
@@ -129,12 +139,11 @@ pub async fn import_swftx(
         }
         Ok(records)
     })
-    .await
-    .map_err(|e| Error::Other(e.to_string()))??;
+    .await?;
 
     // Merge into the open store (upsert by id).
     let session = state.session.lock().unwrap();
-    let store = session.store()?;
+    let store = session.store_at(epoch)?;
     for record in &records {
         store.upsert(record).map_err(store_err)?;
     }
@@ -161,20 +170,38 @@ pub async fn export_vault(
         Error::Other("this vault predates the key descriptor and cannot be backed up".into())
     })?;
     let scratch = storage::sync_scratch_dir(&app)?;
-    let bytes = {
+
+    // Argon2id before the lock is taken, not under it: a KDF is hundreds of
+    // milliseconds, and the session guard held across one stalls every other
+    // command for the duration. Deriving needs only the sidecar and the
+    // password, so there is nothing to race with — the result is only *trusted*
+    // by the check below.
+    let candidate = {
+        let app = app.clone();
+        super::blocking(move || derive_key(&app, &password)).await?
+    };
+
+    let (key, source) = {
         let session = state.session.lock().unwrap();
         // Guard: the export key must match the unlocked vault.
-        let key = session.key()?;
-        if derive_key(&app, &password)?.sqlcipher_key() != key.sqlcipher_key() {
+        let key = session.key()?.sqlcipher_key();
+        if candidate.sqlcipher_key() != key {
             return Err(Error::InvalidPassword);
         }
-        sync::pack::pack_store(
-            session.store()?,
-            &key.sqlcipher_key(),
+        // A connection of its own, so the whole-database copy below does not
+        // borrow the session's for its duration.
+        (key, crate::session::open_snapshot_source(&app, &key)?)
+    };
+
+    let bytes = super::blocking(move || {
+        Ok(sync::pack::pack_store(
+            &source,
+            &key,
             &kdf_params_json,
             &scratch,
-        )?
-    };
+        )?)
+    })
+    .await?;
 
     let dest = save::save_export(
         &app,

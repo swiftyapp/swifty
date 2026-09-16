@@ -563,5 +563,6 @@
   "A workspace needs a name": "Робочому простору потрібна назва",
   "A workspace needs a master password": "Робочому простору потрібен головний пароль",
   "This file is too large": "Цей файл завеликий",
-  "This file is not text": "Цей файл не текстовий"
+  "This file is not text": "Цей файл не текстовий",
+  "The vault changed while this was running. Try again.": "Сховище змінилося під час операції. Спробуйте ще раз."
 }
