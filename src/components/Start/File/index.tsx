@@ -65,7 +65,7 @@ export default function File({ onBack, onRestored }: Props) {
     <AuthShell onBack={onBack}>
       <StepHeader
         progress={0.5}
-          eyebrow={t('Restore · Backup file')}
+        eyebrow={t('Restore · Backup file')}
         title={t('Unlock your backup')}
         body={t('Use the master password you had when this backup was made.')}
       />
