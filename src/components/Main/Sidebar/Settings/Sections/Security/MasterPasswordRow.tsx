@@ -5,6 +5,7 @@ import { describeError } from '@/api/errors'
 import type { TKey } from '@/i18n'
 import Button from '@/components/elements/Button'
 import { inputClass } from '@/components/elements/formStyles'
+import { verbatimInput } from '@/components/elements/inputProps'
 import ExpandableRow from '../ExpandableRow'
 
 const FIELDS: { name: string; label: TKey }[] = [
@@ -54,6 +55,7 @@ export default function MasterPasswordRow() {
             <input
               type="password"
               name={field.name}
+              {...verbatimInput}
               className={`${inputClass} max-w-xs`}
               value={values[field.name] ?? ''}
               onChange={e => setValues({ ...values, [field.name]: e.target.value })}

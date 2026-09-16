@@ -4,6 +4,7 @@ import { openSshGenerator } from '@/store'
 import IconButton from '@/components/elements/IconButton'
 import { FieldRow, grow, useField, useFields } from '@/components/elements/fields'
 import { requiredError } from '@/components/elements/fields/formats'
+import { verbatimInput } from '@/components/elements/inputProps'
 import { EyeGlyph, EyeOffGlyph, RefreshGlyph } from '@/components/Main/icons'
 
 // A textarea cannot fake dots, so the editor hides its own text.
@@ -53,7 +54,7 @@ export default function PrivateKey() {
           value={value}
           rows={1}
           placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
-          spellCheck={false}
+          {...verbatimInput}
           ref={grow}
           style={show ? undefined : MASK}
           onChange={event => {

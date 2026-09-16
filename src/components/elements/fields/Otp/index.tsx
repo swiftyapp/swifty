@@ -3,6 +3,7 @@ import type { TKey } from '@/i18n'
 import { copy } from '@/services/copy'
 import { useOtp } from '@/hooks/useOtp'
 import Panel from '../../Panel'
+import { verbatimInput } from '../../inputProps'
 import { LABEL } from '../../tokens'
 import { useField } from '../context'
 import Dial from './Dial'
@@ -47,8 +48,7 @@ export default function OtpField({
           // Short enough to fit the column: the long form used to truncate mid-word.
           placeholder={t('Paste secret or link')}
           autoFocus={autoFocus}
-          autoComplete="off"
-          spellCheck={false}
+          {...verbatimInput}
           onChange={event => set(event.target.value)}
           // A pasted otpauth:// link collapses to the secret it carries, so the
           // vault only ever stores the thing the generator needs.

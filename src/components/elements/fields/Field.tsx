@@ -6,6 +6,7 @@ import type { TKey } from '@/i18n'
 import { EyeGlyph, EyeOffGlyph } from '../../Main/icons'
 import CopyButton from '../CopyButton'
 import IconButton from '../IconButton'
+import { verbatimInput } from '../inputProps'
 import { HOVER_ONLY, MASK_DOTS, VALUE_LINE } from '../tokens'
 import { useField } from './context'
 import { requiredError } from './formats'
@@ -135,8 +136,7 @@ export default function Field({
           value={shown}
           placeholder={placeholder}
           maxLength={maxLength}
-          autoComplete="off"
-          spellCheck={false}
+          {...verbatimInput}
           style={mask}
           onChange={event => set(event.target.value)}
           onBlur={normalize ? () => set(normalize(value)) : undefined}

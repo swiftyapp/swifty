@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { exportVault } from '@/api/vault'
 import Button from '@/components/elements/Button'
 import { inputClass } from '@/components/elements/formStyles'
+import { verbatimInput } from '@/components/elements/inputProps'
 import ExpandableRow from '../ExpandableRow'
 
 // The whole vault as one `.swftx` file, resealed under the master password the
@@ -39,6 +40,7 @@ export default function BackupRow() {
         <input
           type="password"
           name="export_password"
+          {...verbatimInput}
           placeholder={t('Master password')}
           className={`${inputClass} max-w-xs`}
           value={password}

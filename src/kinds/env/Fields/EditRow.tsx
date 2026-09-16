@@ -4,6 +4,7 @@ import { cx } from '@/utils/cx'
 import IconButton from '@/components/elements/IconButton'
 import { RAIL, STACK, STACK_LABEL, STACK_RAIL, grow, useFields } from '@/components/elements/fields'
 import { requiredError } from '@/components/elements/fields/formats'
+import { verbatimInput } from '@/components/elements/inputProps'
 import { TrashGlyph } from '@/components/Main/icons'
 import { isValidKey, looksLikeEnv } from '../parse'
 import { BOX, BOX_LINE, KEY_COL, focusEnd } from './styles'
@@ -105,8 +106,7 @@ export default function EditRow({
           value={key}
           aria-label={t('Name')}
           placeholder={t('Name')}
-          autoComplete="off"
-          spellCheck={false}
+          {...verbatimInput}
           ref={autoFocus ? focusEnd : undefined}
           onChange={event => type(event.target.value)}
           onPaste={paste}
@@ -119,7 +119,7 @@ export default function EditRow({
             aria-label={t('Value')}
             placeholder={t('Value')}
             rows={1}
-            spellCheck={false}
+            {...verbatimInput}
             ref={grow}
             onChange={event => {
               grow(event.currentTarget)
