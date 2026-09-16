@@ -6,14 +6,16 @@ import { unlock, unlockBiometric } from '@/api/auth'
 import { errorKind, isTooManyAttempts } from '@/api/errors'
 import { enterMain } from '@/store'
 import type { MascotState } from '@/components/elements/Mascot'
+import { unsealError } from '@/components/Start/shared/errors'
 
 // How long the mascot gets to celebrate before the vault fades in.
 const SUCCESS_HOLD_MS = 650
 
+// The password is blamed only when the backend said `invalidPassword`. An open
+// can also fail on I/O, a stuck lock or a corrupt file — none of which counted
+// against the lockout — and those keep their own description.
 const unlockError = (t: TFunction, error: unknown): string =>
-  errorKind(error) === 'vaultTooNew'
-    ? t('Vault needs a newer version of the app')
-    : t('Incorrect Master Password')
+  unsealError(t, error, t('Incorrect Master Password'))
 
 // A biometric failure is never a password problem: the backend's errors here
 // are a cancelled/failed prompt, a missing enrollment, or a keychain issue.
