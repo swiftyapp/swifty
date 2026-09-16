@@ -46,7 +46,12 @@ export default function PasswordStrength({ password, error }: Props) {
       >
         {score !== null ? t(LABELS[score]) : ''}
       </span>
-      <span className={cx('ml-auto min-w-0 truncate text-right', error && 'text-bad')}>
+      {/* The same test id the Error element carries: this is the field's error,
+          shown where the field's guidance already is. */}
+      <span
+        data-testid={error ? 'form-error' : undefined}
+        className={cx('ml-auto min-w-0 truncate text-right', error && 'text-bad')}
+      >
         {error ?? hint}
       </span>
     </div>
