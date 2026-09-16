@@ -1,11 +1,11 @@
 import { createElement, StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App'
-import { appReady, appStatus } from '@/api/app'
-import { hydratePrefs, setApp, setUpdateReady, usePrefs } from '@/store'
+import { appReady, appStatus, type AppStatus } from '@/api/app'
+import { flowSetup, hydratePrefs, setApp, setUpdateReady, usePrefs } from '@/store'
 import { runStartupUpdateCheck } from '@/services/autoUpdate'
 import { applyTheme } from '@/theme'
-import { changeLocale, DEFAULT_LOCALE, initI18n } from '@/i18n'
+import { changeLocale, DEFAULT_LOCALE, getLocale, initI18n } from '@/i18n'
 import { startSplash } from '@/lib/splash'
 
 /**
@@ -41,6 +41,30 @@ const injectedBoot = (): RowelBoot | null => {
   return { locale, settings }
 }
 
+/** Take a probe's answer into the stores, theme included. */
+const adopt = (status: AppStatus) => {
+  setApp(status)
+  hydratePrefs(status.settings)
+  applyTheme(usePrefs.getState().theme)
+}
+
+/**
+ * The preferences a build before Rust owned `settings.json` kept in
+ * localStorage, carried into the file once and the keys removed (see
+ * `lib/legacyPrefs`). Behind a dynamic import and after the first commit, so
+ * the launch chunk does not carry it and nothing on screen waits for it; on
+ * every install that has nothing to import it reads a few absent keys and
+ * stops. When something was carried over the probe is re-read, since only Rust
+ * can say what the stored language resolves to.
+ */
+const adoptLegacyPrefs = async (status: AppStatus) => {
+  const { adoptLegacyPrefs: adoptLegacy } = await import('@/lib/legacyPrefs')
+  const after = await adoptLegacy(status)
+  if (after === status) return
+  adopt(after)
+  if (after.locale !== getLocale()) await changeLocale(after.locale)
+}
+
 export const boot = async (): Promise<void> => {
   const injected = injectedBoot()
   if (injected) {
@@ -56,25 +80,30 @@ export const boot = async (): Promise<void> => {
   void appReady().catch(() => {})
 
   const translated = initI18n(locale).catch(() => {})
-  const probed = appStatus()
+  const probed: Promise<AppStatus | null> = appStatus()
     .then(status => {
-      setApp(status)
-      hydratePrefs(status.settings)
-      applyTheme(usePrefs.getState().theme)
-      return status.locale
+      adopt(status)
+      return status
     })
     // `status` stays null and the shell opens on the lock screen; nothing about
     // a dead probe may leave the app unrendered.
-    .catch(() => locale)
+    .catch(() => null)
 
-  const [, resolved] = await Promise.all([translated, probed])
+  const [, status] = await Promise.all([translated, probed])
   // Only reachable when nothing was injected: with a payload, Rust resolved the
   // language before the bundle ran and the catalogue is already the right one.
+  const resolved = status?.locale ?? locale
   if (resolved !== locale) await changeLocale(resolved).catch(() => {})
+  // Nothing on disk is the one answer that opens somewhere other than the lock
+  // screen. Decided before the first render, so the flow that commits first is
+  // the one the user will see — and the splash stays up over the setup chunk
+  // while it loads rather than fading off a lock screen that is about to go.
+  if (status?.initialized === false) flowSetup()
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     createElement(StrictMode, null, createElement(App))
   )
 
+  if (status) void adoptLegacyPrefs(status).catch(() => {})
   setTimeout(() => void runStartupUpdateCheck(setUpdateReady), UPDATE_CHECK_DELAY_MS)
 }

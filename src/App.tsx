@@ -40,12 +40,24 @@ function Shell() {
   }
 }
 
+// Hands the screen from the splash to React. Rendered inside the flow's
+// Suspense boundary, so its effect runs only once the flow root itself has
+// committed — a lazy `Start` still on its way keeps the splash up rather than
+// fading it off a frame `Suspense` has nothing to fill.
+function SplashHandoff() {
+  useEffect(finishSplash, [])
+  return null
+}
+
 export default function App() {
   useEffect(() => {
-    // React has committed, so the splash can hand the screen over (lib/splash).
-    finishSplash()
-
     const unsubscribe = subscribeToEvents()
+    // Nothing on disk is the only answer that sends us somewhere other than the
+    // lock screen. `boot.ts` already routed on the probe it ran before the first
+    // render; this is the same rule for a shell mounted some other way, and for
+    // the launch whose probe never answered — ask once more rather than strand
+    // a pristine install on a lock screen it has nothing to unlock, and stay
+    // there if that fails too, since `flow` starts on it.
     const route = (status: AppStatus | null) => {
       if (status?.initialized === false) flowSetup()
     }
@@ -67,6 +79,7 @@ export default function App() {
           keeps the chrome that is already painted. */}
       <Suspense fallback={null}>
         <Shell />
+        <SplashHandoff />
       </Suspense>
       <UpdateToast />
     </>

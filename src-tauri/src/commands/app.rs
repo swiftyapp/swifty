@@ -67,6 +67,13 @@ pub fn app_status(app: AppHandle) -> Result<AppStatus> {
 /// The probe's answer, callable from Rust as well as over IPC.
 pub fn snapshot(app: &AppHandle) -> Result<AppStatus> {
     let state = app.state::<AppState>();
+    // Every path below resolves through the active workspace, and this runs off
+    // the main thread now, so a `workspace_select` could otherwise land between
+    // two of the reads and hand back one workspace's sync state under another's
+    // identity. Taken first, as every holder takes it, and held for the whole
+    // answer: the reads under it are the registry and a few metadata stats, the
+    // same class of I/O the switch itself does while holding it.
+    let _paths = state.workspace_lock.lock().unwrap();
     let gate = biometrics::probe();
     let hardware = secure_store::is_supported() && gate.available;
     let marker = storage::biometric_marker(app);
