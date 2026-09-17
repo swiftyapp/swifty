@@ -47,6 +47,15 @@ pub struct PendingAuth {
     pub started: std::time::Instant,
 }
 
+/// OAuth tokens produced by one particular Drive consent attempt.
+///
+/// The attempt travels with the tokens so an async consumer cannot mistake a
+/// newer account's pending credentials for the ones it probed before an await.
+pub struct PendingDrive {
+    pub attempt: u64,
+    pub tokens: crate::sync::Tokens,
+}
+
 /// The sequence number every `sync:status` snapshot carries, counted once for
 /// the whole process rather than per workspace.
 ///
@@ -187,7 +196,7 @@ pub struct AppState {
     /// the moment consent is granted until the restore or create that follows
     /// produces a key to write them under (or the user backs out, which drops
     /// them). Outside `session` because there is no session to put them in.
-    pub pending_drive: Mutex<Option<crate::sync::Tokens>>,
+    pub pending_drive: Mutex<Option<PendingDrive>>,
     /// A first-run create or restore is writing the vault. Same shape as
     /// `syncing`: the check for "no vault yet" and the writes that follow it
     /// are not one step, so two overlapping requests could both pass the check

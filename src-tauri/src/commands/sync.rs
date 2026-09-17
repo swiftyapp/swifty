@@ -126,7 +126,7 @@ pub async fn sync_adopt_pending(app: AppHandle, state: State<'_, AppState>) -> R
     // probe refreshes the copy in place if the access token has expired since
     // consent, which is why the copy, not the pending original, is what gets
     // sealed below.
-    let mut tokens = super::setup::peek_pending(&state)?;
+    let (attempt, mut tokens) = super::setup::peek_pending_attempt(&state)?;
     let packs = super::setup::probe(&app, &mut tokens).await?;
     if !may_adopt(vault_id.as_deref(), &packs) {
         return Err(Error::VaultNotInAccount);
@@ -142,18 +142,42 @@ pub async fn sync_adopt_pending(app: AppHandle, state: State<'_, AppState>) -> R
         // locked during the round trip is not a switch, and keeps them for a
         // retry as before (`Error::Locked` from the read).
         if !still_the_same_workspace(&state, &workspace, vault_id.as_deref())? {
-            super::setup::take_pending(&state);
+            super::setup::take_pending_attempt(&state, attempt);
             return Err(Error::Other(
                 "the workspace changed while Google was answering; connect again from the workspace you want to sync".into(),
             ));
         }
         let cryptor = state.session.lock().unwrap().cryptor()?;
-        // Still pending? A cancel during the round trip forgot the account, and
-        // it must not come back through the copy.
-        super::setup::peek_pending(&state)?;
+        // Still the exact consent result we probed? A cancel or another connect
+        // advances the attempt before it touches this lock. Holding the pending
+        // guard through the local write keeps a newer report from being
+        // mistaken for this account, while the post-write generation check
+        // catches a cancel that arrived during the write itself.
+        let mut pending = state.pending_drive.lock().unwrap();
+        let Some(current) = pending.as_mut() else {
+            return Err(Error::DriveNotConnected);
+        };
+        if current.attempt != attempt || super::setup::current_attempt(&state) != attempt {
+            return Err(Error::DriveNotConnected);
+        }
+        // Keep a refresh-token rotation for a retry if the file write fails.
+        current.tokens = tokens.clone();
         sync::persist_tokens(&app, &cryptor, &tokens)?;
-        // Taken only once written: a failure above leaves them for a retry.
-        super::setup::take_pending(&state);
+        if super::setup::current_attempt(&state) != attempt {
+            // Cancellation/replacement linearized while the file was being
+            // written. Remove only the credential file we just created; the
+            // newer pending account (whose report waits on this guard) survives.
+            sync::disconnect(&app)?;
+            if pending
+                .as_ref()
+                .is_some_and(|pending| pending.attempt == attempt)
+            {
+                *pending = None;
+            }
+            return Err(Error::DriveNotConnected);
+        }
+        // Taken only once written: a failure above leaves it for a retry.
+        *pending = None;
     }
     // The run is claimed before the connect is announced, so the flags overlap
     // rather than leave a gap a workspace switch could use — and the first
