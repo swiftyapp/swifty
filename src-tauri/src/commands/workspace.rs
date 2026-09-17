@@ -295,7 +295,16 @@ pub async fn workspace_restore_from_drive(
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
     let tokens = setup::peek_pending(&state)?;
-    restore_workspace(&app, &state, name, password, file_id, tokens, Account::Pending).await
+    restore_workspace(
+        &app,
+        &state,
+        name,
+        password,
+        file_id,
+        tokens,
+        Account::Pending,
+    )
+    .await
 }
 
 /// Add a workspace by restoring one of the vaults the open workspace's account

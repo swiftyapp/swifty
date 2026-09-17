@@ -530,7 +530,10 @@ mod tests {
     #[test]
     fn only_packs_no_workspace_here_holds_are_offered() {
         let held: HashSet<String> = [ID.to_string(), "eeee".to_string()].into();
-        let offered = remote_only(vec![pack(OTHER), pack(ID), pack("eeee"), pack("ffff")], &held);
+        let offered = remote_only(
+            vec![pack(OTHER), pack(ID), pack("eeee"), pack("ffff")],
+            &held,
+        );
         let ids: Vec<&str> = offered.iter().map(|p| p.vault_id.as_str()).collect();
         assert_eq!(ids, [OTHER, "ffff"]);
         assert!(remote_only(vec![pack(ID)], &held).is_empty());
