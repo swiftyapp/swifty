@@ -1,5 +1,11 @@
-//! Google Drive sync provider. Finds (or creates) a "Rowel" folder and the
-//! `vault.swsync` pack inside it, and reads/writes that one file.
+//! Google Drive sync provider. Finds (or creates) `Rowel/Vaults/` and the
+//! `<vault-id>.rowel` pack inside it, and reads/writes that one file. Every
+//! name it uses comes from [`layout`].
+//!
+//! Which pack is *this* vault's is settled once per run, before the engine
+//! starts: see [`resolve_vault_id`]. That step is also where an install still
+//! keeping its pack at the pre-`Vaults/` `Rowel/vault.swsync` has it moved into
+//! place, so the rest of this module only ever knows the one layout.
 //!
 //! This module is only the *transport*: the sync algorithm lives in [`engine`],
 //! behind the [`engine::Remote`] trait that [`DriveRemote`] implements. Drive's
@@ -29,7 +35,7 @@ use tauri::{async_runtime::block_on, AppHandle, Manager};
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::state::AppState;
-use engine::{Remote, RemoteFile, SessionVault, SyncOutcome};
+use engine::{LocalVault, Remote, RemoteFile, SessionVault, SyncOutcome};
 
 /// A valid Drive access token for the connected account, refreshed if needed.
 /// Crate-visible so `share::remote` can act on the same account.
@@ -171,8 +177,12 @@ pub fn run(app: &AppHandle, cryptor: Cryptor) -> Result<SyncOutcome> {
     if !is_configured(app, &cryptor) {
         return Err(Error::SyncNotConfigured);
     }
-    let remote = DriveRemote::new(app.clone(), cryptor);
     let local = SessionVault::capture(app)?;
+    // Which pack on Drive is this vault's, decided before a byte is pulled. A
+    // failure here is a sync failure like any other: addressing the wrong pack
+    // — or a second one — is the one mistake the merge cannot undo.
+    let vault_id = block_on(resolve_vault_id(app, &cryptor, &local))?;
+    let remote = DriveRemote::new(app.clone(), cryptor, vault_id);
     let outcome = engine::sync(&remote, &local, now_ms())?;
     sweep_shares(app);
     Ok(outcome)
@@ -197,46 +207,208 @@ fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
-/// [`Remote`] over one Drive folder + file pair.
+// --- which pack is ours -----------------------------------------------------
+
+/// What the vault-id resolution has to do before a run can address a pack.
 ///
-/// The folder id is resolved once per instance (one instance per run) because
-/// the selection rule is deterministic and re-listing it would only cost round
-/// trips. The *file* is re-listed on every call: `head_revision` exists
-/// precisely to observe a change another device made, so it must never answer
-/// from a cache.
+/// Split out from the Drive calls so the decision — the part with every
+/// upgrade and first-run case in it — is a pure function over three facts and
+/// can be read, and tested, on its own.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum VaultIdPlan {
+    /// Address `<id>.rowel`. Either it is already there, or the first push
+    /// creates it.
+    Use(String),
+    /// Mint an id locally. Nothing on the remote has anything to say about it.
+    Assign,
+    /// Take on the id of the one live pack the account holds. The pull that
+    /// follows is what brings its data in.
+    Adopt(String),
+    /// Address `<id>.rowel`, with the legacy pack still to be moved into
+    /// `Vaults/` under that name first.
+    MigrateLegacy(String),
+    /// A legacy pack and no local id: mint one, and move the pack in under it.
+    AssignAndMigrateLegacy,
+    /// Several live packs and nothing local to say which of them is this
+    /// vault's. Guessing would merge two people's vaults into one.
+    Ambiguous,
+}
+
+/// Decide which vault id this run addresses.
+///
+/// `local` is the id in this vault's `meta` table, `legacy` whether
+/// `Rowel/vault.swsync` is still there, and `live` the ids of the packs found
+/// in `Vaults/` (an absent folder is simply none of them).
+fn plan_vault_id(local: Option<&str>, legacy: bool, live: &[&str]) -> VaultIdPlan {
+    match (local, legacy) {
+        // A local id settles it outright; the legacy pack is only interesting
+        // while `Vaults/` does not already hold this vault's pack.
+        (Some(id), true) if !live.contains(&id) => VaultIdPlan::MigrateLegacy(id.to_string()),
+        (Some(id), _) => VaultIdPlan::Use(id.to_string()),
+        (None, true) => VaultIdPlan::AssignAndMigrateLegacy,
+        (None, false) => match live {
+            [] => VaultIdPlan::Assign,
+            [only] => VaultIdPlan::Adopt((*only).to_string()),
+            _ => VaultIdPlan::Ambiguous,
+        },
+    }
+}
+
+// Surfaced verbatim by the sync indicator, so it has to read as a sentence.
+fn ambiguous_vault_error() -> String {
+    format!(
+        "this Google account holds more than one {} vault, and this device has no id saying which \
+         of them is its own; restore the one you want onto a fresh install instead",
+        crate::app::APP_NAME
+    )
+}
+
+/// Settle the vault id for this run, doing whatever Drive work [`plan_vault_id`]
+/// calls for.
+///
+/// The one place the two layouts meet: afterwards the account holds this
+/// vault's pack under `Vaults/<id>.rowel` (or holds nothing yet, and the first
+/// push puts it there), and the local vault knows that id.
+async fn resolve_vault_id(
+    app: &AppHandle,
+    cryptor: &Cryptor,
+    local: &impl LocalVault,
+) -> Result<String> {
+    let client = http_client();
+    let token = auth::access_token(&client, app, cryptor).await?;
+
+    let root = drive::folder_id(&client, &token, layout::ROOT_FOLDER).await?;
+    let mut legacy = None;
+    let mut live: Vec<String> = Vec::new();
+    if let Some(root) = &root {
+        legacy = drive::find_file(&client, &token, layout::LEGACY_VAULT_FILE, root).await?;
+        // A missing `Vaults/` is an account no build that knew about the folder
+        // has ever written to, which is the same answer as an empty one.
+        let vaults = drive::folder_id_in(&client, &token, layout::VAULTS_FOLDER, root).await?;
+        if let Some(vaults) = vaults {
+            live = drive::list_folder(&client, &token, &vaults)
+                .await?
+                .iter()
+                .filter_map(|file| layout::vault_id_of(&file.name).map(str::to_string))
+                .collect();
+        }
+    }
+    let live: Vec<&str> = live.iter().map(String::as_str).collect();
+
+    let (id, migrate) = match plan_vault_id(local.vault_id()?.as_deref(), legacy.is_some(), &live) {
+        VaultIdPlan::Use(id) => (id, false),
+        VaultIdPlan::Assign => (local.assign_vault_id()?, false),
+        VaultIdPlan::Adopt(id) => {
+            local.adopt_vault_id(&id)?;
+            (id, false)
+        }
+        VaultIdPlan::MigrateLegacy(id) => (id, true),
+        VaultIdPlan::AssignAndMigrateLegacy => (local.assign_vault_id()?, true),
+        VaultIdPlan::Ambiguous => return Err(Error::Other(ambiguous_vault_error())),
+    };
+
+    // Moved, not re-uploaded: the file keeps its Drive id and its whole
+    // revision history, so a user who wants yesterday's vault back still has it
+    // — and the account is never left holding two packs, one of which quietly
+    // stops being written to.
+    if let (true, Some(root), Some(legacy)) = (migrate, root.as_deref(), &legacy) {
+        let vaults = ensure_vaults_folder(&client, &token, root).await?;
+        let name = layout::vault_file_name(&id);
+        drive::move_file(&client, &token, &legacy.id, &name, root, &vaults).await?;
+    }
+
+    Ok(id)
+}
+
+/// `Rowel/Vaults`, created if this account has never had one.
+async fn ensure_vaults_folder(client: &Client, token: &str, root: &str) -> Result<String> {
+    match drive::folder_id_in(client, token, layout::VAULTS_FOLDER, root).await? {
+        Some(id) => Ok(id),
+        None => drive::create_folder_in(client, token, layout::VAULTS_FOLDER, Some(root)).await,
+    }
+}
+
+/// [`Remote`] over one vault's pack, `Rowel/Vaults/<vault-id>.rowel`.
+///
+/// Both folder ids are resolved once per instance (one instance per run)
+/// because the selection rule is deterministic and re-listing them would only
+/// cost round trips. The *file* is re-listed on every call: `head_revision`
+/// exists precisely to observe a change another device made, so it must never
+/// answer from a cache.
 struct DriveRemote {
     app: AppHandle,
     cryptor: Cryptor,
-    folder: Mutex<Option<String>>,
+    /// Settled by [`resolve_vault_id`] before the run starts, so every call
+    /// below knows the file name it is after without asking again.
+    vault_id: String,
+    root: Mutex<Option<String>>,
+    vaults: Mutex<Option<String>>,
 }
 
 impl DriveRemote {
-    fn new(app: AppHandle, cryptor: Cryptor) -> Self {
+    fn new(app: AppHandle, cryptor: Cryptor, vault_id: String) -> Self {
         Self {
             app,
             cryptor,
-            folder: Mutex::new(None),
+            vault_id,
+            root: Mutex::new(None),
+            vaults: Mutex::new(None),
         }
     }
 
     // Resolve the Rowel folder, remembering it for the rest of the run.
     // `None` means it does not exist yet — which is also "no remote vault".
-    async fn folder(&self, client: &Client, token: &str) -> Result<Option<String>> {
-        if let Some(id) = self.folder.lock().unwrap().clone() {
+    async fn root(&self, client: &Client, token: &str) -> Result<Option<String>> {
+        if let Some(id) = self.root.lock().unwrap().clone() {
             return Ok(Some(id));
         }
         let found = drive::folder_id(client, token, layout::ROOT_FOLDER).await?;
         if let Some(id) = &found {
-            *self.folder.lock().unwrap() = Some(id.clone());
+            *self.root.lock().unwrap() = Some(id.clone());
         }
         Ok(found)
     }
 
-    async fn locate(&self, client: &Client, token: &str) -> Result<Option<drive::DriveFile>> {
-        let Some(folder) = self.folder(client, token).await? else {
+    // `Rowel/Vaults`, the same way.
+    async fn vaults(&self, client: &Client, token: &str) -> Result<Option<String>> {
+        if let Some(id) = self.vaults.lock().unwrap().clone() {
+            return Ok(Some(id));
+        }
+        let Some(root) = self.root(client, token).await? else {
             return Ok(None);
         };
-        drive::find_file(client, token, layout::LEGACY_VAULT_FILE, &folder).await
+        let found = drive::folder_id_in(client, token, layout::VAULTS_FOLDER, &root).await?;
+        if let Some(id) = &found {
+            *self.vaults.lock().unwrap() = Some(id.clone());
+        }
+        Ok(found)
+    }
+
+    // [`vaults`], for the push: both folders are created when this is the first
+    // thing this account has ever had put in it.
+    async fn ensure_vaults(&self, client: &Client, token: &str) -> Result<String> {
+        if let Some(id) = self.vaults(client, token).await? {
+            return Ok(id);
+        }
+        let root = match self.root(client, token).await? {
+            Some(id) => id,
+            None => {
+                let id = drive::create_folder(client, token, layout::ROOT_FOLDER).await?;
+                *self.root.lock().unwrap() = Some(id.clone());
+                id
+            }
+        };
+        let id = ensure_vaults_folder(client, token, &root).await?;
+        *self.vaults.lock().unwrap() = Some(id.clone());
+        Ok(id)
+    }
+
+    async fn locate(&self, client: &Client, token: &str) -> Result<Option<drive::DriveFile>> {
+        let Some(vaults) = self.vaults(client, token).await? else {
+            return Ok(None);
+        };
+        let name = layout::vault_file_name(&self.vault_id);
+        drive::find_file(client, token, &name, &vaults).await
     }
 
     async fn token(&self, client: &Client) -> Result<String> {
@@ -280,24 +452,93 @@ impl Remote for DriveRemote {
         block_on(async {
             let client = http_client();
             let token = self.token(&client).await?;
-            let folder = match self.folder(&client, &token).await? {
-                Some(id) => id,
-                None => {
-                    let id = drive::create_folder(&client, &token, layout::ROOT_FOLDER).await?;
-                    *self.folder.lock().unwrap() = Some(id.clone());
-                    id
-                }
-            };
-            let revision = match drive::find_file(&client, &token, layout::LEGACY_VAULT_FILE, &folder).await?
-            {
+            let vaults = self.ensure_vaults(&client, &token).await?;
+            let name = layout::vault_file_name(&self.vault_id);
+            let revision = match drive::find_file(&client, &token, &name, &vaults).await? {
                 Some(file) => drive::update_file(&client, &token, &file.id, bytes).await?,
                 None => {
-                    drive::create_file(&client, &token, layout::LEGACY_VAULT_FILE, &folder, bytes)
+                    drive::create_file(&client, &token, &name, &vaults, bytes)
                         .await?
                         .head_revision
                 }
             };
             Ok(revision.unwrap_or_default())
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{plan_vault_id, VaultIdPlan};
+
+    const ID: &str = "a1b2c3";
+
+    #[test]
+    fn a_vault_that_knows_its_id_simply_uses_it() {
+        // Its pack is there; and if it is not, the first push creates it.
+        assert_eq!(
+            plan_vault_id(Some(ID), false, &[ID]),
+            VaultIdPlan::Use(ID.into())
+        );
+        assert_eq!(
+            plan_vault_id(Some(ID), false, &[]),
+            VaultIdPlan::Use(ID.into())
+        );
+        // Another vault's pack in the folder is none of this one's business.
+        assert_eq!(
+            plan_vault_id(Some(ID), false, &["dddd", "eeee"]),
+            VaultIdPlan::Use(ID.into())
+        );
+    }
+
+    #[test]
+    fn an_upgraded_install_moves_its_legacy_pack_under_its_own_id() {
+        assert_eq!(
+            plan_vault_id(Some(ID), true, &[]),
+            VaultIdPlan::MigrateLegacy(ID.into())
+        );
+    }
+
+    // The migration already ran — on this device or another — and left the
+    // legacy file behind (a stale listing, a peer mid-migration). Moving it a
+    // second time would overwrite nothing, but it would put an old snapshot
+    // back on top of the live pack's name.
+    #[test]
+    fn a_legacy_file_beside_an_already_migrated_pack_is_left_alone() {
+        assert_eq!(
+            plan_vault_id(Some(ID), true, &[ID]),
+            VaultIdPlan::Use(ID.into())
+        );
+    }
+
+    #[test]
+    fn a_vault_from_before_ids_takes_the_legacy_pack_with_it() {
+        assert_eq!(
+            plan_vault_id(None, true, &[]),
+            VaultIdPlan::AssignAndMigrateLegacy
+        );
+    }
+
+    #[test]
+    fn an_idless_vault_adopts_the_one_pack_the_account_holds() {
+        assert_eq!(
+            plan_vault_id(None, false, &["dddd"]),
+            VaultIdPlan::Adopt("dddd".into())
+        );
+    }
+
+    #[test]
+    fn an_idless_vault_with_nothing_to_adopt_mints_an_id() {
+        assert_eq!(plan_vault_id(None, false, &[]), VaultIdPlan::Assign);
+    }
+
+    // Picking one would push this vault's entries into a stranger's pack and
+    // pull theirs back. There is no evidence here to pick on, so it stops.
+    #[test]
+    fn an_idless_vault_facing_several_packs_refuses_to_guess() {
+        assert_eq!(
+            plan_vault_id(None, false, &["dddd", "eeee"]),
+            VaultIdPlan::Ambiguous
+        );
     }
 }

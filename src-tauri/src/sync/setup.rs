@@ -72,7 +72,7 @@ async fn find_in_vaults(
         return Ok(None);
     };
     Ok(oldest_live_pack(
-        drive::list_files(client, token, &vaults).await?,
+        drive::list_folder(client, token, &vaults).await?,
     ))
 }
 
