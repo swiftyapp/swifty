@@ -14,6 +14,7 @@
   "Sync is not set up": "Синхронізацію не налаштовано",
   "Nothing recognized": "Нічого не розпізнано",
   "This share has expired or was revoked": "Термін дії цього посилання минув або його відкликано",
+  "This share was created in another workspace": "Це посилання створено в іншому робочому просторі",
   "Passwords do not match": "Паролі не збігаються",
   "Successfully changed password": "Пароль змінено",
   "Fill in the password": "Введіть пароль",

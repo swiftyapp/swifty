@@ -61,28 +61,31 @@ pub async fn share_open(link: String) -> Result<Entry> {
     blocking(move || share::open(&DrivePublicFetch, &link, share::now_ms())).await
 }
 
+/// Take one of this vault's shares back. The id arrives from the webview, so it
+/// says which file to look at and nothing about who may delete it; the vault id
+/// goes along for [`share::revoke`] to check it against.
 #[tauri::command]
 pub async fn share_revoke(
     file_id: String,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<()> {
-    let cryptor = sender_cryptor(&state)?;
-    blocking(move || share::revoke(&share::drive_remote(&app, cryptor), &file_id)).await
+    let (cryptor, vault_id) = sender_credentials(&state)?;
+    blocking(move || {
+        share::revoke(
+            &share::drive_remote(&app, cryptor),
+            &file_id,
+            vault_id.as_deref(),
+        )
+    })
+    .await
 }
 
 /// This vault's outstanding shares, expired ones swept first. The account may
 /// hold other vaults' shares too; the vault id is what keeps them apart.
 #[tauri::command]
 pub async fn share_list(app: AppHandle, state: State<'_, AppState>) -> Result<Vec<ActiveShare>> {
-    let (cryptor, vault_id) = {
-        let session = state.session.lock().unwrap();
-        sendable(&session)?;
-        (
-            session.cryptor()?,
-            identity::vault_id(session.store()?).map_err(store_err)?,
-        )
-    };
+    let (cryptor, vault_id) = sender_credentials(&state)?;
     blocking(move || {
         share::list(
             &share::drive_remote(&app, cryptor),
@@ -106,8 +109,14 @@ fn sendable(session: &Session) -> Result<()> {
     Ok(())
 }
 
-fn sender_cryptor(state: &State<'_, AppState>) -> Result<Cryptor> {
+/// What a sender-side Drive call needs: the cryptor that unwraps the account's
+/// tokens, and the id of the vault asking — which is what says whose shares
+/// these are. Both read under one lock, released before the network call.
+fn sender_credentials(state: &State<'_, AppState>) -> Result<(Cryptor, Option<String>)> {
     let session = state.session.lock().unwrap();
     sendable(&session)?;
-    session.cryptor()
+    Ok((
+        session.cryptor()?,
+        identity::vault_id(session.store()?).map_err(store_err)?,
+    ))
 }

@@ -510,6 +510,40 @@ pub(crate) async fn read_capped(resp: &mut reqwest::Response, max_bytes: usize) 
     Ok(body)
 }
 
+/// Set the named `appProperties` on an existing file, leaving every other
+/// property — and the content, the id and the revision history — alone.
+///
+/// Drive merges `appProperties` key by key, so this adds or overwrites exactly
+/// the keys passed and nothing else. That is what lets the migrating vault
+/// stamp `vaultId` onto a share published before the property existed without
+/// disturbing the entry id, kind and expiry it was uploaded with.
+pub async fn update_properties(
+    client: &Client,
+    token: &str,
+    id: &str,
+    properties: &[(&str, &str)],
+) -> Result<()> {
+    let resp = client
+        .patch(format!("{FILES}/{id}"))
+        .bearer_auth(token)
+        .query(&[("fields", FILE_FIELDS)])
+        .json(&properties_request(properties))
+        .send()
+        .await
+        .map_err(other)?;
+    check(resp).await.map(|_| ())
+}
+
+// The body of that patch, built apart from the request so what goes on the wire
+// can be asserted without one.
+fn properties_request(properties: &[(&str, &str)]) -> Value {
+    let map = properties
+        .iter()
+        .map(|(k, v)| ((*k).to_string(), Value::from(*v)))
+        .collect::<serde_json::Map<_, _>>();
+    json!({ "appProperties": map })
+}
+
 /// Overwrite a vault pack's content, returning its new head revision.
 pub async fn update_file(
     client: &Client,
@@ -537,7 +571,7 @@ pub async fn update_file(
 mod tests {
     use super::{
         collect_pages, escape, layout, list_query, multipart_body, oldest, parse_file,
-        parse_listing, parse_properties, parse_size, DriveFile, FILE_FIELDS,
+        parse_listing, parse_properties, parse_size, properties_request, DriveFile, FILE_FIELDS,
         LIST_FIELDS,
     };
     use serde_json::json;
@@ -720,6 +754,18 @@ mod tests {
             assert!(mask.contains("size"), "{mask}");
             assert!(mask.contains("modifiedTime"), "{mask}");
         }
+    }
+
+    // A property patch names only the keys it sets: Drive merges the map, so a
+    // body that spelled out the whole of `appProperties` would drop whatever the
+    // file carried that this caller did not know about.
+    #[test]
+    fn a_property_patch_carries_only_the_keys_it_sets() {
+        assert_eq!(
+            properties_request(&[("vaultId", "a1b2")]),
+            json!({ "appProperties": { "vaultId": "a1b2" } })
+        );
+        assert_eq!(properties_request(&[]), json!({ "appProperties": {} }));
     }
 
     // Binary content must survive the envelope byte for byte — the share is

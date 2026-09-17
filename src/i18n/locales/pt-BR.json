@@ -14,6 +14,7 @@
   "Sync is not set up": "A sincronização não está configurada",
   "Nothing recognized": "Nada reconhecido",
   "This share has expired or was revoked": "Este compartilhamento expirou ou foi revogado",
+  "This share was created in another workspace": "Este compartilhamento foi criado em outro espaço de trabalho",
   "Passwords do not match": "As senhas não conferem",
   "Successfully changed password": "Senha alterada com sucesso",
   "Fill in the password": "Preencha a senha",

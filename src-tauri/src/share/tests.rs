@@ -143,12 +143,84 @@ fn a_revoked_share_reads_as_gone() {
     let remote = FakeShareRemote::new();
     let created = create(&remote, &entry(), Some(VAULT), NOW).unwrap();
 
-    revoke(&remote, &created.file_id).unwrap();
+    revoke(&remote, &created.file_id, Some(VAULT)).unwrap();
     assert!(remote.ids().is_empty());
     assert!(matches!(
         open(&remote, &created.link, NOW).unwrap_err(),
         Error::ShareExpired
     ));
+}
+
+// A share the sweep, another device or an earlier click already removed leaves
+// the caller with exactly what it asked for, so saying so would be a dialog
+// about nothing.
+#[test]
+fn revoking_what_is_already_gone_is_not_a_failure() {
+    let remote = FakeShareRemote::new();
+    let created = create(&remote, &entry(), Some(VAULT), NOW).unwrap();
+
+    revoke(&remote, &created.file_id, Some(VAULT)).unwrap();
+    revoke(&remote, &created.file_id, Some(VAULT)).unwrap();
+    revoke(&remote, "never-existed", Some(VAULT)).unwrap();
+}
+
+// The finding this whole rule exists for: a file id is a bearer value the
+// webview hands in, so the vault that published the share — not the one that
+// asked — is what decides whether it may go.
+#[test]
+fn another_vault_s_share_is_refused_and_left_where_it_is() {
+    let remote = FakeShareRemote::new();
+    let theirs = create(&remote, &entry(), Some("beef"), NOW).unwrap();
+
+    assert!(matches!(
+        revoke(&remote, &theirs.file_id, Some(VAULT)).unwrap_err(),
+        Error::ShareNotOwned
+    ));
+    assert!(remote.ids().contains(&theirs.file_id));
+    // And its own vault still sees it, so the refusal cost the owner nothing.
+    let listed = list(&remote, Some("beef"), NOW).unwrap();
+    assert_eq!(listed[0].file_id, theirs.file_id);
+}
+
+// Before ids existed, sync ran in the primary workspace alone, so an unmarked
+// share has exactly one rightful owner — and until that vault claims it, it is
+// no one's to delete.
+#[test]
+fn an_unclaimed_legacy_share_is_no_vault_s_to_list_or_revoke() {
+    let remote = FakeShareRemote::new();
+    let old = upload_share(&remote, "a.rowelshare", Some(NOW + 1));
+
+    for asking in [Some(VAULT), Some("beef")] {
+        assert!(list(&remote, asking, NOW).unwrap().is_empty());
+        assert!(matches!(
+            revoke(&remote, &old, asking).unwrap_err(),
+            Error::ShareNotOwned
+        ));
+    }
+    assert!(remote.ids().contains(&old));
+
+    // Claimed by the vault that migrates the legacy pack, it is that vault's
+    // share in every way — listed, and revocable.
+    assert_eq!(claim_unmarked(&remote, VAULT).unwrap(), 1);
+    assert_eq!(list(&remote, Some(VAULT), NOW).unwrap()[0].file_id, old);
+    revoke(&remote, &old, Some(VAULT)).unwrap();
+    assert!(remote.ids().is_empty());
+}
+
+#[test]
+fn claiming_takes_the_unmarked_shares_and_only_those() {
+    let remote = FakeShareRemote::new();
+    let theirs = create(&remote, &entry(), Some("beef"), NOW).unwrap();
+    let old = upload_share(&remote, "a.rowelshare", Some(NOW + 1));
+
+    assert_eq!(claim_unmarked(&remote, VAULT).unwrap(), 1);
+    // Idempotent, and free: the second run finds nothing left unmarked.
+    assert_eq!(claim_unmarked(&remote, VAULT).unwrap(), 0);
+
+    assert_eq!(list(&remote, Some(VAULT), NOW).unwrap()[0].file_id, old);
+    let untouched = list(&remote, Some("beef"), NOW).unwrap();
+    assert_eq!(untouched[0].file_id, theirs.file_id);
+    assert_eq!(untouched.len(), 1);
 }
 
 // The fake answers an unknown id with `ShareExpired`, so getting the parse
@@ -170,12 +242,7 @@ fn the_sweep_deletes_only_what_is_known_to_have_expired() {
 
     assert_eq!(sweep(&remote, NOW).unwrap(), 1);
     assert!(!remote.ids().contains(&expired));
-
-    let listed = list(&remote, Some(VAULT), NOW).unwrap();
-    assert_eq!(
-        listed.iter().map(|s| &s.file_id).collect::<Vec<_>>(),
-        vec![&live, &undated]
-    );
+    assert_eq!(remote.ids(), vec![live, undated]);
 }
 
 // The fake's ids double as its clock, so this file was created at 1ms.
@@ -183,6 +250,7 @@ fn the_sweep_deletes_only_what_is_known_to_have_expired() {
 fn a_share_with_no_readable_expiry_is_still_given_one_to_show() {
     let remote = FakeShareRemote::new();
     upload_share(&remote, "a.rowelshare", None);
+    claim_unmarked(&remote, VAULT).unwrap();
 
     let listed = list(&remote, Some(VAULT), NOW).unwrap();
     assert_eq!(listed[0].created_at, "1970-01-01T00:00:00.001Z");
@@ -202,29 +270,11 @@ fn a_list_shows_only_the_asking_vault_s_shares() {
         listed.iter().map(|s| &s.file_id).collect::<Vec<_>>(),
         vec![&mine.file_id]
     );
-    assert_eq!(listed[0].vault_id.as_deref(), Some(VAULT));
 
     // Not listed is not deleted: the other vault still has it.
     assert!(remote.ids().contains(&theirs.file_id));
     let theirs_listed = list(&remote, Some("beef"), NOW).unwrap();
     assert_eq!(theirs_listed[0].file_id, theirs.file_id);
-}
-
-// A share from before the property existed belongs to no vault in particular,
-// and dropping it from every list would strand a link still in circulation.
-#[test]
-fn a_share_with_no_vault_id_stays_visible_to_every_vault() {
-    let remote = FakeShareRemote::new();
-    let old = upload_share(&remote, "a.rowelshare", Some(NOW + 1));
-
-    for asking in [Some(VAULT), Some("beef"), None] {
-        let listed = list(&remote, asking, NOW).unwrap();
-        assert_eq!(
-            listed.iter().map(|s| &s.file_id).collect::<Vec<_>>(),
-            vec![&old]
-        );
-        assert_eq!(listed[0].vault_id, None);
-    }
 }
 
 // The sweep is the account's, not the vault's: an expired share is dead

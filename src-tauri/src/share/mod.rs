@@ -21,7 +21,7 @@ use serde::Serialize;
 use tauri::AppHandle;
 
 use crate::crypto::Cryptor;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::models::Entry;
 use crate::sync::layout;
 use envelope::{Link, ShareKey, SHARE_TTL_MS};
@@ -49,9 +49,6 @@ pub struct ActiveShare {
     /// The sender's local entry id, which the UI resolves to a title.
     pub entry_id: Option<String>,
     pub kind: Option<String>,
-    /// The vault that published it, or `None` on a share made before the
-    /// property existed. Carried through so the UI can tell the two apart.
-    pub vault_id: Option<String>,
     pub created_at: String,
     pub expires_at: String,
 }
@@ -59,8 +56,11 @@ pub struct ActiveShare {
 /// Seal `entry` and publish it, returning the link that opens it.
 ///
 /// `vault_id` is the sharing vault's own id, stamped on the file so that vault
-/// can pick its shares out of an account several vaults now write into. `None`
-/// omits the property, and the share behaves as every pre-`vaultId` one does.
+/// can pick its shares out of an account several vaults now write into, and so
+/// no other one can revoke them. `None` omits the property — a vault with no id
+/// yet, which only a vault that has never synced can be, and sharing needs a
+/// connected account; it then lists and revokes its own unmarked shares by the
+/// same rule everything else here follows.
 pub fn create(
     remote: &impl ShareRemote,
     entry: &Entry,
@@ -118,8 +118,50 @@ pub fn open(fetch: &impl PublicFetch, link: &str, now_ms: i64) -> Result<Entry> 
 }
 
 /// Delete one share now, whatever its expiry. The link stops working.
-pub fn revoke(remote: &impl ShareRemote, file_id: &str) -> Result<()> {
+///
+/// The share has to be the asking vault's own. One account keeps every vault's
+/// shares in one folder, and `file_id` is whatever the caller sent — a bearer
+/// value that authorizes nothing by itself — so ownership is read back off the
+/// marker listing rather than taken on trust. The test is the one [`list`]
+/// applies, so a vault can revoke exactly what it can see and nothing more.
+///
+/// A share that is no longer in the listing counts as revoked: the sweep,
+/// another device, or an earlier click of the same button all leave the caller
+/// with what it asked for, which is why the delete underneath is idempotent too.
+pub fn revoke(remote: &impl ShareRemote, file_id: &str, vault_id: Option<&str>) -> Result<()> {
+    let Some(file) = remote.list()?.into_iter().find(|file| file.id == file_id) else {
+        return Ok(());
+    };
+    if !owned_by(&file, vault_id) {
+        return Err(Error::ShareNotOwned);
+    }
     remote.delete(file_id)
+}
+
+/// Stamp `vault_id` on every share in the account that carries none, and say
+/// how many were claimed.
+///
+/// Sharing is older than vault ids, and back then Drive sync ran in the primary
+/// workspace alone — so every unmarked share in an account was published by the
+/// single vault that existed before ids did. That vault is identifiable exactly
+/// once: it is the one whose pack the sync engine migrates out of the legacy
+/// `Rowel/vault.swsync`, which is the one place this may be called from.
+/// Claiming there hands the old links to the vault that really published them,
+/// instead of leaving them revocable by whichever workspace happened to look.
+///
+/// Idempotent — a second run finds nothing unmarked — and one listing and no
+/// writes for the overwhelmingly common account that never shared anything
+/// before the upgrade. Unclaimed shares are not stranded either way: they expire
+/// within their 24 hours and the account-wide [`sweep`] removes them.
+pub fn claim_unmarked(remote: &impl ShareRemote, vault_id: &str) -> Result<usize> {
+    let mut claimed = 0;
+    for file in remote.list()? {
+        if file.vault_id.is_none() {
+            remote.set_vault_id(&file.id, vault_id)?;
+            claimed += 1;
+        }
+    }
+    Ok(claimed)
 }
 
 /// Delete every share whose expiry is known and has passed; returns how many.
@@ -141,10 +183,9 @@ pub fn sweep(remote: &impl ShareRemote, now_ms: i64) -> Result<usize> {
 /// something a recipient can no longer open.
 ///
 /// The sweep above is account-wide — an expired share is dead wherever it came
-/// from — but the list is not: an account can hold several vaults' shares now,
-/// and a vault has no business revoking another's. A share carrying no
-/// `vaultId` predates the property, so every vault keeps showing it; dropping
-/// it from all of them would strand a link still in circulation.
+/// from, and whichever of the sender's devices notices should say so — but the
+/// list is not: an account can hold several vaults' shares now, and every row
+/// here carries a Revoke.
 pub fn list(
     remote: &impl ShareRemote,
     vault_id: Option<&str>,
@@ -154,12 +195,23 @@ pub fn list(
     Ok(remote
         .list()?
         .iter()
-        .filter(|file| match &file.vault_id {
-            Some(owner) => Some(owner.as_str()) == vault_id,
-            None => true,
-        })
+        .filter(|file| owned_by(file, vault_id))
         .map(active_share)
         .collect())
+}
+
+/// Whether this vault may list `file` and revoke it. Plain equality, and the
+/// single rule both verbs go through: showing a share to a vault that may not
+/// delete it is a Revoke button that fails, and the reverse is one vault
+/// deleting another's link.
+///
+/// A share carrying no `vaultId` is therefore shown to nobody, rather than to
+/// everybody as it was when this filter first went in. Nothing is stranded by
+/// that: it is claimed by the vault that migrates the legacy pack (see
+/// [`claim_unmarked`]), and failing that it expires within its 24 hours and the
+/// account-wide [`sweep`] takes it.
+fn owned_by(file: &ShareFile, vault_id: Option<&str>) -> bool {
+    file.vault_id.as_deref() == vault_id
 }
 
 fn active_share(file: &ShareFile) -> ActiveShare {
@@ -167,7 +219,6 @@ fn active_share(file: &ShareFile) -> ActiveShare {
         file_id: file.id.clone(),
         entry_id: file.entry_id.clone(),
         kind: file.kind.clone(),
-        vault_id: file.vault_id.clone(),
         created_at: rfc3339(file.created_ms),
         // A share we could not date still has to tell the user when it goes:
         // the TTL from its creation is the expiry it was given, whether or not
@@ -203,4 +254,14 @@ pub fn drive_remote(app: &AppHandle, cryptor: Cryptor) -> DriveShareRemote {
 /// The sweep as the end of a sync run calls it.
 pub fn sweep_drive(app: &AppHandle, cryptor: Cryptor) -> Result<usize> {
     sweep(&drive_remote(app, cryptor), now_ms())
+}
+
+/// [`claim_unmarked`] as the legacy-pack migration in `sync` calls it — the one
+/// caller there may ever be, for the reason spelled out on that function.
+//
+// Allowed dead meanwhile because the migration it belongs to is landing
+// separately; the two are being reviewed apart.
+#[allow(dead_code)]
+pub fn claim_unmarked_drive(app: &AppHandle, cryptor: Cryptor, vault_id: &str) -> Result<usize> {
+    claim_unmarked(&drive_remote(app, cryptor), vault_id)
 }

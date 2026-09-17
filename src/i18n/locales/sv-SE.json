@@ -14,6 +14,7 @@
   "Sync is not set up": "Synkning är inte konfigurerad",
   "Nothing recognized": "Inget kändes igen",
   "This share has expired or was revoked": "Den här delningen har upphört att gälla eller återkallats",
+  "This share was created in another workspace": "Den här delningen skapades i en annan arbetsyta",
   "Passwords do not match": "Lösenorden matchar inte",
   "Successfully changed password": "Lösenordet har ändrats",
   "Fill in the password": "Fyll i lösenordet",

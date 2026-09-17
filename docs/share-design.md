@@ -102,10 +102,20 @@ the entry type. `expiresAt` is unix milliseconds, a duplicate of the
 authenticated copy inside the envelope, there so the sweep can date a file
 without its key. `vaultId` is the id of the vault that published the share
 (`store::identity`), which is what lets one account hold several vaults' shares
-and still show each vault only its own; a share carrying none predates the
-property and stays visible to every vault, since hiding a link still in
-circulation is worse than listing it twice. Listings follow `nextPageToken` to
-the end.
+and still show each vault only its own — and, because every listed row carries a
+Revoke, it is also what a revoke is checked against.
+
+A share carrying no `vaultId` predates the property. It is not shown to every
+vault, which would hand one workspace a Revoke over another's link: it belongs
+to whichever vault published it, and exactly one vault can be shown to be that
+one. Sharing is older than vault ids, but Drive sync back then ran in the
+primary workspace alone, so all the unmarked shares in an account came from the
+single vault that existed before ids did — the one whose pack the sync engine
+migrates out of the legacy `Rowel/vault.swsync`. That migration stamps them
+(`share::claim_unmarked`), and from then on they are ordinary shares of that
+vault. Until it does, or if it never runs, they are listed and revocable by
+nobody and the account-wide sweep clears them within their 24 hours. Listings
+follow `nextPageToken` to the end.
 
 ## 5. Lifetime and control
 
@@ -116,13 +126,21 @@ the end.
   removes the file, the ciphertext is still downloadable, and a leaked link
   plus a client that ignores the expiry decrypts it past the 24 hours. Every
   promise in the UI and in `docs/threat-model.md` is worded for that split.
-- **Revoke** deletes the file. From the send dialog right after creating the
-  link, or later from Settings › Sync › Shared links.
+- **Revoke** deletes the file, after looking it up in the marker listing and
+  finding the asking vault's own `vaultId` on it. The file id in the request is
+  whatever the webview sent and authorizes nothing by itself, so a share another
+  vault published is refused with `shareNotOwned` and left where it is — the
+  same test `list` applies, so a vault can revoke exactly what it can see.
+  A share that is already gone counts as revoked. From the send dialog right
+  after creating the link, or later from Settings › Sync › Shared links.
 - **Sweep** lists every marked share and deletes anything past `expiresAt`. It
   runs at the end of every successful sync and whenever the active shares list
-  is opened. Because the truth lives in Drive rather than a local ledger, any
-  of the sender's devices can revoke or clean up, and nothing new is stored
-  locally. A share with no readable expiry is never treated as expired.
+  is opened. It stays account-wide where listing and revoking are per-vault: an
+  expired share is dead whichever vault published it, and whichever of the
+  sender's devices notices should say so. Because the truth lives in Drive
+  rather than a local ledger, any of the sender's devices can revoke or clean
+  up, and nothing new is stored locally. A share with no readable expiry is
+  never treated as expired.
 - The recipient's app treats a missing file as "expired or revoked" and says so.
 - The recipient downloads at most 2 MiB, checked against the declared length
   and again while streaming, with a 30-second deadline: the id in a pasted link
@@ -146,11 +164,12 @@ receive, and the receive dialog says which key is missing.
 
 ## 7. Backend API
 
-`share::create(remote, entry, now_ms) -> Created { link, file_id, expires_at }`
+`share::create(remote, entry, vault_id, now_ms) -> Created { link, file_id, expires_at }`
 `share::open(fetch, link, now_ms) -> Entry` (sanitized, empty id, unexpired)
-`share::revoke(remote, file_id)`
-`share::list(remote, now_ms) -> Vec<ActiveShare>` (also sweeps)
-`share::sweep(remote, now_ms) -> usize`
+`share::revoke(remote, file_id, vault_id)` (refuses another vault's share)
+`share::list(remote, vault_id, now_ms) -> Vec<ActiveShare>` (this vault's; also sweeps)
+`share::sweep(remote, now_ms) -> usize` (account-wide)
+`share::claim_unmarked(remote, vault_id) -> usize` (legacy shares, once, at migration)
 
 Generic over `ShareRemote` and `PublicFetch`, so the whole lifecycle is tested
 against an in-memory fake.

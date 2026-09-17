@@ -13,7 +13,11 @@ export interface ShareCreated {
   expiresAt: string
 }
 
-// One live share, as the sender's own list of them reports it.
+/**
+ * One live share, as the sender's own list of them reports it. Every row here
+ * was published by the vault currently open — Rust filters on that, and refuses
+ * a revoke of anything else — so nothing names a vault.
+ */
 export interface ActiveShare {
   fileId: string
   /**
@@ -22,12 +26,6 @@ export interface ActiveShare {
    */
   entryId: string | null
   kind: EntryType | null
-  /**
-   * The vault that published it. Null on shares made before the property
-   * existed; the backend lists those for every vault rather than hiding a link
-   * that may still be in circulation.
-   */
-  vaultId: string | null
   createdAt: string
   expiresAt: string
 }
@@ -43,7 +41,11 @@ export const shareCreate = (entryId: string): Promise<ShareCreated> =>
  */
 export const shareOpen = (link: string): Promise<Entry> => call('share_open', { link })
 
-// Delete the uploaded file, before its 24 hours are up.
+/**
+ * Delete the uploaded file, before its 24 hours are up. Rejects with
+ * `shareNotOwned` if the file belongs to another workspace's vault, which only
+ * a stale list can produce.
+ */
 export const shareRevoke = (fileId: string): Promise<void> =>
   call('share_revoke', { fileId })
 

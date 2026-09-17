@@ -68,6 +68,13 @@ pub enum Error {
     #[error("this entry is too large to share")]
     EntryTooLargeToShare,
 
+    /// A share published by a different vault than the one asking to delete it.
+    /// One Drive account holds every vault's shares in one folder, and the file
+    /// id in a revoke is whatever the caller sent, so ownership is read back off
+    /// Drive rather than assumed — see [`crate::share::revoke`].
+    #[error("this share was published by another vault")]
+    ShareNotOwned,
+
     #[error("another setup step is still running")]
     SetupBusy,
 
@@ -132,6 +139,7 @@ impl Error {
             Error::ShareTooNew => "shareTooNew",
             Error::ShareTooLarge => "shareTooLarge",
             Error::EntryTooLargeToShare => "entryTooLargeToShare",
+            Error::ShareNotOwned => "shareNotOwned",
             Error::SetupBusy => "setupBusy",
             Error::SyncBusy => "syncBusy",
             Error::DriveNotConnected => "driveNotConnected",

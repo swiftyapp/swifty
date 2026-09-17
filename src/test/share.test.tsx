@@ -432,7 +432,6 @@ describe('Settings › Shared links', () => {
         fileId: 'f1',
         entryId: 'l1',
         kind: 'login' as const,
-        vaultId: 'a1b2',
         createdAt: '2024-01-01T00:00:00.000Z',
         expiresAt
       })
@@ -475,7 +474,6 @@ describe('Settings › Shared links', () => {
         fileId: 'f1',
         entryId: 'l1',
         kind: 'login' as const,
-        vaultId: 'a1b2',
         createdAt: '2024-01-01T00:00:00.000Z',
         expiresAt: new Date(Date.now() + 90_000).toISOString()
       }
@@ -520,7 +518,6 @@ describe('Settings › Shared links', () => {
         fileId: 'f1',
         entryId: 'l1',
         kind: 'login' as const,
-        vaultId: 'a1b2',
         createdAt: '2024-01-01T00:00:00.000Z',
         expiresAt: new Date(Date.now() + 90_000).toISOString()
       }
