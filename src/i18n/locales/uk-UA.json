@@ -569,6 +569,7 @@
   "A workspace needs a name": "Робочому простору потрібна назва",
   "A workspace needs a master password": "Робочому простору потрібен головний пароль",
   "This vault is already a workspace on this device": "Це сховище вже є робочим простором на цьому пристрої",
+  "This Google account holds other vaults": "У цьому обліковому записі Google є інші сховища",
   "This file is too large": "Цей файл завеликий",
   "This file is not text": "Цей файл не текстовий",
   "The vault changed while this was running. Try again.": "Сховище змінилося під час операції. Спробуйте ще раз.",

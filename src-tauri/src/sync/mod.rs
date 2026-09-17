@@ -133,19 +133,12 @@ pub fn is_configured(app: &AppHandle, cryptor: &Cryptor) -> bool {
     auth::is_configured(app, cryptor)
 }
 
-// Run the OAuth consent flow and persist the resulting tokens — unless a
-// disconnect has moved the connection past `generation` since the flow was
-// started. Desktop only: it blocks on the loopback listener, which no mobile
-// OS will redirect to.
-#[cfg(desktop)]
-pub fn setup(app: &AppHandle, cryptor: &Cryptor, generation: u64) -> Result<()> {
-    auth::authenticate(app, cryptor, generation)
-}
-
 // The mobile consent flow, cut in two around the browser hand-off. See
-// `auth.rs`; the halves are joined by the deep-link handler in `lib.rs`.
+// `auth.rs`; the halves are joined by the deep-link handler in `lib.rs`, and
+// the second half is `exchange_for_tokens` — every connect is keyless now, so
+// the tokens are handed back rather than written.
 #[cfg(mobile)]
-pub use auth::{begin, complete, parse_redirect, redirect_matches, Redirect};
+pub use auth::{begin, parse_redirect, redirect_matches, Redirect};
 
 /// Drop the account locally. An error means the token file is still on disk
 /// and the account is therefore still connected.
@@ -157,14 +150,6 @@ pub fn disconnect(app: &AppHandle) -> Result<()> {
 /// missing token file is a no-op, not an error.
 pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()> {
     auth::reseal_tokens(app, old, new)
-}
-
-/// Which Drive connection is current. A consent flow reads it *when it
-/// starts*, on the command thread, and hands it to the half that stores the
-/// tokens ([`setup`] on desktop, [`complete`] on mobile), which refuses them
-/// for a connection a disconnect has since ended.
-pub fn connection_generation(app: &AppHandle) -> u64 {
-    auth::connection_generation(app)
 }
 
 /// One full sync against Drive. Blocking: call it on a dedicated thread.

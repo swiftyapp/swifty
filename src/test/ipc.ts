@@ -170,8 +170,10 @@ const DEFAULTS: Record<string, Handler> = {
   sync_connect: () => undefined,
   sync_disconnect: () => undefined,
   sync_now: () => undefined,
-  // An empty account taking the open vault as its first; the run it starts
-  // reports on `sync:status`, never through this promise.
+  // The account taking the open vault (it was empty, or already held this
+  // vault); the run it starts reports on `sync:status`, never through this
+  // promise. A spec about an account holding other vaults rejects it with
+  // `vaultNotInAccount` instead.
   sync_adopt_pending: () => undefined,
 
   // Sharing. The link is the shape the backend hands back — file id plus key —

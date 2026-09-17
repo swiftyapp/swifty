@@ -150,7 +150,10 @@ pub fn setup_drive_disconnect(state: State<'_, AppState>) -> Result<()> {
 /// Every one of them, not the pick of them: an account can hold a pack per
 /// vault (two installs, two primaries, two ids), and it is the user who has to
 /// say which of those is theirs.
-async fn probe(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Vec<PackInfo>> {
+///
+/// Crate-visible: `commands::sync::sync_adopt_pending` asks the same question
+/// of the pending account before deciding whether the open vault may join it.
+pub(crate) async fn probe(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Vec<PackInfo>> {
     let client = sync::http_client();
     let token = sync::fresh_access_token(&client, app, tokens).await?;
     sync::setup::find_packs(&client, &token).await

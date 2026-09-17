@@ -27,9 +27,8 @@
 use std::io::{BufRead, BufReader, Write};
 #[cfg(desktop)]
 use std::net::TcpListener;
-use std::time::Duration;
 #[cfg(desktop)]
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -64,7 +63,6 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const SCOPE: &str = "https://www.googleapis.com/auth/drive.file";
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
-const REVOKE_URL: &str = "https://oauth2.googleapis.com/revoke";
 
 // Supply your own Google OAuth client at build or run time.
 const CLIENT_ID_PLACEHOLDER: &str = "YOUR_GOOGLE_OAUTH_CLIENT_ID";
@@ -315,34 +313,6 @@ pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()
     write_tokens(app, new, &tokens)
 }
 
-/// The token to revoke. Google kills the whole grant from either half of the
-/// pair, so this prefers the one that outlives the session.
-pub fn revocable(tokens: &Tokens) -> Option<&str> {
-    tokens
-        .refresh_token
-        .as_deref()
-        .or(tokens.access_token.as_deref())
-}
-
-/// Ask Google to invalidate the grant. Best effort, and deliberately bounded:
-/// the local disconnect has already happened and must not be held up by a
-/// network that never answers.
-pub async fn revoke(client: &Client, token: &str) {
-    let sent = client
-        .post(REVOKE_URL)
-        .timeout(Duration::from_secs(10))
-        .form(&[("token", token)])
-        .send()
-        .await;
-    match sent {
-        Ok(resp) if !resp.status().is_success() => {
-            log::warn!("Drive token revocation refused: {}", resp.status())
-        }
-        Err(e) => log::warn!("Drive token revocation failed: {e}"),
-        _ => {}
-    }
-}
-
 // --- OAuth flow ---
 
 /// One consent request in flight: the PKCE verifier the code will be redeemed
@@ -365,31 +335,13 @@ fn open_consent(app: &AppHandle, credentials: &Credentials) -> Result<Started> {
 }
 
 /// Desktop: open the browser and block on the loopback listener until Google
-/// redirects to it, then exchange the code.
+/// redirects to it, then exchange the code — handing the tokens back rather
+/// than writing them.
 ///
-/// The tokens land only if no disconnect ran since `generation` was read —
-/// which the caller does when the flow is *started*, not here on the worker,
-/// so a disconnect in the gap before the worker runs counts too (see
-/// [`persisted_if_current`]). A grant that arrives after one is revoked and
-/// reported instead of recreating the credential the disconnect removed.
-#[cfg(desktop)]
-pub fn authenticate(app: &AppHandle, cryptor: &Cryptor, generation: u64) -> Result<()> {
-    let tokens = obtain_tokens(app)?;
-    if persisted_if_current(app, cryptor, &tokens, generation)? {
-        return Ok(());
-    }
-    if let Some(token) = revocable(&tokens) {
-        tauri::async_runtime::block_on(revoke(&super::http_client(), token));
-    }
-    Err(disconnected_mid_consent())
-}
-
-/// The consent round trip on its own, handing the tokens back rather than
-/// writing them.
-///
-/// Split out of [`authenticate`] for onboarding, which connects Drive *before*
-/// there is a vault — and so before there is any key to seal a token file
-/// under. Blocking (the loopback listener): call it off the main thread.
+/// Every connect is keyless: onboarding has no vault yet, and a sync connect
+/// on an open vault first asks what the account holds before the tokens are
+/// sealed under it (`commands::sync::sync_adopt_pending`). Blocking (the
+/// loopback listener): call it off the main thread.
 #[cfg(desktop)]
 pub fn obtain_tokens(app: &AppHandle) -> Result<Tokens> {
     // Bound before the browser opens, on a port the OS picks: the redirect
@@ -416,35 +368,9 @@ pub fn begin(app: &AppHandle) -> Result<Started> {
     open_consent(app, &Credentials::resolve(app)?)
 }
 
-/// Mobile, second half: exchange a code [`parse_redirect`] accepted and store
-/// the tokens. Async — this runs off the URL-open callback, not on it.
-///
-/// `generation` is the connection generation read when the flow began; as on
-/// desktop, tokens that arrive after a disconnect are revoked, not stored.
-#[cfg(mobile)]
-pub async fn complete(
-    app: &AppHandle,
-    cryptor: &Cryptor,
-    code: &str,
-    verifier: &str,
-    generation: u64,
-) -> Result<()> {
-    let tokens = exchange_for_tokens(app, code, verifier).await?;
-    if persisted_if_current(app, cryptor, &tokens, generation)? {
-        return Ok(());
-    }
-    if let Some(token) = revocable(&tokens) {
-        revoke(&super::http_client(), token).await;
-    }
-    Err(disconnected_mid_consent())
-}
-
-fn disconnected_mid_consent() -> Error {
-    Error::Other("Google Drive was disconnected while signing in; connect again".into())
-}
-
-/// [`complete`] without the writing — the mobile twin of [`obtain_tokens`], for
-/// an onboarding flow that has no key to seal a token file with yet.
+/// Mobile, second half: exchange a code [`parse_redirect`] accepted, handing
+/// the tokens back rather than writing them — the twin of [`obtain_tokens`].
+/// Async: this runs off the URL-open callback, not on it.
 #[cfg(mobile)]
 pub async fn exchange_for_tokens(app: &AppHandle, code: &str, verifier: &str) -> Result<Tokens> {
     let credentials = Credentials::resolve(app)?;
@@ -505,13 +431,6 @@ pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -
         log::info!("Drive disconnected mid-refresh; not writing the refreshed tokens back");
     }
     Ok(token)
-}
-
-/// Which Drive connection is current — see `AppState::sync_generation`. Read
-/// before any round trip whose result would be written to the token file, so
-/// the write can tell whether a disconnect landed in between.
-pub fn connection_generation(app: &AppHandle) -> u64 {
-    *app_state(app).sync_generation.lock().unwrap()
 }
 
 /// Write the tokens if the connection they belong to is still `generation`,
@@ -769,22 +688,6 @@ mod tests {
             challenge(verifier),
             "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
         );
-    }
-
-    #[test]
-    fn revocation_prefers_the_refresh_token() {
-        let both = Tokens {
-            access_token: Some("at".into()),
-            refresh_token: Some("rt".into()),
-            expires_at: None,
-        };
-        assert_eq!(revocable(&both), Some("rt"));
-        let access_only = Tokens {
-            access_token: Some("at".into()),
-            ..Default::default()
-        };
-        assert_eq!(revocable(&access_only), Some("at"));
-        assert_eq!(revocable(&Tokens::default()), None);
     }
 
     #[test]

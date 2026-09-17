@@ -72,11 +72,14 @@ products solve it, don't patch symptoms.
 > **Join, don't fork** — the account is the source of truth for which vaults exist: every
 > device connected to it syncs the vaults it holds, and a new pack is minted only into an
 > empty account (the first device) or by creating a workspace on a device that is already
-> connected. Connecting a vault that has never synced (Settings › Sync › Connect on a phone
-> that "started fresh", say) used to mint a second pack beside the desktop's; it now goes
-> through onboarding's keyless connect and probe (`sync_connect` forks on the vault id), shows
-> the account's vaults with the same picker and restore form Settings › Workspaces uses, and
-> only an *empty* account takes the vault as its first (`sync_adopt_pending`). The first run's
+> connected. Connecting a vault (Settings › Sync › Connect on a phone that "started fresh",
+> say) used to mint a second pack beside the desktop's; every connect now goes through
+> onboarding's keyless connect and probe (`sync_connect`, with no fork — a vault is given an
+> id at creation, so the id says nothing about whether it has synced), and
+> `sync_adopt_pending` lists the account's packs with the pending tokens and adopts only an
+> *empty* account or one that already holds this vault's id. Otherwise it refuses
+> (`vaultNotInAccount`), the tokens stay pending, and Settings shows the account's vaults
+> with the same picker and restore form Settings › Workspaces uses. The first run's
 > conflict screen lost "Start a new vault" for the same reason, and `plan_vault_id` refuses
 > to mint beside an existing vault as belt and braces. "Import from Google Drive" (the
 > `Intent::Import` merge) is gone: a pack is sealed under its own vault's KDF salt, so a vault

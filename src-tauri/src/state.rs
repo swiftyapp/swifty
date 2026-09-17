@@ -5,57 +5,46 @@ use std::sync::{Arc, Mutex};
 use chrono::{SecondsFormat, Utc};
 use serde::Serialize;
 
-#[cfg(mobile)]
-use crate::crypto::Cryptor;
 use crate::session::Session;
 
 /// Why a mobile consent flow was started — which decides what happens once the
 /// redirect comes back, and which events the frontend is told through.
+///
+/// One purpose, because every connect is now keyless: the tokens are handed
+/// back and probed before anything is sealed under a vault key, so there is
+/// nothing to tell apart at the redirect. Kept as an enum so a flow that does
+/// need to be told apart later has somewhere to say so.
 #[cfg(mobile)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthPurpose {
-    /// Turn sync on for the vault that is open now.
-    Connect,
-    /// Connect an account with no vault to seal its tokens under, so the user
-    /// can be shown what is up there and choose which of it to restore: the
+    /// Connect an account without sealing its tokens under any vault, so the
+    /// user can be shown what is up there and choose what to do with it: the
     /// first run, the Settings flow that adds a workspace by restoring one of
-    /// the account's other vaults, and a sync connect on a vault that has never
-    /// synced. Alone of the two, it has no cryptor — which is what its callers
-    /// have in common, and why they share one purpose rather than being told
-    /// apart here. What asked is the frontend's to remember; the redirect does
-    /// the same thing either way.
+    /// the account's other vaults, and a sync connect on the open vault (which
+    /// joins the account only if the account is empty or already holds it —
+    /// see `commands::sync::sync_adopt_pending`). What asked is the frontend's
+    /// to remember; the redirect does the same thing either way and leaves the
+    /// tokens in [`AppState::pending_drive`].
     Setup,
 }
 
 /// A mobile consent flow waiting for the browser to come back.
 ///
-/// The OAuth redirect arrives as a deep link long after `sync_connect`
-/// returned, so what the exchange needs has to survive in between: the PKCE
-/// verifier the code is redeemed with, the cryptor the tokens are written
-/// under, and why the flow was started. Holding the cryptor is the same bargain
-/// the desktop path already makes — it clones one before opening the browser
-/// and keeps it for the whole round trip — and it is what lets an auto-lock
-/// behind the Safari sheet cost the user nothing worse than the follow-up sync.
-///
-/// The cryptor is optional because [`AuthPurpose::Setup`] runs on an install
-/// with no vault: there is no key in existence to seal a token file with, so
-/// those tokens land in [`AppState::pending_drive`] instead.
+/// The OAuth redirect arrives as a deep link long after the command that
+/// started the flow returned, so what the exchange needs has to survive in
+/// between: the PKCE verifier the code is redeemed with, and why the flow was
+/// started.
 ///
 /// It has an identity and an age. The `state` nonce went out in the consent URL
 /// and must come back on the redirect, so a stray URL on the same scheme cannot
 /// consume this in place of Google's callback; `started` is what lets a flow
-/// nobody finished expire instead of pending forever. `generation` is the
-/// connection it was started under: a disconnect while the browser is out
-/// bumps it, and the tokens that come back are then revoked rather than stored
-/// (see `AppState::sync_generation`).
+/// nobody finished expire instead of pending forever.
 #[cfg(mobile)]
 pub struct PendingAuth {
     pub verifier: String,
     pub state: String,
-    pub cryptor: Option<Cryptor>,
     pub purpose: AuthPurpose,
     pub started: std::time::Instant,
-    pub generation: u64,
 }
 
 /// The sequence number every `sync:status` snapshot carries, counted once for

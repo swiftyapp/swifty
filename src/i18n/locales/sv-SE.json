@@ -553,6 +553,7 @@
   "A workspace needs a name": "En arbetsyta behöver ett namn",
   "A workspace needs a master password": "En arbetsyta behöver ett huvudlösenord",
   "This vault is already a workspace on this device": "Det här valvet är redan en arbetsyta på den här enheten",
+  "This Google account holds other vaults": "Det här Google-kontot innehåller andra valv",
   "This file is too large": "Den här filen är för stor",
   "This file is not text": "Den här filen är inte en textfil",
   "The vault changed while this was running. Try again.": "Valvet ändrades under tiden. Försök igen.",
