@@ -36,6 +36,13 @@ export interface EventPayloads {
   'setup:drive:probed': { files: SetupDriveFile[] }
   'setup:drive:error': { error: string }
   /**
+   * After every sync run: the account's vaults that no workspace on this
+   * device holds, newest first, in the probe's shape because Settings ›
+   * Workspaces offers them through the same picker. Empty means every vault in
+   * the account is already here.
+   */
+  'workspaces:remote': { files: SetupDriveFile[] }
+  /**
    * The OS opened a backup with the app — a double-clicked `.rowel` or
    * `.swftx`. Rust also parks the path for a shell that was not yet listening
    * (`takeOpenedFile` in `api/app`), so a launch by double-click and an open
@@ -63,6 +70,7 @@ export const EVENTS: { [K in EventName as Camel<K>]: K } = {
   setupDrivePending: 'setup:drive:pending',
   setupDriveProbed: 'setup:drive:probed',
   setupDriveError: 'setup:drive:error',
+  workspacesRemote: 'workspaces:remote',
   fileOpened: 'file:opened'
 }
 

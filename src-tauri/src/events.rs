@@ -18,6 +18,7 @@ pub const IMPORT_PROGRESS: &str = "import:progress";
 pub const SETUP_DRIVE_PENDING: &str = "setup:drive:pending";
 pub const SETUP_DRIVE_PROBED: &str = "setup:drive:probed";
 pub const SETUP_DRIVE_ERROR: &str = "setup:drive:error";
+pub const WORKSPACES_REMOTE: &str = "workspaces:remote";
 // Desktop only, like the file associations that produce it (`crate::opened`).
 #[cfg(desktop)]
 pub const FILE_OPENED: &str = "file:opened";
@@ -81,6 +82,14 @@ pub fn setup_drive_probed(app: &AppHandle, files: Vec<PackInfo>) {
 
 pub fn setup_drive_error(app: &AppHandle, error: &str) {
     let _ = app.emit(SETUP_DRIVE_ERROR, ErrorText { error });
+}
+
+/// The account's vaults that no workspace on this device holds, after every
+/// sync run — the same shape as the probe's answer, because Settings ›
+/// Workspaces offers them through the same picker. Empty means every vault in
+/// the account is here.
+pub fn remote_vaults(app: &AppHandle, files: Vec<PackInfo>) {
+    let _ = app.emit(WORKSPACES_REMOTE, Probed { files });
 }
 
 /// The OS asked the app to open a backup (see `crate::opened`). Also parked for

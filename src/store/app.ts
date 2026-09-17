@@ -74,6 +74,13 @@ export interface AppState {
   sync: SyncStatus
   setupDrive: SetupDriveState
   /**
+   * The account's vaults that are not workspaces on this device, as the last
+   * sync run reported them (`workspaces:remote`). Settings › Workspaces offers
+   * to restore them. Dropped with the session: they are the open workspace's
+   * account's, and the next unlock's sync says again.
+   */
+  remoteVaults: SetupDriveFile[]
+  /**
    * A backup the OS asked the app to open (`file:opened`), waiting for a
    * screen that can take it: the restore step on a fresh install, Settings ›
    * Import once a vault is open. Kept across a lock — the vault has to be
@@ -112,6 +119,7 @@ export const initialApp: AppState = {
     seq: 0
   },
   setupDrive: DRIVE_IDLE,
+  remoteVaults: [],
   openedFile: null,
   update: { readyVersion: null, readyNotes: null, status: null }
 }
@@ -208,7 +216,11 @@ export const clearSession = () => {
   resetUi()
   resetFavicons()
   cancelScheduledSync()
+  useApp.setState({ remoteVaults: [] })
 }
+
+/** What the last sync run found in the account and not here. */
+export const setRemoteVaults = (files: SetupDriveFile[]) => useApp.setState({ remoteVaults: files })
 
 // Manual lock, from anywhere (top chrome, Settings, palette). Nothing to do
 // here but ask: the backend emits `vault:locked` for every lock there is, and

@@ -439,7 +439,7 @@ pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -
 /// to land in and have its delete undone by the write. `false` means the
 /// account was disconnected since `generation` was read, and nothing was
 /// written; whatever the tokens were for is the caller's to wind down.
-fn persisted_if_current(
+pub(crate) fn persisted_if_current(
     app: &AppHandle,
     cryptor: &Cryptor,
     tokens: &Tokens,

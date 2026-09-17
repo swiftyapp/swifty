@@ -85,9 +85,23 @@ products solve it, don't patch symptoms.
 > `Intent::Import` merge) is gone: a pack is sealed under its own vault's KDF salt, so a vault
 > with a salt of its own could never decode it — the empty-vault hero's restore only ever
 > worked for a vault restored from that very pack. Joining therefore *is* the restore; the
-> vault that was open stays as a workspace of its own. Follow-ups: list the account's other
-> packs in Settings › Workspaces after every sync, restore them with the open workspace's
-> tokens rather than a second sign-in, and have a new workspace inherit the account.
+> vault that was open stays as a workspace of its own.
+>
+> **Every vault on every device** — the second half of the same principle. Each sync run
+> lists the account's packs anyway (to settle the vault id), so it now reports the ones no
+> workspace on this device holds (`sync::publish_remote_vaults` → `workspaces:remote`,
+> registry vault ids plus the run's own), and Settings › Workspaces offers them under "In
+> your Google account" with the shared picker and restore form. The restore
+> (`workspace_restore_from_account`) is `workspace_restore_from_drive` with the sign-in taken
+> out: the open workspace's own tokens do the download and a copy is sealed under the restored
+> key — one account, connected once, in as many workspaces as the account has vaults. In the
+> other direction, `workspace_create` on a connected device inherits the account: the tokens
+> are sealed under the new key and the vault is stamped with a minted id *at creation*, so
+> its first sync addresses a pack of its own rather than being refused as a nameless vault
+> beside the account's others; the pack then shows up on every other device's list after their
+> next sync. Follow-ups: try the password against the account's other packs at unlock and
+> restore the matches without asking; pull on foreground and on a timer, since an idle device
+> only syncs on unlock and after its own writes.
 >
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a

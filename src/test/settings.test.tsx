@@ -13,6 +13,7 @@ import {
   flowMain,
   initialApp,
   openSettings,
+  setRemoteVaults,
   setSettingsSection,
   setSyncStatus,
   setupDriveFailed,
@@ -686,6 +687,93 @@ const OTHER_VAULT: SetupDriveFile = {
   size: 64_512,
   modifiedTime: '2023-06-02T00:00:00.000Z'
 }
+
+// Every device on an account is meant to hold every vault in it. A sync run
+// reports the ones this device lacks (`workspaces:remote`), and the section
+// offers them with the account the open workspace already has.
+describe('Settings › workspaces › vaults in the account', () => {
+  it('draws nothing while every vault in the account is here', async () => {
+    await open()
+    await go('workspaces')
+    expect(screen.queryByTestId('workspace-remote-row')).not.toBeInTheDocument()
+  })
+
+  it('restores a vault the account holds and this device does not, with no sign-in', async () => {
+    await open()
+    await act(async () => setRemoteVaults([VAULT, OTHER_VAULT]))
+    await go('workspaces')
+
+    expect(screen.getByTestId('workspace-remote-row')).toBeInTheDocument()
+    // Two vaults is a choice; the newest is picked to start with.
+    expect(screen.getByTestId('remote-vault-drive-file-1')).toHaveAttribute('aria-checked', 'true')
+    await userEvent.click(screen.getByTestId('remote-vault-drive-file-2'))
+    await userEvent.type(screen.getByTestId('workspace-remote-name'), 'Personal')
+    await userEvent.type(screen.getByTestId('workspace-remote-password'), 'other-device-pass')
+    await act(async () => {
+      await userEvent.click(screen.getByTestId('workspace-remote-submit'))
+    })
+
+    expect(calls('workspace_restore_from_account')).toEqual([
+      { name: 'Personal', password: 'other-device-pass', fileId: 'drive-file-2' }
+    ])
+    // The open workspace's own tokens do the work: nothing is signed into.
+    expect(calls('workspace_drive_connect')).toHaveLength(0)
+    expect(calls('sync_connect')).toHaveLength(0)
+    // It lands like every restore: active, unlocked, re-probed, first sync run.
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
+    expect(calls('sync_now')).toHaveLength(1)
+    // The list was the previous workspace's account's; the new one's run says again.
+    expect(useApp.getState().remoteVaults).toEqual([])
+  })
+
+  // One vault is shown, not offered — and its list sits beside the probe's
+  // picker without the two answering to the same ids.
+  it("names the account's only missing vault without asking which", async () => {
+    await open()
+    await act(async () => setRemoteVaults([VAULT]))
+    await go('workspaces')
+
+    expect(screen.getByTestId('remote-found-file')).toBeInTheDocument()
+    expect(screen.queryByTestId('remote-vault-drive-file-1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('drive-found-file')).not.toBeInTheDocument()
+  })
+
+  it('holds Settings on the section while the restore runs', async () => {
+    mockCommandOnce('workspace_restore_from_account', () => new Promise(() => {}))
+    await open()
+    await act(async () => setRemoteVaults([VAULT]))
+    await go('workspaces')
+
+    await userEvent.type(screen.getByTestId('workspace-remote-name'), 'Personal')
+    await userEvent.type(screen.getByTestId('workspace-remote-password'), 'pass')
+    await userEvent.click(screen.getByTestId('workspace-remote-submit'))
+
+    expect(screen.getByTestId('workspace-remote-submit')).toHaveTextContent('Restoring…')
+    expect(screen.getByTestId('modal-close')).toBeDisabled()
+    expect(screen.getByTestId('settings-nav-sync')).toBeDisabled()
+  })
+
+  it('hands a wrong password back to the form', async () => {
+    mockCommandOnce('workspace_restore_from_account', () =>
+      Promise.reject({ kind: 'invalidPassword', message: 'wrong' })
+    )
+    await open()
+    await act(async () => setRemoteVaults([VAULT]))
+    await go('workspaces')
+
+    await userEvent.type(screen.getByTestId('workspace-remote-name'), 'Personal')
+    await userEvent.type(screen.getByTestId('workspace-remote-password'), 'wrong')
+    await userEvent.click(screen.getByTestId('workspace-remote-submit'))
+
+    expect(
+      await screen.findByText(
+        "That isn't the password this was sealed with. Try the one you use on your other devices."
+      )
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-remote-submit')).toHaveTextContent('Restore')
+    expect(useUi.getState().settingsLocked).toBe(false)
+  })
+})
 
 describe('Settings › workspaces › restore from Drive', () => {
   // Consent, then the probe's answer — which arrives as an event, never through

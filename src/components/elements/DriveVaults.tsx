@@ -6,10 +6,16 @@ import RadioList from './RadioList'
 import FoundFileCard from './FoundFileCard'
 
 interface Props {
-  /** Every vault the probe found, newest first. */
+  /** Every vault on offer, newest first. */
   files: SetupDriveFile[]
   selectedId: string | null
   onSelect: (id: string) => void
+  /**
+   * Test id base: `<testid>-vault-<file id>` per option, `<testid>-found-file`
+   * for the single card. The probe's picker keeps `drive`; a second list on
+   * the same screen (the account's vaults not on this device) names its own.
+   */
+  testid?: string
 }
 
 /**
@@ -21,11 +27,10 @@ interface Props {
  * before the password, which is per-vault. One vault is not a choice, so it is
  * shown rather than offered.
  *
- * Shared by the first run and by Settings › Workspaces, which pick a vault out
- * of the same probe for the same reason. They are never on screen together, so
- * the test ids are the same on both.
+ * Shared by the first run, Settings › Sync and Settings › Workspaces, which
+ * pick a vault out of the same probe for the same reason.
  */
-export default function DriveVaults({ files, selectedId, onSelect }: Props) {
+export default function DriveVaults({ files, selectedId, onSelect, testid = 'drive' }: Props) {
   const { t } = useTranslation()
   const dates = useDates()
   const file = files.find(candidate => candidate.id === selectedId) ?? null
@@ -34,7 +39,7 @@ export default function DriveVaults({ files, selectedId, onSelect }: Props) {
     return (
       <RadioList
         name={t('Vaults in this account')}
-        testidPrefix="drive-vault"
+        testidPrefix={`${testid}-vault`}
         value={selectedId ?? ''}
         onChange={onSelect}
         options={files.map(vault => ({
@@ -49,7 +54,7 @@ export default function DriveVaults({ files, selectedId, onSelect }: Props) {
     file && (
       <FoundFileCard
         where="drive"
-        testid="drive-found-file"
+        testid={`${testid}-found-file`}
         name={t('Rowel vault')}
         meta={describeDriveFile(file, dates)}
         encrypted

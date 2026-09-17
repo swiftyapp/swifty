@@ -1,33 +1,50 @@
 import { useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { SetupDriveFile } from '@/api/setup'
-import {
-  restoreWorkspaceFromDrive,
-  setupDriveSelect,
-  switchWorkspaceDriveAccount
-} from '@/store'
-import DriveVaults from '@/components/elements/DriveVaults'
-import Masterpass from '@/components/elements/Masterpass'
-import Button from '@/components/elements/Button'
-import { inputClass } from '@/components/elements/formStyles'
+import DriveVaults from './DriveVaults'
+import Masterpass from './Masterpass'
+import Button from './Button'
+import { inputClass } from './formStyles'
 import { unsealError } from '@/components/Start/shared/errors'
 
 interface Props {
   files: SetupDriveFile[]
   selectedId: string | null
-  /** A restore is in flight (`setupDrive.status === 'restoring'`). */
+  onSelect: (id: string) => void
+  /** A restore is in flight; every control stands down. */
   busy: boolean
+  /**
+   * Restore the picked vault as a workspace called `name`, unlocked with
+   * `password`. A rejection is shown under the password field — a wrong one
+   * as the same sentence every unseal uses.
+   */
+  onRestore: (name: string, password: string, fileId: string) => Promise<void>
+  /**
+   * Sign in as somebody else. Offered only where the account can change: a
+   * probe's pending account can, the open workspace's own cannot.
+   */
+  onSwitchAccount?: () => void
+  /** Test id base for the form's controls; the picker's is `pickerTestid`. */
+  testid?: string
+  pickerTestid?: string
 }
 
-// Which vault, what to call it here, and the password it was sealed with.
-//
-// No strength bar and no confirmation field, unlike `NewWorkspace`: this
-// password is not being chosen, it is being recalled — it belongs to a vault
-// another device created, and the only thing that can judge it is the pack.
-//
-// `busy` comes from the store rather than living here, because the row that
-// draws this form draws a Cancel of its own that has to stand down with it.
-export default function RestoreForm({ files, selectedId, busy }: Props) {
+/**
+ * Name, password, Restore: the last step of every "make a workspace out of a
+ * vault on Drive" flow, whichever account the vault came from. The list and
+ * the pick are the caller's — they outlive a wrong password — so this only
+ * draws them.
+ */
+export default function DriveRestoreForm({
+  files,
+  selectedId,
+  onSelect,
+  busy,
+  onRestore,
+  onSwitchAccount,
+  testid = 'workspace-restore',
+  pickerTestid = 'drive'
+}: Props) {
   const { t } = useTranslation()
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
@@ -39,14 +56,12 @@ export default function RestoreForm({ files, selectedId, busy }: Props) {
     setPassword(event.currentTarget.value)
   }
 
-  // The fields are read once here and disabled while busy, so what is restored
-  // is exactly what is on screen — the same bargain `NewWorkspace` makes.
   const submit = () => {
     if (busy || !selectedId) return
     const label = name.trim()
     if (!label) return setNameError(t('Fill in the name'))
     setError(null)
-    restoreWorkspaceFromDrive(label, password, selectedId).catch((err: unknown) => {
+    onRestore(label, password, selectedId).catch((err: unknown) => {
       setError(
         unsealError(
           t,
@@ -59,11 +74,11 @@ export default function RestoreForm({ files, selectedId, busy }: Props) {
 
   return (
     <div className="flex max-w-xs flex-col gap-3">
-      <DriveVaults files={files} selectedId={selectedId} onSelect={setupDriveSelect} />
+      <DriveVaults files={files} selectedId={selectedId} onSelect={onSelect} testid={pickerTestid} />
       <input
         type="text"
         className={inputClass}
-        data-testid="workspace-restore-name"
+        data-testid={`${testid}-name`}
         placeholder={t('Workspace name')}
         value={name}
         disabled={busy}
@@ -73,13 +88,13 @@ export default function RestoreForm({ files, selectedId, busy }: Props) {
         }}
       />
       {nameError && (
-        <div data-testid="workspace-restore-name-error" className="text-base text-bad">
+        <div data-testid={`${testid}-name-error`} className="text-base text-bad">
           {nameError}
         </div>
       )}
       <Masterpass
         placeholder={t('Master password')}
-        testid="workspace-restore-password"
+        testid={`${testid}-password`}
         autoFocus={false}
         disabled={busy}
         error={error}
@@ -87,17 +102,15 @@ export default function RestoreForm({ files, selectedId, busy }: Props) {
         onChange={change}
       />
       <div className="flex items-center gap-4">
-        <Button size="md" testid="workspace-restore-submit" loading={busy} onClick={submit}>
+        <Button size="md" testid={`${testid}-submit`} loading={busy} onClick={submit}>
           {busy ? t('Restoring…') : t('Restore')}
         </Button>
-        {/* Withdrawn while the restore runs: it has already taken the account
-            it is restoring from, and the backend would refuse the swap. */}
-        {!busy && (
+        {!busy && onSwitchAccount && (
           <Button
             variant="pale"
             size="md"
-            testid="workspace-restore-switch-account"
-            onClick={switchWorkspaceDriveAccount}
+            testid={`${testid}-switch-account`}
+            onClick={onSwitchAccount}
           >
             {t('Switch account')}
           </Button>

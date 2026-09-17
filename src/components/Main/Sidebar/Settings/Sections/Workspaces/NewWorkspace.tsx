@@ -74,7 +74,7 @@ export default function NewWorkspace() {
     <SettingsRow
       label={t('Add a workspace')}
       description={t(
-        'Each workspace is a separate encrypted database with its own master password and its own Drive connection. Biometric unlock stays with your primary workspace for now.'
+        'Each workspace is a separate encrypted database with its own master password. On a device that syncs, it syncs to the same Google account as a vault of its own. Biometric unlock stays with your primary workspace for now.'
       )}
       testid="workspace-new-row"
     >

@@ -1,5 +1,10 @@
 import type { Workspace } from '@/api/types'
-import { workspaceCreate, workspaceRestoreFromDrive, workspaceSelect } from '@/api/workspace'
+import {
+  workspaceCreate,
+  workspaceRestoreFromAccount,
+  workspaceRestoreFromDrive,
+  workspaceSelect
+} from '@/api/workspace'
 import { PRIMARY_WORKSPACE } from '@/lib/workspace'
 import {
   useApp,
@@ -86,6 +91,28 @@ export const restoreWorkspaceFromDrive = async (
   } catch (error) {
     setupDriveRestoreFailed()
     throw error
+  } finally {
+    lockSettings(false)
+  }
+  clearSession()
+  await enterMain(result)
+  await refreshApp()
+}
+
+// The same landing, for a vault the open workspace's account holds and this
+// device does not. No probe state to keep: there was no sign-in, so nothing is
+// pending and nothing has to be forgotten. Settings is held for the same reason
+// as above — the restore ends by switching workspaces, and a navigation that
+// looked like backing out would let that happen behind the user's back.
+export const restoreWorkspaceFromAccount = async (
+  name: string,
+  password: string,
+  fileId: string
+) => {
+  lockSettings(true)
+  let result
+  try {
+    result = await workspaceRestoreFromAccount(name, password, fileId)
   } finally {
     lockSettings(false)
   }

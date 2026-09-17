@@ -58,3 +58,16 @@ export const workspaceRestoreFromDrive = (
   fileId: string
 ): Promise<UnlockResult> =>
   call('workspace_restore_from_drive', { name, password, fileId })
+
+/**
+ * The same, for one of the vaults the open workspace's own account holds and
+ * this device does not (`workspaces:remote`). No sign-in: the open workspace's
+ * tokens do the download, and a copy is sealed under the restored vault's key.
+ * Refused as `syncNotConfigured` from a workspace that does not sync.
+ */
+export const workspaceRestoreFromAccount = (
+  name: string,
+  password: string,
+  fileId: string
+): Promise<UnlockResult> =>
+  call('workspace_restore_from_account', { name, password, fileId })
