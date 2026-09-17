@@ -42,8 +42,10 @@ use crate::sync;
 ///
 /// Any workspace may connect: the token file resolves under the active
 /// workspace's directory, and the vault's own id names the pack it syncs
-/// (`Rowel/Vaults/<vault-id>.rowel`), so two workspaces share neither the
-/// account nor the file even when the user points them at the same Drive.
+/// (`Rowel/Vaults/<vault-id>.rowel`), so two workspaces share neither
+/// credentials nor a file even when the user points them at the same Drive.
+/// What they do share is the OAuth grant behind those credentials, which Google
+/// keeps per account and client rather than per token — see [`sync_disconnect`].
 #[cfg(desktop)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
@@ -65,8 +67,18 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     start_consent(&app, &state, AuthPurpose::Connect).inspect_err(|e| failed(&app, e.to_string()))
 }
 
-/// Disconnect the sync provider: the token file is deleted and the grant is
-/// retired at Google.
+/// Disconnect the sync provider for the workspace that is open: its token file
+/// is deleted, and the grant is retired at Google only if no other workspace on
+/// this install still holds one.
+///
+/// The condition is Google's, not ours: revocation kills the whole grant for
+/// this account and OAuth client, so revoking on behalf of one workspace would
+/// invalidate every other workspace's credentials too — leaving them
+/// "connected" locally against tokens that no longer work. A workspace-level
+/// disconnect therefore drops only its own credential, and the grant goes only
+/// with the last of them. (Signing this app out of Google everywhere while
+/// other workspaces stay connected is a different action, and one the UI does
+/// not offer yet.)
 ///
 /// The local half runs first and synchronously, and the revocation goes to a
 /// detached task afterwards — a user who disconnects on a plane is still
@@ -74,6 +86,9 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 /// whether or not Google ever hears about it.
 #[tauri::command]
 pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    // Before anything is deleted: a root the app cannot resolve is a failure
+    // that has changed nothing, rather than one reported after the fact.
+    let root = crate::storage::root_dir(&app)?;
     let cryptor = state.session.lock().unwrap().cryptor()?;
     // `?`, and before anything below it: if the delete failed the token file —
     // and the usable refresh token in it — is still on disk, so the vault is
@@ -90,8 +105,16 @@ pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()>
         run.error = None;
         run.last_synced_at = None;
     });
+    // Read after the delete above, so what it looks for is what is left: the
+    // token files of the *other* workspaces. A switch landing in between can
+    // only make this answer "someone else is still connected", which is the
+    // side that leaves working credentials working.
     if let Some(tokens) = tokens {
-        tauri::async_runtime::spawn(async move { sync::revoke(&tokens).await });
+        let registry = crate::workspace::Registry::load(&root);
+        let active = crate::workspace::active_id(&app);
+        if !crate::workspace::other_workspaces_connected(&root, &registry, &active) {
+            tauri::async_runtime::spawn(async move { sync::revoke(&tokens).await });
+        }
     }
     Ok(())
 }
