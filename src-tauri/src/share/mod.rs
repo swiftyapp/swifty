@@ -7,9 +7,10 @@
 //! lifecycle is testable without a network.
 //!
 //! The link is the only secret: it never reaches Drive, and nothing here stores
-//! it. What Drive holds is ciphertext plus three opaque properties, which is
-//! also the only ledger of outstanding shares — any of the sender's devices can
-//! therefore list, revoke and clean up, and a reinstall loses nothing.
+//! it. What Drive holds is ciphertext plus a handful of opaque properties,
+//! which is also the only ledger of outstanding shares — any device holding the
+//! vault that published one can therefore list, revoke and clean it up, and a
+//! reinstall loses nothing.
 
 pub mod envelope;
 pub mod remote;
@@ -20,13 +21,13 @@ use serde::Serialize;
 use tauri::AppHandle;
 
 use crate::crypto::Cryptor;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::models::Entry;
 use crate::sync::layout;
 use envelope::{Link, ShareKey, SHARE_TTL_MS};
 use remote::{
     DriveShareRemote, PublicFetch, ShareFile, ShareRemote, PROP_ENTRY_ID, PROP_EXPIRES_AT,
-    PROP_KIND, PROP_SHARE, PROP_SHARE_VALUE,
+    PROP_KIND, PROP_SHARE, PROP_SHARE_VALUE, PROP_VAULT_ID,
 };
 
 /// A freshly published share, as the send dialog needs it.
@@ -53,7 +54,20 @@ pub struct ActiveShare {
 }
 
 /// Seal `entry` and publish it, returning the link that opens it.
-pub fn create(remote: &impl ShareRemote, entry: &Entry, now_ms: i64) -> Result<Created> {
+///
+/// `vault_id` is the sharing vault's own id, stamped on the file so that vault
+/// can pick its shares out of an account several vaults now write into, and so
+/// no other one can revoke them. It is required rather than optional: a share
+/// carrying no id belongs to nobody (see [`owned_by`]), so publishing one would
+/// hand out a link its own sender could not list or take back. A vault holds an
+/// id only once a sync run has succeeded, which is why the sending commands
+/// refuse before they get here.
+pub fn create(
+    remote: &impl ShareRemote,
+    entry: &Entry,
+    vault_id: &str,
+    now_ms: i64,
+) -> Result<Created> {
     envelope::check_shareable(entry)?;
     let key = ShareKey::generate();
     let expires_ms = envelope::expires_at(now_ms);
@@ -63,6 +77,7 @@ pub fn create(remote: &impl ShareRemote, entry: &Entry, now_ms: i64) -> Result<C
     // away, and this property is precisely what lets the sender's own list name
     // a share that carries no title. The marker property is how every share is
     // found again, whichever folder it landed in.
+    let expires = expires_ms.to_string();
     let file_id = remote.upload(
         &file_name(),
         &sealed,
@@ -70,7 +85,8 @@ pub fn create(remote: &impl ShareRemote, entry: &Entry, now_ms: i64) -> Result<C
             (PROP_SHARE, PROP_SHARE_VALUE),
             (PROP_ENTRY_ID, entry.id.as_str()),
             (PROP_KIND, entry.kind.as_str()),
-            (PROP_EXPIRES_AT, &expires_ms.to_string()),
+            (PROP_EXPIRES_AT, expires.as_str()),
+            (PROP_VAULT_ID, vault_id),
         ],
     )?;
 
@@ -103,7 +119,30 @@ pub fn open(fetch: &impl PublicFetch, link: &str, now_ms: i64) -> Result<Entry> 
 }
 
 /// Delete one share now, whatever its expiry. The link stops working.
-pub fn revoke(remote: &impl ShareRemote, file_id: &str) -> Result<()> {
+///
+/// The share has to be the asking vault's own. One account keeps every vault's
+/// shares in one folder, and `file_id` is whatever the caller sent — a bearer
+/// value that authorizes nothing by itself — so the file is fetched and its
+/// `vaultId` read off Drive rather than taken on trust. It is the same test
+/// [`list`] applies, so a vault can revoke exactly what it can see and no more,
+/// and an unmarked file is not a share of ours at any id: refused, never
+/// deleted.
+///
+/// Fetched by id rather than looked up in the listing, because Drive's query
+/// index lags its files: the send dialog offers Revoke seconds after the upload,
+/// and a share the index has not caught up with would otherwise read as already
+/// gone and be silently left behind.
+///
+/// A file Drive no longer has does count as revoked: the sweep, another device,
+/// or an earlier click of the same button all leave the caller with what it
+/// asked for, which is why the delete underneath is idempotent too.
+pub fn revoke(remote: &impl ShareRemote, file_id: &str, vault_id: &str) -> Result<()> {
+    let Some(file) = remote.get(file_id)? else {
+        return Ok(());
+    };
+    if !owned_by(&file, vault_id) {
+        return Err(Error::ShareNotOwned);
+    }
     remote.delete(file_id)
 }
 
@@ -122,11 +161,37 @@ pub fn sweep(remote: &impl ShareRemote, now_ms: i64) -> Result<usize> {
     Ok(deleted)
 }
 
-/// The sender's outstanding shares, swept first so the list is never showing
+/// This vault's outstanding shares, swept first so the list is never showing
 /// something a recipient can no longer open.
-pub fn list(remote: &impl ShareRemote, now_ms: i64) -> Result<Vec<ActiveShare>> {
+///
+/// The sweep above is account-wide — an expired share is dead wherever it came
+/// from, and whichever of the sender's devices notices should say so — but the
+/// list is not: an account can hold several vaults' shares now, and every row
+/// here carries a Revoke.
+pub fn list(remote: &impl ShareRemote, vault_id: &str, now_ms: i64) -> Result<Vec<ActiveShare>> {
     sweep(remote, now_ms)?;
-    Ok(remote.list()?.iter().map(active_share).collect())
+    Ok(remote
+        .list()?
+        .iter()
+        .filter(|file| owned_by(file, vault_id))
+        .map(active_share)
+        .collect())
+}
+
+/// Whether this vault may list `file` and revoke it. The single rule both verbs
+/// go through: showing a share to a vault that may not delete it is a Revoke
+/// button that fails, and the reverse is one vault deleting another's link.
+///
+/// It has to be one of this app's shares before it can be anyone's, which a
+/// listing settles on its own but [`revoke`] does not — it is handed a file id,
+/// and an arbitrary Drive file carries no marker and so belongs to no vault.
+///
+/// Ownership is two concrete ids agreeing, never two absences: a share carrying
+/// no `vaultId` predates the property and is nobody's, shown to no vault and
+/// revocable by none. Nothing is stranded by that — it expires within its 24
+/// hours and the account-wide [`sweep`] takes it.
+fn owned_by(file: &ShareFile, vault_id: &str) -> bool {
+    file.marked && file.vault_id.as_deref() == Some(vault_id)
 }
 
 fn active_share(file: &ShareFile) -> ActiveShare {

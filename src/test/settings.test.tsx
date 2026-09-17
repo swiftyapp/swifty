@@ -90,6 +90,24 @@ describe('Settings › sync', () => {
     expect(calls('sync_connect')).toHaveLength(1)
   })
 
+  // Every workspace holds its own Drive connection and syncs its own pack now,
+  // so a second one is offered the same controls as the primary rather than a
+  // notice telling it where to go instead.
+  it('offers Drive in a workspace that is not the primary', async () => {
+    seedApp({
+      workspaces: [
+        { id: 'default', name: null },
+        { id: 'w2', name: 'Work' }
+      ],
+      activeWorkspace: 'w2'
+    })
+    await open()
+
+    expect(screen.queryByTestId('settings-sync-primary-only')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('settings-drive-connect'))
+    expect(calls('sync_connect')).toHaveLength(1)
+  })
+
   // The mobile shape of the same flow: `sync_connect` resolves as soon as
   // Safari has the screen, so the row waits on the backend's events — the
   // click itself claims nothing.

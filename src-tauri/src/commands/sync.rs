@@ -20,7 +20,6 @@ use std::sync::Arc;
 #[cfg(mobile)]
 use std::time::Duration;
 
-use chrono::{SecondsFormat, Utc};
 use tauri::{AppHandle, Manager, State};
 
 use crate::crypto::Cryptor;
@@ -39,10 +38,16 @@ use crate::sync;
 /// Returns as soon as the session has a cryptor to give: the consent flow is a
 /// browser round trip, and the frontend hears how it went on `sync:status`
 /// rather than from this promise — the same story mobile tells.
+///
+/// Any workspace may connect: the token file resolves under the active
+/// workspace's directory, and the vault's own id names the pack it syncs
+/// (`Rowel/Vaults/<vault-id>.rowel`), so two workspaces share neither
+/// credentials nor a file even when the user points them at the same Drive.
+/// What they do share is the OAuth grant behind those credentials, which Google
+/// keeps per account and client rather than per token — see [`sync_disconnect`].
 #[cfg(desktop)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    crate::workspace::guard_primary(&app)?;
     spawn_consent(&app, &state, Follow::Run)
 }
 
@@ -58,27 +63,31 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    crate::workspace::guard_primary(&app)?;
     start_consent(&app, &state, AuthPurpose::Connect).inspect_err(|e| failed(&app, e.to_string()))
 }
 
-/// Disconnect the sync provider: the token file is deleted and the grant is
-/// retired at Google.
+/// Disconnect the sync provider for the workspace that is open: its token file
+/// is deleted, and nothing on this device can reconnect without fresh consent.
 ///
-/// The local half runs first and synchronously, and the revocation goes to a
-/// detached task afterwards — a user who disconnects on a plane is still
-/// disconnected, and nothing on this device can reconnect without fresh consent
-/// whether or not Google ever hears about it.
+/// Local only, on purpose. Google's revocation endpoint retires the whole grant
+/// for an account and OAuth client — every token this app ever got for that
+/// account, in every workspace and on every device — so it is not a thing one
+/// workspace can do on its own behalf, and this install cannot tell which
+/// other workspaces (or other devices) share the account: their token files
+/// are sealed under keys it does not hold. Signing this app out of Google is a
+/// separate, explicitly global action, and one the UI does not offer yet.
 #[tauri::command]
 pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    let cryptor = state.session.lock().unwrap().cryptor()?;
+    // Only an unlocked vault can be disconnected: the token file is its own,
+    // and the paths below resolve to the workspace that is open.
+    state.session.lock().unwrap().cryptor()?;
     // `?`, and before anything below it: if the delete failed the token file —
     // and the usable refresh token in it — is still on disk, so the vault is
     // still connected. Flipping the session flag or clearing the run state here
     // would show the user a disconnected account over a live credential. A
     // token refresh awaiting Google meanwhile finds the connection generation
     // changed and skips its write-back (see `AppState::sync_generation`).
-    let tokens = sync::disconnect(&app, &cryptor)?;
+    sync::disconnect(&app)?;
     state.session.lock().unwrap().sync_configured = false;
     // The timestamp goes with the connection: the next one is a new pairing,
     // and "synced 3m ago" from a previous one would be a lie about it.
@@ -87,9 +96,6 @@ pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()>
         run.error = None;
         run.last_synced_at = None;
     });
-    if let Some(tokens) = tokens {
-        tauri::async_runtime::spawn(async move { sync::revoke(&tokens).await });
-    }
     Ok(())
 }
 
@@ -124,7 +130,6 @@ pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(desktop)]
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    crate::workspace::guard_primary(&app)?;
     spawn_consent(&app, &state, Follow::Pull)
 }
 
@@ -132,7 +137,6 @@ pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    crate::workspace::guard_primary(&app)?;
     start_consent(&app, &state, AuthPurpose::Import).inspect_err(|e| failed(&app, e.to_string()))
 }
 
@@ -426,10 +430,7 @@ fn fail(app: &AppHandle, purpose: AuthPurpose, why: String) {
 /// and a probe that read the state just before it is recognisably older.
 fn update(app: &AppHandle, change: impl FnOnce(&mut SyncRun)) {
     app.state::<AppState>()
-        .sync_run
-        .lock()
-        .unwrap()
-        .transition(change);
+        .sync_run(|run| run.transition(change));
     events::sync_status(app, status(app));
 }
 
@@ -491,19 +492,12 @@ fn started(app: &AppHandle) {
     });
 }
 
-/// A run ended. A failed run leaves the previous timestamp standing: the vault
-/// is still current as of whenever it last landed.
+/// A run ended — see [`SyncRun::finish`] for what that leaves standing.
 fn finished(app: &AppHandle, error: Option<String>) {
     if let Some(why) = &error {
         log::warn!("sync failed: {why}");
     }
-    update(app, |run| {
-        run.in_progress = false;
-        if error.is_none() {
-            run.last_synced_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
-        }
-        run.error = error;
-    });
+    update(app, |run| run.finish(error));
 }
 
 /// The whole of sync as the frontend should see it right now.
@@ -519,8 +513,19 @@ pub(crate) fn status(app: &AppHandle) -> SyncStatus {
         crate::storage::sync_configured(app)
     };
     drop(session);
-    let status = state.sync_run.lock().unwrap().status(configured);
-    status
+    state.sync_run(|run| run.status(configured))
+}
+
+/// The active workspace changed: say what sync looks like for the new one.
+///
+/// A transition rather than a bare emit, and that is the point: the snapshot the
+/// frontend is holding describes the workspace that just locked, which may have
+/// been through more transitions than the one being switched to has. Going
+/// through `update` gives this one the later sequence, so it is taken rather
+/// than discarded as stale (see `SYNC_SEQ`). The re-probe that `vault:locked`
+/// triggers then answers with the same snapshot.
+pub(crate) fn switched(app: &AppHandle) {
+    update(app, |_| {});
 }
 
 // --- runs ----------------------------------------------------------------------

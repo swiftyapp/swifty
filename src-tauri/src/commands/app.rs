@@ -90,8 +90,9 @@ pub fn snapshot(app: &AppHandle) -> Result<AppStatus> {
     };
     drop(session);
 
-    // The same snapshot `sync:status` carries, built the same way.
-    let sync = state.sync_run.lock().unwrap().status(sync_configured);
+    // The same snapshot `sync:status` carries, built the same way — and for the
+    // same workspace, since both read the active one's run state.
+    let sync = state.sync_run(|run| run.status(sync_configured));
 
     let settings = settings::current(app);
 

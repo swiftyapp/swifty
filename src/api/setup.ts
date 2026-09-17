@@ -47,16 +47,12 @@ export const setupRestoreFromDrive = (
 
 /**
  * Create the local data under `password`. Any tokens left pending by
- * `setupDriveConnect` are adopted, so the result reports sync as configured;
- * `archiveRemote` renames the pack named by `fileId` to
- * `<name>-archived-<date>.rowel` first, rather than writing over it. `fileId`
- * is null whenever nothing is being archived.
+ * `setupDriveConnect` are adopted, so the result reports sync as configured.
+ * A vault the account already holds is left alone: this one gets its own id,
+ * and syncs to its own pack beside it.
  */
-export const setupCreate = (
-  password: string,
-  archiveRemote: boolean,
-  fileId: string | null = null
-): Promise<UnlockResult> => call('setup_create', { password, archiveRemote, fileId })
+export const setupCreate = (password: string): Promise<UnlockResult> =>
+  call('setup_create', { password })
 
 /**
  * First run only: install a `.rowel` backup as this device's vault. The same

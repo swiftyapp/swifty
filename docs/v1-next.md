@@ -45,11 +45,24 @@ products solve it, don't patch symptoms.
 > restore or to archive, so an account holding two installs' primaries never has one chosen
 > for it.
 >
+> **Per-workspace sync** — every workspace now connects its own Drive account and syncs its own
+> pack, so `guard_primary` is left covering biometric unlock alone (one keychain slot per
+> install). Archive-by-rename went with it: "start fresh" over an account that already holds a
+> vault simply mints a new vault id, and the old pack stays where it is. Shares carry a
+> `vaultId` appProperty so each vault lists only its own, while the sweep stays account-wide.
+> Workspaces share no credentials and no pack, but they do share the OAuth *grant*: Google
+> retires one per account and client, across every workspace and every device. Disconnecting
+> a workspace therefore deletes only its own token file and never revokes at Google — a
+> workspace cannot tell who else holds a token for the account (other token files are sealed
+> under keys it does not have, and other devices are invisible to it), so any revocation it
+> attempted would be either too broad or, guessed from local files alone, wrong.
+>
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a
-> foreign-vault error); OAuth scope audit (`drive.file`); per-workspace sync (drops
-> archive-by-rename — "start fresh" simply becomes a new vault — and adds a `vaultId`
-> appProperty on shares); **release gate: a production Google OAuth client ID (owner task)**.
+> foreign-vault error); OAuth scope audit (`drive.file`); "restore from Drive into an
+> additional workspace" from Settings; an explicitly global "Revoke Google access" action, the
+> one place the grant is retired (a per-workspace disconnect deliberately never does);
+> **release gate: a production Google OAuth client ID (owner task)**.
 
 Re-enable Google Drive sync on the new SQLite storage engine. Postponed during remediation;
 picking it back up now. **The storage groundwork already exists** — do not rebuild it:

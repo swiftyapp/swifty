@@ -3,8 +3,7 @@
 //! ```text
 //! Rowel/
 //!   Vaults/
-//!     <vault-id>.rowel                 one live pack per vault
-//!     <vault-id>-archived-<date>.rowel a pack set aside by "start fresh"
+//!     <vault-id>.rowel     one pack per vault
 //!   Shares/
 //!     <random>.rowelshare              one outstanding share
 //! ```
@@ -44,12 +43,11 @@ pub fn vault_file_name(vault_id: &str) -> String {
     format!("{vault_id}.{VAULT_EXTENSION}")
 }
 
-/// The vault id a file in [`VAULTS_FOLDER`] is the live pack of, if it is one.
+/// The vault id a file in [`VAULTS_FOLDER`] is the pack of, if it is one.
 ///
-/// Exact: `<id>.rowel` where `<id>` is non-empty lowercase hex. An archived
-/// pack (`<id>-archived-<date>.rowel`) is not a live vault and reads as `None`,
-/// which is what keeps "start fresh" from ever being mistaken for a second
-/// vault.
+/// Exact: `<id>.rowel` where `<id>` is non-empty lowercase hex. This is the
+/// user's own Drive folder, so anything else they have put in it — a copy, a
+/// share, a note — reads as `None` rather than as a vault.
 pub fn vault_id_of(file_name: &str) -> Option<&str> {
     let id = file_name.strip_suffix(&format!(".{VAULT_EXTENSION}"))?;
     let is_hex = !id.is_empty()
@@ -57,18 +55,6 @@ pub fn vault_id_of(file_name: &str) -> Option<&str> {
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
     is_hex.then_some(id)
-}
-
-/// The name a pack is set aside under when the user starts fresh on `date`
-/// (`YYYY-MM-DD`, UTC): the original stem, `-archived-<date>`, and the vault
-/// extension — so `<id>.rowel` archives as `<id>-archived-<date>.rowel`. Same
-/// extension as a live pack, so the archive is still recognisably a Rowel vault
-/// the user could restore from.
-pub fn archived_file_name(file_name: &str, date: &str) -> String {
-    let stem = file_name
-        .rsplit_once('.')
-        .map_or(file_name, |(stem, _)| stem);
-    format!("{stem}-archived-{date}.{VAULT_EXTENSION}")
 }
 
 /// A share file's name: `token` is random and the name says nothing else —
@@ -89,24 +75,12 @@ mod tests {
 
     #[test]
     fn only_an_exact_hex_stem_reads_as_a_live_vault() {
-        assert_eq!(vault_id_of("a1b2c3-archived-2026-09-17.rowel"), None);
+        assert_eq!(vault_id_of("a1b2c3-copy.rowel"), None);
         assert_eq!(vault_id_of("notes.txt"), None);
         assert_eq!(vault_id_of(".rowel"), None);
         assert_eq!(vault_id_of("A1B2.rowel"), None);
         assert_eq!(vault_id_of("a1b2.rowelshare"), None);
         assert_eq!(vault_id_of("a1b2"), None);
-    }
-
-    #[test]
-    fn an_archive_keeps_the_stem_and_takes_the_vault_extension() {
-        assert_eq!(
-            archived_file_name("a1b2.rowel", "2026-09-17"),
-            "a1b2-archived-2026-09-17.rowel"
-        );
-        assert_eq!(
-            archived_file_name("noext", "2026-09-17"),
-            "noext-archived-2026-09-17.rowel"
-        );
     }
 
     #[test]

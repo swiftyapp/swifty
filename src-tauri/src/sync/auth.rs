@@ -283,24 +283,24 @@ pub fn is_configured(app: &AppHandle, cryptor: &Cryptor) -> bool {
 /// meant the next unlock read the file back as "configured" and auto-sync
 /// uploaded to an account the user had just disconnected.
 ///
-/// Hands back whatever was stored so the caller can revoke it upstream — the
-/// file is gone by then, and this is the last chance to see it.
+/// Local only: the grant at Google is left alone, because revoking it would
+/// retire every token for the account and client — other workspaces', other
+/// devices' — and a workspace cannot know who else holds one (see
+/// `commands::sync::sync_disconnect`).
 ///
 /// A failed delete is an error, not a shrug: the refresh token is still on disk
 /// and still usable, so the only honest answer is that the account is *not*
-/// disconnected. `Ok(None)` means there was nothing stored to revoke.
+/// disconnected.
 ///
 /// The connection generation is bumped and the file deleted under one hold of
 /// the token-file guard, so a refresh's write-back and a password change's
 /// re-seal (both of which take the same guard) either see the old generation
 /// and finish before this runs, or see the new one and leave the file gone.
-pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<Option<Tokens>> {
+pub fn disconnect(app: &AppHandle) -> Result<()> {
     let state = app_state(app);
     let mut generation = state.sync_generation.lock().unwrap();
     *generation += 1;
-    let tokens = read_tokens(app, cryptor);
-    storage::remove_gdrive(app)?;
-    Ok(tokens)
+    storage::remove_gdrive(app)
 }
 
 /// Re-seal the token file under `new` — a password change moved the vault key

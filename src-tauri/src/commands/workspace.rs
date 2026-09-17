@@ -59,6 +59,10 @@ pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) 
     *state.active_workspace.lock().unwrap() = id;
     // Ended like any other session: clipboard cleared, idle timer dropped.
     crate::session::sealed(&app);
+    // Sync is per workspace, and what the frontend is holding belongs to the one
+    // that just locked. Said now rather than left to the re-probe below, so no
+    // frame shows another vault's "last synced" or another vault's error.
+    super::sync::switched(&app);
     // Announced like any other lock, so the frontend takes the one path it
     // takes for all of them. After the repoint rather than inside the clear
     // (`session::lock`): the reaction re-probes `app_status`, which must find
@@ -76,8 +80,10 @@ pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) 
 /// switch mid-flight would seal one workspace's account under another's
 /// directory, and the next sync from there would publish into the wrong pack.
 fn guard_sync_idle(state: &AppState) -> Result<()> {
-    let run = state.sync_run.lock().unwrap();
-    let busy = state.syncing.load(Ordering::SeqCst) || run.pending || run.in_progress;
+    // The active workspace's run state is the only one that can have a flow in
+    // it: starting one takes the lock this caller is holding.
+    let busy = state.syncing.load(Ordering::SeqCst)
+        || state.sync_run(|run| run.pending || run.in_progress);
     #[cfg(mobile)]
     let busy = busy || state.pending_auth.lock().unwrap().is_some();
     if busy {

@@ -129,10 +129,9 @@ pub fn is_primary(app: &AppHandle) -> bool {
 
 /// Refuse a feature that is still single-vault.
 ///
-/// Drive sync and biometric unlock each hold one slot for the whole install —
-/// one "Rowel" folder with one pack, one keychain item under a fixed service
-/// and account name — so a second workspace using either would overwrite the
-/// primary's rather than get its own.
+/// Biometric unlock alone, now that sync is per-workspace: the enrolled key is
+/// one keychain item under a fixed service and account name, so a second
+/// workspace enrolling would overwrite the primary's rather than get its own.
 pub fn guard_primary(app: &AppHandle) -> Result<()> {
     if is_primary(app) {
         Ok(())

@@ -147,11 +147,10 @@ pub fn setup(app: &AppHandle, cryptor: &Cryptor, generation: u64) -> Result<()> 
 #[cfg(mobile)]
 pub use auth::{begin, complete, parse_redirect, redirect_matches, Redirect};
 
-/// Drop the account locally, handing back the tokens that were stored so the
-/// caller can [`revoke`] them. An error means the token file is still on disk
+/// Drop the account locally. An error means the token file is still on disk
 /// and the account is therefore still connected.
-pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<Option<Tokens>> {
-    auth::disconnect(app, cryptor)
+pub fn disconnect(app: &AppHandle) -> Result<()> {
+    auth::disconnect(app)
 }
 
 /// Re-seal the stored tokens under a new vault key (a password change). A
@@ -166,14 +165,6 @@ pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()
 /// for a connection a disconnect has since ended.
 pub fn connection_generation(app: &AppHandle) -> u64 {
     auth::connection_generation(app)
-}
-
-/// Retire a disconnected account's grant at Google. Best effort: the local
-/// disconnect stands whatever happens here.
-pub(crate) async fn revoke(tokens: &Tokens) {
-    if let Some(token) = auth::revocable(tokens) {
-        auth::revoke(&http_client(), token).await;
-    }
 }
 
 /// Why a run was started, as far as choosing the pack goes.

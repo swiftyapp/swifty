@@ -10,6 +10,10 @@ use crate::error::Error;
 // under test.
 const NOW: i64 = 1_700_000_000_000;
 
+/// The vault doing the sharing throughout. An account can hold several now, so
+/// every call says which one it is asking as.
+const VAULT: &str = "a1b2";
+
 fn entry() -> Entry {
     serde_json::from_value(json!({
         "id": "entry-1", "type": "login", "title": "Router",
@@ -27,12 +31,21 @@ fn entry() -> Entry {
     .unwrap()
 }
 
-// A share as another writer would leave it: marked, dated, nothing else.
-fn upload_share(remote: &FakeShareRemote, name: &str, expires: Option<i64>) -> String {
+// A share uploaded by hand, so a test can leave off what `create` always
+// writes: an expiry, or — as an older build did — the vault it came from.
+fn upload_share(
+    remote: &FakeShareRemote,
+    name: &str,
+    expires: Option<i64>,
+    vault_id: Option<&str>,
+) -> String {
     let expires = expires.map(|e| e.to_string());
     let mut properties = vec![(PROP_SHARE, PROP_SHARE_VALUE)];
     if let Some(expires) = &expires {
         properties.push((PROP_EXPIRES_AT, expires));
+    }
+    if let Some(vault_id) = vault_id {
+        properties.push((PROP_VAULT_ID, vault_id));
     }
     remote.upload(name, b"sealed", &properties).unwrap()
 }
@@ -40,7 +53,7 @@ fn upload_share(remote: &FakeShareRemote, name: &str, expires: Option<i64>) -> S
 #[test]
 fn a_created_share_is_published_ciphertext_with_its_bookkeeping() {
     let remote = FakeShareRemote::new();
-    let created = create(&remote, &entry(), NOW).unwrap();
+    let created = create(&remote, &entry(), VAULT, NOW).unwrap();
 
     assert_eq!(remote.ids(), vec![created.file_id.clone()]);
     assert!(remote.is_public(&created.file_id));
@@ -50,6 +63,7 @@ fn a_created_share_is_published_ciphertext_with_its_bookkeeping() {
     let listed = remote.list().unwrap();
     assert_eq!(listed[0].entry_id.as_deref(), Some("entry-1"));
     assert_eq!(listed[0].kind.as_deref(), Some("login"));
+    assert_eq!(listed[0].vault_id.as_deref(), Some(VAULT));
     assert_eq!(listed[0].expires_ms, Some(NOW + SHARE_TTL_MS));
 
     assert_eq!(created.expires_at, "2023-11-15T22:13:20.000Z");
@@ -65,7 +79,7 @@ fn an_entry_no_recipient_could_download_is_refused_before_upload() {
     let mut huge = entry();
     huge.note = Some("x".repeat(MAX_SHARE_BYTES));
 
-    let err = create(&remote, &huge, NOW).unwrap_err();
+    let err = create(&remote, &huge, VAULT, NOW).unwrap_err();
     assert!(matches!(err, Error::EntryTooLargeToShare));
     // Nothing went to Drive: the sender is told, not the recipient later.
     assert!(remote.ids().is_empty());
@@ -74,7 +88,7 @@ fn an_entry_no_recipient_could_download_is_refused_before_upload() {
 #[test]
 fn the_link_opens_the_entry_without_the_sender_s_copy() {
     let remote = FakeShareRemote::new();
-    let created = create(&remote, &entry(), NOW).unwrap();
+    let created = create(&remote, &entry(), VAULT, NOW).unwrap();
 
     let opened = open(&remote, &created.link, NOW).unwrap();
     assert_eq!(opened.title, "Router");
@@ -91,7 +105,7 @@ fn the_link_opens_the_entry_without_the_sender_s_copy() {
 #[test]
 fn a_link_stops_opening_when_the_share_expires_even_if_the_file_remains() {
     let remote = FakeShareRemote::new();
-    let created = create(&remote, &entry(), NOW).unwrap();
+    let created = create(&remote, &entry(), VAULT, NOW).unwrap();
 
     assert!(open(&remote, &created.link, NOW + SHARE_TTL_MS - 1).is_ok());
     assert!(matches!(
@@ -108,7 +122,9 @@ fn a_passkey_only_login_is_refused_before_anything_is_uploaded() {
     passkey_only.password = None;
 
     assert_eq!(
-        create(&remote, &passkey_only, NOW).unwrap_err().to_string(),
+        create(&remote, &passkey_only, VAULT, NOW)
+            .unwrap_err()
+            .to_string(),
         "this login holds only a passkey, and passkeys cannot be shared"
     );
     assert!(remote.ids().is_empty());
@@ -117,7 +133,7 @@ fn a_passkey_only_login_is_refused_before_anything_is_uploaded() {
 #[test]
 fn a_link_carrying_the_wrong_key_does_not_open_the_share() {
     let remote = FakeShareRemote::new();
-    let created = create(&remote, &entry(), NOW).unwrap();
+    let created = create(&remote, &entry(), VAULT, NOW).unwrap();
     let impostor = Link {
         file_id: created.file_id,
         key: ShareKey::generate(),
@@ -133,14 +149,109 @@ fn a_link_carrying_the_wrong_key_does_not_open_the_share() {
 #[test]
 fn a_revoked_share_reads_as_gone() {
     let remote = FakeShareRemote::new();
-    let created = create(&remote, &entry(), NOW).unwrap();
+    let created = create(&remote, &entry(), VAULT, NOW).unwrap();
 
-    revoke(&remote, &created.file_id).unwrap();
+    revoke(&remote, &created.file_id, VAULT).unwrap();
     assert!(remote.ids().is_empty());
     assert!(matches!(
         open(&remote, &created.link, NOW).unwrap_err(),
         Error::ShareExpired
     ));
+}
+
+// A share the sweep, another device or an earlier click already removed leaves
+// the caller with exactly what it asked for, so saying so would be a dialog
+// about nothing.
+#[test]
+fn revoking_what_is_already_gone_is_not_a_failure() {
+    let remote = FakeShareRemote::new();
+    let created = create(&remote, &entry(), VAULT, NOW).unwrap();
+
+    revoke(&remote, &created.file_id, VAULT).unwrap();
+    revoke(&remote, &created.file_id, VAULT).unwrap();
+    revoke(&remote, "never-existed", VAULT).unwrap();
+}
+
+// Revoke is handed a file id and fetches it directly, so it can be pointed at
+// any file in the account. Nothing without the marker is this app's to delete,
+// whichever vault asks: a file that was never a share carries no `vaultId`, and
+// an absent one matches no vault.
+#[test]
+fn a_file_that_is_not_a_share_is_refused_rather_than_deleted() {
+    let remote = FakeShareRemote::new();
+    let stray = remote.upload("holiday.jpg", b"not ours", &[]).unwrap();
+
+    for asking in [VAULT, "beef"] {
+        assert!(matches!(
+            revoke(&remote, &stray, asking).unwrap_err(),
+            Error::ShareNotOwned
+        ));
+    }
+    assert_eq!(remote.ids(), vec![stray]);
+}
+
+// The send dialog offers Revoke seconds after the upload, and Drive's query
+// index is not that quick. Revoke fetches the file instead of searching for it,
+// so a share no listing would find yet is still revocable — rather than read as
+// already gone and quietly left live for its whole 24 hours.
+#[test]
+fn a_share_the_listing_cannot_see_yet_is_still_revocable() {
+    let remote = FakeShareRemote::new();
+    let created = create(&remote, &entry(), VAULT, NOW).unwrap();
+    remote.unindex(&created.file_id);
+
+    assert!(list(&remote, VAULT, NOW).unwrap().is_empty());
+    revoke(&remote, &created.file_id, VAULT).unwrap();
+    assert!(remote.ids().is_empty());
+}
+
+// The finding this whole rule exists for: a file id is a bearer value the
+// webview hands in, so the vault that published the share — not the one that
+// asked — is what decides whether it may go.
+#[test]
+fn another_vault_s_share_is_refused_and_left_where_it_is() {
+    let remote = FakeShareRemote::new();
+    let theirs = create(&remote, &entry(), "beef", NOW).unwrap();
+
+    assert!(matches!(
+        revoke(&remote, &theirs.file_id, VAULT).unwrap_err(),
+        Error::ShareNotOwned
+    ));
+    assert!(remote.ids().contains(&theirs.file_id));
+    // And its own vault still sees it, so the refusal cost the owner nothing.
+    let listed = list(&remote, "beef", NOW).unwrap();
+    assert_eq!(listed[0].file_id, theirs.file_id);
+}
+
+// The finding this rule exists for. A share published before `vaultId` existed
+// names no vault, and two vaults with no id in common are not a match: it is
+// nobody's, listed by no one and revocable by no one, and it leaves the account
+// the way every other share does — on its expiry, through the sweep.
+#[test]
+fn a_share_with_no_vault_id_belongs_to_nobody() {
+    let remote = FakeShareRemote::new();
+    let old = upload_share(&remote, "a.rowelshare", Some(NOW + 1), None);
+    let mine = create(&remote, &entry(), VAULT, NOW).unwrap();
+
+    for asking in [VAULT, "beef"] {
+        assert!(matches!(
+            revoke(&remote, &old, asking).unwrap_err(),
+            Error::ShareNotOwned
+        ));
+    }
+    // And it is absent from the one list that does have something in it, so the
+    // filter is what left it out rather than an empty account.
+    let listed = list(&remote, VAULT, NOW).unwrap();
+    assert_eq!(
+        listed.iter().map(|s| &s.file_id).collect::<Vec<_>>(),
+        vec![&mine.file_id]
+    );
+    assert!(list(&remote, "beef", NOW).unwrap().is_empty());
+    assert!(remote.ids().contains(&old));
+
+    // Nobody's, but not immortal: the account-wide sweep still dates it.
+    assert_eq!(sweep(&remote, NOW + 2).unwrap(), 1);
+    assert!(!remote.ids().contains(&old));
 }
 
 // The fake answers an unknown id with `ShareExpired`, so getting the parse
@@ -156,29 +267,55 @@ fn a_link_that_is_not_a_link_fails_before_anything_is_fetched() {
 #[test]
 fn the_sweep_deletes_only_what_is_known_to_have_expired() {
     let remote = FakeShareRemote::new();
-    let expired = upload_share(&remote, "a.rowelshare", Some(NOW - 1));
-    let live = upload_share(&remote, "b.rowelshare", Some(NOW + 1));
-    let undated = upload_share(&remote, "c.rowelshare", None);
+    let expired = upload_share(&remote, "a.rowelshare", Some(NOW - 1), Some(VAULT));
+    let live = upload_share(&remote, "b.rowelshare", Some(NOW + 1), Some(VAULT));
+    let undated = upload_share(&remote, "c.rowelshare", None, Some(VAULT));
 
     assert_eq!(sweep(&remote, NOW).unwrap(), 1);
     assert!(!remote.ids().contains(&expired));
-
-    let listed = list(&remote, NOW).unwrap();
-    assert_eq!(
-        listed.iter().map(|s| &s.file_id).collect::<Vec<_>>(),
-        vec![&live, &undated]
-    );
+    assert_eq!(remote.ids(), vec![live, undated]);
 }
 
 // The fake's ids double as its clock, so this file was created at 1ms.
 #[test]
 fn a_share_with_no_readable_expiry_is_still_given_one_to_show() {
     let remote = FakeShareRemote::new();
-    upload_share(&remote, "a.rowelshare", None);
+    upload_share(&remote, "a.rowelshare", None, Some(VAULT));
 
-    let listed = list(&remote, NOW).unwrap();
+    let listed = list(&remote, VAULT, NOW).unwrap();
     assert_eq!(listed[0].created_at, "1970-01-01T00:00:00.001Z");
     assert_eq!(listed[0].expires_at, "1970-01-02T00:00:00.001Z");
+}
+
+// One account, two vaults: each sees its own outstanding shares and nothing of
+// the other's, so neither can revoke a link it did not hand out.
+#[test]
+fn a_list_shows_only_the_asking_vault_s_shares() {
+    let remote = FakeShareRemote::new();
+    let mine = create(&remote, &entry(), VAULT, NOW).unwrap();
+    let theirs = create(&remote, &entry(), "beef", NOW).unwrap();
+
+    let listed = list(&remote, VAULT, NOW).unwrap();
+    assert_eq!(
+        listed.iter().map(|s| &s.file_id).collect::<Vec<_>>(),
+        vec![&mine.file_id]
+    );
+
+    // Not listed is not deleted: the other vault still has it.
+    assert!(remote.ids().contains(&theirs.file_id));
+    let theirs_listed = list(&remote, "beef", NOW).unwrap();
+    assert_eq!(theirs_listed[0].file_id, theirs.file_id);
+}
+
+// The sweep is the account's, not the vault's: an expired share is dead
+// whichever vault published it, and the device that notices should say so.
+#[test]
+fn the_sweep_clears_an_expired_share_from_another_vault_too() {
+    let remote = FakeShareRemote::new();
+    let theirs = create(&remote, &entry(), "beef", NOW - SHARE_TTL_MS).unwrap();
+
+    assert!(list(&remote, VAULT, NOW).unwrap().is_empty());
+    assert!(!remote.ids().contains(&theirs.file_id));
 }
 
 #[test]
@@ -186,6 +323,6 @@ fn a_share_that_cannot_be_published_leaves_no_orphan() {
     let remote = FakeShareRemote::new();
     remote.fail_publishing();
 
-    assert!(create(&remote, &entry(), NOW).is_err());
+    assert!(create(&remote, &entry(), VAULT, NOW).is_err());
     assert!(remote.ids().is_empty());
 }
