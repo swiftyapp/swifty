@@ -70,6 +70,27 @@ pub(crate) fn current_tokens(app: &AppHandle, cryptor: &Cryptor) -> Option<Token
     auth::read_tokens(app, cryptor)
 }
 
+/// [`persist_tokens`], unless a disconnect has ended the connection `generation`
+/// names since it was read — in which case nothing is written and `false` comes
+/// back. The guard every write-back of refreshed tokens takes (see
+/// `AppState::sync_generation`), for a caller that refreshed the open
+/// workspace's tokens across a network round trip of its own.
+pub(crate) fn persist_tokens_if_current(
+    app: &AppHandle,
+    cryptor: &Cryptor,
+    tokens: &Tokens,
+    generation: u64,
+) -> Result<bool> {
+    auth::persisted_if_current(app, cryptor, tokens, generation)
+}
+
+/// Which Drive connection is current — see [`AppState::sync_generation`]. Read
+/// before a network round trip whose refreshed tokens may be written back, so
+/// [`persist_tokens_if_current`] can reject a result from a disconnected account.
+pub(crate) fn connection_generation(app: &AppHandle) -> u64 {
+    *app.state::<AppState>().sync_generation.lock().unwrap()
+}
+
 /// A valid access token for in-memory `tokens`, refreshed in place if expired.
 pub(crate) async fn fresh_access_token(
     client: &Client,

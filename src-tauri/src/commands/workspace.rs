@@ -181,7 +181,7 @@ pub async fn workspace_create(
     let (previous_active, previous, inherited) = {
         let _paths = state.workspace_lock.lock().unwrap();
         guard_sync_idle(&state)?;
-        let inherited = open_account(&app, &state);
+        let inherited = open_account(&app, &state)?;
         let lease = state.session.lock().unwrap().take_out()?;
         let active = std::mem::replace(&mut *state.active_workspace.lock().unwrap(), id.clone());
         (active, lease, inherited)
@@ -244,11 +244,36 @@ pub async fn workspace_create(
     })
 }
 
-/// The open workspace's Google account, if it has one. Read under the caller's
+/// The open workspace's Google account: `None` when it has none, and an error
+/// when it has one that cannot be read. Read under the caller's
 /// `workspace_lock`, through the paths as they stand.
-fn open_account(app: &AppHandle, state: &AppState) -> Option<sync::Tokens> {
-    let cryptor = state.session.lock().unwrap().cryptor().ok()?;
+///
+/// The two are told apart on purpose. A workspace whose session says it syncs
+/// but whose token file will not unseal or parse is damaged, not local: going
+/// ahead would make a workspace that quietly lacks the account the user was
+/// promised (or, for a restore, fail later for a less honest reason).
+fn open_account(app: &AppHandle, state: &AppState) -> Result<Option<sync::Tokens>> {
+    let session = state.session.lock().unwrap();
+    let cryptor = session.cryptor()?;
+    if !session.sync_configured {
+        return Ok(None);
+    }
+    drop(session);
     sync::current_tokens(app, &cryptor)
+        .map(Some)
+        .ok_or_else(|| Error::Other(account_unreadable_error()))
+}
+
+// Surfaced verbatim in the form, so it has to read as a sentence.
+fn account_unreadable_error() -> String {
+    "this workspace's Google account could not be read; disconnect and connect it again, then \
+     retry"
+        .into()
+}
+
+// Surfaced verbatim in the form, so it has to read as a sentence.
+fn disconnected_mid_restore_error() -> String {
+    "Google Drive was disconnected while the vault was downloading; connect again and retry".into()
 }
 
 /// Connect a Google account for a workspace that does not exist yet.
@@ -329,7 +354,7 @@ pub async fn workspace_restore_from_account(
     // through the active workspace, which must not move underneath.
     let tokens = {
         let _paths = state.workspace_lock.lock().unwrap();
-        open_account(&app, &state).ok_or(Error::SyncNotConfigured)?
+        open_account(&app, &state)?.ok_or(Error::SyncNotConfigured)?
     };
     restore_workspace(&app, &state, name, password, file_id, tokens, Account::Open).await
 }
@@ -371,16 +396,33 @@ async fn restore_workspace(
     // listing, a token refresh and a whole vault over the network — and the
     // session of the workspace the user is looking at would otherwise be held
     // out for all of it, taking a vault away that they never asked to leave.
+    //
+    // The connection generation is read first, as every refresh that will be
+    // written back reads it: a disconnect landing during the download must not
+    // have its delete undone by the write below.
+    let generation = sync::connection_generation(app);
     let (bytes, vault_id) = setup::download(app, &mut tokens, &file_id, |vault_id| {
         guard_other_vault(state, &root, vault_id)
     })
     .await?;
     // Whatever the refresh produced has to be kept, for the reason onboarding
     // keeps it: Google rotates refresh tokens, and a mistyped master password
-    // has to leave a retry that works. The open workspace's own refresh is
-    // written back by its next run, as every refresh of its is.
-    if account == Account::Pending {
-        setup::replace_pending_tokens(&state, tokens.clone())?;
+    // has to leave a retry that works. A pending account lives in memory; the
+    // open workspace's lives in its token file, which has to follow too — left
+    // on the old copy, its next run could find the refresh token retired while
+    // only the restored workspace held the live one.
+    match account {
+        Account::Pending => setup::replace_pending_tokens(state, tokens.clone())?,
+        Account::Open => {
+            // Under the workspace lock, through the paths as they still stand.
+            let _paths = state.workspace_lock.lock().unwrap();
+            let cryptor = state.session.lock().unwrap().cryptor()?;
+            if !sync::persist_tokens_if_current(app, &cryptor, &tokens, generation)? {
+                // The user dropped the account meanwhile; sealing it into a new
+                // workspace would bring it back under another name.
+                return Err(Error::Other(disconnected_mid_restore_error()));
+            }
+        }
     }
 
     // As `workspace_create` takes them, and for the same reasons: one step
