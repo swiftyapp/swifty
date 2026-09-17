@@ -114,24 +114,6 @@ pub fn dir_of(root: &Path, id: &str) -> PathBuf {
     }
 }
 
-/// Whether any workspace other than `active` still has Drive credentials on
-/// this install.
-///
-/// What a disconnect asks before revoking: Google retires a grant per account
-/// and client, so the last credential is the only one that may take the grant
-/// with it (see `commands::sync::sync_disconnect`).
-///
-/// A file-existence check, deliberately, and one that needs no keys: token files
-/// are sealed under their own vault's key, and every workspace but the active
-/// one is locked — so "is there a connection here" is a question only the
-/// layout can answer.
-pub fn other_workspaces_connected(root: &Path, registry: &Registry, active: &str) -> bool {
-    registry
-        .workspaces
-        .iter()
-        .any(|w| w.id != active && dir_of(root, &w.id).join(storage::GDRIVE_FILE).exists())
-}
-
 /// Which workspace the app's paths currently resolve to.
 pub fn active_id(app: &AppHandle) -> String {
     app.state::<AppState>()
@@ -228,43 +210,6 @@ mod tests {
         let root = tmp_root();
         fs::write(root.join(REGISTRY_FILE), "{ not json").unwrap();
         assert_eq!(Registry::load(&root), Registry::default());
-    }
-
-    // Write a workspace's Drive token file, directories and all.
-    fn connect(root: &Path, id: &str) {
-        let path = dir_of(root, id).join(storage::GDRIVE_FILE);
-        fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, "sealed").unwrap();
-    }
-
-    #[test]
-    fn only_another_workspaces_token_file_counts_as_still_connected() {
-        let root = tmp_root();
-        let registry = Registry {
-            active: PRIMARY_ID.into(),
-            workspaces: vec![
-                Workspace {
-                    id: PRIMARY_ID.into(),
-                    name: None,
-                },
-                Workspace {
-                    id: "a1b2".into(),
-                    name: Some("Work".into()),
-                },
-            ],
-        };
-
-        // Nobody is connected.
-        assert!(!other_workspaces_connected(&root, &registry, PRIMARY_ID));
-
-        // The one asking does not count — it is the credential being dropped.
-        connect(&root, PRIMARY_ID);
-        assert!(!other_workspaces_connected(&root, &registry, PRIMARY_ID));
-
-        // Another one does, and from either side of the pair.
-        connect(&root, "a1b2");
-        assert!(other_workspaces_connected(&root, &registry, PRIMARY_ID));
-        assert!(other_workspaces_connected(&root, &registry, "a1b2"));
     }
 
     #[test]
