@@ -154,13 +154,12 @@ pub fn is_available() -> bool {
     probe().available
 }
 
-// The verify-then-read gate: Windows always, and macOS/iOS in `GateMode::Prompt`
+// The verify-then-read gate, used by macOS/iOS in `GateMode::Prompt` only
 // (unentitled builds, where the OS cannot enforce biometry on keychain read).
-// Nothing calls it on Linux, where the secure store is unsupported outright.
-#[cfg_attr(
-    not(any(target_vendor = "apple", target_os = "windows")),
-    allow(dead_code)
-)]
+// Windows no longer calls it: there the Hello prompt is the key-credential
+// signature itself (`GateMode::HelloKey`), not a check that merely precedes a
+// read. Linux never calls it — the secure store is unsupported outright.
+#[cfg_attr(not(target_vendor = "apple"), allow(dead_code))]
 pub fn authenticate() -> Result<()> {
     imp::authenticate()
 }

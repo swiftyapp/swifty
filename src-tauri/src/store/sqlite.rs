@@ -614,6 +614,9 @@ fn set_mode(path: &Path, mode: u32) {
     let _ = fs::set_permissions(path, fs::Permissions::from_mode(mode));
 }
 
-// TODO: tighten Windows ACLs to the current user; std has no chmod analog.
+// TODO: tighten Windows ACLs to the current user. `owner_only.rs` already
+// builds the owner-only security descriptor for plaintext exports; applying it
+// to the live vault (which SQLite creates itself, so after the fact) wants a
+// Windows machine to verify the user keeps access before it ships.
 #[cfg(not(unix))]
 fn set_mode(_path: &Path, _mode: u32) {}
