@@ -94,8 +94,7 @@ impl SqliteStore {
     pub fn open(path: &Path, key: &[u8]) -> Result<Self> {
         let existed = path.metadata().map(|m| m.len() > 0).unwrap_or(false);
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-            set_mode(parent, 0o700);
+            create_private_dir(parent)?;
         }
 
         let mut conn = Connection::open(path)?;
@@ -639,6 +638,14 @@ fn wrong_key_or(existed: bool, e: rusqlite::Error) -> StoreError {
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Create `path` (and its parents) as a directory only the current user may
+/// enter. The vault directory and every workspace directory are made this way.
+pub fn create_private_dir(path: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(path)?;
+    set_mode(path, 0o700);
+    Ok(())
 }
 
 #[cfg(unix)]

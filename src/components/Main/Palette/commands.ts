@@ -1,6 +1,7 @@
 import { usePrefs, lockVault, openAddPicker, openSettings, startEntry, toggleTheme } from '@/store'
 import { KINDS, addLabel } from '@/kinds'
 import { t } from '@/i18n'
+import { chord } from '@/lib/platform'
 import { GearGlyph, LockGlyph, MoonGlyph, PlusGlyph, SunGlyph } from '../icons'
 
 type Glyph = typeof LockGlyph
@@ -34,14 +35,14 @@ export const useCommands = (): Command[] => {
     {
       id: 'add-secret',
       label: t('Add a secret'),
-      shortcut: '⌘N',
+      shortcut: chord('N'),
       glyph: PlusGlyph,
       run: openAddPicker
     },
     {
       id: 'lock-vault',
       label: t('Lock vault'),
-      shortcut: '⌘L',
+      shortcut: chord('L'),
       glyph: LockGlyph,
       run: lockVault
     },

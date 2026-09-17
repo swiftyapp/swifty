@@ -5,7 +5,6 @@
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use rand::RngCore;
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -650,12 +649,10 @@ fn unix_secs(value: &Option<String>) -> Option<i64> {
         .map(|t| t.timestamp())
 }
 
-/// CXF ids are `b64url`. Sixteen random bytes, the same width as the app's own
-/// entry ids (`commands::import::new_id`), in the encoding the format asks for.
+/// CXF ids are `b64url`: the app's usual 16 random bytes, in the encoding the
+/// format asks for.
 fn random_id() -> String {
-    let mut bytes = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut bytes);
-    URL_SAFE_NO_PAD.encode(bytes)
+    URL_SAFE_NO_PAD.encode(crate::crypto::random_id_bytes())
 }
 
 const COLUMNS: &[&str] = &[

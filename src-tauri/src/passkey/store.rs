@@ -15,6 +15,7 @@ use passkey_types::webauthn::PublicKeyCredentialDescriptor;
 use crate::crypto::PayloadCipher;
 use crate::error::{Error, Result};
 use crate::models::{Entry, Passkey};
+use crate::session::store_err;
 use crate::store::{migrate, VaultStore};
 
 use super::key;
@@ -194,10 +195,6 @@ fn new_login(passkey: &Passkey) -> Entry {
 // Newest first: `get_assertion` takes the first credential it is offered.
 fn sort_newest_first(found: &mut [Stored]) {
     found.sort_by(|a, b| b.passkey.created_at.cmp(&a.passkey.created_at));
-}
-
-fn store_err(e: crate::store::StoreError) -> Error {
-    Error::Other(e.to_string())
 }
 
 /// Adapts a [`PasskeyVault`] to the async `CredentialStore` the authenticator

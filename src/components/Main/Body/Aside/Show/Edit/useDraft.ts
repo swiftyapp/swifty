@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   useVault,
   setCurrentEntry,
@@ -59,7 +59,10 @@ export function useDraft(type: EntryType, revealed: Entry | null): Draft {
   // What the model looked like when it was loaded — the dirty baseline.
   const [pristine] = useState<EntryDraft>(initial)
 
-  const dirty = JSON.stringify(model) !== JSON.stringify(pristine)
+  // Compared serialized, once per edit rather than once per render: the draft
+  // re-renders on every keystroke and the baseline never changes.
+  const pristineJson = useMemo(() => JSON.stringify(pristine), [pristine])
+  const dirty = useMemo(() => JSON.stringify(model) !== pristineJson, [model, pristineJson])
 
   const set = (name: string, value: DraftValue) => {
     setConfirmDiscard(false)

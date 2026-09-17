@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { shareCreate, shareRevoke, type ShareCreated } from '@/api/share'
 import { describeError } from '@/api/errors'
-import { useApp, closeSend, queueOrphan, revokeOrphans } from '@/store'
+import { useApp, closeSend, queueOrphan } from '@/store'
+import { revokeOrphans } from '@/services/shares'
 import { useCopied } from '@/hooks/useCopied'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
 

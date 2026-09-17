@@ -1,6 +1,7 @@
 import { cx } from '@/utils/cx'
 import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'
+import { chord } from '@/lib/platform'
 import type { Draft } from './useDraft'
 
 // The editing header's cluster, where the read view's menu / copy buttons sit:
@@ -29,7 +30,7 @@ export default function Actions({ draft }: { draft: Draft }) {
       </button>
       <Button
         size="md"
-        kbd="⌘⏎"
+        kbd={chord('⏎')}
         testid="save-entry-button"
         loading={draft.saving}
         onClick={draft.save}

@@ -15,8 +15,8 @@ use tauri::{AppHandle, State};
 use crate::crypto::PayloadCipher;
 use crate::error::{Error, Result};
 use crate::events;
-use crate::import::{self, EntryKind, Format, ImportedEntry, ImportedPasskey, RowError};
-use crate::models::{Entry, EntryMetaDto, ExtraField, Passkey};
+use crate::import::{self, EntryKind, Format, ImportedEntry, RowError};
+use crate::models::{Entry, EntryMetaDto, ExtraField};
 use crate::save;
 use crate::session::{list_metas, live_records, store_err};
 use crate::state::AppState;
@@ -395,8 +395,7 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
             e.website = imp.url.clone();
             e.email = imp.email.clone();
             e.otp = imp.otp.clone();
-            e.passkeys =
-                (!imp.passkeys.is_empty()).then(|| imp.passkeys.iter().map(to_passkey).collect());
+            e.passkeys = (!imp.passkeys.is_empty()).then(|| imp.passkeys.clone());
         }
         EntryKind::Card => {
             e.number = imp.card_number.clone();
@@ -511,13 +510,7 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
         // `expiry_date` is shared with the identity, so it is only read here
         // for an API key — a passport must not export with one.
         api_expires: api_key.then(|| e.expiry_date.clone()).flatten(),
-        passkeys: e
-            .passkeys
-            .as_deref()
-            .unwrap_or_default()
-            .iter()
-            .map(to_imported_passkey)
-            .collect(),
+        passkeys: e.passkeys.clone().unwrap_or_default(),
         extra: e
             .extra
             .as_deref()
@@ -529,36 +522,6 @@ fn entry_to_imported(e: &Entry) -> ImportedEntry {
         created_at: e.created_at.clone(),
         updated_at: e.updated_at.clone(),
         password_updated_at: e.password_updated_at.clone(),
-    }
-}
-
-// The two halves of the passkey mapping. Field-for-field: the import layer's
-// struct mirrors `models::Passkey`, and base64url values cross unchanged.
-fn to_passkey(p: &ImportedPasskey) -> Passkey {
-    Passkey {
-        credential_id: p.credential_id.clone(),
-        rp_id: p.rp_id.clone(),
-        rp_name: p.rp_name.clone(),
-        user_handle: p.user_handle.clone(),
-        user_name: p.user_name.clone(),
-        user_display_name: p.user_display_name.clone(),
-        private_key: p.private_key.clone(),
-        counter: p.counter,
-        created_at: p.created_at.clone(),
-    }
-}
-
-fn to_imported_passkey(p: &Passkey) -> ImportedPasskey {
-    ImportedPasskey {
-        credential_id: p.credential_id.clone(),
-        rp_id: p.rp_id.clone(),
-        rp_name: p.rp_name.clone(),
-        user_handle: p.user_handle.clone(),
-        user_name: p.user_name.clone(),
-        user_display_name: p.user_display_name.clone(),
-        private_key: p.private_key.clone(),
-        counter: p.counter,
-        created_at: p.created_at.clone(),
     }
 }
 

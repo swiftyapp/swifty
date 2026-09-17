@@ -133,7 +133,7 @@ export const refreshApp = (): Promise<AppStatus | null> =>
 // --- flow -----------------------------------------------------------------------
 
 export const flowSetup = () => useApp.setState({ flow: 'setup' })
-export const flowAuth = () => useApp.setState({ flow: 'auth' })
+const flowAuth = () => useApp.setState({ flow: 'auth' })
 export const flowMain = () => useApp.setState({ flow: 'main' })
 
 // The lock screen reads its gate off `status`, so a lock re-runs the probe:
@@ -218,7 +218,7 @@ let syncTimer: ReturnType<typeof setTimeout> | undefined
 
 // Drops a write waiting to be published. Called on lock: the backend has no key
 // to push with any more, and the next unlock syncs anyway.
-export const cancelScheduledSync = () => {
+const cancelScheduledSync = () => {
   if (syncTimer) clearTimeout(syncTimer)
   syncTimer = undefined
 }

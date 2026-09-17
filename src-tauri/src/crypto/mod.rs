@@ -35,6 +35,20 @@ const TAG_LEN: usize = 16;
 const ITERATIONS: u32 = 100_000;
 const KEY_LEN: usize = 32;
 
+/// Sixteen random bytes — the width of every id the app mints for itself
+/// (entries, workspaces, share files, export rows). One source so they all
+/// carry the same 128 bits of entropy; callers pick the encoding.
+pub fn random_id_bytes() -> [u8; 16] {
+    let mut bytes = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    bytes
+}
+
+/// [`random_id_bytes`] as lowercase hex — the shape of the frontend's own ids.
+pub fn random_hex_id() -> String {
+    hex::encode(random_id_bytes())
+}
+
 /// Borrow `bytes` as a 16-byte GCM nonce. aes-gcm 0.11 models nonces as
 /// `hybrid_array::Array` and deprecates its `from_slice`, so the length check is
 /// ours to make: the decrypt paths take the nonce off the wire as a slice.

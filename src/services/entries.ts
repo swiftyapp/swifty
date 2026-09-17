@@ -30,19 +30,28 @@ interface FilterOptions {
 // searches, and tags make the search field the way to pull up a tagged set.
 const SEARCH_KEYS = ['title', 'urlHost', 'tags']
 
-export const filterEntries = (entries: EntryMeta[], options: FilterOptions): EntryMeta[] => {
-  const scoped = entries.filter(
-    entry => matchType(entry, options.type) && matchTag(entry, options.tag)
-  )
+// The rows the kind and tag filters leave. Unordered: the list's own sort
+// (recency or A–Z) is applied downstream, so ordering here would only be thrown
+// away.
+export const scopeEntries = (entries: EntryMeta[], scope: Omit<FilterOptions, 'query'>) =>
+  entries.filter(entry => matchType(entry, scope.type) && matchTag(entry, scope.tag))
 
-  // Unordered without a query: the list's own sort (recency or A–Z) is applied
-  // downstream, so ordering here would only be thrown away.
+export type SearchIndex = Fuse<EntryMeta>
+
+// Fuzzy rank across the searchable metadata (typo-tolerant, relevance-ordered).
+// Building the index walks every row, so a caller that searches the same rows
+// repeatedly (the list, keystroke by keystroke) builds it once and keeps it.
+export const searchIndex = (entries: EntryMeta[]): SearchIndex =>
+  new Fuse(entries, { keys: SEARCH_KEYS, threshold: 0.4, ignoreLocation: true })
+
+export const searchEntries = (index: SearchIndex, query: string): EntryMeta[] =>
+  index.search(query).map(result => result.item)
+
+export const filterEntries = (entries: EntryMeta[], options: FilterOptions): EntryMeta[] => {
+  const scoped = scopeEntries(entries, options)
   const query = options.query.trim()
   if (query === '') return scoped
-
-  // Fuzzy rank across the searchable metadata (typo-tolerant, relevance-ordered).
-  const fuse = new Fuse(scoped, { keys: SEARCH_KEYS, threshold: 0.4, ignoreLocation: true })
-  return fuse.search(query).map(result => result.item)
+  return searchEntries(searchIndex(scoped), query)
 }
 
 const matchType = (entry: EntryMeta, type: EntryType | null) => !type || entry.type === type

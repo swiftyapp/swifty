@@ -5,7 +5,7 @@
 use serde::Deserialize;
 
 use super::export::PASSPHRASE_LABEL;
-use super::{EntryKind, ImportResult, ImportedEntry, ImportedPasskey, Importer};
+use super::{non_empty, EntryKind, ImportResult, ImportedEntry, ImportedPasskey, Importer};
 
 pub struct Bitwarden;
 
@@ -168,13 +168,13 @@ impl From<Fido2Credential> for ImportedPasskey {
         ImportedPasskey {
             credential_id: c.credential_id.unwrap_or_default(),
             rp_id: c.rp_id.unwrap_or_default(),
-            rp_name: opt(c.rp_name),
+            rp_name: non_empty(c.rp_name),
             user_handle: c.user_handle.unwrap_or_default(),
             user_name: c.user_name.unwrap_or_default(),
             user_display_name: c.user_display_name.unwrap_or_default(),
             private_key: c.key_value.unwrap_or_default(),
             counter,
-            created_at: opt(c.creation_date),
+            created_at: non_empty(c.creation_date),
         }
     }
 }
@@ -259,8 +259,8 @@ impl Importer for Bitwarden {
             // twice. Each arm below starts from this rather than the default.
             let mut base = ImportedEntry {
                 favorite: item.favorite,
-                created_at: opt(item.creation_date),
-                updated_at: opt(item.revision_date),
+                created_at: non_empty(item.creation_date),
+                updated_at: non_empty(item.revision_date),
                 ..Default::default()
             };
             super::export::set_labelled(&mut base, |label| take_labelled(&mut extra, label));
@@ -286,11 +286,11 @@ impl Importer for Bitwarden {
                     result.entries.push(ImportedEntry {
                         kind: EntryKind::Login,
                         title,
-                        username: opt(login.username),
-                        password: opt(login.password),
-                        url: login.uris.into_iter().find_map(|u| opt(u.uri)),
-                        notes: opt(item.notes),
-                        otp: opt(login.totp),
+                        username: non_empty(login.username),
+                        password: non_empty(login.password),
+                        url: login.uris.into_iter().find_map(|u| non_empty(u.uri)),
+                        notes: non_empty(item.notes),
+                        otp: non_empty(login.totp),
                         passkeys,
                         extra,
                         ..base
@@ -299,7 +299,7 @@ impl Importer for Bitwarden {
                 Some(2) => result.entries.push(ImportedEntry {
                     kind: EntryKind::Note,
                     title,
-                    notes: opt(item.notes),
+                    notes: non_empty(item.notes),
                     extra,
                     ..base
                 }),
@@ -314,12 +314,12 @@ impl Importer for Bitwarden {
                     result.entries.push(ImportedEntry {
                         kind: EntryKind::Card,
                         title,
-                        notes: opt(item.notes),
-                        card_number: opt(card.number),
-                        card_month: opt(card.exp_month),
-                        card_year: opt(card.exp_year),
-                        card_cvc: opt(card.code),
-                        cardholder: opt(card.cardholder_name),
+                        notes: non_empty(item.notes),
+                        card_number: non_empty(card.number),
+                        card_month: non_empty(card.exp_month),
+                        card_year: non_empty(card.exp_year),
+                        card_cvc: non_empty(card.code),
+                        cardholder: non_empty(card.cardholder_name),
                         extra,
                         ..base
                     });
@@ -329,7 +329,7 @@ impl Importer for Bitwarden {
                     // A licence number says "driver_license"; anything else —
                     // including an item with neither number — is a passport,
                     // which is what Bitwarden's own field is named after.
-                    let licence = opt(identity.license_number.clone());
+                    let licence = non_empty(identity.license_number.clone());
                     let doc_type = if licence.is_some() {
                         "driver_license"
                     } else {
@@ -338,14 +338,14 @@ impl Importer for Bitwarden {
                     result.entries.push(ImportedEntry {
                         kind: EntryKind::Identity,
                         title,
-                        notes: opt(item.notes),
+                        notes: non_empty(item.notes),
                         doc_type: Some(doc_type.to_owned()),
-                        doc_number: licence.or_else(|| opt(identity.passport_number.clone())),
-                        doc_country: opt(identity.country.clone()),
+                        doc_number: licence.or_else(|| non_empty(identity.passport_number.clone())),
+                        doc_country: non_empty(identity.country.clone()),
                         holder_name: identity.full_name(),
                         // Bitwarden's own member wins; a file that carries the
                         // number as a labelled field instead still keeps it.
-                        doc_personal_number: opt(identity.ssn.clone())
+                        doc_personal_number: non_empty(identity.ssn.clone())
                             .or_else(|| base.doc_personal_number.clone()),
                         extra,
                         ..base
@@ -361,14 +361,14 @@ impl Importer for Bitwarden {
                     result.entries.push(ImportedEntry {
                         kind: EntryKind::Ssh,
                         title,
-                        notes: opt(item.notes),
-                        ssh_private_key: opt(key.private_key),
-                        ssh_public_key: opt(key.public_key),
-                        ssh_fingerprint: opt(key.key_fingerprint),
+                        notes: non_empty(item.notes),
+                        ssh_private_key: non_empty(key.private_key),
+                        ssh_public_key: non_empty(key.public_key),
+                        ssh_fingerprint: non_empty(key.key_fingerprint),
                         ssh_passphrase: passphrase
                             .into_iter()
                             .next()
-                            .and_then(|(_, v)| opt(Some(v))),
+                            .and_then(|(_, v)| non_empty(Some(v))),
                         extra,
                         ..base
                     });
@@ -381,11 +381,6 @@ impl Importer for Bitwarden {
     }
 }
 
-// Treat empty strings as absent so blank export fields don't become "" secrets.
-fn opt(s: Option<String>) -> Option<String> {
-    s.filter(|v| !v.is_empty())
-}
-
 // Remove the custom field labelled `label` (case-insensitively) and hand back
 // its value: a field of ours is not the user's, so it leaves the extras when it
 // is claimed — the same move the SSH passphrase makes in its own arm.
@@ -393,5 +388,5 @@ fn take_labelled(extra: &mut Vec<(String, String)>, label: &str) -> Option<Strin
     let at = extra
         .iter()
         .position(|(l, _)| l.eq_ignore_ascii_case(label))?;
-    opt(Some(extra.remove(at).1))
+    non_empty(Some(extra.remove(at).1))
 }

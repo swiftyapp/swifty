@@ -9,7 +9,6 @@ import {
 } from 'react'
 import { cx } from '@/utils/cx'
 import { useTranslation } from 'react-i18next'
-import type { TKey } from '@/i18n'
 import Error from '../Error'
 import IconButton from '../IconButton'
 import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
@@ -228,12 +227,10 @@ export default function Masterpass({
           />
           {/* Reveal is a secondary modifier of what you're typing, so it only
               appears once there is something to reveal, small and dim. The
-              crossed eye alone carries the on state — no persistent wash.
-              Neither string has a catalog entry (pre-existing gap); looked up
-              opportunistically and falls through to the English text. */}
+              crossed eye alone carries the on state — no persistent wash. */}
           {value.length > 0 && (
             <IconButton
-              label={t((reveal ? 'Hide passphrase' : 'Reveal passphrase') as TKey)}
+              label={t(reveal ? 'Hide passphrase' : 'Reveal passphrase')}
               className="animate-fade absolute right-1.5 top-1/2 -translate-y-1/2"
               muted
               onClick={() => setReveal(r => !r)}
