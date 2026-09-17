@@ -542,9 +542,11 @@ pub(crate) fn switched(app: &AppHandle) {
 /// can settle on different ids and publish a pack each, leaving one vault
 /// spread across two files in the account.
 ///
-/// A run turned away here is a no-op rather than an error: a sync is
-/// full-state, so the run already underway publishes whatever this caller
-/// wanted published.
+/// A run turned away here is not lost: a sync is full-state, but the run
+/// underway may already have packed before the write that asked, so the
+/// request is kept as a rerun flag and honoured once that run ends
+/// ([`spawn_run`]). Two runs at most per burst of writes, and nothing waits
+/// for the next unlock.
 ///
 /// The run goes to the blocking pool rather than `async_runtime::spawn`. The
 /// Drive calls are driven with `block_on`, which is only legal off the async
@@ -557,7 +559,7 @@ fn start_run(app: &AppHandle) {
     // them: the run either starts against the paths it was keyed for, or finds
     // them already moved and does not start at all.
     let paths = state.workspace_lock.lock().unwrap();
-    let Some(claim) = claim_run(&state.syncing) else {
+    let Some(claim) = claim_or_defer(&state) else {
         return;
     };
 
@@ -577,10 +579,37 @@ fn start_run(app: &AppHandle) {
 fn spawn_run(app: &AppHandle, claim: RunClaim, cryptor: Cryptor) {
     let app = app.clone();
     super::detached(move || {
-        let _claim = claim;
         started(&app);
         report(&app, sync::run(&app, cryptor));
+        // Release first, then look: a request that found the claim held raised
+        // the flag before it looked, so whichever order the two land in, one of
+        // them sees the other (see `AppState::sync_rerun`). `start_run` clears
+        // the flag when it wins the claim, so a rerun does not chain into a
+        // third run unless another write asked for one meanwhile.
+        drop(claim);
+        if take_rerun(&app.state::<AppState>()) {
+            start_run(&app);
+        }
     });
+}
+
+/// Claim the run, or leave a request behind for the run that holds it.
+///
+/// The flag goes up before the claim is tried and comes down only when the
+/// claim is won: a caller turned away therefore always leaves it up, and a run
+/// releasing at the same instant cannot miss it (`spawn_run` checks after its
+/// release). A caller that wins clears it, since the run it starts will pack
+/// after every write that has asked so far.
+fn claim_or_defer(state: &AppState) -> Option<RunClaim> {
+    state.sync_rerun.store(true, Ordering::SeqCst);
+    let claim = claim_run(&state.syncing)?;
+    state.sync_rerun.store(false, Ordering::SeqCst);
+    Some(claim)
+}
+
+/// Whether a run was asked for while one was in flight; answering lowers it.
+fn take_rerun(state: &AppState) -> bool {
+    state.sync_rerun.swap(false, Ordering::SeqCst)
 }
 
 fn session_cryptor(state: &State<'_, AppState>) -> Option<Cryptor> {
@@ -662,6 +691,43 @@ mod tests {
         assert!(claim_run(&state.syncing).is_none(), "and holds it in turn");
         drop(next);
         assert!(claim_run(&state.syncing).is_some());
+    }
+
+    // A write that lands while a run is in flight may have missed that run's
+    // pack. Its request is not dropped: it is left for the run to honour on its
+    // way out, and honoured exactly once.
+    #[test]
+    fn a_request_turned_away_is_kept_for_the_run_in_flight() {
+        let state = AppState::default();
+
+        let running = claim_or_defer(&state).expect("nothing was running");
+        assert!(!take_rerun(&state), "a run that won the claim owes nothing");
+        // Taking the answer must not have lowered a flag nobody raised again.
+        assert!(!take_rerun(&state));
+
+        assert!(claim_or_defer(&state).is_none(), "the claim is held");
+        // Two writes during one run are one rerun, not two.
+        assert!(claim_or_defer(&state).is_none());
+
+        drop(running);
+        assert!(take_rerun(&state), "the run in flight was asked to go again");
+        assert!(!take_rerun(&state), "and only once");
+    }
+
+    // The rerun itself is an ordinary claim: it clears the request it answers,
+    // so a burst of writes ends in a bounded number of runs.
+    #[test]
+    fn the_rerun_clears_the_request_it_answers() {
+        let state = AppState::default();
+
+        let running = claim_or_defer(&state).unwrap();
+        assert!(claim_or_defer(&state).is_none());
+        drop(running);
+
+        assert!(take_rerun(&state));
+        let rerun = claim_or_defer(&state).expect("the claim was released");
+        drop(rerun);
+        assert!(!take_rerun(&state), "nothing asked during the rerun");
     }
 
     fn pack(vault_id: &str) -> PackInfo {
