@@ -94,17 +94,18 @@ pub trait LocalVault {
     /// Record a completed push: the revision it landed at, and when.
     fn note_push(&self, revision: &str, at_ms: i64) -> Result<()>;
 
-    // The three below are not part of a run at all — they are what the provider
-    // settles *before* one, to learn which remote pack this vault is. They live
-    // on the trait because the id sits in the vault's own `meta` table, and
-    // reaching it means taking the session lock exactly as everything else here
-    // does.
+    // The two below are not part of a run at all — they bracket it. The
+    // provider reads the id *before* a run, to learn which remote pack this
+    // vault is, and writes it *after* a successful one, once that pack has
+    // been fetched, decoded and merged (see `sync::run`). They live on the
+    // trait because the id sits in the vault's own `meta` table, and reaching
+    // it means taking the session lock exactly as everything else here does.
     //
-    /// This vault's id, or `None` for a vault created before ids existed.
+    /// This vault's id, or `None` for a vault created before ids existed — or
+    /// for one whose first run has not yet succeeded.
     fn vault_id(&self) -> Result<Option<String>>;
-    /// Mint a fresh id for this vault and hand it back.
-    fn assign_vault_id(&self) -> Result<String>;
-    /// Take on an id that already names this vault's pack on the remote.
+    /// Take on an id this run has proved to be this vault's, whether it was
+    /// read off the remote or minted for it.
     fn adopt_vault_id(&self, id: &str) -> Result<()>;
 }
 
@@ -286,10 +287,6 @@ impl LocalVault for SessionVault {
 
     fn vault_id(&self) -> Result<Option<String>> {
         self.with_store(|store| identity::vault_id(store).map_err(store_err))
-    }
-
-    fn assign_vault_id(&self) -> Result<String> {
-        self.with_store(|store| identity::assign_vault_id(store).map_err(store_err))
     }
 
     fn adopt_vault_id(&self, id: &str) -> Result<()> {
@@ -493,9 +490,6 @@ mod tests {
         }
         fn vault_id(&self) -> Result<Option<String>> {
             identity::vault_id(&self.store).map_err(store_err)
-        }
-        fn assign_vault_id(&self) -> Result<String> {
-            identity::assign_vault_id(&self.store).map_err(store_err)
         }
         fn adopt_vault_id(&self, id: &str) -> Result<()> {
             identity::adopt_vault_id(&self.store, id).map_err(store_err)

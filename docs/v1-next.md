@@ -34,6 +34,12 @@ products solve it, don't patch symptoms.
 > local backup, which is the same bytes) and shares `Shares/<random>.rowelshare`, all named by
 > `sync::layout`. An upgraded install moves its legacy file into place on first sync, keeping
 > the Drive file id and its revision history; the `SWSY` magic bytes are a format tag and stay.
+> The move leaves a **tombstone** at `Rowel/vault.swsync`: a header carrying format byte `2`,
+> which a device still on the old build cannot parse, so its sync stops with "update the app"
+> instead of silently creating a second vault and diverging. New builds read the same file's
+> `rowelMovedTo` appProperty out of the listing to learn which pack the vault moved to. The
+> id a run settles on is written into the vault's `meta` only after that run has succeeded,
+> so a failed import never leaves a vault pointed at a pack it did not merge.
 >
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a
