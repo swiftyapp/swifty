@@ -176,9 +176,13 @@ carries them as part of the opaque payload and never sees them.
    moved into a blocking-pool task that tries it against the Google account's
    packs this device lacks and adds the ones it opens as workspaces
    (`commands/autojoin.rs`). The copy is spent on those Argon2id derives, is
-   never written anywhere, and is scrubbed when the task ends — seconds, bounded
-   by the Drive request deadlines. Biometric unlock has no passphrase and does
-   not do this.
+   never written anywhere, and is scrubbed when the task ends. How long that is:
+   the task stops starting on new candidates 60 seconds in (`JOIN_BUDGET`), so
+   the copy lives for at most that budget plus the one download in flight when
+   it ran out — each download bounded only by the Drive connect and read-stall
+   deadlines, so a large pack on a slow but steady link can stretch it by the
+   length of that download. Whatever was not tried stays on offer in Settings ›
+   Workspaces. Biometric unlock has no passphrase and does not do this.
 2. **Hold in Rust only.** The derived secret lives in the Rust session
    (`state.rs`, `Session.master_key`) wrapped in a zeroizing buffer, alongside the
    open encrypted store handle — never a fully decrypted vault. It never crosses

@@ -107,9 +107,13 @@ products solve it, don't patch symptoms.
 > (`commands::autojoin`, reporting `workspaces:added` per vault and a refreshed
 > `workspaces:remote`; the frontend re-probes and shows a passing notice). The password lives
 > exactly as long as that blocking-pool task, as a second `Zeroizing` copy, and is never
-> written — see the threat model's unlock section. A pack sealed with a different password
-> stays on offer in Settings › Workspaces. Biometric unlock has a key and no password, so it
-> cannot do this. Follow-up: pull on foreground and on a timer, since an idle device only syncs
+> written; the task stops starting candidates after a 60-second budget, so that is the budget
+> plus one download — see the threat model's unlock section. The task is bound to the account
+> it began on: the refreshed tokens are written back to the originating workspace under the
+> generation guard before each install, a disconnect meanwhile ends the task, and the
+> "already a workspace here" refusal is asked again with the step held and once more inside
+> the registry write. A pack sealed with a different password stays on offer in Settings ›
+> Workspaces. Biometric unlock has a key and no password, so it cannot do this. Follow-up: pull on foreground and on a timer, since an idle device only syncs
 > on unlock and after its own writes.
 >
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
