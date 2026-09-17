@@ -34,7 +34,7 @@ export const subscribeToEvents = (): (() => void) => {
     // The first run's own consent flow: the same pending/result/error trio as
     // sync, against an account there is no vault behind yet.
     on(EVENTS.setupDrivePending, () => setupDrivePending()),
-    on(EVENTS.setupDriveProbed, payload => setupDriveProbed(payload.file)),
+    on(EVENTS.setupDriveProbed, payload => setupDriveProbed(payload.files)),
     on(EVENTS.setupDriveError, payload => setupDriveFailed(payload.error)),
     // The one reaction to a lock, whoever asked for it: the lock command, the
     // inactivity autolock, the tray, a workspace switch. Every one of them ends

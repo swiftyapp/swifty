@@ -41,11 +41,15 @@ products solve it, don't patch symptoms.
 > id a run settles on is written into the vault's `meta` only after that run has succeeded,
 > so a failed import never leaves a vault pointed at a pack it did not merge.
 >
+> Onboarding's probe lists every live pack it finds — plus the legacy file while that is still
+> a pack rather than a tombstone — and the first run picks which vault to restore or to
+> archive, so an account holding two installs' primaries never has one chosen for it.
+>
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a
 > foreign-vault error); OAuth scope audit (`drive.file`); per-workspace sync (drops
-> archive-by-rename — "start fresh" simply becomes a new vault — adds a `vaultId` appProperty
-> on shares, and gives onboarding a vault picker); drop the legacy `vault.swsync` fallback once
+> archive-by-rename — "start fresh" simply becomes a new vault — and adds a `vaultId`
+> appProperty on shares); drop the legacy `vault.swsync` fallback once
 > upgraded installs have migrated; **release gate: a production Google OAuth client ID (owner
 > task)**.
 

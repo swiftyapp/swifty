@@ -44,10 +44,12 @@ struct Progress {
     total: usize,
 }
 
-/// `null` is an answer — the account holds no vault — not an absence.
+/// Every vault the account holds, so the first run can offer a choice rather
+/// than one picked for it. An empty list is an answer — the account holds no
+/// vault — not an absence.
 #[derive(Serialize, Clone)]
 struct Probed {
-    file: Option<PackInfo>,
+    files: Vec<PackInfo>,
 }
 
 pub fn vault_locked(app: &AppHandle) {
@@ -73,8 +75,8 @@ pub fn setup_drive_pending(app: &AppHandle) {
     let _ = app.emit(SETUP_DRIVE_PENDING, ());
 }
 
-pub fn setup_drive_probed(app: &AppHandle, file: Option<PackInfo>) {
-    let _ = app.emit(SETUP_DRIVE_PROBED, Probed { file });
+pub fn setup_drive_probed(app: &AppHandle, files: Vec<PackInfo>) {
+    let _ = app.emit(SETUP_DRIVE_PROBED, Probed { files });
 }
 
 pub fn setup_drive_error(app: &AppHandle, error: &str) {

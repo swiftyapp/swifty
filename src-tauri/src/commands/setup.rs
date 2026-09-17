@@ -21,7 +21,7 @@ use crate::crypto::VaultKey;
 use crate::error::{Error, Result};
 use crate::events;
 use crate::models::UnlockResult;
-use crate::session::{create_vault, list_metas};
+use crate::session::{create_vault, list_metas, store_err};
 use crate::state::AppState;
 use crate::storage;
 use crate::store::SqliteStore;
@@ -46,8 +46,8 @@ pub fn setup_drive_connect(app: AppHandle) -> Result<()> {
         let probed = sync::obtain_tokens(&app).and_then(|mut tokens| {
             // `block_on` is legal here because a blocking-pool thread is not one
             // of the async runtime's workers. Same rule as a sync run.
-            let file = tauri::async_runtime::block_on(probe(&app, &mut tokens))?;
-            Ok((tokens, file))
+            let files = tauri::async_runtime::block_on(probe(&app, &mut tokens))?;
+            Ok((tokens, files))
         });
         report(&app, attempt, probed);
     });
@@ -73,10 +73,7 @@ pub fn setup_drive_connect(app: AppHandle, state: State<'_, AppState>) -> Result
 pub(crate) async fn on_consent(app: &AppHandle, code: &str, verifier: &str) {
     let attempt = current_attempt(&app.state::<AppState>());
     let probed = match sync::exchange_for_tokens(app, code, verifier).await {
-        Ok(mut tokens) => {
-            let file = probe(app, &mut tokens).await;
-            file.map(|file| (tokens, file))
-        }
+        Ok(mut tokens) => probe(app, &mut tokens).await.map(|files| (tokens, files)),
         Err(e) => Err(e),
     };
     report(app, attempt, probed);
@@ -106,15 +103,16 @@ pub fn setup_drive_disconnect(state: State<'_, AppState>) -> Result<()> {
     Ok(())
 }
 
-/// Does the account hold a vault? Refreshes `tokens` in place if the access
-/// token consent just minted has somehow already expired.
-async fn probe(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Option<PackInfo>> {
+/// Which vaults does the account hold? Refreshes `tokens` in place if the
+/// access token consent just minted has somehow already expired.
+///
+/// Every one of them, not the pick of them: an account can hold a pack per
+/// vault (two installs, two primaries, two ids), and it is the user who has to
+/// say which of those is theirs.
+async fn probe(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Vec<PackInfo>> {
     let client = sync::http_client();
     let token = sync::fresh_access_token(&client, app, tokens).await?;
-    Ok(sync::setup::find_pack(&client, &token)
-        .await?
-        .as_ref()
-        .map(PackInfo::from))
+    sync::setup::find_packs(&client, &token).await
 }
 
 /// The one ending for a connect attempt, so the frontend always hears exactly
@@ -123,15 +121,15 @@ async fn probe(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Option<Pack
 /// An attempt the user has since backed out of (or replaced) hears nothing
 /// and keeps nothing: adopting its account now would silently connect a
 /// fresh vault to a sign-in the user thought they had cancelled.
-fn report(app: &AppHandle, attempt: u64, probed: Result<(sync::Tokens, Option<PackInfo>)>) {
+fn report(app: &AppHandle, attempt: u64, probed: Result<(sync::Tokens, Vec<PackInfo>)>) {
     if current_attempt(&app.state::<AppState>()) != attempt {
         log::info!("drive setup: dropping a consent the user already abandoned");
         return;
     }
     match probed {
-        Ok((tokens, file)) => {
+        Ok((tokens, files)) => {
             *app.state::<AppState>().pending_drive.lock().unwrap() = Some(tokens);
-            events::setup_drive_probed(app, file);
+            events::setup_drive_probed(app, files);
         }
         Err(e) => {
             // Half a connection is worse than none — the next attempt starts
@@ -145,8 +143,9 @@ fn report(app: &AppHandle, attempt: u64, probed: Result<(sync::Tokens, Option<Pa
 
 // --- restore ---------------------------------------------------------------
 
-/// Adopt the connected account's vault as this device's, with the master
-/// password it was created under.
+/// Adopt one of the connected account's vaults as this device's, with the
+/// master password it was created under. `file_id` is the Drive file the user
+/// chose from what the probe listed.
 ///
 /// A wrong password leaves the install exactly as it was (see
 /// [`restore::restore_from_pack`]) *and* leaves the account connected, so the
@@ -156,6 +155,7 @@ fn report(app: &AppHandle, attempt: u64, probed: Result<(sync::Tokens, Option<Pa
 #[tauri::command]
 pub async fn setup_restore_from_drive(
     password: Zeroizing<String>,
+    file_id: String,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
@@ -163,13 +163,13 @@ pub async fn setup_restore_from_drive(
     let _step = begin_step(&state)?;
     let mut tokens = peek_pending(&state)?;
 
-    let bytes = download(&app, &mut tokens).await?;
+    let (bytes, vault_id) = download(&app, &mut tokens, &file_id).await?;
     // Whatever the download's refresh produced has to be kept: Google rotates
     // refresh tokens, and a retry after a mistyped password uses these again.
     *state.pending_drive.lock().unwrap() = Some(tokens.clone());
 
     let (key, store) = restore_off_thread(&app, bytes, password).await?;
-    adopt(&app, &state, key, store, Some(&tokens))
+    adopt(&app, &state, key, store, Some(&tokens), vault_id.as_deref())
 }
 
 /// Restore from a `.rowel` backup on disk. Onboarding only.
@@ -197,19 +197,25 @@ pub async fn setup_restore_from_file(
         restore::restore_from_pack(&handle, &bytes, &password)
     })
     .await?;
-    adopt(&app, &state, key, store, None)
+    adopt(&app, &state, key, store, None, None)
 }
 
-/// Fetch the account's pack, re-locating it rather than trusting the id the
-/// probe saw: the two are minutes apart, and a stale id is a confusing failure
-/// where "no vault up there any more" is a clear one.
-async fn download(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Vec<u8>> {
+/// Fetch the chosen pack, and say which vault its name says it is.
+///
+/// The listing is taken again rather than the probe's answer trusted: the two
+/// are minutes apart, and an id that is no longer there fails as
+/// [`Error::NoRemoteVault`] — "no vault up there any more", which is a clear
+/// failure where a stale id would be a confusing one.
+async fn download(
+    app: &AppHandle,
+    tokens: &mut sync::Tokens,
+    file_id: &str,
+) -> Result<(Vec<u8>, Option<String>)> {
     let client = sync::http_client();
     let token = sync::fresh_access_token(&client, app, tokens).await?;
-    let file = sync::setup::find_pack(&client, &token)
-        .await?
-        .ok_or(Error::NoRemoteVault)?;
-    sync::setup::download_pack(&client, &token, &file.id).await
+    let file = sync::setup::find_pack_by_id(&client, &token, file_id).await?;
+    let bytes = sync::setup::download_pack(&client, &token, &file.id).await?;
+    Ok((bytes, file.vault_id))
 }
 
 // Argon2id + a SQLCipher open, both CPU-bound: off the command thread, as unlock does.
@@ -230,10 +236,15 @@ async fn restore_off_thread(
 /// With one, the credentials are sealed under the new key and the session is
 /// marked connected — the frontend's `enterMain` runs the first sync, which is
 /// what creates the folder and the pack on Drive.
+///
+/// `file_id` names the pack "start fresh, archive the old one" is about: the
+/// one the user was shown, not whichever the account happens to list first. It
+/// is `None` whenever nothing is being archived.
 #[tauri::command]
 pub async fn setup_create(
     password: Zeroizing<String>,
     archive_remote: bool,
+    file_id: Option<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
@@ -247,23 +258,23 @@ pub async fn setup_create(
     // left on a still-fresh install to try again, rather than holding a new
     // vault whose first sync is about to overwrite the pack they asked to keep.
     if archive_remote {
-        if let Some(tokens) = tokens.as_mut() {
-            archive(&app, tokens).await?;
+        if let (Some(tokens), Some(file_id)) = (tokens.as_mut(), file_id.as_deref()) {
+            archive(&app, tokens, file_id).await?;
         }
     }
 
     let (key, store) = create_off_thread(&app, password).await?;
-    adopt(&app, &state, key, store, tokens.as_ref())
+    adopt(&app, &state, key, store, tokens.as_ref(), None)
 }
 
-/// Move the account's existing pack aside, if it has one. Nothing up there is
-/// not a failure — it is the common case, and the same outcome either way.
-async fn archive(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<()> {
+/// Move the chosen pack aside so the vault about to be created can take its
+/// place. A pack that is no longer there fails as [`Error::NoRemoteVault`],
+/// the same way a restore of it would: the user is being asked about a vault
+/// the account does not hold, so the question has to be put again.
+async fn archive(app: &AppHandle, tokens: &mut sync::Tokens, file_id: &str) -> Result<()> {
     let client = sync::http_client();
     let token = sync::fresh_access_token(&client, app, tokens).await?;
-    let Some(file) = sync::setup::find_pack(&client, &token).await? else {
-        return Ok(());
-    };
+    let file = sync::setup::find_pack_by_id(&client, &token, file_id).await?;
     sync::setup::archive_pack(&client, &token, &file, &sync::setup::today_utc()).await
 }
 
@@ -289,17 +300,22 @@ pub(crate) async fn create_off_thread(
 /// over. Removing what was just written puts them back on a fresh install,
 /// where the retry is one press away. (The remote pack an archive already
 /// renamed stays renamed; nothing about that is lost.)
+/// `vault_id` is the id the restored pack's own file name gave it, when it came
+/// from `Vaults/<id>.rowel`. Stamped here, inside the all-or-nothing, rather
+/// than after the fact.
 fn adopt(
     app: &AppHandle,
     state: &AppState,
     key: VaultKey,
     store: SqliteStore,
     tokens: Option<&sync::Tokens>,
+    vault_id: Option<&str>,
 ) -> Result<UnlockResult> {
-    // Metadata first, tokens last: nothing else is written until the one read
-    // that could fail has succeeded, so a failure here leaves no token file
-    // sealed under a key that is about to be discarded.
-    let installed = list_metas(&store).and_then(|entries| {
+    // Id first, then metadata, tokens last: nothing else is written until the
+    // one read that could fail has succeeded, so a failure here leaves no token
+    // file sealed under a key that is about to be discarded.
+    let installed = stamp_vault_id(&store, vault_id).and_then(|()| {
+        let entries = list_metas(&store)?;
         if let Some(tokens) = tokens {
             sync::persist_tokens(app, &key.cryptor(), tokens)?;
         }
@@ -325,6 +341,19 @@ fn adopt(
             discard_fresh_vault(app);
             Err(e)
         }
+    }
+}
+
+/// Make the restored vault answer to the name the account addresses it by.
+///
+/// The file name is authoritative, not whatever the pack carries inside: a pack
+/// written before ids were stamped into `meta` carries none at all, and this
+/// device has to reach `Vaults/<id>.rowel` on its very first sync — under a
+/// different id it would upload a second pack beside the one it just restored.
+fn stamp_vault_id(store: &SqliteStore, vault_id: Option<&str>) -> Result<()> {
+    match vault_id {
+        Some(id) => crate::store::identity::adopt_vault_id(store, id).map_err(store_err),
+        None => Ok(()),
     }
 }
 
