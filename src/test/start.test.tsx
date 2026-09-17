@@ -33,8 +33,10 @@ const biometricStatus = (canEnroll: boolean) =>
 // Must satisfy the setup strength gate (>= 12 chars, zxcvbn score >= 2).
 const STRONG = 'my-strong-vault-passphrase-2026'
 
+// What the probe reports for a pack in `Rowel/Vaults/`: the name is the vault's
+// own id, so the screens show an opaque file name rather than a friendly one.
 const REMOTE: SetupDriveFile = {
-  name: 'vault.swsync',
+  name: '9f3c1a2b4d5e6f708192a3b4c5d6e7f8.rowel',
   size: 1_258_291,
   modifiedTime: '2024-01-01T00:00:00.000Z'
 }
@@ -322,7 +324,7 @@ describe('a Drive that already holds data', () => {
     await reachConflict()
 
     expect(await screen.findByText('This Drive already has Rowel data')).toBeInTheDocument()
-    expect(screen.getByTestId('setup-conflict-file')).toHaveTextContent('vault.swsync')
+    expect(screen.getByTestId('setup-conflict-file')).toHaveTextContent(REMOTE.name)
     expect(calls('setup_create')).toHaveLength(0)
   })
 
@@ -361,7 +363,7 @@ describe('restoring from Google Drive', () => {
     expect(screen.getByTestId('drive-spinner')).toBeInTheDocument()
 
     await act(async () => setupDriveProbed(REMOTE))
-    expect(screen.getByTestId('drive-found-file')).toHaveTextContent('vault.swsync')
+    expect(screen.getByTestId('drive-found-file')).toHaveTextContent(REMOTE.name)
 
     await userEvent.type(screen.getByTestId('drive-password-input'), STRONG)
     await userEvent.click(screen.getByTestId('drive-unlock-button'))

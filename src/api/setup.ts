@@ -2,8 +2,10 @@ import { call } from './client'
 import type { UnlockResult } from './types'
 
 /**
- * The sealed pack this Google account already holds, as the setup probe reports
- * it. `size` is bytes; `modifiedTime` is RFC3339.
+ * The sealed `.rowel` pack this Google account already holds, as the setup
+ * probe reports it. `name` is the file's name in `Rowel/Vaults/` — the vault's
+ * own id, not a label the user chose. `size` is bytes; `modifiedTime` is
+ * RFC3339.
  */
 export interface SetupDriveFile {
   name: string
@@ -31,8 +33,8 @@ export const setupRestoreFromDrive = (password: string): Promise<UnlockResult> =
 /**
  * Create the local data under `password`. Any tokens left pending by
  * `setupDriveConnect` are adopted, so the result reports sync as configured;
- * `archiveRemote` renames the pack already in that Drive folder first, rather
- * than writing over it.
+ * `archiveRemote` renames the pack already in that Drive account to
+ * `<name>-archived-<date>.rowel` first, rather than writing over it.
  */
 export const setupCreate = (
   password: string,
