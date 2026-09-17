@@ -10,22 +10,26 @@ import {
   isModalOpen,
   lockVault
 } from '@/store'
+import { keyCode } from '@/utils/keys'
 
 // The app-level shortcut surface. One listener, one record — a new chord is
 // one line here. Mounted from Main, so chords are live only while unlocked.
+//
+// Keyed by physical key (`KeyboardEvent.code`), not by the character the layout
+// prints, so the chords work the same on a Cyrillic keyboard (see `keyCode`).
 const BINDINGS: Record<string, () => void> = {
-  k: openPalette,
-  l: lockVault,
+  KeyK: openPalette,
+  KeyL: lockVault,
   // Re-pressing ⌘G must not drop the callback the generator was opened with:
   // the flag flips before the card mounts, so one press cannot queue a second
   // open.
-  g: () => {
+  KeyG: () => {
     if (!isModalOpen()) openGenerator()
   },
-  n: openAddPicker,
-  f: focusSearch,
+  KeyN: openAddPicker,
+  KeyF: focusSearch,
   // Edit whatever the list has selected — nothing to edit without a selection.
-  e: () => {
+  KeyE: () => {
     if (selectCurrent(useVault.getState())) editEntry()
   }
 }
@@ -34,7 +38,7 @@ export const useShortcuts = () => {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return
-      const run = BINDINGS[e.key.toLowerCase()]
+      const run = BINDINGS[keyCode(e)]
       if (!run) return
       e.preventDefault()
       // A dialog owns the keyboard while it is up: every chord here would

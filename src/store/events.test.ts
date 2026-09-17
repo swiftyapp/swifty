@@ -164,12 +164,27 @@ describe('vault:locked', () => {
     flowMain()
 
     handlerFor(EVENTS.vaultLocked)()
-    await vi.waitFor(() => expect(useApp.getState().flow).toBe('auth'))
+    expect(useApp.getState().flow).toBe('auth')
 
     // The regression: this used to be `flowAuth(false)` unconditionally, so an
     // in-session lock (autolock, tray) never offered Touch ID again until a
-    // full app restart. The lock screen reads the gate off the re-run probe.
-    expect(useApp.getState().status?.biometric.available).toBe(true)
+    // full app restart. The lock screen reads the gate off the re-run probe,
+    // which lands after the routing rather than before it.
+    await vi.waitFor(() =>
+      expect(useApp.getState().status?.biometric.available).toBe(true)
+    )
+  })
+
+  // The probe is async; the routing must not wait on it. While it did, the main
+  // shell stayed mounted over an emptied store — live chords and all.
+  it('leaves the main shell before the probe answers', () => {
+    flowMain()
+    setEntries([meta('a')])
+
+    handlerFor(EVENTS.vaultLocked)()
+
+    expect(useApp.getState().flow).toBe('auth')
+    expect(useVault.getState().items).toEqual([])
   })
 
   it('drops the session data with the key', async () => {

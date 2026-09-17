@@ -1,4 +1,4 @@
-import type { EntryType } from '@/api/types'
+import type { Entry, EntryType } from '@/api/types'
 import type { TKey } from '@/i18n'
 import type { Kind } from './types'
 import login from './login'
@@ -21,6 +21,19 @@ export const KINDS: Kind[] = [login, card, note, identity, ssh, apikey, env]
 const BY_TYPE: Record<EntryType, Kind> = { login, card, note, identity, ssh, apikey, env }
 
 export const kindOf = (type: EntryType): Kind => BY_TYPE[type]
+
+/**
+ * An entry as the webview's types describe it, from one as Rust sends it.
+ *
+ * Every text field on Rust's `Entry` is an `Option<String>` that is left off
+ * the wire when unset, so a login saved without an email arrives with no
+ * `email` key at all — where `LoginEntry` promises a string. The kind's empty
+ * draft is the list of what that kind is supposed to carry, so it fills the
+ * blanks and the rest of the app can read `entry.email.length` as typed.
+ * `api/contract.test.ts` checks the drafts cover every field Rust may omit.
+ */
+export const completeEntry = (entry: Entry): Entry =>
+  ({ ...kindOf(entry.type).defaults, ...entry }) as Entry
 
 /**
  * "Add a login" / "Add a credit card": the create action, named after the kind

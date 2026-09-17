@@ -58,6 +58,27 @@ describe('Main', () => {
     expect(screen.getByTestId('search-input')).toHaveFocus()
   })
 
+  // `key` is what the layout prints — on ru-RU, ⌘F arrives as `а`. The chord is
+  // read off the physical key, so a Cyrillic layout gets the same shortcuts.
+  it('reads chords off the physical key, whatever the layout prints', async () => {
+    seed()
+    render(<Main />)
+
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'а', code: 'KeyF', metaKey: true, bubbles: true })
+      )
+    })
+    expect(screen.getByTestId('search-input')).toHaveFocus()
+
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'т', code: 'KeyN', metaKey: true, bubbles: true })
+      )
+    })
+    expect(useUi.getState().addPicker).toBe(true)
+  })
+
   it('lets the open generator dialog swallow the shell chords', async () => {
     seed()
     render(<Main />)

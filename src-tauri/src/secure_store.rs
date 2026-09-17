@@ -13,12 +13,18 @@
 //!   signed build — an ad-hoc-signed dev build gets `errSecMissingEntitlement`.
 //!   On iOS the data-protection keychain is the only keychain, so the switch
 //!   macOS needs is simply absent there.
-//! - [`GateMode::Prompt`]: verify-then-read. The app runs an explicit biometric
-//!   check ([`crate::biometrics::authenticate`]) and only then reads the key
-//!   from an ordinary credential-store item (macOS login keychain / Windows
-//!   Credential Manager). The gate is app-enforced rather than OS-enforced —
-//!   the same model the Windows path has always used, and the same one the
-//!   legacy Electron app used via keytar.
+//! - [`GateMode::Prompt`] (Apple only): verify-then-read. The app runs an
+//!   explicit biometric check ([`crate::biometrics::authenticate`]) and only
+//!   then reads the key from an ordinary login-keychain item. The gate is
+//!   app-enforced rather than OS-enforced, which is all an unentitled macOS
+//!   build can do — and the same model the legacy Electron app used via keytar.
+//! - [`GateMode::HelloKey`] (Windows only): the key material is sealed under a
+//!   wrapping key derived from a Windows Hello *key credential* signature, and
+//!   only the sealed blob goes to Credential Manager. Producing that signature
+//!   requires a Hello prompt the OS enforces, so the stored item is inert to
+//!   anything that cannot pass it — unlike a verify-then-read item in Credential
+//!   Manager, which has no gate of its own and is readable by any process
+//!   running as the same user.
 //! - **other (Linux, …):** unsupported — we report biometric unavailable rather
 //!   than store a key that nothing can gate.
 //!
@@ -53,6 +59,9 @@ pub enum GateMode {
     Protected,
     /// App-enforced: explicit biometric prompt, then a plain credential-store read.
     Prompt,
+    /// Windows: sealed under a Windows Hello key-credential signature, so the
+    /// stored blob cannot be opened without passing the Hello prompt.
+    HelloKey,
 }
 
 impl GateMode {
@@ -62,6 +71,7 @@ impl GateMode {
         match self {
             Self::Protected => "protected",
             Self::Prompt => "prompt",
+            Self::HelloKey => "hello-key",
         }
     }
 
@@ -73,6 +83,7 @@ impl GateMode {
         match marker.trim() {
             "prompt" => Self::Prompt,
             "protected" => Self::Protected,
+            "hello-key" => Self::HelloKey,
             _ => Self::LEGACY,
         }
     }
@@ -117,7 +128,77 @@ impl KeyStore for Platform {
 
 /// Whether this platform can biometric-gate the secure store at all.
 pub fn is_supported() -> bool {
-    imp::SUPPORTED
+    imp::SUPPORTED && hello_key_store_available()
+}
+
+// Windows binds the stored material to a Hello *key credential*, so a device
+// whose key store cannot mint one has no gate to offer even when
+// `biometrics::is_available()` says a Hello prompt exists. Nowhere else has a
+// second requirement, hence the constant `true`.
+#[cfg(not(target_os = "windows"))]
+fn hello_key_store_available() -> bool {
+    true
+}
+
+#[cfg(target_os = "windows")]
+fn hello_key_store_available() -> bool {
+    imp::key_credentials_available()
+}
+
+// --- Windows Hello key wrapping ---------------------------------------------
+//
+// The platform-independent halves of the Windows path live here, uncfg'd from
+// the OS, so the wrap/unwrap round trip is testable on the machines we develop
+// on rather than only on Windows.
+
+/// The message the Hello key credential signs. Fixed on purpose: the design
+/// relies on Hello signing with RSA PKCS#1 v1.5 over SHA-256, a deterministic
+/// scheme, so signing a constant yields a byte-identical signature every time —
+/// which is what makes the derived wrapping key reproducible across unlocks.
+///
+/// Microsoft's documentation disagrees with itself on the scheme. The Windows
+/// Hello developer guide says "We are using SHA256 as the hash algorithm and
+/// Pkcs1 for SignaturePadding" and ships server code that verifies with
+/// `RSASignaturePadding.Pkcs1`; the `KeyCredentialManager` class reference's
+/// remarks say "PKCS #1 RSA PSS with SHA256", which is probabilistic and would
+/// make this design unworkable. Practice sides with the guide: Bitwarden's
+/// desktop client ships this same construction ("a signing API, that
+/// deterministically signs a challenge, from which a windows hello key is
+/// derived" — `desktop_native/biometric/src/windows.rs`). Still, enrollment
+/// does not trust either page: it verifies the signature it just obtained as
+/// PKCS#1 v1.5 against the credential's own public key
+/// (`assert_pkcs1_signature`) and refuses to enroll otherwise, rather than
+/// store a blob no later prompt could open. One enrollment on a real Windows
+/// machine settles the question.
+///
+/// Nothing is secret about the challenge — the secrecy is the private key,
+/// which lives in the TPM/Hello key store and only signs after a prompt.
+#[cfg(target_os = "windows")]
+const HELLO_CHALLENGE: &[u8] = b"rowel-biometric-v1";
+
+/// HKDF label, distinct from every vault subkey label so this wrapping key can
+/// never collide with the SQLCipher or payload key.
+#[cfg(any(target_os = "windows", test))]
+const HELLO_WRAP_INFO: &[u8] = b"rowel windows-hello wrap";
+
+#[cfg(any(target_os = "windows", test))]
+fn hello_wrapping_key(signature: &[u8]) -> Zeroizing<[u8; 32]> {
+    Zeroizing::new(crate::crypto::hkdf_subkey(signature, HELLO_WRAP_INFO))
+}
+
+/// Seal the key material under the signature-derived wrapping key. Only this
+/// blob is handed to Credential Manager: on its own it is inert, because
+/// reproducing the wrapping key needs a fresh Hello signature.
+#[cfg(any(target_os = "windows", test))]
+fn wrap_master(signature: &[u8], master: &[u8]) -> Result<Vec<u8>> {
+    crate::crypto::seal_aead(&*hello_wrapping_key(signature), master)
+}
+
+/// Reverse of [`wrap_master`]. A blob that was tampered with, or a signature
+/// from a different Hello key, fails the GCM tag rather than yielding garbage.
+#[cfg(any(target_os = "windows", test))]
+fn unwrap_master(signature: &[u8], blob: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
+    crate::crypto::unseal_aead(&*hello_wrapping_key(signature), blob).map(Zeroizing::new)
 }
 
 /// Outcome of a protected-mode store attempt, classified so the enrollment
@@ -215,6 +296,10 @@ mod imp {
                 biometrics::authenticate()?;
                 generic_password(prompt_options()).map_err(map_err)?
             }
+            // A Windows-only mode: no Apple build ever enrolls it, and reading
+            // an enrollment under a gate it was not stored behind is exactly
+            // what this module refuses to do.
+            GateMode::HelloKey => return Err(Error::NotFound),
         };
         Ok(Zeroizing::new(bytes))
     }
@@ -251,40 +336,207 @@ mod imp {
 #[cfg(target_os = "windows")]
 mod imp {
     use super::*;
-    use crate::biometrics;
     use keyring::{Entry, Error as KrError};
+    use windows::core::HSTRING;
+    use windows::Security::Credentials::{
+        KeyCredentialCreationOption, KeyCredentialManager, KeyCredentialRetrievalResult,
+        KeyCredentialStatus,
+    };
+    use windows::Storage::Streams::{DataReader, DataWriter, IBuffer};
 
     pub const SUPPORTED: bool = true;
+
+    // The Hello key credential the stored blob is bound to. Per app, not per
+    // user; reusing SERVICE keeps the two halves of one enrollment named alike.
+    const CREDENTIAL_NAME: &str = SERVICE;
 
     fn entry() -> Result<Entry> {
         Entry::new(SERVICE, ACCOUNT).map_err(|e| Error::Other(e.to_string()))
     }
 
-    // Credential Manager has no OS-enforced biometric gate, so Windows is always
-    // verify-then-read — there is no protected mode to prefer or fall back from.
-    pub fn store(key: &[u8]) -> Result<GateMode> {
-        entry()?
-            .set_secret(key)
-            .map_err(|e| Error::Other(e.to_string()))?;
-        Ok(GateMode::Prompt)
+    // `join` is windows-rs 0.62's name for what used to be `get`: block the
+    // calling thread until the WinRT async operation completes (same idiom as
+    // `biometrics.rs`). Every secure-store call already runs off the UI thread.
+    pub fn key_credentials_available() -> bool {
+        KeyCredentialManager::IsSupportedAsync()
+            .and_then(|op| op.join())
+            .unwrap_or(false)
     }
 
-    // `mode` is always `Prompt` here (see `store`); the read path is unconditional.
-    pub fn retrieve(_mode: GateMode) -> Result<Zeroizing<Vec<u8>>> {
-        // Verify-then-read: gate the Credential Manager read behind Windows Hello.
-        biometrics::authenticate()?;
-        match entry()?.get_secret() {
-            Ok(bytes) => Ok(Zeroizing::new(bytes)),
-            Err(KrError::NoEntry) => Err(Error::NotFound),
-            Err(e) => Err(Error::Other(e.to_string())),
+    // Credential Manager has no gate of its own, so the material is sealed
+    // before it goes in: `RequestCreateAsync` is itself the Hello prompt, and
+    // ReplaceExisting mints a fresh key pair so a re-enrollment never inherits
+    // the previous one's wrapping key.
+    pub fn store(key: &[u8]) -> Result<GateMode> {
+        let created = KeyCredentialManager::RequestCreateAsync(
+            &HSTRING::from(CREDENTIAL_NAME),
+            KeyCredentialCreationOption::ReplaceExisting,
+        )
+        .and_then(|op| op.join())
+        .map_err(win_err)?;
+        let signature = sign_challenge(&created)?;
+        // Before anything is stored: a signature that is not the deterministic
+        // one the design assumes would seal the key under a value no later
+        // prompt can reproduce, and the enrollment would only be found broken
+        // at the first unlock.
+        assert_pkcs1_signature(&created, &signature)?;
+        let blob = wrap_master(&signature, key)?;
+        entry()?
+            .set_secret(&blob)
+            .map_err(|e| Error::Other(e.to_string()))?;
+        Ok(GateMode::HelloKey)
+    }
+
+    // Verify the enrollment signature as RSA PKCS#1 v1.5 / SHA-256 against the
+    // credential's own public key. PKCS#1 v1.5 is deterministic, so passing this
+    // is what guarantees the next prompt reproduces the same bytes and with them
+    // the wrapping key; a probabilistic scheme (RSA-PSS) fails it, and the
+    // enrollment is refused with a reason instead of stored unopenable. One
+    // public-key operation, no second prompt.
+    fn assert_pkcs1_signature(
+        result: &KeyCredentialRetrievalResult,
+        signature: &[u8],
+    ) -> Result<()> {
+        use windows::Security::Cryptography::Core::{
+            AsymmetricAlgorithmNames, AsymmetricKeyAlgorithmProvider, CryptographicEngine,
+            CryptographicPublicKeyBlobType,
+        };
+
+        let public_key = result
+            .Credential()
+            .map_err(win_err)?
+            .RetrievePublicKeyWithBlobType(CryptographicPublicKeyBlobType::BCryptPublicKey)
+            .map_err(win_err)?;
+        let provider = AsymmetricKeyAlgorithmProvider::OpenAlgorithm(
+            &AsymmetricAlgorithmNames::RsaSignPkcs1Sha256().map_err(win_err)?,
+        )
+        .map_err(win_err)?;
+        let key = provider
+            .ImportPublicKeyWithBlobType(
+                &public_key,
+                CryptographicPublicKeyBlobType::BCryptPublicKey,
+            )
+            .map_err(win_err)?;
+        let verified = CryptographicEngine::VerifySignature(
+            &key,
+            &to_buffer(HELLO_CHALLENGE)?,
+            &to_buffer(signature)?,
+        )
+        .map_err(win_err)?;
+        if verified {
+            Ok(())
+        } else {
+            Err(Error::Other(
+                "Windows Hello on this device does not sign with RSA PKCS#1 v1.5, which \
+                 biometric unlock relies on to reproduce its key; biometric unlock is \
+                 unavailable here"
+                    .into(),
+            ))
         }
     }
 
+    pub fn retrieve(mode: GateMode) -> Result<Zeroizing<Vec<u8>>> {
+        if mode != GateMode::HelloKey {
+            // A pre-Hello-key enrollment (`Prompt`, which is also what the
+            // legacy "1" marker reads as here). That item is an *ungated* copy
+            // of the master key — Credential Manager enforces nothing, so any
+            // process running as this user could read it. Delete it rather than
+            // read it: the caller treats NotFound as "the enrollment is gone"
+            // and un-enrolls, so re-enabling biometrics produces a wrapped one.
+            // A failed delete propagates as itself: reporting NotFound over a
+            // key that is still there would clear the marker and with it the
+            // only path that ever retries the removal.
+            delete()?;
+            return Err(Error::NotFound);
+        }
+        // Opening and signing *is* the verification — the wrapping key cannot
+        // exist without a signature Hello refuses to produce unprompted. Hence
+        // no `biometrics::authenticate()` here: a prompt that merely precedes a
+        // plain read gates nothing.
+        let opened = KeyCredentialManager::OpenAsync(&HSTRING::from(CREDENTIAL_NAME))
+            .and_then(|op| op.join())
+            .map_err(win_err)?;
+        let signature = sign_challenge(&opened)?;
+        let blob = match entry()?.get_secret() {
+            Ok(blob) => blob,
+            Err(KrError::NoEntry) => return Err(Error::NotFound),
+            Err(e) => return Err(Error::Other(e.to_string())),
+        };
+        // A GCM failure here means this signature is not the one the blob was
+        // sealed under — a reset Hello key, or a signature scheme that changed
+        // under us. Neither is "the enrollment is gone", so not `NotFound`; the
+        // user re-enrolls and the message says so.
+        unwrap_master(&signature, &blob).map_err(|_| {
+            Error::Other(
+                "Windows Hello did not reproduce the biometric key; re-enable biometric \
+                 unlock to re-enroll"
+                    .into(),
+            )
+        })
+    }
+
     pub fn delete() -> Result<()> {
+        // Both halves go, and a missing one is not an error: a leftover key
+        // credential would keep prompting for material that no longer exists,
+        // and a leftover blob would outlive the key that opens it.
+        let _ = KeyCredentialManager::DeleteAsync(&HSTRING::from(CREDENTIAL_NAME))
+            .and_then(|op| op.join());
         match entry()?.delete_credential() {
             Ok(()) | Err(KrError::NoEntry) => Ok(()),
             Err(e) => Err(Error::Other(e.to_string())),
         }
+    }
+
+    // Both halves of a Hello operation report a `KeyCredentialStatus`. Mapped
+    // the way `biometrics.rs` maps `UserConsentVerificationResult`: a dismissed
+    // or declined prompt is the user's choice, not a failure, and a missing
+    // credential means the enrollment is gone (the caller clears the marker).
+    fn check_status(status: KeyCredentialStatus) -> Result<()> {
+        if status == KeyCredentialStatus::Success {
+            Ok(())
+        } else if status == KeyCredentialStatus::NotFound {
+            Err(Error::NotFound)
+        } else if status == KeyCredentialStatus::UserCanceled
+            || status == KeyCredentialStatus::UserPrefersPassword
+        {
+            Err(Error::Cancelled)
+        } else {
+            Err(Error::Other(format!(
+                "Windows Hello refused the key credential ({status:?})"
+            )))
+        }
+    }
+
+    fn sign_challenge(result: &KeyCredentialRetrievalResult) -> Result<Zeroizing<Vec<u8>>> {
+        check_status(result.Status().map_err(win_err)?)?;
+        let credential = result.Credential().map_err(win_err)?;
+        let signed = credential
+            .RequestSignAsync(&to_buffer(HELLO_CHALLENGE)?)
+            .and_then(|op| op.join())
+            .map_err(win_err)?;
+        check_status(signed.Status().map_err(win_err)?)?;
+        let buffer = signed.Result().map_err(win_err)?;
+        Ok(Zeroizing::new(from_buffer(&buffer)?))
+    }
+
+    // WinRT speaks `IBuffer`, not slices. `DataWriter`/`DataReader` are the
+    // conversion that needs no extra `windows` feature beyond Storage_Streams.
+    fn to_buffer(bytes: &[u8]) -> Result<IBuffer> {
+        let writer = DataWriter::new().map_err(win_err)?;
+        writer.WriteBytes(bytes).map_err(win_err)?;
+        writer.DetachBuffer().map_err(win_err)
+    }
+
+    fn from_buffer(buffer: &IBuffer) -> Result<Vec<u8>> {
+        let len = buffer.Length().map_err(win_err)? as usize;
+        let reader = DataReader::FromBuffer(buffer).map_err(win_err)?;
+        let mut out = vec![0u8; len];
+        reader.ReadBytes(&mut out).map_err(win_err)?;
+        Ok(out)
+    }
+
+    fn win_err(e: windows::core::Error) -> Error {
+        Error::Other(e.to_string())
     }
 }
 
@@ -321,6 +573,7 @@ mod tests {
     struct MockStore {
         protected: RefCell<Option<Vec<u8>>>,
         prompt: RefCell<Option<Vec<u8>>>,
+        hello_key: RefCell<Option<Vec<u8>>>,
         // Simulates an ad-hoc-signed build: the protected keychain refuses.
         no_entitlement: Cell<bool>,
     }
@@ -335,6 +588,7 @@ mod tests {
             match mode {
                 GateMode::Protected => &self.protected,
                 GateMode::Prompt => &self.prompt,
+                GateMode::HelloKey => &self.hello_key,
             }
         }
     }
@@ -368,6 +622,7 @@ mod tests {
         fn delete(&self) -> Result<()> {
             *self.protected.borrow_mut() = None;
             *self.prompt.borrow_mut() = None;
+            *self.hello_key.borrow_mut() = None;
             Ok(())
         }
     }
@@ -472,12 +727,60 @@ mod tests {
 
     #[test]
     fn gate_mode_markers_round_trip() {
-        for mode in [GateMode::Protected, GateMode::Prompt] {
+        for mode in [GateMode::Protected, GateMode::Prompt, GateMode::HelloKey] {
             assert_eq!(GateMode::from_marker(mode.as_marker()), mode);
         }
         // A pre-mode marker reads as whatever that build actually wrote.
         assert_eq!(GateMode::from_marker("1"), GateMode::LEGACY);
         assert_eq!(GateMode::from_marker(""), GateMode::LEGACY);
+    }
+
+    // --- Windows Hello wrapping (platform-independent halves) ----------------
+
+    // A stand-in for what `KeyCredential::RequestSignAsync` hands back: opaque
+    // bytes that only a successful Hello prompt can reproduce.
+    const SIGNATURE: &[u8] = b"a-windows-hello-rsa-signature";
+
+    #[test]
+    fn hello_wrapping_round_trips_the_key_material() {
+        let master = crate::crypto::hash_secret("hunter2").into_bytes();
+        let blob = wrap_master(SIGNATURE, &master).unwrap();
+        // Only this blob reaches Credential Manager; the key must not be in it.
+        assert!(!blob.windows(master.len()).any(|w| w == master.as_slice()));
+        assert_eq!(&*unwrap_master(SIGNATURE, &blob).unwrap(), &master);
+    }
+
+    #[test]
+    fn a_tampered_hello_blob_does_not_unwrap() {
+        let mut blob = wrap_master(SIGNATURE, b"master").unwrap();
+        let last = blob.len() - 1;
+        blob[last] ^= 0x01;
+        assert!(unwrap_master(SIGNATURE, &blob).is_err());
+        // Too short to even hold a nonce and tag: also a clean failure.
+        assert!(unwrap_master(SIGNATURE, b"nope").is_err());
+    }
+
+    #[test]
+    fn a_different_hello_signature_does_not_unwrap() {
+        // Re-enrolling Hello (new PIN, reset key credential) yields a different
+        // signature, so the old blob is inert rather than readable.
+        let blob = wrap_master(SIGNATURE, b"master").unwrap();
+        assert!(unwrap_master(b"a-different-signature", &blob).is_err());
+    }
+
+    #[test]
+    fn the_hello_wrapping_key_is_not_a_vault_subkey() {
+        // The wrapping key shares the master's HKDF salt, so only the distinct
+        // `info` label keeps it clear of the SQLCipher and payload subkeys.
+        let master = [7u8; 32];
+        assert_ne!(
+            *hello_wrapping_key(&master),
+            crate::crypto::hkdf_subkey(&master, b"sqlcipher-db-key")
+        );
+        assert_ne!(
+            *hello_wrapping_key(&master),
+            crate::crypto::hkdf_subkey(&master, b"payload-aead-key")
+        );
     }
 
     // --- Real-keychain probes -------------------------------------------------

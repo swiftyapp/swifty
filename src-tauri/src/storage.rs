@@ -16,6 +16,10 @@ pub const DB_REKEY_BACKUP_FILE: &str = "vault.db.rekey-backup";
 // salt (public by design) and is read *before* deriving the key — the salt/params
 // cannot live inside the encrypted DB, since deriving the key is what opens it.
 pub const KDF_SIDECAR_FILE: &str = "vault.kdf.json";
+// Pre-change recovery snapshot of the KDF sidecar, taken alongside the DB one.
+// Rolling the DB back to its old key is only half a rollback: the descriptor that
+// says how to derive that key has to roll back with it, or nothing opens.
+pub const KDF_SIDECAR_REKEY_BACKUP_FILE: &str = "vault.kdf.json.rekey-backup";
 // Plaintext failed-unlock backoff state (T-AUTH-3), stored next to the DB for the
 // same reason as the KDF sidecar: a wrong password never opens the encrypted DB,
 // so the attempt counter cannot live in the `meta` table. Public by design —
@@ -55,7 +59,12 @@ pub fn root_dir(app: &AppHandle) -> Result<PathBuf> {
 // The active workspace's own directory — which, for the primary, IS the root
 // (see `workspace::dir_of`). Everything belonging to one vault resolves through
 // here, so switching workspaces moves the whole set of paths at once.
-fn workspace_dir(app: &AppHandle) -> Result<PathBuf> {
+//
+// Crate-visible for callers that need several of one workspace's files to be
+// guaranteed to belong to the *same* workspace: resolving each path separately
+// re-reads the active id each time, so a switch landing between two lookups
+// hands back a mixed set (see `auth::recover_interrupted_rekey`).
+pub(crate) fn workspace_dir(app: &AppHandle) -> Result<PathBuf> {
     Ok(crate::workspace::dir_of(
         &root_dir(app)?,
         &crate::workspace::active_id(app),
@@ -81,11 +90,6 @@ pub fn sync_scratch_dir(app: &AppHandle) -> Result<PathBuf> {
 // once serves every workspace and leaks nothing about which of them uses it.
 pub fn icons_dir(app: &AppHandle) -> Result<PathBuf> {
     Ok(root_dir(app)?.join("icons"))
-}
-
-// Sibling recovery snapshot of the DB (change-master-password rollback point).
-pub fn db_rekey_backup_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(workspace_dir(app)?.join(DB_REKEY_BACKUP_FILE))
 }
 
 // Whether the SQLite store has been created (non-empty file present).
@@ -168,11 +172,18 @@ pub fn write_lockout_sidecar(app: &AppHandle, json: &str) -> Result<()> {
     atomic_write_file(&lockout_sidecar_path(app)?, json)
 }
 
-// Durably replace `path`: build a uniquely named temp sibling, fsync it,
-// atomically persist it over the target, then fsync the directory. The target
+// Durably replace `path`: create a uniquely named temp sibling, fsync it,
+// atomically rename it over the target, then fsync the directory. The target
 // ends up as either the complete old bytes or the complete new bytes — never a
 // truncated/empty file. `write` is injected so failure after a partial temp
-// write is testable; dropping NamedTempFile removes that partial sibling.
+// write is testable; the partial sibling is removed on every failure.
+//
+// `private` makes the temp sibling owner-readable from the instant it exists
+// (`owner_only::create_new`: `0600` on Unix, a protected DACL supplied at
+// creation on Windows), so there is no moment at which the umask or the
+// folder's inherited permissions govern it — a handle opened in such a moment
+// would keep its access after the permissions changed — and the replaced file
+// keeps that restriction whatever an existing file at `path` allowed.
 fn atomic_replace_with<F>(path: &Path, private: bool, write: F) -> Result<()>
 where
     F: FnOnce(&mut fs::File) -> std::io::Result<()>,
@@ -182,19 +193,12 @@ where
         .ok_or_else(|| Error::Other("destination has no parent directory".into()))?;
     fs::create_dir_all(parent)?;
 
-    let mut temp = tempfile::NamedTempFile::new_in(parent)?;
-    #[cfg(unix)]
-    if private {
-        use std::os::unix::fs::PermissionsExt;
-        temp.as_file()
-            .set_permissions(fs::Permissions::from_mode(0o600))?;
-    }
-    #[cfg(not(unix))]
-    let _ = private;
-
-    write(temp.as_file_mut())?;
-    temp.as_file().sync_all()?;
-    temp.persist(path).map_err(|e| e.error)?;
+    let mut staged = Staged::from(create_temp_sibling(path, private)?);
+    write(staged.file())?;
+    staged.file().sync_all()?;
+    staged.close();
+    fs::rename(&staged.path, path)?;
+    staged.keep();
 
     // Persist the directory entry for the rename where the platform supports it
     // (opening a directory as a file fails on Windows — best-effort there).
@@ -204,12 +208,99 @@ where
     Ok(())
 }
 
+// A temp sibling that is removed unless the replacement it was staged for goes
+// through. In `Drop` so every early exit — a failed write, sync or rename —
+// takes it with it. It owns the open handle too, and closes it *before* the
+// removal: on Windows the private writer opens the file with no delete
+// sharing, so a removal attempted while the handle is still open would fail
+// and leave the partial plaintext behind. Two separate locals would drop in
+// the wrong order for that (last declared, first dropped).
+struct Staged {
+    path: PathBuf,
+    file: Option<fs::File>,
+    remove: bool,
+}
+
+impl From<(PathBuf, fs::File)> for Staged {
+    fn from((path, file): (PathBuf, fs::File)) -> Self {
+        Self {
+            path,
+            file: Some(file),
+            remove: true,
+        }
+    }
+}
+
+impl Staged {
+    fn file(&mut self) -> &mut fs::File {
+        self.file
+            .as_mut()
+            .expect("closed only once, before the rename")
+    }
+
+    // Release the handle so the file can be renamed (and, on failure, removed).
+    fn close(&mut self) {
+        self.file.take();
+    }
+
+    fn keep(mut self) {
+        self.remove = false;
+    }
+}
+
+impl Drop for Staged {
+    fn drop(&mut self) {
+        self.close();
+        if self.remove {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+
+// A fresh sibling of `path` — `<name>.<random>.tmp` beside it — created for
+// writing, and never over an existing file. Owner-only from creation when
+// `private`; otherwise a plain file that keeps the `0600` these temp files
+// have always had on Unix.
+fn create_temp_sibling(path: &Path, private: bool) -> Result<(PathBuf, fs::File)> {
+    let name = path
+        .file_name()
+        .ok_or_else(|| Error::Other("destination has no file name".into()))?;
+    for _ in 0..8 {
+        let mut candidate = name.to_os_string();
+        candidate.push(format!(".{:016x}.tmp", rand::random::<u64>()));
+        let candidate = path.with_file_name(candidate);
+        let created = if private {
+            crate::owner_only::create_new(&candidate)
+        } else {
+            let mut options = fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            options.open(&candidate)
+        };
+        match created {
+            Ok(file) => return Ok((candidate, file)),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Err(Error::Other(
+        "could not find a free name for a temporary sibling".into(),
+    ))
+}
+
 /// Atomically write the UTF-8 sidecars that gate vault opening and lockout.
 pub fn atomic_write_file(path: &Path, data: &str) -> Result<()> {
     atomic_replace_with(path, false, |file| file.write_all(data.as_bytes()))
 }
 
-/// Atomically replace a plaintext secret, owner-readable only on Unix.
+/// Atomically replace a plaintext secret with one only its owner can read:
+/// `0600` on Unix, an owner-and-SYSTEM protected DACL on Windows — regardless
+/// of the umask, of the folder's inheritable permissions, or of how an existing
+/// file at `path` was permissioned.
 #[cfg(desktop)]
 pub fn atomic_write_private(path: &Path, data: &[u8]) -> Result<()> {
     atomic_replace_with(path, true, |file| file.write_all(data))
@@ -245,11 +336,19 @@ pub fn write_gdrive(app: &AppHandle, data: &str) -> Result<()> {
     write_file(&gdrive_path(app)?, data)
 }
 
-// Remove the token file, whatever state a failed write left it in. Absent is
-// fine: this is the rollback of a first-run setup, where "no file" is the goal.
-pub fn remove_gdrive(app: &AppHandle) {
-    if let Ok(path) = gdrive_path(app) {
-        let _ = fs::remove_file(path);
+// Remove the token file, whatever state a failed write left it in. "No file" is
+// the goal, so an already-absent one is success — but every other failure is
+// reported rather than swallowed: a token file that outlives a disconnect is a
+// live refresh token, and a caller told the delete worked would never know.
+pub fn remove_gdrive(app: &AppHandle) -> Result<()> {
+    remove_if_present(&gdrive_path(app)?)
+}
+
+// The file-level half, on a plain path so it is testable without an `AppHandle`.
+fn remove_if_present(path: &Path) -> Result<()> {
+    match fs::remove_file(path) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.into()),
+        _ => Ok(()),
     }
 }
 
@@ -291,7 +390,7 @@ pub fn sync_configured(app: &AppHandle) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{atomic_replace_with, atomic_write_file};
+    use super::{atomic_replace_with, atomic_write_file, remove_if_present};
     use std::fs;
     use std::io::{self, Write};
     use std::path::{Path, PathBuf};
@@ -365,5 +464,18 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), "complete old bytes");
         assert_eq!(fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
+    }
+
+    // The delete behind a Drive disconnect: gone is the goal, so already-gone is
+    // success — but a delete that actually failed must not read as one, or a
+    // caller would report a disconnect over a token file that is still there.
+    #[test]
+    fn removing_an_absent_file_succeeds_and_a_present_one_goes() {
+        let path = tmp_sidecar().with_file_name("gdrive.swftx");
+        remove_if_present(&path).unwrap();
+
+        fs::write(&path, "sealed tokens").unwrap();
+        remove_if_present(&path).unwrap();
+        assert!(!path.exists());
     }
 }

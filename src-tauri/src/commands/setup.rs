@@ -340,7 +340,10 @@ fn discard_fresh_vault(app: &AppHandle) {
     if let Ok(path) = storage::kdf_sidecar_path(app) {
         let _ = std::fs::remove_file(path);
     }
-    storage::remove_gdrive(app);
+    // Best effort, unlike the disconnect path: this is already the cleanup of a
+    // failed setup, and there is no vault left for a surviving token file to
+    // sync — the next create or restore overwrites it before anything reads it.
+    let _ = storage::remove_gdrive(app);
 }
 
 /// Refuse to touch the pending account while a create or restore is using it.

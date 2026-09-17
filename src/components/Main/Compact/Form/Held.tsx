@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { EntryMeta, EntryType } from '@/api/types'
 import { setNoEntry } from '@/store'
@@ -7,6 +8,8 @@ import { useHeading } from './useHeading'
 interface Props {
   entry?: EntryMeta
   type: EntryType
+  /** What to say in the frame, if anything — a reveal that failed, for one. */
+  children?: ReactNode
 }
 
 /**
@@ -23,7 +26,7 @@ interface Props {
  * revealed the entry and `Compact/Entry` shares the one reveal between the two
  * faces. Only an edit asked for before the first reveal landed gets here.
  */
-export default function Held({ entry, type }: Props) {
+export default function Held({ entry, type, children }: Props) {
   const { t } = useTranslation()
   const heading = useHeading(type, entry)
 
@@ -42,7 +45,7 @@ export default function Held({ entry, type }: Props) {
           </button>
         }
       />
-      <div className="min-h-0 flex-1" />
+      <div className="flex min-h-0 flex-1 flex-col px-4">{children}</div>
     </div>
   )
 }

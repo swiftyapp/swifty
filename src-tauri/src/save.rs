@@ -81,18 +81,8 @@ pub async fn save_private_text(
     let Some(dest) = ask(app, file_name, "", "").await? else {
         return Ok(None);
     };
-    write_private(&dest, text.into_bytes())?;
+    write_and_scrub(&dest, text.into_bytes())?;
     Ok(Some(dest))
-}
-
-// Commit through the shared durable writer: the owner-only temp sibling is
-// complete and fsynced before it atomically replaces the destination, so a
-// failed overwrite leaves the old file whole. Scrub the plaintext on every exit.
-#[cfg(desktop)]
-fn write_private(dest: &Path, mut bytes: Vec<u8>) -> Result<()> {
-    let result = crate::storage::atomic_write_private(dest, &bytes);
-    bytes.zeroize();
-    result
 }
 
 /// Where one export stages inside `dir`, and the name to ask the dialog for so
@@ -199,11 +189,23 @@ pub fn with_extension(dest: PathBuf, extension: &str) -> PathBuf {
     }
 }
 
-// The CSV export is plaintext, so the copy in memory goes as soon as it is out.
-fn write_and_scrub(dest: &Path, mut bytes: Vec<u8>) -> Result<()> {
-    let result = std::fs::write(dest, &bytes);
+/// Put plaintext on disk and scrub the copy in memory on every exit.
+///
+/// An export is the whole vault in the clear, so on desktop it goes through the
+/// shared durable writer that a saved `.env` gets: the owner-only temp sibling
+/// (`0600` on Unix, a protected owner-and-SYSTEM DACL on Windows) is complete
+/// and fsynced before it atomically replaces the destination, so the bytes are
+/// never briefly readable through the folder's permissions and a failed
+/// overwrite leaves the old file whole. `atomic_write_private` is desktop-only —
+/// on mobile the only thing written here is the staging copy inside the app's
+/// own sandbox, which the picker consumes and [`Staged`] then removes.
+pub(crate) fn write_and_scrub(dest: &Path, mut bytes: Vec<u8>) -> Result<()> {
+    #[cfg(desktop)]
+    let result = crate::storage::atomic_write_private(dest, &bytes);
+    #[cfg(not(desktop))]
+    let result = std::fs::write(dest, &bytes).map_err(Error::from);
     bytes.zeroize();
-    Ok(result?)
+    result
 }
 
 #[cfg(test)]
@@ -222,7 +224,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let dest = dir.join(".env.production");
 
-        write_private(&dest, b"KEY=value\n".to_vec()).unwrap();
+        write_and_scrub(&dest, b"KEY=value\n".to_vec()).unwrap();
         assert_eq!(std::fs::read(&dest).unwrap(), b"KEY=value\n");
         assert_eq!(
             std::fs::metadata(&dest).unwrap().permissions().mode() & 0o777,
@@ -231,8 +233,28 @@ mod tests {
 
         // Overwriting a looser file tightens it.
         std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o644)).unwrap();
-        write_private(&dest, b"KEY=other\n".to_vec()).unwrap();
+        write_and_scrub(&dest, b"KEY=other\n".to_vec()).unwrap();
         assert_eq!(std::fs::read(&dest).unwrap(), b"KEY=other\n");
+        assert_eq!(
+            std::fs::metadata(&dest).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // An export is every entry in the clear — a bigger secret than one `.env`,
+    // and written through the same writer, so it lands with the same mode.
+    #[cfg(all(desktop, unix))]
+    #[test]
+    fn an_export_lands_owner_readable_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!("rowel-export-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let dest = dir.join("rowel-export.csv");
+
+        write_and_scrub(&dest, b"title,username,password\n".to_vec()).unwrap();
         assert_eq!(
             std::fs::metadata(&dest).unwrap().permissions().mode() & 0o777,
             0o600
@@ -331,8 +353,11 @@ mod tests {
     // A write that fails is the one exit the old "delete after the dialog"
     // ordering missed: the guard exists before the bytes go down, so whatever
     // the failed write left in the directory is removed exactly like a complete
-    // export. Unix-only because a read-only file is the portable way to make
-    // the write fail, and Windows then refuses to remove it as well.
+    // export. The refusal comes from a read-only *directory* rather than a
+    // read-only file, because the desktop writer replaces its destination by
+    // rename — which a read-only file does not stand in the way of. Unix-only
+    // because that is the portable way to make the write fail, and Windows then
+    // refuses to remove the directory as well.
     #[cfg(unix)]
     #[test]
     fn a_failed_write_leaves_nothing_behind() {
@@ -341,15 +366,13 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("rowel-save-partial-{}", std::process::id()));
         let (staged, _) = staging(&dir, "rowel-export.csv");
         std::fs::create_dir_all(&staged).unwrap();
-        let file = staged.join("rowel-export.csv");
-        std::fs::write(&file, b"").unwrap();
-        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o444)).unwrap();
+        std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o555)).unwrap();
 
         let result = Staged::write(&staged, "rowel-export.csv", b"name,password".to_vec());
 
         assert!(
             result.is_err(),
-            "a read-only file should have refused the write"
+            "a read-only directory should have refused the write"
         );
         assert!(
             !staged.exists(),

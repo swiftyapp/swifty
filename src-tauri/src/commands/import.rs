@@ -85,12 +85,16 @@ pub async fn import_entries(
     state: State<'_, AppState>,
 ) -> Result<ImportReport> {
     // Taken before the file work, so a locked vault is turned away at once
-    // instead of after parsing. A preview writes nothing and needs no cipher,
-    // which is what lets it run on a vault that is not open. The epoch comes
-    // with the cipher: the write below is only accepted by the session the
-    // cipher belongs to (see `Session::store_at`).
+    // instead of after parsing. A preview writes nothing and so needs no cipher,
+    // but it still reads a path the webview named and reports what is in it —
+    // that is a read of the user's disk, and only an open vault may ask for one.
+    // The epoch comes with the cipher: the write below is only accepted by the
+    // session the cipher belongs to (see `Session::store_at`).
     let (cipher, epoch) = match dry_run {
-        true => (None, None),
+        true => {
+            state.session.lock().unwrap().key()?;
+            (None, None)
+        }
         false => {
             let session = state.session.lock().unwrap();
             (Some(session.payload_cipher()?), Some(session.epoch()))
@@ -260,8 +264,27 @@ fn dedupe_key(entry: &ImportedEntry) -> (&str, &str) {
     (entry.kind.as_str(), entry.title.as_str())
 }
 
-// Export the open vault to a third-party format. `path` may be supplied directly;
-// when None, a save dialog is shown. `format` is "bitwarden", "cxf" or "csv".
+// When a caller-chosen export destination is honoured, as a decision on its own
+// so the rule can be read (and tested) without an environment around it.
+const fn explicit_path_allowed(debug: bool, e2e: bool) -> bool {
+    debug && e2e
+}
+
+// The same two gates `commands::e2e` applies, which cannot be borrowed from it:
+// that whole module is `#[cfg(debug_assertions)]` and this one is not, so the
+// debug check has to be a `cfg!` value here rather than a missing symbol.
+// `ROWEL_E2E=1` is the second gate because `tauri dev` is a debug build too, and
+// a developer's own run must not expose this to a stray `invoke`.
+fn e2e_enabled() -> bool {
+    explicit_path_allowed(
+        cfg!(debug_assertions),
+        std::env::var("ROWEL_E2E").as_deref() == Ok("1"),
+    )
+}
+
+// Export the open vault to a third-party format. `path` is honoured only in an
+// E2E build (see below); otherwise a save dialog is shown. `format` is
+// "bitwarden", "cxf" or "csv".
 #[tauri::command]
 pub async fn export_entries(
     path: Option<String>,
@@ -293,12 +316,21 @@ pub async fn export_entries(
     })
     .await?;
 
-    // An explicit path skips the dialog (the E2E suite exports to a temp file).
+    // An explicit path skips the dialog (the E2E suite exports to a temp file),
+    // which makes it a webview-reachable "write the whole plaintext vault to
+    // this path" — the exfiltration route the CSP exists to close. So it is the
+    // suite's alone; every other build refuses it and the user's own export
+    // goes through a dialog they chose the destination in.
     let dest = match path {
-        Some(p) => {
+        Some(p) if e2e_enabled() => {
             let dest = save::with_extension(std::path::PathBuf::from(p), ext);
-            fs::write(&dest, bytes)?;
+            save::write_and_scrub(&dest, bytes)?;
             Some(dest)
+        }
+        Some(_) => {
+            return Err(Error::Other(
+                "explicit export paths are only available to the e2e suite".into(),
+            ))
         }
         None => save::save_export(&app, &format!("rowel-export.{ext}"), "Export", bytes).await?,
     };
@@ -543,6 +575,17 @@ mod tests {
         };
         let store = SqliteStore::open(path, &key.sqlcipher_key()).unwrap();
         (key, store)
+    }
+
+    // Both gates, not either: a release build the suite's env var happens to be
+    // set in is still a release build, and a developer's `tauri dev` is still a
+    // debug build.
+    #[test]
+    fn only_a_debug_build_running_the_suite_may_name_its_own_destination() {
+        assert!(explicit_path_allowed(true, true));
+        assert!(!explicit_path_allowed(true, false));
+        assert!(!explicit_path_allowed(false, true));
+        assert!(!explicit_path_allowed(false, false));
     }
 
     fn tmp_db() -> std::path::PathBuf {

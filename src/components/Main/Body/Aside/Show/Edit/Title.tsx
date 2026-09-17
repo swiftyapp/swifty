@@ -45,7 +45,7 @@ export default function Title({ draft, kind, tile, glyph, className, message }: 
           spellCheck={false}
           placeholder={t(kind.untitledLabel)}
           onChange={event => draft.set('title', event.target.value)}
-          className="min-w-0 flex-1 truncate border-b border-line2 bg-transparent text-2xl font-semibold tracking-display text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line"
+          className="min-w-0 flex-1 truncate border-b border-line2 bg-transparent text-2xl font-semibold tracking-display text-text outline-none transition-colors placeholder:text-text2 focus:border-accent-line"
         />
       </div>
       {/* Every kind requires a title, so the editor owns this one message. */}

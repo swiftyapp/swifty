@@ -1,5 +1,6 @@
 import { useVault, useCurrentEntry } from '@/store'
 import { useShown } from '../../Body/Aside/Show/useShown'
+import RevealError from '../../Body/Aside/Show/RevealError'
 import Read from '../Detail/Read'
 import Editor from '../Form/Editor'
 import Held from '../Form/Held'
@@ -26,9 +27,18 @@ export default function Entry() {
   // in-flight reveal, and with it its id. (`newEntry` clears the selection, so
   // this only ever restates the intent — but it restates it where it matters.)
   const entry = type ? undefined : (selected ?? undefined)
-  const { kindType, current, held } = useShown(entry, type ?? undefined)
+  const { kindType, current, held, failed, retry } = useShown(entry, type ?? undefined)
 
   if (!kindType) return null
+
+  // A refused reveal has nothing to read and nothing to seed a draft from, in
+  // either face. The held frame lends its Cancel as the way off the screen.
+  if (failed && entry)
+    return (
+      <Held entry={entry} type={kindType}>
+        <RevealError entry={entry} onRetry={retry} />
+      </Held>
+    )
 
   if (type || editing) {
     // A draft has nothing to reveal, and coming from the read screen the
