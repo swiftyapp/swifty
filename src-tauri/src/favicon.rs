@@ -8,16 +8,26 @@
 //! The result crosses IPC as a `data:` URI, which keeps the webview CSP's
 //! `img-src 'self' data:` intact. Remote SVG is refused outright — an SVG is
 //! a script container, not an image.
+//!
+//! The host comes from an entry's URL, which is whatever was typed or imported,
+//! so every request this module makes is a request the vault's contents can
+//! aim. It may only aim at the public internet, and a name alone cannot say
+//! where that is — `icons.example.com` may resolve to 127.0.0.1 — so each hop
+//! (the page, every icon it names, every redirect) is resolved here, refused
+//! unless every address is public, and connected to those very addresses. See
+//! [`get`].
 
 use std::fs;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::path::Path;
 use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
-use reqwest::Client;
+use reqwest::redirect::Policy;
+use reqwest::{Client, Response};
 use tauri::AppHandle;
-use url::Url;
+use url::{Host, Url};
 
 use crate::error::Result;
 use crate::storage;
@@ -120,68 +130,161 @@ fn fresh_miss(path: &Path) -> bool {
 // Declared icons from the homepage <head> first (usually crisp PNGs), then
 // the conventional /favicon.ico as the fallback.
 async fn lookup(host: &str, allowed: &impl Fn() -> bool) -> Option<String> {
-    let client = client()?;
     let root = Url::parse(&format!("https://{host}/")).ok()?;
 
-    if !allowed() {
-        return None;
-    }
-    if let Some(html) = fetch_html(&client, root.clone()).await {
+    if let Some(html) = fetch_html(root.clone(), allowed).await {
         for href in icon_hrefs(&html) {
             let Ok(url) = root.join(&href) else { continue };
-            if !is_public_https(&url) {
-                continue;
-            }
-            if !allowed() {
-                return None;
-            }
-            if let Some(uri) = fetch_icon(&client, url).await {
+            if let Some(uri) = fetch_icon(url, allowed).await {
                 return Some(uri);
             }
         }
     }
 
-    if !allowed() {
-        return None;
-    }
-    fetch_icon(&client, root.join("favicon.ico").ok()?).await
+    fetch_icon(root.join("favicon.ico").ok()?, allowed).await
 }
 
 // Every URL this module follows — a declared icon's href, a redirect's target
 // — has to pass the same bar as the host it started from: HTTPS, to a public
 // name. A page can point its icon at a CDN, which is fine; it cannot point it
-// at `http://10.0.0.1/` or have a redirect land there.
+// at `http://10.0.0.1/` or have a redirect land there. This is the cheap half
+// of the gate, on the name; where the name actually points is [`public_addrs`].
 fn is_public_https(url: &Url) -> bool {
     url.scheme() == "https" && url.host_str().and_then(safe_host).is_some()
 }
 
-// The shared deadlines plus a redirect policy: a handful of hops, and only to
-// URLs [`is_public_https`] accepts, since a redirect is the one way a fetch
-// can end up somewhere the href check never saw.
-fn client() -> Option<Client> {
-    let policy = reqwest::redirect::Policy::custom(|attempt| {
-        if attempt.previous().len() >= MAX_REDIRECTS || !is_public_https(attempt.url()) {
-            attempt.stop()
-        } else {
-            attempt.follow()
+const MAX_REDIRECTS: usize = 5;
+
+// The one way out to the network. Every hop — the URL asked for and each
+// redirect after it — passes the whole gate: still `allowed`, a public HTTPS
+// name, and a name that resolves only to public addresses, with the connection
+// pinned to those very addresses. Resolving to check and then letting the
+// client resolve again would leave open the window the check exists to close —
+// a name that answered a public address to us can answer 127.0.0.1 to the
+// client. Redirects are followed by hand for the same reason: the client's own
+// follow would resolve the next host itself.
+async fn get(mut url: Url, allowed: &impl Fn() -> bool) -> Option<Response> {
+    for _ in 0..MAX_REDIRECTS {
+        if !allowed() || !is_public_https(&url) {
+            return None;
         }
-    });
+        let resp = pinned_client(&url)
+            .await?
+            .get(url.clone())
+            .timeout(TIMEOUT)
+            .header("User-Agent", USER_AGENT)
+            .send()
+            .await
+            .ok()?;
+        if !resp.status().is_redirection() {
+            return Some(resp);
+        }
+        let location = resp
+            .headers()
+            .get(reqwest::header::LOCATION)?
+            .to_str()
+            .ok()?;
+        url = url.join(location).ok()?;
+    }
+    None
+}
+
+// A client that will connect to `url`'s host only at the public addresses it
+// resolved to just now, and will not follow a redirect on its own. Only a
+// name qualifies: an address literal was refused by name already.
+async fn pinned_client(url: &Url) -> Option<Client> {
+    let Host::Domain(domain) = url.host()? else {
+        return None;
+    };
+    let addrs = public_addrs(domain, url.port_or_known_default()?).await?;
     crate::sync::http_client_builder()
-        .redirect(policy)
+        .redirect(Policy::none())
+        .resolve_to_addrs(domain, &addrs)
         .build()
         .ok()
 }
 
-const MAX_REDIRECTS: usize = 5;
+// Where `domain` points, provided that is somewhere public. Resolved on the
+// blocking pool, since the system resolver is synchronous. `None` if it
+// resolves nowhere, or to any address that is not public: one private answer
+// among public ones is still a way in.
+async fn public_addrs(domain: &str, port: u16) -> Option<Vec<SocketAddr>> {
+    let domain = domain.to_owned();
+    let addrs: Vec<SocketAddr> = tauri::async_runtime::spawn_blocking(move || {
+        (domain.as_str(), port)
+            .to_socket_addrs()
+            .map(|addrs| addrs.collect::<Vec<_>>())
+    })
+    .await
+    .ok()?
+    .ok()?;
+    all_public(&addrs).then_some(addrs)
+}
 
-async fn fetch_icon(client: &Client, url: Url) -> Option<String> {
-    let mut resp = client
-        .get(url)
-        .timeout(TIMEOUT)
-        .header("User-Agent", USER_AGENT)
-        .send()
-        .await
-        .ok()?;
+fn all_public(addrs: &[SocketAddr]) -> bool {
+    !addrs.is_empty() && addrs.iter().all(|addr| is_public(addr.ip()))
+}
+
+// Routable on the public internet, as opposed to this machine, its network or
+// nowhere. The list is the IANA special-purpose registry's, spelled out because
+// the standard library's `is_global` is not stable yet. An IPv6 address that
+// carries an IPv4 one (mapped, or NAT64's well-known prefix) is judged as that
+// address, or `::ffff:127.0.0.1` would be a loopback with a public face.
+fn is_public(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => is_public_v4(v4),
+        IpAddr::V6(v6) => match embedded_v4(v6) {
+            Some(v4) => is_public_v4(v4),
+            None => {
+                !(v6.is_unspecified()
+                    || v6.is_loopback()
+                    || v6.is_multicast()
+                    || v6.is_unique_local()
+                    || v6.is_unicast_link_local()
+                    // 2001:db8::/32, documentation.
+                    || (v6.segments()[0] == 0x2001 && v6.segments()[1] == 0xdb8))
+            }
+        },
+    }
+}
+
+fn is_public_v4(v4: Ipv4Addr) -> bool {
+    let [a, b, c, _] = v4.octets();
+    !(v4.is_unspecified()
+        || v4.is_loopback()
+        || v4.is_private()
+        || v4.is_link_local()
+        || v4.is_broadcast()
+        || v4.is_multicast()
+        || v4.is_documentation()
+        // 0.0.0.0/8, "this network".
+        || a == 0
+        // 100.64.0.0/10, the carrier-grade NAT shared space.
+        || (a == 100 && (64..128).contains(&b))
+        // 192.0.0.0/24, IETF protocol assignments.
+        || (a == 192 && b == 0 && c == 0)
+        // 198.18.0.0/15, benchmarking.
+        || (a == 198 && (b == 18 || b == 19))
+        // 240.0.0.0/4, reserved (255.255.255.255 was caught above).
+        || a >= 240)
+}
+
+// The IPv4 address an IPv6 one stands for, if it does: `::ffff:a.b.c.d`, or
+// `64:ff9b::a.b.c.d` (NAT64's well-known prefix, RFC 6052).
+fn embedded_v4(v6: Ipv6Addr) -> Option<Ipv4Addr> {
+    if let Some(v4) = v6.to_ipv4_mapped() {
+        return Some(v4);
+    }
+    let s = v6.segments();
+    (s[..6] == [0x64, 0xff9b, 0, 0, 0, 0]).then(|| {
+        let [a, b] = s[6].to_be_bytes();
+        let [c, d] = s[7].to_be_bytes();
+        Ipv4Addr::new(a, b, c, d)
+    })
+}
+
+async fn fetch_icon(url: Url, allowed: &impl Fn() -> bool) -> Option<String> {
+    let mut resp = get(url, allowed).await?;
     if !resp.status().is_success() {
         return None;
     }
@@ -212,14 +315,8 @@ async fn fetch_icon(client: &Client, url: Url) -> Option<String> {
 // The first `MAX_HTML_BYTES` of the page. Only the <head> is wanted, so an
 // oversized page is truncated rather than refused — and the read stops at the
 // cap instead of downloading the rest to throw it away.
-async fn fetch_html(client: &Client, url: Url) -> Option<String> {
-    let mut resp = client
-        .get(url)
-        .timeout(TIMEOUT)
-        .header("User-Agent", USER_AGENT)
-        .send()
-        .await
-        .ok()?;
+async fn fetch_html(url: Url, allowed: &impl Fn() -> bool) -> Option<String> {
+    let mut resp = get(url, allowed).await?;
     if !resp.status().is_success() {
         return None;
     }
@@ -319,6 +416,76 @@ mod tests {
             safe_host("internal-tools.example.com"),
             Some("internal-tools.example.com".into())
         );
+    }
+
+    // What a name the vault controls must not be able to point at: this
+    // machine, its network, and the addresses that stand for them in IPv6.
+    #[test]
+    fn refuses_every_address_that_is_not_on_the_public_internet() {
+        for private in [
+            "127.0.0.1",
+            "127.8.8.8",
+            "0.0.0.0",
+            "0.1.2.3",
+            "10.1.2.3",
+            "172.16.0.1",
+            "192.168.1.1",
+            "169.254.169.254",
+            "100.64.0.1",
+            "192.0.0.1",
+            "198.18.0.1",
+            "224.0.0.1",
+            "240.0.0.1",
+            "255.255.255.255",
+            "::",
+            "::1",
+            "fc00::1",
+            "fd12::1",
+            "fe80::1",
+            "ff02::1",
+            "2001:db8::1",
+            "::ffff:127.0.0.1",
+            "::ffff:10.0.0.1",
+            "64:ff9b::7f00:1",
+        ] {
+            assert!(!is_public(private.parse().unwrap()), "{private}");
+        }
+        for public in [
+            "93.184.216.34",
+            "8.8.8.8",
+            "100.63.255.255",
+            "100.128.0.1",
+            "192.0.1.1",
+            "198.17.0.1",
+            "198.20.0.1",
+            "2606:2800:220:1:248:1893:25c8:1946",
+            "::ffff:8.8.8.8",
+            "64:ff9b::808:808",
+        ] {
+            assert!(is_public(public.parse().unwrap()), "{public}");
+        }
+    }
+
+    // One private answer among public ones is a way in, and no answer at all
+    // is nowhere to go.
+    #[test]
+    fn a_host_is_only_as_public_as_its_least_public_address() {
+        let public: SocketAddr = "93.184.216.34:443".parse().unwrap();
+        let private: SocketAddr = "10.0.0.1:443".parse().unwrap();
+        assert!(all_public(&[public]));
+        assert!(!all_public(&[public, private]));
+        assert!(!all_public(&[]));
+    }
+
+    // An address literal never reaches the resolver, whatever shape it takes.
+    #[tokio::test]
+    async fn a_literal_address_gets_no_client() {
+        for url in ["https://127.0.0.1/", "https://[::1]/", "https://8.8.8.8/"] {
+            assert!(
+                pinned_client(&Url::parse(url).unwrap()).await.is_none(),
+                "{url}"
+            );
+        }
     }
 
     #[test]
