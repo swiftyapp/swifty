@@ -272,6 +272,13 @@ pub fn write_tokens(app: &AppHandle, cryptor: &Cryptor, tokens: &Tokens) -> Resu
     storage::write_gdrive(app, &cryptor.encrypt(&json)?)
 }
 
+/// [`write_tokens`] into a named workspace directory rather than the active
+/// workspace's, for a vault being added beside the open one.
+pub fn write_tokens_in(dir: &std::path::Path, cryptor: &Cryptor, tokens: &Tokens) -> Result<()> {
+    let json = serde_json::to_string(tokens)?;
+    storage::write_gdrive_in(dir, &cryptor.encrypt(&json)?)
+}
+
 pub fn is_configured(app: &AppHandle, cryptor: &Cryptor) -> bool {
     read_tokens(app, cryptor).is_some_and(|t| t.access_token.is_some() || t.refresh_token.is_some())
 }

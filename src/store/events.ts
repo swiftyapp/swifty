@@ -7,11 +7,13 @@ import {
   setupDriveFailed,
   setRemoteVaults,
   clearSession,
+  refreshApp,
   showLockScreen,
   fileOpened
 } from './app'
 import { setEntries, loadArchive, runAudit } from './vault'
-import { useUi } from './ui'
+import { useUi, showNotice } from './ui'
+import { t } from '@/i18n'
 
 // A merge can add or drop tombstones as readily as live entries, but the Archive
 // only loads on entering the view — so an open Archive would sit stale until the
@@ -19,6 +21,17 @@ import { useUi } from './ui'
 // correct, and the next visit refetches anyway.
 const refreshOpenArchive = () => {
   if (useUi.getState().view === 'archive') void loadArchive()
+}
+
+/**
+ * A vault from the account arrived as a workspace on its own (the password
+ * that opened this vault opened it too). The workspace list lives on the launch
+ * probe's answer, so it is re-probed; the user is told in passing, since
+ * nothing on screen changed.
+ */
+export const workspaceAdded = (name: string) => {
+  void refreshApp()
+  showNotice(t('Added “{{name}}” from your Google account', { name }))
 }
 
 // Wires backend events to store actions. Returns a cleanup function.
@@ -38,6 +51,7 @@ export const subscribeToEvents = (): (() => void) => {
     on(EVENTS.setupDriveProbed, payload => setupDriveProbed(payload.files)),
     on(EVENTS.setupDriveError, payload => setupDriveFailed(payload.error)),
     on(EVENTS.workspacesRemote, payload => setRemoteVaults(payload.files)),
+    on(EVENTS.workspacesAdded, payload => workspaceAdded(payload.name)),
     // The one reaction to a lock, whoever asked for it: the lock command, the
     // inactivity autolock, the tray, a workspace switch. Every one of them ends
     // in `session::lock` on the Rust side, so none of them has to hand-roll

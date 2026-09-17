@@ -43,6 +43,12 @@ export interface EventPayloads {
    */
   'workspaces:remote': { files: SetupDriveFile[] }
   /**
+   * A vault from the account was added as a workspace without being asked
+   * for: the password that just opened a vault opened it too. Nothing has
+   * switched; the list of workspaces has grown by `name`.
+   */
+  'workspaces:added': { name: string }
+  /**
    * The OS opened a backup with the app — a double-clicked `.rowel` or
    * `.swftx`. Rust also parks the path for a shell that was not yet listening
    * (`takeOpenedFile` in `api/app`), so a launch by double-click and an open
@@ -71,6 +77,7 @@ export const EVENTS: { [K in EventName as Camel<K>]: K } = {
   setupDriveProbed: 'setup:drive:probed',
   setupDriveError: 'setup:drive:error',
   workspacesRemote: 'workspaces:remote',
+  workspacesAdded: 'workspaces:added',
   fileOpened: 'file:opened'
 }
 

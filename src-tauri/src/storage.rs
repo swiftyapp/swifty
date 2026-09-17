@@ -335,6 +335,13 @@ pub fn write_gdrive(app: &AppHandle, data: &str) -> Result<()> {
     atomic_write_private(&gdrive_path(app)?, data.as_bytes())
 }
 
+// The same, into a workspace directory named outright rather than the active
+// one: for a workspace being made *beside* the open one, whose paths must stay
+// where they are (`commands::autojoin`).
+pub fn write_gdrive_in(dir: &Path, data: &str) -> Result<()> {
+    atomic_write_private(&dir.join(GDRIVE_FILE), data.as_bytes())
+}
+
 // Remove the token file, whatever state a failed write left it in. "No file" is
 // the goal, so an already-absent one is success — but every other failure is
 // reported rather than swallowed: a token file that outlives a disconnect is a

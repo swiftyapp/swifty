@@ -171,7 +171,14 @@ carries them as part of the opaque payload and never sees them.
    in the webview. It is passed once to the Rust core, which derives the key
    material and opens SQLCipher (which runs its own internal KDF) on a blocking
    thread (`spawn_blocking` in `commands/auth.rs`), so the UI never stalls. The
-   passphrase itself is not stored.
+   passphrase itself is not stored. One thing outlives the unlock by a bounded
+   stretch: when the vault syncs, a second `Zeroizing` copy of the passphrase is
+   moved into a blocking-pool task that tries it against the Google account's
+   packs this device lacks and adds the ones it opens as workspaces
+   (`commands/autojoin.rs`). The copy is spent on those Argon2id derives, is
+   never written anywhere, and is scrubbed when the task ends — seconds, bounded
+   by the Drive request deadlines. Biometric unlock has no passphrase and does
+   not do this.
 2. **Hold in Rust only.** The derived secret lives in the Rust session
    (`state.rs`, `Session.master_key`) wrapped in a zeroizing buffer, alongside the
    open encrypted store handle — never a fully decrypted vault. It never crosses

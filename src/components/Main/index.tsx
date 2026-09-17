@@ -4,6 +4,7 @@ import { FrameProvider } from '@/components/elements/Frame'
 import Modal from '@/components/elements/Modal'
 import Sheet from '@/components/elements/Sheet'
 import CopyToast from '@/components/elements/CopyToast'
+import NoticeToast from '@/components/elements/NoticeToast'
 import Wide from './Wide'
 import Compact from './Compact'
 import Palette from './Palette'
@@ -42,6 +43,7 @@ export function Main() {
         <EnvDrop />
       </FrameProvider>
       <CopyToast />
+      <NoticeToast />
     </div>
   )
 }

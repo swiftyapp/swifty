@@ -70,6 +70,17 @@ pub(crate) fn current_tokens(app: &AppHandle, cryptor: &Cryptor) -> Option<Token
     auth::read_tokens(app, cryptor)
 }
 
+/// [`persist_tokens`] into the workspace directory `dir` rather than the active
+/// workspace's — for a vault added beside the open one while its paths stay put
+/// (`commands::autojoin`).
+pub(crate) fn persist_tokens_in(
+    dir: &std::path::Path,
+    cryptor: &Cryptor,
+    tokens: &Tokens,
+) -> Result<()> {
+    auth::write_tokens_in(dir, cryptor, tokens)
+}
+
 /// [`persist_tokens`], unless a disconnect has ended the connection `generation`
 /// names since it was read — in which case nothing is written and `false` comes
 /// back. The guard every write-back of refreshed tokens takes (see
@@ -257,7 +268,10 @@ fn publish_remote_vaults(app: &AppHandle, own_id: &str, packs: Vec<setup::PackIn
 
 /// The packs among `packs` that no workspace on this device holds, in the order
 /// the listing gave them (newest first).
-fn remote_only(packs: Vec<setup::PackInfo>, held: &HashSet<String>) -> Vec<setup::PackInfo> {
+pub(crate) fn remote_only(
+    packs: Vec<setup::PackInfo>,
+    held: &HashSet<String>,
+) -> Vec<setup::PackInfo> {
     packs
         .into_iter()
         .filter(|pack| !held.contains(&pack.vault_id))

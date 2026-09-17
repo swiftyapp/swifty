@@ -533,6 +533,7 @@
   "Workspace name": "Workspace name",
   "New workspace": "New workspace",
   "In your Google account": "In your Google account",
+  "Added “{{name}}” from your Google account": "Added “{{name}}” from your Google account",
   "Not on this device yet": "Not on this device yet",
   "Restore one to add it as a workspace here, unlocked with its own master password and already syncing. No new sign-in needed.": "Restore one to add it as a workspace here, unlocked with its own master password and already syncing. No new sign-in needed.",
   "Add a workspace": "Add a workspace",

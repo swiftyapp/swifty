@@ -533,6 +533,7 @@
   "Workspace name": "Arbetsytans namn",
   "New workspace": "Ny arbetsyta",
   "In your Google account": "I ditt Google-konto",
+  "Added “{{name}}” from your Google account": "”{{name}}” har lagts till från ditt Google-konto",
   "Not on this device yet": "Inte på den här enheten ännu",
   "Restore one to add it as a workspace here, unlocked with its own master password and already syncing. No new sign-in needed.": "Återställ ett för att lägga till det här som en arbetsyta, upplåst med sitt eget huvudlösenord och redan synkat. Ingen ny inloggning behövs.",
   "Add a workspace": "Lägg till en arbetsyta",

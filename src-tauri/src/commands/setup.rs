@@ -228,8 +228,13 @@ pub async fn setup_restore_from_drive(
     // refresh tokens, and a retry after a mistyped password uses these again.
     replace_pending_tokens(&state, tokens.clone())?;
 
+    // Kept past the restore for the account's *other* vaults: the ones this
+    // password opens too are added beside this one (`commands::autojoin`).
+    let join = password.clone();
     let (key, store) = restore_off_thread(&app, bytes, password).await?;
-    adopt(&app, &state, key, store, Some(&tokens), Some(&vault_id))
+    let result = adopt(&app, &state, key, store, Some(&tokens), Some(&vault_id))?;
+    super::autojoin::with_password(&app, join);
+    Ok(result)
 }
 
 /// Restore from a `.rowel` backup on disk. Onboarding only.

@@ -110,7 +110,7 @@ fn guard_sync_idle(state: &AppState) -> Result<()> {
 /// two writers can never each save a copy that lacks the other's change — a
 /// rename landing beside a create would otherwise drop the new workspace from
 /// the file and leave its vault with no way back to it after a relaunch.
-fn update_registry<T>(
+pub(crate) fn update_registry<T>(
     state: &AppState,
     root: &Path,
     change: impl FnOnce(&mut Registry) -> Result<T>,
@@ -446,6 +446,9 @@ async fn restore_workspace(
         (active, lease)
     };
 
+    // Kept past the restore for the account's *other* vaults: the ones this
+    // password opens too are added beside this one (`commands::autojoin`).
+    let join = password.clone();
     let restored = restore_vault_in(app, &root, &id, bytes, password, &vault_id, &tokens).await;
     let (key, store, entries) = match restored {
         Ok(restored) => restored,
@@ -497,6 +500,7 @@ async fn restore_workspace(
     if !state.session.lock().unwrap().adopt(claim, key, store, true) {
         return Err(Error::Locked);
     }
+    super::autojoin::with_password(app, join);
     Ok(UnlockResult {
         entries,
         sync_configured: true,
@@ -612,7 +616,7 @@ async fn restore_vault_in(
 /// each workspace's vault id as its syncs settle it (`Workspace::vault_id`).
 /// A workspace that never synced has no record there — and no pack on Drive to
 /// be restored from, so nothing is missed by that.
-fn guard_other_vault(state: &AppState, root: &Path, vault_id: &str) -> Result<()> {
+pub(crate) fn guard_other_vault(state: &AppState, root: &Path, vault_id: &str) -> Result<()> {
     let session = state.session.lock().unwrap();
     // Locked, or held out by another whole-vault operation: nothing to compare
     // against live, and the lease below is what will turn that away.
@@ -637,7 +641,7 @@ fn guard_other_vault(state: &AppState, root: &Path, vault_id: &str) -> Result<()
 // Undo everything `create_vault_in` or `restore_vault_in` may have written.
 // Removing the directory is what takes the restored workspace's token file with
 // it — the one file of the set that is not named here.
-fn discard(root: &Path, id: &str) {
+pub(crate) fn discard(root: &Path, id: &str) {
     let dir = workspace::dir_of(root, id);
     storage::remove_db_files(&dir.join(storage::DB_FILE));
     let _ = fs::remove_file(dir.join(storage::KDF_SIDECAR_FILE));

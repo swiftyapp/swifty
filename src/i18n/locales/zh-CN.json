@@ -525,6 +525,7 @@
   "Workspace name": "工作区名称",
   "New workspace": "新建工作区",
   "In your Google account": "在你的 Google 账号中",
+  "Added “{{name}}” from your Google account": "已从你的 Google 账号添加“{{name}}”",
   "Not on this device yet": "尚未在此设备上",
   "Restore one to add it as a workspace here, unlocked with its own master password and already syncing. No new sign-in needed.": "恢复一个即可在此添加为工作区，使用其自身的主密码解锁并已开始同步。无需重新登录。",
   "Add a workspace": "添加工作区",

@@ -549,6 +549,7 @@
   "Workspace name": "Назва простору",
   "New workspace": "Новий робочий простір",
   "In your Google account": "У вашому акаунті Google",
+  "Added “{{name}}” from your Google account": "Додано «{{name}}» з вашого акаунта Google",
   "Not on this device yet": "Ще немає на цьому пристрої",
   "Restore one to add it as a workspace here, unlocked with its own master password and already syncing. No new sign-in needed.": "Відновіть одне, щоб додати його сюди як робочий простір — розблокований власним майстер-паролем і вже синхронізований. Повторний вхід не потрібен.",
   "Add a workspace": "Додати робочий простір",
