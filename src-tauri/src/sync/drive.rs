@@ -235,6 +235,15 @@ pub async fn find_by_app_property(
     find_all(client, token, &q).await
 }
 
+/// Every non-trashed file directly inside `parent`, in whatever order Drive
+/// lists them. Unlike [`find_file`] the caller does not know the name it wants:
+/// onboarding reads `Rowel/Vaults/` to find out which vaults an account holds,
+/// and the names are exactly what it is asking about.
+pub async fn list_files(client: &Client, token: &str, parent: &str) -> Result<Vec<DriveFile>> {
+    let q = format!("trashed = false and '{}' in parents", escape(parent));
+    find_all(client, token, &q).await
+}
+
 pub async fn find_file(
     client: &Client,
     token: &str,

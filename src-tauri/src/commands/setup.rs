@@ -264,7 +264,7 @@ async fn archive(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<()> {
     let Some(file) = sync::setup::find_pack(&client, &token).await? else {
         return Ok(());
     };
-    sync::setup::archive_pack(&client, &token, &file.id, &sync::setup::today_utc()).await
+    sync::setup::archive_pack(&client, &token, &file, &sync::setup::today_utc()).await
 }
 
 // Argon2id + creating the encrypted DB: CPU-bound, same as the restore path.
