@@ -193,12 +193,11 @@ where
         .ok_or_else(|| Error::Other("destination has no parent directory".into()))?;
     fs::create_dir_all(parent)?;
 
-    let (temp_path, mut temp) = create_temp_sibling(path, private)?;
-    let staged = Staged(Some(temp_path));
-    write(&mut temp)?;
-    temp.sync_all()?;
-    drop(temp);
-    fs::rename(staged.path(), path)?;
+    let mut staged = Staged::from(create_temp_sibling(path, private)?);
+    write(staged.file())?;
+    staged.file().sync_all()?;
+    staged.close();
+    fs::rename(&staged.path, path)?;
     staged.keep();
 
     // Persist the directory entry for the rename where the platform supports it
@@ -211,23 +210,49 @@ where
 
 // A temp sibling that is removed unless the replacement it was staged for goes
 // through. In `Drop` so every early exit — a failed write, sync or rename —
-// takes it with it.
-struct Staged(Option<PathBuf>);
+// takes it with it. It owns the open handle too, and closes it *before* the
+// removal: on Windows the private writer opens the file with no delete
+// sharing, so a removal attempted while the handle is still open would fail
+// and leave the partial plaintext behind. Two separate locals would drop in
+// the wrong order for that (last declared, first dropped).
+struct Staged {
+    path: PathBuf,
+    file: Option<fs::File>,
+    remove: bool,
+}
+
+impl From<(PathBuf, fs::File)> for Staged {
+    fn from((path, file): (PathBuf, fs::File)) -> Self {
+        Self {
+            path,
+            file: Some(file),
+            remove: true,
+        }
+    }
+}
 
 impl Staged {
-    fn path(&self) -> &Path {
-        self.0.as_deref().expect("kept only once")
+    fn file(&mut self) -> &mut fs::File {
+        self.file
+            .as_mut()
+            .expect("closed only once, before the rename")
+    }
+
+    // Release the handle so the file can be renamed (and, on failure, removed).
+    fn close(&mut self) {
+        self.file.take();
     }
 
     fn keep(mut self) {
-        self.0.take();
+        self.remove = false;
     }
 }
 
 impl Drop for Staged {
     fn drop(&mut self) {
-        if let Some(path) = self.0.take() {
-            let _ = fs::remove_file(path);
+        self.close();
+        if self.remove {
+            let _ = fs::remove_file(&self.path);
         }
     }
 }
