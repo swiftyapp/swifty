@@ -330,17 +330,21 @@ pub async fn workspace_restore_from_drive(
         return Err(e);
     }
 
+    // The account belongs to the new workspace now: its token file is on disk,
+    // sealed under the key above, and the registry names the vault it is in.
+    // Dropping the in-memory copy is what stops a later restore from silently
+    // adopting it — and it goes *before* the adopt below, because a lock that
+    // wins there is not a failure of the restore, and must not leave the
+    // credentials pending as if it were.
+    setup::take_pending(&state);
+
     // The restored vault continues the session the previous one was taken from,
-    // and it arrives connected: its token file is on disk, sealed under the key
-    // above. A lock that landed while the lease was out still wins — the
-    // workspace exists and is recorded, and the next unlock opens it.
+    // and it arrives connected. A lock that landed while the lease was out still
+    // wins — the workspace exists and is recorded, and the next unlock opens it.
     let (_, _, _, claim) = previous.split();
     if !state.session.lock().unwrap().adopt(claim, key, store, true) {
         return Err(Error::Locked);
     }
-    // The account belongs to the new workspace now. Dropping the in-memory copy
-    // is what stops a later create or restore from silently adopting it.
-    setup::take_pending(&state);
     Ok(UnlockResult {
         entries,
         sync_configured: true,

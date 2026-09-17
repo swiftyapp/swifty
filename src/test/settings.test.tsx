@@ -605,6 +605,41 @@ describe('Settings › workspaces › restore from Drive', () => {
     expect(screen.getByTestId('workspace-restore-connect')).toBeInTheDocument()
   })
 
+  // Once the restore is running the backend holds the account for its length
+  // and would refuse to drop it, so nothing on screen may offer to: a Cancel
+  // that did nothing would read as a cancellation that happened.
+  it('withdraws Cancel and Switch account while the restore runs', async () => {
+    mockCommandOnce('workspace_restore_from_drive', () => new Promise(() => {}))
+    await connect([VAULT])
+
+    await userEvent.type(screen.getByTestId('workspace-restore-name'), 'Work')
+    await userEvent.type(screen.getByTestId('workspace-restore-password'), 'pass')
+    await userEvent.click(screen.getByTestId('workspace-restore-submit'))
+
+    expect(useApp.getState().setupDrive.status).toBe('restoring')
+    expect(screen.queryByTestId('workspace-restore-cancel')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('workspace-restore-switch-account')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-restore-submit')).toHaveTextContent('Restoring…')
+    expect(calls('setup_drive_disconnect')).toHaveLength(0)
+  })
+
+  // A failed restore hands the form back: the list and the pick are still
+  // there, and so are Cancel and Switch account.
+  it('hands the form back when the restore fails', async () => {
+    mockCommandOnce('workspace_restore_from_drive', () =>
+      Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })
+    )
+    await connect([VAULT])
+
+    await userEvent.type(screen.getByTestId('workspace-restore-name'), 'Work')
+    await userEvent.type(screen.getByTestId('workspace-restore-password'), 'wrong')
+    await userEvent.click(screen.getByTestId('workspace-restore-submit'))
+
+    await waitFor(() => expect(useApp.getState().setupDrive.status).toBe('found'))
+    expect(screen.getByTestId('workspace-restore-cancel')).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-restore-switch-account')).toBeInTheDocument()
+  })
+
   it('blames the password only when the backend does', async () => {
     mockCommandOnce('workspace_restore_from_drive', () =>
       Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })

@@ -61,7 +61,12 @@ products solve it, don't patch symptoms.
 > of the connected account's *other* vaults, so a second device reaches every vault on the
 > account rather than only the one onboarding picked. It reuses onboarding's keyless connect,
 > probe and picker outright (`commands::setup::connect_pending`) and mirrors `workspace_create`
-> for the rest; a pack the open workspace already holds is refused by vault id.
+> for the rest; a pack the open workspace already holds is refused by vault id. Only the *open*
+> workspace's, deliberately: every other workspace keeps its vault id inside its own encrypted
+> database, so a pack one of *those* holds is let through and the two go on syncing one pack.
+> Closing that would mean recording each workspace's vault id in the plaintext registry — a
+> design call (it links local workspaces to Drive packs on disk) that is not worth making for
+> an alpha of one user.
 >
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a

@@ -24,8 +24,10 @@ export type UpdateCheckStatus = 'checking' | 'uptodate' | 'error' | null
  * `found`   — the probe came back with at least one pack to restore
  * `empty`   — the probe came back with nothing; the account is usable, just bare
  * `error`   — the connect or the probe failed
+ * `restoring` — a pack from `found` is being unsealed into a workspace; the
+ *               account is spoken for until that lands one way or the other
  */
-export type SetupDriveStatus = 'idle' | 'pending' | 'found' | 'empty' | 'error'
+export type SetupDriveStatus = 'idle' | 'pending' | 'found' | 'empty' | 'error' | 'restoring'
 
 /**
  * The first run's Drive probe, which has no vault behind it yet — so it cannot
@@ -302,6 +304,25 @@ export const setupDriveProbed = (files: SetupDriveFile[]) =>
 export const setupDriveFailed = (error: string) =>
   useApp.setState({ setupDrive: { ...DRIVE_IDLE, status: 'error', error } })
 export const setupDriveReset = () => useApp.setState({ setupDrive: DRIVE_IDLE })
+
+/**
+ * The restore is in flight. The list and the pick stay, because a wrong
+ * password comes straight back to them.
+ */
+export const setupDriveRestoring = () =>
+  useApp.setState(state => ({ setupDrive: { ...state.setupDrive, status: 'restoring' } }))
+
+/**
+ * The restore failed and the form is back in the user's hands. Only from
+ * `restoring`: the screen may have been left and reset meanwhile, and a form
+ * over an emptied list would be worse than the idle row.
+ */
+export const setupDriveRestoreFailed = () =>
+  useApp.setState(state =>
+    state.setupDrive.status === 'restoring'
+      ? { setupDrive: { ...state.setupDrive, status: 'found' } }
+      : {}
+  )
 
 /** The user picked one of several vaults; every later step follows this. */
 export const setupDriveSelect = (id: string) =>

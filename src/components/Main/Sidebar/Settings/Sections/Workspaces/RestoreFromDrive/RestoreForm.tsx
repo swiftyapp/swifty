@@ -15,6 +15,8 @@ import { unsealError } from '@/components/Start/shared/errors'
 interface Props {
   files: SetupDriveFile[]
   selectedId: string | null
+  /** A restore is in flight (`setupDrive.status === 'restoring'`). */
+  busy: boolean
 }
 
 // Which vault, what to call it here, and the password it was sealed with.
@@ -22,13 +24,15 @@ interface Props {
 // No strength bar and no confirmation field, unlike `NewWorkspace`: this
 // password is not being chosen, it is being recalled — it belongs to a vault
 // another device created, and the only thing that can judge it is the pack.
-export default function RestoreForm({ files, selectedId }: Props) {
+//
+// `busy` comes from the store rather than living here, because the row that
+// draws this form draws a Cancel of its own that has to stand down with it.
+export default function RestoreForm({ files, selectedId, busy }: Props) {
   const { t } = useTranslation()
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [nameError, setNameError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
 
   const change = (event: ChangeEvent<HTMLInputElement>) => {
     setError(null)
@@ -41,10 +45,8 @@ export default function RestoreForm({ files, selectedId }: Props) {
     if (busy || !selectedId) return
     const label = name.trim()
     if (!label) return setNameError(t('Fill in the name'))
-    setBusy(true)
     setError(null)
     restoreWorkspaceFromDrive(label, password, selectedId).catch((err: unknown) => {
-      setBusy(false)
       setError(
         unsealError(
           t,

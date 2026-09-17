@@ -24,8 +24,13 @@ export default function RestoreFromDrive() {
   // adopted by a later create or restore, so the pending tokens go with the
   // screen that asked for them — whether it goes because the user pressed
   // Cancel, moved to another section, or closed Settings. Harmless after a
-  // restore that worked: the backend has already taken them.
+  // restore that worked: the backend has already taken them. And harmless
+  // during one: the backend holds the account for the restore's length and
+  // refuses to drop it, so leaving mid-restore lets what the user asked for
+  // finish — exactly as leaving mid-create does.
   useEffect(() => forgetDrive, [])
+
+  const restoring = drive.status === 'restoring'
 
   return (
     <SettingsRow
@@ -39,7 +44,10 @@ export default function RestoreFromDrive() {
           <Button size="md" testid="workspace-restore-connect" onClick={connectWorkspaceDrive}>
             {t('Connect')}
           </Button>
-        ) : (
+        ) : restoring ? null : (
+          // Withdrawn while the restore runs, with the form's own Switch
+          // account: the account is spoken for, and a Cancel that the backend
+          // would refuse is a lie.
           <Button
             variant="pale"
             size="md"
@@ -66,8 +74,8 @@ export default function RestoreFromDrive() {
           {drive.error || t('Something went wrong')}
         </p>
       )}
-      {drive.status === 'found' && (
-        <RestoreForm files={drive.files} selectedId={drive.selectedId} />
+      {(drive.status === 'found' || restoring) && (
+        <RestoreForm files={drive.files} selectedId={drive.selectedId} busy={restoring} />
       )}
     </SettingsRow>
   )

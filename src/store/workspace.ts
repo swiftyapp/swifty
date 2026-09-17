@@ -7,6 +7,8 @@ import {
   enterMain,
   refreshApp,
   forgetBiometricGate,
+  setupDriveRestoring,
+  setupDriveRestoreFailed,
   type AppState
 } from './app'
 
@@ -62,12 +64,24 @@ export const createWorkspace = async (name: string, password: string) => {
 // previous workspace's data goes first and the probe brings the new list on
 // screen — and the same landing as the first run's restore too: the result says
 // `syncConfigured`, which is what has `enterMain` run the first sync.
+//
+// The store, not the form, says a restore is running: the backend has claimed
+// the pending account for its length and refuses to give it up, so every
+// control that would (Cancel, Switch account) has to know to stand down — and
+// the form is not the only thing drawing them.
 export const restoreWorkspaceFromDrive = async (
   name: string,
   password: string,
   fileId: string
 ) => {
-  const result = await workspaceRestoreFromDrive(name, password, fileId)
+  setupDriveRestoring()
+  let result
+  try {
+    result = await workspaceRestoreFromDrive(name, password, fileId)
+  } catch (error) {
+    setupDriveRestoreFailed()
+    throw error
+  }
   clearSession()
   await enterMain(result)
   await refreshApp()

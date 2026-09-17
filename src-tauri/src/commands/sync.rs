@@ -273,14 +273,33 @@ pub(crate) fn start_consent(app: &AppHandle, state: &AppState, purpose: AuthPurp
         _ => Some(state.session.lock().unwrap().cryptor()?),
     };
     let started = sync::begin(app)?;
-    *state.pending_auth.lock().unwrap() = Some(crate::state::PendingAuth {
-        verifier: started.verifier,
-        state: started.state,
-        cryptor,
-        purpose,
-        started: std::time::Instant::now(),
-        generation: sync::connection_generation(app),
-    });
+    let displaced = state
+        .pending_auth
+        .lock()
+        .unwrap()
+        .replace(crate::state::PendingAuth {
+            verifier: started.verifier,
+            state: started.state,
+            cryptor,
+            purpose,
+            started: std::time::Instant::now(),
+            generation: sync::connection_generation(app),
+        });
+    // One consent at a time: a redirect for the flow this one replaced can no
+    // longer be matched, so that flow is over. If it was reporting on the other
+    // event family — a sync connect displaced by a workspace restore, or the
+    // reverse — its screen is still saying "waiting", and nothing else would
+    // ever tell it otherwise. Same family, same screen: it is already waiting
+    // for this one.
+    if let Some(old) = displaced {
+        if (old.purpose == AuthPurpose::Setup) != (purpose == AuthPurpose::Setup) {
+            fail(
+                app,
+                old.purpose,
+                "Sign-in cancelled: another one was started".into(),
+            );
+        }
+    }
     // Onboarding announces itself on its own `setup:drive:*` family, because it
     // runs on a screen that knows nothing about sync settings.
     match purpose {
