@@ -710,7 +710,10 @@ mod tests {
         assert!(claim_or_defer(&state).is_none());
 
         drop(running);
-        assert!(take_rerun(&state), "the run in flight was asked to go again");
+        assert!(
+            take_rerun(&state),
+            "the run in flight was asked to go again"
+        );
         assert!(!take_rerun(&state), "and only once");
     }
 
