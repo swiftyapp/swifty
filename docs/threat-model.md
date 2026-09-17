@@ -43,6 +43,19 @@ Inside the decrypted database:
   So a secret stays ciphertext even inside the *decrypted* database and is
   unsealed only when the user reveals or copies it (**decrypt-on-reveal**,
   `reveal_entry` in `src-tauri/src/commands/vault.rs`).
+- **A payload is bound to its row.** Because the metadata columns are in the
+  clear inside the decrypted database, someone holding only the SQLCipher key
+  could otherwise move one row's sealed payload under another row's title and
+  host. Payloads sealed by current builds carry the entry id as AEAD
+  associated data, and every payload — including those sealed before the AAD
+  existed — is checked after unsealing to carry the id of the row it came from
+  (`crypto::PayloadCipher`). A payload moved between rows fails to open.
+- **Freed content is zeroed.** The connection runs with `secure_delete` on,
+  so a "delete forever" (which empties the row's payload) or a reclaimed
+  tombstone leaves zeros in the freed pages rather than the old ciphertext,
+  and a purge also checkpoints and truncates the write-ahead log so the page's
+  previous image does not linger there. Someone who later obtains the database
+  key finds no purged secrets in free space.
 - A small `meta` key/value table holds app data — the KDF descriptor and similar
   settings — not schema versioning (that rides SQLite's `user_version`).
 
@@ -96,6 +109,13 @@ KDF descriptor recorded in the `meta` table is currently the placeholder string
 >   precisely why Argon2id is the target primitive.
 > - **Attempt throttling.** There is no failed-unlock backoff, so offline guessing
 >   against a stolen database is bounded only by the KDF cost.
+> - **Untrusted KDF parameters are bounded.** A descriptor is read off things
+>   this build did not write — a `.rowel` backup, a pack pulled from Drive, the
+>   sidecar on disk — and the Argon2 crate would otherwise accept a memory cost
+>   of 4 TiB. `KdfParams` refuses costs past a ceiling (1 GiB, 64 passes, 64
+>   lanes; 10M PBKDF2 iterations) both when parsed and when derived from, so a
+>   crafted header is an error rather than an abort or a derivation that never
+>   returns.
 
 ### Passkeys
 
@@ -113,12 +133,14 @@ carries them as part of the opaque payload and never sees them.
   which is the encrypted vault snapshot itself, or Bitwarden JSON, which is
   plaintext by construction and carries the key as base64url) — the same
   deliberate exposure the password export already is.
-- **User verification is the unlocked session.** WebAuthn's "user verified" bit
-  is asserted on the strength of the vault being unlocked; there is no
-  per-ceremony prompt yet, so any code that can reach the authenticator can sign.
-  That is only sound while nothing can: the module has no Tauri command and no
-  transport, and the browser-extension PR that adds one adds the per-ceremony
-  confirmation with it.
+- **User verification is the unlocked session plus the user's consent.** The
+  vault being unlocked is the identity half of WebAuthn's "user verified" bit;
+  the intent half is asked for on every registration and sign-in through the
+  `passkey::UserConsent` seam, which whatever feeds requests in must supply —
+  an `Authenticator` cannot be built without one, so the browser-extension PR
+  has to bring its confirm prompt rather than inherit a silent yes. A refusal
+  ends the ceremony as denied. Today nothing can reach the authenticator: the
+  module has no Tauri command and no transport.
 - **Signature counters stay at zero.** Credentials sync across devices, so a
   per-device counter would look to a relying party like a cloned authenticator.
   New credentials are created with the constant zero the spec recommends for
@@ -142,9 +164,17 @@ carries them as part of the opaque payload and never sees them.
    `reveal_entry`, one decrypted entry.
 3. **Zeroize on lock.** The key buffer is scrubbed from the heap (`zeroize`) when
    it is dropped or replaced, and the store connection is closed. Locking happens
-   several ways: an explicit Lock action, a **60-second inactivity auto-lock**
-   (armed when the window loses focus, cancelled when it regains focus —
-   `autolock.rs`), and on app exit (the session is dropped).
+   several ways: an explicit Lock action, the **inactivity auto-lock** (60
+   seconds by default, configurable up to a day — `autolock.rs`), and on app
+   exit (the session is dropped). The auto-lock is armed for the whole of an
+   unlocked session and re-armed by every sign of the user — input in the
+   webview, throttled to one ping every few seconds (`touch_activity`), and the
+   window gaining or losing focus — so the vault seals that long after the
+   *last* one whether the window is in front or behind. Every lock, including
+   a workspace switch, also **clears the clipboard** if it still holds a secret
+   the app copied, so a copied password does not outlive the session it came
+   from even with the clipboard timeout set to "Never" (not on iOS, where the
+   pasteboard expiry set at copy time is the clear).
 4. **Optional biometric unlock (opt-in).** Instead of re-entering the passphrase,
    the same key material can be stored in the OS keychain behind a biometric gate
    (`secure_store.rs`):
@@ -191,6 +221,18 @@ Bringing existing data forward is an **explicit** action, and there are two path
   encrypted vault blob to the user's own Google Drive; the master passphrase and
   derived keys never leave the device. A compromised Drive account or a tapped
   sync channel yields ciphertext, not secrets.
+- **A stalled or hostile network peer.** Every HTTPS client in the app shares a
+  connect deadline and a read-stall deadline (`sync::http_client_builder`), so
+  a connection that stops answering fails the run instead of holding the
+  `syncing` flag — and with it manual sync and workspace switching — until the
+  process exits. Downloads are capped and the cap is enforced on the bytes as
+  they arrive: 256 MiB for a sync pack, 2 MiB for a share, 256 KiB for an icon.
+  The desktop OAuth loopback listener binds an OS-chosen port and gives up
+  after five minutes, so an abandoned consent tab frees the flow rather than
+  wedging a fixed port. Favicon fetches run only for an unlocked vault, only
+  over HTTPS, never to an IP literal or a local-only name (`.local`, `.lan`,
+  `.internal`, `.home.arpa`, `.localhost`), and follow redirects only to URLs
+  that pass the same bar.
 - **Remote server breach.** There is nothing central to breach. Rowel is
   offline-first with no account server, no telemetry, and no phone-home. The only
   outbound request at launch is the signed updater check to GitHub Releases; Drive
@@ -268,8 +310,21 @@ fresh random 256-bit AES-GCM key and uploaded to the sender's own Drive as an
   is the PBKDF2 parameters described above until Argon2id is wired into the live
   path.
 - **The clipboard window.** Copied secrets go to the system clipboard. Rowel
-  marks them as concealed and auto-clears after a timeout, but other apps can read
-  the clipboard during that window.
+  marks them as concealed and auto-clears after a timeout (and on lock), but
+  other apps can read the clipboard during that window.
+- **Rollback through Drive's revision history.** Sync is a whole-state merge:
+  a device pulls the pack, merges it, and pushes the union. Deletions travel as
+  tombstones, and tombstones are reclaimed after 90 days so the vault does not
+  grow without bound. Google keeps earlier revisions of the pack, and anyone
+  who can write to the Drive account — the account's owner, or someone who has
+  taken it over — can restore a revision older than that window. Every device
+  then merges the old pack, and a credential deleted (or "deleted forever")
+  more than 90 days ago has no tombstone left to refuse it, so it comes back
+  everywhere, along with any other state the old revision held. Within the
+  window the tombstone wins and the rollback is absorbed. Rowel treats the
+  Drive account as the user's own and does not defend against its owner; the
+  practical guard is the same as for the account itself: strong authentication
+  on the Google account, and re-deleting anything a rollback brings back.
 - **Physical memory attacks.** Cold-boot or DMA attacks against an unlocked
   session are out of scope.
 

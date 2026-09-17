@@ -18,22 +18,66 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 /// what the compare-before-clear wants — an earlier value is no longer on the
 /// clipboard, so there is nothing left for its deadline to clear.
 ///
+/// Also remembers the last secret written, so a lock can clear it without
+/// waiting for the deadline — or when there is no deadline at all ("Never").
+///
 /// Managed in `lib.rs`, and not on iOS: nothing arms it there.
 #[cfg(not(target_os = "ios"))]
-pub struct ClipboardClear(Arc<crate::timer::Timer>);
+pub struct ClipboardClear {
+    timer: Arc<crate::timer::Timer>,
+    /// What this app last put on the clipboard, until it is cleared or the
+    /// user copies something else over it. Zeroized on drop like every other
+    /// copy of a secret this process holds.
+    last: std::sync::Mutex<Option<zeroize::Zeroizing<String>>>,
+}
 
 #[cfg(not(target_os = "ios"))]
 impl Default for ClipboardClear {
     fn default() -> Self {
-        Self(crate::timer::Timer::spawn())
+        Self {
+            timer: crate::timer::Timer::spawn(),
+            last: std::sync::Mutex::new(None),
+        }
     }
 }
 
 #[cfg(not(target_os = "ios"))]
 impl ClipboardClear {
     fn arm(&self, after: Duration, fire: impl FnOnce() + Send + 'static) {
-        self.0.arm(after, fire);
+        self.timer.arm(after, fire);
     }
+
+    fn remember(&self, value: &str) {
+        *self.last.lock().unwrap() = Some(zeroize::Zeroizing::new(value.to_string()));
+    }
+
+    fn forget(&self) -> Option<zeroize::Zeroizing<String>> {
+        self.last.lock().unwrap().take()
+    }
+}
+
+/// The vault has just locked: a secret it copied must not outlive it.
+///
+/// Compare-before-clear, like the timed clear — the user may have copied
+/// something of their own since, and that is theirs to keep. The pending timer
+/// is dropped either way: the value it was armed for is gone or was never ours.
+///
+/// Not on iOS, where nothing is read back from the pasteboard (see
+/// `copy_to_clipboard`): the expiry set at write time is the clear there.
+pub fn clear_on_lock(app: &AppHandle) {
+    #[cfg(not(target_os = "ios"))]
+    {
+        let state = app.state::<ClipboardClear>();
+        state.timer.disarm();
+        if let Some(written) = state.forget() {
+            let current = app.clipboard().read_text().ok();
+            if should_clear(&written, current.as_deref()) {
+                let _ = app.clipboard().clear();
+            }
+        }
+    }
+    #[cfg(target_os = "ios")]
+    let _ = app;
 }
 
 // Copy text to the clipboard, optionally clearing it after `clear_after_ms`.
@@ -52,14 +96,27 @@ pub fn copy_to_clipboard(app: AppHandle, value: String, clear_after_ms: Option<u
     // not. Reading the pasteboard back to compare would also raise the iOS 16+
     // system paste banner over a value the user never asked to paste.
     #[cfg(not(target_os = "ios"))]
-    if let Some(delay) = clear_after {
-        let handle = app.clone();
-        app.state::<ClipboardClear>().arm(delay, move || {
-            let current = handle.clipboard().read_text().ok();
-            if should_clear(&value, current.as_deref()) {
-                let _ = handle.clipboard().clear();
-            }
-        });
+    {
+        let state = app.state::<ClipboardClear>();
+        // Remembered whether or not a deadline follows: with the timeout set to
+        // "Never", the lock is the only clear this value will ever get.
+        state.remember(&value);
+        if let Some(delay) = clear_after {
+            let handle = app.clone();
+            state.arm(delay, move || {
+                let current = handle.clipboard().read_text().ok();
+                if should_clear(&value, current.as_deref()) {
+                    let _ = handle.clipboard().clear();
+                }
+                // Cleared, or overwritten by the user: either way there is
+                // nothing of ours left for a lock to find.
+                handle.state::<ClipboardClear>().forget();
+            });
+        } else {
+            // A copy with no deadline replaces whatever an earlier one armed;
+            // that value is no longer on the clipboard.
+            state.timer.disarm();
+        }
     }
     Ok(())
 }

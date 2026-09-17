@@ -202,7 +202,7 @@ fn restore_db_from_backup(app: &AppHandle, backup: &Path) -> Result<()> {
 // Unseal a record's payload under the old cipher and re-seal it under the new one,
 // preserving all metadata (id/kind/title/tags/url_host/timestamps/tombstone).
 fn reseal_record(mut r: Record, old: &PayloadCipher, new: &PayloadCipher) -> Result<Record> {
-    let entry = old.unseal(&r.payload)?;
+    let entry = old.unseal(&r.id, &r.payload)?;
     r.payload = new.seal(&entry)?;
     Ok(r)
 }

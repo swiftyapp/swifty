@@ -111,6 +111,17 @@ pub fn lock(app: AppHandle) -> Result<()> {
     Ok(())
 }
 
+// The user is at the keyboard: restart the inactivity clock. The webview sends
+// this throttled off its own input events (`useActivityPing`), once on mount
+// and then at most every few seconds while the user is active; the auto-lock
+// comes due that long after the last one. Cheap and side-effect free on a
+// locked vault, so it needs no guard.
+#[tauri::command]
+pub fn touch_activity(app: AppHandle) -> Result<()> {
+    crate::autolock::touch(&app);
+    Ok(())
+}
+
 // Unlock from a locked start using the biometric-gated key in the OS secure
 // store. Retrieving the key triggers the biometric prompt; the sidecar decides
 // how to interpret the stored bytes (Argon2id master vs legacy secret). The

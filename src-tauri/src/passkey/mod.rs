@@ -8,15 +8,18 @@
 //! adds the browser-extension host that feeds requests in.
 //!
 //! ## User verification
-//! An unlocked vault *is* the user verification, so [`UnlockedSession`] reports
-//! both presence and verification unconditionally — it can only be constructed
-//! from an unlocked session in the first place. That makes registering and
-//! signing in silent, which is the weakest acceptable stance and only tenable
-//! because nothing can reach this module yet: the extension PR adds the
-//! per-ceremony confirm prompt and replaces the check with its answer. The one
-//! ceremony it does refuse is a registration whose excludeCredentials names a
-//! credential we already hold — `passkey-authenticator` leaves that answer to
-//! the verification method.
+//! An unlocked vault is the *identity* half of user verification: only the
+//! holder of the master password (or the biometric) has one. The *intent*
+//! half — that the user wants this registration or this sign-in to happen —
+//! is asked for every ceremony through [`UserConsent`], which the transport
+//! supplies when it builds the [`Authenticator`]. There is no default: nothing
+//! can construct an authenticator without saying how the user is asked, so the
+//! extension PR has to bring its confirm prompt with it rather than inherit a
+//! silent yes. A refusal ends the ceremony as `OperationDenied`; presence and
+//! verification are both reported only after an approval. The one ceremony
+//! refused before the user is asked is a registration whose excludeCredentials
+//! names a credential we already hold — `passkey-authenticator` leaves that
+//! answer to the verification method.
 //!
 //! ## Signature counters
 //! Passkeys here sync between devices, so a per-device counter would look like
@@ -56,18 +59,40 @@ pub const AAGUID: Aaguid = Aaguid([
 pub type Ctap2Authenticator<V> =
     passkey_authenticator::Authenticator<VaultCredentialStore<V>, UnlockedSession>;
 
+/// What the user is being asked to approve, in the terms a prompt would show.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ceremony<'a> {
+    /// Create a passkey for `rp_id`, for the account the site calls `user_name`.
+    Register {
+        rp_id: &'a str,
+        user_name: Option<&'a str>,
+    },
+    /// Sign in to `rp_id` with a passkey the vault already holds.
+    SignIn { rp_id: &'a str },
+}
+
+/// The user's say over a ceremony. `approve` runs before a key is created or a
+/// signature made; `false` ends the ceremony as denied. Supplied by whatever
+/// feeds requests in — the browser-extension host and its confirm sheet — and
+/// blocking is fine: the authenticator runs off the UI thread.
+pub trait UserConsent: Send + Sync {
+    fn approve(&self, ceremony: Ceremony<'_>) -> bool;
+}
+
 /// Registers and asserts passkeys against a [`PasskeyVault`].
 pub struct Authenticator<V: PasskeyVault> {
     inner: Ctap2Authenticator<V>,
 }
 
 impl<V: PasskeyVault> Authenticator<V> {
-    pub fn new(vault: V) -> Self {
+    pub fn new(vault: V, consent: impl UserConsent + 'static) -> Self {
         Self {
             inner: passkey_authenticator::Authenticator::new(
                 AAGUID,
                 VaultCredentialStore::new(vault),
-                UnlockedSession,
+                UnlockedSession {
+                    consent: Box::new(consent),
+                },
             ),
         }
     }
@@ -102,8 +127,11 @@ impl<V: PasskeyVault> Authenticator<V> {
     }
 }
 
-/// User verification by way of the vault being unlocked. See the module docs.
-pub struct UnlockedSession;
+/// User verification: the vault is unlocked (or this could not have been
+/// built), and the user approves each ceremony. See the module docs.
+pub struct UnlockedSession {
+    consent: Box<dyn UserConsent>,
+}
 
 #[async_trait::async_trait]
 impl UserValidationMethod for UnlockedSession {
@@ -115,16 +143,27 @@ impl UserValidationMethod for UnlockedSession {
         _presence: bool,
         _verification: bool,
     ) -> std::result::Result<UserCheck, Ctap2Error> {
-        // `make_credential` no longer refuses an excludeCredentials hit itself
-        // (passkey-authenticator 0.5 hands the decision here, so a UI can say
-        // "you already have one"), so refusing is now ours to do — otherwise a
-        // second registration would silently store a duplicate credential.
-        if matches!(hint, UiHint::InformExcludedCredentialFound(_)) {
-            return Err(Ctap2Error::CredentialExcluded);
+        let approved = match hint {
+            // `make_credential` no longer refuses an excludeCredentials hit
+            // itself (passkey-authenticator 0.5 hands the decision here, so a
+            // UI can say "you already have one"), so refusing is ours to do —
+            // otherwise a second registration would silently store a duplicate
+            // credential.
+            UiHint::InformExcludedCredentialFound(_) => return Err(Ctap2Error::CredentialExcluded),
+            // Nothing to approve: the library fails the ceremony on its own
+            // once this returns.
+            UiHint::InformNoCredentialsFound => true,
+            UiHint::RequestNewCredential(user, rp) => self.consent.approve(Ceremony::Register {
+                rp_id: &rp.id,
+                user_name: user.name.as_deref(),
+            }),
+            UiHint::RequestExistingCredential(passkey) => self.consent.approve(Ceremony::SignIn {
+                rp_id: &passkey.rp_id,
+            }),
+        };
+        if !approved {
+            return Err(Ctap2Error::OperationDenied);
         }
-        // Every other hint is something a device with a display would show;
-        // nothing here can draw, so it is dropped. The extension PR's confirm
-        // prompt is where it becomes the prompt's text.
         Ok(UserCheck {
             presence: true,
             verification: true,

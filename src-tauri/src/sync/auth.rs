@@ -2,7 +2,11 @@
 //!
 //! Desktop talks to a Desktop-app client: the consent URL opens in the browser
 //! and a one-shot loopback listener on 127.0.0.1 captures the auth code, so the
-//! whole flow is one blocking call.
+//! whole flow is one blocking call. The listener takes whichever port the OS
+//! hands it (Google allows any loopback port for a Desktop-app client) and
+//! gives up after [`CONSENT_TIMEOUT`], so a consent tab the user closes
+//! without answering cannot wedge a fixed port — or the "pending" state the
+//! frontend shows — until the app restarts.
 //!
 //! iOS talks to an iOS client, which is public (no secret, PKCE mandatory) and
 //! is registered against a redirect URI on its own URL scheme. Safari takes the
@@ -24,7 +28,7 @@ use std::io::{BufRead, BufReader, Write};
 #[cfg(desktop)]
 use std::net::TcpListener;
 #[cfg(desktop)]
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -44,9 +48,18 @@ use crate::{crypto::Cryptor, storage};
 #[cfg(desktop)]
 const HOST: &str = "127.0.0.1";
 #[cfg(desktop)]
-const PORT: u16 = 4567;
-#[cfg(desktop)]
 const CALLBACK: &str = "/auth/callback";
+/// How long the loopback listener waits for the browser to come back with an
+/// answer. Long enough to read a consent screen and pick an account; short
+/// enough that an abandoned tab frees the flow within the session.
+#[cfg(desktop)]
+const CONSENT_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+/// How often the listener checks the deadline while nothing has connected.
+#[cfg(desktop)]
+const ACCEPT_POLL: Duration = Duration::from_millis(100);
+/// How long one connection gets to send its request line.
+#[cfg(desktop)]
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const SCOPE: &str = "https://www.googleapis.com/auth/drive.file";
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
@@ -127,15 +140,24 @@ fn no_client() -> Error {
 
 #[cfg(desktop)]
 impl Credentials {
+    /// The client alone. The redirect is left empty because it depends on the
+    /// port the consent flow's listener lands on ([`Credentials::with_loopback`]);
+    /// a token refresh, the other caller, never sends one.
     fn resolve(_app: &AppHandle) -> Result<Self> {
         Ok(Self {
             client_id: env_client_id().ok_or_else(no_client)?,
-            redirect_uri: format!("http://{HOST}:{PORT}{CALLBACK}"),
+            redirect_uri: String::new(),
             secret: std::env::var("GOOGLE_OAUTH_CLIENT_SECRET")
                 .ok()
                 .or_else(|| option_env!("GOOGLE_OAUTH_CLIENT_SECRET").map(String::from))
                 .filter(|s| !s.is_empty()),
         })
+    }
+
+    /// Address the redirect at the loopback listener bound to `port`.
+    fn with_loopback(mut self, port: u16) -> Self {
+        self.redirect_uri = format!("http://{HOST}:{port}{CALLBACK}");
+        self
     }
 }
 
@@ -287,9 +309,14 @@ pub fn authenticate(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
 /// under. Blocking (the loopback listener): call it off the main thread.
 #[cfg(desktop)]
 pub fn obtain_tokens(app: &AppHandle) -> Result<Tokens> {
-    let credentials = Credentials::resolve(app)?;
+    // Bound before the browser opens, on a port the OS picks: the redirect
+    // then names a port this process actually holds, and two attempts (or two
+    // apps) can never fight over one.
+    let listener = TcpListener::bind((HOST, 0)).map_err(other)?;
+    let port = listener.local_addr()?.port();
+    let credentials = Credentials::resolve(app)?.with_loopback(port);
     let started = open_consent(app, &credentials)?;
-    let code = listen_for_code(&started.state)?;
+    let code = listen_for_code(&listener, &started.state)?;
     let client = super::http_client();
     tauri::async_runtime::block_on(exchange_code(
         &client,
@@ -496,31 +523,69 @@ fn challenge(verifier: &str) -> String {
 
 // --- loopback listener (desktop) ---
 
-// Block until the browser hits the callback, returning the auth code.
+// Block until the browser hits the callback, returning the auth code — or
+// until `CONSENT_TIMEOUT` passes with no answer, which is an error like any
+// other refusal and frees whatever the caller had marked pending.
+//
+// `std` has no accept-with-timeout, so the listener is non-blocking and polled
+// against the deadline. Browsers also open connections that are not the
+// answer (a favicon request, a speculative connection that sends nothing), so
+// anything that is not the callback is answered 404 and the wait goes on.
 #[cfg(desktop)]
-fn listen_for_code(state: &str) -> Result<String> {
-    let listener = TcpListener::bind((HOST, PORT)).map_err(other)?;
-    let (mut stream, _) = listener.accept()?;
-    stream.set_read_timeout(Some(Duration::from_secs(300)))?;
-
-    let mut reader = BufReader::new(&stream);
-    let mut request_line = String::new();
-    reader.read_line(&mut request_line)?;
-
-    // "GET /auth/callback?code=... HTTP/1.1"
-    let path = request_line.split_whitespace().nth(1).unwrap_or("");
-    let url = Url::parse(&format!("http://{HOST}:{PORT}{path}")).map_err(other)?;
-    let code = match parse_redirect(&url, state) {
-        Redirect::Code(code) => Ok(code),
-        Redirect::Denied(error) => Err(Error::Other(error)),
-        Redirect::Foreign => Err(Error::Other(
-            "the browser's reply did not match this sign-in request".into(),
-        )),
-    };
-
-    let _ = stream.write_all(response_html(code.as_ref().err()).as_bytes());
-    code
+fn listen_for_code(listener: &TcpListener, state: &str) -> Result<String> {
+    listen_for_code_until(listener, state, Instant::now() + CONSENT_TIMEOUT)
 }
+
+#[cfg(desktop)]
+fn listen_for_code_until(listener: &TcpListener, state: &str, deadline: Instant) -> Result<String> {
+    listener.set_nonblocking(true)?;
+    loop {
+        let (mut stream, _) = match listener.accept() {
+            Ok(connection) => connection,
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                if Instant::now() >= deadline {
+                    return Err(Error::Other(
+                        "Google sign-in took too long; try again".into(),
+                    ));
+                }
+                std::thread::sleep(ACCEPT_POLL);
+                continue;
+            }
+            Err(e) => return Err(e.into()),
+        };
+        // Some platforms hand the accepted socket the listener's non-blocking
+        // flag; the read below wants a plain deadline instead.
+        stream.set_nonblocking(false)?;
+        stream.set_read_timeout(Some(REQUEST_TIMEOUT))?;
+
+        let mut reader = BufReader::new(&stream);
+        let mut request_line = String::new();
+        if reader.read_line(&mut request_line).is_err() {
+            continue;
+        }
+
+        // "GET /auth/callback?code=... HTTP/1.1"
+        let path = request_line.split_whitespace().nth(1).unwrap_or("");
+        if !path.starts_with(CALLBACK) {
+            let _ = stream.write_all(NOT_FOUND.as_bytes());
+            continue;
+        }
+        let url = Url::parse(&format!("http://{HOST}{path}")).map_err(other)?;
+        let code = match parse_redirect(&url, state) {
+            Redirect::Code(code) => Ok(code),
+            Redirect::Denied(error) => Err(Error::Other(error)),
+            Redirect::Foreign => Err(Error::Other(
+                "the browser's reply did not match this sign-in request".into(),
+            )),
+        };
+
+        let _ = stream.write_all(response_html(code.as_ref().err()).as_bytes());
+        return code;
+    }
+}
+
+#[cfg(desktop)]
+const NOT_FOUND: &str = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
 
 #[cfg(desktop)]
 fn response_html(error: Option<&Error>) -> String {
@@ -560,6 +625,36 @@ mod tests {
     fn verifier_length_within_pkce_bounds() {
         let v = gen_nonce();
         assert!((43..=128).contains(&v.len()));
+    }
+
+    // The redirect follows the listener, not the other way round: whatever
+    // port the OS hands out is the one Google is told to come back to.
+    #[cfg(desktop)]
+    #[test]
+    fn the_desktop_redirect_names_the_listeners_port() {
+        let credentials = Credentials {
+            client_id: "1-a.apps.googleusercontent.com".into(),
+            redirect_uri: String::new(),
+            secret: None,
+        }
+        .with_loopback(51234);
+        assert_eq!(
+            credentials.redirect_uri,
+            "http://127.0.0.1:51234/auth/callback"
+        );
+    }
+
+    // An answer that never comes is an error, not a thread parked forever.
+    #[cfg(desktop)]
+    #[test]
+    fn a_listener_nobody_connects_to_gives_up() {
+        let listener = TcpListener::bind((HOST, 0)).unwrap();
+        // The real deadline is minutes; the loop's shape is what this checks,
+        // so run it against a deadline that has already passed.
+        let started = Instant::now();
+        let result = listen_for_code_until(&listener, "nonce", started);
+        assert!(result.is_err());
+        assert!(started.elapsed() < CONSENT_TIMEOUT);
     }
 
     #[test]

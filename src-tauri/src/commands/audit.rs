@@ -22,16 +22,17 @@ pub async fn get_audit(state: State<'_, AppState>, check_breaches: bool) -> Resu
     // thread with the session payload cipher.
     let (cipher, payloads) = {
         let s = state.session.lock().unwrap();
-        let payloads: Vec<Vec<u8>> = live_records(s.store()?)?
+        // The id rides along: a payload only unseals on the row it was sealed for.
+        let payloads: Vec<(String, Vec<u8>)> = live_records(s.store()?)?
             .into_iter()
-            .map(|r| r.payload)
+            .map(|r| (r.id, r.payload))
             .collect();
         (s.payload_cipher()?, payloads)
     };
     super::blocking(move || {
         let entries: Vec<Entry> = payloads
             .iter()
-            .map(|p| cipher.unseal(p))
+            .map(|(id, p)| cipher.unseal(id, p))
             .collect::<Result<_>>()?;
         audit(&entries, check_breaches)
     })

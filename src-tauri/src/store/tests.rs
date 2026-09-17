@@ -211,6 +211,16 @@ fn purge_only_touches_tombstones() {
     assert_eq!(store.get("1").unwrap().unwrap().payload, b"sealed-payload");
 }
 
+// "Delete forever" has to hold for someone who later gets the database key
+// too: the freed ciphertext must be zeroed, not left in a free page until it
+// happens to be reused. The pragma is set per connection, so this checks the
+// one `open` configures.
+#[test]
+fn the_store_zeroes_what_it_frees() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    assert_eq!(store.pragma_i64("secure_delete").unwrap(), 1);
+}
+
 #[test]
 fn purge_beats_a_peer_that_still_holds_the_row() {
     let store = seeded(&[Record {
@@ -657,7 +667,7 @@ fn save_then_reveal_round_trips_one_row() {
 
     // reveal_entry: unseal the stored payload with the session payload key.
     let rec = store.get("1").unwrap().unwrap();
-    let revealed = cipher.unseal(&rec.payload).unwrap();
+    let revealed = cipher.unseal(&rec.id, &rec.payload).unwrap();
     assert_eq!(revealed.password.as_deref(), Some("s3cret"));
     assert_eq!(revealed.username.as_deref(), Some("alice"));
 }
@@ -691,7 +701,7 @@ fn argon2_descriptor_reproduces_key_and_opens() {
     let store2 = SqliteStore::open(&path, &key2.sqlcipher_key()).unwrap();
     let revealed = key2
         .payload_cipher()
-        .unseal(&store2.get("1").unwrap().unwrap().payload)
+        .unseal("1", &store2.get("1").unwrap().unwrap().payload)
         .unwrap();
     assert_eq!(revealed.password.as_deref(), Some("s3cret"));
 
@@ -718,7 +728,7 @@ fn legacy_sidecarless_vault_opens() {
     let store2 = SqliteStore::open(&path, &key2.sqlcipher_key()).unwrap();
     let revealed = key2
         .payload_cipher()
-        .unseal(&store2.get("1").unwrap().unwrap().payload)
+        .unseal("1", &store2.get("1").unwrap().unwrap().payload)
         .unwrap();
     assert_eq!(revealed.password.as_deref(), Some("s3cret"));
 }
@@ -748,7 +758,7 @@ fn change_password_reseals_rekeys_and_new_descriptor_opens() {
         .unwrap()
         .into_iter()
         .map(|mut r| {
-            let entry = old_cipher.unseal(&r.payload).unwrap();
+            let entry = old_cipher.unseal(&r.id, &r.payload).unwrap();
             r.payload = new_cipher.seal(&entry).unwrap();
             r
         })
@@ -766,7 +776,7 @@ fn change_password_reseals_rekeys_and_new_descriptor_opens() {
     let store2 = SqliteStore::open(&path, &reopened.sqlcipher_key()).unwrap();
     let revealed = reopened
         .payload_cipher()
-        .unseal(&store2.get("1").unwrap().unwrap().payload)
+        .unseal("1", &store2.get("1").unwrap().unwrap().payload)
         .unwrap();
     assert_eq!(revealed.password.as_deref(), Some("s3cret"));
 }
@@ -811,7 +821,7 @@ fn snapshot_then_rekey_then_restore_recovers_old_key() {
     let store = SqliteStore::open(&path, &old.sqlcipher_key()).unwrap();
     let revealed = old
         .payload_cipher()
-        .unseal(&store.get("1").unwrap().unwrap().payload)
+        .unseal("1", &store.get("1").unwrap().unwrap().payload)
         .unwrap();
     assert_eq!(revealed.password.as_deref(), Some("s3cret"));
 }
@@ -865,7 +875,7 @@ fn import_swftx_reseals_across_passwords_and_upserts_by_id() {
 
     // Reveal with the current payload key returns the original plaintext secrets.
     let revealed = cipher
-        .unseal(&store.get("1").unwrap().unwrap().payload)
+        .unseal("1", &store.get("1").unwrap().unwrap().payload)
         .unwrap();
     assert_eq!(revealed.password.as_deref(), Some("hunter2"));
     assert_eq!(revealed.username.as_deref(), Some("alice"));
@@ -918,7 +928,7 @@ fn swftx_round_trip_preserves_a_starred_record() {
     assert!(list[0].favorite);
     // The secrets still round-trip, so the star did not ride in on a broken export.
     let revealed = cipher
-        .unseal(&restored.get("1").unwrap().unwrap().payload)
+        .unseal("1", &restored.get("1").unwrap().unwrap().payload)
         .unwrap();
     assert_eq!(revealed.password.as_deref(), Some("s3cret"));
 }

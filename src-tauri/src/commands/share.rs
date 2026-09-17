@@ -35,7 +35,9 @@ pub async fn share_create(
             .map_err(store_err)?
             .ok_or(Error::NotFound)?;
         (
-            session.payload_cipher()?.unseal(&record.payload)?,
+            session
+                .payload_cipher()?
+                .unseal(&record.id, &record.payload)?,
             session.cryptor()?,
         )
     };

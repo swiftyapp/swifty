@@ -12,7 +12,36 @@ use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 
 use super::store::{MemoryVault, PasskeyVault, SessionVault};
-use super::{key, Authenticator};
+use super::{key, Authenticator, Ceremony, UserConsent};
+
+// The consent every ceremony test grants, standing in for the confirm prompt
+// the transport will supply.
+struct Approve;
+
+impl UserConsent for Approve {
+    fn approve(&self, _: Ceremony<'_>) -> bool {
+        true
+    }
+}
+
+// The user said no.
+struct Refuse;
+
+impl UserConsent for Refuse {
+    fn approve(&self, _: Ceremony<'_>) -> bool {
+        false
+    }
+}
+
+// Approves, and keeps what it was asked.
+struct Recording(std::sync::Arc<std::sync::Mutex<Vec<String>>>);
+
+impl UserConsent for Recording {
+    fn approve(&self, ceremony: Ceremony<'_>) -> bool {
+        self.0.lock().unwrap().push(format!("{ceremony:?}"));
+        true
+    }
+}
 use crate::crypto::{PayloadCipher, VaultKey};
 use crate::import::{self, export, EntryKind, ImportedEntry, ImportedPasskey};
 use crate::models::{Entry, Passkey};
@@ -190,7 +219,7 @@ fn assert_signature_verifies(
 // One registration through a real WebAuthn client, returning the credential id
 // the relying party would keep.
 async fn register<V: PasskeyVault>(vault: V) -> Bytes {
-    let mut client = Client::new(Authenticator::new(vault).into_ctap2());
+    let mut client = Client::new(Authenticator::new(vault, Approve).into_ctap2());
     let origin = url::Url::parse(ORIGIN).unwrap();
     client
         .register(&origin, creation_options(None), DefaultClientData)
@@ -202,7 +231,7 @@ async fn register<V: PasskeyVault>(vault: V) -> Bytes {
 #[tokio::test]
 async fn registers_and_signs_in_with_a_new_credential() {
     let vault = MemoryVault::new();
-    let mut client = Client::new(Authenticator::new(&vault).into_ctap2());
+    let mut client = Client::new(Authenticator::new(&vault, Approve).into_ctap2());
     let origin = url::Url::parse(ORIGIN).unwrap();
 
     let created = client
@@ -258,7 +287,7 @@ async fn registers_and_signs_in_with_a_new_credential() {
 #[tokio::test]
 async fn a_second_registration_for_an_excluded_credential_is_refused() {
     let vault = MemoryVault::new();
-    let mut client = Client::new(Authenticator::new(&vault).into_ctap2());
+    let mut client = Client::new(Authenticator::new(&vault, Approve).into_ctap2());
     let origin = url::Url::parse(ORIGIN).unwrap();
 
     let created = client
@@ -329,7 +358,7 @@ async fn signs_in_with_an_imported_key() {
     let imported = imported_passkey(RP_ID);
     vault.seed("entry-1", imported.clone());
 
-    let mut authenticator = Authenticator::new(&vault);
+    let mut authenticator = Authenticator::new(&vault, Approve);
     let client_data_hash = random_vec(32);
     // No allow list: the vault's credentials are discoverable.
     let response = authenticator
@@ -360,12 +389,70 @@ async fn an_allow_list_matches_a_credential_id_stored_with_padding() {
         },
     );
 
-    let mut authenticator = Authenticator::new(&vault);
+    let mut authenticator = Authenticator::new(&vault, Approve);
     let request = assertion_request(&random_vec(32), Some(vec![raw.into()]));
 
     assert!(
         authenticator.get_assertion(request).await.is_ok(),
         "credential ids are matched as bytes, not as strings"
+    );
+}
+
+// --- consent -----------------------------------------------------------------
+
+// The user's refusal is the end of it: no key is minted, no signature made.
+#[tokio::test]
+async fn a_refused_ceremony_creates_nothing_and_signs_nothing() {
+    let vault = MemoryVault::new();
+    vault.seed("entry-1", imported_passkey(RP_ID));
+
+    let mut authenticator = Authenticator::new(&vault, Refuse);
+    assert!(
+        authenticator
+            .get_assertion(assertion_request(&random_vec(32), None))
+            .await
+            .is_err(),
+        "a refused sign-in must not produce an assertion"
+    );
+
+    let mut client = Client::new(Authenticator::new(&vault, Refuse).into_ctap2());
+    let origin = url::Url::parse(ORIGIN).unwrap();
+    assert!(
+        client
+            .register(&origin, creation_options(None), DefaultClientData)
+            .await
+            .is_err(),
+        "a refused registration must not produce a credential"
+    );
+    assert_eq!(vault.all().len(), 1, "the vault is exactly as it was");
+}
+
+// The prompt gets the site and the account it is asking about, in the shape
+// it would show them.
+#[tokio::test]
+async fn the_user_is_asked_about_the_site_and_account() {
+    let vault = MemoryVault::new();
+    let asked = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+
+    let mut client = Client::new(Authenticator::new(&vault, Recording(asked.clone())).into_ctap2());
+    let origin = url::Url::parse(ORIGIN).unwrap();
+    let created = client
+        .register(&origin, creation_options(None), DefaultClientData)
+        .await
+        .expect("registration")
+        .raw_id;
+    client
+        .authenticate(&origin, request_options(created), DefaultClientData)
+        .await
+        .expect("sign-in");
+
+    let asked = asked.lock().unwrap();
+    assert_eq!(
+        asked.as_slice(),
+        [
+            "Register { rp_id: \"example.com\", user_name: Some(\"alice\") }",
+            "SignIn { rp_id: \"example.com\" }",
+        ]
     );
 }
 
@@ -448,7 +535,10 @@ fn insert_creates_a_login_when_no_single_host_matches() {
     assert_eq!(found[0].entry_id, created.id);
 
     let entry = cipher
-        .unseal(&store.get(&created.id).unwrap().unwrap().payload)
+        .unseal(
+            &created.id,
+            &store.get(&created.id).unwrap().unwrap().payload,
+        )
         .unwrap();
     assert_eq!(entry.website.as_deref(), Some("https://example.com"));
     assert_eq!(entry.username.as_deref(), Some("alice"));

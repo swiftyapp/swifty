@@ -41,6 +41,18 @@ pub const DEFAULT_M_COST: u32 = 65_536; // 64 MiB
 pub const DEFAULT_T_COST: u32 = 3; // iterations (time cost)
 pub const DEFAULT_P_COST: u32 = 4; // parallelism (lanes)
 
+// The most a descriptor may ask for. A descriptor is read off things this
+// build did not write — a `.rowel` backup, a pack pulled from Drive, the
+// sidecar on disk — and the `argon2` crate accepts costs up to `u32::MAX`,
+// so without a ceiling a crafted header is a 4 TiB allocation (an abort) or a
+// derivation that never returns. The ceilings are an order of magnitude past
+// the defaults: room to raise the defaults as hardware improves, never room
+// for a hostile file to hang the app. `MAX_M_COST` is in KiB, like `m_cost`.
+pub const MAX_M_COST: u32 = 1_048_576; // 1 GiB
+pub const MAX_T_COST: u32 = 64;
+pub const MAX_P_COST: u32 = 64;
+pub const MAX_PBKDF2_ITERATIONS: u32 = 10_000_000;
+
 fn err<E: std::fmt::Display>(e: E) -> Error {
     Error::Crypto(e.to_string())
 }
@@ -119,8 +131,35 @@ impl KdfParams {
     }
 
     /// Parse from the JSON string produced by [`to_json`](Self::to_json).
+    ///
+    /// Bounds-checked on the way in (see [`KdfParams::validate`]): every
+    /// descriptor this parses came off disk or off the network, and refusing it
+    /// here keeps an absurd one out of every path that would derive from it.
     pub fn from_json(s: &str) -> Result<Self> {
-        Ok(serde_json::from_str(s)?)
+        let params: Self = serde_json::from_str(s)?;
+        params.validate()?;
+        Ok(params)
+    }
+
+    /// Refuse costs outside what this build is prepared to pay. Zero and
+    /// below-minimum values are left to the primitives, which reject them
+    /// with their own message; this is the ceiling they do not have.
+    pub fn validate(&self) -> Result<()> {
+        let too_costly = match self {
+            Self::Argon2id {
+                m_cost,
+                t_cost,
+                p_cost,
+                ..
+            } => *m_cost > MAX_M_COST || *t_cost > MAX_T_COST || *p_cost > MAX_P_COST,
+            Self::Pbkdf2Sha512 { iterations, .. } => *iterations > MAX_PBKDF2_ITERATIONS,
+        };
+        if too_costly {
+            return Err(Error::Crypto(
+                "key derivation parameters exceed the supported bounds".into(),
+            ));
+        }
+        Ok(())
     }
 
     fn decoded_salt(salt: &str) -> Result<Vec<u8>> {
@@ -140,6 +179,9 @@ pub fn random_salt() -> Vec<u8> {
 /// The output is zeroized on drop. `password` is treated as opaque input bytes:
 /// callers feed the master password directly for Argon2id.
 pub fn derive(password: &[u8], params: &KdfParams) -> Result<Zeroizing<Vec<u8>>> {
+    // Checked here as well as at parse time: a descriptor can be built in
+    // code, and this is the one place the cost is actually paid.
+    params.validate()?;
     let mut out = Zeroizing::new(vec![0u8; KEY_LEN]);
     match params {
         KdfParams::Argon2id {
@@ -284,6 +326,43 @@ mod tests {
             }
             _ => panic!("default_argon2id must be Argon2id"),
         }
+    }
+
+    // A descriptor is untrusted input: a header asking for terabytes of memory
+    // or a derivation that runs for hours must be refused, not attempted.
+    #[test]
+    fn costs_past_the_ceiling_are_refused() {
+        let huge_memory = KdfParams::argon2id(SALT_A, u32::MAX, 1, 1);
+        assert!(derive(b"pw", &huge_memory).is_err());
+        let endless = KdfParams::argon2id(SALT_A, 256, u32::MAX, 1);
+        assert!(derive(b"pw", &endless).is_err());
+        let too_wide = KdfParams::argon2id(SALT_A, 256, 1, MAX_P_COST + 1);
+        assert!(derive(b"pw", &too_wide).is_err());
+        let forever = KdfParams::pbkdf2_sha512(SALT_A, u32::MAX);
+        assert!(derive(b"pw", &forever).is_err());
+
+        // Refused at parse time too, so a hostile file never reaches `derive`.
+        let json = format!(
+            r#"{{"algo":"argon2id","m_cost":{},"t_cost":3,"p_cost":4,"salt":"{}"}}"#,
+            u32::MAX,
+            STANDARD.encode(SALT_A)
+        );
+        assert!(KdfParams::from_json(&json).is_err());
+    }
+
+    // The ceilings sit well above the defaults, so no vault this app writes
+    // can ever fail its own check.
+    #[test]
+    fn the_defaults_are_within_the_ceiling() {
+        assert!(KdfParams::default_argon2id().validate().is_ok());
+        assert!(
+            KdfParams::argon2id(SALT_A, MAX_M_COST, MAX_T_COST, MAX_P_COST)
+                .validate()
+                .is_ok()
+        );
+        assert!(KdfParams::pbkdf2_sha512(SALT_A, MAX_PBKDF2_ITERATIONS)
+            .validate()
+            .is_ok());
     }
 
     #[test]
