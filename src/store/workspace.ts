@@ -1,7 +1,14 @@
 import type { Workspace } from '@/api/types'
 import { workspaceCreate, workspaceSelect } from '@/api/workspace'
 import { PRIMARY_WORKSPACE } from '@/lib/workspace'
-import { useApp, clearSession, enterMain, refreshApp, type AppState } from './app'
+import {
+  useApp,
+  clearSession,
+  enterMain,
+  refreshApp,
+  forgetBiometricGate,
+  type AppState
+} from './app'
 
 /**
  * Workspaces are not state of their own: the launch probe reports which exist
@@ -25,7 +32,17 @@ export const useIsPrimaryWorkspace = () => useApp(selectActiveWorkspace) === PRI
 // and the backend emits `vault:locked` for it like any other, so there is
 // nothing to do here afterwards: the one handler re-probes and lands on that
 // workspace's lock screen with the picker still offering the way back.
-export const switchWorkspace = (id: string) => workspaceSelect(id)
+//
+// The gate is dropped first: it belongs to the workspace being left, and the
+// lock screen would otherwise wear it for the new one until the re-probe lands
+// (see `forgetBiometricGate`). A switch that fails re-probes to put it back.
+export const switchWorkspace = (id: string) => {
+  forgetBiometricGate()
+  return workspaceSelect(id).catch((error: unknown) => {
+    void refreshApp()
+    throw error
+  })
+}
 
 // Create a workspace and open it. It arrives active and unlocked, so this is an
 // unlock rather than a first run — but of a different database, so the session

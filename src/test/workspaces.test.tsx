@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import WorkspacePicker from '@/components/Auth/WorkspacePicker'
 import type { Workspace } from '@/api/types'
-import { calls } from './ipc'
+import { useApp } from '@/store'
+import { appStatusDefault, calls, mockCommand } from './ipc'
 import { resetStores, seedApp } from './utils'
 
 beforeEach(() => {
@@ -38,6 +39,39 @@ describe('WorkspacePicker', () => {
     await userEvent.click(screen.getByTestId('workspace-option-w2'))
 
     expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
+  })
+
+  // Enrollment is per workspace. The lock screen draws the last known gate
+  // until the re-probe lands, so the one being left must not be offered for
+  // the one being entered.
+  it('forgets the biometric gate the moment a switch is asked for', async () => {
+    seedApp({
+      workspaces: [PRIMARY, WORK],
+      activeWorkspace: 'default',
+      biometric: { available: true, canEnroll: true, type: 'touch', mode: 'prompt' }
+    })
+    render(<WorkspacePicker />)
+
+    await userEvent.click(screen.getByTestId('workspace-option-w2'))
+
+    expect(useApp.getState().status?.biometric.available).toBe(false)
+  })
+
+  it('puts the gate back when the switch is refused', async () => {
+    seedApp({
+      workspaces: [PRIMARY, WORK],
+      biometric: { available: true, canEnroll: true, type: 'touch', mode: 'prompt' }
+    })
+    mockCommand('app_status', () => ({
+      ...appStatusDefault(),
+      biometric: { available: true, canEnroll: true, type: 'touch', mode: 'prompt' }
+    }))
+    mockCommand('workspace_select', () => Promise.reject({ kind: 'other', message: 'busy' }))
+    render(<WorkspacePicker />)
+
+    await userEvent.click(screen.getByTestId('workspace-option-w2'))
+
+    await waitFor(() => expect(useApp.getState().status?.biometric.available).toBe(true))
   })
 
   it('does nothing when the workspace already open is picked', async () => {

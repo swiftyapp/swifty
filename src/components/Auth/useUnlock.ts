@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next'
 import type { UnlockResult } from '@/api/types'
 import { unlock, unlockBiometric } from '@/api/auth'
 import { errorKind, isTooManyAttempts } from '@/api/errors'
-import { enterMain } from '@/store'
+import { enterMain, useApp } from '@/store'
 import type { MascotState } from '@/components/elements/Mascot'
 import { unsealError } from '@/components/Start/shared/errors'
 
@@ -89,10 +89,15 @@ export function useUnlock(): Unlock {
   // resized across the layout breakpoint during the hold remounts this hook —
   // and dropping the timer with it left Rust unlocked behind a UI still asking
   // for the password.
+  //
+  // Only while the flow is still `auth`, which is what a layout remount leaves
+  // it on. An unmount because the flow itself moved on — a workspace create
+  // landing its own unlock, a return to setup — means someone else owns the
+  // session now, and this result describes a vault that is no longer open.
   useEffect(
     () => () => {
       clearTimeout(holdTimer.current)
-      if (pending.current) void enterMain(pending.current)
+      if (pending.current && useApp.getState().flow === 'auth') void enterMain(pending.current)
     },
     []
   )

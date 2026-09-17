@@ -46,6 +46,21 @@ describe('Show chrome', () => {
     expect(await screen.findByTestId('entry-sheet')).toBeInTheDocument()
   })
 
+  // The failure is the entry's, not the pane's: selecting another row must not
+  // flash the previous row's error under the new title.
+  it('keeps one entry’s failure off the next entry', async () => {
+    mockCommand('reveal_entry', ({ id }) =>
+      id === 'l1' ? Promise.reject({ kind: 'other', message: 'refused' }) : new Promise(() => {})
+    )
+    withEntries([loginMeta(), loginMeta({ id: 'l2', title: 'Other' })])
+    const { rerender } = render(<Show entry={loginMeta()} />)
+    await screen.findByTestId('reveal-error')
+
+    rerender(<Show entry={loginMeta({ id: 'l2', title: 'Other' })} />)
+
+    expect(screen.queryByTestId('reveal-error')).not.toBeInTheDocument()
+  })
+
   it('closes the failed entry from the error surface', async () => {
     mockCommand('reveal_entry', () => Promise.reject({ kind: 'other', message: 'refused' }))
     withEntries([loginMeta()])

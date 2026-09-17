@@ -150,6 +150,21 @@ export const showLockScreen = () => {
   return refreshApp()
 }
 
+/**
+ * Forget whether a key is enrolled, ahead of a move to another workspace.
+ * Enrollment is per workspace, and the lock screen draws the last known gate
+ * until the re-probe lands — so without this, the vault being switched *to*
+ * briefly wore the gate of the one being left. `false` is the safe default:
+ * a gate that is not offered, rather than one that is offered and refused.
+ * The probe that follows every lock restores the truth.
+ */
+export const forgetBiometricGate = () =>
+  useApp.setState(state =>
+    state.status
+      ? { status: { ...state.status, biometric: { ...state.status.biometric, available: false } } }
+      : {}
+  )
+
 // Everything the unlocked session put in the stores. A lock has to drop all of
 // it — it outlives the session otherwise, and the next unlock (of this or any
 // other vault) opens onto the previous one's rows. Session-shaped state (flow,

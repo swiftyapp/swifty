@@ -23,25 +23,32 @@ export interface Revealed {
 //
 // A failure is reported rather than swallowed: a rejected reveal used to leave
 // the pane looking like one still loading, with nothing to read and no way out.
+// Recorded by entry id, the way the caller matches a success to the entry in
+// hand: the reset below runs after the commit, so the first render for the next
+// entry would otherwise still carry the previous one's failure.
 export function useRevealed(entry?: { id: string; updatedAt?: string } | null): Revealed {
   const [revealed, setRevealed] = useState<Entry | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [failedId, setFailedId] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const id = entry?.id
   const stamp = entry?.updatedAt
 
   useEffect(() => {
     setRevealed(null)
-    setFailed(false)
+    setFailedId(null)
     if (!id) return
     let active = true
     revealEntry(id)
       .then(e => active && setRevealed(completeEntry(e)))
-      .catch(() => active && setFailed(true))
+      .catch(() => active && setFailedId(id))
     return () => {
       active = false
     }
   }, [id, stamp, attempt])
 
-  return { entry: revealed, failed, retry: () => setAttempt(n => n + 1) }
+  return {
+    entry: revealed,
+    failed: !!id && failedId === id,
+    retry: () => setAttempt(n => n + 1)
+  }
 }
