@@ -57,12 +57,17 @@ products solve it, don't patch symptoms.
 > under keys it does not have, and other devices are invisible to it), so any revocation it
 > attempted would be either too broad or, guessed from local files alone, wrong.
 >
+> **Restore into a workspace** — Settings › Workspaces can now add a workspace by restoring one
+> of the connected account's *other* vaults, so a second device reaches every vault on the
+> account rather than only the one onboarding picked. It reuses onboarding's keyless connect,
+> probe and picker outright (`commands::setup::connect_pending`) and mirrors `workspace_create`
+> for the rest; a pack the open workspace already holds is refused by vault id.
+>
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a
-> foreign-vault error); OAuth scope audit (`drive.file`); "restore from Drive into an
-> additional workspace" from Settings; an explicitly global "Revoke Google access" action, the
-> one place the grant is retired (a per-workspace disconnect deliberately never does);
-> **release gate: a production Google OAuth client ID (owner task)**.
+> foreign-vault error); OAuth scope audit (`drive.file`); an explicitly global "Revoke Google
+> access" action, the one place the grant is retired (a per-workspace disconnect deliberately
+> never does); **release gate: a production Google OAuth client ID (owner task)**.
 
 Re-enable Google Drive sync on the new SQLite storage engine. Postponed during remediation;
 picking it back up now. **The storage groundwork already exists** — do not rebuild it:
