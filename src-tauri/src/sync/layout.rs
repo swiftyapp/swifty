@@ -7,7 +7,9 @@
 //!     <vault-id>-archived-<date>.rowel a pack set aside by "start fresh"
 //!   Shares/
 //!     <random>.rowelshare              one outstanding share
-//!   vault.swsync                       the pre-Vaults/ layout, migrated on sight
+//!   vault.swsync                       the pre-Vaults/ layout: a real pack until
+//!                                      migrated, then a tombstone saying where
+//!                                      the pack went (see PROP_MOVED_TO)
 //! ```
 //!
 //! Every folder name, file name and extension Drive ever sees is minted here,
@@ -44,6 +46,15 @@ pub const VAULT_MIME: &str = "application/vnd.rowel";
 /// [`ROOT_FOLDER`]. Read so an upgraded install can move it into place, and
 /// so a fresh install can still restore from an account nobody has migrated.
 pub const LEGACY_VAULT_FILE: &str = "vault.swsync";
+
+/// `appProperties` key on the tombstone left at [`LEGACY_VAULT_FILE`] once the
+/// pack has been moved into [`VAULTS_FOLDER`]; its value is the vault id the
+/// pack now lives under. A listing alone therefore tells an upgraded device
+/// which vault to take on, and tells onboarding the file is not a vault. The
+/// tombstone's *content* is for devices still on the old build: a pack header
+/// with a format byte they do not know, so their sync stops with "update the
+/// app" instead of quietly starting a second vault.
+pub const PROP_MOVED_TO: &str = "rowelMovedTo";
 
 /// The live pack of the vault with this id: `<vault-id>.rowel`.
 pub fn vault_file_name(vault_id: &str) -> String {
