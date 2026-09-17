@@ -344,36 +344,16 @@ describe('a Drive that already holds data', () => {
     expect(calls('setup_create')).toHaveLength(0)
   })
 
-  // Starting fresh moves nothing aside: the new vault takes an id of its own,
-  // so the create call says nothing about the pack already up there.
-  it('creates a vault beside the existing one when the new password is kept', async () => {
+  // Every device connected to an account syncs the vaults it holds. A second
+  // vault beside the first is how data got forked across two packs, so the
+  // screen offers exactly one way on: unlocking what is there.
+  it('offers no way to start a second vault beside the existing one', async () => {
     render(<Start />)
     await reachConflict()
 
-    await userEvent.click(await screen.findByTestId('setup-start-fresh-button'))
-
-    expect(calls('setup_create')).toContainEqual({ password: STRONG })
-    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
-  })
-
-  // With two vaults up there, picking one on the restore screen and then
-  // starting a new vault instead leaves both exactly where they are: the new
-  // vault is created on its own and nothing up there is named, moved or asked
-  // about.
-  it('starting a new vault leaves the picked vault untouched', async () => {
-    render(<Start />)
-    await choosePassword()
-    await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
-    await act(async () => setupDriveProbed([REMOTE, OTHER]))
-
-    // The picker lives on the restore screen, so the choice is made there and
-    // the conflict question follows it back.
-    await userEvent.click(await screen.findByTestId('setup-unlock-existing-button'))
-    await userEvent.click(await screen.findByTestId(`drive-vault-${OTHER.id}`))
-    await userEvent.click(screen.getByTestId('go-back-button'))
-    await userEvent.click(await screen.findByTestId('setup-start-fresh-button'))
-
-    expect(calls('setup_create')).toContainEqual({ password: STRONG })
+    expect(screen.queryByTestId('setup-start-fresh-button')).not.toBeInTheDocument()
+    expect(screen.queryByText('Start a new vault')).not.toBeInTheDocument()
+    expect(calls('setup_create')).toHaveLength(0)
   })
 
   it('hands over to the restore screen without asking Google again', async () => {

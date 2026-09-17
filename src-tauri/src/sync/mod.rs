@@ -133,19 +133,12 @@ pub fn is_configured(app: &AppHandle, cryptor: &Cryptor) -> bool {
     auth::is_configured(app, cryptor)
 }
 
-// Run the OAuth consent flow and persist the resulting tokens — unless a
-// disconnect has moved the connection past `generation` since the flow was
-// started. Desktop only: it blocks on the loopback listener, which no mobile
-// OS will redirect to.
-#[cfg(desktop)]
-pub fn setup(app: &AppHandle, cryptor: &Cryptor, generation: u64) -> Result<()> {
-    auth::authenticate(app, cryptor, generation)
-}
-
 // The mobile consent flow, cut in two around the browser hand-off. See
-// `auth.rs`; the halves are joined by the deep-link handler in `lib.rs`.
+// `auth.rs`; the halves are joined by the deep-link handler in `lib.rs`, and
+// the second half is `exchange_for_tokens` — every connect is keyless now, so
+// the tokens are handed back rather than written.
 #[cfg(mobile)]
-pub use auth::{begin, complete, parse_redirect, redirect_matches, Redirect};
+pub use auth::{begin, parse_redirect, redirect_matches, Redirect};
 
 /// Drop the account locally. An error means the token file is still on disk
 /// and the account is therefore still connected.
@@ -159,28 +152,8 @@ pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()
     auth::reseal_tokens(app, old, new)
 }
 
-/// Which Drive connection is current. A consent flow reads it *when it
-/// starts*, on the command thread, and hands it to the half that stores the
-/// tokens ([`setup`] on desktop, [`complete`] on mobile), which refuses them
-/// for a connection a disconnect has since ended.
-pub fn connection_generation(app: &AppHandle) -> u64 {
-    auth::connection_generation(app)
-}
-
-/// Why a run was started, as far as choosing the pack goes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Intent {
-    /// The ordinary run: this vault's own pack, whatever else the account holds.
-    Sync,
-    /// "Import from Drive": the user wants what the account already has
-    /// brought into this vault. If the account holds exactly one vault, this
-    /// vault takes on its id and merges with it — its own, usually empty, pack
-    /// would otherwise be the only thing an import ever found.
-    Import,
-}
-
 /// One full sync against Drive. Blocking: call it on a dedicated thread.
-pub fn run(app: &AppHandle, cryptor: Cryptor, intent: Intent) -> Result<SyncOutcome> {
+pub fn run(app: &AppHandle, cryptor: Cryptor) -> Result<SyncOutcome> {
     if !is_configured(app, &cryptor) {
         return Err(Error::SyncNotConfigured);
     }
@@ -188,36 +161,31 @@ pub fn run(app: &AppHandle, cryptor: Cryptor, intent: Intent) -> Result<SyncOutc
     // Which pack on Drive is this vault's, decided before a byte is pulled. A
     // failure here is a sync failure like any other: addressing the wrong pack
     // — or a second one — is the one mistake the merge cannot undo.
-    let resolved = block_on(resolve_vault_id(app, &cryptor, &local, intent))?;
+    let resolved = block_on(resolve_vault_id(app, &cryptor, &local))?;
     let remote = DriveRemote::new(app.clone(), cryptor, resolved.id.clone());
 
     // The id is written from inside the run, at the one moment that satisfies
     // both of the things this ordering has to guarantee (see [`engine::sync`],
     // which decides when that moment is):
     //
-    // * Nothing before the pull has been fetched, decoded and merged. An import
+    // * Nothing before the pull has been fetched, decoded and merged: a run
     //   that cannot reach or read the pack it was pointed at leaves this vault
-    //   answering to the id it already had, rather than to a pack it has never
-    //   seen a record of.
+    //   answering to the id it already had.
     // * Nothing after the first push. Written afterwards, a vault that locked
     //   between the upload and the write would have changed Drive without
     //   changing itself: an id-less vault would have published `<new-id>.rowel`
-    //   and would mint a *different* id on its next run, and an import would
-    //   have updated the adopted pack while still answering to its old name.
+    //   and would mint a *different* id on its next run.
     //
     // A `settle` that fails therefore aborts the run before anything is
     // uploaded, and the account is left as the run found it.
     //
-    // Because the write lands before `pack()`, the first pack an assigned or
-    // adopted vault pushes already names its own id inside `meta`. The file name
-    // names it too, which is what addresses it on Drive, and a restore still
-    // takes the id from there (`restore::adopt_vault_id_from_name`) — belt and
-    // braces for packs written before this ordering existed.
+    // Because the write lands before `pack()`, the first pack a freshly named
+    // vault pushes already names its own id inside `meta`. The file name names
+    // it too, which is what addresses it on Drive, and a restore still takes
+    // the id from there (`restore::adopt_vault_id_from_name`) — belt and braces
+    // for packs written before this ordering existed.
     let outcome = engine::sync(&remote, &local, now_ms(), || {
         if resolved.persist {
-            // `adopt_vault_id` covers a minted id as well as one taken from the
-            // remote: by the time the write happens they are both simply "the
-            // id this run proved to be ours".
             local.adopt_vault_id(&resolved.id)?;
         }
         // The registry's copy, for a Drive restore to check against once this
@@ -257,22 +225,21 @@ fn now_ms() -> i64 {
 
 /// What the vault-id resolution has to do before a run can address a pack.
 ///
-/// Split out from the Drive calls so the decision — the part with every
-/// first-run and import case in it — is a pure function over two facts and can
-/// be read, and tested, on its own.
+/// Split out from the Drive calls so the decision — the part with the first-run
+/// case in it — is a pure function over two facts and can be read, and tested,
+/// on its own.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum VaultIdPlan {
     /// Address `<id>.rowel`. Either it is already there, or the first push
     /// creates it.
     Use(String),
-    /// Mint an id. Nothing on the remote has anything to say about it.
+    /// Mint an id: the account holds no vault yet, so this one is its first.
     Assign,
-    /// Take on an id the remote says is this vault's. The pull that follows is
-    /// what brings its data in.
-    Adopt(String),
-    /// An import facing several live packs, with nothing to say which of them
-    /// the user meant. Guessing would merge two vaults into one.
-    Ambiguous,
+    /// A vault that has never synced, facing an account that already holds
+    /// vaults. Minting here is what forked a user's data across two packs when
+    /// they meant one, and a pack cannot be taken on from here either — it is
+    /// sealed under its own key, which only a restore has the password for.
+    Refuse,
 }
 
 /// Decide which vault id this run addresses.
@@ -280,38 +247,27 @@ enum VaultIdPlan {
 /// `local` is the id in this vault's `meta` table and `live` the ids of the
 /// packs found in `Vaults/` (an absent folder is simply none of them).
 ///
-/// The rule underneath the arms: a remote pack is only ever taken on when the
-/// user *asks* for it, by importing. A pack that merely happens to be the only
-/// one in the account is not evidence of anything.
-fn plan_vault_id(intent: Intent, local: Option<&str>, live: &[&str]) -> VaultIdPlan {
-    // An import is the one time the account's pack outranks this vault's own
-    // name: the user asked for what is up there. With nothing up there it is an
-    // ordinary run, and with several packs there is no telling which they meant.
-    if intent == Intent::Import {
-        match live {
-            [] => {}
-            // Already syncing to that pack, so there is nothing to take on and
-            // no reason to re-point a vault that is where it belongs.
-            [only] if Some(*only) == local => return VaultIdPlan::Use((*only).to_string()),
-            [only] => return VaultIdPlan::Adopt((*only).to_string()),
-            _ => return VaultIdPlan::Ambiguous,
-        }
-    }
-    match local {
+/// The rule underneath the arms: the account is the source of truth for which
+/// vaults exist. A vault that already has a name keeps it; one that has none
+/// gets one only when the account has nothing — every device connected to an
+/// account syncs the vaults it holds rather than adding to them.
+fn plan_vault_id(local: Option<&str>, live: &[&str]) -> VaultIdPlan {
+    match (local, live) {
         // Its own name is the answer, whatever else the account holds.
-        Some(id) => VaultIdPlan::Use(id.to_string()),
-        // A vault that has never synced. Whatever packs are up there belong to
-        // other installs until the user says otherwise.
-        None => VaultIdPlan::Assign,
+        (Some(id), _) => VaultIdPlan::Use(id.to_string()),
+        (None, []) => VaultIdPlan::Assign,
+        (None, _) => VaultIdPlan::Refuse,
     }
 }
 
 // Surfaced verbatim by the sync indicator, so it has to read as a sentence.
-// Only an import can reach it: an ordinary run never chooses between packs.
-fn ambiguous_vault_error() -> String {
+// Ordinarily unreachable: a connect on a vault that has never synced goes
+// through the account's vaults first (`commands::sync::sync_connect`) and
+// restores one of them instead of syncing this vault to the account.
+fn account_has_vaults_error() -> String {
     format!(
-        "this Google account holds more than one {} vault and nothing says which of them to \
-         import; restore the one you want onto a fresh install instead",
+        "this Google account already holds a {} vault; disconnect, then connect again to \
+         restore it on this device instead of syncing a second vault beside it",
         crate::app::APP_NAME
     )
 }
@@ -321,11 +277,11 @@ fn ambiguous_vault_error() -> String {
 struct Resolved {
     /// The id every file name in this run is built from.
     id: String,
-    /// Whether `meta` still has to be given `id` — an assign or an adopt, as
-    /// opposed to a vault that already knew its own name. Deliberately *not*
-    /// written by [`resolve_vault_id`]: see [`run`], which hands the write to
-    /// the engine to make mid-run, once the pull has proved the id and before
-    /// any push can act on it.
+    /// Whether `meta` still has to be given `id` — a minted id, as opposed to a
+    /// vault that already knew its own name. Deliberately *not* written by
+    /// [`resolve_vault_id`]: see [`run`], which hands the write to the engine
+    /// to make mid-run, once the pull has proved the id and before any push can
+    /// act on it.
     persist: bool,
 }
 
@@ -340,7 +296,6 @@ async fn resolve_vault_id(
     app: &AppHandle,
     cryptor: &Cryptor,
     local: &impl LocalVault,
-    intent: Intent,
 ) -> Result<Resolved> {
     let client = http_client();
     let token = auth::access_token(&client, app, cryptor).await?;
@@ -361,14 +316,13 @@ async fn resolve_vault_id(
     }
     let live: Vec<&str> = live.iter().map(String::as_str).collect();
 
-    match plan_vault_id(intent, local.vault_id()?.as_deref(), &live) {
+    match plan_vault_id(local.vault_id()?.as_deref(), &live) {
         VaultIdPlan::Use(id) => Ok(Resolved { id, persist: false }),
-        VaultIdPlan::Adopt(id) => Ok(Resolved { id, persist: true }),
         VaultIdPlan::Assign => Ok(Resolved {
             id: crate::crypto::random_hex_id(),
             persist: true,
         }),
-        VaultIdPlan::Ambiguous => Err(Error::Other(ambiguous_vault_error())),
+        VaultIdPlan::Refuse => Err(Error::Other(account_has_vaults_error())),
     }
 }
 
@@ -521,69 +475,35 @@ impl Remote for DriveRemote {
 
 #[cfg(test)]
 mod tests {
-    use super::{plan_vault_id, Intent, VaultIdPlan};
+    use super::{plan_vault_id, VaultIdPlan};
 
     const ID: &str = "a1b2c3";
     const OTHER: &str = "dddd";
 
-    fn plan(local: Option<&str>, live: &[&str]) -> VaultIdPlan {
-        plan_vault_id(Intent::Sync, local, live)
-    }
-
-    fn import(local: Option<&str>, live: &[&str]) -> VaultIdPlan {
-        plan_vault_id(Intent::Import, local, live)
-    }
-
-    // --- an ordinary run -----------------------------------------------------
-
     #[test]
     fn a_vault_that_knows_its_id_simply_uses_it() {
         // Its pack is there; and if it is not, the first push creates it.
-        assert_eq!(plan(Some(ID), &[ID]), VaultIdPlan::Use(ID.into()));
-        assert_eq!(plan(Some(ID), &[]), VaultIdPlan::Use(ID.into()));
+        assert_eq!(plan_vault_id(Some(ID), &[ID]), VaultIdPlan::Use(ID.into()));
+        assert_eq!(plan_vault_id(Some(ID), &[]), VaultIdPlan::Use(ID.into()));
         // Another vault's pack in the folder is none of this one's business.
         assert_eq!(
-            plan(Some(ID), &[OTHER, "eeee"]),
+            plan_vault_id(Some(ID), &[OTHER, "eeee"]),
             VaultIdPlan::Use(ID.into())
         );
     }
 
-    // The count is not evidence. A vault that has never synced has no claim on
-    // whatever single pack the account happens to hold — it could be another
-    // install's, and adopting it would push this vault's entries into it. The
-    // user asks for that explicitly, by importing.
+    // The first device: nothing up there, so this vault is the account's first.
     #[test]
-    fn a_vault_that_has_never_synced_mints_an_id_whatever_is_up_there() {
-        assert_eq!(plan(None, &[]), VaultIdPlan::Assign);
-        assert_eq!(plan(None, &[OTHER]), VaultIdPlan::Assign);
-        assert_eq!(plan(None, &[OTHER, "eeee"]), VaultIdPlan::Assign);
+    fn a_vault_that_has_never_synced_mints_an_id_into_an_empty_account() {
+        assert_eq!(plan_vault_id(None, &[]), VaultIdPlan::Assign);
     }
 
-    // --- "Import from Drive" -------------------------------------------------
-
-    // An import is asked by a vault that has an id of its own and, usually,
-    // nothing in it. Keeping that id would find nothing to import.
+    // Every later device: the account already says which vaults exist, and a
+    // vault with no name of its own does not add to them. However many packs
+    // are up there, the answer is to restore one, never to mint beside them.
     #[test]
-    fn an_import_takes_on_the_one_vault_the_account_holds() {
-        assert_eq!(import(Some(ID), &[OTHER]), VaultIdPlan::Adopt(OTHER.into()));
-        assert_eq!(import(None, &[OTHER]), VaultIdPlan::Adopt(OTHER.into()));
-        // Already that vault: nothing to take on, and no reason to re-point a
-        // vault that is already syncing to its own pack.
-        assert_eq!(import(Some(ID), &[ID]), VaultIdPlan::Use(ID.into()));
-    }
-
-    // The only way to reach it: an ordinary run never chooses between packs.
-    #[test]
-    fn an_import_refuses_to_guess_between_several_vaults() {
-        assert_eq!(import(Some(ID), &[OTHER, "eeee"]), VaultIdPlan::Ambiguous);
-        assert_eq!(import(None, &[OTHER, "eeee"]), VaultIdPlan::Ambiguous);
-    }
-
-    // With nothing under `Vaults/` there is nothing to import, so the same arms
-    // as an ordinary run decide it.
-    #[test]
-    fn an_import_into_an_empty_account_behaves_like_a_sync() {
-        assert_eq!(import(Some(ID), &[]), VaultIdPlan::Use(ID.into()));
-        assert_eq!(import(None, &[]), VaultIdPlan::Assign);
+    fn a_vault_that_has_never_synced_never_mints_beside_an_existing_vault() {
+        assert_eq!(plan_vault_id(None, &[OTHER]), VaultIdPlan::Refuse);
+        assert_eq!(plan_vault_id(None, &[OTHER, "eeee"]), VaultIdPlan::Refuse);
     }
 }

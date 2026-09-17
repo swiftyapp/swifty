@@ -113,6 +113,13 @@ pub enum Error {
     #[error("this vault is already a workspace on this device")]
     VaultAlreadyOpen,
 
+    /// A sync connect on a vault the account does not hold, while it holds
+    /// others. The account is the source of truth for which vaults exist, so
+    /// this vault is not added beside them: the user restores one of the
+    /// account's vaults instead — see [`crate::commands::sync::sync_adopt_pending`].
+    #[error("this Google account holds other vaults")]
+    VaultNotInAccount,
+
     #[error("the file is too large")]
     FileTooLarge,
 
@@ -164,6 +171,7 @@ impl Error {
             Error::WorkspaceNameRequired => "workspaceNameRequired",
             Error::WorkspacePasswordRequired => "workspacePasswordRequired",
             Error::VaultAlreadyOpen => "vaultAlreadyOpen",
+            Error::VaultNotInAccount => "vaultNotInAccount",
             Error::FileTooLarge => "fileTooLarge",
             Error::FileNotText => "fileNotText",
             Error::Io(_) => "io",

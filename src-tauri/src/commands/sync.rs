@@ -10,10 +10,20 @@
 //! transition updates [`SyncRun`] and re-emits the whole [`SyncStatus`], which
 //! the frontend stores as-is. One event, one shape, no order to agree on.
 //!
-//! Every run starts in [`launch`], whichever command asked for it — a scheduled
-//! sync, `sync_now`, or the import behind a connect. One launcher means one
-//! claim, and one claim is what keeps two runs from addressing the account at
-//! the same time.
+//! Every run starts in [`start_run`], whichever command asked for it — a scheduled
+//! sync, `sync_now`, or the run behind a connect. One launcher means one claim,
+//! and one claim is what keeps two runs from addressing the account at the same
+//! time.
+//!
+//! Connecting is not a run either. Every connect is keyless: the account is
+//! asked what it holds first (`commands::setup::connect_pending`, the same
+//! consent and probe onboarding runs), and only [`sync_adopt_pending`] seals
+//! its tokens under the open vault — when the account is empty or already
+//! holds this vault. An account holding other vaults is offered to restore
+//! instead: every device connected to an account syncs the vaults it holds
+//! rather than adding a pack beside them. The adoption is bound to the
+//! workspace that started it: a switch during the probe is caught before the
+//! tokens are sealed, never after.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -23,7 +33,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager, State};
 
 use crate::crypto::Cryptor;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::events;
 use crate::models::EntryMetaDto;
 use crate::session::list_metas;
@@ -31,13 +41,17 @@ use crate::session::list_metas;
 use crate::state::AuthPurpose;
 use crate::state::{AppState, SyncRun, SyncStatus};
 use crate::sync;
+use crate::sync::setup::PackInfo;
 
-/// Connect a sync provider (OAuth), then publish/adopt straight away so the
-/// user sees the effect of connecting without a second click.
+/// Connect a sync provider (OAuth) to the vault that is open.
 ///
-/// Returns as soon as the session has a cryptor to give: the consent flow is a
-/// browser round trip, and the frontend hears how it went on `sync:status`
-/// rather than from this promise — the same story mobile tells.
+/// Keyless, always: the account is asked what it holds before anything is
+/// sealed under this vault's key. Consent and probe run on the blocking pool
+/// and report on the `setup:drive:*` events — the ones onboarding and Settings
+/// › Workspaces listen to — and the frontend then calls [`sync_adopt_pending`],
+/// which joins the account only if it is empty or already holds this vault,
+/// and otherwise leaves the account's vaults to be restored. Offered only on a
+/// vault that is not connected, so there is no other road to take.
 ///
 /// Any workspace may connect: the token file resolves under the active
 /// workspace's directory, and the vault's own id names the pack it syncs
@@ -45,17 +59,21 @@ use crate::sync;
 /// credentials nor a file even when the user points them at the same Drive.
 /// What they do share is the OAuth grant behind those credentials, which Google
 /// keeps per account and client rather than per token — see [`sync_disconnect`].
+///
+/// A connect that cannot start (another setup step is still running) is
+/// reported as status as well as rejected, so the frontend never has to turn a
+/// rejected promise into state itself.
 #[cfg(desktop)]
 #[tauri::command]
-pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    spawn_consent(&app, &state, Follow::Run)
+pub fn sync_connect(app: AppHandle) -> Result<()> {
+    super::setup::connect_pending(&app).inspect_err(|e| failed(&app, e.to_string()))
 }
 
 /// Start the consent flow and return — see [`on_redirect`] for the other half.
 ///
 /// Nothing here waits: Safari takes the screen and iOS suspends the app behind
-/// it, so there is no result to wait for. The frontend is told by `sync:status`
-/// rather than by this promise.
+/// it, so there is no result to wait for. The frontend is told by the
+/// `setup:drive:*` events rather than by this promise, as on desktop.
 ///
 /// Synchronous on purpose, unlike its desktop twin. It does no blocking work,
 /// and running on the IPC (main) thread is what puts the opener plugin's
@@ -63,7 +81,156 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    start_consent(&app, &state, AuthPurpose::Connect).inspect_err(|e| failed(&app, e.to_string()))
+    super::setup::connect_pending(&app, &state).inspect_err(|e| failed(&app, e.to_string()))
+}
+
+/// Make the account a connect left pending this vault's — if the account will
+/// have it.
+///
+/// The account is the source of truth for which vaults exist, so the decision
+/// is read off the account itself, with the pending tokens: one holding no
+/// pack takes this vault as its first, and one already holding this vault's
+/// id takes it as another device of that vault. One holding only *other*
+/// vaults refuses ([`Error::VaultNotInAccount`]) and leaves the tokens
+/// pending, so the frontend can offer those vaults to restore instead of
+/// adding a pack beside them (see [`may_adopt`]).
+///
+/// Adopting seals the tokens under the open vault's key, and the run that
+/// follows creates the pack — or joins the one already there, since
+/// `plan_vault_id` keeps an id the vault already has. Nothing pending is an
+/// error rather than a silent success: the frontend would otherwise show
+/// "Connected" over a vault with no token file.
+///
+/// The adoption is bound to the workspace that started it. The probe is a
+/// network round trip with no lock held, and a pending account is
+/// workspace-agnostic by design — onboarding and the Workspaces restore both
+/// adopt one with no vault open, so `commands::workspace::guard_sync_idle`
+/// does not treat it as busy and a switch may land while Google is answering.
+/// The workspace id and vault id are therefore read together under
+/// `workspace_lock` before the probe and checked again under it before anything
+/// is written ([`still_the_same_workspace`]): sealing the tokens under whichever
+/// vault happened to be open afterwards would give that vault the account, and
+/// its first sync would create a second pack beside the one the user meant.
+#[tauri::command]
+pub async fn sync_adopt_pending(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    // Which workspace is asking, and which vault it holds, as one read under
+    // the workspace lock: a switch moves both under that lock, so the pair
+    // cannot straddle one. Released before the network call below.
+    let (workspace, vault_id) = {
+        let _paths = state.workspace_lock.lock().unwrap();
+        let workspace = state.active_workspace.lock().unwrap().clone();
+        (workspace, open_vault_id(&state)?)
+    };
+    // Asked of the account on a copy of the pending tokens, and with no lock
+    // held: this is a network round trip (see `AppState::workspace_lock`). The
+    // probe refreshes the copy in place if the access token has expired since
+    // consent, which is why the copy, not the pending original, is what gets
+    // sealed below.
+    let (attempt, mut tokens) = super::setup::peek_pending_attempt(&state)?;
+    let packs = super::setup::probe(&app, &mut tokens).await?;
+    if !may_adopt(vault_id.as_deref(), &packs) {
+        return Err(Error::VaultNotInAccount);
+    }
+    // Key, tokens and flag under the workspace lock, as one step: a switch
+    // cannot land between taking this workspace's key and sealing the account
+    // under it (see `commands::workspace::guard_sync_idle`).
+    let run = {
+        let _paths = state.workspace_lock.lock().unwrap();
+        // Still the workspace that asked? The tokens belonged to a connect the
+        // user walked away from, so they go: a retry from the other workspace
+        // would only seal them under the wrong key again. A session that merely
+        // locked during the round trip is not a switch, and keeps them for a
+        // retry as before (`Error::Locked` from the read).
+        if !still_the_same_workspace(&state, &workspace, vault_id.as_deref())? {
+            super::setup::take_pending_attempt(&state, attempt);
+            return Err(Error::Other(
+                "the workspace changed while Google was answering; connect again from the workspace you want to sync".into(),
+            ));
+        }
+        let cryptor = state.session.lock().unwrap().cryptor()?;
+        // Still the exact consent result we probed? A cancel or another connect
+        // advances the attempt before it touches this lock. Holding the pending
+        // guard through the local write keeps a newer report from being
+        // mistaken for this account, while the post-write generation check
+        // catches a cancel that arrived during the write itself.
+        let mut pending = state.pending_drive.lock().unwrap();
+        let Some(current) = pending.as_mut() else {
+            return Err(Error::DriveNotConnected);
+        };
+        if current.attempt != attempt || super::setup::current_attempt(&state) != attempt {
+            return Err(Error::DriveNotConnected);
+        }
+        // Keep a refresh-token rotation for a retry if the file write fails.
+        current.tokens = tokens.clone();
+        sync::persist_tokens(&app, &cryptor, &tokens)?;
+
+        // Claim the first run before clearing the pending status, so a workspace
+        // switch cannot land between those two busy flags. The claim is only
+        // started after the connection transition below has won.
+        let claim = claim_run(&state.syncing);
+
+        // This compare-and-swap is the connection's commit point. A cancel or a
+        // replacement advances the same generation before waiting for the
+        // pending-token guard, so it either wins here and makes us roll the file
+        // back, or arrives after this attempt is already connected. There is no
+        // unowned interval between clearing `pending` and calling `connected`.
+        if !super::setup::complete_attempt(&state, attempt) {
+            sync::disconnect(&app)?;
+            if pending
+                .as_ref()
+                .is_some_and(|pending| pending.attempt == attempt)
+            {
+                *pending = None;
+            }
+            return Err(Error::DriveNotConnected);
+        }
+
+        // Announce the committed connection while both the workspace and its run
+        // claim are still pinned. Only then retire the pending credentials.
+        connected(&app);
+        *pending = None;
+        claim.map(|claim| (claim, cryptor))
+    };
+
+    if let Some((claim, cryptor)) = run {
+        spawn_run(&app, claim, cryptor);
+    }
+    Ok(())
+}
+
+/// Whether the open vault, with `vault_id` if it has one, may take an account
+/// holding `packs`: yes for an empty account, and for one that already holds
+/// this very vault; no when the account holds only other vaults. A vault with
+/// no id yet can only ever be an empty account's first.
+fn may_adopt(vault_id: Option<&str>, packs: &[PackInfo]) -> bool {
+    packs.is_empty() || vault_id.is_some_and(|id| packs.iter().any(|pack| pack.vault_id == id))
+}
+
+/// Is `workspace`, holding the vault with `vault_id`, still the one that is
+/// open? The caller holds `workspace_lock`, so what this reads is what the
+/// write that follows will address.
+///
+/// Both halves are checked: the same workspace re-unlocked is fine, a different
+/// workspace is not, and neither is a different vault behind the same paths — a
+/// restore over the workspace would be one. A locked session is neither answer
+/// and is reported as such (`Error::Locked`), since the caller treats it
+/// differently from a switch.
+fn still_the_same_workspace(
+    state: &AppState,
+    workspace: &str,
+    vault_id: Option<&str>,
+) -> Result<bool> {
+    if *state.active_workspace.lock().unwrap() != workspace {
+        return Ok(false);
+    }
+    Ok(open_vault_id(state)?.as_deref() == vault_id)
+}
+
+/// The open vault's id, under the session lock alone: it is a read off `meta`.
+fn open_vault_id(state: &AppState) -> Result<Option<String>> {
+    let session = state.session.lock().unwrap();
+    let store = session.store()?;
+    crate::store::identity::vault_id(store).map_err(crate::session::store_err)
 }
 
 /// Disconnect the sync provider for the workspace that is open: its token file
@@ -118,117 +285,6 @@ pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     Ok(())
 }
 
-/// The "Import from Google Drive" flow: connect, then take on whatever the
-/// account already holds.
-///
-/// It is a **merge**, not a restore. The legacy version overwrote the local
-/// vault with the remote one, which silently discarded anything this device had
-/// not pushed yet; adopting a remote vault wholesale is only ever correct on an
-/// install that has none, and that is [`sync::restore`]'s job, not this one.
-/// The caller is an unlocked (usually empty) vault, so a merge gives the same
-/// result the user expects — every remote entry appears — without the risk.
-#[cfg(desktop)]
-#[tauri::command]
-pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    spawn_consent(&app, &state, Follow::Pull)
-}
-
-/// The mobile twin of [`sync_import`]: start consent, adopt on the redirect.
-#[cfg(mobile)]
-#[tauri::command]
-pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    start_consent(&app, &state, AuthPurpose::Import).inspect_err(|e| failed(&app, e.to_string()))
-}
-
-/// A connect that fails before the browser even opens (the vault locked under
-/// it) is still reported as status, so the frontend never has to turn a
-/// rejected promise into state itself.
-#[cfg(desktop)]
-fn cryptor_or_report(app: &AppHandle, state: &State<'_, AppState>) -> Result<Cryptor> {
-    state
-        .session
-        .lock()
-        .unwrap()
-        .cryptor()
-        .inspect_err(|e| failed(app, e.to_string()))
-}
-
-/// What a connection is for: publishing what this device has, or taking on what
-/// the account already holds.
-#[cfg(desktop)]
-#[derive(Clone, Copy)]
-enum Follow {
-    Run,
-    Pull,
-}
-
-/// Run the desktop consent flow on the blocking pool. `sync::setup` waits on a
-/// loopback listener and drives Drive with `block_on`, so it may never run on
-/// the command thread nor on an async worker — see [`super::detached`].
-#[cfg(desktop)]
-fn spawn_consent(app: &AppHandle, state: &State<'_, AppState>, follow: Follow) -> Result<()> {
-    // Key and flag under the workspace lock, as one step: a switch cannot land
-    // between taking this workspace's key and announcing the flow that will
-    // write with it (see `commands::workspace::guard_sync_idle`).
-    // The connection generation is read here too, synchronously, and carried
-    // to the worker: read on the worker instead, a disconnect landing before
-    // the worker starts would go unnoticed and the consent it was meant to
-    // cancel would be accepted (see `AppState::sync_generation`).
-    let (cryptor, generation) = {
-        let _paths = state.workspace_lock.lock().unwrap();
-        let cryptor = cryptor_or_report(app, state)?;
-        pending(app);
-        (cryptor, sync::connection_generation(app))
-    };
-    let app = app.clone();
-    super::detached(move || match sync::setup(&app, &cryptor, generation) {
-        // Either way the run is claimed before the consent is marked over, so
-        // the flags overlap rather than leave a gap a workspace switch could
-        // use — and the first upload cannot be skipped by one landing there.
-        Ok(()) => match follow {
-            Follow::Run => {
-                start_run(&app);
-                connected(&app);
-            }
-            Follow::Pull => import(&app, cryptor),
-        },
-        Err(e) => failed(&app, e.to_string()),
-    });
-    Ok(())
-}
-
-/// Take on whatever the account holds, as the run that follows a connect.
-///
-/// Run as an import, not a sync: this vault has an id and a pack name of its
-/// own, and an ordinary run would look for that pack, find nothing, and push
-/// the empty vault — the opposite of what the user pressed.
-///
-/// The run is claimed *before* the connect is announced, exactly as the
-/// `Follow::Run` arm claims it before `connected`. Announcing first would open a
-/// window in which this session counts as connected and no run is claimed, and a
-/// `sync_now` — manual, or the debounced one a save fires — landing in it would
-/// run beside this import against the same account: two runs can settle on
-/// different vault ids and publish a pack each.
-///
-/// Returns as soon as the run is claimed; the run itself is on a thread of its
-/// own, which is also what keeps this off iOS's IPC thread.
-fn import(app: &AppHandle, cryptor: Cryptor) {
-    let launched = launch(app, Credentials::Held(cryptor), sync::Intent::Import);
-    connected(app);
-    // Nothing else should be running: until `connected` above, this session was
-    // not configured for sync, and `sync_now` is a no-op on a session that is
-    // not. But if something is, the import did not happen — and the user pressed
-    // it precisely to make it happen, so saying nothing would read as a success.
-    if !launched {
-        not_started(app, import_not_started_error());
-    }
-}
-
-// Surfaced verbatim by the sync indicator, so it has to read as a sentence.
-fn import_not_started_error() -> String {
-    "a sync was already running, so nothing was imported; try again in a moment".into()
-}
-
 // --- the mobile consent flow ---
 //
 // A consent flow is a value with a lifecycle, not a flag. It is created by
@@ -258,29 +314,22 @@ const RESUME_GRACE: Duration = Duration::from_secs(3);
 /// call has long returned by then. A flow already pending is simply replaced —
 /// its nonce dies with it, so its redirect, if one ever comes, is foreign.
 ///
-/// Crate-visible: onboarding's `setup_drive_connect` is the same flow with a
-/// different purpose, and must not fork the bookkeeping.
+/// Crate-visible: every connect on mobile — onboarding's, Settings ›
+/// Workspaces' and [`sync_connect`]'s — reaches it through
+/// `commands::setup::connect_pending`, so none of them forks the bookkeeping.
+///
+/// No key is taken here, and so no workspace lock: the tokens the redirect
+/// brings back are probed and left pending, and only [`sync_adopt_pending`]
+/// seals them under a vault — under the lock, when that happens.
 #[cfg(mobile)]
 pub(crate) fn start_consent(app: &AppHandle, state: &AppState, purpose: AuthPurpose) -> Result<()> {
-    // Key and pending flow recorded under the workspace lock, as one step, for
-    // the reason `spawn_consent` gives on desktop.
-    let _paths = state.workspace_lock.lock().unwrap();
-    // Setup runs before any vault exists, so there is no session to take a
-    // cryptor from — and nothing to seal the tokens with until the restore or
-    // create that follows makes a key.
-    let cryptor = match purpose {
-        AuthPurpose::Setup => None,
-        _ => Some(state.session.lock().unwrap().cryptor()?),
-    };
     // One consent at a time, and checked before Safari is opened for a second.
     // Replacing the pending flow would orphan it: its redirect could never be
-    // matched again, and if it was reporting on the other event family (a sync
-    // connect displaced by a workspace restore, or the reverse) its screen
-    // would say "waiting" for good. A flow the user walked away from does not
-    // block for long — `on_resume` writes it off once the redirect has had its
-    // chance to arrive.
+    // matched again, and its screen would say "waiting" for good. A flow the
+    // user walked away from does not block for long — `on_resume` writes it
+    // off once the redirect has had its chance to arrive.
     if state.pending_auth.lock().unwrap().is_some() {
-        return Err(crate::error::Error::Other(
+        return Err(Error::Other(
             "another Google sign-in is still waiting for its answer; finish or cancel it first"
                 .into(),
         ));
@@ -289,17 +338,12 @@ pub(crate) fn start_consent(app: &AppHandle, state: &AppState, purpose: AuthPurp
     *state.pending_auth.lock().unwrap() = Some(crate::state::PendingAuth {
         verifier: started.verifier,
         state: started.state,
-        cryptor,
         purpose,
         started: std::time::Instant::now(),
-        generation: sync::connection_generation(app),
     });
-    // Onboarding announces itself on its own `setup:drive:*` family, because it
-    // runs on a screen that knows nothing about sync settings.
-    match purpose {
-        AuthPurpose::Setup => events::setup_drive_pending(app),
-        _ => pending(app),
-    }
+    // Every connect announces itself on the `setup:drive:*` family: it is the
+    // probe's answer the frontend waits for, whichever screen asked.
+    events::setup_drive_pending(app);
     Ok(())
 }
 
@@ -321,7 +365,6 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
     };
     // Judge the URL against the pending request *before* consuming it, so a URL
     // that is not the answer costs the real answer nothing.
-    let purpose = pending.purpose;
     let code = match sync::parse_redirect(url, &pending.state) {
         sync::Redirect::Foreign => {
             log::warn!("ignoring a redirect that does not answer the pending sign-in");
@@ -330,7 +373,7 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
         sync::Redirect::Denied(why) => {
             slot.take();
             drop(slot);
-            fail(app, purpose, why);
+            fail(app, why);
             return;
         }
         sync::Redirect::Code(code) => code,
@@ -338,41 +381,15 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
     let pending = slot.take().expect("checked above");
     drop(slot);
     if pending.started.elapsed() > CONSENT_TTL {
-        fail(
-            app,
-            purpose,
-            "Google sign-in took too long; try again".into(),
-        );
+        fail(app, "Google sign-in took too long; try again".into());
         return;
     }
 
+    // Redeem the code, probe the account and leave the tokens pending — the
+    // one thing every purpose does with a redirect (see `AuthPurpose`).
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        // Onboarding has nowhere to write tokens yet and a different story to
-        // tell the frontend, so it finishes the exchange for itself.
-        if purpose == AuthPurpose::Setup {
-            crate::commands::setup::on_consent(&app, &code, &pending.verifier).await;
-            return;
-        }
-        // Unreachable: every other purpose is started from an unlocked session.
-        let Some(cryptor) = pending.cryptor else {
-            fail(&app, purpose, "the vault was locked during sign-in".into());
-            return;
-        };
-        match sync::complete(&app, &cryptor, &code, &pending.verifier, pending.generation).await {
-            Ok(()) => {
-                // The run is claimed before the consent is marked over, as in
-                // `spawn_consent`; both arms put the run itself on the blocking
-                // pool for the reason `launch` gives.
-                if purpose == AuthPurpose::Import {
-                    import(&app, cryptor);
-                } else {
-                    start_run(&app);
-                    connected(&app);
-                }
-            }
-            Err(e) => fail(&app, purpose, e.to_string()),
-        }
+        crate::commands::setup::on_consent(&app, &code, &pending.verifier).await;
     });
 }
 
@@ -414,26 +431,19 @@ pub fn on_resume(app: &AppHandle) {
                     _ => None,
                 }
             };
-            if let Some(abandoned) = abandoned {
-                fail(
-                    &handle,
-                    abandoned.purpose,
-                    "Google sign-in was cancelled".into(),
-                );
+            if abandoned.is_some() {
+                fail(&handle, "Google sign-in was cancelled".into());
             }
         });
 }
 
 /// The consent flow ended without a connection. One place, so every ending
-/// reports the same way — on whichever event family the flow was started under.
+/// reports the same way — on the `setup:drive:*` family every keyless connect
+/// is started under.
 #[cfg(mobile)]
-fn fail(app: &AppHandle, purpose: AuthPurpose, why: String) {
-    if purpose == AuthPurpose::Setup {
-        log::warn!("drive setup failed: {why}");
-        events::setup_drive_error(app, &why);
-        return;
-    }
-    failed(app, why);
+fn fail(app: &AppHandle, why: String) {
+    log::warn!("drive setup failed: {why}");
+    events::setup_drive_error(app, &why);
 }
 
 // --- status ------------------------------------------------------------------
@@ -447,31 +457,10 @@ fn update(app: &AppHandle, change: impl FnOnce(&mut SyncRun)) {
     events::sync_status(app, status(app));
 }
 
-/// The browser is out with a consent request.
-fn pending(app: &AppHandle) {
-    update(app, |run| {
-        run.pending = true;
-        run.error = None;
-    });
-}
-
-/// The consent flow ended without a connection.
+/// A connect could not start, or the account could not be adopted: said as
+/// status, so the row shows it next to the button that asked.
 fn failed(app: &AppHandle, why: String) {
     log::warn!("sync connect failed: {why}");
-    update(app, |run| {
-        run.pending = false;
-        run.error = Some(why);
-    });
-}
-
-/// A run the user asked for could not start because another one holds the
-/// claim. Only the message changes: the run that is in flight still owns
-/// `in_progress`, and reporting this as a finished run would tell the frontend
-/// that syncing stopped — re-enabling actions and showing an error — while
-/// Drive is being written to. The message stands until that run lands and
-/// reports for itself.
-fn not_started(app: &AppHandle, why: String) {
-    log::warn!("sync not started: {why}");
     update(app, |run| {
         run.pending = false;
         run.error = Some(why);
@@ -543,72 +532,55 @@ pub(crate) fn switched(app: &AppHandle) {
 
 // --- runs ----------------------------------------------------------------------
 
-/// Where a run's credentials come from.
-enum Credentials {
-    /// Taken from the live session, under the same lock as the claim.
-    Session,
-    /// Already in hand: a consent flow took one before the browser went out,
-    /// and its vault may well have locked behind it since.
-    Held(Cryptor),
-}
-
-/// Start one run of `intent` unless one is already in flight, in which case
-/// nothing is started and `false` comes back for the caller to make of what it
-/// will.
+/// Start one run against this vault's own pack, from the live session, unless
+/// one is already in flight — in which case nothing is started.
 ///
 /// **Every** run in the process starts here, whatever asked for it — the
-/// debounced auto-sync, `sync_now`, the run behind a fresh connect, the import
-/// — because the claim below is the only thing keeping two of them apart, and
-/// they must be kept apart: two runs racing resolve the vault id independently,
-/// so they can settle on different ids and publish a pack each, leaving one
-/// vault spread across two files in the account.
+/// debounced auto-sync, `sync_now`, the run behind a fresh connect — because
+/// the claim below is the only thing keeping two of them apart, and they must
+/// be kept apart: two runs racing resolve the vault id independently, so they
+/// can settle on different ids and publish a pack each, leaving one vault
+/// spread across two files in the account.
 ///
-/// An ordinary run turned away here is a no-op rather than an error: a sync is
+/// A run turned away here is a no-op rather than an error: a sync is
 /// full-state, so the run already underway publishes whatever this caller
-/// wanted published. An import is not, which is why the answer is returned
-/// rather than swallowed.
+/// wanted published.
 ///
 /// The run goes to the blocking pool rather than `async_runtime::spawn`. The
 /// Drive calls are driven with `block_on`, which is only legal off the async
 /// runtime's own worker threads — a blocking-pool thread is not one of them —
 /// and it also guarantees that no amount of network latency can reach the
 /// command or main thread.
-fn launch(app: &AppHandle, credentials: Credentials, intent: sync::Intent) -> bool {
+fn start_run(app: &AppHandle) {
     let state = app.state::<AppState>();
     // Claim and key under the workspace lock, so a switch cannot land between
     // them: the run either starts against the paths it was keyed for, or finds
     // them already moved and does not start at all.
     let paths = state.workspace_lock.lock().unwrap();
     let Some(claim) = claim_run(&state.syncing) else {
-        return false;
+        return;
     };
 
     // Cloned before the thread starts, so the run owns its credentials even if
     // the session auto-locks a moment later. Everything else it needs is taken
     // from the session per step, and a locked session simply ends the run.
-    let cryptor = match credentials {
-        Credentials::Held(cryptor) => cryptor,
-        Credentials::Session => match session_cryptor(&state) {
-            Some(cryptor) => cryptor,
-            // Dropping `claim` here is what releases it: a vault that locked
-            // under a scheduled run must not leave sync wedged for the process.
-            None => return false,
-        },
+    // Dropping `claim` on the way out is what releases it: a vault that locked
+    // under a scheduled run must not leave sync wedged for the process.
+    let Some(cryptor) = session_cryptor(&state) else {
+        return;
     };
     drop(paths);
 
+    spawn_run(app, claim, cryptor);
+}
+
+fn spawn_run(app: &AppHandle, claim: RunClaim, cryptor: Cryptor) {
     let app = app.clone();
     super::detached(move || {
         let _claim = claim;
         started(&app);
-        report(&app, intent, sync::run(&app, cryptor, intent));
+        report(&app, sync::run(&app, cryptor));
     });
-    true
-}
-
-/// The ordinary run: this vault's own pack, started from the live session.
-fn start_run(app: &AppHandle) {
-    launch(app, Credentials::Session, sync::Intent::Sync);
 }
 
 fn session_cryptor(state: &State<'_, AppState>) -> Option<Cryptor> {
@@ -618,13 +590,10 @@ fn session_cryptor(state: &State<'_, AppState>) -> Option<Cryptor> {
 // Announce the result, and — when the entry list may have changed — hand the
 // frontend the refreshed list. Emitting the metas rather than a bare "reload"
 // signal keeps the store's update in one round trip and one render.
-fn report(app: &AppHandle, intent: sync::Intent, result: Result<sync::engine::SyncOutcome>) {
+fn report(app: &AppHandle, result: Result<sync::engine::SyncOutcome>) {
     match result {
         Ok(outcome) => {
-            // An import refreshes whether or not the merge wrote a row: the
-            // user asked to see what was up there, and "nothing new" is an
-            // answer worth rendering.
-            if outcome.merged > 0 || intent == sync::Intent::Import {
+            if outcome.merged > 0 {
                 events::vault_merged(app, entry_metas(app));
             }
             finished(app, None);
@@ -670,6 +639,7 @@ impl Drop for RunClaim {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::workspace::PRIMARY_ID;
 
     // An import and an ordinary sync are not two flows with two flags: they
     // take the same claim, so whichever gets there first is the only one that
@@ -692,5 +662,104 @@ mod tests {
         assert!(claim_run(&state.syncing).is_none(), "and holds it in turn");
         drop(next);
         assert!(claim_run(&state.syncing).is_some());
+    }
+
+    fn pack(vault_id: &str) -> PackInfo {
+        PackInfo {
+            id: format!("drive-file-{vault_id}"),
+            name: format!("{vault_id}.rowel"),
+            vault_id: vault_id.into(),
+            size: 0,
+            modified_time: String::new(),
+        }
+    }
+
+    // The account is the source of truth for which vaults exist: this vault
+    // joins it only as its first vault or as a device of a vault it already
+    // holds — never as a pack beside the others.
+    #[test]
+    fn an_empty_account_takes_the_vault_as_its_first() {
+        assert!(may_adopt(Some("this-vault"), &[]));
+        // A vault with no id yet has nothing to match, and still may.
+        assert!(may_adopt(None, &[]));
+    }
+
+    #[test]
+    fn an_account_already_holding_this_vault_takes_it_again() {
+        let packs = [pack("another-vault"), pack("this-vault"), pack("a-third")];
+        assert!(may_adopt(Some("this-vault"), &packs));
+    }
+
+    #[test]
+    fn an_account_holding_only_other_vaults_refuses() {
+        let packs = [pack("another-vault"), pack("a-third")];
+        assert!(!may_adopt(Some("this-vault"), &packs));
+        // Nor may an id-less vault be minted beside them.
+        assert!(!may_adopt(None, &packs));
+    }
+
+    // An unlocked primary holding the vault `vault_id`, or one with no id yet.
+    fn open_primary(vault_id: Option<&str>) -> AppState {
+        use crate::crypto::VaultKey;
+        use crate::store::SqliteStore;
+
+        static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "rowel-sync-adopt-{}-{}.db",
+            std::process::id(),
+            N.fetch_add(1, Ordering::SeqCst)
+        ));
+        let store = SqliteStore::open(&path, &[9u8; 32]).unwrap();
+        if let Some(id) = vault_id {
+            crate::store::identity::adopt_vault_id(&store, id).unwrap();
+        }
+        // A key of the right shape; nothing here derives or opens anything with it.
+        let key = VaultKey::Argon2 {
+            master: zeroize::Zeroizing::new(vec![0u8; 32]),
+        };
+        let state = AppState::default();
+        state.session.lock().unwrap().set(key, store, false);
+        state
+    }
+
+    // The round trip to Google is the one gap `guard_sync_idle` does not close:
+    // the adoption must find, after it, exactly the workspace and vault it read
+    // before it.
+    #[test]
+    fn the_same_workspace_holding_the_same_vault_is_still_it() {
+        let state = open_primary(Some("a1b2"));
+        assert!(still_the_same_workspace(&state, PRIMARY_ID, Some("a1b2")).unwrap());
+    }
+
+    #[test]
+    fn another_workspace_is_not() {
+        let state = open_primary(Some("a1b2"));
+        *state.active_workspace.lock().unwrap() = "b2c3".into();
+        assert!(!still_the_same_workspace(&state, PRIMARY_ID, Some("a1b2")).unwrap());
+    }
+
+    // The paths did not move, but what is behind them did: a restore over the
+    // same workspace, say.
+    #[test]
+    fn the_same_workspace_holding_another_vault_is_not() {
+        let state = open_primary(Some("cafe"));
+        assert!(!still_the_same_workspace(&state, PRIMARY_ID, Some("a1b2")).unwrap());
+    }
+
+    // A vault that has not synced yet has no id on either side of the probe.
+    #[test]
+    fn a_vault_with_no_id_yet_is_still_it() {
+        let state = open_primary(None);
+        assert!(still_the_same_workspace(&state, PRIMARY_ID, None).unwrap());
+    }
+
+    // Locked mid-round-trip is not a switch: the caller leaves the tokens for a
+    // retry rather than dropping them.
+    #[test]
+    fn a_locked_session_is_neither_answer() {
+        assert!(matches!(
+            still_the_same_workspace(&AppState::default(), PRIMARY_ID, None),
+            Err(Error::Locked)
+        ));
     }
 }

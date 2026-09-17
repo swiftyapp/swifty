@@ -177,9 +177,7 @@ export function Start() {
       case 'sync':
         return <Sync onCreate={createWithPassword} onConflict={() => go('conflict')} />
       case 'conflict':
-        return (
-          <Conflict onUnlockExisting={() => go('drive')} onStartFresh={createWithPassword} />
-        )
+        return <Conflict onUnlockExisting={() => go('drive')} />
       case 'drive':
         return (
           <Drive

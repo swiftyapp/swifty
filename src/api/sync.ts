@@ -26,10 +26,15 @@ export interface SyncStatus {
 }
 
 /**
- * Start the Google consent flow. Returns immediately on every platform: the
- * outcome arrives as `sync:status`, pending first and then either connected or
- * carrying an error. A rejection here is an immediate guard failure (no OAuth
- * client configured, vault locked) and has already been reported as status.
+ * Start the Google consent flow for the open vault. Returns immediately on
+ * every platform: the backend probes the account first and reports on
+ * `setup:drive:pending`, then one of `setup:drive:probed` / `setup:drive:error`
+ * — the same events the first run and Settings › Workspaces listen to. A
+ * rejection here is an immediate guard failure (another setup step running)
+ * and has already been reported as `sync:status`.
+ *
+ * A probe leaves the account's tokens pending and its vaults listed; whether
+ * this vault may join the account is then `syncAdoptPending`'s to say.
  */
 export const syncConnect = (): Promise<void> => call('sync_connect')
 
@@ -37,5 +42,15 @@ export const syncDisconnect = (): Promise<void> => call('sync_disconnect')
 
 export const syncNow = (): Promise<void> => call('sync_now')
 
-/** Pull the remote pack into this vault. Reports through the same status. */
-export const syncImport = (): Promise<void> => call('sync_import')
+/**
+ * Ask the backend to make the account a probe left pending this vault's. It
+ * lists the account's vaults with the pending tokens and decides: an account
+ * holding no vault takes this one as its first, and one already holding this
+ * vault's id takes it as another device of it — the tokens are sealed under the
+ * open vault's key and the first sync runs, reporting through `sync:status`
+ * like a connect. An account holding only *other* vaults rejects with
+ * `vaultNotInAccount` and leaves the tokens pending, so the caller offers those
+ * vaults to restore (`workspaceRestoreFromDrive`) instead of adding a pack
+ * beside them.
+ */
+export const syncAdoptPending = (): Promise<void> => call('sync_adopt_pending')

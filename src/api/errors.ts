@@ -33,6 +33,7 @@ export type BackendErrorKind =
   | 'workspaceNameRequired'
   | 'workspacePasswordRequired'
   | 'vaultAlreadyOpen'
+  | 'vaultNotInAccount'
   | 'fileTooLarge'
   | 'fileNotText'
   | 'io'
@@ -131,6 +132,8 @@ export const describeError = (error: unknown): string => {
       return t('A workspace needs a master password')
     case 'vaultAlreadyOpen':
       return t('This vault is already a workspace on this device')
+    case 'vaultNotInAccount':
+      return t('This Google account holds other vaults')
     case 'fileTooLarge':
       return t('This file is too large')
     case 'fileNotText':

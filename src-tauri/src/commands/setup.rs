@@ -30,7 +30,7 @@ use crate::error::{Error, Result};
 use crate::events;
 use crate::models::UnlockResult;
 use crate::session::{create_vault, list_metas, store_err};
-use crate::state::AppState;
+use crate::state::{AppState, PendingDrive};
 use crate::storage;
 use crate::store::SqliteStore;
 use crate::sync::{self, restore, setup::PackInfo};
@@ -127,8 +127,11 @@ pub(crate) async fn on_consent(app: &AppHandle, code: &str, verifier: &str) {
 #[tauri::command]
 pub fn setup_drive_disconnect(state: State<'_, AppState>) -> Result<()> {
     ensure_idle(&state)?;
-    take_pending(&state);
+    // Invalidate first. An adoption may be holding the pending-token lock while
+    // it seals credentials; advancing the attempt lets its post-write check see
+    // this cancellation and remove the file again before it reports connected.
     abandon_attempt(&state);
+    take_pending(&state);
     // On mobile the half-finished consent is a record, not a thread: dropping
     // it makes the redirect, if it ever comes, a stranger the handler ignores.
     #[cfg(mobile)]
@@ -150,7 +153,10 @@ pub fn setup_drive_disconnect(state: State<'_, AppState>) -> Result<()> {
 /// Every one of them, not the pick of them: an account can hold a pack per
 /// vault (two installs, two primaries, two ids), and it is the user who has to
 /// say which of those is theirs.
-async fn probe(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Vec<PackInfo>> {
+///
+/// Crate-visible: `commands::sync::sync_adopt_pending` asks the same question
+/// of the pending account before deciding whether the open vault may join it.
+pub(crate) async fn probe(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Vec<PackInfo>> {
     let client = sync::http_client();
     let token = sync::fresh_access_token(&client, app, tokens).await?;
     sync::setup::find_packs(&client, &token).await
@@ -163,19 +169,30 @@ async fn probe(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Vec<PackInf
 /// and keeps nothing: adopting its account now would silently connect a
 /// fresh vault to a sign-in the user thought they had cancelled.
 fn report(app: &AppHandle, attempt: u64, probed: Result<(sync::Tokens, Vec<PackInfo>)>) {
-    if current_attempt(&app.state::<AppState>()) != attempt {
+    let state = app.state::<AppState>();
+    // `begin_attempt` waits for this guard after advancing the generation. That
+    // makes publication and the corresponding event one ordered operation: an
+    // old callback can finish before a replacement announces "pending", or be
+    // discarded after it starts, but can never publish over the newer attempt.
+    let mut pending = state.pending_drive.lock().unwrap();
+    if current_attempt(&state) != attempt {
         log::info!("drive setup: dropping a consent the user already abandoned");
         return;
     }
     match probed {
         Ok((tokens, files)) => {
-            *app.state::<AppState>().pending_drive.lock().unwrap() = Some(tokens);
+            *pending = Some(PendingDrive { attempt, tokens });
             events::setup_drive_probed(app, files);
         }
         Err(e) => {
             // Half a connection is worse than none — the next attempt starts
             // from consent rather than from credentials that failed once.
-            take_pending(&app.state::<AppState>());
+            if pending
+                .as_ref()
+                .is_some_and(|pending| pending.attempt == attempt)
+            {
+                *pending = None;
+            }
             log::warn!("drive setup failed: {e}");
             events::setup_drive_error(app, &e.to_string());
         }
@@ -209,7 +226,7 @@ pub async fn setup_restore_from_drive(
     let (bytes, vault_id) = download(&app, &mut tokens, &file_id, |_| Ok(())).await?;
     // Whatever the download's refresh produced has to be kept: Google rotates
     // refresh tokens, and a retry after a mistyped password uses these again.
-    *state.pending_drive.lock().unwrap() = Some(tokens.clone());
+    replace_pending_tokens(&state, tokens.clone())?;
 
     let (key, store) = restore_off_thread(&app, bytes, password).await?;
     adopt(&app, &state, key, store, Some(&tokens), Some(&vault_id))
@@ -288,9 +305,10 @@ async fn restore_off_thread(
 /// marked connected — the frontend's `enterMain` runs the first sync, which is
 /// what creates the folder and the pack on Drive.
 ///
-/// Whatever the account already holds is left exactly as it is: the new vault
-/// mints its own id and so syncs to a pack of its own, alongside the old one
-/// rather than over it.
+/// The account is expected to be empty when tokens are pending: the first run
+/// offers no way past a probe that found a vault except restoring it. A create
+/// that reached here beside one anyway would not fork the account — the first
+/// sync refuses to mint an id next to an existing vault (`sync::plan_vault_id`).
 #[tauri::command]
 pub async fn setup_create(
     password: Zeroizing<String>,
@@ -301,7 +319,9 @@ pub async fn setup_create(
     // so running it over an existing vault would leave that vault unopenable.
     guard_no_vault(&app)?;
     let _step = begin_step(&state)?;
-    let tokens = state.pending_drive.lock().unwrap().clone();
+    // Creating without Drive is valid; a stale result from a cancelled or
+    // replaced attempt is not.
+    let tokens = peek_pending(&state).ok();
 
     let (key, store) = create_off_thread(&app, password).await?;
     adopt(&app, &state, key, store, tokens.as_ref(), None)
@@ -447,7 +467,13 @@ impl Drop for SetupStep<'_> {
 
 /// Start a connect attempt; the number identifies it to [`report`].
 fn begin_attempt(state: &AppState) -> u64 {
-    state.setup_attempt.fetch_add(1, Ordering::SeqCst) + 1
+    // Advance first so an adoption holding `pending_drive` can observe the
+    // replacement and roll back its write. Waiting for that same lock before
+    // returning also orders the old callback's event before the new caller's
+    // "pending" event, and retires credentials from the previous attempt.
+    let attempt = state.setup_attempt.fetch_add(1, Ordering::SeqCst) + 1;
+    *state.pending_drive.lock().unwrap() = None;
+    attempt
 }
 
 /// Disown whatever attempt is in flight: its `report` will find itself stale.
@@ -455,14 +481,30 @@ fn abandon_attempt(state: &AppState) {
     state.setup_attempt.fetch_add(1, Ordering::SeqCst);
 }
 
-fn current_attempt(state: &AppState) -> u64 {
+pub(crate) fn current_attempt(state: &AppState) -> u64 {
     state.setup_attempt.load(Ordering::SeqCst)
 }
 
+/// Atomically make one consent attempt the completed connection. Cancellation
+/// and replacement advance the same counter, so exactly one side can win: a
+/// loser must roll back anything it wrote before trying this transition.
+pub(crate) fn complete_attempt(state: &AppState, attempt: u64) -> bool {
+    state
+        .setup_attempt
+        .compare_exchange(
+            attempt,
+            attempt.wrapping_add(1),
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        )
+        .is_ok()
+}
+
 /// Onboarding only. A device that already holds a vault has other routes to
-/// Drive (`sync_connect`, `sync_import`), and every one of them merges rather
-/// than replaces — which is the point: nothing here may be reachable in a way
-/// that could overwrite a vault this device already has.
+/// Drive (`sync_connect`, `workspace_restore_from_drive`), and every one of
+/// them merges or adds a workspace rather than replaces — which is the point:
+/// nothing here may be reachable in a way that could overwrite a vault this
+/// device already has.
 fn guard_no_vault(app: &AppHandle) -> Result<()> {
     if storage::db_exists(app) {
         return Err(Error::AlreadySetUp);
@@ -473,17 +515,54 @@ fn guard_no_vault(app: &AppHandle) -> Result<()> {
 /// The connected account's tokens, left in place for a retry. Crate-visible
 /// because a workspace restore reads them the same way.
 pub(crate) fn peek_pending(state: &AppState) -> Result<sync::Tokens> {
-    state
-        .pending_drive
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or(Error::DriveNotConnected)
+    peek_pending_attempt(state).map(|(_, tokens)| tokens)
+}
+
+/// The pending account together with the consent attempt that produced it.
+/// Consumers that await must carry the attempt through the await and compare it
+/// again before writing, so a cancel or replacement account cannot be mistaken
+/// for the account they originally probed.
+pub(crate) fn peek_pending_attempt(state: &AppState) -> Result<(u64, sync::Tokens)> {
+    let pending = state.pending_drive.lock().unwrap();
+    let pending = pending.as_ref().ok_or(Error::DriveNotConnected)?;
+    if current_attempt(state) != pending.attempt {
+        return Err(Error::DriveNotConnected);
+    }
+    Ok((pending.attempt, pending.tokens.clone()))
+}
+
+/// Keep a refresh-token rotation only for the account that is still pending.
+pub(crate) fn replace_pending_tokens(state: &AppState, tokens: sync::Tokens) -> Result<()> {
+    let mut pending = state.pending_drive.lock().unwrap();
+    let pending = pending.as_mut().ok_or(Error::DriveNotConnected)?;
+    if current_attempt(state) != pending.attempt {
+        return Err(Error::DriveNotConnected);
+    }
+    pending.tokens = tokens;
+    Ok(())
 }
 
 /// Forget the connected account, if there is one.
 pub(crate) fn take_pending(state: &AppState) -> Option<sync::Tokens> {
-    state.pending_drive.lock().unwrap().take()
+    state
+        .pending_drive
+        .lock()
+        .unwrap()
+        .take()
+        .map(|pending| pending.tokens)
+}
+
+/// Forget one particular consent result without disturbing a newer account.
+pub(crate) fn take_pending_attempt(state: &AppState, attempt: u64) -> Option<sync::Tokens> {
+    let mut pending = state.pending_drive.lock().unwrap();
+    if pending
+        .as_ref()
+        .is_some_and(|pending| pending.attempt == attempt)
+    {
+        pending.take().map(|pending| pending.tokens)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -496,6 +575,15 @@ mod tests {
             refresh_token: Some("refresh".into()),
             expires_at: Some(4_102_444_800),
         }
+    }
+
+    fn set_pending(state: &AppState, access: &str) -> u64 {
+        let attempt = begin_attempt(state);
+        *state.pending_drive.lock().unwrap() = Some(PendingDrive {
+            attempt,
+            tokens: tokens(access),
+        });
+        attempt
     }
 
     // A fresh install has connected nothing, so restore has nothing to ask for
@@ -515,7 +603,7 @@ mod tests {
     #[test]
     fn peeking_keeps_the_account_and_taking_ends_it() {
         let state = AppState::default();
-        *state.pending_drive.lock().unwrap() = Some(tokens("first"));
+        set_pending(&state, "first");
 
         assert_eq!(
             peek_pending(&state).unwrap().access_token.as_deref(),
@@ -538,12 +626,25 @@ mod tests {
     #[test]
     fn connecting_again_replaces_the_account() {
         let state = AppState::default();
-        *state.pending_drive.lock().unwrap() = Some(tokens("first"));
-        *state.pending_drive.lock().unwrap() = Some(tokens("second"));
+        set_pending(&state, "first");
+        set_pending(&state, "second");
         assert_eq!(
             take_pending(&state).unwrap().access_token.as_deref(),
             Some("second")
         );
+    }
+
+    #[test]
+    fn starting_a_replacement_retires_the_previous_account() {
+        let state = AppState::default();
+        set_pending(&state, "first");
+
+        begin_attempt(&state);
+
+        assert!(matches!(
+            peek_pending_attempt(&state),
+            Err(Error::DriveNotConnected)
+        ));
     }
 
     // Two creates (or a create and a restore) cannot both be writing the vault:
@@ -588,6 +689,49 @@ mod tests {
         let next = begin_attempt(&state);
         assert_ne!(next, attempt);
         assert_eq!(current_attempt(&state), next);
+    }
+
+    #[test]
+    fn a_cancelled_or_replaced_attempt_cannot_be_peeked() {
+        let state = AppState::default();
+        let cancelled = set_pending(&state, "first");
+        abandon_attempt(&state);
+        assert_ne!(current_attempt(&state), cancelled);
+        assert!(matches!(
+            peek_pending_attempt(&state),
+            Err(Error::DriveNotConnected)
+        ));
+
+        let current = set_pending(&state, "second");
+        let (attempt, tokens) = peek_pending_attempt(&state).unwrap();
+        assert_eq!(attempt, current);
+        assert_eq!(tokens.access_token.as_deref(), Some("second"));
+    }
+
+    #[test]
+    fn finishing_an_old_attempt_cannot_remove_the_new_account() {
+        let state = AppState::default();
+        let old = set_pending(&state, "first");
+        let current = set_pending(&state, "second");
+
+        assert!(take_pending_attempt(&state, old).is_none());
+
+        let (attempt, tokens) = peek_pending_attempt(&state).unwrap();
+        assert_eq!(attempt, current);
+        assert_eq!(tokens.access_token.as_deref(), Some("second"));
+    }
+
+    #[test]
+    fn cancellation_and_completion_have_exactly_one_winner() {
+        let completed = AppState::default();
+        let attempt = set_pending(&completed, "first");
+        assert!(complete_attempt(&completed, attempt));
+        assert!(!complete_attempt(&completed, attempt));
+
+        let cancelled = AppState::default();
+        let attempt = set_pending(&cancelled, "first");
+        abandon_attempt(&cancelled);
+        assert!(!complete_attempt(&cancelled, attempt));
     }
 
     // The event names are the frontend's contract.

@@ -48,8 +48,8 @@ export const setupRestoreFromDrive = (
 /**
  * Create the local data under `password`. Any tokens left pending by
  * `setupDriveConnect` are adopted, so the result reports sync as configured.
- * A vault the account already holds is left alone: this one gets its own id,
- * and syncs to its own pack beside it.
+ * Only reached with an account the probe found empty: one that already holds a
+ * vault is restored instead, never added to.
  */
 export const setupCreate = (password: string): Promise<UnlockResult> =>
   call('setup_create', { password })

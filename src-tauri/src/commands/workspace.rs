@@ -291,7 +291,7 @@ pub async fn workspace_restore_from_drive(
     // Whatever the refresh produced has to be kept, for the reason onboarding
     // keeps it: Google rotates refresh tokens, and a mistyped master password
     // has to leave a retry that works.
-    *state.pending_drive.lock().unwrap() = Some(tokens.clone());
+    setup::replace_pending_tokens(&state, tokens.clone())?;
 
     // As `workspace_create` takes them, and for the same reasons: one step
     // under the lock, the session kept rather than dropped so a failure can put
