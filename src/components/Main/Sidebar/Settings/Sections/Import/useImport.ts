@@ -1,18 +1,23 @@
-import { useCallback, useState } from 'react'
-import { setEntries } from '@/store'
+import { useCallback, useEffect, useState } from 'react'
+import { claimOpenedFile, setEntries, useApp } from '@/store'
 import { importSwftx } from '@/api/vault'
 import { importEntries, type ImportFormat, type ImportReport } from '@/api/imports'
 import { syncNow } from '@/api/sync'
 import { pickImportFile, pickBackup } from '@/api/pickers'
 import { describeError, errorKind } from '@/api/errors'
+import { isBackupFile } from '@/lib/backup'
 import { t } from '@/i18n'
 import { useProgress } from './useProgress'
 
-// Either a third-party export (parsed by the backend under `format`) or a
-// Rowel backup, which is independently encrypted and needs its own password.
+// Either a third-party export (parsed by the backend under `format`), a legacy
+// `.swftx` vault, which is independently encrypted and needs its own password,
+// or a `.rowel` backup — which is a whole sealed database and restores a fresh
+// install rather than merging into this one, so it is only ever named here to
+// say so (it arrives through the OS opening it with the app, never a tile).
 export type Picked =
   | { kind: 'format'; format: ImportFormat; path: string }
   | { kind: 'swftx'; path: string }
+  | { kind: 'rowel'; path: string }
 
 // One import flow for every tile: pick or drop a file, preview it (dry run),
 // then commit. Preview and result both surface per-row errors.
@@ -31,14 +36,25 @@ export function useImport() {
     setResult(null)
     setCount(null)
     setError(null)
-    // A backup cannot be inspected without its password, so it waits for input.
-    if (next.kind === 'swftx') return
+    // A backup cannot be inspected without its password, so it waits for
+    // input; a `.rowel` is not imported at all.
+    if (next.kind !== 'format') return
     setRunning(true)
     importEntries(next.path, next.format, true)
       .then(setPreview)
       .catch((e: unknown) => setError(describeError(e)))
       .finally(() => setRunning(false))
   }, [])
+
+  // A backup the OS opened with the app, once this section is on screen: a
+  // legacy `.swftx` is picked as the tile would have picked it; a `.rowel` is
+  // named and turned down (see `Picked`).
+  const opened = useApp(state => state.openedFile)
+  useEffect(() => {
+    if (!opened) return
+    claimOpenedFile()
+    start({ kind: isBackupFile(opened) ? 'rowel' : 'swftx', path: opened })
+  }, [opened, start])
 
   const chooseFile = useCallback(
     (format: ImportFormat) =>

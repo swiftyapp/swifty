@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { pickBackup } from '@/api/pickers'
 import { useFileDrop } from '@/hooks/useFileDrop'
+import { isBackupFile } from '@/lib/backup'
 import { DownloadGlyph } from '@/components/Main/icons'
 import { META } from '@/components/elements/tokens'
 
@@ -15,7 +16,7 @@ export default function DropZone({ onPick }: Props) {
   const { t } = useTranslation()
 
   useFileDrop(paths => {
-    const path = paths.find(p => p.toLowerCase().endsWith('.rowel'))
+    const path = paths.find(isBackupFile)
     if (path) onPick(path)
   })
 

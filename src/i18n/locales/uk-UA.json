@@ -564,5 +564,6 @@
   "A workspace needs a master password": "Робочому простору потрібен головний пароль",
   "This file is too large": "Цей файл завеликий",
   "This file is not text": "Цей файл не текстовий",
-  "The vault changed while this was running. Try again.": "Сховище змінилося під час операції. Спробуйте ще раз."
+  "The vault changed while this was running. Try again.": "Сховище змінилося під час операції. Спробуйте ще раз.",
+  "Backups restore a fresh install and are not imported into an existing vault.": "Резервна копія відновлює чисту інсталяцію й не імпортується в наявне сховище."
 }

@@ -7,7 +7,7 @@ import { syncNow, type SyncStatus } from '@/api/sync'
 import { checkForUpdate } from '@/api/autoUpdate'
 import { resetFavicons } from '@/hooks/useFavicon'
 import { setEntries, resetVault, runAudit } from './vault'
-import { resetUi } from './ui'
+import { openSettings, resetUi } from './ui'
 
 /**
  * State that lives as long as the app does, across locks: which flow is on
@@ -57,6 +57,14 @@ export interface AppState {
    * cannot live in `sync`, whose `enabled` means "this vault syncs".
    */
   setupDrive: { status: SetupDriveStatus; file: SetupDriveFile | null; error: string | null }
+  /**
+   * A backup the OS asked the app to open (`file:opened`), waiting for a
+   * screen that can take it: the restore step on a fresh install, Settings ›
+   * Import once a vault is open. Kept across a lock — the vault has to be
+   * unlocked before anything can be imported into it — and cleared by the
+   * screen that takes it (`claimOpenedFile`).
+   */
+  openedFile: string | null
   update: {
     // Version + release notes of a staged update awaiting restart (null = none).
     readyVersion: string | null
@@ -83,6 +91,7 @@ export const initialApp: AppState = {
     seq: 0
   },
   setupDrive: DRIVE_IDLE,
+  openedFile: null,
   update: { readyVersion: null, readyNotes: null, status: null }
 }
 
@@ -189,6 +198,9 @@ export const lockVault = () => lock().catch(() => {})
 export const enterMain = async (result: UnlockResult) => {
   setEntries(result.entries)
   flowMain()
+  // A backup the OS opened while the vault was locked (or before it existed)
+  // has waited for this: the only screen that can import it is now reachable.
+  if (useApp.getState().openedFile) openSettings('import')
   // The unlock result carries whether this vault syncs; everything else about
   // sync arrives as `sync:status` once a flow or a run happens. No re-probe:
   // `initialized` and `scanSupported` cannot have changed, and this is the one
@@ -198,6 +210,26 @@ export const enterMain = async (result: UnlockResult) => {
   // and it may itself be holding writes a previous session never published.
   if (result.syncConfigured) syncNow().catch(() => {})
   void runAudit()
+}
+
+// --- a backup the OS opened with the app -------------------------------------------
+
+/**
+ * The OS handed over a backup (a double-clicked `.rowel` or `.swftx`). Where it
+ * goes depends on the flow: the first run's restore step and Settings › Import
+ * each watch `openedFile` and claim it when they are on screen. An unlocked
+ * vault is sent to Import at once; a locked one gets there through `enterMain`.
+ */
+export const fileOpened = (path: string) => {
+  useApp.setState({ openedFile: path })
+  if (useApp.getState().flow === 'main') openSettings('import')
+}
+
+/** A screen took the file, so nothing else offers it again. */
+export const claimOpenedFile = (): string | null => {
+  const path = useApp.getState().openedFile
+  if (path) useApp.setState({ openedFile: null })
+  return path
 }
 
 // --- sync -----------------------------------------------------------------------

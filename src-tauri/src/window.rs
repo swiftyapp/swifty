@@ -106,6 +106,17 @@ pub fn reveal(app: &AppHandle) {
     }
 }
 
+/// Bring the window forward for a document the OS handed over while the app is
+/// up. Before the first reveal it does nothing: the launch choreography shows
+/// the window itself, and showing it here would put it up bare, ahead of the
+/// splash it is meant to appear with.
+#[cfg(desktop)]
+pub fn raise(app: &AppHandle) {
+    if REVEALED.load(Ordering::SeqCst) {
+        show(app);
+    }
+}
+
 // Show and focus the main window (tray "Open Rowel" and second-instance launch).
 pub fn show(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(MAIN) {

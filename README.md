@@ -112,7 +112,8 @@ Your real dev vault is left untouched — `bun run tauri:dev` goes back to it.
 Setting `ROWEL_DB_DIR` yourself overrides that and keeps the same directory
 across runs, which is how you set a throwaway vault up once and then relaunch
 into its unlock screen. Nothing here ever deletes a data directory; to start
-that one over, remove it yourself.
+that one over, remove it yourself. Debug builds only: a release build ignores
+the variable and always uses the OS app-data directory.
 
 ## Configuration
 

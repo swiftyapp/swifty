@@ -556,5 +556,6 @@
   "A workspace needs a master password": "Um espaço de trabalho precisa de uma senha mestra",
   "This file is too large": "Este arquivo é grande demais",
   "This file is not text": "Este arquivo não é um arquivo de texto",
-  "The vault changed while this was running. Try again.": "O cofre mudou durante a operação. Tente novamente."
+  "The vault changed while this was running. Try again.": "O cofre mudou durante a operação. Tente novamente.",
+  "Backups restore a fresh install and are not imported into an existing vault.": "Backups restauram uma instalação nova e não são importados para um cofre existente."
 }

@@ -7,6 +7,7 @@ use std::sync::Mutex;
 
 use rusqlite::{params, Connection, OptionalExtension, Row, Statement};
 use rusqlite_migration::{Migrations, M};
+use zeroize::Zeroizing;
 
 use super::hash::{record_hash, state_digest};
 use super::{now_ms, EntryMeta, Record, Result, StoreError, VaultStore};
@@ -96,11 +97,14 @@ impl SqliteStore {
         if let Some(parent) = path.parent() {
             create_private_dir(parent)?;
         }
+        // Before SQLite touches the path, so the file — and the `-wal`/`-shm`
+        // it will create beside it — is never on disk under the umask's mode.
+        restrict(path)?;
 
         let mut conn = Connection::open(path)?;
         // Raw-key pragma: the hex bytes are the key, not a passphrase. Must run
         // before any other pragma that touches the (encrypted) file.
-        conn.execute_batch(&format!("PRAGMA key = \"x'{}'\";", hex(key)))?;
+        conn.execute_batch(&key_pragma("key", key))?;
         // Connection hygiene: WAL for crash-safe per-row writes; NORMAL is the
         // durable/fast pairing for WAL; temp_store=MEMORY keeps sort/temp data
         // (plaintext metadata) off disk; busy_timeout absorbs the brief lock a
@@ -143,7 +147,6 @@ impl SqliteStore {
             .to_latest(&mut conn)
             .map_err(|e| StoreError::Other(e.to_string()))?;
 
-        set_mode(path, 0o600);
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -160,14 +163,12 @@ impl SqliteStore {
     /// `key`, so the snapshot is as encrypted as the source — never a plaintext
     /// leak — and reopens as a normal store.
     pub fn snapshot_to(&self, dest: &Path, key: &[u8]) -> Result<()> {
+        restrict(dest)?;
         let mut dst = Connection::open(dest)?;
-        dst.execute_batch(&format!("PRAGMA key = \"x'{}'\";", hex(key)))?;
+        dst.execute_batch(&key_pragma("key", key))?;
         let src = self.lock();
         let backup = rusqlite::backup::Backup::new(&src, &mut dst)?;
         backup.run_to_completion(100, std::time::Duration::from_millis(50), None)?;
-        drop(backup);
-        drop(dst);
-        set_mode(dest, 0o600);
         Ok(())
     }
 
@@ -176,8 +177,7 @@ impl SqliteStore {
     /// key afterwards. Used by change-master-password after the payloads have
     /// been re-encrypted under the new app key.
     pub fn rekey(&self, new_key: &[u8]) -> Result<()> {
-        self.lock()
-            .execute_batch(&format!("PRAGMA rekey = \"x'{}'\";", hex(new_key)))?;
+        self.lock().execute_batch(&key_pragma("rekey", new_key))?;
         Ok(())
     }
 
@@ -636,8 +636,39 @@ fn wrong_key_or(existed: bool, e: rusqlite::Error) -> StoreError {
     }
 }
 
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+// `PRAGMA key` / `PRAGMA rekey` with the raw key spelled as hex. The statement
+// *is* the key in another alphabet, so it is zeroized when dropped rather than
+// left on the heap for the allocator to hand out later — as is the hex it is
+// assembled from.
+fn key_pragma(pragma: &str, key: &[u8]) -> Zeroizing<String> {
+    use std::fmt::Write;
+    let mut hex = Zeroizing::new(String::with_capacity(key.len() * 2));
+    for byte in key {
+        // Writing into a `String` cannot fail.
+        let _ = write!(hex, "{byte:02x}");
+    }
+    Zeroizing::new(format!("PRAGMA {pragma} = \"x'{}'\";", *hex))
+}
+
+// Make the database file owner-only *before* SQLite opens it. A path with
+// nothing at it is created empty — which SQLite reads as a new database — with
+// the mode already in force; a file that exists is tightened in place. The
+// `-wal` and `-shm` siblings need nothing of their own: SQLite creates them
+// with the main file's permissions, so they inherit these.
+//
+// This replaces a `chmod` that used to run after the open and the migrations,
+// by which point the file (and, in WAL mode, its log) had already spent the
+// whole open under the umask's mode.
+#[cfg(unix)]
+fn restrict(path: &Path) -> Result<()> {
+    match crate::owner_only::create_new(path) {
+        Ok(_created) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            set_mode(path, 0o600);
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 /// Create `path` (and its parents) as a directory only the current user may
@@ -655,8 +686,13 @@ fn set_mode(path: &Path, mode: u32) {
 }
 
 // TODO: tighten Windows ACLs to the current user. `owner_only.rs` already
-// builds the owner-only security descriptor for plaintext exports; applying it
-// to the live vault (which SQLite creates itself, so after the fact) wants a
+// builds the owner-only security descriptor for plaintext exports; handing the
+// vault to SQLite born with it (the way `restrict` does on Unix) wants a
 // Windows machine to verify the user keeps access before it ships.
+#[cfg(not(unix))]
+fn restrict(_path: &Path) -> Result<()> {
+    Ok(())
+}
+
 #[cfg(not(unix))]
 fn set_mode(_path: &Path, _mode: u32) {}

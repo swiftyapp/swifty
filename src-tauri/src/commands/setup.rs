@@ -15,6 +15,7 @@
 use std::sync::atomic::Ordering;
 
 use tauri::{AppHandle, Manager, State};
+use zeroize::Zeroizing;
 
 use crate::crypto::VaultKey;
 use crate::error::{Error, Result};
@@ -154,7 +155,7 @@ fn report(app: &AppHandle, attempt: u64, probed: Result<(sync::Tokens, Option<Pa
 /// + SQLCipher on its own terms.
 #[tauri::command]
 pub async fn setup_restore_from_drive(
-    password: String,
+    password: Zeroizing<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
@@ -183,7 +184,7 @@ pub async fn setup_restore_from_drive(
 #[tauri::command]
 pub async fn setup_restore_from_file(
     path: String,
-    password: String,
+    password: Zeroizing<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
@@ -215,7 +216,7 @@ async fn download(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<Vec<u8>>
 async fn restore_off_thread(
     app: &AppHandle,
     bytes: Vec<u8>,
-    password: String,
+    password: Zeroizing<String>,
 ) -> Result<(VaultKey, SqliteStore)> {
     let app = app.clone();
     super::blocking(move || restore::restore_from_pack(&app, &bytes, &password)).await
@@ -231,7 +232,7 @@ async fn restore_off_thread(
 /// what creates the folder and the pack on Drive.
 #[tauri::command]
 pub async fn setup_create(
-    password: String,
+    password: Zeroizing<String>,
     archive_remote: bool,
     app: AppHandle,
     state: State<'_, AppState>,
@@ -270,7 +271,7 @@ async fn archive(app: &AppHandle, tokens: &mut sync::Tokens) -> Result<()> {
 // Shared with `commands::workspace`, which creates a vault the same way.
 pub(crate) async fn create_off_thread(
     app: &AppHandle,
-    password: String,
+    password: Zeroizing<String>,
 ) -> Result<(VaultKey, SqliteStore)> {
     let app = app.clone();
     super::blocking(move || create_vault(&app, &password)).await

@@ -23,7 +23,13 @@ export default function Result({ flow }: { flow: ReturnType<typeof useImport> })
     <div className={`${CARD} flex flex-col gap-3 p-4`} data-testid="import-result">
       <div className={META}>{fileName(picked.path)}</div>
 
-      {picked.kind === 'swftx' ? (
+      {picked.kind === 'rowel' ? (
+        // The OS opened one of our own backups with the app, but a vault is
+        // already open: it is a whole sealed database, not rows to merge.
+        <span className="text-base text-text2" data-testid="import-rowel-notice">
+          {t('Backups restore a fresh install and are not imported into an existing vault.')}
+        </span>
+      ) : picked.kind === 'swftx' ? (
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="password"

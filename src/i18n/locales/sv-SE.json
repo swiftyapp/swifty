@@ -548,5 +548,6 @@
   "A workspace needs a master password": "En arbetsyta behöver ett huvudlösenord",
   "This file is too large": "Den här filen är för stor",
   "This file is not text": "Den här filen är inte en textfil",
-  "The vault changed while this was running. Try again.": "Valvet ändrades under tiden. Försök igen."
+  "The vault changed while this was running. Try again.": "Valvet ändrades under tiden. Försök igen.",
+  "Backups restore a fresh install and are not imported into an existing vault.": "Säkerhetskopior återställer en ny installation och importeras inte till ett befintligt valv."
 }

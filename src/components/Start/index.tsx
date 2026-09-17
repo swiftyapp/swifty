@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BiometryType, UnlockResult } from '@/api/types'
 import { setupCreate } from '@/api/setup'
-import { enterMain, useApp } from '@/store'
+import { claimOpenedFile, enterMain, useApp } from '@/store'
+import { isBackupFile } from '@/lib/backup'
 import AuthShell from '@/components/elements/AuthShell'
 import Mascot, { type MascotState } from '@/components/elements/Mascot'
 import BiometryGlyph from '@/components/elements/BiometryGlyph'
@@ -65,6 +66,19 @@ export function Start() {
   }, [screen])
 
   const [password, setPassword] = useState('')
+  // A `.rowel` the OS opened the app with lands straight on the restore step,
+  // file already picked. Anything else it opened (a legacy `.swftx`) has no
+  // vault to go into yet, so it stays parked for Settings › Import once this
+  // flow has made one (`store/app`).
+  const [restoreFrom, setRestoreFrom] = useState<string | null>(null)
+  const opened = useApp(state => state.openedFile)
+  useEffect(() => {
+    if (!opened || !isBackupFile(opened)) return
+    claimOpenedFile()
+    setRestoreFrom(opened)
+    setDirection('forward')
+    setStack(['welcome', 'file'])
+  }, [opened])
   // Consent already given, on the way through the restore screen: the create
   // flow adopts those tokens instead of asking for Drive a second time.
   const [driveLinked, setDriveLinked] = useState(false)
@@ -102,6 +116,9 @@ export function Start() {
     // and the next visit to this step would read "empty" and create at once,
     // never having asked.
     if (screen === 'sync') forgetDrive()
+    // Leaving the restore step is declining the file the OS opened; the next
+    // visit starts from the picker.
+    if (screen === 'file') setRestoreFrom(null)
     setDirection('back')
     setStack(current => (current.length > 1 ? current.slice(0, -1) : current))
   }
@@ -189,7 +206,7 @@ export function Start() {
           />
         )
       case 'file':
-        return <File onRestored={finish} />
+        return <File onRestored={finish} initialPath={restoreFrom} />
       case 'biometric':
         return (
           <Biometric

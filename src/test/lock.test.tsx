@@ -40,7 +40,9 @@ describe('lock screen on compact', () => {
   })
 
   it('blames the prompt, not the passphrase, when biometrics fail', async () => {
-    mockCommand('unlock_biometric', () => Promise.reject({ kind: 'cancelled', message: 'cancelled' }))
+    mockCommand('unlock_biometric', () =>
+      Promise.reject({ kind: 'other', message: 'biometric authentication failed' })
+    )
     render(<LockScreen biometric />)
 
     await userEvent.click(screen.getByTestId('biometric-tile'))
@@ -49,6 +51,19 @@ describe('lock screen on compact', () => {
       'Biometric unlock failed'
     )
     expect(screen.queryByText('Incorrect Master Password')).not.toBeInTheDocument()
+  })
+
+  // Rust reports a dismissed prompt as `cancelled`, apart from every failure.
+  // The user chose to close it, so nothing is wrong to report: the screen just
+  // goes back to waiting.
+  it('goes back to waiting, with no error, when the prompt is dismissed', async () => {
+    mockCommand('unlock_biometric', () => Promise.reject({ kind: 'cancelled', message: 'cancelled' }))
+    render(<LockScreen biometric />)
+
+    await userEvent.click(screen.getByTestId('biometric-tile'))
+
+    expect(await screen.findByTestId('unlock-status')).toHaveTextContent('Vault sealed')
+    expect(screen.queryByTestId('unlock-error')).not.toBeInTheDocument()
   })
 
   it('shows the passphrase card straight away with no enrollment', () => {

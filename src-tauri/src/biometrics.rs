@@ -11,7 +11,7 @@ mod imp {
     use block2::RcBlock;
     use objc2::runtime::Bool;
     use objc2_foundation::{NSError, NSString};
-    use objc2_local_authentication::{LABiometryType, LAContext, LAPolicy};
+    use objc2_local_authentication::{LABiometryType, LAContext, LAError, LAPolicy};
     use std::sync::mpsc;
 
     const POLICY: LAPolicy = LAPolicy::DeviceOwnerAuthenticationWithBiometrics;
@@ -44,15 +44,35 @@ mod imp {
         let ctx = unsafe { LAContext::new() };
         let reason = NSString::from_str("Confirm your identity");
         // evaluatePolicy fires its reply on an internal queue; block on a channel.
+        // The error code rides along: it is what tells a prompt the user
+        // dismissed from one that failed.
         let (tx, rx) = mpsc::channel();
-        let reply = RcBlock::new(move |success: Bool, _err: *mut NSError| {
-            let _ = tx.send(success.as_bool());
+        let reply = RcBlock::new(move |success: Bool, err: *mut NSError| {
+            // The block owns nothing about `err` beyond this call, so the code
+            // is read out now rather than the pointer sent across.
+            let code = (!err.is_null()).then(|| LAError(unsafe { (*err).code() }));
+            let _ = tx.send((success.as_bool(), code));
         });
         unsafe { ctx.evaluatePolicy_localizedReason_reply(POLICY, &reason, &reply) };
         match rx.recv() {
-            Ok(true) => Ok(()),
+            Ok((true, _)) => Ok(()),
+            Ok((false, Some(code))) if is_cancel(code) => Err(Error::Cancelled),
             _ => Err(Error::Other("biometric authentication failed".into())),
         }
+    }
+
+    // The ways a prompt ends without an answer rather than with a wrong one:
+    // the user pressed Cancel or "Enter password", the system took the screen
+    // (a call, a lock), or the app itself withdrew the prompt. None of them
+    // says anything about the user's finger or face.
+    fn is_cancel(code: LAError) -> bool {
+        matches!(
+            code,
+            LAError::UserCancel
+                | LAError::UserFallback
+                | LAError::SystemCancel
+                | LAError::AppCancel
+        )
     }
 }
 
@@ -83,14 +103,14 @@ mod imp {
 
     pub fn authenticate() -> Result<()> {
         let message = HSTRING::from("Confirm your identity");
-        let verified = UserConsentVerifier::RequestVerificationAsync(&message)
-            .and_then(|op| op.join())
-            .map(|r| r == UserConsentVerificationResult::Verified)
-            .unwrap_or(false);
-        if verified {
-            Ok(())
-        } else {
-            Err(Error::Other("biometric authentication failed".into()))
+        let result =
+            UserConsentVerifier::RequestVerificationAsync(&message).and_then(|op| op.join());
+        match result {
+            Ok(UserConsentVerificationResult::Verified) => Ok(()),
+            // Dismissed, not refused: the user closed the Hello prompt. The
+            // same distinction `secure_store` draws for the key credential.
+            Ok(UserConsentVerificationResult::Canceled) => Err(Error::Cancelled),
+            _ => Err(Error::Other("biometric authentication failed".into())),
         }
     }
 }

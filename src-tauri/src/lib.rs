@@ -13,6 +13,8 @@ mod hibp;
 mod import;
 mod locale;
 mod models;
+// Backups the OS asks the app to open (the `.rowel`/`.swftx` file associations).
+mod opened;
 // How a stored `otp` value is spelled — read by the generator, the importers
 // and the exporters alike, so it sits below all three.
 mod otp;
@@ -59,8 +61,16 @@ pub fn run() {
     #[cfg(desktop)]
     {
         builder = builder
-            .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-                window::show(app); // focus existing window on a second launch
+            .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+                // Focus the existing window on a second launch.
+                window::show(app);
+                // On Windows and Linux a file association runs the executable
+                // again with the document as its argument; the second instance
+                // hands its command line here and exits. `argv[0]` is itself.
+                opened::accept(
+                    app,
+                    opened::from_args(argv.into_iter().skip(1), std::path::Path::new(&cwd)),
+                );
             }))
             .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_process::init());
@@ -123,6 +133,16 @@ pub fn run() {
             window::create(app.handle())?;
             #[cfg(desktop)]
             tray::create(app.handle())?;
+            // Launched *for* a document (Windows/Linux file associations put
+            // it on the command line; macOS sends `RunEvent::Opened` instead,
+            // see `run` below). Parked until the webview asks for it.
+            #[cfg(desktop)]
+            if let Ok(cwd) = std::env::current_dir() {
+                opened::accept(
+                    app.handle(),
+                    opened::from_args(std::env::args().skip(1), &cwd),
+                );
+            }
             // The second half of the mobile OAuth flow: iOS reopens the app
             // with Google's redirect once the user has approved.
             #[cfg(mobile)]
@@ -147,6 +167,7 @@ pub fn run() {
             commands::auth::change_master_password,
             commands::app::app_status,
             commands::app::app_ready,
+            commands::app::take_opened_file,
             commands::app::set_settings,
             commands::vault::reveal_entry,
             commands::vault::save_entry,
@@ -191,6 +212,15 @@ pub fn run() {
             #[cfg(debug_assertions)]
             commands::e2e::e2e_reset,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            // macOS hands a document over as an event rather than on the
+            // command line — at launch, when Finder opened one with the app,
+            // and again for every one opened while it runs.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &_event {
+                opened::accept(_app, opened::from_urls(urls));
+            }
+        });
 }

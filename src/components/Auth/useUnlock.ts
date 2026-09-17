@@ -141,7 +141,9 @@ export function useUnlock(): Unlock {
       .then(holdThenEnter)
       .catch((err: unknown) => {
         setPhase('idle')
-        setError(biometricError(t, err))
+        // A prompt the user dismissed is their choice, not a failure to
+        // report in red: the screen goes back to waiting, passphrase at hand.
+        if (errorKind(err) !== 'cancelled') setError(biometricError(t, err))
       })
   }
 

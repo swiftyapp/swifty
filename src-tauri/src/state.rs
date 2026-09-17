@@ -167,6 +167,12 @@ pub struct AppState {
     /// abandoned can tell it is stale and drop its tokens instead of adopting
     /// an account the user already walked away from.
     pub setup_attempt: AtomicU64,
+    /// A backup the OS asked the app to open (a double-clicked `.rowel` or
+    /// `.swftx`) that the webview has not collected yet. Parked because the
+    /// request can land before the webview is listening — at launch it always
+    /// does — and handed over once through `commands::app::take_opened_file`.
+    /// See `crate::opened`.
+    pub pending_open: Mutex<Option<String>>,
     #[cfg(mobile)]
     pub pending_auth: Mutex<Option<PendingAuth>>,
     /// How long a resumed app waits for a redirect before writing the pending
@@ -190,6 +196,7 @@ impl Default for AppState {
             pending_drive: Mutex::default(),
             setup_busy: AtomicBool::default(),
             setup_attempt: AtomicU64::default(),
+            pending_open: Mutex::default(),
             #[cfg(mobile)]
             pending_auth: Mutex::default(),
             #[cfg(mobile)]

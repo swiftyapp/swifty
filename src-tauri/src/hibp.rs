@@ -53,6 +53,12 @@ async fn fetch_range(client: &Client, prefix: &str) -> Result<String> {
     let resp = client
         .get(range_url(prefix))
         .header("User-Agent", "Rowel-Password-Manager")
+        // Every range has a different number of suffixes, so the size of the
+        // response alone tells someone watching the TLS stream which prefix
+        // was asked for. With padding the API adds `SUFFIX:0` lines until each
+        // response is within the same size band; `is_breached` already reads a
+        // zero count as "not breached", so the filler costs nothing.
+        .header("Add-Padding", "true")
         .send()
         .await
         .map_err(|e| Error::Other(e.to_string()))?;

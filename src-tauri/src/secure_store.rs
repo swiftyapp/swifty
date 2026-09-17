@@ -251,6 +251,9 @@ mod imp {
 
     // errSecItemNotFound — no such keychain item.
     const ERR_ITEM_NOT_FOUND: i32 = -25300;
+    // errSecUserCanceled — the user dismissed the authentication sheet the
+    // protected item's SecAccessControl put up.
+    const ERR_USER_CANCELED: i32 = -128;
     // errSecMissingEntitlement — the data-protection keychain rejected the item
     // because the binary lacks `keychain-access-groups`. Matched by OSStatus, not
     // by message text, which is localized.
@@ -329,6 +332,10 @@ mod imp {
     fn map_err(e: security_framework::base::Error) -> Error {
         match e.code() {
             ERR_ITEM_NOT_FOUND => Error::NotFound,
+            // The Touch ID sheet the protected read puts up was dismissed. The
+            // user's choice, not a failure — the lock screen goes back to
+            // waiting rather than reporting one.
+            ERR_USER_CANCELED => Error::Cancelled,
             // Distinct from NotFound on purpose: the item may well still exist,
             // this build just can't reach it. Callers must not treat it as "the
             // enrollment is gone" and delete the marker (see `unlock_biometric`).

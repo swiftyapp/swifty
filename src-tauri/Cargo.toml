@@ -55,7 +55,9 @@ url = "2"
 # under reqwest, and `std` is the single feature `buffer_unordered` needs — the
 # async-await macros the default set adds are not used here.
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
-zeroize = "1.8.2"
+# `serde` so a master password can be deserialized straight into a
+# `Zeroizing<String>` at the command boundary and scrubbed when it drops.
+zeroize = { version = "1.8.2", features = ["serde"] }
 tempfile = "3"
 argon2 = "0.6"
 sys-locale = "0.3"
@@ -98,9 +100,12 @@ objc2 = "0.6"
 objc2-foundation = "0.3"
 # `LABiometryType` gates the `LAContext.biometryType` property — which biometry
 # this device actually has, so Touch ID iPads are not labelled Face ID.
+# `LAError` is the reply's error code, which is how a prompt the user dismissed
+# is told apart from one that failed.
 objc2-local-authentication = { version = "0.3", features = [
   "LAContext",
   "LABiometryType",
+  "LAError",
   "block2",
 ] }
 block2 = "0.6"

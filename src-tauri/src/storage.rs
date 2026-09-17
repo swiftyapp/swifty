@@ -39,8 +39,13 @@ pub const BIOMETRIC_FILE: &str = "biometric.enabled";
 // the workspace registry itself lives.
 pub fn root_dir(app: &AppHandle) -> Result<PathBuf> {
     // E2E test isolation: point the whole data dir at a fresh temp dir per run.
-    if let Ok(dir) = std::env::var("ROWEL_DB_DIR") {
-        return Ok(PathBuf::from(dir));
+    // Debug builds only, like the reset command that depends on it
+    // (`commands::e2e`): a release binary must not let a variable in its
+    // environment decide where the vault is written — or read from.
+    if cfg!(debug_assertions) {
+        if let Ok(dir) = std::env::var("ROWEL_DB_DIR") {
+            return Ok(PathBuf::from(dir));
+        }
     }
 
     let dir = app
@@ -297,11 +302,10 @@ pub fn atomic_write_file(path: &Path, data: &str) -> Result<()> {
     atomic_replace_with(path, false, |file| file.write_all(data.as_bytes()))
 }
 
-/// Atomically replace a plaintext secret with one only its owner can read:
-/// `0600` on Unix, an owner-and-SYSTEM protected DACL on Windows — regardless
-/// of the umask, of the folder's inheritable permissions, or of how an existing
-/// file at `path` was permissioned.
-#[cfg(desktop)]
+/// Atomically replace a secret with one only its owner can read: `0600` on
+/// Unix, an owner-and-SYSTEM protected DACL on Windows — regardless of the
+/// umask, of the folder's inheritable permissions, or of how an existing file
+/// at `path` was permissioned.
 pub fn atomic_write_private(path: &Path, data: &[u8]) -> Result<()> {
     atomic_replace_with(path, true, |file| file.write_all(data))
 }
@@ -314,15 +318,6 @@ fn read_file(path: &PathBuf) -> Result<String> {
     Ok(fs::read_to_string(path)?)
 }
 
-// Overwrite a file, creating parent dirs as needed.
-fn write_file(path: &PathBuf, data: &str) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(path, data)?;
-    Ok(())
-}
-
 // Read an arbitrary backup file chosen by the user (absolute path).
 pub fn read_backup(path: &str) -> Result<String> {
     Ok(fs::read_to_string(path)?)
@@ -332,8 +327,12 @@ pub fn read_gdrive(app: &AppHandle) -> Result<String> {
     read_file(&gdrive_path(app)?)
 }
 
+// The sealed Drive tokens. Atomic, so a crash mid-write leaves the previous
+// grant rather than a truncated file that reads as "not connected" — and
+// owner-only from creation, like every other secret the app writes: the seal is
+// the real protection, the mode is the second line.
 pub fn write_gdrive(app: &AppHandle, data: &str) -> Result<()> {
-    write_file(&gdrive_path(app)?, data)
+    atomic_write_private(&gdrive_path(app)?, data.as_bytes())
 }
 
 // Remove the token file, whatever state a failed write left it in. "No file" is
@@ -368,10 +367,12 @@ pub fn biometric_enrolled(app: &AppHandle) -> bool {
 }
 
 // Record the enrolled gate, or clear the marker entirely with `None`. Idempotent.
+// Atomic like the sidecars: a torn marker would read as the legacy gate
+// (`GateMode::from_marker`) and send the next unlock through the wrong one.
 pub fn set_biometric_marker(app: &AppHandle, marker: Option<&str>) -> Result<()> {
     let path = workspace_dir(app)?.join(BIOMETRIC_FILE);
     match marker {
-        Some(marker) => write_file(&path, marker),
+        Some(marker) => atomic_write_file(&path, marker),
         None if path.exists() => {
             fs::remove_file(&path)?;
             Ok(())

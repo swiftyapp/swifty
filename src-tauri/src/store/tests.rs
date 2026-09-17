@@ -1172,6 +1172,43 @@ fn purge_tombstones_before_spares_live_and_recent_rows() {
 // Restore scrubs the source device's sync bookkeeping by prefix. The match must
 // be a literal prefix — `_` is a LIKE wildcard, so a naive `LIKE 'sync_%'` would
 // also eat `syncopation`.
+// The database is owner-only from the moment it exists — not chmod'ed after the
+// open and the migrations, when the file (and its WAL) had already been on disk
+// under the umask for the whole open. The `-wal` and `-shm` files SQLite adds
+// take the main file's mode, so a write after the open has to leave them 0600
+// as well; `snapshot_to` creates its destination the same way.
+#[cfg(unix)]
+#[test]
+fn the_database_and_its_wal_are_owner_only_from_creation() {
+    use std::os::unix::fs::PermissionsExt;
+    let mode =
+        |path: &std::path::Path| std::fs::metadata(path).unwrap().permissions().mode() & 0o777;
+    let sibling = |path: &std::path::Path, suffix: &str| {
+        let mut s = path.as_os_str().to_owned();
+        s.push(suffix);
+        PathBuf::from(s)
+    };
+
+    let path = tmp_db();
+    let store = SqliteStore::open(&path, KEY).unwrap();
+    store.upsert(&rec("a", b"payload")).unwrap();
+
+    assert_eq!(mode(&path), 0o600);
+    assert_eq!(mode(&sibling(&path, "-wal")), 0o600);
+    assert_eq!(mode(&sibling(&path, "-shm")), 0o600);
+
+    let snapshot = path.with_file_name("snapshot.db");
+    store.snapshot_to(&snapshot, KEY).unwrap();
+    assert_eq!(mode(&snapshot), 0o600);
+
+    // A database that already exists with a looser mode is tightened before it
+    // is opened, so a vault written by an older build catches up on first open.
+    drop(store);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+    let _reopened = SqliteStore::open(&path, KEY).unwrap();
+    assert_eq!(mode(&path), 0o600);
+}
+
 #[test]
 fn meta_delete_prefix_removes_only_the_namespace() {
     let store = SqliteStore::open(&tmp_db(), KEY).unwrap();

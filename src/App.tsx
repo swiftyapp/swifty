@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { useApp, flowSetup, refreshApp } from './store'
-import type { AppStatus } from './api/app'
+import { useApp, flowSetup, refreshApp, fileOpened } from './store'
+import { takeOpenedFile, type AppStatus } from './api/app'
 import { subscribeToEvents } from './store/events'
 import { useLayout } from './hooks/useLayout'
 import Auth from './components/Auth'
@@ -64,6 +64,15 @@ export default function App() {
     const known = useApp.getState().status
     if (known) route(known)
     else void refreshApp().then(route)
+
+    // Launched by double-clicking a backup: Rust parked the path because
+    // nothing was listening yet. Asked after subscribing above, so an open
+    // that lands from here on comes in as `file:opened` instead.
+    takeOpenedFile()
+      .then(path => {
+        if (path) fileOpened(path)
+      })
+      .catch(() => {})
 
     const prefetch = setTimeout(() => void loadMain().catch(() => {}), PREFETCH_MAIN_MS)
     return () => {

@@ -1,10 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 
 // A vault entry. Kept as a single flat struct (rather than an enum) so it
 // round-trips the untyped legacy object shape; `kind` discriminates
 // login/note/card/identity.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+//
+// `Debug` is written by hand (below), not derived: the fields are the secrets
+// the vault exists to keep, and a derived impl would print every one of them.
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Entry {
     pub id: String,
     #[serde(rename = "type")]
@@ -141,12 +145,27 @@ fn is_unset(flag: &bool) -> bool {
     !*flag
 }
 
+// Only what the list already shows. Everything else on an entry is, or may
+// be, a secret, and `Debug` output ends up in panic messages, `assert_eq!`
+// failures and `{:?}` log lines — none of which should ever carry a password.
+// `finish_non_exhaustive` marks the withheld rest as `..`.
+impl fmt::Debug for Entry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Entry")
+            .field("id", &self.id)
+            .field("kind", &self.kind)
+            .field("title", &self.title)
+            .finish_non_exhaustive()
+    }
+}
+
 /// A single WebAuthn credential held by a login entry. Only P-256 ECDSA is
 /// supported, so there is no algorithm field. `credential_id`, `user_handle` and
 /// `private_key` are base64url and are stored exactly as the source gave them —
 /// never re-encoded, so a round-trip through import/export is byte-exact.
-/// `private_key` is a secret and only ever lives inside the sealed payload.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// `private_key` is a secret and only ever lives inside the sealed payload —
+/// which is why `Debug` is hand-written below and leaves it out.
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Passkey {
     pub credential_id: String,
@@ -163,6 +182,19 @@ pub struct Passkey {
     /// RFC3339.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub created_at: Option<String>,
+}
+
+// The credential's identity — what names it to a relying party — and nothing
+// that could sign for it.
+impl fmt::Debug for Passkey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Passkey")
+            .field("credential_id", &self.credential_id)
+            .field("rp_id", &self.rp_id)
+            .field("user_name", &self.user_name)
+            .field("counter", &self.counter)
+            .finish_non_exhaustive()
+    }
 }
 
 /// One free-form field on an entry: a label the user wrote and its value.

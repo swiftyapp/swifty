@@ -34,6 +34,13 @@ export interface EventPayloads {
   'setup:drive:pending': void
   'setup:drive:probed': { file: SetupDriveFile | null }
   'setup:drive:error': { error: string }
+  /**
+   * The OS opened a backup with the app — a double-clicked `.rowel` or
+   * `.swftx`. Rust also parks the path for a shell that was not yet listening
+   * (`takeOpenedFile` in `api/app`), so a launch by double-click and an open
+   * while running both end up in `store/app`'s `fileOpened`.
+   */
+  'file:opened': { path: string }
 }
 
 export type EventName = keyof EventPayloads
@@ -54,7 +61,8 @@ export const EVENTS: { [K in EventName as Camel<K>]: K } = {
   importProgress: 'import:progress',
   setupDrivePending: 'setup:drive:pending',
   setupDriveProbed: 'setup:drive:probed',
-  setupDriveError: 'setup:drive:error'
+  setupDriveError: 'setup:drive:error',
+  fileOpened: 'file:opened'
 }
 
 // Typed wrapper over Tauri's `listen`.

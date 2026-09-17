@@ -87,6 +87,8 @@ export const appStatusDefault = (): AppStatus => ({
 const DEFAULTS: Record<string, Handler> = {
   app_status: appStatusDefault,
   app_ready: () => undefined,
+  // Nothing was double-clicked to launch the app, which is every ordinary run.
+  take_opened_file: () => null,
 
   setup: () => undefined,
   unlock: () => session,

@@ -164,6 +164,14 @@ pub fn app_ready(app: AppHandle) {
     window::reveal(&app);
 }
 
+/// The backup the OS asked the app to open before the webview was listening
+/// for `file:opened` — a launch by double-clicking one. Handed over once (see
+/// `crate::opened`); `null` on every ordinary launch.
+#[tauri::command]
+pub fn take_opened_file(app: AppHandle) -> Option<String> {
+    crate::opened::take(&app)
+}
+
 /// Apply a partial settings object and hand the whole merged result back, so a
 /// caller that patched one key ends up holding exactly what is on disk. The
 /// auto-lock is re-armed inside `settings::set`, under its lock, rather than by

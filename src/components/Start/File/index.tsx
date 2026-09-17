@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from 'react'
+import { useEffect, useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import Masterpass from '@/components/elements/Masterpass'
 import Button from '@/components/elements/Button'
@@ -14,15 +14,23 @@ import { fileNameOf } from '../shared/describe'
 
 interface Props {
   onRestored: (result: UnlockResult) => Promise<void>
+  /** A backup already chosen — the one the OS opened the app with. */
+  initialPath?: string | null
 }
 
 // Restoring from a `.rowel` backup: pick the file, then unseal it with the
 // master password it was sealed under. Desktop only — a phone has nowhere to
 // drag a file from, and the backup it would need was saved on a machine that
 // does.
-export default function File({ onRestored }: Props) {
+export default function File({ onRestored, initialPath = null }: Props) {
   const { t } = useTranslation()
-  const [path, setPath] = useState<string | null>(null)
+  const [path, setPath] = useState<string | null>(initialPath)
+  // Also adopted when it changes while this screen is already up: the OS can
+  // open a backup with the picker on screen, and `Start` then keeps this
+  // component mounted rather than remounting it on the same `file` key.
+  useEffect(() => {
+    if (initialPath) setPath(initialPath)
+  }, [initialPath])
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
