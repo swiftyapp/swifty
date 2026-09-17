@@ -4361,7 +4361,7 @@ dependencies = [
 
 [[package]]
 name = "rowel"
-version = "1.0.0-alpha.2"
+version = "1.0.0-alpha.1"
 dependencies = [
  "aes-gcm",
  "argon2",
