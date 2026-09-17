@@ -2,10 +2,11 @@ import { useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import Masterpass from '@/components/elements/Masterpass'
 import Button from '@/components/elements/Button'
+import RadioList from '@/components/elements/RadioList'
 import { isMobile } from '@/lib/platform'
 import type { UnlockResult } from '@/api/types'
 import { setupRestoreFromDrive } from '@/api/setup'
-import { useApp } from '@/store'
+import { useApp, selectedDriveFile, setupDriveSelect } from '@/store'
 import StepHeader from '../shared/StepHeader'
 import FoundFileCard from '../shared/FoundFileCard'
 import SpinnerCard from '../shared/SpinnerCard'
@@ -32,6 +33,7 @@ export default function Drive({ onStartFresh, onUseFile, onRestored }: Props) {
   const { t } = useTranslation()
   const dates = useDates()
   const drive = useApp(state => state.setupDrive)
+  const file = useApp(selectedDriveFile)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -42,10 +44,10 @@ export default function Drive({ onStartFresh, onUseFile, onRestored }: Props) {
   }
 
   const unlock = () => {
-    if (busy || !password) return
+    if (busy || !password || !file) return
     setBusy(true)
     setError(null)
-    setupRestoreFromDrive(password)
+    setupRestoreFromDrive(password, file.id)
       .then(onRestored)
       .catch((err: unknown) => {
         setBusy(false)
@@ -124,23 +126,47 @@ export default function Drive({ onStartFresh, onUseFile, onRestored }: Props) {
       </>
     )
 
+  // More than one vault in the account happens when separate installs have
+  // each synced their own primary here: two packs, two ids, and nothing but
+  // their dates and sizes to tell them apart — so the choice is the user's,
+  // and it is made before the password, which is per-vault.
+  const several = drive.files.length > 1
+
   return (
     <>
       <StepHeader
         eyebrow={t('Restore · Google Drive')}
         title={t('Welcome back.')}
-        body={t('Enter your master password to unlock on this device.')}
+        body={
+          several
+            ? t('This account holds more than one vault. Pick the one to unlock here.')
+            : t('Enter your master password to unlock on this device.')
+        }
       />
 
       <div className={`${COLUMN} mt-9`}>
-        {drive.file && (
-          <FoundFileCard
-            where="drive"
-            testid="drive-found-file"
-            name={drive.file.name}
-            meta={describeDriveFile(drive.file, dates)}
-            encrypted
+        {several ? (
+          <RadioList
+            name={t('Vaults in this account')}
+            testidPrefix="drive-vault"
+            value={drive.selectedId ?? ''}
+            onChange={setupDriveSelect}
+            options={drive.files.map(vault => ({
+              value: vault.id,
+              label: t('Rowel vault'),
+              meta: describeDriveFile(vault, dates)
+            }))}
           />
+        ) : (
+          file && (
+            <FoundFileCard
+              where="drive"
+              testid="drive-found-file"
+              name={t('Rowel vault')}
+              meta={describeDriveFile(file, dates)}
+              encrypted
+            />
+          )
         )}
 
         <div className="mt-6">

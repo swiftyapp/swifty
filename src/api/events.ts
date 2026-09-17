@@ -12,8 +12,8 @@ import type { EntryMeta } from './types'
  * consent flow out with the browser against an account there is no vault behind
  * yet. The backend owns all three: it is what opens the browser and what hears
  * back from it, so the frontend mirrors these rather than guessing from a click
- * — the command itself resolves the moment the browser is on screen. `file:
- * null` there is an account with no Rowel data in it, a fact rather than a
+ * — the command itself resolves the moment the browser is on screen. An empty
+ * `files` there is an account with no Rowel data in it, a fact rather than a
  * failure, so it is not an error event.
  */
 export interface EventPayloads {
@@ -32,7 +32,8 @@ export interface EventPayloads {
   'sync:status': SyncStatus
   'import:progress': { done: number; total: number }
   'setup:drive:pending': void
-  'setup:drive:probed': { file: SetupDriveFile | null }
+  /** Every vault the account holds, newest first; empty is "nothing to restore". */
+  'setup:drive:probed': { files: SetupDriveFile[] }
   'setup:drive:error': { error: string }
   /**
    * The OS opened a backup with the app — a double-clicked `.rowel` or

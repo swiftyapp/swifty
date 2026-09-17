@@ -3,9 +3,9 @@
 //! During first-run onboarding there is no vault, so none of the usual entry
 //! points apply: [`super::run`] needs a session cryptor to read the token file
 //! with, and the token file itself cannot exist until a vault key does. The
-//! three questions onboarding actually has — is there a vault up there, give me
-//! its bytes, move it aside — are answered here against [`drive`] directly,
-//! with an access token the caller holds in memory.
+//! three questions onboarding actually has — which vaults are up there, give me
+//! this one's bytes, move this one aside — are answered here against [`drive`]
+//! directly, with an access token the caller holds in memory.
 //!
 //! (Not to be confused with [`super::setup`], the desktop consent flow for an
 //! install that already has a vault.)
@@ -14,14 +14,21 @@ use reqwest::Client;
 use serde::Serialize;
 
 use super::{drive, layout, pack};
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 /// A remote vault as the onboarding screen describes it — enough for the user
-/// to recognise the account as theirs, without downloading a byte.
+/// to recognise the account as theirs, and to choose between two, without
+/// downloading a byte.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PackInfo {
+    /// The Drive file id. The frontend hands it back to name which of several
+    /// vaults the user chose to restore or to archive.
+    pub id: String,
     pub name: String,
+    /// The vault this pack holds, from its file name — `None` for the legacy
+    /// `vault.swsync`, which predates vaults having ids.
+    pub vault_id: Option<String>,
     /// `0` when Drive reported no length. Onboarding only renders this, and a
     /// missing size is not worth a second shape in the payload.
     pub size: u64,
@@ -32,73 +39,94 @@ pub struct PackInfo {
 impl From<&drive::DriveFile> for PackInfo {
     fn from(file: &drive::DriveFile) -> Self {
         Self {
+            id: file.id.clone(),
             name: file.name.clone(),
+            vault_id: layout::vault_id_of(&file.name).map(str::to_owned),
             size: file.size.unwrap_or(0),
             modified_time: file.modified_time.clone(),
         }
     }
 }
 
-/// The pack in `Rowel/Vaults/` this install could restore from, if the account
-/// holds one.
+/// Every vault in the account a first run could restore from, newest first.
 ///
-/// `None` covers "no Rowel folder", "no Vaults/ in it" and "a Vaults/ with
-/// nothing restorable in it" — to onboarding they are the same answer, and the
-/// same fresh start.
-pub async fn find_pack(client: &Client, token: &str) -> Result<Option<drive::DriveFile>> {
+/// An empty list covers "no Rowel folder", "no Vaults/ in it" and "a Vaults/
+/// with nothing restorable in it" — to onboarding they are the same answer, and
+/// the same fresh start.
+///
+/// All of them rather than one: two installs syncing their own primary vault to
+/// the same Google account each mint their own vault id, so the account holds a
+/// pack per vault. Picking one here would hide the rest, and restore or "start
+/// fresh" would then act on a vault the user never chose.
+pub async fn find_packs(client: &Client, token: &str) -> Result<Vec<PackInfo>> {
     let Some(root) = drive::folder_id(client, token, layout::ROOT_FOLDER).await? else {
-        return Ok(None);
+        return Ok(Vec::new());
     };
-    if let Some(pack) = find_in_vaults(client, token, &root).await? {
-        return Ok(Some(pack));
-    }
-    // Fall back to the pre-`Vaults/` location, for an account nobody has synced
+    let vaults = match drive::folder_id_in(client, token, layout::VAULTS_FOLDER, &root).await? {
+        Some(vaults) => drive::list_folder(client, token, &vaults).await?,
+        None => Vec::new(),
+    };
+    // The pre-`Vaults/` location is read too, for an account nobody has synced
     // since the upgrade: its pack still sits directly in `Rowel/` under the old
     // name, and a first run that could not see it would offer to start fresh
     // over a vault the user very much still has. The sync engine moves the file
-    // into place on its next run, so this fallback goes with the rest of the
-    // legacy layout in a later cleanup.
-    drive::find_file(client, token, layout::LEGACY_VAULT_FILE, &root).await
+    // into place on its next run, so this goes with the rest of the legacy
+    // layout in a later cleanup.
+    let legacy = drive::find_file(client, token, layout::LEGACY_VAULT_FILE, &root).await?;
+    Ok(restorable_packs(vaults, legacy))
 }
 
-/// The live pack in `Rowel/Vaults/`, if that folder exists and holds one.
-async fn find_in_vaults(
-    client: &Client,
-    token: &str,
-    root: &str,
-) -> Result<Option<drive::DriveFile>> {
-    let Some(vaults) = drive::folder_id_in(client, token, layout::VAULTS_FOLDER, root).await?
-    else {
-        return Ok(None);
-    };
-    Ok(oldest_live_pack(
-        drive::list_folder(client, token, &vaults).await?,
-    ))
+/// The pack with this Drive file id, re-listed rather than trusted from the
+/// probe: the two are minutes apart, and a stale id is a confusing failure
+/// where "no vault up there any more" is a clear one.
+pub async fn find_pack_by_id(client: &Client, token: &str, file_id: &str) -> Result<PackInfo> {
+    find_packs(client, token)
+        .await?
+        .into_iter()
+        .find(|pack| pack.id == file_id)
+        .ok_or(Error::NoRemoteVault)
 }
 
-/// The one pack of `Rowel/Vaults/` onboarding offers to restore.
+/// Which of `vaults` (the contents of `Rowel/Vaults/`) and the legacy
+/// `Rowel/vault.swsync` are vaults to offer, and in what order.
 ///
 /// Live packs only: an archived pack is a vault the user deliberately set
-/// aside, and [`layout::vault_id_of`] is what tells the two apart.
+/// aside, and [`layout::vault_id_of`] is what tells the two apart. The legacy
+/// file counts only while it is still a real pack — once an upgraded device has
+/// migrated it, the same name holds a tombstone carrying
+/// [`layout::PROP_MOVED_TO`], which is a signpost to a pack already listed
+/// above and not a vault of its own.
 ///
-/// A stop-gap while more than one live pack cannot happen: sync covers the
-/// primary workspace alone, so an account holds one vault. If it somehow holds
-/// several, the oldest wins — the same rule the rest of `drive` settles ties
-/// with, and `created_time` is RFC 3339 UTC, a fixed-width format whose
-/// lexicographic order *is* chronological order. A follow-up will list them all
-/// and let the user pick instead of choosing for them.
-fn oldest_live_pack(files: Vec<drive::DriveFile>) -> Option<drive::DriveFile> {
-    files
-        .into_iter()
+/// Newest first, because that is the order a picker wants: `modified_time` is
+/// RFC 3339 UTC, a fixed-width format whose lexicographic order *is*
+/// chronological order, and the file id settles ties so every device shows the
+/// same list.
+fn restorable_packs(
+    vaults: Vec<drive::DriveFile>,
+    legacy: Option<drive::DriveFile>,
+) -> Vec<PackInfo> {
+    let mut packs: Vec<PackInfo> = vaults
+        .iter()
         .filter(|file| layout::vault_id_of(&file.name).is_some())
-        .min_by(|a, b| {
-            a.created_time
-                .cmp(&b.created_time)
-                .then_with(|| a.id.cmp(&b.id))
-        })
+        .chain(legacy.iter().filter(|file| !is_tombstone(file)))
+        .map(PackInfo::from)
+        .collect();
+    packs.sort_by(|a, b| {
+        b.modified_time
+            .cmp(&a.modified_time)
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    packs
 }
 
-/// Download a pack located by [`find_pack`], under the same size cap the sync
+/// Whether the file at [`layout::LEGACY_VAULT_FILE`] is the marker left behind
+/// by a migration rather than a pack. The listing alone answers it — the
+/// appProperty is there precisely so nobody has to download the bytes.
+fn is_tombstone(file: &drive::DriveFile) -> bool {
+    file.app_properties.contains_key(layout::PROP_MOVED_TO)
+}
+
+/// Download a pack located by [`find_packs`], under the same size cap the sync
 /// engine applies.
 pub async fn download_pack(client: &Client, token: &str, id: &str) -> Result<Vec<u8>> {
     drive::read_file(client, token, id, pack::MAX_PACK_BYTES).await
@@ -111,14 +139,14 @@ pub async fn download_pack(client: &Client, token: &str, id: &str) -> Result<Vec
 /// whatever the account already held, and this is their own Drive — the
 /// archived pack stays in the same folder for them to restore or bin later.
 ///
-/// The whole file, not just its id, because the archived name is built from the
+/// The whole pack, not just its id, because the archived name is built from the
 /// name it already has: a pack keeps its vault id, and the legacy file keeps
 /// its stem. Same-day collisions are fine — Drive allows same-name siblings, so
 /// a second archive on one day sits beside the first rather than replacing it.
 pub async fn archive_pack(
     client: &Client,
     token: &str,
-    file: &drive::DriveFile,
+    file: &PackInfo,
     today: &str,
 ) -> Result<()> {
     let name = layout::archived_file_name(&file.name, today);
@@ -135,16 +163,30 @@ pub fn today_utc() -> String {
 mod tests {
     use super::*;
 
-    fn drive_file(id: &str, name: &str, created: &str) -> drive::DriveFile {
+    // `modified_time` doubles as the created stamp: nothing here reads the
+    // latter, and the listing is ordered by the former.
+    fn drive_file(id: &str, name: &str, modified: &str) -> drive::DriveFile {
         drive::DriveFile {
             id: id.into(),
             name: name.into(),
-            created_time: created.into(),
-            modified_time: String::new(),
+            created_time: modified.into(),
+            modified_time: modified.into(),
             size: None,
             head_revision: None,
             app_properties: Default::default(),
         }
+    }
+
+    // The legacy file once an upgraded device has moved the pack into `Vaults/`.
+    fn tombstone(id: &str, moved_to: &str) -> drive::DriveFile {
+        let mut file = drive_file(id, layout::LEGACY_VAULT_FILE, "2024-06-01T00:00:00.000Z");
+        file.app_properties
+            .insert(layout::PROP_MOVED_TO.into(), moved_to.into());
+        file
+    }
+
+    fn ids(packs: &[PackInfo]) -> Vec<&str> {
+        packs.iter().map(|pack| pack.id.as_str()).collect()
     }
 
     // What "start fresh" leaves behind: the pack keeps its vault id, the legacy
@@ -167,11 +209,13 @@ mod tests {
         );
     }
 
-    // One vault in the account is the case that exists today.
+    // One vault in the account is the ordinary case.
     #[test]
     fn the_single_live_pack_is_the_one_to_restore() {
         let pack = drive_file("f1", "a1b2.rowel", "2024-01-01T00:00:00.000Z");
-        assert_eq!(oldest_live_pack(vec![pack.clone()]), Some(pack));
+        let packs = restorable_packs(vec![pack], None);
+        assert_eq!(ids(&packs), ["f1"]);
+        assert_eq!(packs[0].vault_id.as_deref(), Some("a1b2"));
     }
 
     // Anything that is not a live pack is not something to restore: an archive
@@ -188,20 +232,54 @@ mod tests {
             drive_file("f2", "notes.txt", "2024-01-01T00:00:00.000Z"),
             drive_file("f3", "a1b2.rowelshare", "2024-01-01T00:00:00.000Z"),
         ];
-        assert_eq!(oldest_live_pack(files), None);
-        assert_eq!(oldest_live_pack(Vec::new()), None);
+        assert!(restorable_packs(files, None).is_empty());
+        assert!(restorable_packs(Vec::new(), None).is_empty());
     }
 
-    // Not expected while sync is primary-workspace-only, but whichever pack the
-    // account had first is the answer every device would give.
+    // Every vault the account holds, so the user picks rather than having one
+    // picked for them — newest first, whatever order Drive listed them in.
     #[test]
-    fn the_oldest_live_pack_wins_whatever_order_drive_lists_in() {
+    fn every_live_pack_is_offered_newest_first() {
         let files = vec![
             drive_file("f2", "beef.rowel", "2024-06-01T00:00:00.000Z"),
             drive_file("f1", "a1b2.rowel", "2024-01-01T00:00:00.000Z"),
             drive_file("f3", "cafe.rowel", "2024-03-01T00:00:00.000Z"),
         ];
-        assert_eq!(oldest_live_pack(files).unwrap().id, "f1");
+        assert_eq!(ids(&restorable_packs(files, None)), ["f2", "f3", "f1"]);
+    }
+
+    // Two packs written in the same second still list in one fixed order, so
+    // every device shows the same thing and a chosen id means the same vault.
+    #[test]
+    fn packs_of_the_same_age_are_ordered_by_file_id() {
+        let files = vec![
+            drive_file("f2", "beef.rowel", "2024-06-01T00:00:00.000Z"),
+            drive_file("f1", "a1b2.rowel", "2024-06-01T00:00:00.000Z"),
+        ];
+        assert_eq!(ids(&restorable_packs(files, None)), ["f1", "f2"]);
+    }
+
+    // An account nobody has synced since the upgrade holds its only vault at
+    // the legacy name — it is offered alongside the rest, with no vault id of
+    // its own because the name carries none.
+    #[test]
+    fn the_legacy_pack_is_a_vault_until_it_is_migrated() {
+        let legacy = drive_file("old", layout::LEGACY_VAULT_FILE, "2024-06-01T00:00:00.000Z");
+        let packs = restorable_packs(Vec::new(), Some(legacy));
+        assert_eq!(ids(&packs), ["old"]);
+        assert_eq!(packs[0].vault_id, None);
+        assert_eq!(packs[0].name, layout::LEGACY_VAULT_FILE);
+    }
+
+    // Once the pack has moved into `Vaults/`, the old name holds a signpost to
+    // it. Listing that as a vault would offer the same data twice — and the
+    // second copy would not open, because a tombstone is not a pack.
+    #[test]
+    fn a_tombstone_at_the_legacy_name_is_not_a_vault() {
+        let moved = drive_file("f1", "a1b2.rowel", "2024-01-01T00:00:00.000Z");
+        let packs = restorable_packs(vec![moved], Some(tombstone("old", "a1b2")));
+        assert_eq!(ids(&packs), ["f1"]);
+        assert!(restorable_packs(Vec::new(), Some(tombstone("old", "a1b2"))).is_empty());
     }
 
     #[test]
@@ -214,18 +292,21 @@ mod tests {
 
     #[test]
     fn a_listed_pack_describes_itself_to_onboarding() {
-        let mut file = drive_file("f1", "a1b2.rowel", "2024-01-01T00:00:00.000Z");
-        file.modified_time = "2024-05-04T10:11:12.000Z".into();
+        let mut file = drive_file("f1", "a1b2.rowel", "2024-05-04T10:11:12.000Z");
         file.size = Some(2048);
 
         let info = PackInfo::from(&file);
+        assert_eq!(info.id, "f1");
         assert_eq!(info.name, "a1b2.rowel");
+        assert_eq!(info.vault_id.as_deref(), Some("a1b2"));
         assert_eq!(info.size, 2048);
         assert_eq!(info.modified_time, "2024-05-04T10:11:12.000Z");
 
         // Payload keys are the frontend's contract.
         let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(json["id"], "f1");
         assert_eq!(json["name"], "a1b2.rowel");
+        assert_eq!(json["vaultId"], "a1b2");
         assert_eq!(json["size"], 2048);
         assert_eq!(json["modifiedTime"], "2024-05-04T10:11:12.000Z");
     }

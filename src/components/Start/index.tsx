@@ -143,8 +143,8 @@ export function Start() {
   }, [])
 
   const create = useCallback(
-    (value: string, archiveRemote: boolean) =>
-      setupCreate(value, archiveRemote).then(finish),
+    (value: string, archiveRemote: boolean, fileId: string | null = null) =>
+      setupCreate(value, archiveRemote, fileId).then(finish),
     [finish]
   )
 
@@ -153,7 +153,12 @@ export function Start() {
     [create, password]
   )
 
-  const archiveAndCreate = useCallback(() => create(password, true), [create, password])
+  // The pack the conflict screen just described, by id: an account can hold
+  // more than one, and "archive the old one" has to set aside that one.
+  const archiveAndCreate = useCallback(
+    () => create(password, true, useApp.getState().setupDrive.selectedId),
+    [create, password]
+  )
 
   const openDrive = () => {
     connectDrive()
