@@ -29,9 +29,6 @@ use crate::crypto::KdfParams;
 use crate::storage;
 use crate::store::SqliteStore;
 
-/// The remote file name this format is stored under.
-pub const FILE_NAME: &str = "vault.swsync";
-
 /// The most a pack may be when pulled from Drive. A vault is metadata plus
 /// sealed payloads whose biggest members are 1 MiB env files, so a real pack is
 /// megabytes; the cap is there so a file that is not a real pack cannot be

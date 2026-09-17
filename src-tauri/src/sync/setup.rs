@@ -13,7 +13,7 @@
 use reqwest::Client;
 use serde::Serialize;
 
-use super::{drive, pack, FOLDER_NAME};
+use super::{drive, layout, pack};
 use crate::error::Result;
 
 /// A remote vault as the onboarding screen describes it — enough for the user
@@ -44,10 +44,10 @@ impl From<&drive::DriveFile> for PackInfo {
 /// `None` covers both "no Rowel folder" and "a folder with no pack in it" —
 /// to onboarding they are the same answer, and the same fresh start.
 pub async fn find_pack(client: &Client, token: &str) -> Result<Option<drive::DriveFile>> {
-    let Some(folder) = drive::folder_id(client, token, FOLDER_NAME).await? else {
+    let Some(folder) = drive::folder_id(client, token, layout::ROOT_FOLDER).await? else {
         return Ok(None);
     };
-    drive::find_file(client, token, pack::FILE_NAME, &folder).await
+    drive::find_file(client, token, layout::LEGACY_VAULT_FILE, &folder).await
 }
 
 /// Download a pack located by [`find_pack`], under the same size cap the sync
@@ -93,7 +93,7 @@ mod tests {
         // Same extension as the live pack, so the archive is still recognisably
         // a Rowel vault the user could restore from.
         assert!(archive_name("2024-05-04")
-            .ends_with(&format!(".{}", pack::FILE_NAME.rsplit('.').next().unwrap())));
+            .ends_with(&format!(".{}", layout::LEGACY_VAULT_FILE.rsplit('.').next().unwrap())));
     }
 
     #[test]

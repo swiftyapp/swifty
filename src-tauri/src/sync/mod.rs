@@ -11,6 +11,9 @@ mod auth;
 // Crate-visible: `share::remote` drives the same Drive REST surface.
 pub(crate) mod drive;
 pub mod engine;
+// Every name Drive sees: folders, file names, extensions. Crate-visible so
+// sharing and the backup export spell them the same way.
+pub mod layout;
 pub mod pack;
 pub mod restore;
 // First-run onboarding's keyless view of the account. Named for the flow, not
@@ -27,8 +30,6 @@ use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::state::AppState;
 use engine::{Remote, RemoteFile, SessionVault, SyncOutcome};
-
-pub(crate) const FOLDER_NAME: &str = "Rowel";
 
 /// A valid Drive access token for the connected account, refreshed if needed.
 /// Crate-visible so `share::remote` can act on the same account.
@@ -224,7 +225,7 @@ impl DriveRemote {
         if let Some(id) = self.folder.lock().unwrap().clone() {
             return Ok(Some(id));
         }
-        let found = drive::folder_id(client, token, FOLDER_NAME).await?;
+        let found = drive::folder_id(client, token, layout::ROOT_FOLDER).await?;
         if let Some(id) = &found {
             *self.folder.lock().unwrap() = Some(id.clone());
         }
@@ -235,7 +236,7 @@ impl DriveRemote {
         let Some(folder) = self.folder(client, token).await? else {
             return Ok(None);
         };
-        drive::find_file(client, token, pack::FILE_NAME, &folder).await
+        drive::find_file(client, token, layout::LEGACY_VAULT_FILE, &folder).await
     }
 
     async fn token(&self, client: &Client) -> Result<String> {
@@ -282,16 +283,16 @@ impl Remote for DriveRemote {
             let folder = match self.folder(&client, &token).await? {
                 Some(id) => id,
                 None => {
-                    let id = drive::create_folder(&client, &token, FOLDER_NAME).await?;
+                    let id = drive::create_folder(&client, &token, layout::ROOT_FOLDER).await?;
                     *self.folder.lock().unwrap() = Some(id.clone());
                     id
                 }
             };
-            let revision = match drive::find_file(&client, &token, pack::FILE_NAME, &folder).await?
+            let revision = match drive::find_file(&client, &token, layout::LEGACY_VAULT_FILE, &folder).await?
             {
                 Some(file) => drive::update_file(&client, &token, &file.id, bytes).await?,
                 None => {
-                    drive::create_file(&client, &token, pack::FILE_NAME, &folder, bytes)
+                    drive::create_file(&client, &token, layout::LEGACY_VAULT_FILE, &folder, bytes)
                         .await?
                         .head_revision
                 }

@@ -12,6 +12,9 @@ mod sqlite;
 // Migration glue lives in-module but deliberately references the app's crypto —
 // it is the boundary adapter, not part of the pure trait.
 pub mod migrate;
+// The vault id in `meta`: same boundary status as `migrate` (it mints ids with
+// the app's crypto).
+pub mod identity;
 
 #[cfg(test)]
 mod tests;

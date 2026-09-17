@@ -85,9 +85,9 @@ pub fn set_favorite(
     meta_dto_of(store, &id)
 }
 
-/// The backup file's extension, and the one `export_vault` writes. Also the
-/// desktop file association in `tauri.conf.json`; keep the two in step.
-pub const BACKUP_EXTENSION: &str = "rowel";
+/// The backup file's extension, and the one `export_vault` writes: the same
+/// pack, and so the same extension, as the vault on Drive (`sync::layout`).
+pub const BACKUP_EXTENSION: &str = sync::layout::VAULT_EXTENSION;
 
 /// What an import merged, plus the list it left behind — so the frontend takes
 /// the refreshed vault from the same call rather than re-reading it.
