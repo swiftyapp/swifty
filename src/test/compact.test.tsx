@@ -12,6 +12,7 @@ import {
   useVault,
   selectCurrent,
   editEntry,
+  lockSettings,
   openPalette,
   openSettings,
   openAddPicker,
@@ -414,6 +415,32 @@ describe('compact shell', () => {
 
     await userEvent.click(screen.getByTestId('settings-back'))
     expect(screen.getByTestId('settings-nav-security')).toBeInTheDocument()
+  })
+
+  // The pane's section is local state, so the store's guard on the wide
+  // modal's close and nav does not reach it by itself — the Back has to honour
+  // the same lock, or a restore from Drive could be walked away from here
+  // (and would finish behind the user's back) while the desktop refuses it.
+  it('holds a locked settings section against Back and the tab bar', async () => {
+    seed()
+    render(<Main />)
+
+    act(() => openSettings())
+    await userEvent.click(screen.getByTestId('settings-nav-workspaces'))
+    expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeInTheDocument()
+
+    act(() => lockSettings(true))
+    expect(screen.getByTestId('settings-back')).toBeDisabled()
+    await userEvent.click(screen.getByTestId('settings-back'))
+    expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeInTheDocument()
+    // Leaving Settings from the tab bar goes through the guarded `closeSettings`.
+    await userEvent.click(screen.getByTestId('tab-items'))
+    expect(useUi.getState().settings).toBe(true)
+    expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeInTheDocument()
+
+    act(() => lockSettings(false))
+    await userEvent.click(screen.getByTestId('settings-back'))
+    expect(screen.getByTestId('settings-nav-workspaces')).toBeInTheDocument()
   })
 
   // The chip's default is the wide modal's section state, which a pushed pane
