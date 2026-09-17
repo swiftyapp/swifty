@@ -381,7 +381,6 @@ impl Importer for Bitwarden {
     }
 }
 
-
 // Remove the custom field labelled `label` (case-insensitively) and hand back
 // its value: a field of ours is not the user's, so it leaves the extras when it
 // is claimed — the same move the SSH passphrase makes in its own arm.

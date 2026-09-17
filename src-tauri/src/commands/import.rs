@@ -395,8 +395,7 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
             e.website = imp.url.clone();
             e.email = imp.email.clone();
             e.otp = imp.otp.clone();
-            e.passkeys =
-                (!imp.passkeys.is_empty()).then(|| imp.passkeys.clone());
+            e.passkeys = (!imp.passkeys.is_empty()).then(|| imp.passkeys.clone());
         }
         EntryKind::Card => {
             e.number = imp.card_number.clone();

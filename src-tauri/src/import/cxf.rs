@@ -401,4 +401,3 @@ fn rfc3339(secs: u64) -> Option<String> {
     let secs = i64::try_from(secs).ok()?;
     chrono::DateTime::from_timestamp(secs, 0).map(|t| t.to_rfc3339())
 }
-

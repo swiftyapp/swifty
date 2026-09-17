@@ -250,4 +250,3 @@ fn discard(root: &Path, id: &str) {
     let _ = fs::remove_file(dir.join(storage::KDF_SIDECAR_FILE));
     let _ = fs::remove_dir_all(&dir);
 }
-
