@@ -278,7 +278,10 @@ pub struct SshKeyPair {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OtpResult {
     pub code: String,
+    /// Seconds left in the current window.
     pub time: u32,
+    /// How long that window is — 30s unless the seed said otherwise.
+    pub period: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
