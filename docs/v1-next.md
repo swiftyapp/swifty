@@ -37,8 +37,9 @@ products solve it, don't patch symptoms.
 > onboarding. Upgrade path: update the device that holds the vault first (its data is local and
 > its first sync pushes it to the new layout), then reset every other device and restore it from
 > that new pack. `Rowel/vault.swsync` can then be deleted by hand. The id a run settles on is
-> written into the vault's `meta` only after that run has succeeded, so a failed import never
-> leaves a vault pointed at a pack it did not merge.
+> written into the vault's `meta` mid-run, at the one point that is past a fetched, decoded and
+> merged pull and short of every push: a failed import never leaves a vault pointed at a pack it
+> did not merge, and no pack is ever uploaded under an id the vault does not already answer to.
 >
 > Onboarding's probe lists every live pack it finds and the first run picks which vault to
 > restore or to archive, so an account holding two installs' primaries never has one chosen

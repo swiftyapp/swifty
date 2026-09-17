@@ -5,9 +5,11 @@
 //! Which pack is *this* vault's is settled once per run, before the engine
 //! starts: see [`resolve_vault_id`].
 //!
-//! The id that step settles on reaches the vault's `meta` table only *after*
-//! the run it was settled for has succeeded (see [`run`]): until the pack has
-//! been fetched, decoded and merged, nothing has proved it is this vault's.
+//! The id that step settles on reaches the vault's `meta` table in the middle of
+//! the run it was settled for (see [`run`]), never at either end: after the
+//! remote pack has been fetched, decoded and merged — until then nothing has
+//! proved it is this vault's — and before anything is packed or uploaded, so
+//! Drive is never changed under an id this vault does not yet answer to.
 //!
 //! This module is only the *transport*: the sync algorithm lives in [`engine`],
 //! behind the [`engine::Remote`] trait that [`DriveRemote`] implements. Drive's
@@ -197,28 +199,38 @@ pub fn run(app: &AppHandle, cryptor: Cryptor, intent: Intent) -> Result<SyncOutc
     // — or a second one — is the one mistake the merge cannot undo.
     let resolved = block_on(resolve_vault_id(app, &cryptor, &local, intent))?;
     let remote = DriveRemote::new(app.clone(), cryptor, resolved.id.clone());
-    let outcome = engine::sync(&remote, &local, now_ms())?;
 
-    // The id is written *here*, on the far side of a whole successful run, and
-    // nowhere earlier. An import that cannot reach, decode or merge the pack it
-    // was pointed at leaves this vault answering to the id it already had,
-    // rather than to a pack it has never seen a record of.
+    // The id is written from inside the run, at the one moment that satisfies
+    // both of the things this ordering has to guarantee (see [`engine::sync`],
+    // which decides when that moment is):
     //
-    // A run that failed after an `Assign` leaves this vault id-less and the
-    // account untouched, so the next run mints an id again. Nothing was pushed
-    // under the first one — the push is part of the run that failed.
+    // * Nothing before the pull has been fetched, decoded and merged. An import
+    //   that cannot reach or read the pack it was pointed at leaves this vault
+    //   answering to the id it already had, rather than to a pack it has never
+    //   seen a record of.
+    // * Nothing after the first push. Written afterwards, a vault that locked
+    //   between the upload and the write would have changed Drive without
+    //   changing itself: an id-less vault would have published `<new-id>.rowel`
+    //   and would mint a *different* id on its next run, and an import would
+    //   have updated the adopted pack while still answering to its old name.
     //
-    // The price is that the pack this run pushed carries a snapshot taken
-    // before the write, so the very first pack of an assigned or adopted vault
-    // does not name its own id inside `meta`. The file name does, which is what
-    // addresses it on Drive; a restore from such a pack takes the id from there
-    // (`restore::adopt_vault_id_from_name`).
-    if resolved.persist {
-        // `adopt_vault_id` covers a minted id as well as one taken from the
-        // remote: by the time the write happens they are both simply "the id
-        // this run proved to be ours".
-        local.adopt_vault_id(&resolved.id)?;
-    }
+    // A `settle` that fails therefore aborts the run before anything is
+    // uploaded, and the account is left as the run found it.
+    //
+    // Because the write lands before `pack()`, the first pack an assigned or
+    // adopted vault pushes already names its own id inside `meta`. The file name
+    // names it too, which is what addresses it on Drive, and a restore still
+    // takes the id from there (`restore::adopt_vault_id_from_name`) — belt and
+    // braces for packs written before this ordering existed.
+    let outcome = engine::sync(&remote, &local, now_ms(), || {
+        if resolved.persist {
+            // `adopt_vault_id` covers a minted id as well as one taken from the
+            // remote: by the time the write happens they are both simply "the
+            // id this run proved to be ours".
+            local.adopt_vault_id(&resolved.id)?;
+        }
+        Ok(())
+    })?;
 
     sweep_shares(app);
     Ok(outcome)
@@ -313,8 +325,9 @@ struct Resolved {
     id: String,
     /// Whether `meta` still has to be given `id` — an assign or an adopt, as
     /// opposed to a vault that already knew its own name. Deliberately *not*
-    /// written by [`resolve_vault_id`]: see [`run`], which writes it once the
-    /// run it was resolved for has succeeded.
+    /// written by [`resolve_vault_id`]: see [`run`], which hands the write to
+    /// the engine to make mid-run, once the pull has proved the id and before
+    /// any push can act on it.
     persist: bool,
 }
 
@@ -322,8 +335,9 @@ struct Resolved {
 /// calls for.
 ///
 /// The *local* vault is not touched here at all — an id this function minted
-/// lives in memory for as long as the run does, which is what keeps a failed run
-/// from leaving a vault pointed at a pack it never read.
+/// lives in memory until the run's own pull has proved it (see [`run`]), which
+/// is what keeps a failed run from leaving a vault pointed at a pack it never
+/// read.
 async fn resolve_vault_id(
     app: &AppHandle,
     cryptor: &Cryptor,
