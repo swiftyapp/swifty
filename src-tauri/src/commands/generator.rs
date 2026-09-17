@@ -1,5 +1,6 @@
 use crate::error::{Error, Result};
 use crate::models::{GeneratorOptions, OtpResult, SshKeyPair};
+use crate::otp::{self, OtpAlgorithm, OtpParams};
 use rand::seq::SliceRandom;
 use rand::Rng;
 use ssh_key::{private::PrivateKey, Algorithm as SshAlgorithm, HashAlg, LineEnding};
@@ -84,18 +85,26 @@ pub fn generate_ssh_key(comment: Option<String>) -> Result<SshKeyPair> {
     })
 }
 
-fn totp(secret: &str) -> Result<Totp> {
-    let secret = Secret::try_from_base32(secret)
+// The generator for one already-read stored value. The parameters are not
+// optional decoration: an 8-digit or 60-second enrolment generates codes the
+// site refuses if they are ignored.
+fn totp(params: &OtpParams) -> Result<Totp> {
+    let secret = Secret::try_from_base32(&params.secret)
         .map_err(|e| Error::Other(format!("invalid otp secret: {e:?}")))?;
-    // SHA1, 6 digits, 30s period, ±1 window — matches legacy speakeasy defaults.
-    // `build_noncompliant` skips the RFC secret-length and digit checks, exactly
-    // as the old `new_unchecked` did: stored secrets are whatever the issuer
-    // handed the user, and refusing a short one would lock them out.
+    // ±1 window matches the legacy speakeasy defaults. `build_noncompliant`
+    // skips the RFC secret-length and digit checks, exactly as the old
+    // `new_unchecked` did: stored secrets are whatever the issuer handed the
+    // user, and refusing a short one would lock them out.
     Ok(Builder::new()
-        .with_algorithm(Algorithm::SHA1)
-        .with_digits(6)
+        .with_algorithm(match params.algorithm {
+            OtpAlgorithm::Sha1 => Algorithm::SHA1,
+            OtpAlgorithm::Sha256 => Algorithm::SHA256,
+            OtpAlgorithm::Sha512 => Algorithm::SHA512,
+        })
+        // `otp::DIGITS` caps the count at 10, so the cast cannot truncate.
+        .with_digits(params.digits as u8)
         .with_skew(1)
-        .with_step_duration(30)
+        .with_step_duration(params.period)
         .with_secret(secret)
         .build_noncompliant())
 }
@@ -109,15 +118,20 @@ fn unix_now() -> Result<u64> {
         .as_secs())
 }
 
-// Generate the current TOTP code for a base32 secret plus seconds left in the window.
+// Generate the current TOTP code for a stored secret, plus the seconds left in
+// the window and how long that window is — the frontend's ring is drawn to
+// scale, and 60-second seeds are not unusual.
 #[tauri::command]
 pub fn generate_otp(secret: String) -> Result<OtpResult> {
     let now = unix_now()?;
+    let params = otp::parse(&secret).map_err(|e| Error::Other(e.to_string()))?;
+    let period = params.period;
     Ok(OtpResult {
         // `Token`'s Display zero-pads to the configured digit count, which is
         // exactly the string 5.x's `generate` returned.
-        code: totp(&secret)?.generate(now).to_string(),
-        time: 30 - (now % 30) as u32,
+        code: totp(&params)?.generate(now).to_string(),
+        time: (period - now % period) as u32,
+        period: period as u32,
     })
 }
 
@@ -196,12 +210,33 @@ mod tests {
     #[test]
     fn otp_generates_the_code_for_the_current_step() {
         let secret = "JBSWY3DPEHPK3PXP"; // "Hello!\xDE\xAD\xBE\xEF" base32
-        let otp = generate_otp(secret.to_string()).unwrap();
-        assert_eq!(otp.code.len(), 6);
-        assert!(otp.time >= 1 && otp.time <= 30);
-        assert!(totp(secret)
+        let result = generate_otp(secret.to_string()).unwrap();
+        assert_eq!(result.code.len(), 6);
+        assert_eq!(result.period, 30);
+        assert!(result.time >= 1 && result.time <= 30);
+        assert!(totp(&otp::parse(secret).unwrap())
             .unwrap()
-            .check(&otp.code, unix_now().unwrap())
+            .check(&result.code, unix_now().unwrap())
+            .is_some());
+    }
+
+    // The bug this guards against: the parameters on an enrolment URI were
+    // dropped, so an 8-digit SHA-256 seed generated a 6-digit SHA-1 code the
+    // site would never accept — silently, with no way to tell from the dial.
+    #[test]
+    fn otp_honours_the_parameters_on_an_otpauth_uri() {
+        let uri = "otpauth://totp/Acme:me@acme.io?secret=JBSWY3DPEHPK3PXP\
+                   &digits=8&period=60&algorithm=SHA256";
+        let result = generate_otp(uri.to_string()).unwrap();
+        assert_eq!(result.code.len(), 8);
+        assert!(result.code.chars().all(|c| c.is_ascii_digit()));
+        assert_eq!(result.period, 60);
+        assert!(result.time >= 1 && result.time <= 60);
+        // A 60s window is a different code from the same seed on 30s, which is
+        // what "the parameters were read" actually means here.
+        assert!(totp(&otp::parse(uri).unwrap())
+            .unwrap()
+            .check(&result.code, unix_now().unwrap())
             .is_some());
     }
 

@@ -14,6 +14,7 @@ use super::export::{
     ENVIRONMENT_LABEL, FINGERPRINT_LABEL, PASSPHRASE_LABEL, PUBLIC_KEY_LABEL, SCOPES_LABEL,
 };
 use super::{EntryKind, ImportResult, ImportedEntry, ImportedPasskey, Importer};
+use crate::otp::{self, OtpAlgorithm, OtpParams};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -85,9 +86,17 @@ struct Credential {
     // api-key
     #[serde(default)]
     url: Option<Value>,
-    // totp
+    // totp. The three parameters are `Value` because exporters write them as
+    // either a number or a string, and one we cannot read must cost the item
+    // its totp, not the whole document — see `totp_params`.
     #[serde(default)]
     secret: Option<String>,
+    #[serde(default)]
+    period: Option<Value>,
+    #[serde(default)]
+    digits: Option<Value>,
+    #[serde(default)]
+    algorithm: Option<Value>,
     // credit-card
     #[serde(default)]
     number: Option<Value>,
@@ -168,8 +177,17 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
                 Some(p) => passkeys.push(p),
                 None => result.push_err(row, "incomplete passkey"),
             },
-            // The app keeps a single base32 seed per entry, so the first wins.
-            "totp" => otp = otp.or_else(|| non_empty(cred.secret)),
+            // The app keeps a single seed per entry, so the first usable one
+            // wins. The parameters beside it are part of that seed — dropping
+            // them used to turn an 8-digit enrolment into codes nobody accepts
+            // — so they are folded into the stored value, and a seed whose
+            // parameters we cannot honour is skipped rather than stored with
+            // ones we made up.
+            "totp" if otp.is_none() => match totp_params(&cred) {
+                Ok(Some(p)) => otp = Some(otp::to_stored(&p)),
+                Ok(None) => {}
+                Err(e) => result.push_err(row, format!("totp credential skipped: {e}")),
+            },
             "note" => note = note.or_else(|| Some(text(&cred.content).unwrap_or_default())),
             _ => {}
         }
@@ -302,6 +320,58 @@ fn expiry(v: &Option<Value>) -> (Option<String>, Option<String>) {
     match text(v).and_then(|s| s.split_once('-').map(|(y, m)| (y.to_owned(), m.to_owned()))) {
         Some((year, month)) => (Some(month), Some(year)),
         None => (None, None),
+    }
+}
+
+/// The parameters of a `totp` credential, as the generator will read them.
+/// `Ok(None)` when there is no secret, and so nothing to keep.
+///
+/// An absent `period`, `digits` or `algorithm` means the RFC 6238 default —
+/// that is what the spec says absence means. A present one we cannot read or
+/// generate for is an error, not a default: the spec has an importer ignore a
+/// TOTP whose algorithm it does not know, and a `period` of 301 or `digits`
+/// of "eight" are no different in kind. Filling any of them in would store a
+/// seed that generates plausible codes the site refuses — the exact failure
+/// `crate::otp` exists to rule out. The item still imports without its totp.
+fn totp_params(c: &Credential) -> Result<Option<OtpParams>, String> {
+    let Some(secret) = non_empty(c.secret.clone()) else {
+        return Ok(None);
+    };
+    let digits = match &c.digits {
+        None => otp::DEFAULT_DIGITS,
+        Some(v) => totp_number(v)
+            .and_then(|d| u32::try_from(d).ok())
+            .filter(|d| otp::DIGITS.contains(d))
+            .ok_or_else(|| format!("unsupported digits: {v}"))?,
+    };
+    let period = match &c.period {
+        None => otp::DEFAULT_PERIOD,
+        Some(v) => totp_number(v)
+            .filter(|p| otp::PERIOD.contains(p))
+            .ok_or_else(|| format!("unsupported period: {v}"))?,
+    };
+    let algorithm = match &c.algorithm {
+        None => OtpAlgorithm::default(),
+        Some(v) => v
+            .as_str()
+            .ok_or_else(|| format!("unsupported algorithm: {v}"))
+            .and_then(|a| OtpAlgorithm::parse(a).map_err(|e| e.to_string()))?,
+    };
+    Ok(Some(OtpParams {
+        secret,
+        digits,
+        period,
+        algorithm,
+    }))
+}
+
+/// A totp parameter, written as a JSON number by the spec and as a string by
+/// about half the exporters. `None` for anything else.
+fn totp_number(v: &Value) -> Option<u64> {
+    match v {
+        Value::Number(n) => n.as_u64(),
+        Value::String(s) => s.trim().parse().ok(),
+        _ => None,
     }
 }
 
