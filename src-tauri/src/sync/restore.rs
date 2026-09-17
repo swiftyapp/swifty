@@ -1,4 +1,4 @@
-//! Fresh-install restore: adopt a remote `.swsync` file as *the* local vault.
+//! Fresh-install restore: adopt a remote `.rowel` pack as *the* local vault.
 //!
 //! This is the one path that installs a vault it did not create, and it only
 //! ever runs on an install that has none. A device that already holds a vault
@@ -142,7 +142,7 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::{Record, VaultStore};
+    use crate::store::{identity, Record, VaultStore};
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -199,6 +199,7 @@ mod tests {
         store.meta_set("sync_last_digest", "deadbeef").unwrap();
         // …and app meta that it must keep.
         store.meta_set("kdf", "argon2id").unwrap();
+        identity::assign_vault_id(&store).unwrap();
 
         let bytes = pack::pack_store(
             &store,
@@ -251,6 +252,22 @@ mod tests {
         assert_eq!(store.meta_get("sync_last_digest").unwrap(), None);
         // Scrubbing is scoped to the prefix: app meta is untouched.
         assert_eq!(store.meta_get("kdf").unwrap().as_deref(), Some("argon2id"));
+    }
+
+    // The restored vault *is* the source vault, so it answers to the same name
+    // on Drive. The id is deliberately not under `SYNC_META_PREFIX`: scrubbing
+    // it would make the next sync mint a second id, and the account would end
+    // up holding the same vault twice under two names.
+    #[test]
+    fn restore_keeps_the_vault_id_the_pack_carries() {
+        let (source, bytes) = packed_source();
+        let (db, sidecar) = fresh_target();
+
+        let (_, store) = restore_at(&db, &sidecar, &bytes, PASSWORD).unwrap();
+
+        let restored = identity::vault_id(&store).unwrap();
+        assert!(restored.is_some());
+        assert_eq!(restored, identity::vault_id(&source).unwrap());
     }
 
     #[test]

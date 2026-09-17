@@ -1,4 +1,4 @@
-//! `vault.swsync` — the single-file sync exchange artifact.
+//! The `.rowel` pack — the single-file sync exchange artifact.
 //!
 //! Byte layout:
 //!
@@ -35,6 +35,8 @@ use crate::store::SqliteStore;
 /// buffered whole before `unpack` gets to refuse it.
 pub const MAX_PACK_BYTES: usize = 256 * 1024 * 1024;
 
+// The format tag, not the product name: every pack ever written carries it, so
+// changing it would make this build refuse files it wrote itself.
 const MAGIC: &[u8; 4] = b"SWSY";
 const FORMAT_V1: u8 = 1;
 const HEADER_LEN: usize = MAGIC.len() + 1 + 4;
@@ -52,7 +54,7 @@ const MAX_KDF_LEN: usize = 64 * 1024;
 // wrong when the download was short is the misdiagnosis this app cannot afford.
 const SQLITE_MIN_PAGE: usize = 512;
 
-/// Why a `.swsync` file could not be read. Messages are user-safe: they can be
+/// Why a `.rowel` pack could not be read. Messages are user-safe: they can be
 /// surfaced verbatim without naming offsets, paths, or key material.
 #[derive(Debug, thiserror::Error)]
 pub enum PackError {
@@ -91,7 +93,7 @@ impl From<PackError> for crate::error::Error {
     }
 }
 
-/// A parsed `.swsync` file: its plaintext KDF descriptor and the encrypted
+/// A parsed `.rowel` pack: its plaintext KDF descriptor and the encrypted
 /// database snapshot that follows it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Unpacked {
@@ -99,7 +101,7 @@ pub struct Unpacked {
     pub snapshot: Vec<u8>,
 }
 
-/// Wrap a SQLCipher snapshot in the `.swsync` header.
+/// Wrap a SQLCipher snapshot in the pack header.
 pub fn pack(kdf_params_json: &str, snapshot: &[u8]) -> Vec<u8> {
     let kdf = kdf_params_json.as_bytes();
     let mut out = Vec::with_capacity(HEADER_LEN + kdf.len() + snapshot.len());
@@ -111,7 +113,7 @@ pub fn pack(kdf_params_json: &str, snapshot: &[u8]) -> Vec<u8> {
     out
 }
 
-/// Parse a `.swsync` file.
+/// Parse a `.rowel` pack.
 ///
 /// Every field is validated before it is trusted, because the input is a file
 /// pulled from a remote drive: it can be truncated by a failed upload, replaced
@@ -191,7 +193,7 @@ pub fn pack_store(
 fn scratch_name() -> String {
     static N: AtomicU64 = AtomicU64::new(0);
     format!(
-        "swsync-{}-{}.db",
+        "rowel-sync-{}-{}.db",
         std::process::id(),
         N.fetch_add(1, Ordering::SeqCst)
     )

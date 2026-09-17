@@ -27,7 +27,7 @@ use crate::error::{Error, Result};
 use crate::session::{store_err, Session};
 use crate::state::AppState;
 use crate::storage;
-use crate::store::{state_digest, Record, SqliteStore, StoreError, VaultStore};
+use crate::store::{identity, state_digest, Record, SqliteStore, StoreError, VaultStore};
 
 /// How long a tombstone is kept before it is reclaimed. A device offline for
 /// longer than this can resurrect what it deleted; see
@@ -82,7 +82,7 @@ pub trait Remote {
 /// is a superset of the one the digest was taken from — never a rollback — and
 /// the write's own debounced sync settles whatever is left over.
 pub trait LocalVault {
-    /// Open a pulled `.swsync` pack and read its records out. The local
+    /// Open a pulled `.rowel` pack and read its records out. The local
     /// database is not touched: the snapshot goes into its own scratch DB.
     fn decode(&self, pack_bytes: &[u8]) -> Result<Vec<Record>>;
     /// Last-writer-wins merge of `incoming`; returns the rows written.
@@ -93,6 +93,19 @@ pub trait LocalVault {
     fn pack(&self, cutoff_ms: i64) -> Result<Vec<u8>>;
     /// Record a completed push: the revision it landed at, and when.
     fn note_push(&self, revision: &str, at_ms: i64) -> Result<()>;
+
+    // The three below are not part of a run at all — they are what the provider
+    // settles *before* one, to learn which remote pack this vault is. They live
+    // on the trait because the id sits in the vault's own `meta` table, and
+    // reaching it means taking the session lock exactly as everything else here
+    // does.
+    //
+    /// This vault's id, or `None` for a vault created before ids existed.
+    fn vault_id(&self) -> Result<Option<String>>;
+    /// Mint a fresh id for this vault and hand it back.
+    fn assign_vault_id(&self) -> Result<String>;
+    /// Take on an id that already names this vault's pack on the remote.
+    fn adopt_vault_id(&self, id: &str) -> Result<()>;
 }
 
 /// What one run did, for the caller's events and logs.
@@ -270,6 +283,18 @@ impl LocalVault for SessionVault {
     fn note_push(&self, revision: &str, at_ms: i64) -> Result<()> {
         self.with_store(|store| note_push(store, revision, at_ms))
     }
+
+    fn vault_id(&self) -> Result<Option<String>> {
+        self.with_store(|store| identity::vault_id(store).map_err(store_err))
+    }
+
+    fn assign_vault_id(&self) -> Result<String> {
+        self.with_store(|store| identity::assign_vault_id(store).map_err(store_err))
+    }
+
+    fn adopt_vault_id(&self, id: &str) -> Result<()> {
+        self.with_store(|store| identity::adopt_vault_id(store, id).map_err(store_err))
+    }
 }
 
 // --- shared implementations -------------------------------------------------
@@ -338,7 +363,7 @@ fn note_push(store: &SqliteStore, revision: &str, at_ms: i64) -> Result<()> {
 fn scratch_name(role: &str) -> String {
     static N: AtomicU64 = AtomicU64::new(0);
     format!(
-        "swsync-{role}-{}-{}.db",
+        "rowel-sync-{role}-{}-{}.db",
         std::process::id(),
         N.fetch_add(1, Ordering::SeqCst)
     )
@@ -465,6 +490,15 @@ mod tests {
         }
         fn note_push(&self, revision: &str, at_ms: i64) -> Result<()> {
             note_push(&self.store, revision, at_ms)
+        }
+        fn vault_id(&self) -> Result<Option<String>> {
+            identity::vault_id(&self.store).map_err(store_err)
+        }
+        fn assign_vault_id(&self) -> Result<String> {
+            identity::assign_vault_id(&self.store).map_err(store_err)
+        }
+        fn adopt_vault_id(&self, id: &str) -> Result<()> {
+            identity::adopt_vault_id(&self.store, id).map_err(store_err)
         }
     }
 

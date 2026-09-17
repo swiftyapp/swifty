@@ -3,7 +3,7 @@
 //! string-concatenated (fixes the legacy `q` injection).
 //!
 //! Bodies are **bytes**, not strings: the artifact this module moves is a
-//! `.swsync` pack — SQLCipher ciphertext with a binary header — and routing it
+//! `.rowel` pack — SQLCipher ciphertext with a binary header — and routing it
 //! through `String` would either corrupt it or fail to decode.
 
 use std::collections::BTreeMap;
@@ -12,6 +12,7 @@ use std::future::Future;
 use reqwest::Client;
 use serde_json::{json, Value};
 
+use super::layout;
 use crate::error::{Error, Result};
 
 const FILES: &str = "https://www.googleapis.com/drive/v3/files";
@@ -28,6 +29,8 @@ const LIST_FIELDS: &str =
 const PAGE_SIZE: &str = "100";
 const FILE_FIELDS: &str =
     "id, name, createdTime, modifiedTime, size, headRevisionId, appProperties";
+// What an upload declares when it is not a vault pack — shares, which are
+// opaque sealed blobs to everything but the recipient's app.
 const FILE_MIME: &str = "application/octet-stream";
 const FOLDER_MIME: &str = "application/vnd.google-apps.folder";
 
@@ -235,6 +238,16 @@ pub async fn find_by_app_property(
     find_all(client, token, &q).await
 }
 
+/// Everything non-trashed that sits directly inside `parent`.
+///
+/// For a caller that has to see the whole folder rather than one known name —
+/// the vault-id resolution, which learns which vaults an account holds from the
+/// file names it finds in `Vaults/`.
+pub async fn list_folder(client: &Client, token: &str, parent: &str) -> Result<Vec<DriveFile>> {
+    let q = format!("'{}' in parents and trashed = false", escape(parent));
+    find_all(client, token, &q).await
+}
+
 pub async fn find_file(
     client: &Client,
     token: &str,
@@ -315,7 +328,8 @@ pub async fn create_folder_in(
         .ok_or_else(|| Error::Other("Drive API returned no id".into()))
 }
 
-/// multipart/related upload: a JSON metadata part, then the raw pack bytes.
+/// multipart/related upload of a vault pack: a JSON metadata part, then the raw
+/// pack bytes.
 pub async fn create_file(
     client: &Client,
     token: &str,
@@ -323,11 +337,23 @@ pub async fn create_file(
     parent: &str,
     content: &[u8],
 ) -> Result<DriveFile> {
-    create_file_with_properties(client, token, name, parent, content, &[]).await
+    upload_new(
+        client,
+        token,
+        name,
+        parent,
+        content,
+        &[],
+        layout::VAULT_MIME,
+    )
+    .await
 }
 
 /// [`create_file`] plus `appProperties` — private metadata the listing carries
 /// back, so a caller can tell its files apart without downloading them.
+///
+/// A share, not a vault pack, so it goes up as an opaque blob: nothing but the
+/// recipient's app can make sense of the bytes, and Drive should not offer to.
 pub async fn create_file_with_properties(
     client: &Client,
     token: &str,
@@ -336,7 +362,19 @@ pub async fn create_file_with_properties(
     content: &[u8],
     properties: &[(&str, &str)],
 ) -> Result<DriveFile> {
-    let mut metadata = json!({ "name": name, "mimeType": FILE_MIME, "parents": [parent] });
+    upload_new(client, token, name, parent, content, properties, FILE_MIME).await
+}
+
+async fn upload_new(
+    client: &Client,
+    token: &str,
+    name: &str,
+    parent: &str,
+    content: &[u8],
+    properties: &[(&str, &str)],
+    mime: &str,
+) -> Result<DriveFile> {
+    let mut metadata = json!({ "name": name, "mimeType": mime, "parents": [parent] });
     if !properties.is_empty() {
         metadata["appProperties"] = properties
             .iter()
@@ -353,7 +391,7 @@ pub async fn create_file_with_properties(
             reqwest::header::CONTENT_TYPE,
             format!("multipart/related; boundary={BOUNDARY}"),
         )
-        .body(multipart_body(&metadata, content))
+        .body(multipart_body(&metadata, content, mime))
         .send()
         .await
         .map_err(other)?;
@@ -364,10 +402,10 @@ const BOUNDARY: &str = "rowel-boundary";
 
 /// The envelope is assembled by hand because the body is binary — it is spliced
 /// in between UTF-8 boundary lines rather than formatted into a `String`.
-fn multipart_body(metadata: &Value, content: &[u8]) -> Vec<u8> {
+fn multipart_body(metadata: &Value, content: &[u8], mime: &str) -> Vec<u8> {
     let head = format!(
         "--{BOUNDARY}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n\
-         --{BOUNDARY}\r\nContent-Type: {FILE_MIME}\r\n\r\n"
+         --{BOUNDARY}\r\nContent-Type: {mime}\r\n\r\n"
     );
     let tail = format!("\r\n--{BOUNDARY}--");
 
@@ -494,7 +532,50 @@ fn rename_body(name: &str) -> Value {
     json!({ "name": name })
 }
 
-/// Overwrite a file's content, returning its new head revision.
+/// Move a file to `to_parent` under `new_name`, in one request.
+///
+/// The same object comes out the other side: its Drive id, its content and its
+/// revision history are all untouched, which is the whole reason this is a
+/// patch and not a copy-and-delete. Migrating the pre-`Vaults/` pack therefore
+/// costs no upload and loses no history, and a link to the old file still
+/// resolves.
+pub async fn move_file(
+    client: &Client,
+    token: &str,
+    id: &str,
+    new_name: &str,
+    from_parent: &str,
+    to_parent: &str,
+) -> Result<()> {
+    let (query, body) = move_request(new_name, from_parent, to_parent);
+    let resp = client
+        .patch(format!("{FILES}/{id}"))
+        .bearer_auth(token)
+        .query(&query)
+        .json(&body)
+        .send()
+        .await
+        .map_err(other)?;
+    check(resp).await.map(|_| ())
+}
+
+// Reparenting is a query parameter and renaming is a body field, so one
+// `files.patch` does both — and, because the patch merges, disturbs nothing
+// else about the file.
+fn move_request<'a>(
+    new_name: &str,
+    from_parent: &'a str,
+    to_parent: &'a str,
+) -> (Vec<(&'static str, &'a str)>, Value) {
+    let query = vec![
+        ("addParents", to_parent),
+        ("removeParents", from_parent),
+        ("fields", FILE_FIELDS),
+    ];
+    (query, json!({ "name": new_name }))
+}
+
+/// Overwrite a vault pack's content, returning its new head revision.
 pub async fn update_file(
     client: &Client,
     token: &str,
@@ -505,7 +586,7 @@ pub async fn update_file(
         .patch(format!("{UPLOAD}/{id}"))
         .bearer_auth(token)
         .query(&[("uploadType", "media"), ("fields", FILE_FIELDS)])
-        .header(reqwest::header::CONTENT_TYPE, FILE_MIME)
+        .header(reqwest::header::CONTENT_TYPE, layout::VAULT_MIME)
         .body(content.to_vec())
         .send()
         .await
@@ -520,8 +601,9 @@ pub async fn update_file(
 #[cfg(test)]
 mod tests {
     use super::{
-        collect_pages, escape, list_query, multipart_body, oldest, parse_file, parse_listing,
-        parse_properties, parse_size, rename_body, DriveFile, FILE_FIELDS, LIST_FIELDS,
+        collect_pages, escape, layout, list_query, move_request, multipart_body, oldest, parse_file,
+        parse_listing, parse_properties, parse_size, rename_body, DriveFile, FILE_FIELDS,
+        LIST_FIELDS,
     };
     use serde_json::json;
     use std::cell::RefCell;
@@ -633,14 +715,14 @@ mod tests {
     fn a_listed_file_carries_its_name_and_properties() {
         let parsed = parse_file(&json!({
             "id": "f1",
-            "name": "share-1.swshare",
+            "name": "share-1.rowelshare",
             "createdTime": "2024-01-01T00:00:00.000Z",
             "headRevisionId": "r1",
             "appProperties": { "kind": "login", "expiresAt": "1700000000000" },
         }))
         .unwrap();
 
-        assert_eq!(parsed.name, "share-1.swshare");
+        assert_eq!(parsed.name, "share-1.rowelshare");
         assert_eq!(parsed.app_properties["kind"], "login");
         assert_eq!(parsed.app_properties["expiresAt"], "1700000000000");
         assert_eq!(parsed.head_revision.as_deref(), Some("r1"));
@@ -675,7 +757,7 @@ mod tests {
     fn a_listed_file_carries_its_size_and_modified_time() {
         let parsed = parse_file(&json!({
             "id": "f1",
-            "name": "vault.swsync",
+            "name": "a1b2c3.rowel",
             "modifiedTime": "2024-05-04T10:11:12.000Z",
             "size": "2097152",
         }))
@@ -710,8 +792,21 @@ mod tests {
     // where they are.
     #[test]
     fn a_rename_patches_only_the_name() {
-        let body = rename_body("vault-archived-2024-05-04.swsync");
-        assert_eq!(body, json!({ "name": "vault-archived-2024-05-04.swsync" }));
+        let body = rename_body("vault-archived-2024-05-04.rowel");
+        assert_eq!(body, json!({ "name": "vault-archived-2024-05-04.rowel" }));
+    }
+
+    // A move is one patch: the parents swap in the query, the name in the body.
+    // Splitting it in two would leave the file briefly in both folders — or, if
+    // the second call failed, in neither the caller expected.
+    #[test]
+    fn a_move_reparents_and_renames_in_a_single_patch() {
+        let (query, body) = move_request("a1b2c3.rowel", "root-folder", "vaults-folder");
+
+        assert!(query.contains(&("addParents", "vaults-folder")));
+        assert!(query.contains(&("removeParents", "root-folder")));
+        assert!(query.contains(&("fields", FILE_FIELDS)));
+        assert_eq!(body, json!({ "name": "a1b2c3.rowel" }));
     }
 
     // Binary content must survive the envelope byte for byte — the share is
@@ -719,11 +814,12 @@ mod tests {
     #[test]
     fn the_upload_envelope_splices_raw_bytes_between_the_boundaries() {
         let content = [0x00u8, 0xff, 0x1a, b'\r', b'\n'];
-        let body = multipart_body(&json!({ "name": "x" }), &content);
+        let body = multipart_body(&json!({ "name": "x" }), &content, layout::VAULT_MIME);
 
         let text = String::from_utf8_lossy(&body);
         assert!(text.starts_with("--rowel-boundary\r\n"));
         assert!(text.contains("{\"name\":\"x\"}"));
+        assert!(text.contains(layout::VAULT_MIME));
         assert!(body.ends_with(b"\r\n--rowel-boundary--"));
         assert!(body.windows(content.len()).any(|w| w == content));
     }
