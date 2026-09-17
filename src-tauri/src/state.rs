@@ -1,6 +1,8 @@
-use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
+use chrono::{SecondsFormat, Utc};
 use serde::Serialize;
 
 #[cfg(mobile)]
@@ -53,10 +55,27 @@ pub struct PendingAuth {
     pub generation: u64,
 }
 
-/// Sync as the frontend sees it. Every transition in `commands::sync` updates
-/// this and re-emits the whole thing as `sync:status`, so the frontend mirrors
-/// one value instead of reconstructing it from an order of events. Process
-/// lifetime, not session: a lock does not un-happen the last successful run.
+/// The sequence number every `sync:status` snapshot carries, counted once for
+/// the whole process rather than per workspace.
+///
+/// The frontend keeps whichever of two snapshots has the higher sequence
+/// (`store/app.ts`), because a launch probe can resolve after the event of a
+/// transition it predates. A workspace switch hands it a snapshot about a
+/// *different* workspace, which has been through a different number of
+/// transitions of its own — so a per-workspace counter would have the switched-to
+/// status discarded as stale whenever the workspace being left had seen more of
+/// them. Counted here, anything the backend produces later reads as later,
+/// whichever workspace it describes.
+static SYNC_SEQ: AtomicU64 = AtomicU64::new(0);
+
+/// Sync as the frontend sees it, for one workspace. Every transition in
+/// `commands::sync` updates this and re-emits the whole thing as `sync:status`,
+/// so the frontend mirrors one value instead of reconstructing it from an order
+/// of events. Process lifetime, not session: a lock does not un-happen the last
+/// successful run.
+///
+/// One of these per workspace, reached through [`AppState::sync_run`]: each has
+/// its own Drive connection, so each has its own last run to report.
 #[derive(Default)]
 pub struct SyncRun {
     /// A consent flow is out with the browser.
@@ -64,10 +83,12 @@ pub struct SyncRun {
     pub in_progress: bool,
     /// What the last connect or run failed with, until the next one starts.
     pub error: Option<String>,
-    /// RFC 3339 time of the last run that succeeded in this process.
+    /// RFC 3339 time of the last run of *this workspace* that succeeded in this
+    /// process.
     pub last_synced_at: Option<String>,
-    /// How many transitions this run state has been through. Every snapshot
-    /// carries it, so two of them can be put in order by whoever holds them.
+    /// Where this workspace's last transition fell in the process-wide order
+    /// ([`SYNC_SEQ`]). Every snapshot carries it, so two of them can be put in
+    /// order by whoever holds them.
     pub seq: u64,
 }
 
@@ -76,7 +97,20 @@ impl SyncRun {
     /// advances with it; a snapshot taken before the change reads as older.
     pub fn transition(&mut self, change: impl FnOnce(&mut SyncRun)) {
         change(self);
-        self.seq += 1;
+        self.seq = SYNC_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+    }
+
+    /// A run ended. A failed run leaves the previous timestamp standing: the
+    /// vault is still current as of whenever it last landed. Both the timestamp
+    /// and the error belong to this workspace alone — another workspace's
+    /// success never stands in for this one's, and its failure is not this
+    /// one's to report.
+    pub fn finish(&mut self, error: Option<String>) {
+        self.in_progress = false;
+        if error.is_none() {
+            self.last_synced_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
+        }
+        self.error = error;
     }
 
     /// The snapshot the frontend gets. `configured` is the session's to answer,
@@ -150,9 +184,10 @@ pub struct AppState {
     /// it and the write for the disconnect to land in. Held across local file
     /// operations only, never a network call.
     pub sync_generation: Mutex<u64>,
-    /// Sync as reported to the frontend; also what `commands::workspace` reads
-    /// to refuse a switch while a consent flow or a run is out.
-    pub sync_run: Mutex<SyncRun>,
+    /// Sync as reported to the frontend, one entry per workspace; also what
+    /// `commands::workspace` reads to refuse a switch while a consent flow or a
+    /// run is out. Reached through [`AppState::sync_run`], never directly.
+    pub sync_runs: Mutex<HashMap<String, SyncRun>>,
     /// Drive tokens for an account connected during first-run onboarding.
     ///
     /// Memory only, and deliberately so: they are sealed under the vault key,
@@ -186,6 +221,27 @@ pub struct AppState {
     pub consent_grace: std::sync::Arc<crate::timer::Timer>,
 }
 
+impl AppState {
+    /// The active workspace's run state, created empty the first time it is
+    /// touched.
+    ///
+    /// Sync is per workspace, not per process: each connects its own Drive
+    /// account, so one must never show another's "last synced" or another's
+    /// error. A flow never spans a switch — `commands::workspace::guard_sync_idle`
+    /// refuses one while a consent flow or a run is out — so the active
+    /// workspace is always the one a transition belongs to, and the one a status
+    /// describes.
+    ///
+    /// A closure rather than a borrow of the entry: it lives inside the map's
+    /// lock, and handing the entry out would mean handing the lock out with it.
+    pub fn sync_run<R>(&self, with: impl FnOnce(&mut SyncRun) -> R) -> R {
+        // The id is read and released before the map is locked, so the two are
+        // never held at once and no order between them has to be agreed on.
+        let active = self.active_workspace.lock().unwrap().clone();
+        with(self.sync_runs.lock().unwrap().entry(active).or_default())
+    }
+}
+
 // Hand-written only because `active_workspace` starts at the primary rather than
 // at `String::default()`. `lib.rs` overwrites it from the registry at startup.
 impl Default for AppState {
@@ -196,7 +252,7 @@ impl Default for AppState {
             workspace_lock: Mutex::default(),
             syncing: Arc::default(),
             sync_generation: Mutex::default(),
-            sync_run: Mutex::default(),
+            sync_runs: Mutex::default(),
             pending_drive: Mutex::default(),
             setup_busy: AtomicBool::default(),
             setup_attempt: AtomicU64::default(),
@@ -206,5 +262,74 @@ impl Default for AppState {
             #[cfg(mobile)]
             consent_grace: crate::timer::Timer::spawn(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // What a workspace switch does to the state these tests are about: the
+    // session goes and the paths — and with them the run state — point
+    // elsewhere (`commands::workspace::workspace_select`).
+    fn switch_to(state: &AppState, id: &str) {
+        *state.active_workspace.lock().unwrap() = id.to_string();
+    }
+
+    // Every transition the app makes goes through `SyncRun::transition`, so the
+    // tests below reach the run state the way `commands::sync` does.
+    fn finish(state: &AppState, error: Option<&str>) {
+        state.sync_run(|run| run.transition(|run| run.finish(error.map(String::from))));
+    }
+
+    #[test]
+    fn a_workspace_reports_its_own_last_run_and_never_anothers() {
+        let state = AppState::default();
+
+        // A syncs, successfully.
+        switch_to(&state, "a");
+        finish(&state, None);
+        let a = state.sync_run(|run| run.status(true));
+        assert!(a.last_synced_at.is_some());
+        assert_eq!(a.error, None);
+
+        // B has never synced: neither A's timestamp nor A's (absent) error is
+        // any part of what B has to say about itself.
+        switch_to(&state, "b");
+        let before = state.sync_run(|run| run.status(true));
+        assert_eq!(before.last_synced_at, None);
+        assert_eq!(before.error, None);
+
+        // A failed run keeps the previous timestamp — B's, which is none. The
+        // error is B's own.
+        finish(&state, Some("no network"));
+        let failed = state.sync_run(|run| run.status(true));
+        assert_eq!(failed.last_synced_at, None);
+        assert_eq!(failed.error.as_deref(), Some("no network"));
+
+        // And nothing that happened to B happened to A.
+        switch_to(&state, "a");
+        let back = state.sync_run(|run| run.status(true));
+        assert_eq!(back.last_synced_at, a.last_synced_at);
+        assert_eq!(back.error, None);
+    }
+
+    // The frontend keeps the snapshot with the higher sequence, so the one a
+    // switch announces has to outrank the workspace it left however many
+    // transitions each of them has been through.
+    #[test]
+    fn a_switched_to_workspace_outranks_the_one_the_frontend_is_holding() {
+        let state = AppState::default();
+        switch_to(&state, "a");
+        for _ in 0..3 {
+            state.sync_run(|run| run.transition(|_| {}));
+        }
+        let held = state.sync_run(|run| run.status(true));
+
+        // One transition against a workspace that has never had one: exactly
+        // what `commands::sync::switched` does after the repoint.
+        switch_to(&state, "b");
+        state.sync_run(|run| run.transition(|_| {}));
+        assert!(state.sync_run(|run| run.status(true)).seq > held.seq);
     }
 }

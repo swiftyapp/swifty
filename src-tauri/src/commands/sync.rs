@@ -20,7 +20,6 @@ use std::sync::Arc;
 #[cfg(mobile)]
 use std::time::Duration;
 
-use chrono::{SecondsFormat, Utc};
 use tauri::{AppHandle, Manager, State};
 
 use crate::crypto::Cryptor;
@@ -450,10 +449,7 @@ fn fail(app: &AppHandle, purpose: AuthPurpose, why: String) {
 /// and a probe that read the state just before it is recognisably older.
 fn update(app: &AppHandle, change: impl FnOnce(&mut SyncRun)) {
     app.state::<AppState>()
-        .sync_run
-        .lock()
-        .unwrap()
-        .transition(change);
+        .sync_run(|run| run.transition(change));
     events::sync_status(app, status(app));
 }
 
@@ -515,19 +511,12 @@ fn started(app: &AppHandle) {
     });
 }
 
-/// A run ended. A failed run leaves the previous timestamp standing: the vault
-/// is still current as of whenever it last landed.
+/// A run ended — see [`SyncRun::finish`] for what that leaves standing.
 fn finished(app: &AppHandle, error: Option<String>) {
     if let Some(why) = &error {
         log::warn!("sync failed: {why}");
     }
-    update(app, |run| {
-        run.in_progress = false;
-        if error.is_none() {
-            run.last_synced_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
-        }
-        run.error = error;
-    });
+    update(app, |run| run.finish(error));
 }
 
 /// The whole of sync as the frontend should see it right now.
@@ -543,8 +532,19 @@ pub(crate) fn status(app: &AppHandle) -> SyncStatus {
         crate::storage::sync_configured(app)
     };
     drop(session);
-    let status = state.sync_run.lock().unwrap().status(configured);
-    status
+    state.sync_run(|run| run.status(configured))
+}
+
+/// The active workspace changed: say what sync looks like for the new one.
+///
+/// A transition rather than a bare emit, and that is the point: the snapshot the
+/// frontend is holding describes the workspace that just locked, which may have
+/// been through more transitions than the one being switched to has. Going
+/// through `update` gives this one the later sequence, so it is taken rather
+/// than discarded as stale (see `SYNC_SEQ`). The re-probe that `vault:locked`
+/// triggers then answers with the same snapshot.
+pub(crate) fn switched(app: &AppHandle) {
+    update(app, |_| {});
 }
 
 // --- runs ----------------------------------------------------------------------
