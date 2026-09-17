@@ -154,9 +154,11 @@ pub async fn import_entries(
     let session = state.session.lock().unwrap();
 
     if dry_run {
-        // A preview is allowed on a locked vault — it writes nothing and needs
-        // no cipher. There is then nothing to compare against, so it reports no
-        // duplicates rather than refusing a preview that used to work.
+        // The vault was open when the preview began (checked above), but the
+        // parse ran outside the lock and a lock may have landed since. A
+        // preview writes nothing, so a vault that closed under it is not an
+        // error — there is merely nothing left to compare against, and it
+        // reports no duplicates.
         let duplicates = match (session.store(), session.payload_cipher()) {
             (Ok(store), Ok(cipher)) => duplicate_flags(store, &cipher, &parsed.entries)?
                 .iter()
