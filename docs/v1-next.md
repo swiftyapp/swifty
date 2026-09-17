@@ -29,10 +29,19 @@ products solve it, don't patch symptoms.
 > point was resolved as: sync the whole SQLCipher snapshot in a thin plaintext-KDF-header
 > container (Enpass/KeePass model), not per-entry envelopes.
 >
+> **Drive layout, post-rebrand** — "one pack per vault under `Rowel/Vaults/`" replaced the
+> single `Rowel/vault.swsync`: packs are now `Vaults/<vault-id>.rowel` (same extension as the
+> local backup, which is the same bytes) and shares `Shares/<random>.rowelshare`, all named by
+> `sync::layout`. An upgraded install moves its legacy file into place on first sync, keeping
+> the Drive file id and its revision history; the `SWSY` magic bytes are a format tag and stay.
+>
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a
-> foreign-vault error); OAuth scope audit (`drive.file`); **release gate: a production Google
-> OAuth client ID (owner task)**.
+> foreign-vault error); OAuth scope audit (`drive.file`); per-workspace sync (drops
+> archive-by-rename — "start fresh" simply becomes a new vault — adds a `vaultId` appProperty
+> on shares, and gives onboarding a vault picker); drop the legacy `vault.swsync` fallback once
+> upgraded installs have migrated; **release gate: a production Google OAuth client ID (owner
+> task)**.
 
 Re-enable Google Drive sync on the new SQLite storage engine. Postponed during remediation;
 picking it back up now. **The storage groundwork already exists** — do not rebuild it:

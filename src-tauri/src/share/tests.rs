@@ -156,9 +156,9 @@ fn a_link_that_is_not_a_link_fails_before_anything_is_fetched() {
 #[test]
 fn the_sweep_deletes_only_what_is_known_to_have_expired() {
     let remote = FakeShareRemote::new();
-    let expired = upload_share(&remote, "a.swshare", Some(NOW - 1));
-    let live = upload_share(&remote, "b.swshare", Some(NOW + 1));
-    let undated = upload_share(&remote, "c.swshare", None);
+    let expired = upload_share(&remote, "a.rowelshare", Some(NOW - 1));
+    let live = upload_share(&remote, "b.rowelshare", Some(NOW + 1));
+    let undated = upload_share(&remote, "c.rowelshare", None);
 
     assert_eq!(sweep(&remote, NOW).unwrap(), 1);
     assert!(!remote.ids().contains(&expired));
@@ -174,7 +174,7 @@ fn the_sweep_deletes_only_what_is_known_to_have_expired() {
 #[test]
 fn a_share_with_no_readable_expiry_is_still_given_one_to_show() {
     let remote = FakeShareRemote::new();
-    upload_share(&remote, "a.swshare", None);
+    upload_share(&remote, "a.rowelshare", None);
 
     let listed = list(&remote, NOW).unwrap();
     assert_eq!(listed[0].created_at, "1970-01-01T00:00:00.001Z");

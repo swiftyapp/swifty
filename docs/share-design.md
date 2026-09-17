@@ -73,12 +73,20 @@ message, rather than arriving as a username and nothing else.
 ## 4. Drive layout
 
 ```
-Rowel/                 the existing sync folder
-  vault.swsync          the vault pack, untouched by sharing
+Rowel/                      the existing sync folder
+  Vaults/
+    <vault-id>.rowel        a vault pack, untouched by sharing
   Shares/
-    <random>.swshare    one share, appProperties: rowelShare, entryId, kind, expiresAt
+    <random>.rowelshare     one share, appProperties: rowelShare, entryId, kind, expiresAt
 ```
 
+Every name here is minted by `sync::layout`, sharing included. A vault is
+addressed by its vault id — the opaque identity of the data, never the user's
+label for it, which does not reach Drive at all. A share is named by randomness
+alone.
+
+Shares stay account-level rather than moving under a vault: any of the sender's
+devices must be able to revoke or sweep one, whichever vault it came out of.
 `appProperties` is the only metadata written. `rowelShare=1` is the marker
 every share carries, and the only thing listing selects on: shares are found by
 it wherever they sit, so two devices racing to create `Shares/` and uploading

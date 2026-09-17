@@ -20,11 +20,8 @@ use super::envelope::MAX_SHARE_BYTES;
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::sync::drive::{self, DriveFile};
-use crate::sync::layout::ROOT_FOLDER;
+use crate::sync::layout::{ROOT_FOLDER, SHARES_FOLDER};
 use crate::sync::{access_token, http_client};
-
-/// The subfolder of `Rowel` that holds outstanding shares.
-pub const SHARES_FOLDER: &str = "Shares";
 
 /// `appProperties` keys on a share file. Values are opaque to Google.
 pub const PROP_ENTRY_ID: &str = "entryId";
@@ -362,7 +359,7 @@ mod tests {
     fn drive_file(created: &str, properties: &[(&str, &str)]) -> DriveFile {
         DriveFile {
             id: "f1".into(),
-            name: "share.swshare".into(),
+            name: "share.rowelshare".into(),
             created_time: created.into(),
             modified_time: String::new(),
             size: None,
@@ -413,7 +410,7 @@ mod tests {
         let remote = FakeShareRemote::new();
         let id = remote
             .upload(
-                "share.swshare",
+                "share.rowelshare",
                 b"sealed",
                 &[
                     (PROP_SHARE, PROP_SHARE_VALUE),
@@ -437,7 +434,7 @@ mod tests {
     #[test]
     fn publishing_is_what_makes_a_share_downloadable() {
         let remote = FakeShareRemote::new();
-        let id = remote.upload("share.swshare", b"sealed", &[]).unwrap();
+        let id = remote.upload("share.rowelshare", b"sealed", &[]).unwrap();
 
         assert!(!remote.is_public(&id));
         assert!(remote.download(&id).is_err());
@@ -451,7 +448,7 @@ mod tests {
     #[test]
     fn an_unknown_or_revoked_share_fails_the_way_the_recipient_is_told() {
         let remote = FakeShareRemote::new();
-        let id = remote.upload("share.swshare", b"sealed", &[]).unwrap();
+        let id = remote.upload("share.rowelshare", b"sealed", &[]).unwrap();
         remote.make_public(&id).unwrap();
         remote.delete(&id).unwrap();
 
@@ -464,7 +461,7 @@ mod tests {
     #[test]
     fn deleting_removes_the_share_and_deleting_twice_is_fine() {
         let remote = FakeShareRemote::new();
-        let id = remote.upload("share.swshare", b"sealed", &[]).unwrap();
+        let id = remote.upload("share.rowelshare", b"sealed", &[]).unwrap();
 
         remote.delete(&id).unwrap();
         assert!(remote.list().unwrap().is_empty());
