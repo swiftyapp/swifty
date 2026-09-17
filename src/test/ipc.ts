@@ -105,6 +105,12 @@ const DEFAULTS: Record<string, Handler> = {
 
   // A new workspace arrives active and unlocked, so it answers like an unlock.
   workspace_create: () => session,
+  // Onboarding's connect, reached from Settings: the probe's answer comes back
+  // as `setup:drive:*`, never through this promise.
+  workspace_drive_connect: () => undefined,
+  // A restored one arrives the same way, but connected — its account was sealed
+  // under the restored vault's key on the way in.
+  workspace_restore_from_drive: () => ({ entries: [], syncConfigured: true }),
   // Switching is locking what is open, and Rust announces it as one.
   workspace_select: () => emitEventSoon(EVENTS.vaultLocked, undefined),
   workspace_rename: () => undefined,

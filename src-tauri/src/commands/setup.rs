@@ -11,6 +11,14 @@
 //! frontend can render "waiting for the browser" while the flow is out. Exactly
 //! one of `setup:drive:probed` / `setup:drive:error` follows every
 //! `setup:drive:pending` (see [`crate::events`]).
+//!
+//! That first half is not onboarding's alone. Adding a workspace by restoring
+//! one of the account's other vaults has the same problem — a vault that does
+//! not exist yet, so no key to seal an account under — and so borrows
+//! [`connect_pending`], [`peek_pending`], [`download`] and
+//! [`setup_drive_disconnect`] from here rather than copying them (see
+//! `commands::workspace`). What that flow does *not* share is
+//! [`guard_no_vault`], which is exactly the condition it inverts.
 
 use std::sync::atomic::Ordering;
 
@@ -30,18 +38,43 @@ use crate::sync::{self, restore, setup::PackInfo};
 // --- connect ---------------------------------------------------------------
 
 /// Connect an account and report what it holds. Onboarding only.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn setup_drive_connect(app: AppHandle) -> Result<()> {
+    guard_no_vault(&app)?;
+    connect_pending(&app)
+}
+
+/// The mobile twin of [`setup_drive_connect`].
+#[cfg(mobile)]
+#[tauri::command]
+pub fn setup_drive_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+    guard_no_vault(&app)?;
+    connect_pending(&app, &state)
+}
+
+/// Consent, probe, report — the whole of connecting an account whose tokens
+/// have nowhere to be written yet.
+///
+/// Shared with `commands::workspace`, which offers the same flow from Settings
+/// to add a workspace by restoring one of the account's other vaults. The
+/// precondition is the only difference between the two callers, and it is the
+/// opposite one: onboarding refuses to run once a vault exists, and a workspace
+/// restore is the case where one already does. Everything after it is the same
+/// — the tokens wait in [`AppState::pending_drive`] until whichever flow
+/// follows produces a key to seal them under, and the same probe answers on the
+/// same `setup:drive:*` events, so one screen's picker serves both.
 ///
 /// Desktop: the consent flow waits on a loopback listener and the probe is a
 /// network round trip, so both go to the blocking pool — the command returns as
 /// soon as its guards have passed, and the frontend listens for the events.
 #[cfg(desktop)]
-#[tauri::command]
-pub fn setup_drive_connect(app: AppHandle) -> Result<()> {
-    guard_no_vault(&app)?;
+pub(crate) fn connect_pending(app: &AppHandle) -> Result<()> {
     ensure_idle(&app.state::<AppState>())?;
     let attempt = begin_attempt(&app.state::<AppState>());
-    events::setup_drive_pending(&app);
+    events::setup_drive_pending(app);
 
+    let app = app.clone();
     super::detached(move || {
         let probed = sync::obtain_tokens(&app).and_then(|mut tokens| {
             // `block_on` is legal here because a blocking-pool thread is not one
@@ -56,13 +89,16 @@ pub fn setup_drive_connect(app: AppHandle) -> Result<()> {
 
 /// The mobile twin: start consent and return — iOS suspends the app behind
 /// Safari, so there is no result to wait for. [`on_consent`] finishes it.
+///
+/// One purpose covers both callers. [`crate::state::AuthPurpose`] says what the
+/// redirect does when it comes back, and that is identical here: redeem the
+/// code, probe, and leave the tokens pending. Which flow asked is the
+/// frontend's to remember, not the deep-link handler's.
 #[cfg(mobile)]
-#[tauri::command]
-pub fn setup_drive_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    guard_no_vault(&app)?;
-    ensure_idle(&state)?;
-    begin_attempt(&state);
-    crate::commands::sync::start_consent(&app, &state, crate::state::AuthPurpose::Setup)
+pub(crate) fn connect_pending(app: &AppHandle, state: &AppState) -> Result<()> {
+    ensure_idle(state)?;
+    begin_attempt(state);
+    crate::commands::sync::start_consent(app, state, crate::state::AuthPurpose::Setup)
 }
 
 /// Mobile, second half: redeem the code the deep-link handler accepted, then
@@ -83,6 +119,11 @@ pub(crate) async fn on_consent(app: &AppHandle, code: &str, verifier: &str) {
 /// thing to the backend: nothing was written, so nothing needs undoing — but a
 /// consent still out with the browser has to be disowned too, or its tokens
 /// would land in `pending_drive` after the user had already moved on.
+///
+/// Not onboarding's alone: cancelling the Settings dialog that restores a
+/// workspace from Drive means exactly this, so it calls the same command rather
+/// than a second spelling of it. There is no vault to guard here — the whole
+/// point is that nothing has been written yet.
 #[tauri::command]
 pub fn setup_drive_disconnect(state: State<'_, AppState>) -> Result<()> {
     ensure_idle(&state)?;
@@ -163,7 +204,9 @@ pub async fn setup_restore_from_drive(
     let _step = begin_step(&state)?;
     let mut tokens = peek_pending(&state)?;
 
-    let (bytes, vault_id) = download(&app, &mut tokens, &file_id).await?;
+    // Nothing to refuse on a fresh install: there is no vault here for the
+    // chosen one to collide with, which is what `guard_no_vault` just said.
+    let (bytes, vault_id) = download(&app, &mut tokens, &file_id, |_| Ok(())).await?;
     // Whatever the download's refresh produced has to be kept: Google rotates
     // refresh tokens, and a retry after a mistyped password uses these again.
     *state.pending_drive.lock().unwrap() = Some(tokens.clone());
@@ -206,14 +249,22 @@ pub async fn setup_restore_from_file(
 /// are minutes apart, and an id that is no longer there fails as
 /// [`Error::NoRemoteVault`] — "no vault up there any more", which is a clear
 /// failure where a stale id would be a confusing one.
-async fn download(
+///
+/// `accept` is asked about the vault id the listing resolved, before a byte of
+/// the pack is pulled: a restore the caller is going to refuse should not cost
+/// the user the wait for a whole vault over the network. Crate-visible for
+/// `commands::workspace`, which fetches the same way and refuses the vault it
+/// already has open.
+pub(crate) async fn download(
     app: &AppHandle,
     tokens: &mut sync::Tokens,
     file_id: &str,
+    accept: impl FnOnce(&str) -> Result<()>,
 ) -> Result<(Vec<u8>, String)> {
     let client = sync::http_client();
     let token = sync::fresh_access_token(&client, app, tokens).await?;
     let file = sync::setup::find_pack_by_id(&client, &token, file_id).await?;
+    accept(&file.vault_id)?;
     let bytes = sync::setup::download_pack(&client, &token, &file.id).await?;
     Ok((bytes, file.vault_id))
 }
@@ -419,8 +470,9 @@ fn guard_no_vault(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-/// The connected account's tokens, left in place for a retry.
-fn peek_pending(state: &AppState) -> Result<sync::Tokens> {
+/// The connected account's tokens, left in place for a retry. Crate-visible
+/// because a workspace restore reads them the same way.
+pub(crate) fn peek_pending(state: &AppState) -> Result<sync::Tokens> {
     state
         .pending_drive
         .lock()
@@ -430,7 +482,7 @@ fn peek_pending(state: &AppState) -> Result<sync::Tokens> {
 }
 
 /// Forget the connected account, if there is one.
-fn take_pending(state: &AppState) -> Option<sync::Tokens> {
+pub(crate) fn take_pending(state: &AppState) -> Option<sync::Tokens> {
     state.pending_drive.lock().unwrap().take()
 }
 

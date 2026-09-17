@@ -1,5 +1,5 @@
 import type { Workspace } from '@/api/types'
-import { workspaceCreate, workspaceSelect } from '@/api/workspace'
+import { workspaceCreate, workspaceRestoreFromDrive, workspaceSelect } from '@/api/workspace'
 import { PRIMARY_WORKSPACE } from '@/lib/workspace'
 import {
   useApp,
@@ -7,8 +7,11 @@ import {
   enterMain,
   refreshApp,
   forgetBiometricGate,
+  setupDriveRestoring,
+  setupDriveRestoreFailed,
   type AppState
 } from './app'
+import { lockSettings } from './ui'
 
 /**
  * Workspaces are not state of their own: the launch probe reports which exist
@@ -52,6 +55,40 @@ export const switchWorkspace = (id: string) => {
 // changes it without passing through a lock.
 export const createWorkspace = async (name: string, password: string) => {
   const result = await workspaceCreate(name, password)
+  clearSession()
+  await enterMain(result)
+  await refreshApp()
+}
+
+// Add a workspace by restoring one of the connected account's other vaults.
+// The same landing as a create — it arrives active and unlocked, so the
+// previous workspace's data goes first and the probe brings the new list on
+// screen — and the same landing as the first run's restore too: the result says
+// `syncConfigured`, which is what has `enterMain` run the first sync.
+//
+// The store, not the form, says a restore is running: the backend has claimed
+// the pending account for its length and refuses to give it up, so every
+// control that would (Cancel, Switch account) has to know to stand down — and
+// the form is not the only thing drawing them. Settings is held shut and on
+// its section for the same reason: closing it or moving away would have run the
+// same refused disconnect and then let the restore finish and switch
+// workspaces behind the user's back.
+export const restoreWorkspaceFromDrive = async (
+  name: string,
+  password: string,
+  fileId: string
+) => {
+  setupDriveRestoring()
+  lockSettings(true)
+  let result
+  try {
+    result = await workspaceRestoreFromDrive(name, password, fileId)
+  } catch (error) {
+    setupDriveRestoreFailed()
+    throw error
+  } finally {
+    lockSettings(false)
+  }
   clearSession()
   await enterMain(result)
   await refreshApp()

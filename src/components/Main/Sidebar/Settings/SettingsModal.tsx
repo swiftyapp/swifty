@@ -12,6 +12,9 @@ const TITLE_ID = 'settings-title'
 export default function SettingsModal() {
   const { t } = useTranslation()
   const section = useUi(state => state.settingsSection)
+  // The store already refuses to close or move while locked; the controls
+  // are shown disabled so that refusal is not read as a button that broke.
+  const locked = useUi(state => state.settingsLocked)
 
   return (
     <Modal
@@ -21,7 +24,7 @@ export default function SettingsModal() {
       testid="settings-modal"
       hideClose
     >
-      <Nav section={section} onSelect={setSettingsSection} />
+      <Nav section={section} onSelect={setSettingsSection} disabled={locked} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex flex-none items-center gap-4 px-7 pt-6">
           <h1
@@ -34,6 +37,7 @@ export default function SettingsModal() {
             onClick={closeSettings}
             title={t('Close')}
             testid="modal-close"
+            disabled={locked}
             muted
           >
             <CloseGlyph />

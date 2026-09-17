@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Section } from '@/store'
+import { useUi, type Section } from '@/store'
 import Root from './Root'
 import Pane from './Pane'
 
@@ -14,12 +14,25 @@ import Pane from './Pane'
  * inside a pane. Local state starts at the root and resets with the screen,
  * which is what a tab root wants — and it is not navigation the store implies,
  * so it earns no place in it.
+ *
+ * What the store *does* say is when the section may not be left
+ * (`settingsLocked`): the wide modal's close and nav refuse under it, and the
+ * pane's Back is the same move here, so it refuses the same way. The tab bar
+ * needs nothing of its own — leaving Settings from there goes through
+ * `closeSettings`, which is already guarded.
  */
 export default function Settings() {
   const [section, setSection] = useState<Section | null>(null)
+  const locked = useUi(state => state.settingsLocked)
 
   return section ? (
-    <Pane section={section} onBack={() => setSection(null)} />
+    <Pane
+      section={section}
+      locked={locked}
+      onBack={() => {
+        if (!locked) setSection(null)
+      }}
+    />
   ) : (
     <Root onSelect={setSection} />
   )

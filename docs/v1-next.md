@@ -57,12 +57,23 @@ products solve it, don't patch symptoms.
 > under keys it does not have, and other devices are invisible to it), so any revocation it
 > attempted would be either too broad or, guessed from local files alone, wrong.
 >
+> **Restore into a workspace** — Settings › Workspaces can now add a workspace by restoring one
+> of the connected account's *other* vaults, so a second device reaches every vault on the
+> account rather than only the one onboarding picked. It reuses onboarding's keyless connect,
+> probe and picker outright (`commands::setup::connect_pending`) and mirrors `workspace_create`
+> for the rest; a pack that is already a workspace on the device is refused by vault id. The
+> open workspace is asked live; every other one is locked and unreadable, so the registry
+> records each workspace's vault id as its syncs settle it (`Workspace::vault_id`, not a
+> secret — it is the pack's file name in the user's own Drive) and the restore asks that.
+> While a restore runs, Settings cannot be closed or moved off the section: the backend holds
+> the pending account for its length, so a Cancel or a navigation that appeared to back out
+> would have let the restore finish and switch workspaces behind the user's back.
+>
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a
-> foreign-vault error); OAuth scope audit (`drive.file`); "restore from Drive into an
-> additional workspace" from Settings; an explicitly global "Revoke Google access" action, the
-> one place the grant is retired (a per-workspace disconnect deliberately never does);
-> **release gate: a production Google OAuth client ID (owner task)**.
+> foreign-vault error); OAuth scope audit (`drive.file`); an explicitly global "Revoke Google
+> access" action, the one place the grant is retired (a per-workspace disconnect deliberately
+> never does); **release gate: a production Google OAuth client ID (owner task)**.
 
 Re-enable Google Drive sync on the new SQLite storage engine. Postponed during remediation;
 picking it back up now. **The storage groundwork already exists** — do not rebuild it:

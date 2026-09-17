@@ -204,6 +204,8 @@ pub fn run() {
             commands::share::share_list,
             commands::workspace::workspace_select,
             commands::workspace::workspace_create,
+            commands::workspace::workspace_drive_connect,
+            commands::workspace::workspace_restore_from_drive,
             commands::workspace::workspace_rename,
             // E2E-only vault reset. `generate_handler!` honours per-command
             // attributes, so in a release build the match arm — and with it the

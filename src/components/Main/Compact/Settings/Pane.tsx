@@ -14,13 +14,29 @@ import { TAB_BAR_CLEARANCE } from '../chrome'
  * reserves its clearance, and the way back is the shared `NavBar` carrying the
  * previous screen's name, exactly as the entry screen's row does.
  */
-export default function Pane({ section, onBack }: { section: Key; onBack: () => void }) {
+export default function Pane({
+  section,
+  locked,
+  onBack
+}: {
+  section: Key
+  /** The section may not be left (see `settingsLocked`); Back is shown inert. */
+  locked: boolean
+  onBack: () => void
+}) {
   const { t } = useTranslation()
 
   return (
     <div className="flex min-h-0 flex-1 flex-col animate-sheet bg-list">
       <NavBar
-        leading={<BackButton testid="settings-back" label={t('Settings')} onClick={onBack} />}
+        leading={
+          <BackButton
+            testid="settings-back"
+            label={t('Settings')}
+            disabled={locked}
+            onClick={onBack}
+          />
+        }
       />
 
       <div className={cx('min-h-0 flex-1 overflow-y-auto px-4 pt-1', TAB_BAR_CLEARANCE)}>

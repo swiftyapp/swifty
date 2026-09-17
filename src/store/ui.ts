@@ -49,6 +49,13 @@ export interface UiState {
   palette: boolean
   settings: boolean
   settingsSection: Section
+  /**
+   * Settings may not be closed or moved off its section: an operation on the
+   * open section has claimed something the backend will not give back until it
+   * lands (a workspace restore holds the pending Google account), so leaving
+   * would only look like backing out. Set by the operation, not by the shell.
+   */
+  settingsLocked: boolean
   addPicker: boolean
   generator: Generator
   /** The entry being shared, or null when the send dialog is closed. */
@@ -94,6 +101,7 @@ export const initialUi: UiState = {
   palette: false,
   settings: false,
   settingsSection: 'sync',
+  settingsLocked: false,
   addPicker: false,
   generator: GENERATOR_CLOSED,
   sendFor: null,
@@ -207,8 +215,15 @@ export const openSettings = (section?: Section) =>
     settings: true,
     settingsSection: section ?? state.settingsSection
   }))
-export const closeSettings = () => useUi.setState({ settings: false })
-export const setSettingsSection = (section: Section) => useUi.setState({ settingsSection: section })
+// Both refuse while locked, and refuse *here* rather than in the shell: the X,
+// Escape, the backdrop, the rail tile and the palette all end up in these two,
+// and a lock that any of them could walk around is not one.
+export const closeSettings = () =>
+  useUi.setState(state => (state.settingsLocked ? {} : { settings: false }))
+export const setSettingsSection = (section: Section) =>
+  useUi.setState(state => (state.settingsLocked ? {} : { settingsSection: section }))
+/** Hold Settings on its current section until `lockSettings(false)`. */
+export const lockSettings = (locked: boolean) => useUi.setState({ settingsLocked: locked })
 
 export const openAddPicker = () => useUi.setState({ palette: false, addPicker: true })
 export const closeAddPicker = () => useUi.setState({ addPicker: false })

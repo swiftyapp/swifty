@@ -272,6 +272,19 @@ pub(crate) fn start_consent(app: &AppHandle, state: &AppState, purpose: AuthPurp
         AuthPurpose::Setup => None,
         _ => Some(state.session.lock().unwrap().cryptor()?),
     };
+    // One consent at a time, and checked before Safari is opened for a second.
+    // Replacing the pending flow would orphan it: its redirect could never be
+    // matched again, and if it was reporting on the other event family (a sync
+    // connect displaced by a workspace restore, or the reverse) its screen
+    // would say "waiting" for good. A flow the user walked away from does not
+    // block for long — `on_resume` writes it off once the redirect has had its
+    // chance to arrive.
+    if state.pending_auth.lock().unwrap().is_some() {
+        return Err(crate::error::Error::Other(
+            "another Google sign-in is still waiting for its answer; finish or cancel it first"
+                .into(),
+        ));
+    }
     let started = sync::begin(app)?;
     *state.pending_auth.lock().unwrap() = Some(crate::state::PendingAuth {
         verifier: started.verifier,

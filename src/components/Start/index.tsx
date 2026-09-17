@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BiometryType, UnlockResult } from '@/api/types'
 import { setupCreate } from '@/api/setup'
-import { claimOpenedFile, enterMain, useApp } from '@/store'
+import { claimOpenedFile, connectDrive, enterMain, forgetDrive, useApp } from '@/store'
 import { isBackupFile } from '@/lib/backup'
 import AuthShell from '@/components/elements/AuthShell'
 import Mascot, { type MascotState } from '@/components/elements/Mascot'
@@ -13,7 +13,6 @@ import Conflict from './Conflict'
 import Drive from './Drive'
 import File from './File'
 import Biometric from './Biometric'
-import { connectDrive, forgetDrive } from './shared/driveSession'
 
 type Screen = 'welcome' | 'password' | 'sync' | 'conflict' | 'drive' | 'file' | 'biometric'
 

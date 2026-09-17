@@ -2,12 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'
 import { META_TYPE } from '@/components/elements/tokens'
-import { useApp, setupDriveReset } from '@/store'
+import { useApp, setupDriveReset, connectDrive } from '@/store'
 import StepHeader from '../shared/StepHeader'
 import SpinnerCard from '../shared/SpinnerCard'
 import { COLUMN, STACK, FOOTNOTE } from '../shared/layout'
 import { describeError } from '@/api/errors'
-import { connectDrive } from '../shared/driveSession'
 
 interface Props {
   /** Create the data here and now, with sync on if consent already landed. */

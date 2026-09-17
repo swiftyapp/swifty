@@ -18,9 +18,13 @@ pub enum AuthPurpose {
     Connect,
     /// Connect, then merge in whatever the account already holds.
     Import,
-    /// First-run onboarding: connect an account *before* any vault exists, so
-    /// the user can be shown what is up there and choose to restore it or start
-    /// over. Alone among the three, it has no session and no cryptor.
+    /// Connect an account with no vault to seal its tokens under, so the user
+    /// can be shown what is up there and choose which of it to restore: the
+    /// first run, and the Settings flow that adds a workspace by restoring one
+    /// of the account's other vaults. Alone among the three, it has no session
+    /// and no cryptor — which is what the two callers have in common, and why
+    /// they share one purpose rather than being told apart here. What asked is
+    /// the frontend's to remember; the redirect does the same thing either way.
     Setup,
 }
 
