@@ -293,6 +293,7 @@
   "Copy": "Скопировать",
   "Copy code": "Скопировать код",
   "Could not delete. Please try again.": "Не удалось удалить. Попробуйте ещё раз.",
+  "Could not open this entry. Please try again.": "Не удалось открыть эту запись. Попробуйте ещё раз.",
   "Could not save. Please try again.": "Не удалось сохранить. Попробуйте ещё раз.",
   "Create a new vault or restore from an existing backup.": "Создайте новое хранилище или восстановите данные из резервной копии.",
   "Edit": "Изменить",

@@ -75,7 +75,7 @@ export default function Conflict({ onUnlockExisting, onArchive }: Props) {
         </Button>
       </div>
 
-      <p className={`${FOOTNOTE} ${META_TYPE} ${error ? 'text-bad' : 'text-text3'}`}>
+      <p className={`${FOOTNOTE} ${META_TYPE} ${error ? 'text-bad' : 'text-text2'}`}>
         {error ?? t('Archiving renames it in the same Drive folder. Nothing is deleted.')}
       </p>
     </>

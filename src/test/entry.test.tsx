@@ -44,6 +44,27 @@ describe('Editing in the pane', () => {
     await waitFor(() => expect(useVault.getState().items[0].title).toBe('GitHub'))
   })
 
+  // A new entry has no id until the backend answers; every save call before
+  // that minted its own, so two quick presses wrote two rows.
+  it('writes a new entry once however many times Save is pressed in flight', async () => {
+    let finish: (value: unknown) => void = () => {}
+    mockCommand('save_entry', ({ entry }) => new Promise(done => (finish = () => done(toEntryMeta(entry as Entry)))))
+    render(<Show type="login" editing />)
+    await userEvent.type(titleInput(), 'GitHub')
+    await userEvent.type(field('username'), 'octocat')
+    await userEvent.type(field('password'), 'pw')
+
+    await userEvent.click(screen.getByTestId('save-entry-button'))
+    await userEvent.click(screen.getByTestId('save-entry-button'))
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
+
+    expect(calls('save_entry')).toHaveLength(1)
+    expect(screen.getByTestId('save-entry-button')).toBeDisabled()
+
+    await act(async () => finish(undefined))
+    await waitFor(() => expect(useVault.getState().items).toHaveLength(1))
+  })
+
   it('blocks an invalid save and says which rows are missing', async () => {
     render(<Show type="login" editing />)
     await userEvent.click(screen.getByText('Save'))

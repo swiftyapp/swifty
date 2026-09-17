@@ -39,7 +39,7 @@ export default function NoteField({
               grow(event.currentTarget)
               set(event.target.value)
             }}
-            className="block min-h-6 w-full resize-none overflow-hidden border-b border-line2 bg-transparent text-base leading-relaxed text-text outline-none transition-colors placeholder:text-text3 focus:border-accent-line"
+            className="block min-h-6 w-full resize-none overflow-hidden border-b border-line2 bg-transparent text-base leading-relaxed text-text outline-none transition-colors placeholder:text-text2 focus:border-accent-line"
           />
         ) : (
           <div

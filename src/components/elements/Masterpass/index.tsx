@@ -197,7 +197,7 @@ export default function Masterpass({
             // value are both drawn by the cell overlay (see Dots) so they share
             // one geometry, including the selection wash. Only the placeholder
             // renders from here (15px, muted ink).
-            className="absolute inset-0 w-full rounded-xl border-0 bg-transparent px-10 text-center font-sans text-md tracking-secret text-transparent caret-transparent outline-none selection:bg-transparent placeholder:text-text3"
+            className="absolute inset-0 w-full rounded-xl border-0 bg-transparent px-10 text-center font-sans text-md tracking-secret text-transparent caret-transparent outline-none selection:bg-transparent placeholder:text-text2"
             placeholder={placeholder || t('Master Password')}
             // The passphrase is stored exactly as typed, including while
             // revealed — when `type` is `text` and nothing else would hold the

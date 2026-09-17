@@ -293,6 +293,7 @@
   "Copy": "Copier",
   "Copy code": "Copier le code",
   "Could not delete. Please try again.": "Suppression impossible. Veuillez réessayer.",
+  "Could not open this entry. Please try again.": "Impossible d’ouvrir cet élément. Veuillez réessayer.",
   "Could not save. Please try again.": "Enregistrement impossible. Veuillez réessayer.",
   "Create a new vault or restore from an existing backup.": "Créez un nouveau coffre ou restaurez-le depuis une sauvegarde existante.",
   "Edit": "Modifier",

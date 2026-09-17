@@ -1,6 +1,7 @@
 import type { EntryMeta, EntryType } from '@/api/types'
 import Read from './Read'
 import Edit from './Edit'
+import RevealError from './RevealError'
 import { useShown } from './useShown'
 
 interface Props {
@@ -15,9 +16,12 @@ interface Props {
 // than in either mode, so entering and leaving edit doesn't re-fetch the
 // secrets and blank the rows on the way through.
 export default function Show({ entry, type, editing }: Props) {
-  const { kindType, current, held } = useShown(entry, type)
+  const { kindType, current, held, failed, retry } = useShown(entry, type)
 
   if (!kindType) return null
+  // A refused reveal is the same dead end in both faces: no rows to read and
+  // no secrets to seed a draft from. Say so, and offer the way back.
+  if (failed && entry) return <RevealError entry={entry} onRetry={retry} />
   if (editing) {
     // Hold the pane's frame until the secrets are in hand — a tombstone never
     // gets here, so this always resolves. (`reveal_entry` refuses deleted rows;

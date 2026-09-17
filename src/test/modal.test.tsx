@@ -10,6 +10,19 @@ const openSettings = async () => {
   return screen.getByTestId('settings-modal')
 }
 
+describe('Modal close control', () => {
+  // The default card's close is a bare glyph; without a name every dialog that
+  // inherits it announces as "button".
+  it('names the close button', () => {
+    render(
+      <Modal onClose={vi.fn()} testid="plain">
+        <p>body</p>
+      </Modal>
+    )
+    expect(screen.getByTestId('modal-close')).toHaveAccessibleName('Close')
+  })
+})
+
 describe('Modal focus management', () => {
   it('moves focus inside the card when it opens', async () => {
     render(<Settings />)

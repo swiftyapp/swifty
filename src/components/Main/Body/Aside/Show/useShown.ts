@@ -13,6 +13,10 @@ export interface Shown {
    * the surface holds its frame instead of mounting one.
    */
   held: boolean
+  /** The reveal failed: nothing more is coming, and the surface has to say so. */
+  failed: boolean
+  /** Ask for the secrets again. */
+  retry: () => void
 }
 
 /**
@@ -23,7 +27,7 @@ export interface Shown {
  * rows, so asking would only buy a rejected invoke per selection in the Archive.
  */
 export function useShown(entry?: EntryMeta, type?: EntryType): Shown {
-  const revealed = useRevealed(entry?.deletedAt ? null : entry)
+  const { entry: revealed, failed, retry } = useRevealed(entry?.deletedAt ? null : entry)
   // The reveal is cleared in an effect, so the first render after the props
   // change still carries the previous entry's secrets. Match it to the entry in
   // hand before handing it on — a draft (no entry) never gets one at all.
@@ -43,6 +47,8 @@ export function useShown(entry?: EntryMeta, type?: EntryType): Shown {
   return {
     kindType: type ?? entry?.type,
     current,
-    held: !!entry && !current && served !== entry.id
+    held: !!entry && !current && served !== entry.id,
+    failed: !!entry && !current && failed,
+    retry
   }
 }

@@ -29,6 +29,48 @@ describe('Show chrome', () => {
     expect(footer).toHaveTextContent('Created')
   })
 
+  // A rejected reveal used to be swallowed, leaving a pane that looked like one
+  // still loading — no rows, no message, and in edit mode no way out.
+  it('says so when the reveal fails, and offers a retry and a way out', async () => {
+    mockCommand('reveal_entry', () => Promise.reject({ kind: 'other', message: 'refused' }))
+    withEntries([loginMeta()])
+    setCurrentEntry('l1')
+    render(<Show entry={loginMeta()} editing />)
+
+    const error = await screen.findByTestId('reveal-error')
+    expect(error).toHaveTextContent('Could not open this entry. Please try again.')
+    expect(screen.queryByTestId('entry-sheet')).not.toBeInTheDocument()
+
+    mockCommand('reveal_entry', () => loginEntry())
+    await userEvent.click(screen.getByTestId('reveal-retry-button'))
+    expect(await screen.findByTestId('entry-sheet')).toBeInTheDocument()
+  })
+
+  // The failure is the entry's, not the pane's: selecting another row must not
+  // flash the previous row's error under the new title.
+  it('keeps one entry’s failure off the next entry', async () => {
+    mockCommand('reveal_entry', ({ id }) =>
+      id === 'l1' ? Promise.reject({ kind: 'other', message: 'refused' }) : new Promise(() => {})
+    )
+    withEntries([loginMeta(), loginMeta({ id: 'l2', title: 'Other' })])
+    const { rerender } = render(<Show entry={loginMeta()} />)
+    await screen.findByTestId('reveal-error')
+
+    rerender(<Show entry={loginMeta({ id: 'l2', title: 'Other' })} />)
+
+    expect(screen.queryByTestId('reveal-error')).not.toBeInTheDocument()
+  })
+
+  it('closes the failed entry from the error surface', async () => {
+    mockCommand('reveal_entry', () => Promise.reject({ kind: 'other', message: 'refused' }))
+    withEntries([loginMeta()])
+    setCurrentEntry('l1')
+    render(<Show entry={loginMeta()} />)
+
+    await userEvent.click(await screen.findByTestId('reveal-close-button'))
+    expect(useVault.getState().currentId).toBeNull()
+  })
+
   it('filters the list by a tag pressed in the detail pane', async () => {
     mockCommand('reveal_entry', () => loginEntry({ tags: ['work'] }))
     render(<Show entry={loginMeta({ tags: ['work'] })} />)

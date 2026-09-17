@@ -532,6 +532,9 @@
   --c-sel: rgba(59, 91, 219, 0.09);
   --c-text: #15161a;
   --c-text2: #585c64;
+  /* The glyph tier. ~3.6:1 on --c-detail and ~2.9:1 on --c-app: enough for a
+     bare icon (WCAG AA 3:1 for graphics), not for text (4.5:1). Labels, stamps
+     and placeholders take text2 — see elements/tokens. */
   --c-text3: #84878e;
   --c-accent: #3b5bdb;
   --c-accent-fg: #ffffff;

@@ -12,7 +12,7 @@ export const STACK_VALUE = '@max-[420px]:h-auto @max-[420px]:whitespace-normal @
 
 // The underlined editor box CustomFields draws, minus its border ink — the row
 // picks that by whether it has something to complain about.
-export const BOX = 'border-b bg-transparent outline-none transition-colors placeholder:text-text3'
+export const BOX = 'border-b bg-transparent outline-none transition-colors placeholder:text-text2'
 export const BOX_LINE = 'border-line2 focus:border-accent-line'
 
 // The key column. Its width is one value per table (`--key-col`, set on the

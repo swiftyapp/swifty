@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Auth from '@/components/Auth'
-import { useApp } from '@/store'
+import { useApp, flowSetup } from '@/store'
 import { calls, mockCommand, mockCommandOnce } from './ipc'
 
 beforeEach(() => vi.clearAllMocks())
@@ -91,6 +91,41 @@ describe('Auth', () => {
     // The vault entry is held back briefly so the celebration can play.
     expect(useApp.getState().flow).not.toBe('main')
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
+  })
+
+  // The wide and compact lock screens are different components, so a resize
+  // across the layout breakpoint during the celebration hold remounts the hook.
+  // Rust has already opened the vault by then; the UI must follow it in.
+  it('still enters the vault when unmounted during the success hold', async () => {
+    mockCommand('unlock', () => ({ entries: [], syncConfigured: false }))
+    const { unmount } = render(<Auth biometric={false} />)
+
+    await userEvent.type(screen.getByPlaceholderText('Master Password'), 'right{Enter}')
+    await waitFor(() =>
+      expect(screen.getByTestId('lock-mascot')).toHaveAttribute('data-state', 'success')
+    )
+    expect(useApp.getState().flow).not.toBe('main')
+
+    unmount()
+
+    expect(useApp.getState().flow).toBe('main')
+  })
+
+  // ...but not when the unmount is because the flow itself moved on: that
+  // result describes a session someone else has since replaced.
+  it('drops a held unlock if the flow has already left the lock screen', async () => {
+    mockCommand('unlock', () => ({ entries: [], syncConfigured: false }))
+    const { unmount } = render(<Auth biometric={false} />)
+
+    await userEvent.type(screen.getByPlaceholderText('Master Password'), 'right{Enter}')
+    await waitFor(() =>
+      expect(screen.getByTestId('lock-mascot')).toHaveAttribute('data-state', 'success')
+    )
+
+    flowSetup()
+    unmount()
+
+    expect(useApp.getState().flow).toBe('setup')
   })
 
   it('unlocks the vault on Enter', async () => {

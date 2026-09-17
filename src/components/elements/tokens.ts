@@ -33,7 +33,11 @@ export const TOAST =
 // "EDITING ·" eyebrow) and LABEL otherwise.
 export const LABEL_TYPE = 'text-xs uppercase tracking-label'
 
-export const LABEL = `${LABEL_TYPE} text-text3`
+// Small text sits on the secondary tier (text2), not the tertiary: text3 is
+// ~3.6:1 on white and ~2.9:1 on the app ground in light mode, under WCAG AA's
+// 4.5:1 for text — fine for a glyph (3:1), too pale for an 11px label or stamp
+// (see Compact/Tab, which measured the same and moved first).
+export const LABEL = `${LABEL_TYPE} text-text2`
 
 // The meta face, without an ink: counts, timestamps, hints, shortcuts, chips —
 // the same 11px as the label tier, set as ordinary text rather than a tracked
@@ -43,7 +47,7 @@ export const LABEL = `${LABEL_TYPE} text-text3`
 // and META otherwise.
 export const META_TYPE = 'text-xs tabular-nums'
 
-export const META = `${META_TYPE} text-text3`
+export const META = `${META_TYPE} text-text2`
 
 // The detail row's value line: one line high, never wrapping, the ink the
 // caller's. VALUE_LINE leaves the size open for the one row that sets its own

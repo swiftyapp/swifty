@@ -42,8 +42,9 @@ export default function NavRow({ draft, title }: Props) {
         <button
           type="button"
           data-testid="save-entry-button"
+          disabled={draft.saving}
           onClick={draft.save}
-          className="flex h-14 min-w-11 cursor-pointer items-center justify-end px-2 text-md font-semibold text-accent"
+          className="flex h-14 min-w-11 cursor-pointer items-center justify-end px-2 text-md font-semibold text-accent disabled:cursor-default disabled:opacity-50"
         >
           {t('Save')}
         </button>

@@ -293,6 +293,7 @@
   "Copy": "Копіювати",
   "Copy code": "Копіювати код",
   "Could not delete. Please try again.": "Не вдалося видалити. Спробуйте ще раз.",
+  "Could not open this entry. Please try again.": "Не вдалося відкрити цей запис. Спробуйте ще раз.",
   "Could not save. Please try again.": "Не вдалося зберегти. Спробуйте ще раз.",
   "Create a new vault or restore from an existing backup.": "Створіть нове сховище або відновіть його з резервної копії.",
   "Edit": "Редагувати",

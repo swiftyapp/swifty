@@ -136,11 +136,34 @@ export const flowSetup = () => useApp.setState({ flow: 'setup' })
 export const flowAuth = () => useApp.setState({ flow: 'auth' })
 export const flowMain = () => useApp.setState({ flow: 'main' })
 
-// The lock screen reads its gate off `status`, so a lock re-runs the probe
-// first: whether a key is enrolled can have changed since the last one. Asked
-// rather than assumed — hardcoding `false` here is how the Touch ID button used
-// to vanish on every in-session lock.
-export const showLockScreen = () => refreshApp().then(() => flowAuth())
+// The lock screen reads its gate off `status`, so a lock re-runs the probe:
+// whether a key is enrolled can have changed since the last one. Asked rather
+// than assumed — hardcoding `false` here is how the Touch ID button used to
+// vanish on every in-session lock.
+//
+// Routed first, probed second. The session is already gone by the time this
+// runs, and waiting on the probe kept the main shell — with its live chords and
+// an empty list — on screen until the answer came back. The lock screen draws
+// the last known gate meanwhile and re-renders when the probe lands.
+export const showLockScreen = () => {
+  flowAuth()
+  return refreshApp()
+}
+
+/**
+ * Forget whether a key is enrolled, ahead of a move to another workspace.
+ * Enrollment is per workspace, and the lock screen draws the last known gate
+ * until the re-probe lands — so without this, the vault being switched *to*
+ * briefly wore the gate of the one being left. `false` is the safe default:
+ * a gate that is not offered, rather than one that is offered and refused.
+ * The probe that follows every lock restores the truth.
+ */
+export const forgetBiometricGate = () =>
+  useApp.setState(state =>
+    state.status
+      ? { status: { ...state.status, biometric: { ...state.status.biometric, available: false } } }
+      : {}
+  )
 
 // Everything the unlocked session put in the stores. A lock has to drop all of
 // it — it outlives the session otherwise, and the next unlock (of this or any

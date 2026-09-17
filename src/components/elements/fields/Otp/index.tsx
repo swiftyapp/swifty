@@ -58,7 +58,7 @@ export default function OtpField({
           // unless it also carries a digit count, period or algorithm of its
           // own, which the link is the only place to keep.
           onBlur={() => set(stored || value.trim())}
-          className={`mt-2.5 h-6 w-full self-stretch truncate border-b bg-transparent text-center text-base text-text outline-none transition-colors placeholder:text-text3 ${
+          className={`mt-2.5 h-6 w-full self-stretch truncate border-b bg-transparent text-center text-base text-text outline-none transition-colors placeholder:text-text2 ${
             value && !parsed ? 'border-bad' : 'border-line2 focus:border-accent-line'
           }`}
         />

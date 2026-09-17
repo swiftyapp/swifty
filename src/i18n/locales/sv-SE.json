@@ -293,6 +293,7 @@
   "Copy": "Kopiera",
   "Copy code": "Kopiera koden",
   "Could not delete. Please try again.": "Kunde inte radera. Försök igen.",
+  "Could not open this entry. Please try again.": "Kunde inte öppna posten. Försök igen.",
   "Could not save. Please try again.": "Kunde inte spara. Försök igen.",
   "Create a new vault or restore from an existing backup.": "Skapa ett nytt valv eller återställ från en befintlig säkerhetskopia.",
   "Edit": "Redigera",
