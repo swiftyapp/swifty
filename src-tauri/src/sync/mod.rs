@@ -63,11 +63,23 @@ pub(crate) fn persist_tokens(app: &AppHandle, cryptor: &Cryptor, tokens: &Tokens
     auth::write_tokens(app, cryptor, tokens)
 }
 
-/// The open workspace's account, unsealed — `None` when it has none. What a
-/// workspace made or restored beside this one is given, so that one account
-/// connected once reaches every vault on the device without a second sign-in.
-pub(crate) fn current_tokens(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
-    auth::read_tokens(app, cryptor)
+/// The open workspace's account, unsealed, with the connection generation it
+/// belongs to — `None` when it has none. What a workspace made or restored
+/// beside this one is given, so that one account connected once reaches every
+/// vault on the device without a second sign-in.
+///
+/// The two are read as one step under the guard a disconnect bumps and deletes
+/// under, for a caller that will refresh the tokens across round trips of its
+/// own and write them back with [`persist_tokens_if_current`]. Read apart, a
+/// disconnect landing between the reads would hand back the dropped
+/// credentials under the generation that replaced them, and the write-back
+/// would undo it. The same pairing `auth::access_token` makes for the sync
+/// engine's own refresh.
+pub(crate) fn current_account(app: &AppHandle, cryptor: &Cryptor) -> Option<(Tokens, u64)> {
+    let state = app.state::<AppState>();
+    let generation = state.sync_generation.lock().unwrap();
+    let tokens = auth::read_tokens(app, cryptor)?;
+    Some((tokens, *generation))
 }
 
 /// [`persist_tokens`] into the workspace directory `dir` rather than the active

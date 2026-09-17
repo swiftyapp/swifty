@@ -181,7 +181,7 @@ pub async fn workspace_create(
     let (previous_active, previous, inherited) = {
         let _paths = state.workspace_lock.lock().unwrap();
         guard_sync_idle(&state)?;
-        let inherited = open_account(&app, &state)?;
+        let inherited = open_account(&app, &state)?.map(|(tokens, _)| tokens);
         let lease = state.session.lock().unwrap().take_out()?;
         let active = std::mem::replace(&mut *state.active_workspace.lock().unwrap(), id.clone());
         (active, lease, inherited)
@@ -244,22 +244,25 @@ pub async fn workspace_create(
     })
 }
 
-/// The open workspace's Google account: `None` when it has none, and an error
-/// when it has one that cannot be read. Read under the caller's
-/// `workspace_lock`, through the paths as they stand.
+/// The open workspace's Google account, with the connection generation it was
+/// read under: `None` when it has none, and an error when it has one that
+/// cannot be read. Read under the caller's `workspace_lock`, through the paths
+/// as they stand. The generation is read in the same step as the tokens
+/// (`sync::current_account`), so a caller that writes refreshed tokens back can
+/// never be handed dropped credentials under a generation that still passes.
 ///
 /// The two are told apart on purpose. A workspace whose session says it syncs
 /// but whose token file will not unseal or parse is damaged, not local: going
 /// ahead would make a workspace that quietly lacks the account the user was
 /// promised (or, for a restore, fail later for a less honest reason).
-fn open_account(app: &AppHandle, state: &AppState) -> Result<Option<sync::Tokens>> {
+fn open_account(app: &AppHandle, state: &AppState) -> Result<Option<(sync::Tokens, u64)>> {
     let session = state.session.lock().unwrap();
     let cryptor = session.cryptor()?;
     if !session.sync_configured {
         return Ok(None);
     }
     drop(session);
-    sync::current_tokens(app, &cryptor)
+    sync::current_account(app, &cryptor)
         .map(Some)
         .ok_or_else(|| Error::Other(account_unreadable_error()))
 }
@@ -352,21 +355,32 @@ pub async fn workspace_restore_from_account(
 ) -> Result<UnlockResult> {
     // Under the lock, as `workspace_create` reads it: the token file resolves
     // through the active workspace, which must not move underneath.
-    let tokens = {
+    let (tokens, generation) = {
         let _paths = state.workspace_lock.lock().unwrap();
         open_account(&app, &state)?.ok_or(Error::SyncNotConfigured)?
     };
-    restore_workspace(&app, &state, name, password, file_id, tokens, Account::Open).await
+    restore_workspace(
+        &app,
+        &state,
+        name,
+        password,
+        file_id,
+        tokens,
+        Account::Open { generation },
+    )
+    .await
 }
 
 /// Whose tokens a restore runs on, which is the one thing that differs between
 /// the two restores: a pending account has to be kept current through the
 /// download and dropped once it is sealed inside the new workspace; the open
-/// workspace's account is its own to keep, and nothing here touches it.
+/// workspace's account is its own to keep, and its token file follows the
+/// refresh — if the connection is still the one the tokens were read under,
+/// which is what `generation` names.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Account {
     Pending,
-    Open,
+    Open { generation: u64 },
 }
 
 /// Turn the pack `file_id` into a workspace, unlocked with `password`.
@@ -397,10 +411,10 @@ async fn restore_workspace(
     // session of the workspace the user is looking at would otherwise be held
     // out for all of it, taking a vault away that they never asked to leave.
     //
-    // The connection generation is read first, as every refresh that will be
-    // written back reads it: a disconnect landing during the download must not
-    // have its delete undone by the write below.
-    let generation = sync::connection_generation(app);
+    // The connection generation came with the tokens, read as one step with
+    // them, as every refresh that will be written back reads it: a disconnect
+    // landing anywhere from that read to the write below must not have its
+    // delete undone by the write.
     let (bytes, vault_id) = setup::download(app, &mut tokens, &file_id, |vault_id| {
         guard_other_vault(state, &root, vault_id)
     })
@@ -430,14 +444,15 @@ async fn restore_workspace(
     let (previous_active, previous) = {
         let _paths = state.workspace_lock.lock().unwrap();
         guard_sync_idle(state)?;
-        if account == Account::Open {
+        if let Account::Open { generation } = account {
             let cryptor = state.session.lock().unwrap().cryptor()?;
             if !sync::persist_tokens_if_current(app, &cryptor, &tokens, generation)? {
                 return Err(Error::Other(disconnected_mid_restore_error()));
             }
         }
         let lease = state.session.lock().unwrap().take_out()?;
-        if account == Account::Open && sync::connection_generation(app) != generation {
+        if matches!(account, Account::Open { generation } if sync::connection_generation(app) != generation)
+        {
             // The paths have not moved yet, so the session goes straight back.
             state.session.lock().unwrap().restore(lease);
             return Err(Error::Other(disconnected_mid_restore_error()));

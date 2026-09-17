@@ -40,7 +40,7 @@ use crate::sync::{self, restore, setup::PackInfo, Tokens};
 use crate::workspace::{self, Registry, Workspace};
 
 use super::setup::{self as onboarding, begin_step};
-use super::workspace::{discard, guard_other_vault, update_registry};
+use super::workspace::{discard, guard_other_vault};
 
 /// Try `password` against the vaults the open workspace's account holds and
 /// this device does not. Returns at once; the work runs on the blocking pool
@@ -63,21 +63,24 @@ fn join_all(app: &AppHandle, password: &str) -> Result<()> {
 
     // The open workspace, its account and its vault id, as one step under the
     // workspace lock: the token file resolves through the active paths, which
-    // must be the same paths the session's key belongs to. The connection
-    // generation is read here too, so a disconnect landing anywhere in the
-    // task can be told (see [`Account::settle`]).
+    // must be the same paths the session's key belongs to. The tokens come
+    // with the connection generation they were read under, the two as one step
+    // (`sync::current_account`), so a disconnect landing anywhere in the task
+    // can be told (see [`Account::settle`]) — read apart, a disconnect between
+    // the reads would leave dropped credentials under a generation that still
+    // passes.
     let (account, own_vault_id, mut tokens) = {
         let _paths = state.workspace_lock.lock().unwrap();
         let workspace = state.active_workspace.lock().unwrap().clone();
         let session = state.session.lock().unwrap();
         let cryptor = session.cryptor()?;
         let own = crate::store::identity::vault_id(session.store()?).map_err(store_err)?;
-        let Some(tokens) = sync::current_tokens(app, &cryptor) else {
+        let Some((tokens, generation)) = sync::current_account(app, &cryptor) else {
             return Ok(());
         };
         let account = Account {
             workspace,
-            generation: sync::connection_generation(app),
+            generation,
         };
         (account, own, tokens)
     };
@@ -86,6 +89,12 @@ fn join_all(app: &AppHandle, password: &str) -> Result<()> {
     // No lock held from here on: everything below is network or the new
     // workspace's own files, and the registry writes take their own lock.
     let packs = block_on(onboarding::probe(app, &mut tokens))?;
+    // The listing may have refreshed the tokens. The workspace they came from
+    // keeps the refreshed copy whether or not a candidate follows — and a
+    // disconnect that landed under the listing ends the task here.
+    if !account.settle(app, &state, &tokens)? {
+        return Ok(());
+    }
     let held = held_vault_ids(&Registry::load(&root), own_vault_id.as_deref());
     let candidates = sync::remote_only(packs, &held);
     if candidates.is_empty() {
@@ -155,6 +164,37 @@ impl Account {
         };
         sync::persist_tokens_if_current(app, &cryptor, tokens, self.generation)
     }
+
+    /// Record `workspace` — the installed vault, with `vault_id` behind it —
+    /// in the registry, which is what makes it a workspace of this device.
+    /// Unless the connection its token file was copied from has been dropped
+    /// meanwhile: [`Account::settle`] ran before the Argon2id work and the
+    /// install, and a disconnect landing during them would otherwise be
+    /// followed by a new holder of the credentials the user had just dropped.
+    /// The check and the write are one step under the guard a disconnect
+    /// bumps, so nothing can land between them; the caller discards the
+    /// installed files on the refusal. The "already a workspace here" question
+    /// is asked once more too, as every registry writer asks it under the
+    /// registry's lock.
+    fn commit(
+        &self,
+        state: &AppState,
+        root: &Path,
+        vault_id: &str,
+        workspace: Workspace,
+    ) -> Result<()> {
+        let _paths = state.workspace_lock.lock().unwrap();
+        // Before the connection guard: this takes the session lock, and the
+        // two are never held together anywhere else.
+        guard_other_vault(state, root, vault_id)?;
+        let connection = state.sync_generation.lock().unwrap();
+        if *connection != self.generation {
+            return Err(Error::SyncNotConfigured);
+        }
+        let mut registry = Registry::load(root);
+        registry.workspaces.push(workspace);
+        registry.save(root)
+    }
 }
 
 /// Every vault a workspace on this device holds, plus the open one's — whose
@@ -215,19 +255,14 @@ fn join_one(
 
     // Registry last, as every workspace writer records it: an entry only once
     // there is a vault behind it. Not `active` — the user is looking at the
-    // vault they unlocked, and stays there. The check and the write are one
-    // step under the registry's lock, so no second holder of this vault can
-    // be recorded beside it.
-    let recorded = update_registry(state, root, |registry| {
-        guard_other_vault(state, root, &vault_id)?;
-        registry.workspaces.push(Workspace {
-            id: id.clone(),
-            name: Some(name.clone()),
-            vault_id: Some(vault_id.clone()),
-        });
-        Ok(())
-    });
-    if let Err(e) = recorded {
+    // vault they unlocked, and stays there. A refusal (a second holder, or the
+    // account disconnected since `settle`) takes the installed files with it.
+    let workspace = Workspace {
+        id: id.clone(),
+        name: Some(name.clone()),
+        vault_id: Some(vault_id.clone()),
+    };
+    if let Err(e) = account.commit(state, root, &vault_id, workspace) {
         discard(root, &id);
         return Err(e);
     }
