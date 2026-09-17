@@ -1,6 +1,8 @@
 pub mod app;
 pub mod audit;
 pub mod auth;
+// Adding the account's other vaults with the password that just opened one.
+pub mod autojoin;
 pub mod clipboard;
 // E2E-only reset seam. Compiled out of release builds entirely (see e2e.rs for
 // the full gating rationale); the registration in lib.rs carries the same cfg.

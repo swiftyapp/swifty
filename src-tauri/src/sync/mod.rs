@@ -63,11 +63,34 @@ pub(crate) fn persist_tokens(app: &AppHandle, cryptor: &Cryptor, tokens: &Tokens
     auth::write_tokens(app, cryptor, tokens)
 }
 
-/// The open workspace's account, unsealed — `None` when it has none. What a
-/// workspace made or restored beside this one is given, so that one account
-/// connected once reaches every vault on the device without a second sign-in.
-pub(crate) fn current_tokens(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
-    auth::read_tokens(app, cryptor)
+/// The open workspace's account, unsealed, with the connection generation it
+/// belongs to — `None` when it has none. What a workspace made or restored
+/// beside this one is given, so that one account connected once reaches every
+/// vault on the device without a second sign-in.
+///
+/// The two are read as one step under the guard a disconnect bumps and deletes
+/// under, for a caller that will refresh the tokens across round trips of its
+/// own and write them back with [`persist_tokens_if_current`]. Read apart, a
+/// disconnect landing between the reads would hand back the dropped
+/// credentials under the generation that replaced them, and the write-back
+/// would undo it. The same pairing `auth::access_token` makes for the sync
+/// engine's own refresh.
+pub(crate) fn current_account(app: &AppHandle, cryptor: &Cryptor) -> Option<(Tokens, u64)> {
+    let state = app.state::<AppState>();
+    let generation = state.sync_generation.lock().unwrap();
+    let tokens = auth::read_tokens(app, cryptor)?;
+    Some((tokens, *generation))
+}
+
+/// [`persist_tokens`] into the workspace directory `dir` rather than the active
+/// workspace's — for a vault added beside the open one while its paths stay put
+/// (`commands::autojoin`).
+pub(crate) fn persist_tokens_in(
+    dir: &std::path::Path,
+    cryptor: &Cryptor,
+    tokens: &Tokens,
+) -> Result<()> {
+    auth::write_tokens_in(dir, cryptor, tokens)
 }
 
 /// [`persist_tokens`], unless a disconnect has ended the connection `generation`
@@ -257,7 +280,10 @@ fn publish_remote_vaults(app: &AppHandle, own_id: &str, packs: Vec<setup::PackIn
 
 /// The packs among `packs` that no workspace on this device holds, in the order
 /// the listing gave them (newest first).
-fn remote_only(packs: Vec<setup::PackInfo>, held: &HashSet<String>) -> Vec<setup::PackInfo> {
+pub(crate) fn remote_only(
+    packs: Vec<setup::PackInfo>,
+    held: &HashSet<String>,
+) -> Vec<setup::PackInfo> {
     packs
         .into_iter()
         .filter(|pack| !held.contains(&pack.vault_id))

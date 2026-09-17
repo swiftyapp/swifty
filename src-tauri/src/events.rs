@@ -19,6 +19,7 @@ pub const SETUP_DRIVE_PENDING: &str = "setup:drive:pending";
 pub const SETUP_DRIVE_PROBED: &str = "setup:drive:probed";
 pub const SETUP_DRIVE_ERROR: &str = "setup:drive:error";
 pub const WORKSPACES_REMOTE: &str = "workspaces:remote";
+pub const WORKSPACES_ADDED: &str = "workspaces:added";
 // Desktop only, like the file associations that produce it (`crate::opened`).
 #[cfg(desktop)]
 pub const FILE_OPENED: &str = "file:opened";
@@ -90,6 +91,18 @@ pub fn setup_drive_error(app: &AppHandle, error: &str) {
 /// the account is here.
 pub fn remote_vaults(app: &AppHandle, files: Vec<PackInfo>) {
     let _ = app.emit(WORKSPACES_REMOTE, Probed { files });
+}
+
+#[derive(Serialize, Clone)]
+struct Added<'a> {
+    name: &'a str,
+}
+
+/// A vault from the account was added as a workspace without being asked for
+/// — the password that just opened a vault opened it too (`commands::autojoin`).
+/// The frontend re-probes for the new list and says so; nothing switches.
+pub fn workspace_added(app: &AppHandle, name: &str) {
+    let _ = app.emit(WORKSPACES_ADDED, Added { name });
 }
 
 /// The OS asked the app to open a backup (see `crate::opened`). Also parked for

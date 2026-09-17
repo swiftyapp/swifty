@@ -541,6 +541,7 @@
   "Workspace name": "Nome do espaço de trabalho",
   "New workspace": "Novo espaço de trabalho",
   "In your Google account": "Na sua conta do Google",
+  "Added “{{name}}” from your Google account": "“{{name}}” adicionado da sua conta do Google",
   "Not on this device yet": "Ainda não neste dispositivo",
   "Restore one to add it as a workspace here, unlocked with its own master password and already syncing. No new sign-in needed.": "Restaure um para adicioná-lo aqui como espaço de trabalho, desbloqueado com a própria senha mestra e já sincronizando. Não é preciso entrar de novo.",
   "Add a workspace": "Adicionar um espaço de trabalho",

@@ -99,9 +99,22 @@ products solve it, don't patch symptoms.
 > are sealed under the new key and the vault is stamped with a minted id *at creation*, so
 > its first sync addresses a pack of its own rather than being refused as a nameless vault
 > beside the account's others; the pack then shows up on every other device's list after their
-> next sync. Follow-ups: try the password against the account's other packs at unlock and
-> restore the matches without asking; pull on foreground and on a timer, since an idle device
-> only syncs on unlock and after its own writes.
+> next sync.
+>
+> **Same password, no prompts** — the moment a password is in hand (a password unlock, a
+> first-run restore, a workspace restore) it is tried against the account's packs this device
+> lacks, and the ones it opens become workspaces beside the open one without switching to them
+> (`commands::autojoin`, reporting `workspaces:added` per vault and a refreshed
+> `workspaces:remote`; the frontend re-probes and shows a passing notice). The password lives
+> exactly as long as that blocking-pool task, as a second `Zeroizing` copy, and is never
+> written; the task stops starting candidates after a 60-second budget, so that is the budget
+> plus one download — see the threat model's unlock section. The task is bound to the account
+> it began on: the refreshed tokens are written back to the originating workspace under the
+> generation guard before each install, a disconnect meanwhile ends the task, and the
+> "already a workspace here" refusal is asked again with the step held and once more inside
+> the registry write. A pack sealed with a different password stays on offer in Settings ›
+> Workspaces. Biometric unlock has a key and no password, so it cannot do this. Follow-up: pull on foreground and on a timer, since an idle device only syncs
+> on unlock and after its own writes.
 >
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a

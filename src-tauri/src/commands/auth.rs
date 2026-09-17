@@ -57,6 +57,12 @@ pub async fn unlock(
         });
     }
 
+    // A second copy of the password, for the one thing that may outlive the
+    // unlock: trying it against the account's other vaults
+    // (`commands::autojoin`). Only for a vault that syncs — a local vault has
+    // no account to look in — and only once the unlock has succeeded.
+    let join = storage::sync_configured(&app).then(|| password.clone());
+
     match unlock_off_thread(&app, password).await {
         Ok((key, store, entries)) => {
             if lockout != LockoutState::default() {
@@ -70,6 +76,9 @@ pub async fn unlock(
                 .lock()
                 .unwrap()
                 .set(key, store, sync_configured);
+            if let Some(password) = join {
+                super::autojoin::with_password(&app, password);
+            }
             Ok(UnlockResult {
                 entries,
                 sync_configured,

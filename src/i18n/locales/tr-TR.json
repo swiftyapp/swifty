@@ -533,6 +533,7 @@
   "Workspace name": "Çalışma alanı adı",
   "New workspace": "Yeni çalışma alanı",
   "In your Google account": "Google hesabında",
+  "Added “{{name}}” from your Google account": "Google hesabından “{{name}}” eklendi",
   "Not on this device yet": "Henüz bu cihazda değil",
   "Restore one to add it as a workspace here, unlocked with its own master password and already syncing. No new sign-in needed.": "Birini geri yükleyerek buraya çalışma alanı olarak ekle; kendi ana parolasıyla açılır ve zaten eşitlenir. Yeniden oturum açmak gerekmez.",
   "Add a workspace": "Çalışma alanı ekle",

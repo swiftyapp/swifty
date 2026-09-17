@@ -82,6 +82,12 @@ export interface UiState {
   // The app-level "Copied to Clipboard" pill is up. Raised by `flashCopied`
   // and lowered by it alone, so nothing else has to know the timing.
   copied: boolean
+  /**
+   * A sentence worth a moment of the user's attention and nothing more — a
+   * vault the account held arriving as a workspace on its own, say. Shown by
+   * `NoticeToast` for a few seconds, then gone; `null` between notices.
+   */
+  notice: string | null
 }
 
 const GENERATOR_CLOSED: Generator = { open: false, apply: null, ssh: null }
@@ -110,10 +116,24 @@ export const initialUi: UiState = {
   searchFocus: 0,
   scanBusy: false,
   scanError: null,
-  copied: false
+  copied: false,
+  notice: null
 }
 
 export const useUi = create<UiState>()(() => initialUi)
+
+// --- transient notices -----------------------------------------------------------
+
+const NOTICE_TIMEOUT = 5000
+let noticeTimer: ReturnType<typeof setTimeout>
+
+// A second notice while one is up replaces it and restarts the clock, so the
+// later one gets its full few seconds.
+export const showNotice = (text: string) => {
+  clearTimeout(noticeTimer)
+  noticeTimer = setTimeout(() => useUi.setState({ notice: null }), NOTICE_TIMEOUT)
+  useUi.setState({ notice: text })
+}
 
 // --- clipboard feedback ----------------------------------------------------------
 
