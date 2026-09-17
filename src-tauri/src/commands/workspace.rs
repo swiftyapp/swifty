@@ -410,28 +410,38 @@ async fn restore_workspace(
     // has to leave a retry that works. A pending account lives in memory; the
     // open workspace's lives in its token file, which has to follow too — left
     // on the old copy, its next run could find the refresh token retired while
-    // only the restored workspace held the live one.
-    match account {
-        Account::Pending => setup::replace_pending_tokens(state, tokens.clone())?,
-        Account::Open => {
-            // Under the workspace lock, through the paths as they still stand.
-            let _paths = state.workspace_lock.lock().unwrap();
-            let cryptor = state.session.lock().unwrap().cryptor()?;
-            if !sync::persist_tokens_if_current(app, &cryptor, &tokens, generation)? {
-                // The user dropped the account meanwhile; sealing it into a new
-                // workspace would bring it back under another name.
-                return Err(Error::Other(disconnected_mid_restore_error()));
-            }
-        }
+    // only the restored workspace held the live one. That write happens below,
+    // in the same step as the lease.
+    if account == Account::Pending {
+        setup::replace_pending_tokens(state, tokens.clone())?;
     }
 
     // As `workspace_create` takes them, and for the same reasons: one step
     // under the lock, the session kept rather than dropped so a failure can put
     // it back, and a lock landing meanwhile winning over both outcomes.
+    //
+    // For the open workspace's account this step is also where a disconnect is
+    // shut out for good. `sync_disconnect` needs the session's key, so once the
+    // lease is out none can run until the restore ends — and one that landed
+    // before it is caught by the generation check made *after* the lease: the
+    // write-back and the check happen with the lock held, and nothing in
+    // between can undo them. Sealing tokens the user had just dropped into a
+    // new workspace would bring the account back under another name.
     let (previous_active, previous) = {
         let _paths = state.workspace_lock.lock().unwrap();
         guard_sync_idle(state)?;
+        if account == Account::Open {
+            let cryptor = state.session.lock().unwrap().cryptor()?;
+            if !sync::persist_tokens_if_current(app, &cryptor, &tokens, generation)? {
+                return Err(Error::Other(disconnected_mid_restore_error()));
+            }
+        }
         let lease = state.session.lock().unwrap().take_out()?;
+        if account == Account::Open && sync::connection_generation(app) != generation {
+            // The paths have not moved yet, so the session goes straight back.
+            state.session.lock().unwrap().restore(lease);
+            return Err(Error::Other(disconnected_mid_restore_error()));
+        }
         let active = std::mem::replace(&mut *state.active_workspace.lock().unwrap(), id.clone());
         (active, lease)
     };
