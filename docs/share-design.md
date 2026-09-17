@@ -77,7 +77,8 @@ Rowel/                      the existing sync folder
   Vaults/
     <vault-id>.rowel        a vault pack, untouched by sharing
   Shares/
-    <random>.rowelshare     one share, appProperties: rowelShare, entryId, kind, expiresAt
+    <random>.rowelshare     one share, appProperties: rowelShare, entryId, kind,
+                            expiresAt, vaultId
 ```
 
 Every name here is minted by `sync::layout`, sharing included. A vault is
@@ -85,8 +86,11 @@ addressed by its vault id — the opaque identity of the data, never the user's
 label for it, which does not reach Drive at all. A share is named by randomness
 alone.
 
-Shares stay account-level rather than moving under a vault: any of the sender's
-devices must be able to revoke or sweep one, whichever vault it came out of.
+Shares stay account-level rather than moving under a vault: the sweep must be
+able to clear an expired file whichever vault it came out of, and every one of
+the sender's devices runs it. What a share belongs to is a property, not a
+folder — see `vaultId` below.
+
 `appProperties` is the only metadata written. `rowelShare=1` is the marker
 every share carries, and the only thing listing selects on: shares are found by
 it wherever they sit, so two devices racing to create `Shares/` and uploading
@@ -96,7 +100,12 @@ share never gain one. `entryId` is the sender's local id, an opaque UUID that
 lets the sender's own UI show a title without revealing it to Drive. `kind` is
 the entry type. `expiresAt` is unix milliseconds, a duplicate of the
 authenticated copy inside the envelope, there so the sweep can date a file
-without its key. Listings follow `nextPageToken` to the end.
+without its key. `vaultId` is the id of the vault that published the share
+(`store::identity`), which is what lets one account hold several vaults' shares
+and still show each vault only its own; a share carrying none predates the
+property and stays visible to every vault, since hiding a link still in
+circulation is worse than listing it twice. Listings follow `nextPageToken` to
+the end.
 
 ## 5. Lifetime and control
 

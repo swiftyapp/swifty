@@ -22,6 +22,12 @@ export interface ActiveShare {
    */
   entryId: string | null
   kind: EntryType | null
+  /**
+   * The vault that published it. Null on shares made before the property
+   * existed; the backend lists those for every vault rather than hiding a link
+   * that may still be in circulation.
+   */
+  vaultId: string | null
   createdAt: string
   expiresAt: string
 }
@@ -41,4 +47,5 @@ export const shareOpen = (link: string): Promise<Entry> => call('share_open', { 
 export const shareRevoke = (fileId: string): Promise<void> =>
   call('share_revoke', { fileId })
 
+/** This vault's outstanding shares; another vault's in the same account are not ours to see. */
 export const shareList = (): Promise<ActiveShare[]> => call('share_list')

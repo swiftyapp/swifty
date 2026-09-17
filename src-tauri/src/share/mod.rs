@@ -7,9 +7,10 @@
 //! lifecycle is testable without a network.
 //!
 //! The link is the only secret: it never reaches Drive, and nothing here stores
-//! it. What Drive holds is ciphertext plus three opaque properties, which is
-//! also the only ledger of outstanding shares — any of the sender's devices can
-//! therefore list, revoke and clean up, and a reinstall loses nothing.
+//! it. What Drive holds is ciphertext plus a handful of opaque properties,
+//! which is also the only ledger of outstanding shares — any device holding the
+//! vault that published one can therefore list, revoke and clean it up, and a
+//! reinstall loses nothing.
 
 pub mod envelope;
 pub mod remote;
@@ -26,7 +27,7 @@ use crate::sync::layout;
 use envelope::{Link, ShareKey, SHARE_TTL_MS};
 use remote::{
     DriveShareRemote, PublicFetch, ShareFile, ShareRemote, PROP_ENTRY_ID, PROP_EXPIRES_AT,
-    PROP_KIND, PROP_SHARE, PROP_SHARE_VALUE,
+    PROP_KIND, PROP_SHARE, PROP_SHARE_VALUE, PROP_VAULT_ID,
 };
 
 /// A freshly published share, as the send dialog needs it.
@@ -48,12 +49,24 @@ pub struct ActiveShare {
     /// The sender's local entry id, which the UI resolves to a title.
     pub entry_id: Option<String>,
     pub kind: Option<String>,
+    /// The vault that published it, or `None` on a share made before the
+    /// property existed. Carried through so the UI can tell the two apart.
+    pub vault_id: Option<String>,
     pub created_at: String,
     pub expires_at: String,
 }
 
 /// Seal `entry` and publish it, returning the link that opens it.
-pub fn create(remote: &impl ShareRemote, entry: &Entry, now_ms: i64) -> Result<Created> {
+///
+/// `vault_id` is the sharing vault's own id, stamped on the file so that vault
+/// can pick its shares out of an account several vaults now write into. `None`
+/// omits the property, and the share behaves as every pre-`vaultId` one does.
+pub fn create(
+    remote: &impl ShareRemote,
+    entry: &Entry,
+    vault_id: Option<&str>,
+    now_ms: i64,
+) -> Result<Created> {
     envelope::check_shareable(entry)?;
     let key = ShareKey::generate();
     let expires_ms = envelope::expires_at(now_ms);
@@ -63,16 +76,18 @@ pub fn create(remote: &impl ShareRemote, entry: &Entry, now_ms: i64) -> Result<C
     // away, and this property is precisely what lets the sender's own list name
     // a share that carries no title. The marker property is how every share is
     // found again, whichever folder it landed in.
-    let file_id = remote.upload(
-        &file_name(),
-        &sealed,
-        &[
-            (PROP_SHARE, PROP_SHARE_VALUE),
-            (PROP_ENTRY_ID, entry.id.as_str()),
-            (PROP_KIND, entry.kind.as_str()),
-            (PROP_EXPIRES_AT, &expires_ms.to_string()),
-        ],
-    )?;
+    let expires = expires_ms.to_string();
+    let mut properties = vec![
+        (PROP_SHARE, PROP_SHARE_VALUE),
+        (PROP_ENTRY_ID, entry.id.as_str()),
+        (PROP_KIND, entry.kind.as_str()),
+        (PROP_EXPIRES_AT, expires.as_str()),
+    ];
+    if let Some(vault_id) = vault_id {
+        properties.push((PROP_VAULT_ID, vault_id));
+    }
+
+    let file_id = remote.upload(&file_name(), &sealed, &properties)?;
 
     // An uploaded file nobody can read is worse than no share at all: the link
     // would go out and fail, and the orphan would sit in Drive until the sweep
@@ -122,11 +137,29 @@ pub fn sweep(remote: &impl ShareRemote, now_ms: i64) -> Result<usize> {
     Ok(deleted)
 }
 
-/// The sender's outstanding shares, swept first so the list is never showing
+/// This vault's outstanding shares, swept first so the list is never showing
 /// something a recipient can no longer open.
-pub fn list(remote: &impl ShareRemote, now_ms: i64) -> Result<Vec<ActiveShare>> {
+///
+/// The sweep above is account-wide — an expired share is dead wherever it came
+/// from — but the list is not: an account can hold several vaults' shares now,
+/// and a vault has no business revoking another's. A share carrying no
+/// `vaultId` predates the property, so every vault keeps showing it; dropping
+/// it from all of them would strand a link still in circulation.
+pub fn list(
+    remote: &impl ShareRemote,
+    vault_id: Option<&str>,
+    now_ms: i64,
+) -> Result<Vec<ActiveShare>> {
     sweep(remote, now_ms)?;
-    Ok(remote.list()?.iter().map(active_share).collect())
+    Ok(remote
+        .list()?
+        .iter()
+        .filter(|file| match &file.vault_id {
+            Some(owner) => Some(owner.as_str()) == vault_id,
+            None => true,
+        })
+        .map(active_share)
+        .collect())
 }
 
 fn active_share(file: &ShareFile) -> ActiveShare {
@@ -134,6 +167,7 @@ fn active_share(file: &ShareFile) -> ActiveShare {
         file_id: file.id.clone(),
         entry_id: file.entry_id.clone(),
         kind: file.kind.clone(),
+        vault_id: file.vault_id.clone(),
         created_at: rfc3339(file.created_ms),
         // A share we could not date still has to tell the user when it goes:
         // the TTL from its creation is the expiry it was given, whether or not

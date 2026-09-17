@@ -17,7 +17,7 @@ use crate::models::Entry;
 use crate::session::{store_err, Session};
 use crate::share::{self, remote::DrivePublicFetch, ActiveShare, Created};
 use crate::state::AppState;
-use crate::store::VaultStore;
+use crate::store::{identity, VaultStore};
 
 /// Seal one of this vault's entries and publish it; returns the link.
 #[tauri::command]
@@ -26,11 +26,11 @@ pub async fn share_create(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Created> {
-    let (entry, cryptor) = {
+    let (entry, vault_id, cryptor) = {
         let session = state.session.lock().unwrap();
         sendable(&session)?;
-        let record = session
-            .store()?
+        let store = session.store()?;
+        let record = store
             .get(&entry_id)
             .map_err(store_err)?
             .ok_or(Error::NotFound)?;
@@ -38,12 +38,20 @@ pub async fn share_create(
             session
                 .payload_cipher()?
                 .unseal(&record.id, &record.payload)?,
+            identity::vault_id(store).map_err(store_err)?,
             session.cryptor()?,
         )
     };
 
-    blocking(move || share::create(&share::drive_remote(&app, cryptor), &entry, share::now_ms()))
-        .await
+    blocking(move || {
+        share::create(
+            &share::drive_remote(&app, cryptor),
+            &entry,
+            vault_id.as_deref(),
+            share::now_ms(),
+        )
+    })
+    .await
 }
 
 /// Open a link someone sent. Needs no account and no unlocked vault — the
@@ -63,11 +71,26 @@ pub async fn share_revoke(
     blocking(move || share::revoke(&share::drive_remote(&app, cryptor), &file_id)).await
 }
 
-/// The sender's outstanding shares, expired ones swept first.
+/// This vault's outstanding shares, expired ones swept first. The account may
+/// hold other vaults' shares too; the vault id is what keeps them apart.
 #[tauri::command]
 pub async fn share_list(app: AppHandle, state: State<'_, AppState>) -> Result<Vec<ActiveShare>> {
-    let cryptor = sender_cryptor(&state)?;
-    blocking(move || share::list(&share::drive_remote(&app, cryptor), share::now_ms())).await
+    let (cryptor, vault_id) = {
+        let session = state.session.lock().unwrap();
+        sendable(&session)?;
+        (
+            session.cryptor()?,
+            identity::vault_id(session.store()?).map_err(store_err)?,
+        )
+    };
+    blocking(move || {
+        share::list(
+            &share::drive_remote(&app, cryptor),
+            vault_id.as_deref(),
+            share::now_ms(),
+        )
+    })
+    .await
 }
 
 /// What the sending side requires. Checked in this order because a locked

@@ -27,6 +27,9 @@ use crate::sync::{access_token, http_client};
 pub const PROP_ENTRY_ID: &str = "entryId";
 pub const PROP_KIND: &str = "kind";
 pub const PROP_EXPIRES_AT: &str = "expiresAt";
+/// Which of the sender's vaults published the share. Opaque to Google like the
+/// rest; it is what lets one account's several vaults each list their own.
+pub const PROP_VAULT_ID: &str = "vaultId";
 /// The marker every share carries, and the only thing a listing selects on:
 /// shares are found by it wherever they sit, so a duplicate `Shares` folder
 /// created by a racing device hides nothing from the sweep or the revoke list.
@@ -46,6 +49,10 @@ pub struct ShareFile {
     pub entry_id: Option<String>,
     /// Entry kind from appProperties (`kind`), e.g. "login".
     pub kind: Option<String>,
+    /// The vault that published it (`vaultId`). Absent on shares created before
+    /// the property existed, which every vault's list therefore keeps showing —
+    /// see [`crate::share::list`].
+    pub vault_id: Option<String>,
     pub created_ms: i64,
     /// Absent when the file predates expiry bookkeeping or carries a malformed
     /// value — treated as "no known expiry" rather than "expired now", so a
@@ -76,6 +83,7 @@ pub fn parse_share_file(file: &DriveFile) -> ShareFile {
         id: file.id.clone(),
         entry_id: file.app_properties.get(PROP_ENTRY_ID).cloned(),
         kind: file.app_properties.get(PROP_KIND).cloned(),
+        vault_id: file.app_properties.get(PROP_VAULT_ID).cloned(),
         created_ms: chrono::DateTime::parse_from_rfc3339(&file.created_time)
             .map(|t| t.timestamp_millis())
             .unwrap_or(0),
@@ -328,6 +336,7 @@ impl ShareRemote for FakeShareRemote {
                 id: id.clone(),
                 entry_id: file.properties.get(PROP_ENTRY_ID).cloned(),
                 kind: file.properties.get(PROP_KIND).cloned(),
+                vault_id: file.properties.get(PROP_VAULT_ID).cloned(),
                 created_ms: file.created_ms,
                 expires_ms: file
                     .properties
@@ -379,12 +388,14 @@ mod tests {
                 (PROP_ENTRY_ID, "entry-uuid"),
                 (PROP_KIND, "login"),
                 (PROP_EXPIRES_AT, "1709300000000"),
+                (PROP_VAULT_ID, "a1b2"),
             ],
         ));
 
         assert_eq!(parsed.id, "f1");
         assert_eq!(parsed.entry_id.as_deref(), Some("entry-uuid"));
         assert_eq!(parsed.kind.as_deref(), Some("login"));
+        assert_eq!(parsed.vault_id.as_deref(), Some("a1b2"));
         assert_eq!(parsed.created_ms, 1_709_294_400_000);
         assert_eq!(parsed.expires_ms, Some(1_709_300_000_000));
     }
@@ -394,6 +405,7 @@ mod tests {
         let parsed = parse_share_file(&drive_file("2024-03-01T12:00:00.000Z", &[]));
         assert_eq!(parsed.entry_id, None);
         assert_eq!(parsed.kind, None);
+        assert_eq!(parsed.vault_id, None);
         assert_eq!(parsed.expires_ms, None);
     }
 
