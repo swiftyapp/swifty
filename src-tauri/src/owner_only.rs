@@ -10,7 +10,7 @@
 //! backup, indexing and antivirus services run as) and nobody else, handed to
 //! `CreateFile` in the security attributes so the file is born with it.
 
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io;
 use std::path::Path;
 
@@ -19,7 +19,7 @@ use std::path::Path;
 #[cfg(unix)]
 pub fn create_new(path: &Path) -> io::Result<File> {
     use std::os::unix::fs::OpenOptionsExt;
-    OpenOptions::new()
+    std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(0o600)
@@ -28,23 +28,42 @@ pub fn create_new(path: &Path) -> io::Result<File> {
 
 /// Create `path`, which must not exist yet, for writing — readable by its
 /// owner alone from the first instant.
+///
+/// Straight to `CreateFileW`: `std::fs::OpenOptions` has no stable way to pass
+/// security attributes, and they have to go in at creation. Exclusive share
+/// mode as well, so nothing else can open the file while it is being written —
+/// belt and braces over the DACL, which already says the same thing. The
+/// handle is handed to `File`, which closes it.
 #[cfg(windows)]
 pub fn create_new(path: &Path) -> io::Result<File> {
-    use std::os::windows::fs::OpenOptionsExt;
-    use windows::core::BOOL;
+    use std::os::windows::io::FromRawHandle;
+    use windows::core::{BOOL, HSTRING};
+    use windows::Win32::Foundation::GENERIC_WRITE;
     use windows::Win32::Security::SECURITY_ATTRIBUTES;
+    use windows::Win32::Storage::FileSystem::{
+        CreateFileW, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_NONE,
+    };
 
     let descriptor = OwnerOnlyDescriptor::for_current_user()?;
-    let mut attributes = SECURITY_ATTRIBUTES {
+    let attributes = SECURITY_ATTRIBUTES {
         nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
         lpSecurityDescriptor: descriptor.as_ptr(),
         bInheritHandle: BOOL(0),
     };
-    OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .security_attributes((&mut attributes as *mut SECURITY_ATTRIBUTES).cast())
-        .open(path)
+    let name = HSTRING::from(path.as_os_str());
+    let handle = unsafe {
+        CreateFileW(
+            &name,
+            GENERIC_WRITE.0,
+            FILE_SHARE_NONE,
+            Some(&attributes),
+            CREATE_NEW,
+            FILE_ATTRIBUTE_NORMAL,
+            None,
+        )
+    }
+    .map_err(win)?;
+    Ok(unsafe { File::from_raw_handle(handle.0) })
 }
 
 // The SDDL for "this user and SYSTEM, full access, nothing inherited". `P`
@@ -55,9 +74,19 @@ fn owner_only_sddl(user_sid: &str) -> String {
     format!("D:P(A;;FA;;;{user_sid})(A;;FA;;;SY)")
 }
 
+// A Win32 failure as the `io::Error` std would have produced for it, so callers
+// can match on `kind()` — `create_temp_sibling` retries on `AlreadyExists`,
+// which is `ERROR_FILE_EXISTS` under CREATE_NEW. Such errors arrive as
+// `HRESULT_FROM_WIN32` (facility 7, code in the low 16 bits); anything else is
+// passed on as text.
 #[cfg(windows)]
 fn win(e: windows::core::Error) -> io::Error {
-    io::Error::other(e.to_string())
+    let hresult = e.code().0 as u32;
+    if hresult & 0xFFFF_0000 == 0x8007_0000 {
+        io::Error::from_raw_os_error((hresult & 0xFFFF) as i32)
+    } else {
+        io::Error::other(e.to_string())
+    }
 }
 
 /// A self-relative security descriptor built from [`owner_only_sddl`], freed
