@@ -68,7 +68,10 @@ mod imp {
     fn is_cancel(code: LAError) -> bool {
         matches!(
             code,
-            LAError::UserCancel | LAError::UserFallback | LAError::SystemCancel | LAError::AppCancel
+            LAError::UserCancel
+                | LAError::UserFallback
+                | LAError::SystemCancel
+                | LAError::AppCancel
         )
     }
 }
@@ -100,7 +103,8 @@ mod imp {
 
     pub fn authenticate() -> Result<()> {
         let message = HSTRING::from("Confirm your identity");
-        let result = UserConsentVerifier::RequestVerificationAsync(&message).and_then(|op| op.join());
+        let result =
+            UserConsentVerifier::RequestVerificationAsync(&message).and_then(|op| op.join());
         match result {
             Ok(UserConsentVerificationResult::Verified) => Ok(()),
             // Dismissed, not refused: the user closed the Hello prompt. The

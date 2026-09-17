@@ -62,7 +62,8 @@ pub fn run() {
     {
         builder = builder
             .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-                window::show(app); // focus existing window on a second launch
+                // Focus the existing window on a second launch.
+                window::show(app);
                 // On Windows and Linux a file association runs the executable
                 // again with the document as its argument; the second instance
                 // hands its command line here and exits. `argv[0]` is itself.

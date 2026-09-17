@@ -66,7 +66,9 @@ pub fn from_args(args: impl IntoIterator<Item = String>, cwd: &Path) -> Vec<Path
 /// another scheme is not a document.
 #[cfg(target_os = "macos")]
 pub fn from_urls(urls: &[tauri::Url]) -> Vec<PathBuf> {
-    urls.iter().filter_map(|url| url.to_file_path().ok()).collect()
+    urls.iter()
+        .filter_map(|url| url.to_file_path().ok())
+        .collect()
 }
 
 #[cfg(desktop)]
@@ -90,7 +92,13 @@ mod tests {
         for name in ["vault.rowel", "Backup.ROWEL", "old.swftx", "x.SwFtX"] {
             assert!(has_our_extension(Path::new(name)), "{name}");
         }
-        for name in ["notes.txt", "rowel", ".rowel.bak", "archive.rowel.zip", "--flag"] {
+        for name in [
+            "notes.txt",
+            "rowel",
+            ".rowel.bak",
+            "archive.rowel.zip",
+            "--flag",
+        ] {
             assert!(!has_our_extension(Path::new(name)), "{name}");
         }
     }
@@ -100,7 +108,10 @@ mod tests {
     #[test]
     fn resolves_relative_arguments_against_the_launch_directory() {
         let cwd = Path::new("/home/me/Downloads");
-        let paths = from_args(["backup.rowel".to_string(), "/tmp/other.rowel".to_string()], cwd);
+        let paths = from_args(
+            ["backup.rowel".to_string(), "/tmp/other.rowel".to_string()],
+            cwd,
+        );
         assert_eq!(
             paths,
             [

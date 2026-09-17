@@ -1181,7 +1181,8 @@ fn purge_tombstones_before_spares_live_and_recent_rows() {
 #[test]
 fn the_database_and_its_wal_are_owner_only_from_creation() {
     use std::os::unix::fs::PermissionsExt;
-    let mode = |path: &std::path::Path| std::fs::metadata(path).unwrap().permissions().mode() & 0o777;
+    let mode =
+        |path: &std::path::Path| std::fs::metadata(path).unwrap().permissions().mode() & 0o777;
     let sibling = |path: &std::path::Path, suffix: &str| {
         let mut s = path.as_os_str().to_owned();
         s.push(suffix);
