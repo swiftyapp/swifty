@@ -111,6 +111,8 @@ const DEFAULTS: Record<string, Handler> = {
   // A restored one arrives the same way, but connected — its account was sealed
   // under the restored vault's key on the way in.
   workspace_restore_from_drive: () => ({ entries: [], syncConfigured: true }),
+  // The same landing from the open workspace's own account: no sign-in first.
+  workspace_restore_from_account: () => ({ entries: [], syncConfigured: true }),
   // Switching is locking what is open, and Rust announces it as one.
   workspace_select: () => emitEventSoon(EVENTS.vaultLocked, undefined),
   workspace_rename: () => undefined,

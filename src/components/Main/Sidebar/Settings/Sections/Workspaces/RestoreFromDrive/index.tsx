@@ -1,6 +1,13 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useApp, connectWorkspaceDrive, forgetDrive } from '@/store'
+import {
+  useApp,
+  connectWorkspaceDrive,
+  forgetDrive,
+  restoreWorkspaceFromDrive,
+  setupDriveSelect,
+  switchWorkspaceDriveAccount
+} from '@/store'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
 import DriveRestoreForm from '@/components/elements/DriveRestoreForm'
@@ -75,7 +82,14 @@ export default function RestoreFromDrive() {
         </p>
       )}
       {(drive.status === 'found' || restoring) && (
-        <DriveRestoreForm files={drive.files} selectedId={drive.selectedId} busy={restoring} />
+        <DriveRestoreForm
+          files={drive.files}
+          selectedId={drive.selectedId}
+          onSelect={setupDriveSelect}
+          busy={restoring}
+          onRestore={restoreWorkspaceFromDrive}
+          onSwitchAccount={switchWorkspaceDriveAccount}
+        />
       )}
     </SettingsRow>
   )

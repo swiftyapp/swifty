@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useApp, forgetDrive, setupDriveFailed, setupDriveReset } from '@/store'
+import {
+  useApp,
+  forgetDrive,
+  restoreWorkspaceFromDrive,
+  setupDriveFailed,
+  setupDriveReset,
+  setupDriveSelect,
+  switchWorkspaceDriveAccount
+} from '@/store'
 import { syncAdoptPending, syncConnect, syncDisconnect, syncNow } from '@/api/sync'
 import { describeError, errorKind } from '@/api/errors'
 import SettingsGroup from '@/components/elements/SettingsGroup'
@@ -140,7 +148,10 @@ export default function Sync() {
               <DriveRestoreForm
                 files={drive.files}
                 selectedId={drive.selectedId}
+                onSelect={setupDriveSelect}
                 busy={restoring}
+                onRestore={restoreWorkspaceFromDrive}
+                onSwitchAccount={switchWorkspaceDriveAccount}
               />
             </div>
           )}

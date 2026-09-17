@@ -9,7 +9,13 @@
 //! A workspace can also arrive from Drive rather than be made here. That flow
 //! borrows onboarding's keyless connect (`commands::setup`) wholesale — the
 //! tokens it leaves pending, the probe, the events — and differs only in where
-//! the restored vault lands and in what has to be put back when it fails.
+//! the restored vault lands and in what has to be put back when it fails. Or
+//! it arrives from the account the open workspace already syncs to, with no
+//! sign-in at all: every device connected to an account is meant to hold every
+//! vault in it, so the account's other vaults are offered after each sync
+//! (`sync::publish_remote_vaults`) and restored with the open workspace's own
+//! tokens. A workspace *made* on a connected device inherits the account the
+//! same way, and syncs to it as a vault of its own.
 
 use std::fs;
 use std::path::Path;
@@ -129,9 +135,17 @@ fn restore(state: &AppState, active: String, previous: Lease) {
 
 /// Create a workspace with its own master password and leave it unlocked.
 ///
-/// The new vault is empty and unsynced by construction, so the result needs no
-/// listing or token probe — it is what the caller of a first unlock expects,
-/// with nothing in it yet.
+/// The new vault is empty, so the result needs no listing — it is what the
+/// caller of a first unlock expects, with nothing in it yet.
+///
+/// It inherits the open workspace's Google account, when there is one: the
+/// tokens are sealed under the new key, and the vault is given its id here so
+/// that its first sync addresses a pack of its own rather than being turned
+/// away as a nameless vault beside the account's others (`sync::plan_vault_id`).
+/// That first sync — run by the frontend's `enterMain`, as after the first
+/// run's create — is what creates the pack, and what puts the new vault in
+/// front of every other device on the account. A workspace made on a device
+/// that does not sync is exactly what it was: local, sync off.
 #[tauri::command]
 pub async fn workspace_create(
     name: String,
@@ -160,15 +174,20 @@ pub async fn workspace_create(
     // back exactly as it was, and the frontend — which only changes screens on
     // success — is still looking at a vault that is still open. A lock that
     // lands while the lease is out wins over both outcomes (`Session::adopt`).
-    let (previous_active, previous) = {
+    //
+    // The account is read in the same step, before the paths move: the token
+    // file resolves through the active workspace, and after the repoint that
+    // is the new, empty one.
+    let (previous_active, previous, inherited) = {
         let _paths = state.workspace_lock.lock().unwrap();
         guard_sync_idle(&state)?;
+        let inherited = open_account(&app, &state);
         let lease = state.session.lock().unwrap().take_out()?;
         let active = std::mem::replace(&mut *state.active_workspace.lock().unwrap(), id.clone());
-        (active, lease)
+        (active, lease, inherited)
     };
 
-    let created = match create_vault_in(&app, &root, &id, password).await {
+    let created = match create_vault_in(&app, &root, &id, password, inherited.as_ref()).await {
         Ok(created) => created,
         Err(e) => {
             // Leave no trace of a workspace that never opened: the user is put
@@ -178,6 +197,7 @@ pub async fn workspace_create(
             return Err(e);
         }
     };
+    let (key, store, vault_id) = created;
 
     // Registry last: an entry is recorded only once there is a vault behind it,
     // so a failure anywhere above has nothing on record to undo. If this write
@@ -187,17 +207,18 @@ pub async fn workspace_create(
         registry.workspaces.push(Workspace {
             id: id.clone(),
             name: Some(name),
-            // Minted at creation, but not recorded until a sync proves a pack
-            // exists for it: a vault with no pack cannot be duplicated from
-            // Drive, and that is the one question the record answers.
-            vault_id: None,
+            // A vault that will sync is recorded by its id now, as a restored
+            // one is: its pack exists after the first run, and the record is
+            // what turns a restore of that pack away. A local vault has no id
+            // and no pack, so there is nothing to record.
+            vault_id: vault_id.clone(),
         });
         registry.active = id.clone();
         Ok(())
     });
     if let Err(e) = recorded {
         // The store closes before its files are removed.
-        drop(created);
+        drop(store);
         discard(&root, &id);
         restore(&state, previous_active, previous);
         return Err(e);
@@ -207,20 +228,27 @@ pub async fn workspace_create(
     // that session was locked while the vault was being created, it stays
     // locked: the workspace exists and is recorded, and the next unlock opens
     // it, but it does not open itself behind a lock the user asked for.
-    let (key, store) = created;
+    let syncing = inherited.is_some();
     let (_, _, _, claim) = previous.split();
     if !state
         .session
         .lock()
         .unwrap()
-        .adopt(claim, key, store, false)
+        .adopt(claim, key, store, syncing)
     {
         return Err(Error::Locked);
     }
     Ok(UnlockResult {
         entries: vec![],
-        sync_configured: false,
+        sync_configured: syncing,
     })
+}
+
+/// The open workspace's Google account, if it has one. Read under the caller's
+/// `workspace_lock`, through the paths as they stand.
+fn open_account(app: &AppHandle, state: &AppState) -> Option<sync::Tokens> {
+    let cryptor = state.session.lock().unwrap().cryptor().ok()?;
+    sync::current_tokens(app, &cryptor)
 }
 
 /// Connect a Google account for a workspace that does not exist yet.
@@ -266,6 +294,57 @@ pub async fn workspace_restore_from_drive(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
+    let tokens = setup::peek_pending(&state)?;
+    restore_workspace(&app, &state, name, password, file_id, tokens, Account::Pending).await
+}
+
+/// Add a workspace by restoring one of the vaults the open workspace's account
+/// holds and this device does not — the ones every sync run reports
+/// (`sync::publish_remote_vaults`).
+///
+/// [`workspace_restore_from_drive`] with the sign-in taken out: the tokens are
+/// the open workspace's own, read off its token file, and a copy is sealed
+/// under the restored vault's key exactly as a pending account would be. The
+/// device ends up with one account in two workspaces, which is what an account
+/// connected once is meant to reach. A workspace that does not sync has no
+/// account to restore from and is refused before anything is downloaded.
+#[tauri::command]
+pub async fn workspace_restore_from_account(
+    name: String,
+    password: Zeroizing<String>,
+    file_id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<UnlockResult> {
+    // Under the lock, as `workspace_create` reads it: the token file resolves
+    // through the active workspace, which must not move underneath.
+    let tokens = {
+        let _paths = state.workspace_lock.lock().unwrap();
+        open_account(&app, &state).ok_or(Error::SyncNotConfigured)?
+    };
+    restore_workspace(&app, &state, name, password, file_id, tokens, Account::Open).await
+}
+
+/// Whose tokens a restore runs on, which is the one thing that differs between
+/// the two restores: a pending account has to be kept current through the
+/// download and dropped once it is sealed inside the new workspace; the open
+/// workspace's account is its own to keep, and nothing here touches it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Account {
+    Pending,
+    Open,
+}
+
+/// Turn the pack `file_id` into a workspace, unlocked with `password`.
+async fn restore_workspace(
+    app: &AppHandle,
+    state: &AppState,
+    name: String,
+    password: Zeroizing<String>,
+    file_id: String,
+    mut tokens: sync::Tokens,
+    account: Account,
+) -> Result<UnlockResult> {
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err(Error::WorkspaceNameRequired);
@@ -274,51 +353,53 @@ pub async fn workspace_restore_from_drive(
         return Err(Error::WorkspacePasswordRequired);
     }
     // The same exclusion `workspace_create` takes, and for the same files.
-    let _step = begin_step(&state)?;
+    let _step = begin_step(state)?;
 
-    let root = storage::root_dir(&app)?;
+    let root = storage::root_dir(app)?;
     let id = crate::crypto::random_hex_id();
 
     // The download runs *before* the paths move. It is the slow half — a
     // listing, a token refresh and a whole vault over the network — and the
     // session of the workspace the user is looking at would otherwise be held
     // out for all of it, taking a vault away that they never asked to leave.
-    let mut tokens = setup::peek_pending(&state)?;
-    let (bytes, vault_id) = setup::download(&app, &mut tokens, &file_id, |vault_id| {
-        guard_other_vault(&state, &root, vault_id)
+    let (bytes, vault_id) = setup::download(app, &mut tokens, &file_id, |vault_id| {
+        guard_other_vault(state, &root, vault_id)
     })
     .await?;
     // Whatever the refresh produced has to be kept, for the reason onboarding
     // keeps it: Google rotates refresh tokens, and a mistyped master password
-    // has to leave a retry that works.
-    setup::replace_pending_tokens(&state, tokens.clone())?;
+    // has to leave a retry that works. The open workspace's own refresh is
+    // written back by its next run, as every refresh of its is.
+    if account == Account::Pending {
+        setup::replace_pending_tokens(&state, tokens.clone())?;
+    }
 
     // As `workspace_create` takes them, and for the same reasons: one step
     // under the lock, the session kept rather than dropped so a failure can put
     // it back, and a lock landing meanwhile winning over both outcomes.
     let (previous_active, previous) = {
         let _paths = state.workspace_lock.lock().unwrap();
-        guard_sync_idle(&state)?;
+        guard_sync_idle(state)?;
         let lease = state.session.lock().unwrap().take_out()?;
         let active = std::mem::replace(&mut *state.active_workspace.lock().unwrap(), id.clone());
         (active, lease)
     };
 
-    let restored = restore_vault_in(&app, &root, &id, bytes, password, &vault_id, &tokens).await;
+    let restored = restore_vault_in(app, &root, &id, bytes, password, &vault_id, &tokens).await;
     let (key, store, entries) = match restored {
         Ok(restored) => restored,
         Err(e) => {
             // Leave no trace of a workspace that never opened — the token file
             // the restore may have written goes with the directory.
             discard(&root, &id);
-            restore(&state, previous_active, previous);
+            restore(state, previous_active, previous);
             return Err(e);
         }
     };
 
     // Registry last, for the reason `workspace_create` records it last: an
     // entry only once there is a vault behind it.
-    let recorded = update_registry(&state, &root, |registry| {
+    let recorded = update_registry(state, &root, |registry| {
         registry.workspaces.push(Workspace {
             id: id.clone(),
             name: Some(name),
@@ -334,7 +415,7 @@ pub async fn workspace_restore_from_drive(
         // The store closes before its files are removed.
         drop(store);
         discard(&root, &id);
-        restore(&state, previous_active, previous);
+        restore(state, previous_active, previous);
         return Err(e);
     }
 
@@ -344,7 +425,9 @@ pub async fn workspace_restore_from_drive(
     // adopting it — and it goes *before* the adopt below, because a lock that
     // wins there is not a failure of the restore, and must not leave the
     // credentials pending as if it were.
-    setup::take_pending(&state);
+    if account == Account::Pending {
+        setup::take_pending(state);
+    }
 
     // The restored vault continues the session the previous one was taken from,
     // and it arrives connected. A lock that landed while the lease was out still
@@ -387,15 +470,29 @@ pub fn workspace_rename(
 // Argon2id + creating the encrypted DB, off the command thread. The directory
 // comes first: `create_vault` writes the KDF sidecar before SQLCipher opens
 // anything, and the sidecar must land in the new workspace, not beside it.
+//
+// With an account to inherit, the vault is also named and connected here, so a
+// failure in either leaves the caller one `discard` from a clean slate. The id
+// is returned for the registry; `None` is a local vault, which has none.
 async fn create_vault_in(
     app: &AppHandle,
     root: &Path,
     id: &str,
     password: Zeroizing<String>,
-) -> Result<(crate::crypto::VaultKey, crate::store::SqliteStore)> {
+    inherited: Option<&sync::Tokens>,
+) -> Result<(VaultKey, SqliteStore, Option<String>)> {
     let dir = workspace::dir_of(root, id);
     crate::store::create_private_dir(&dir)?;
-    create_off_thread(app, password).await
+    let (key, store) = create_off_thread(app, password).await?;
+    let Some(tokens) = inherited else {
+        return Ok((key, store, None));
+    };
+    // The id before the tokens, as every other stamp-and-seal here orders them:
+    // nothing is sealed under a key a failure would then discard.
+    let vault_id = crate::crypto::random_hex_id();
+    crate::store::identity::adopt_vault_id(&store, &vault_id).map_err(store_err)?;
+    sync::persist_tokens(app, &key.cryptor(), tokens)?;
+    Ok((key, store, Some(vault_id)))
 }
 
 // Everything that turns the chosen pack into a workspace on this device, off

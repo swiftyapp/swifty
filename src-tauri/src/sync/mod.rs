@@ -30,6 +30,7 @@ pub mod restore;
 // for `setup` below — modules and functions live in separate namespaces.
 pub mod setup;
 
+use std::collections::HashSet;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -60,6 +61,13 @@ pub(crate) use auth::Tokens;
 /// them — the step [`setup`] does for itself and onboarding defers.
 pub(crate) fn persist_tokens(app: &AppHandle, cryptor: &Cryptor, tokens: &Tokens) -> Result<()> {
     auth::write_tokens(app, cryptor, tokens)
+}
+
+/// The open workspace's account, unsealed — `None` when it has none. What a
+/// workspace made or restored beside this one is given, so that one account
+/// connected once reaches every vault on the device without a second sign-in.
+pub(crate) fn current_tokens(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
+    auth::read_tokens(app, cryptor)
 }
 
 /// A valid access token for in-memory `tokens`, refreshed in place if expired.
@@ -198,8 +206,41 @@ pub fn run(app: &AppHandle, cryptor: Cryptor) -> Result<SyncOutcome> {
         Ok(())
     })?;
 
+    publish_remote_vaults(app, &resolved.id, resolved.packs);
     sweep_shares(app);
     Ok(outcome)
+}
+
+/// Tell the frontend which of the account's vaults are not on this device, so
+/// Settings › Workspaces can offer to add them. Every device connected to an
+/// account is meant to hold every vault in it; this is how a vault made on one
+/// device shows up on the others.
+///
+/// Best effort, after a run that has just proved the account reachable: the
+/// registry failing to load is not a sync failure, and the next run says again.
+fn publish_remote_vaults(app: &AppHandle, own_id: &str, packs: Vec<setup::PackInfo>) {
+    let Ok(root) = crate::storage::root_dir(app) else {
+        return;
+    };
+    // Every vault a workspace here holds, plus this one's — which the registry
+    // has just been told about, but which the packs were listed before the
+    // first push created, so it is named here rather than left to that.
+    let held: HashSet<String> = crate::workspace::Registry::load(&root)
+        .workspaces
+        .into_iter()
+        .filter_map(|w| w.vault_id)
+        .chain(std::iter::once(own_id.to_string()))
+        .collect();
+    crate::events::remote_vaults(app, remote_only(packs, &held));
+}
+
+/// The packs among `packs` that no workspace on this device holds, in the order
+/// the listing gave them (newest first).
+fn remote_only(packs: Vec<setup::PackInfo>, held: &HashSet<String>) -> Vec<setup::PackInfo> {
+    packs
+        .into_iter()
+        .filter(|pack| !held.contains(&pack.vault_id))
+        .collect()
 }
 
 /// Drop expired one-time shares, riding along on a run that has just proved the
@@ -283,6 +324,10 @@ struct Resolved {
     /// to make mid-run, once the pull has proved the id and before any push can
     /// act on it.
     persist: bool,
+    /// Every live pack the account held when the run began — the listing the
+    /// decision was made from, kept for [`publish_remote_vaults`] so the run
+    /// does not list the folder twice.
+    packs: Vec<setup::PackInfo>,
 }
 
 /// Settle the vault id for this run, doing whatever Drive work [`plan_vault_id`]
@@ -300,30 +345,18 @@ async fn resolve_vault_id(
     let client = http_client();
     let token = auth::access_token(&client, app, cryptor).await?;
 
-    let mut live: Vec<String> = Vec::new();
-    // A missing `Rowel/` or `Vaults/` is an account nothing has ever synced to,
-    // which is the same answer as an empty folder.
-    if let Some(root) = drive::folder_id(&client, &token, layout::ROOT_FOLDER).await? {
-        if let Some(vaults) =
-            drive::folder_id_in(&client, &token, layout::VAULTS_FOLDER, &root).await?
-        {
-            live = drive::list_folder(&client, &token, &vaults)
-                .await?
-                .iter()
-                .filter_map(|file| layout::vault_id_of(&file.name).map(str::to_string))
-                .collect();
-        }
-    }
-    let live: Vec<&str> = live.iter().map(String::as_str).collect();
+    // The same listing onboarding's probe makes: a missing `Rowel/` or
+    // `Vaults/` is an account nothing has ever synced to, which is the same
+    // answer as an empty folder.
+    let packs = setup::find_packs(&client, &token).await?;
+    let live: Vec<&str> = packs.iter().map(|pack| pack.vault_id.as_str()).collect();
 
-    match plan_vault_id(local.vault_id()?.as_deref(), &live) {
-        VaultIdPlan::Use(id) => Ok(Resolved { id, persist: false }),
-        VaultIdPlan::Assign => Ok(Resolved {
-            id: crate::crypto::random_hex_id(),
-            persist: true,
-        }),
-        VaultIdPlan::Refuse => Err(Error::Other(account_has_vaults_error())),
-    }
+    let (id, persist) = match plan_vault_id(local.vault_id()?.as_deref(), &live) {
+        VaultIdPlan::Use(id) => (id, false),
+        VaultIdPlan::Assign => (crate::crypto::random_hex_id(), true),
+        VaultIdPlan::Refuse => return Err(Error::Other(account_has_vaults_error())),
+    };
+    Ok(Resolved { id, persist, packs })
 }
 
 /// `Rowel/Vaults`, created if this account has never had one.
@@ -475,10 +508,33 @@ impl Remote for DriveRemote {
 
 #[cfg(test)]
 mod tests {
-    use super::{plan_vault_id, VaultIdPlan};
+    use super::{plan_vault_id, remote_only, setup::PackInfo, VaultIdPlan};
+    use std::collections::HashSet;
 
     const ID: &str = "a1b2c3";
     const OTHER: &str = "dddd";
+
+    fn pack(vault_id: &str) -> PackInfo {
+        PackInfo {
+            id: format!("file-{vault_id}"),
+            name: format!("{vault_id}.rowel"),
+            vault_id: vault_id.into(),
+            size: 0,
+            modified_time: String::new(),
+        }
+    }
+
+    // The vaults offered to add are exactly the account's packs no workspace
+    // here holds — this vault's own included among the held, since its pack
+    // may not have existed when the folder was listed.
+    #[test]
+    fn only_packs_no_workspace_here_holds_are_offered() {
+        let held: HashSet<String> = [ID.to_string(), "eeee".to_string()].into();
+        let offered = remote_only(vec![pack(OTHER), pack(ID), pack("eeee"), pack("ffff")], &held);
+        let ids: Vec<&str> = offered.iter().map(|p| p.vault_id.as_str()).collect();
+        assert_eq!(ids, [OTHER, "ffff"]);
+        assert!(remote_only(vec![pack(ID)], &held).is_empty());
+    }
 
     #[test]
     fn a_vault_that_knows_its_id_simply_uses_it() {
