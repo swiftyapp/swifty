@@ -81,7 +81,11 @@ pub(crate) fn hkdf_subkey(ikm: &[u8], info: &[u8]) -> [u8; KEY_LEN] {
 /// Seal `plaintext` with AES-256-GCM under `key` and a fresh random 16-byte
 /// nonce, returning `nonce ‖ ciphertext ‖ tag`. This is the per-payload AEAD for
 /// Argon2id-keyed vaults — no per-payload KDF; the caller derives `key` once.
-pub(crate) fn seal_aead(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
+///
+/// `aad` is authenticated but not stored: the caller has to present the same
+/// bytes to [`unseal_aead`], which is what binds a ciphertext to its context
+/// (a vault payload to its row id). Empty when there is nothing to bind to.
+pub(crate) fn seal_aead(key: &[u8], aad: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
     let cipher = Aes256Gcm16::new_from_slice(key).map_err(err)?;
     let mut nonce = [0u8; IV_LEN];
     rand::thread_rng().fill_bytes(&mut nonce);
@@ -90,7 +94,7 @@ pub(crate) fn seal_aead(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
             &to_nonce(&nonce)?,
             Payload {
                 msg: plaintext,
-                aad: &[],
+                aad,
             },
         )
         .map_err(err)?;
@@ -100,21 +104,16 @@ pub(crate) fn seal_aead(key: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-/// Reverse of [`seal_aead`]: split off the 16-byte nonce and decrypt the rest.
-pub(crate) fn unseal_aead(key: &[u8], blob: &[u8]) -> Result<Vec<u8>> {
+/// Reverse of [`seal_aead`]: split off the 16-byte nonce and decrypt the rest,
+/// under the same `aad` it was sealed with.
+pub(crate) fn unseal_aead(key: &[u8], aad: &[u8], blob: &[u8]) -> Result<Vec<u8>> {
     if blob.len() < IV_LEN + TAG_LEN {
         return Err(Error::Crypto("payload too short".into()));
     }
     let (nonce, sealed) = blob.split_at(IV_LEN);
     let cipher = Aes256Gcm16::new_from_slice(key).map_err(err)?;
     cipher
-        .decrypt(
-            &to_nonce(nonce)?,
-            Payload {
-                msg: sealed,
-                aad: &[],
-            },
-        )
+        .decrypt(&to_nonce(nonce)?, Payload { msg: sealed, aad })
         .map_err(err)
 }
 

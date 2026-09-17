@@ -50,9 +50,10 @@ pub async fn find_pack(client: &Client, token: &str) -> Result<Option<drive::Dri
     drive::find_file(client, token, pack::FILE_NAME, &folder).await
 }
 
-/// Download a pack located by [`find_pack`].
+/// Download a pack located by [`find_pack`], under the same size cap the sync
+/// engine applies.
 pub async fn download_pack(client: &Client, token: &str, id: &str) -> Result<Vec<u8>> {
-    drive::read_file(client, token, id).await
+    drive::read_file(client, token, id, pack::MAX_PACK_BYTES).await
 }
 
 /// Move a pre-existing remote vault aside so a newly created one can take its

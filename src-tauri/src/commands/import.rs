@@ -236,7 +236,7 @@ fn duplicate_flags(
                 .entry(key)
                 .or_default()
                 .push(without_bookkeeping(entry_to_imported(
-                    &cipher.unseal(&record.payload)?,
+                    &cipher.unseal(&record.id, &record.payload)?,
                 )));
         }
     }
@@ -346,7 +346,7 @@ fn to_imported(records: &[Record], cipher: &PayloadCipher) -> Result<Vec<Importe
             // The star lives in a column, not in the sealed payload, so it is
             // re-attached here — the same move `migrate::export_entry` makes
             // for a `.swftx` backup.
-            let mut entry = cipher.unseal(&r.payload)?;
+            let mut entry = cipher.unseal(&r.id, &r.payload)?;
             entry.favorite = r.favorite;
             Ok(entry_to_imported(&entry))
         })

@@ -1,4 +1,5 @@
 import { useLayout } from '@/hooks/useLayout'
+import { useActivityPing } from '@/hooks/useActivityPing'
 import { FrameProvider } from '@/components/elements/Frame'
 import Modal from '@/components/elements/Modal'
 import Sheet from '@/components/elements/Sheet'
@@ -20,6 +21,8 @@ import { useShortcuts } from './useShortcuts'
 export function Main() {
   const compact = useLayout() === 'compact'
   useShortcuts()
+  // The unlocked vault is the only place there is an idle clock to feed.
+  useActivityPing()
 
   return (
     <div

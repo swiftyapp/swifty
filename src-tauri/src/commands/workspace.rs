@@ -57,6 +57,8 @@ pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) 
     // one workspace's key against another's database.
     state.session.lock().unwrap().clear();
     *state.active_workspace.lock().unwrap() = id;
+    // Ended like any other session: clipboard cleared, idle timer dropped.
+    crate::session::sealed(&app);
     // Announced like any other lock, so the frontend takes the one path it
     // takes for all of them. After the repoint rather than inside the clear
     // (`session::lock`): the reaction re-probes `app_status`, which must find

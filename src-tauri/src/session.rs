@@ -217,8 +217,18 @@ pub fn lock(app: &AppHandle) -> bool {
     }
     session.clear();
     drop(session);
+    sealed(app);
     events::vault_locked(app);
     true
+}
+
+/// What follows every clear of a session, however it was ended — here, or by
+/// a workspace switch that clears and repoints in one step. A secret copied
+/// out of the vault does not outlive the vault being open, and the idle timer
+/// armed for this session must not come due inside the next one.
+pub fn sealed(app: &AppHandle) {
+    crate::commands::clipboard::clear_on_lock(app);
+    crate::autolock::disarm(app);
 }
 
 pub fn store_err(e: StoreError) -> Error {
@@ -306,7 +316,7 @@ fn backfill_derived_columns(store: &SqliteStore, key: &VaultKey) {
         let Ok(Some(record)) = store.get(&meta.id) else {
             continue;
         };
-        let Ok(entry) = cipher.unseal(&record.payload) else {
+        let Ok(entry) = cipher.unseal(&record.id, &record.payload) else {
             continue;
         };
         if brand_missing {

@@ -51,7 +51,7 @@ pub fn build_record(entry: &Entry, payload: Vec<u8>) -> Result<Record> {
 /// portable file. Paired with `build_record` here so the two cannot drift on
 /// which columns survive a backup.
 pub fn export_entry(rec: &Record, cipher: &PayloadCipher, out: &Cryptor) -> Result<Entry> {
-    let mut entry = cipher.unseal(&rec.payload)?;
+    let mut entry = cipher.unseal(&rec.id, &rec.payload)?;
     entry.favorite = rec.favorite;
     out.obscure(&entry)
 }

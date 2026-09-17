@@ -433,7 +433,7 @@ fn restore_db_file(db: &Path, backup: &Path) -> Result<()> {
 // Unseal a record's payload under the old cipher and re-seal it under the new one,
 // preserving all metadata (id/kind/title/tags/url_host/timestamps/tombstone).
 fn reseal_record(mut r: Record, old: &PayloadCipher, new: &PayloadCipher) -> Result<Record> {
-    let entry = old.unseal(&r.payload)?;
+    let entry = old.unseal(&r.id, &r.payload)?;
     r.payload = new.seal(&entry)?;
     Ok(r)
 }
@@ -565,7 +565,10 @@ mod recovery_tests {
     fn title_under(db: &Path, key: &VaultKey) -> String {
         let store = SqliteStore::open(db, &key.sqlcipher_key()).unwrap();
         let record = store.get("1").unwrap().unwrap();
-        key.payload_cipher().unseal(&record.payload).unwrap().title
+        key.payload_cipher()
+            .unseal(&record.id, &record.payload)
+            .unwrap()
+            .title
     }
 
     #[test]

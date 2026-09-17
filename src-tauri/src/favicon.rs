@@ -40,8 +40,17 @@ const SAFE_TYPES: [&str; 6] = [
 ];
 
 // The favicon for `host` as a data: URI, or None when it has none. Disk-cached
-// both ways; safe to call before unlock (touches no vault state).
-pub async fn fetch(app: &AppHandle, host: &str) -> Result<Option<String>> {
+// both ways. Touches no vault state, but the caller gates it on an unlocked
+// session all the same (`commands::tools::fetch_favicon`): the hosts come out
+// of the vault, and a locked app has no business making requests about them.
+// `allowed` is that gate, asked again before every request this makes — a
+// lookup is several round trips, and a lock that lands in the middle of one
+// ends it there rather than after the icon has been fetched.
+pub async fn fetch(
+    app: &AppHandle,
+    host: &str,
+    allowed: impl Fn() -> bool,
+) -> Result<Option<String>> {
     let Some(host) = safe_host(host) else {
         return Ok(None);
     };
@@ -57,7 +66,7 @@ pub async fn fetch(app: &AppHandle, host: &str) -> Result<Option<String>> {
         return Ok(None);
     }
 
-    match lookup(&host).await {
+    match lookup(&host, &allowed).await {
         Some(uri) => {
             let _ = fs::write(&hit, &uri);
             let _ = fs::remove_file(&miss);
@@ -71,7 +80,12 @@ pub async fn fetch(app: &AppHandle, host: &str) -> Result<Option<String>> {
 }
 
 // Hostnames double as cache file names, so reject anything that isn't a plain
-// DNS name (no slashes, no traversal, no URL metacharacters).
+// DNS name (no slashes, no traversal, no URL metacharacters). Also refuses
+// what a public website is never called: an IP literal, or a name under a
+// suffix that only resolves on the local network. An entry's host is the
+// user's own data, but a request to `192.168.1.1` or `nas.local` from a
+// password manager is a probe of the LAN the user did not ask for, and the
+// answer would be cached under the vault's icons for good.
 fn safe_host(host: &str) -> Option<String> {
     let host = host.trim().trim_end_matches('.').to_ascii_lowercase();
     let ok = !host.is_empty()
@@ -79,8 +93,20 @@ fn safe_host(host: &str) -> Option<String> {
         && host.contains('.')
         && host
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+        && !is_ip_literal(&host)
+        && !LOCAL_SUFFIXES.iter().any(|suffix| host.ends_with(suffix));
     ok.then_some(host)
+}
+
+// Suffixes that never name a public site (RFC 6762 `.local`, the reserved
+// `.localhost`, `.internal` and `.home.arpa`, and the de-facto `.lan`).
+const LOCAL_SUFFIXES: [&str; 5] = [".local", ".localhost", ".internal", ".home.arpa", ".lan"];
+
+// A dotted-quad is the only IP shape that survives the character check above
+// (an IPv6 literal has colons).
+fn is_ip_literal(host: &str) -> bool {
+    host.parse::<std::net::Ipv4Addr>().is_ok()
 }
 
 fn fresh_miss(path: &Path) -> bool {
@@ -93,15 +119,21 @@ fn fresh_miss(path: &Path) -> bool {
 
 // Declared icons from the homepage <head> first (usually crisp PNGs), then
 // the conventional /favicon.ico as the fallback.
-async fn lookup(host: &str) -> Option<String> {
-    let client = crate::sync::http_client();
+async fn lookup(host: &str, allowed: &impl Fn() -> bool) -> Option<String> {
+    let client = client()?;
     let root = Url::parse(&format!("https://{host}/")).ok()?;
 
+    if !allowed() {
+        return None;
+    }
     if let Some(html) = fetch_html(&client, root.clone()).await {
         for href in icon_hrefs(&html) {
             let Ok(url) = root.join(&href) else { continue };
-            if !matches!(url.scheme(), "http" | "https") {
+            if !is_public_https(&url) {
                 continue;
+            }
+            if !allowed() {
+                return None;
             }
             if let Some(uri) = fetch_icon(&client, url).await {
                 return Some(uri);
@@ -109,11 +141,41 @@ async fn lookup(host: &str) -> Option<String> {
         }
     }
 
+    if !allowed() {
+        return None;
+    }
     fetch_icon(&client, root.join("favicon.ico").ok()?).await
 }
 
+// Every URL this module follows — a declared icon's href, a redirect's target
+// — has to pass the same bar as the host it started from: HTTPS, to a public
+// name. A page can point its icon at a CDN, which is fine; it cannot point it
+// at `http://10.0.0.1/` or have a redirect land there.
+fn is_public_https(url: &Url) -> bool {
+    url.scheme() == "https" && url.host_str().and_then(safe_host).is_some()
+}
+
+// The shared deadlines plus a redirect policy: a handful of hops, and only to
+// URLs [`is_public_https`] accepts, since a redirect is the one way a fetch
+// can end up somewhere the href check never saw.
+fn client() -> Option<Client> {
+    let policy = reqwest::redirect::Policy::custom(|attempt| {
+        if attempt.previous().len() >= MAX_REDIRECTS || !is_public_https(attempt.url()) {
+            attempt.stop()
+        } else {
+            attempt.follow()
+        }
+    });
+    crate::sync::http_client_builder()
+        .redirect(policy)
+        .build()
+        .ok()
+}
+
+const MAX_REDIRECTS: usize = 5;
+
 async fn fetch_icon(client: &Client, url: Url) -> Option<String> {
-    let resp = client
+    let mut resp = client
         .get(url)
         .timeout(TIMEOUT)
         .header("User-Agent", USER_AGENT)
@@ -135,21 +197,23 @@ async fn fetch_icon(client: &Client, url: Url) -> Option<String> {
     if !SAFE_TYPES.contains(&mime.as_str()) {
         return None;
     }
-    if resp
-        .content_length()
-        .is_some_and(|len| len as usize > MAX_ICON_BYTES)
-    {
-        return None;
-    }
-    let bytes = resp.bytes().await.ok()?;
-    if bytes.is_empty() || bytes.len() > MAX_ICON_BYTES {
+    // Enforced on the bytes as they arrive, not just on the declared length: a
+    // body with no `Content-Length`, or one that lies, is cut off at the cap
+    // rather than buffered whole and then measured.
+    let bytes = crate::sync::drive::read_capped(&mut resp, MAX_ICON_BYTES)
+        .await
+        .ok()?;
+    if bytes.is_empty() {
         return None;
     }
     Some(format!("data:{mime};base64,{}", B64.encode(&bytes)))
 }
 
+// The first `MAX_HTML_BYTES` of the page. Only the <head> is wanted, so an
+// oversized page is truncated rather than refused — and the read stops at the
+// cap instead of downloading the rest to throw it away.
 async fn fetch_html(client: &Client, url: Url) -> Option<String> {
-    let resp = client
+    let mut resp = client
         .get(url)
         .timeout(TIMEOUT)
         .header("User-Agent", USER_AGENT)
@@ -159,9 +223,15 @@ async fn fetch_html(client: &Client, url: Url) -> Option<String> {
     if !resp.status().is_success() {
         return None;
     }
-    let bytes = resp.bytes().await.ok()?;
-    let cut = bytes.len().min(MAX_HTML_BYTES);
-    Some(String::from_utf8_lossy(&bytes[..cut]).into_owned())
+    let mut bytes = Vec::new();
+    while bytes.len() < MAX_HTML_BYTES {
+        let Some(chunk) = resp.chunk().await.ok()? else {
+            break;
+        };
+        let room = MAX_HTML_BYTES - bytes.len();
+        bytes.extend_from_slice(&chunk[..chunk.len().min(room)]);
+    }
+    Some(String::from_utf8_lossy(&bytes).into_owned())
 }
 
 // hrefs of <link> tags whose rel mentions "icon" ("icon", "shortcut icon",
@@ -226,6 +296,39 @@ mod tests {
         assert_eq!(safe_host("evil.com/../../vault"), None);
         assert_eq!(safe_host("host with space.com"), None);
         assert_eq!(safe_host(""), None);
+    }
+
+    // A vault entry can name anything; a favicon fetch may only reach the
+    // public internet.
+    #[test]
+    fn rejects_ip_literals_and_local_only_names() {
+        assert_eq!(safe_host("192.168.1.1"), None);
+        assert_eq!(safe_host("10.0.0.1"), None);
+        assert_eq!(safe_host("8.8.8.8"), None);
+        assert_eq!(safe_host("nas.local"), None);
+        assert_eq!(safe_host("router.lan"), None);
+        assert_eq!(safe_host("db.internal"), None);
+        assert_eq!(safe_host("printer.home.arpa"), None);
+        assert_eq!(safe_host("app.localhost"), None);
+        // A name that merely contains one of the words is still public.
+        assert_eq!(
+            safe_host("localhost.example.com"),
+            Some("localhost.example.com".into())
+        );
+        assert_eq!(
+            safe_host("internal-tools.example.com"),
+            Some("internal-tools.example.com".into())
+        );
+    }
+
+    #[test]
+    fn only_public_https_urls_are_followed() {
+        let ok = |s: &str| is_public_https(&Url::parse(s).unwrap());
+        assert!(ok("https://cdn.example.com/icon.png"));
+        assert!(!ok("http://cdn.example.com/icon.png"));
+        assert!(!ok("https://10.0.0.1/icon.png"));
+        assert!(!ok("https://nas.local/icon.png"));
+        assert!(!ok("https://localhost/icon.png"));
     }
 
     #[test]

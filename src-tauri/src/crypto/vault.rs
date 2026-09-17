@@ -92,6 +92,21 @@ fn secret_str(secret: &[u8]) -> String {
 
 /// Seals and unseals a single entry's payload. The stored payload is opaque
 /// bytes; only this type knows the format.
+///
+/// A payload is bound to the row it is stored in. Every row's metadata is in
+/// plaintext columns, so anyone holding the SQLCipher key could otherwise move
+/// the sealed payload of one entry under another's title and host — a
+/// `bank.com` row that unseals to the attacker's own credentials, say. Two
+/// things stop that here, one for each generation of payload:
+///
+/// - Payloads sealed by this build carry the entry id as AEAD associated data,
+///   so the tag itself fails under any other row.
+/// - Every payload, whichever build sealed it, is checked after unsealing:
+///   the id inside the (authenticated) plaintext has to be the row's id. This
+///   is what protects rows sealed before the AAD existed, and it is why those
+///   rows can still be read at all — [`PayloadCipher::unseal`] falls back to
+///   the empty AAD they were sealed with, and the id check is what makes that
+///   fallback safe rather than a way around the binding.
 pub enum PayloadCipher {
     /// AES-256-GCM over the plaintext entry JSON, keyed by the payload subkey.
     Aead(Zeroizing<[u8; KEY_LEN]>),
@@ -100,25 +115,39 @@ pub enum PayloadCipher {
 }
 
 impl PayloadCipher {
-    /// Seal a plaintext entry into its stored payload bytes.
+    /// Seal a plaintext entry into its stored payload bytes, bound to `entry.id`
+    /// (which `migrate::build_record` makes the row's id).
     pub fn seal(&self, entry: &Entry) -> Result<Vec<u8>> {
         match self {
-            Self::Aead(key) => seal_aead(&**key, &serde_json::to_vec(entry)?),
+            Self::Aead(key) => seal_aead(&**key, entry.id.as_bytes(), &serde_json::to_vec(entry)?),
             Self::Legacy(c) => Ok(c.encrypt_data(&c.obscure(entry)?)?.into_bytes()),
         }
     }
 
-    /// Unseal stored payload bytes back into a plaintext entry.
-    pub fn unseal(&self, payload: &[u8]) -> Result<Entry> {
-        match self {
-            Self::Aead(key) => Ok(serde_json::from_slice(&unseal_aead(&**key, payload)?)?),
+    /// Unseal the payload stored on the row `id` back into a plaintext entry.
+    /// Fails if the payload was not sealed for that row.
+    pub fn unseal(&self, id: &str, payload: &[u8]) -> Result<Entry> {
+        let entry: Entry = match self {
+            Self::Aead(key) => {
+                let plain = match unseal_aead(&**key, id.as_bytes(), payload) {
+                    Ok(plain) => plain,
+                    // Sealed before payloads carried their row id. The id check
+                    // below is what this fallback rests on.
+                    Err(_) => unseal_aead(&**key, &[], payload)?,
+                };
+                serde_json::from_slice(&plain)?
+            }
             Self::Legacy(c) => {
                 let blob =
                     std::str::from_utf8(payload).map_err(|e| Error::Crypto(e.to_string()))?;
                 let obscured: Entry = c.decrypt_data(blob)?;
-                c.expose(&obscured)
+                c.expose(&obscured)?
             }
+        };
+        if entry.id != id {
+            return Err(Error::Crypto("payload belongs to another entry".into()));
         }
+        Ok(entry)
     }
 }
 
@@ -157,10 +186,38 @@ mod tests {
         let sealed = cipher.seal(&entry()).unwrap();
         // The plaintext secret never appears in the sealed bytes.
         assert!(!sealed.windows(6).any(|w| w == b"s3cret"));
-        let back = cipher.unseal(&sealed).unwrap();
+        let back = cipher.unseal("1", &sealed).unwrap();
         assert_eq!(back.password.as_deref(), Some("s3cret"));
         assert_eq!(back.otp.as_deref(), Some("SEED"));
         assert_eq!(back.username.as_deref(), Some("alice"));
+    }
+
+    // The swap an attacker holding only the SQLCipher key could make: the
+    // sealed payload of one row moved under another row's plaintext metadata.
+    #[test]
+    fn a_payload_does_not_unseal_under_another_rows_id() {
+        let cipher = argon2_key().payload_cipher();
+        let sealed = cipher.seal(&entry()).unwrap();
+        assert!(cipher.unseal("2", &sealed).is_err());
+
+        let legacy = VaultKey::legacy_from_password("pw").payload_cipher();
+        let sealed = legacy.seal(&entry()).unwrap();
+        assert!(legacy.unseal("2", &sealed).is_err());
+    }
+
+    // Rows sealed before payloads carried their id (empty AAD) still open on
+    // their own row, and still refuse to open on any other.
+    #[test]
+    fn a_payload_sealed_without_aad_still_binds_to_its_row() {
+        let key = argon2_key();
+        let PayloadCipher::Aead(payload_key) = key.payload_cipher() else {
+            panic!("argon2 vault must use the AEAD payload cipher");
+        };
+        let sealed = seal_aead(&*payload_key, &[], &serde_json::to_vec(&entry()).unwrap()).unwrap();
+
+        let cipher = key.payload_cipher();
+        assert_eq!(cipher.unseal("1", &sealed).unwrap().id, "1");
+        assert!(cipher.unseal("2", &sealed).is_err());
     }
 
     #[test]
@@ -179,14 +236,14 @@ mod tests {
         let other = VaultKey::Argon2 {
             master: Zeroizing::new(vec![9u8; KEY_LEN]),
         };
-        assert!(other.payload_cipher().unseal(&sealed).is_err());
+        assert!(other.payload_cipher().unseal("1", &sealed).is_err());
     }
 
     #[test]
     fn legacy_payload_round_trips() {
         let cipher = VaultKey::legacy_from_password("pw").payload_cipher();
         let sealed = cipher.seal(&entry()).unwrap();
-        let back = cipher.unseal(&sealed).unwrap();
+        let back = cipher.unseal("1", &sealed).unwrap();
         assert_eq!(back.password.as_deref(), Some("s3cret"));
     }
 
@@ -217,7 +274,7 @@ mod tests {
         // The private key never appears in the sealed bytes.
         let secret = b"cHJpdmF0ZUtleQ";
         assert!(!sealed.windows(secret.len()).any(|w| w == secret));
-        let back = cipher.unseal(&sealed).unwrap();
+        let back = cipher.unseal("1", &sealed).unwrap();
         assert_eq!(back.passkeys, entry_with_passkey().passkeys);
     }
 
@@ -225,7 +282,7 @@ mod tests {
     fn legacy_payload_round_trips_passkeys() {
         let cipher = VaultKey::legacy_from_password("pw").payload_cipher();
         let sealed = cipher.seal(&entry_with_passkey()).unwrap();
-        let back = cipher.unseal(&sealed).unwrap();
+        let back = cipher.unseal("1", &sealed).unwrap();
         assert_eq!(back.passkeys, entry_with_passkey().passkeys);
     }
 
