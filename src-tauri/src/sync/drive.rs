@@ -601,9 +601,9 @@ pub async fn update_file(
 #[cfg(test)]
 mod tests {
     use super::{
-        collect_pages, escape, layout, list_query, move_request, multipart_body, oldest, parse_file,
-        parse_listing, parse_properties, parse_size, rename_body, DriveFile, FILE_FIELDS,
-        LIST_FIELDS,
+        collect_pages, escape, layout, list_query, move_request, multipart_body, oldest,
+        parse_file, parse_listing, parse_properties, parse_size, rename_body, DriveFile,
+        FILE_FIELDS, LIST_FIELDS,
     };
     use serde_json::json;
     use std::cell::RefCell;
