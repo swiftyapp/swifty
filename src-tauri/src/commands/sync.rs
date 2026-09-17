@@ -9,8 +9,14 @@
 //! The frontend never reconstructs sync state from a sequence of events: every
 //! transition updates [`SyncRun`] and re-emits the whole [`SyncStatus`], which
 //! the frontend stores as-is. One event, one shape, no order to agree on.
+//!
+//! Every run starts in [`launch`], whichever command asked for it — a scheduled
+//! sync, `sync_now`, or the import behind a connect. One launcher means one
+//! claim, and one claim is what keeps two runs from addressing the account at
+//! the same time.
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 #[cfg(mobile)]
 use std::time::Duration;
 
@@ -180,33 +186,43 @@ fn spawn_consent(app: &AppHandle, state: &State<'_, AppState>, follow: Follow) -
                 start_run(&app);
                 connected(&app);
             }
-            Follow::Pull => {
-                started(&app);
-                connected(&app);
-                pull(&app, cryptor);
-            }
+            Follow::Pull => import(&app, cryptor),
         },
         Err(e) => failed(&app, e.to_string()),
     });
     Ok(())
 }
 
-/// Take on whatever the account holds. The refreshed list always goes out on a
-/// success: the user connected in order to see what was up there, and "nothing
-/// new" is an answer worth rendering.
+/// Take on whatever the account holds, as the run that follows a connect.
 ///
-/// Blocking, and deliberately: `sync::run` drives Drive with `block_on`, so
-/// every caller has to be on the blocking pool (see [`start_run`]). The caller
-/// has already announced the run (`started`) — before the consent it follows was
-/// marked over, so a workspace switch never finds a moment with neither flag up.
-fn pull(app: &AppHandle, cryptor: Cryptor) {
-    match sync::run(app, cryptor) {
-        Ok(_) => {
-            events::vault_merged(app, entry_metas(app));
-            finished(app, None);
-        }
-        Err(e) => finished(app, Some(e.to_string())),
+/// Run as an import, not a sync: this vault has an id and a pack name of its
+/// own, and an ordinary run would look for that pack, find nothing, and push
+/// the empty vault — the opposite of what the user pressed.
+///
+/// The run is claimed *before* the connect is announced, exactly as the
+/// `Follow::Run` arm claims it before `connected`. Announcing first would open a
+/// window in which this session counts as connected and no run is claimed, and a
+/// `sync_now` — manual, or the debounced one a save fires — landing in it would
+/// run beside this import against the same account: two runs can settle on
+/// different vault ids and publish a pack each.
+///
+/// Returns as soon as the run is claimed; the run itself is on a thread of its
+/// own, which is also what keeps this off iOS's IPC thread.
+fn import(app: &AppHandle, cryptor: Cryptor) {
+    let launched = launch(app, Credentials::Held(cryptor), sync::Intent::Import);
+    connected(app);
+    // Nothing else should be running: until `connected` above, this session was
+    // not configured for sync, and `sync_now` is a no-op on a session that is
+    // not. But if something is, the import did not happen — and the user pressed
+    // it precisely to make it happen, so saying nothing would read as a success.
+    if !launched {
+        not_started(app, import_not_started_error());
     }
+}
+
+// Surfaced verbatim by the sync indicator, so it has to read as a sentence.
+fn import_not_started_error() -> String {
+    "a sync was already running, so nothing was imported; try again in a moment".into()
 }
 
 // --- the mobile consent flow ---
@@ -329,13 +345,10 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
         match sync::complete(&app, &cryptor, &code, &pending.verifier, pending.generation).await {
             Ok(()) => {
                 // The run is claimed before the consent is marked over, as in
-                // `spawn_consent`; the pull goes to the blocking pool for the
-                // same reason `start_run` does.
+                // `spawn_consent`; both arms put the run itself on the blocking
+                // pool for the reason `launch` gives.
                 if purpose == AuthPurpose::Import {
-                    started(&app);
-                    connected(&app);
-                    let handle = app.clone();
-                    crate::commands::detached(move || pull(&handle, cryptor));
+                    import(&app, cryptor);
                 } else {
                     start_run(&app);
                     connected(&app);
@@ -437,6 +450,20 @@ fn failed(app: &AppHandle, why: String) {
     });
 }
 
+/// A run the user asked for could not start because another one holds the
+/// claim. Only the message changes: the run that is in flight still owns
+/// `in_progress`, and reporting this as a finished run would tell the frontend
+/// that syncing stopped — re-enabling actions and showing an error — while
+/// Drive is being written to. The message stands until that run lands and
+/// reports for itself.
+fn not_started(app: &AppHandle, why: String) {
+    log::warn!("sync not started: {why}");
+    update(app, |run| {
+        run.pending = false;
+        run.error = Some(why);
+    });
+}
+
 /// Mark the session connected and say so. The flag is session-only — what
 /// actually makes a vault "configured" is the token file `write_tokens` just
 /// wrote, which is what a later unlock reads.
@@ -498,61 +525,88 @@ pub(crate) fn status(app: &AppHandle) -> SyncStatus {
 
 // --- runs ----------------------------------------------------------------------
 
-/// Start a run unless one is already in flight, in which case this is a no-op:
-/// a second request is dropped rather than queued, because a sync is
-/// full-state and the run already underway will publish whatever the caller
-/// wanted published.
+/// Where a run's credentials come from.
+enum Credentials {
+    /// Taken from the live session, under the same lock as the claim.
+    Session,
+    /// Already in hand: a consent flow took one before the browser went out,
+    /// and its vault may well have locked behind it since.
+    Held(Cryptor),
+}
+
+/// Start one run of `intent` unless one is already in flight, in which case
+/// nothing is started and `false` comes back for the caller to make of what it
+/// will.
+///
+/// **Every** run in the process starts here, whatever asked for it — the
+/// debounced auto-sync, `sync_now`, the run behind a fresh connect, the import
+/// — because the claim below is the only thing keeping two of them apart, and
+/// they must be kept apart: two runs racing resolve the vault id independently,
+/// so they can settle on different ids and publish a pack each, leaving one
+/// vault spread across two files in the account.
+///
+/// An ordinary run turned away here is a no-op rather than an error: a sync is
+/// full-state, so the run already underway publishes whatever this caller
+/// wanted published. An import is not, which is why the answer is returned
+/// rather than swallowed.
 ///
 /// The run goes to the blocking pool rather than `async_runtime::spawn`. The
 /// Drive calls are driven with `block_on`, which is only legal off the async
 /// runtime's own worker threads — a blocking-pool thread is not one of them —
 /// and it also guarantees that no amount of network latency can reach the
 /// command or main thread.
-fn start_run(app: &AppHandle) {
+fn launch(app: &AppHandle, credentials: Credentials, intent: sync::Intent) -> bool {
     let state = app.state::<AppState>();
     // Claim and key under the workspace lock, so a switch cannot land between
     // them: the run either starts against the paths it was keyed for, or finds
     // them already moved and does not start at all.
     let paths = state.workspace_lock.lock().unwrap();
-    if state
-        .syncing
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .is_err()
-    {
-        return;
-    }
+    let Some(claim) = claim_run(&state.syncing) else {
+        return false;
+    };
 
     // Cloned before the thread starts, so the run owns its credentials even if
     // the session auto-locks a moment later. Everything else it needs is taken
     // from the session per step, and a locked session simply ends the run.
-    let cryptor = match session_cryptor(&state) {
-        Some(cryptor) => cryptor,
-        None => {
-            state.syncing.store(false, Ordering::SeqCst);
-            return;
-        }
+    let cryptor = match credentials {
+        Credentials::Held(cryptor) => cryptor,
+        Credentials::Session => match session_cryptor(&state) {
+            Some(cryptor) => cryptor,
+            // Dropping `claim` here is what releases it: a vault that locked
+            // under a scheduled run must not leave sync wedged for the process.
+            None => return false,
+        },
     };
     drop(paths);
 
     let app = app.clone();
     super::detached(move || {
-        let _guard = RunGuard(app.clone());
+        let _claim = claim;
         started(&app);
-        report(&app, sync::run(&app, cryptor));
+        report(&app, intent, sync::run(&app, cryptor, intent));
     });
+    true
+}
+
+/// The ordinary run: this vault's own pack, started from the live session.
+fn start_run(app: &AppHandle) {
+    launch(app, Credentials::Session, sync::Intent::Sync);
 }
 
 fn session_cryptor(state: &State<'_, AppState>) -> Option<Cryptor> {
     state.session.lock().unwrap().cryptor().ok()
 }
 
-// Announce the result, and — when the merge actually changed rows — hand the
+// Announce the result, and — when the entry list may have changed — hand the
 // frontend the refreshed list. Emitting the metas rather than a bare "reload"
 // signal keeps the store's update in one round trip and one render.
-fn report(app: &AppHandle, result: Result<sync::engine::SyncOutcome>) {
+fn report(app: &AppHandle, intent: sync::Intent, result: Result<sync::engine::SyncOutcome>) {
     match result {
         Ok(outcome) => {
-            if outcome.merged > 0 {
+            // An import refreshes whether or not the merge wrote a row: the
+            // user asked to see what was up there, and "nothing new" is an
+            // answer worth rendering.
+            if outcome.merged > 0 || intent == sync::Intent::Import {
                 events::vault_merged(app, entry_metas(app));
             }
             finished(app, None);
@@ -571,15 +625,54 @@ fn entry_metas(app: &AppHandle) -> Vec<EntryMetaDto> {
         .unwrap_or_else(|_| Vec::new())
 }
 
-// Clears the in-flight flag however the run ends, panics included — a wedged
-// flag would disable sync for the rest of the process.
-struct RunGuard(AppHandle);
+/// The process's one sync run, held for as long as this guard lives.
+///
+/// Owns its share of the flag rather than borrowing the state, so the claim can
+/// be taken on the thread that decides to run — under `workspace_lock`, before
+/// anything else can be told a run is under way — and then moved onto the thread
+/// that does the running.
+struct RunClaim(Arc<AtomicBool>);
 
-impl Drop for RunGuard {
+/// Claim the run, or `None` if one is already in flight.
+fn claim_run(syncing: &Arc<AtomicBool>) -> Option<RunClaim> {
+    syncing
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .ok()
+        .map(|_| RunClaim(Arc::clone(syncing)))
+}
+
+// Releases the claim however the run ends, panics included — a wedged flag
+// would disable sync for the rest of the process.
+impl Drop for RunClaim {
     fn drop(&mut self) {
-        self.0
-            .state::<AppState>()
-            .syncing
-            .store(false, Ordering::SeqCst);
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // An import and an ordinary sync are not two flows with two flags: they
+    // take the same claim, so whichever gets there first is the only one that
+    // runs. Two runs at once resolve the vault id independently and can publish
+    // a pack each under different ids.
+    #[test]
+    fn an_import_in_flight_turns_an_ordinary_run_away() {
+        let state = AppState::default();
+
+        let import = claim_run(&state.syncing).expect("nothing was running");
+        assert!(
+            claim_run(&state.syncing).is_none(),
+            "a sync cannot start beside the import"
+        );
+
+        // However the import ended — returned, errored, or panicked — the next
+        // run is free to start.
+        drop(import);
+        let next = claim_run(&state.syncing).expect("the import released it");
+        assert!(claim_run(&state.syncing).is_none(), "and holds it in turn");
+        drop(next);
+        assert!(claim_run(&state.syncing).is_some());
     }
 }

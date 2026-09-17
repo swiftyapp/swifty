@@ -27,7 +27,7 @@ use crate::error::{Error, Result};
 use crate::session::{store_err, Session};
 use crate::state::AppState;
 use crate::storage;
-use crate::store::{state_digest, Record, SqliteStore, StoreError, VaultStore};
+use crate::store::{identity, state_digest, Record, SqliteStore, StoreError, VaultStore};
 
 /// How long a tombstone is kept before it is reclaimed. A device offline for
 /// longer than this can resurrect what it deleted; see
@@ -82,7 +82,7 @@ pub trait Remote {
 /// is a superset of the one the digest was taken from — never a rollback — and
 /// the write's own debounced sync settles whatever is left over.
 pub trait LocalVault {
-    /// Open a pulled `.swsync` pack and read its records out. The local
+    /// Open a pulled `.rowel` pack and read its records out. The local
     /// database is not touched: the snapshot goes into its own scratch DB.
     fn decode(&self, pack_bytes: &[u8]) -> Result<Vec<Record>>;
     /// Last-writer-wins merge of `incoming`; returns the rows written.
@@ -93,6 +93,21 @@ pub trait LocalVault {
     fn pack(&self, cutoff_ms: i64) -> Result<Vec<u8>>;
     /// Record a completed push: the revision it landed at, and when.
     fn note_push(&self, revision: &str, at_ms: i64) -> Result<()>;
+
+    // The two below are the vault's *identity* rather than its contents. The
+    // provider reads the id before a run, to learn which remote pack this vault
+    // is, and writes it from the `settle` hook [`sync`] calls mid-run — after
+    // the pull has been merged and before anything is pushed. Neither is called
+    // by the engine itself; they live on the trait because the id sits in the
+    // vault's own `meta` table, and reaching it means taking the session lock
+    // exactly as everything else here does.
+    //
+    /// This vault's id, or `None` for a vault created before ids existed — or
+    /// for one whose first run has not yet settled one.
+    fn vault_id(&self) -> Result<Option<String>>;
+    /// Take on an id this run has proved to be this vault's, whether it was
+    /// read off the remote or minted for it.
+    fn adopt_vault_id(&self, id: &str) -> Result<()>;
 }
 
 /// What one run did, for the caller's events and logs.
@@ -106,38 +121,66 @@ pub struct SyncOutcome {
 }
 
 /// Run one sync: pull, merge, and push if — and only if — the two digests differ.
-pub fn sync<R: Remote, L: LocalVault>(remote: &R, local: &L, now_ms: i64) -> Result<SyncOutcome> {
+///
+/// `settle` is the caller's chance to write down whatever this run has just
+/// proved — in practice the vault id the provider resolved (see `sync::run`).
+/// It is called **once**, at the one point in the run that is on the far side of
+/// a validated pull and on the near side of every push: after the remote pack
+/// has been fetched, decoded and merged (or found not to exist), and before
+/// anything is packed or uploaded. A run that cannot read the pack it was
+/// pointed at therefore never reaches it, and no byte can leave this device
+/// under an identity that is not yet on disk. A `settle` that fails ends the
+/// run there, before any upload.
+///
+/// Once per run, not once per attempt: a re-pull after losing a race proves
+/// nothing new about the identity, and the write has already happened.
+pub fn sync<R: Remote, L: LocalVault>(
+    remote: &R,
+    local: &L,
+    now_ms: i64,
+    settle: impl FnOnce() -> Result<()>,
+) -> Result<SyncOutcome> {
     let mut outcome = SyncOutcome::default();
+    let mut settle = Some(settle);
 
     for _ in 0..MAX_ATTEMPTS {
         // 1-3. Pull, open the snapshot, merge it in. A remote that cannot be
         // read errors out here, before the local vault has been touched.
         let pulled = remote.fetch()?;
-        let base_revision = match &pulled {
-            Some(file) => {
-                let remote_records = local.decode(&file.bytes)?;
-                outcome.merged += local.merge(&remote_records)?;
-
-                // 4. The push decision is digest inequality, nothing else.
-                //
-                // Not the dirty flag, and not "the merge changed something":
-                // both miss the case where local is a strict superset of remote
-                // — another device pushed a state derived from an older pull
-                // and clobbered ours. Merging that back in adds nothing to us
-                // (every incoming row loses last-writer-wins), so a
-                // change-driven heuristic concludes "in sync" and leaves our
-                // entries missing from the remote forever. The digests still
-                // differ, so this pushes.
-                if local.digest()? == state_digest(&remote_records) {
-                    return Ok(outcome);
-                }
-                Some(file.revision.clone())
-            }
-            // Nothing on the remote yet: this run creates it.
+        // Nothing on the remote yet means this run creates it, and there is no
+        // snapshot to decode or merge.
+        let incoming = match &pulled {
+            Some(file) => Some(local.decode(&file.bytes)?),
             None => None,
         };
+        if let Some(records) = &incoming {
+            outcome.merged += local.merge(records)?;
+        }
 
-        // 5. Pre-flight. If the head moved since the pull, another device
+        // 4. Settle the identity, now that the pull is in and nothing has gone
+        // out. See this function's own doc for why it is exactly here.
+        if let Some(settle) = settle.take() {
+            settle()?;
+        }
+
+        if let Some(records) = &incoming {
+            // 5. The push decision is digest inequality, nothing else.
+            //
+            // Not the dirty flag, and not "the merge changed something":
+            // both miss the case where local is a strict superset of remote
+            // — another device pushed a state derived from an older pull
+            // and clobbered ours. Merging that back in adds nothing to us
+            // (every incoming row loses last-writer-wins), so a
+            // change-driven heuristic concludes "in sync" and leaves our
+            // entries missing from the remote forever. The digests still
+            // differ, so this pushes.
+            if local.digest()? == state_digest(records) {
+                return Ok(outcome);
+            }
+        }
+        let base_revision = pulled.as_ref().map(|file| file.revision.clone());
+
+        // 6. Pre-flight. If the head moved since the pull, another device
         // pushed while we were merging and our snapshot would drop its work.
         // Start over from its state instead.
         if remote.head_revision()? != base_revision {
@@ -270,6 +313,14 @@ impl LocalVault for SessionVault {
     fn note_push(&self, revision: &str, at_ms: i64) -> Result<()> {
         self.with_store(|store| note_push(store, revision, at_ms))
     }
+
+    fn vault_id(&self) -> Result<Option<String>> {
+        self.with_store(|store| identity::vault_id(store).map_err(store_err))
+    }
+
+    fn adopt_vault_id(&self, id: &str) -> Result<()> {
+        self.with_store(|store| identity::adopt_vault_id(store, id).map_err(store_err))
+    }
 }
 
 // --- shared implementations -------------------------------------------------
@@ -338,7 +389,7 @@ fn note_push(store: &SqliteStore, revision: &str, at_ms: i64) -> Result<()> {
 fn scratch_name(role: &str) -> String {
     static N: AtomicU64 = AtomicU64::new(0);
     format!(
-        "swsync-{role}-{}-{}.db",
+        "rowel-sync-{role}-{}-{}.db",
         std::process::id(),
         N.fetch_add(1, Ordering::SeqCst)
     )
@@ -357,11 +408,19 @@ impl Drop for Scratch {
 mod tests {
     use super::*;
     use crate::crypto::KdfParams;
+    use std::sync::atomic::AtomicBool;
     use std::sync::Mutex;
 
     const KEY: &[u8] = &[0x5a; 32];
     const NOW: i64 = 1_700_000_000_000;
     const DAY_MS: i64 = 24 * 60 * 60 * 1000;
+
+    // Most tests here are about the merge, not the identity, and have nothing
+    // to settle. Shadows `super::sync` on purpose so they read as the algorithm
+    // does; the identity tests below call `super::sync` with a hook of their own.
+    fn sync<R: Remote, L: LocalVault>(remote: &R, local: &L, now_ms: i64) -> Result<SyncOutcome> {
+        super::sync(remote, local, now_ms, || Ok(()))
+    }
 
     fn kdf_json() -> String {
         KdfParams::argon2id(b"salt-0123456789012345", 256, 1, 1)
@@ -411,6 +470,10 @@ mod tests {
     struct Device {
         store: SqliteStore,
         scratch: PathBuf,
+        // What `vault_id()` answered the last time `pack()` ran. The whole point
+        // of settling the id before the push is that this is never `None` for a
+        // run that had one to settle.
+        id_when_packed: Mutex<Option<String>>,
     }
 
     impl Device {
@@ -419,6 +482,7 @@ mod tests {
             Self {
                 store: SqliteStore::open(&dir.join("vault.db"), KEY).unwrap(),
                 scratch: dir.join("scratch"),
+                id_when_packed: Mutex::default(),
             }
         }
 
@@ -453,6 +517,7 @@ mod tests {
             self.store.state_digest().map_err(store_err)
         }
         fn pack(&self, cutoff_ms: i64) -> Result<Vec<u8>> {
+            *self.id_when_packed.lock().unwrap() = self.vault_id()?;
             self.store
                 .purge_tombstones_before(cutoff_ms)
                 .map_err(store_err)?;
@@ -466,6 +531,12 @@ mod tests {
         fn note_push(&self, revision: &str, at_ms: i64) -> Result<()> {
             note_push(&self.store, revision, at_ms)
         }
+        fn vault_id(&self) -> Result<Option<String>> {
+            identity::vault_id(&self.store).map_err(store_err)
+        }
+        fn adopt_vault_id(&self, id: &str) -> Result<()> {
+            identity::adopt_vault_id(&self.store, id).map_err(store_err)
+        }
     }
 
     #[derive(Default)]
@@ -476,6 +547,9 @@ mod tests {
         // Bumped by the test between a pull and the push that follows it, to
         // stand in for another device landing a snapshot mid-run.
         interlopers: Vec<Vec<u8>>,
+        // Every upload fails: the link dropped, Drive said no. The pull side
+        // keeps working, as it would.
+        refuse_uploads: bool,
     }
 
     #[derive(Default)]
@@ -507,6 +581,11 @@ mod tests {
             self.state.lock().unwrap().uploads
         }
 
+        // Turn the push side off, and back on for the retry that follows.
+        fn refuse_uploads(&self, refuse: bool) {
+            self.state.lock().unwrap().refuse_uploads = refuse;
+        }
+
         fn content(&self) -> Option<Vec<u8>> {
             self.state.lock().unwrap().content.clone()
         }
@@ -532,6 +611,9 @@ mod tests {
 
         fn upload(&self, bytes: &[u8]) -> Result<String> {
             let mut state = self.state.lock().unwrap();
+            if state.refuse_uploads {
+                return Err(Error::Other("the upload failed".into()));
+            }
             state.revision += 1;
             state.uploads += 1;
             state.content = Some(bytes.to_vec());
@@ -828,5 +910,130 @@ mod tests {
         sync(&remote, &a, NOW).unwrap();
 
         assert!(fs::read_dir(&a.scratch).unwrap().next().is_none());
+    }
+
+    // --- settling the vault id ---------------------------------------------
+    //
+    // `sync::run` passes a `settle` that writes the id it resolved. These pin
+    // the ordering down from both sides: nothing is written before the pull has
+    // been read, and nothing is uploaded before the write.
+
+    const ID: &str = "0123456789abcdef0123456789abcdef";
+
+    // The vault locked, or the `meta` write failed, at the moment the run went
+    // to settle its identity. That has to end the run *before* the push: an
+    // upload here would put a pack on Drive under an id this vault does not
+    // answer to, and its next run would mint another one and publish a second.
+    #[test]
+    fn a_settle_that_fails_stops_the_run_before_anything_is_uploaded() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+
+        let result = super::sync(&remote, &a, NOW, || {
+            Err(Error::Other("the vault locked during sync".into()))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(remote.uploads(), 0);
+        assert_eq!(remote.content(), None, "the account is as the run found it");
+        assert_eq!(a.vault_id().unwrap(), None, "and the vault took no id");
+    }
+
+    // The other side of the same guarantee: the id is already on disk when the
+    // push is attempted, so a push that fails leaves the two in step. The next
+    // run addresses the same pack rather than minting a second id for it.
+    #[test]
+    fn an_upload_that_fails_after_the_settle_retries_under_the_same_id() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+        remote.refuse_uploads(true);
+
+        assert!(super::sync(&remote, &a, NOW, || a.adopt_vault_id(ID)).is_err());
+        assert_eq!(
+            a.vault_id().unwrap().as_deref(),
+            Some(ID),
+            "written before the push was even attempted"
+        );
+        assert_eq!(remote.uploads(), 0);
+        assert_eq!(remote.content(), None);
+
+        // The retry finds the vault already named, so it has nothing to settle
+        // — `resolve_vault_id` would answer `Use` — and converges in one push.
+        remote.refuse_uploads(false);
+        assert!(sync(&remote, &a, NOW).unwrap().pushed);
+        assert_eq!(remote.uploads(), 1, "one pack, under the one id");
+        assert_eq!(a.vault_id().unwrap().as_deref(), Some(ID));
+        assert_eq!(remote_records(&remote), a.store.export_for_sync().unwrap());
+    }
+
+    // An import points this vault at a pack the account already holds. If that
+    // pack cannot be read there is nothing to adopt: taking its id anyway would
+    // leave the vault answering to a pack it has never seen a record of.
+    #[test]
+    fn an_import_of_a_pack_it_cannot_read_never_takes_that_packs_id() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        // Structurally a pack, but sealed by a different install.
+        let foreign = KdfParams::argon2id(b"a-completely-different-salt-here", 256, 1, 1)
+            .to_json()
+            .unwrap();
+        let remote = FakeRemote::with(pack::pack(&foreign, &[0u8; 4096]));
+
+        let settled = AtomicBool::new(false);
+        let result = super::sync(&remote, &a, NOW, || {
+            settled.store(true, Ordering::SeqCst);
+            a.adopt_vault_id(ID)
+        });
+
+        assert!(result.is_err());
+        assert!(
+            !settled.load(Ordering::SeqCst),
+            "the pull never got far enough to prove the id"
+        );
+        assert_eq!(a.vault_id().unwrap(), None);
+        assert_eq!(remote.uploads(), 0);
+    }
+
+    // The happy path, and the reason the file-name stamp on restore is now only
+    // belt and braces: the snapshot is taken after the id is written, so the
+    // very first pack a newly named vault pushes carries that id in its `meta`.
+    #[test]
+    fn the_first_pack_of_a_newly_named_vault_already_carries_its_id() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+
+        let outcome = super::sync(&remote, &a, NOW, || a.adopt_vault_id(ID)).unwrap();
+
+        assert!(outcome.pushed);
+        assert_eq!(remote.uploads(), 1);
+        assert_eq!(
+            a.id_when_packed.lock().unwrap().as_deref(),
+            Some(ID),
+            "the id was on disk by the time the snapshot was taken"
+        );
+    }
+
+    // A re-pull after losing a race proves nothing new about the identity, and
+    // the write has already happened — so the hook runs once per run, not once
+    // per attempt.
+    #[test]
+    fn a_run_that_loses_a_race_settles_its_id_once_not_once_per_attempt() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+        sync(&remote, &a, NOW).unwrap();
+        a.store.import(&[record("2", 400, b"two")]).unwrap();
+
+        // C lands its own snapshot in the pull/push window, forcing a second pass.
+        let c = Device::seeded(&[record("1", 200, b"one"), record("3", 500, b"three")]);
+        remote.interlope(c.pack_bytes());
+
+        let settles = AtomicU64::new(0);
+        let outcome = super::sync(&remote, &a, NOW, || {
+            settles.fetch_add(1, Ordering::SeqCst);
+            a.adopt_vault_id(ID)
+        })
+        .unwrap();
+
+        assert!(outcome.pushed);
+        assert_eq!(settles.load(Ordering::SeqCst), 1);
     }
 }

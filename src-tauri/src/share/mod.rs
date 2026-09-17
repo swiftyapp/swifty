@@ -22,6 +22,7 @@ use tauri::AppHandle;
 use crate::crypto::Cryptor;
 use crate::error::Result;
 use crate::models::Entry;
+use crate::sync::layout;
 use envelope::{Link, ShareKey, SHARE_TTL_MS};
 use remote::{
     DriveShareRemote, PublicFetch, ShareFile, ShareRemote, PROP_ENTRY_ID, PROP_EXPIRES_AT,
@@ -144,10 +145,11 @@ fn active_share(file: &ShareFile) -> ActiveShare {
     }
 }
 
-/// A name that says nothing. Drive shows the owner a file list, so the name
-/// carries no title — only enough randomness never to collide.
+/// A name that says nothing: random, and shaped by [`layout::share_file_name`]
+/// like every other name Drive sees. Drive shows the owner a file list, so the
+/// name carries no title — only enough randomness never to collide.
 fn file_name() -> String {
-    format!("{}.swshare", crate::crypto::random_hex_id())
+    layout::share_file_name(&crate::crypto::random_hex_id())
 }
 
 fn rfc3339(ms: i64) -> String {

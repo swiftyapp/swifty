@@ -364,6 +364,9 @@ pub fn create_vault(app: &AppHandle, password: &str) -> Result<(VaultKey, Sqlite
     let store =
         SqliteStore::open(&storage::db_path(app)?, &key.sqlcipher_key()).map_err(store_err)?;
     record_kdf_meta(&store, &params)?;
+    // Born with an identity: what names this vault's pack on Drive, wherever
+    // it is later synced from (`store::identity`).
+    crate::store::identity::assign_vault_id(&store).map_err(store_err)?;
     Ok((key, store))
 }
 

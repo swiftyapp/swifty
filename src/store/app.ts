@@ -21,11 +21,29 @@ export type UpdateCheckStatus = 'checking' | 'uptodate' | 'error' | null
 
 /**
  * `pending` — consent is out with the browser
- * `found`   — the probe came back with a pack to restore
+ * `found`   — the probe came back with at least one pack to restore
  * `empty`   — the probe came back with nothing; the account is usable, just bare
  * `error`   — the connect or the probe failed
  */
 export type SetupDriveStatus = 'idle' | 'pending' | 'found' | 'empty' | 'error'
+
+/**
+ * The first run's Drive probe, which has no vault behind it yet — so it cannot
+ * live in `sync`, whose `enabled` means "this vault syncs".
+ *
+ * `files` is every vault the account holds, newest first, because one account
+ * can hold several: two installs syncing their own primary each mint a vault
+ * id. `selectedId` is the one the next step acts on — restore unseals it,
+ * "start fresh" archives it — defaulting to the newest until the user says
+ * otherwise, so the single-vault case never asks a question it has one answer
+ * to.
+ */
+export interface SetupDriveState {
+  status: SetupDriveStatus
+  files: SetupDriveFile[]
+  selectedId: string | null
+  error: string | null
+}
 
 export interface AppState {
   flow: FlowName
@@ -52,11 +70,7 @@ export interface AppState {
    * local until the next lock.
    */
   sync: SyncStatus
-  /**
-   * The first run's Drive probe, which has no vault behind it yet — so it
-   * cannot live in `sync`, whose `enabled` means "this vault syncs".
-   */
-  setupDrive: { status: SetupDriveStatus; file: SetupDriveFile | null; error: string | null }
+  setupDrive: SetupDriveState
   /**
    * A backup the OS asked the app to open (`file:opened`), waiting for a
    * screen that can take it: the restore step on a fresh install, Settings ›
@@ -74,7 +88,12 @@ export interface AppState {
   }
 }
 
-const DRIVE_IDLE = { status: 'idle' as SetupDriveStatus, file: null, error: null }
+const DRIVE_IDLE: SetupDriveState = {
+  status: 'idle',
+  files: [],
+  selectedId: null,
+  error: null
+}
 
 export const initialApp: AppState = {
   // The auth screen is the default; setup is reached explicitly via `flowSetup`
@@ -270,12 +289,31 @@ export const setSyncStatus = (sync: SyncStatus) =>
 // --- first-run Drive probe ---------------------------------------------------------
 
 export const setupDrivePending = () =>
-  useApp.setState({ setupDrive: { status: 'pending', file: null, error: null } })
-export const setupDriveProbed = (file: SetupDriveFile | null) =>
-  useApp.setState({ setupDrive: { status: file ? 'found' : 'empty', file, error: null } })
+  useApp.setState({ setupDrive: { ...DRIVE_IDLE, status: 'pending' } })
+export const setupDriveProbed = (files: SetupDriveFile[]) =>
+  useApp.setState({
+    setupDrive: {
+      status: files.length > 0 ? 'found' : 'empty',
+      files,
+      selectedId: files[0]?.id ?? null,
+      error: null
+    }
+  })
 export const setupDriveFailed = (error: string) =>
-  useApp.setState({ setupDrive: { status: 'error', file: null, error } })
+  useApp.setState({ setupDrive: { ...DRIVE_IDLE, status: 'error', error } })
 export const setupDriveReset = () => useApp.setState({ setupDrive: DRIVE_IDLE })
+
+/** The user picked one of several vaults; every later step follows this. */
+export const setupDriveSelect = (id: string) =>
+  useApp.setState(state => ({ setupDrive: { ...state.setupDrive, selectedId: id } }))
+
+/**
+ * The vault the flow is about, for the screens that describe or act on one.
+ * A selector rather than stored state: it is `files` and `selectedId` read
+ * together, and there is nothing to keep in step.
+ */
+export const selectedDriveFile = (state: AppState): SetupDriveFile | null =>
+  state.setupDrive.files.find(file => file.id === state.setupDrive.selectedId) ?? null
 
 // --- updates ----------------------------------------------------------------------
 

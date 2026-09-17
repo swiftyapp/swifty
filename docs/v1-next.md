@@ -29,10 +29,27 @@ products solve it, don't patch symptoms.
 > point was resolved as: sync the whole SQLCipher snapshot in a thin plaintext-KDF-header
 > container (Enpass/KeePass model), not per-entry envelopes.
 >
+> **Drive layout, post-rebrand** — "one pack per vault under `Rowel/Vaults/`" replaced the
+> single `Rowel/vault.swsync`: packs are now `Vaults/<vault-id>.rowel` (same extension as the
+> local backup, which is the same bytes) and shares `Shares/<random>.rowelshare`, all named by
+> `sync::layout`; the `SWSY` magic bytes are a format tag and stay. The layout changed inside
+> the alpha with **no migration**, and the old file is never read again — not by sync, not by
+> onboarding. Upgrade path: update the device that holds the vault first (its data is local and
+> its first sync pushes it to the new layout), then reset every other device and restore it from
+> that new pack. `Rowel/vault.swsync` can then be deleted by hand. The id a run settles on is
+> written into the vault's `meta` mid-run, at the one point that is past a fetched, decoded and
+> merged pull and short of every push: a failed import never leaves a vault pointed at a pack it
+> did not merge, and no pack is ever uploaded under an id the vault does not already answer to.
+>
+> Onboarding's probe lists every live pack it finds and the first run picks which vault to
+> restore or to archive, so an account holding two installs' primaries never has one chosen
+> for it.
+>
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a
-> foreign-vault error); OAuth scope audit (`drive.file`); **release gate: a production Google
-> OAuth client ID (owner task)**.
+> foreign-vault error); OAuth scope audit (`drive.file`); per-workspace sync (drops
+> archive-by-rename — "start fresh" simply becomes a new vault — and adds a `vaultId`
+> appProperty on shares); **release gate: a production Google OAuth client ID (owner task)**.
 
 Re-enable Google Drive sync on the new SQLite storage engine. Postponed during remediation;
 picking it back up now. **The storage groundwork already exists** — do not rebuild it:

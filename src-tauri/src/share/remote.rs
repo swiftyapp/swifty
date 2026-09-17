@@ -20,10 +20,8 @@ use super::envelope::MAX_SHARE_BYTES;
 use crate::crypto::Cryptor;
 use crate::error::{Error, Result};
 use crate::sync::drive::{self, DriveFile};
-use crate::sync::{access_token, http_client, FOLDER_NAME};
-
-/// The subfolder of `Rowel` that holds outstanding shares.
-pub const SHARES_FOLDER: &str = "Shares";
+use crate::sync::layout::{ROOT_FOLDER, SHARES_FOLDER};
+use crate::sync::{access_token, http_client};
 
 /// `appProperties` keys on a share file. Values are opaque to Google.
 pub const PROP_ENTRY_ID: &str = "entryId";
@@ -119,7 +117,7 @@ impl DriveShareRemote {
         if let Some(id) = self.folder.lock().unwrap().clone() {
             return Ok(Some(id));
         }
-        let Some(root) = drive::folder_id(client, token, FOLDER_NAME).await? else {
+        let Some(root) = drive::folder_id(client, token, ROOT_FOLDER).await? else {
             return Ok(None);
         };
         let shares = drive::folder_id_in(client, token, SHARES_FOLDER, &root).await?;
@@ -136,9 +134,9 @@ impl DriveShareRemote {
         if let Some(id) = self.find_folder(client, token).await? {
             return Ok(id);
         }
-        let root = match drive::folder_id(client, token, FOLDER_NAME).await? {
+        let root = match drive::folder_id(client, token, ROOT_FOLDER).await? {
             Some(id) => id,
-            None => drive::create_folder(client, token, FOLDER_NAME).await?,
+            None => drive::create_folder(client, token, ROOT_FOLDER).await?,
         };
         let shares = drive::create_folder_in(client, token, SHARES_FOLDER, Some(&root)).await?;
         *self.folder.lock().unwrap() = Some(shares.clone());
@@ -361,7 +359,7 @@ mod tests {
     fn drive_file(created: &str, properties: &[(&str, &str)]) -> DriveFile {
         DriveFile {
             id: "f1".into(),
-            name: "share.swshare".into(),
+            name: "share.rowelshare".into(),
             created_time: created.into(),
             modified_time: String::new(),
             size: None,
@@ -412,7 +410,7 @@ mod tests {
         let remote = FakeShareRemote::new();
         let id = remote
             .upload(
-                "share.swshare",
+                "share.rowelshare",
                 b"sealed",
                 &[
                     (PROP_SHARE, PROP_SHARE_VALUE),
@@ -436,7 +434,7 @@ mod tests {
     #[test]
     fn publishing_is_what_makes_a_share_downloadable() {
         let remote = FakeShareRemote::new();
-        let id = remote.upload("share.swshare", b"sealed", &[]).unwrap();
+        let id = remote.upload("share.rowelshare", b"sealed", &[]).unwrap();
 
         assert!(!remote.is_public(&id));
         assert!(remote.download(&id).is_err());
@@ -450,7 +448,7 @@ mod tests {
     #[test]
     fn an_unknown_or_revoked_share_fails_the_way_the_recipient_is_told() {
         let remote = FakeShareRemote::new();
-        let id = remote.upload("share.swshare", b"sealed", &[]).unwrap();
+        let id = remote.upload("share.rowelshare", b"sealed", &[]).unwrap();
         remote.make_public(&id).unwrap();
         remote.delete(&id).unwrap();
 
@@ -463,7 +461,7 @@ mod tests {
     #[test]
     fn deleting_removes_the_share_and_deleting_twice_is_fine() {
         let remote = FakeShareRemote::new();
-        let id = remote.upload("share.swshare", b"sealed", &[]).unwrap();
+        let id = remote.upload("share.rowelshare", b"sealed", &[]).unwrap();
 
         remote.delete(&id).unwrap();
         assert!(remote.list().unwrap().is_empty());

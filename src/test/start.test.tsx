@@ -33,10 +33,25 @@ const biometricStatus = (canEnroll: boolean) =>
 // Must satisfy the setup strength gate (>= 12 chars, zxcvbn score >= 2).
 const STRONG = 'my-strong-vault-passphrase-2026'
 
+// What the probe reports for a pack in `Rowel/Vaults/`: the file name is the
+// vault's own id, which says nothing to a user, so the screens title it
+// "Rowel vault" and let the meta line do the distinguishing.
 const REMOTE: SetupDriveFile = {
-  name: 'vault.swsync',
+  id: 'drive-file-1',
+  name: '9f3c1a2b4d5e6f708192a3b4c5d6e7f8.rowel',
+  vaultId: '9f3c1a2b4d5e6f708192a3b4c5d6e7f8',
   size: 1_258_291,
   modifiedTime: '2024-01-01T00:00:00.000Z'
+}
+
+// A second install synced its own primary to the same account: another vault,
+// another id, and older — so the probe lists it after `REMOTE`.
+const OTHER: SetupDriveFile = {
+  id: 'drive-file-2',
+  name: '11223344556677889900112233445566.rowel',
+  vaultId: '11223344556677889900112233445566',
+  size: 64_512,
+  modifiedTime: '2023-06-02T00:00:00.000Z'
 }
 
 beforeEach(() => {
@@ -213,7 +228,7 @@ describe('choosing a master password', () => {
     await act(async () => check.resolve(scored(STRONG)))
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
 
-    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false })
+    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false, fileId: null })
   })
 
   // A chunk that will not load leaves nothing to wait for: say so, and take
@@ -241,7 +256,7 @@ describe('the backup step', () => {
 
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
 
-    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false })
+    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false, fileId: null })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
@@ -253,9 +268,9 @@ describe('the backup step', () => {
     expect(calls('setup_drive_connect')).toHaveLength(1)
     expect(screen.getByTestId('setup-drive-spinner')).toBeInTheDocument()
 
-    await act(async () => setupDriveProbed(null))
+    await act(async () => setupDriveProbed([]))
 
-    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false })
+    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false, fileId: null })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
@@ -291,7 +306,7 @@ describe('the backup step', () => {
     await userEvent.click(screen.getByTestId('go-back-button'))
 
     expect(calls('setup_drive_disconnect')).toHaveLength(1)
-    expect(useApp.getState().setupDrive).toEqual({ status: 'idle', file: null, error: null })
+    expect(useApp.getState().setupDrive).toEqual({ status: 'idle', files: [], selectedId: null, error: null })
     expect(screen.getByTestId('setup-password-input')).toBeInTheDocument()
   })
 
@@ -314,7 +329,7 @@ describe('a Drive that already holds data', () => {
   const reachConflict = async () => {
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
-    await act(async () => setupDriveProbed(REMOTE))
+    await act(async () => setupDriveProbed([REMOTE]))
   }
 
   it('stops to ask rather than writing over the existing pack', async () => {
@@ -322,7 +337,10 @@ describe('a Drive that already holds data', () => {
     await reachConflict()
 
     expect(await screen.findByText('This Drive already has Rowel data')).toBeInTheDocument()
-    expect(screen.getByTestId('setup-conflict-file')).toHaveTextContent('vault.swsync')
+    // The hex file name means nothing to a user; the card is titled for what it
+    // is, and the meta line is what tells two of them apart.
+    expect(screen.getByTestId('setup-conflict-file')).toHaveTextContent('Rowel vault')
+    expect(screen.getByTestId('setup-conflict-file')).not.toHaveTextContent(REMOTE.name)
     expect(calls('setup_create')).toHaveLength(0)
   })
 
@@ -332,8 +350,35 @@ describe('a Drive that already holds data', () => {
 
     await userEvent.click(await screen.findByTestId('setup-archive-button'))
 
-    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: true })
+    expect(calls('setup_create')).toContainEqual({
+      password: STRONG,
+      archiveRemote: true,
+      fileId: REMOTE.id
+    })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
+  })
+
+  // With two vaults up there, "start fresh, archive the old one" has to set
+  // aside the one the user was shown and then chose — not whichever the
+  // account happens to list first.
+  it('archives the vault the user picked, not the one listed first', async () => {
+    render(<Start />)
+    await choosePassword()
+    await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
+    await act(async () => setupDriveProbed([REMOTE, OTHER]))
+
+    // The picker lives on the restore screen, so the choice is made there and
+    // the conflict question follows it back.
+    await userEvent.click(await screen.findByTestId('setup-unlock-existing-button'))
+    await userEvent.click(await screen.findByTestId(`drive-vault-${OTHER.id}`))
+    await userEvent.click(screen.getByTestId('go-back-button'))
+    await userEvent.click(await screen.findByTestId('setup-archive-button'))
+
+    expect(calls('setup_create')).toContainEqual({
+      password: STRONG,
+      archiveRemote: true,
+      fileId: OTHER.id
+    })
   })
 
   it('hands over to the restore screen without asking Google again', async () => {
@@ -360,13 +405,42 @@ describe('restoring from Google Drive', () => {
     expect(calls('setup_drive_connect')).toHaveLength(1)
     expect(screen.getByTestId('drive-spinner')).toBeInTheDocument()
 
-    await act(async () => setupDriveProbed(REMOTE))
-    expect(screen.getByTestId('drive-found-file')).toHaveTextContent('vault.swsync')
+    await act(async () => setupDriveProbed([REMOTE]))
+    // One vault: the card, not a choice — and titled for what it is rather
+    // than by the opaque id its file is named after.
+    expect(screen.getByTestId('drive-found-file')).toHaveTextContent('Rowel vault')
+    expect(screen.queryByTestId(`drive-vault-${REMOTE.id}`)).not.toBeInTheDocument()
 
     await userEvent.type(screen.getByTestId('drive-password-input'), STRONG)
     await userEvent.click(screen.getByTestId('drive-unlock-button'))
 
-    expect(calls('setup_restore_from_drive')).toContainEqual({ password: STRONG })
+    expect(calls('setup_restore_from_drive')).toContainEqual({
+      password: STRONG,
+      fileId: REMOTE.id
+    })
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
+  })
+
+  // Two installs syncing their own primary to one account leave two packs in
+  // it. Restoring either is a choice only the user can make, so the screen
+  // lists both and unlocks the one they point at.
+  it('offers every vault in the account and restores the chosen one', async () => {
+    render(<Start />)
+    await openDrive()
+    await act(async () => setupDriveProbed([REMOTE, OTHER]))
+
+    expect(screen.queryByTestId('drive-found-file')).not.toBeInTheDocument()
+    expect(screen.getByTestId(`drive-vault-${REMOTE.id}`)).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId(`drive-vault-${OTHER.id}`)).toHaveAttribute('aria-checked', 'false')
+
+    await userEvent.click(screen.getByTestId(`drive-vault-${OTHER.id}`))
+    await userEvent.type(screen.getByTestId('drive-password-input'), STRONG)
+    await userEvent.click(screen.getByTestId('drive-unlock-button'))
+
+    expect(calls('setup_restore_from_drive')).toContainEqual({
+      password: STRONG,
+      fileId: OTHER.id
+    })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
@@ -377,7 +451,7 @@ describe('restoring from Google Drive', () => {
     mockCommandOnce('setup_restore_from_drive', () => new Promise(resolve => (finish = resolve)))
     render(<Start />)
     await openDrive()
-    await act(async () => setupDriveProbed(REMOTE))
+    await act(async () => setupDriveProbed([REMOTE]))
     expect(screen.getByTestId('drive-switch-account')).toBeInTheDocument()
 
     await userEvent.type(screen.getByTestId('drive-password-input'), STRONG)
@@ -396,7 +470,7 @@ describe('restoring from Google Drive', () => {
     )
     render(<Start />)
     await openDrive()
-    await act(async () => setupDriveProbed(REMOTE))
+    await act(async () => setupDriveProbed([REMOTE]))
 
     await userEvent.type(screen.getByTestId('drive-password-input'), 'wrong-password')
     await userEvent.click(screen.getByTestId('drive-unlock-button'))
@@ -408,7 +482,7 @@ describe('restoring from Google Drive', () => {
   it('sends a bare account back to the create flow, keeping the connection', async () => {
     render(<Start />)
     await openDrive()
-    await act(async () => setupDriveProbed(null))
+    await act(async () => setupDriveProbed([]))
 
     expect(screen.getByText('Nothing here yet')).toBeInTheDocument()
     await userEvent.click(screen.getByTestId('drive-start-fresh-button'))
@@ -418,19 +492,19 @@ describe('restoring from Google Drive', () => {
     await userEvent.type(screen.getByTestId('setup-confirm-password-input'), STRONG)
     await userEvent.click(screen.getByTestId('setup-continue-button'))
 
-    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false })
+    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false, fileId: null })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
   it('gives the pending tokens back when the user walks away', async () => {
     render(<Start />)
     await openDrive()
-    await act(async () => setupDriveProbed(REMOTE))
+    await act(async () => setupDriveProbed([REMOTE]))
 
     await userEvent.click(screen.getByTestId('go-back-button'))
 
     expect(calls('setup_drive_disconnect')).toHaveLength(1)
-    expect(useApp.getState().setupDrive).toEqual({ status: 'idle', file: null, error: null })
+    expect(useApp.getState().setupDrive).toEqual({ status: 'idle', files: [], selectedId: null, error: null })
     expect(screen.getByTestId('start-setup-button')).toBeInTheDocument()
   })
 
@@ -439,7 +513,7 @@ describe('restoring from Google Drive', () => {
   it('forgets the account when the user switches to a backup file', async () => {
     render(<Start />)
     await openDrive()
-    await act(async () => setupDriveProbed(REMOTE))
+    await act(async () => setupDriveProbed([REMOTE]))
 
     await userEvent.click(screen.getByTestId('drive-use-file'))
 
@@ -455,7 +529,7 @@ describe('restoring from Google Drive', () => {
     )
     render(<Start />)
     await openDrive()
-    await act(async () => setupDriveProbed(REMOTE))
+    await act(async () => setupDriveProbed([REMOTE]))
 
     await userEvent.type(screen.getByTestId('drive-password-input'), STRONG)
     await userEvent.click(screen.getByTestId('drive-unlock-button'))

@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, AtomicU64};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 
@@ -132,7 +132,11 @@ pub struct AppState {
     // A sync run is in flight. Held outside `session` on purpose: the run takes
     // and releases the session lock repeatedly (never across a network call),
     // so the "one at a time" guard cannot live behind that same lock.
-    pub syncing: AtomicBool,
+    //
+    // Behind an `Arc` so the claim on it can be a guard the run *owns* for its
+    // whole length (`commands::sync::RunClaim`), rather than a flag raised here
+    // and lowered by hand on the thread that happens to end the run.
+    pub syncing: Arc<AtomicBool>,
     /// Which Drive connection is current, and the guard on the token file.
     ///
     /// A token refresh reads the file, awaits a network round trip, and writes
@@ -190,7 +194,7 @@ impl Default for AppState {
             session: Mutex::default(),
             active_workspace: Mutex::new(crate::workspace::PRIMARY_ID.to_string()),
             workspace_lock: Mutex::default(),
-            syncing: AtomicBool::default(),
+            syncing: Arc::default(),
             sync_generation: Mutex::default(),
             sync_run: Mutex::default(),
             pending_drive: Mutex::default(),

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Button from '@/components/elements/Button'
 import { META_TYPE } from '@/components/elements/tokens'
-import { useApp } from '@/store'
+import { selectedDriveFile, useApp } from '@/store'
 import StepHeader from '../shared/StepHeader'
 import FoundFileCard from '../shared/FoundFileCard'
 import { COLUMN, ACTIONS, FOOTNOTE } from '../shared/layout'
@@ -23,7 +23,10 @@ interface Props {
 export default function Conflict({ onUnlockExisting, onArchive }: Props) {
   const { t } = useTranslation()
   const dates = useDates()
-  const file = useApp(state => state.setupDrive.file)
+  // The vault this question is about: the one the flow has selected, which on
+  // the ordinary single-vault account is simply the only one. Archiving takes
+  // the same file, so what is described and what is set aside cannot differ.
+  const file = useApp(selectedDriveFile)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -53,7 +56,7 @@ export default function Conflict({ onUnlockExisting, onArchive }: Props) {
           <FoundFileCard
             where="drive"
             testid="setup-conflict-file"
-            name={file.name}
+            name={t('Rowel vault')}
             meta={describeDriveFile(file, dates)}
             encrypted
           />
