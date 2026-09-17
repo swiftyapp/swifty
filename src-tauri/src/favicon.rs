@@ -43,7 +43,14 @@ const SAFE_TYPES: [&str; 6] = [
 // both ways. Touches no vault state, but the caller gates it on an unlocked
 // session all the same (`commands::tools::fetch_favicon`): the hosts come out
 // of the vault, and a locked app has no business making requests about them.
-pub async fn fetch(app: &AppHandle, host: &str) -> Result<Option<String>> {
+// `allowed` is that gate, asked again before every request this makes — a
+// lookup is several round trips, and a lock that lands in the middle of one
+// ends it there rather than after the icon has been fetched.
+pub async fn fetch(
+    app: &AppHandle,
+    host: &str,
+    allowed: impl Fn() -> bool,
+) -> Result<Option<String>> {
     let Some(host) = safe_host(host) else {
         return Ok(None);
     };
@@ -59,7 +66,7 @@ pub async fn fetch(app: &AppHandle, host: &str) -> Result<Option<String>> {
         return Ok(None);
     }
 
-    match lookup(&host).await {
+    match lookup(&host, &allowed).await {
         Some(uri) => {
             let _ = fs::write(&hit, &uri);
             let _ = fs::remove_file(&miss);
@@ -112,15 +119,21 @@ fn fresh_miss(path: &Path) -> bool {
 
 // Declared icons from the homepage <head> first (usually crisp PNGs), then
 // the conventional /favicon.ico as the fallback.
-async fn lookup(host: &str) -> Option<String> {
+async fn lookup(host: &str, allowed: &impl Fn() -> bool) -> Option<String> {
     let client = client()?;
     let root = Url::parse(&format!("https://{host}/")).ok()?;
 
+    if !allowed() {
+        return None;
+    }
     if let Some(html) = fetch_html(&client, root.clone()).await {
         for href in icon_hrefs(&html) {
             let Ok(url) = root.join(&href) else { continue };
             if !is_public_https(&url) {
                 continue;
+            }
+            if !allowed() {
+                return None;
             }
             if let Some(uri) = fetch_icon(&client, url).await {
                 return Some(uri);
@@ -128,6 +141,9 @@ async fn lookup(host: &str) -> Option<String> {
         }
     }
 
+    if !allowed() {
+        return None;
+    }
     fetch_icon(&client, root.join("favicon.ico").ok()?).await
 }
 

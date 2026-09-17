@@ -28,7 +28,25 @@ pub struct ClipboardClear {
     /// What this app last put on the clipboard, until it is cleared or the
     /// user copies something else over it. Zeroized on drop like every other
     /// copy of a secret this process holds.
-    last: std::sync::Mutex<Option<zeroize::Zeroizing<String>>>,
+    last: std::sync::Mutex<Option<Remembered>>,
+    /// Counts copies. Each remembered value carries the generation it was
+    /// written under, and a timer callback acts only while its own generation
+    /// is still the current one — see [`Remembered`].
+    generation: std::sync::atomic::AtomicU64,
+}
+
+/// One copy: the value, and which copy it was.
+///
+/// The generation is what keeps an *earlier* copy's deadline from acting on a
+/// *later* copy. The timer takes a callback out of its slot before running it,
+/// so re-arming cannot cancel one already on its way: a copy that lands while
+/// the previous deadline is firing would otherwise have its value forgotten by
+/// that callback — and then left on the clipboard by the lock that came to
+/// clear it, since nothing remembered it any more.
+#[cfg(not(target_os = "ios"))]
+struct Remembered {
+    generation: u64,
+    value: zeroize::Zeroizing<String>,
 }
 
 #[cfg(not(target_os = "ios"))]
@@ -37,6 +55,7 @@ impl Default for ClipboardClear {
         Self {
             timer: crate::timer::Timer::spawn(),
             last: std::sync::Mutex::new(None),
+            generation: std::sync::atomic::AtomicU64::new(0),
         }
     }
 }
@@ -47,12 +66,41 @@ impl ClipboardClear {
         self.timer.arm(after, fire);
     }
 
-    fn remember(&self, value: &str) {
-        *self.last.lock().unwrap() = Some(zeroize::Zeroizing::new(value.to_string()));
+    /// Record `value` as the latest copy, returning its generation.
+    fn remember(&self, value: &str) -> u64 {
+        let generation = self
+            .generation
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+            + 1;
+        *self.last.lock().unwrap() = Some(Remembered {
+            generation,
+            value: zeroize::Zeroizing::new(value.to_string()),
+        });
+        generation
     }
 
+    /// Whether the copy made under `generation` is still the latest.
+    fn is_current(&self, generation: u64) -> bool {
+        self.last
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|r| r.generation == generation)
+    }
+
+    /// Forget the latest copy, but only if it is the one made under
+    /// `generation`: a later copy is someone else's to forget.
+    fn forget_if(&self, generation: u64) {
+        let mut last = self.last.lock().unwrap();
+        if last.as_ref().is_some_and(|r| r.generation == generation) {
+            *last = None;
+        }
+    }
+
+    /// Forget whatever is remembered, handing it back. For the lock, which
+    /// ends every copy regardless of which one it was.
     fn forget(&self) -> Option<zeroize::Zeroizing<String>> {
-        self.last.lock().unwrap().take()
+        self.last.lock().unwrap().take().map(|r| r.value)
     }
 }
 
@@ -100,17 +148,24 @@ pub fn copy_to_clipboard(app: AppHandle, value: String, clear_after_ms: Option<u
         let state = app.state::<ClipboardClear>();
         // Remembered whether or not a deadline follows: with the timeout set to
         // "Never", the lock is the only clear this value will ever get.
-        state.remember(&value);
+        let generation = state.remember(&value);
         if let Some(delay) = clear_after {
             let handle = app.clone();
             state.arm(delay, move || {
+                let state = handle.state::<ClipboardClear>();
+                // A later copy owns the clipboard now, and its own deadline —
+                // or the lock — will see to it. This one is done.
+                if !state.is_current(generation) {
+                    return;
+                }
                 let current = handle.clipboard().read_text().ok();
                 if should_clear(&value, current.as_deref()) {
                     let _ = handle.clipboard().clear();
                 }
                 // Cleared, or overwritten by the user: either way there is
-                // nothing of ours left for a lock to find.
-                handle.state::<ClipboardClear>().forget();
+                // nothing of ours left for a lock to find — unless another
+                // copy landed in the meantime, which stays remembered.
+                state.forget_if(generation);
             });
         } else {
             // A copy with no deadline replaces whatever an earlier one armed;
@@ -278,5 +333,35 @@ mod tests {
     fn keeps_an_empty_or_unreadable_clipboard() {
         assert!(!should_clear("secret", None));
         assert!(!should_clear("secret", Some("")));
+    }
+
+    // The race the generation exists for: a copy's deadline fires while a
+    // newer copy has already been remembered. The stale callback must leave
+    // the newer value in place for its own deadline, or the lock, to clear.
+    #[cfg(not(target_os = "ios"))]
+    #[test]
+    fn a_stale_deadline_does_not_forget_a_newer_copy() {
+        let state = super::ClipboardClear::default();
+        let first = state.remember("first");
+        let second = state.remember("second");
+
+        assert!(!state.is_current(first));
+        assert!(state.is_current(second));
+
+        state.forget_if(first);
+        assert_eq!(
+            state.forget().as_deref().map(String::as_str),
+            Some("second")
+        );
+    }
+
+    #[cfg(not(target_os = "ios"))]
+    #[test]
+    fn a_current_deadline_forgets_its_own_copy() {
+        let state = super::ClipboardClear::default();
+        let generation = state.remember("secret");
+
+        state.forget_if(generation);
+        assert!(state.forget().is_none());
     }
 }
