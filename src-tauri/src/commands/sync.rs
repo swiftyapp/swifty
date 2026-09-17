@@ -56,11 +56,23 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     start_consent(&app, &state, AuthPurpose::Connect).inspect_err(|e| failed(&app, e.to_string()))
 }
 
-// Disconnect the sync provider (keeps the refresh token, per legacy).
+/// Disconnect the sync provider: the token file is deleted and the grant is
+/// retired at Google.
+///
+/// The local half runs first and synchronously, and the revocation goes to a
+/// detached task afterwards — a user who disconnects on a plane is still
+/// disconnected, and nothing on this device can reconnect without fresh consent
+/// whether or not Google ever hears about it.
 #[tauri::command]
 pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     let cryptor = state.session.lock().unwrap().cryptor()?;
-    sync::disconnect(&app, &cryptor)?;
+    // `?`, and before anything below it: if the delete failed the token file —
+    // and the usable refresh token in it — is still on disk, so the vault is
+    // still connected. Flipping the session flag or clearing the run state here
+    // would show the user a disconnected account over a live credential. A
+    // token refresh awaiting Google meanwhile finds the connection generation
+    // changed and skips its write-back (see `AppState::sync_generation`).
+    let tokens = sync::disconnect(&app, &cryptor)?;
     state.session.lock().unwrap().sync_configured = false;
     // The timestamp goes with the connection: the next one is a new pairing,
     // and "synced 3m ago" from a previous one would be a lie about it.
@@ -69,6 +81,9 @@ pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()>
         run.error = None;
         run.last_synced_at = None;
     });
+    if let Some(tokens) = tokens {
+        tauri::async_runtime::spawn(async move { sync::revoke(&tokens).await });
+    }
     Ok(())
 }
 
@@ -145,14 +160,18 @@ fn spawn_consent(app: &AppHandle, state: &State<'_, AppState>, follow: Follow) -
     // Key and flag under the workspace lock, as one step: a switch cannot land
     // between taking this workspace's key and announcing the flow that will
     // write with it (see `commands::workspace::guard_sync_idle`).
-    let cryptor = {
+    // The connection generation is read here too, synchronously, and carried
+    // to the worker: read on the worker instead, a disconnect landing before
+    // the worker starts would go unnoticed and the consent it was meant to
+    // cancel would be accepted (see `AppState::sync_generation`).
+    let (cryptor, generation) = {
         let _paths = state.workspace_lock.lock().unwrap();
         let cryptor = cryptor_or_report(app, state)?;
         pending(app);
-        cryptor
+        (cryptor, sync::connection_generation(app))
     };
     let app = app.clone();
-    super::detached(move || match sync::setup(&app, &cryptor) {
+    super::detached(move || match sync::setup(&app, &cryptor, generation) {
         // Either way the run is claimed before the consent is marked over, so
         // the flags overlap rather than leave a gap a workspace switch could
         // use — and the first upload cannot be skipped by one landing there.
@@ -240,6 +259,7 @@ pub(crate) fn start_consent(app: &AppHandle, state: &AppState, purpose: AuthPurp
         cryptor,
         purpose,
         started: std::time::Instant::now(),
+        generation: sync::connection_generation(app),
     });
     // Onboarding announces itself on its own `setup:drive:*` family, because it
     // runs on a screen that knows nothing about sync settings.
@@ -306,7 +326,7 @@ pub fn on_redirect(app: &AppHandle, url: &url::Url) {
             fail(&app, purpose, "the vault was locked during sign-in".into());
             return;
         };
-        match sync::complete(&app, &cryptor, &code, &pending.verifier).await {
+        match sync::complete(&app, &cryptor, &code, &pending.verifier, pending.generation).await {
             Ok(()) => {
                 // The run is claimed before the consent is marked over, as in
                 // `spawn_consent`; the pull goes to the blocking pool for the

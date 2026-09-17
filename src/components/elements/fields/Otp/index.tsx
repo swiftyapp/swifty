@@ -7,7 +7,7 @@ import { verbatimInput } from '../../inputProps'
 import { LABEL } from '../../tokens'
 import { useField } from '../context'
 import Dial from './Dial'
-import { otpSecret } from './secret'
+import { otpSecret, otpStored } from './secret'
 
 // The one field that is a panel rather than a row: a code with a lifetime needs
 // the dial, and the dial is the same size in both modes. Reading, it offers the
@@ -26,7 +26,11 @@ export default function OtpField({
   const { t } = useTranslation()
   const { value, set, editing } = useField(name)
   const parsed = otpSecret(value)
-  const { code, time } = useOtp(parsed)
+  // `parsed` answers "is this a secret at all"; `stored` is the thing worth
+  // keeping — the same seed, plus the parameters when the link carries any the
+  // generator would otherwise have to guess at. The backend reads both forms.
+  const stored = otpStored(value)
+  const { code, time, period } = useOtp(stored)
 
   // Reading, the panel is worth its column only once a code has arrived.
   // Passing the raw value through when it failed to parse bought nothing but a
@@ -50,16 +54,17 @@ export default function OtpField({
           autoFocus={autoFocus}
           {...verbatimInput}
           onChange={event => set(event.target.value)}
-          // A pasted otpauth:// link collapses to the secret it carries, so the
-          // vault only ever stores the thing the generator needs.
-          onBlur={() => set(parsed || value.trim())}
+          // A pasted otpauth:// link collapses to the secret it carries —
+          // unless it also carries a digit count, period or algorithm of its
+          // own, which the link is the only place to keep.
+          onBlur={() => set(stored || value.trim())}
           className={`mt-2.5 h-6 w-full self-stretch truncate border-b bg-transparent text-center text-base text-text outline-none transition-colors placeholder:text-text3 ${
             value && !parsed ? 'border-bad' : 'border-line2 focus:border-accent-line'
           }`}
         />
       )}
 
-      {parsed && <Dial code={code} time={time} />}
+      {parsed && <Dial code={code} time={time} period={period} />}
 
       {editing && value !== '' && !parsed && (
         <div className="mt-3 text-base text-bad">{t('Not a one-time-password secret')}</div>

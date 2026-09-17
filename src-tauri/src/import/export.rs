@@ -12,6 +12,7 @@ use serde_json::{json, Value};
 use super::bitwarden::{FIELD_HIDDEN, FIELD_TEXT, KEY_ALGORITHM, KEY_CURVE, KEY_TYPE};
 use super::{EntryKind, ImportedEntry, ImportedPasskey};
 use crate::app::APP_NAME;
+use crate::otp::{self, OtpParams};
 
 /// The exporter's relying-party id in a CXF document: the project's domain.
 pub const EXPORTER_RP_ID: &str = "rowel.app";
@@ -274,14 +275,20 @@ fn cxf_item(e: &ImportedEntry) -> Value {
             credentials.push(basic);
             credentials.extend(e.passkeys.iter().map(cxf_passkey));
             if let Some(secret) = &e.otp {
-                // The app stores a bare base32 seed and generates with the
-                // WebAuthn/TOTP defaults, which are what these three are.
+                // CXF spells the parameters out beside the seed, so the stored
+                // value is taken apart here. Something we cannot read goes out
+                // verbatim with the defaults — the same guess as before, and a
+                // reader that understands it has lost nothing.
+                let p = otp::parse(secret).unwrap_or_else(|_| OtpParams {
+                    secret: secret.clone(),
+                    ..Default::default()
+                });
                 credentials.push(json!({
                     "type": "totp",
-                    "secret": secret,
-                    "period": 30,
-                    "digits": 6,
-                    "algorithm": "sha1",
+                    "secret": p.secret,
+                    "period": p.period,
+                    "digits": p.digits,
+                    "algorithm": p.algorithm.as_str(),
                 }));
             }
         }

@@ -27,8 +27,9 @@
 use std::io::{BufRead, BufReader, Write};
 #[cfg(desktop)]
 use std::net::TcpListener;
+use std::time::Duration;
 #[cfg(desktop)]
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -63,6 +64,7 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const SCOPE: &str = "https://www.googleapis.com/auth/drive.file";
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
+const REVOKE_URL: &str = "https://oauth2.googleapis.com/revoke";
 
 // Supply your own Google OAuth client at build or run time.
 const CLIENT_ID_PLACEHOLDER: &str = "YOUR_GOOGLE_OAUTH_CLIENT_ID";
@@ -260,17 +262,69 @@ pub fn is_configured(app: &AppHandle, cryptor: &Cryptor) -> bool {
     read_tokens(app, cryptor).is_some_and(|t| t.access_token.is_some() || t.refresh_token.is_some())
 }
 
-// Keep only the refresh token (parity with legacy disconnect).
-pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
-    let refresh_token = read_tokens(app, cryptor).and_then(|t| t.refresh_token);
-    write_tokens(
-        app,
-        cryptor,
-        &Tokens {
-            refresh_token,
-            ..Default::default()
-        },
-    )
+/// Forget the account: the token file goes, so nothing survives to mint a new
+/// access token with. Keeping the refresh token here (as the legacy client did)
+/// meant the next unlock read the file back as "configured" and auto-sync
+/// uploaded to an account the user had just disconnected.
+///
+/// Hands back whatever was stored so the caller can revoke it upstream — the
+/// file is gone by then, and this is the last chance to see it.
+///
+/// A failed delete is an error, not a shrug: the refresh token is still on disk
+/// and still usable, so the only honest answer is that the account is *not*
+/// disconnected. `Ok(None)` means there was nothing stored to revoke.
+///
+/// The connection generation is bumped and the file deleted under one hold of
+/// the token-file guard, so a refresh's write-back and a password change's
+/// re-seal (both of which take the same guard) either see the old generation
+/// and finish before this runs, or see the new one and leave the file gone.
+pub fn disconnect(app: &AppHandle, cryptor: &Cryptor) -> Result<Option<Tokens>> {
+    let state = app_state(app);
+    let mut generation = state.sync_generation.lock().unwrap();
+    *generation += 1;
+    let tokens = read_tokens(app, cryptor);
+    storage::remove_gdrive(app)?;
+    Ok(tokens)
+}
+
+/// Re-seal the token file under `new` — a password change moved the vault key
+/// it was sealed with. Read and write under the token-file guard, so a
+/// disconnect cannot land between them and have its delete undone by the write.
+pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()> {
+    let state = app_state(app);
+    let _generation = state.sync_generation.lock().unwrap();
+    let Some(tokens) = read_tokens(app, old) else {
+        return Ok(());
+    };
+    write_tokens(app, new, &tokens)
+}
+
+/// The token to revoke. Google kills the whole grant from either half of the
+/// pair, so this prefers the one that outlives the session.
+pub fn revocable(tokens: &Tokens) -> Option<&str> {
+    tokens
+        .refresh_token
+        .as_deref()
+        .or(tokens.access_token.as_deref())
+}
+
+/// Ask Google to invalidate the grant. Best effort, and deliberately bounded:
+/// the local disconnect has already happened and must not be held up by a
+/// network that never answers.
+pub async fn revoke(client: &Client, token: &str) {
+    let sent = client
+        .post(REVOKE_URL)
+        .timeout(Duration::from_secs(10))
+        .form(&[("token", token)])
+        .send()
+        .await;
+    match sent {
+        Ok(resp) if !resp.status().is_success() => {
+            log::warn!("Drive token revocation refused: {}", resp.status())
+        }
+        Err(e) => log::warn!("Drive token revocation failed: {e}"),
+        _ => {}
+    }
 }
 
 // --- OAuth flow ---
@@ -296,9 +350,22 @@ fn open_consent(app: &AppHandle, credentials: &Credentials) -> Result<Started> {
 
 /// Desktop: open the browser and block on the loopback listener until Google
 /// redirects to it, then exchange the code.
+///
+/// The tokens land only if no disconnect ran since `generation` was read —
+/// which the caller does when the flow is *started*, not here on the worker,
+/// so a disconnect in the gap before the worker runs counts too (see
+/// [`persisted_if_current`]). A grant that arrives after one is revoked and
+/// reported instead of recreating the credential the disconnect removed.
 #[cfg(desktop)]
-pub fn authenticate(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
-    write_tokens(app, cryptor, &obtain_tokens(app)?)
+pub fn authenticate(app: &AppHandle, cryptor: &Cryptor, generation: u64) -> Result<()> {
+    let tokens = obtain_tokens(app)?;
+    if persisted_if_current(app, cryptor, &tokens, generation)? {
+        return Ok(());
+    }
+    if let Some(token) = revocable(&tokens) {
+        tauri::async_runtime::block_on(revoke(&super::http_client(), token));
+    }
+    Err(disconnected_mid_consent())
 }
 
 /// The consent round trip on its own, handing the tokens back rather than
@@ -335,18 +402,29 @@ pub fn begin(app: &AppHandle) -> Result<Started> {
 
 /// Mobile, second half: exchange a code [`parse_redirect`] accepted and store
 /// the tokens. Async — this runs off the URL-open callback, not on it.
+///
+/// `generation` is the connection generation read when the flow began; as on
+/// desktop, tokens that arrive after a disconnect are revoked, not stored.
 #[cfg(mobile)]
 pub async fn complete(
     app: &AppHandle,
     cryptor: &Cryptor,
     code: &str,
     verifier: &str,
+    generation: u64,
 ) -> Result<()> {
-    write_tokens(
-        app,
-        cryptor,
-        &exchange_for_tokens(app, code, verifier).await?,
-    )
+    let tokens = exchange_for_tokens(app, code, verifier).await?;
+    if persisted_if_current(app, cryptor, &tokens, generation)? {
+        return Ok(());
+    }
+    if let Some(token) = revocable(&tokens) {
+        revoke(&super::http_client(), token).await;
+    }
+    Err(disconnected_mid_consent())
+}
+
+fn disconnected_mid_consent() -> Error {
+    Error::Other("Google Drive was disconnected while signing in; connect again".into())
 }
 
 /// [`complete`] without the writing — the mobile twin of [`obtain_tokens`], for
@@ -387,15 +465,63 @@ pub fn parse_redirect(url: &Url, state: &str) -> Redirect {
 
 // Return a valid access token, refreshing it if expired.
 pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -> Result<String> {
-    let mut tokens = read_tokens(app, cryptor).ok_or(Error::SyncNotConfigured)?;
+    // Which connection these tokens belong to, read before they are. A refresh
+    // awaits a network round trip between the read and the write-back, and no
+    // lock is held across it (this codebase never holds one across a network
+    // call — see `AppState::workspace_lock`), so a disconnect can delete the
+    // token file in that window; the generation is what lets the write-back
+    // notice.
+    let state = app_state(app);
+    let (generation, mut tokens) = {
+        let generation = state.sync_generation.lock().unwrap();
+        let tokens = read_tokens(app, cryptor).ok_or(Error::SyncNotConfigured)?;
+        (*generation, tokens)
+    };
     // Asked before the call, because that is what says whether the file on
     // disk is now out of date — afterwards the tokens look fresh either way.
     let refreshing = needs_refresh(&tokens);
     let token = fresh_access_token(client, app, &mut tokens).await?;
-    if refreshing {
-        write_tokens(app, cryptor, &tokens)?;
+    // Skipping the write is the whole point: re-creating the file would undo
+    // the disconnect. The caller still gets this token for the request it is
+    // in the middle of, which is harmless — the file is gone, so nothing after
+    // this can refresh again.
+    if refreshing && !persisted_if_current(app, cryptor, &tokens, generation)? {
+        log::info!("Drive disconnected mid-refresh; not writing the refreshed tokens back");
     }
     Ok(token)
+}
+
+/// Which Drive connection is current — see `AppState::sync_generation`. Read
+/// before any round trip whose result would be written to the token file, so
+/// the write can tell whether a disconnect landed in between.
+pub fn connection_generation(app: &AppHandle) -> u64 {
+    *app_state(app).sync_generation.lock().unwrap()
+}
+
+/// Write the tokens if the connection they belong to is still `generation`,
+/// and say whether they were. Compared and written under the guard a disconnect
+/// bumps and deletes under: a bare compare would leave a gap for the disconnect
+/// to land in and have its delete undone by the write. `false` means the
+/// account was disconnected since `generation` was read, and nothing was
+/// written; whatever the tokens were for is the caller's to wind down.
+fn persisted_if_current(
+    app: &AppHandle,
+    cryptor: &Cryptor,
+    tokens: &Tokens,
+    generation: u64,
+) -> Result<bool> {
+    let state = app_state(app);
+    let current = state.sync_generation.lock().unwrap();
+    if *current != generation {
+        return Ok(false);
+    }
+    write_tokens(app, cryptor, tokens)?;
+    Ok(true)
+}
+
+fn app_state(app: &AppHandle) -> tauri::State<'_, crate::state::AppState> {
+    use tauri::Manager;
+    app.state::<crate::state::AppState>()
 }
 
 /// A valid access token for `tokens`, refreshing them *in place* if the one
@@ -627,6 +753,22 @@ mod tests {
             challenge(verifier),
             "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
         );
+    }
+
+    #[test]
+    fn revocation_prefers_the_refresh_token() {
+        let both = Tokens {
+            access_token: Some("at".into()),
+            refresh_token: Some("rt".into()),
+            expires_at: None,
+        };
+        assert_eq!(revocable(&both), Some("rt"));
+        let access_only = Tokens {
+            access_token: Some("at".into()),
+            ..Default::default()
+        };
+        assert_eq!(revocable(&access_only), Some("at"));
+        assert_eq!(revocable(&Tokens::default()), None);
     }
 
     #[test]

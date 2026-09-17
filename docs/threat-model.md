@@ -69,8 +69,13 @@ Writes are **per-row and atomic** (WAL mode), not a whole-file rewrite: saving o
 edited entry re-seals only that row's payload. Deletes are **tombstones**
 (`deleted_at` is stamped and the row is retained so a later sync can propagate the
 deletion), not hard deletes. On-disk file and directory modes are tightened on
-Unix (`0600` file / `0700` dir); the Windows ACL equivalent is still a TODO
-(`set_mode` no-ops off Unix in `sqlite.rs`).
+Unix (`0600` file / `0700` dir); the Windows ACL equivalent for the database is
+still a TODO (`set_mode` no-ops off Unix in `sqlite.rs`). Plaintext exports and
+saved `.env` files, written through `storage::atomic_write_private`, are
+owner-only on both: `0600` on Unix, and on Windows a protected DACL granting the
+current user and SYSTEM alone (`owner_only.rs`), supplied when the temp file is
+created so it never exists, even briefly, under the folder's inherited
+permissions.
 
 ### Key derivation (KDF)
 
@@ -181,8 +186,10 @@ carries them as part of the opaque payload and never sees them.
    - **macOS:** a data-protection Keychain item with a `SecAccessControl` of
      `kSecAccessControlBiometryCurrentSet`. Touch ID is enforced by the OS on
      *read*, and the item auto-invalidates if the enrolled fingerprints change.
-   - **Windows:** Credential Manager, with a Windows Hello prompt required before
-     the read (verify-then-read).
+   - **Windows:** only an AES-256-GCM blob goes into Credential Manager, sealed
+     under a key derived from a Windows Hello key-credential signature, so
+     opening it requires passing the Hello prompt rather than merely being the
+     logged-in user.
    - **Linux and others:** unsupported; the app reports biometrics unavailable
      rather than store an ungated key.
 

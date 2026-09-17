@@ -30,9 +30,12 @@ export const generateSshKey = (comment?: string): Promise<SshKeyPair> =>
 
 export interface OtpResult {
   code: string
-  time: number // seconds left in the current 30s window
+  time: number // seconds left in the current window
+  period: number // how long that window is — 30s unless the seed said otherwise
 }
 
+// `secret` is a bare base32 seed or a whole otpauth:// URI; the backend reads
+// the digits, period and algorithm off the latter.
 export const generateOtp = (secret: string): Promise<OtpResult> =>
   call('generate_otp', { secret })
 

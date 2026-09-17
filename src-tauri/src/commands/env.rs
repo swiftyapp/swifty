@@ -7,8 +7,10 @@ use std::fs;
 use std::path::Path;
 
 use serde::Serialize;
+use tauri::State;
 
 use crate::error::{Error, Result};
+use crate::state::AppState;
 
 // A real .env is a few kilobytes. Anything past this is not one, and reading
 // it whole into the webview would only ever be a mistake.
@@ -40,7 +42,12 @@ pub fn read_env_text(path: &Path) -> Result<EnvFile> {
 // user just pointed at — which may be a network mount. Off the IPC thread with
 // everything else that touches the disk.
 #[tauri::command]
-pub async fn read_env_file(path: String) -> Result<EnvFile> {
+pub async fn read_env_file(path: String, state: State<'_, AppState>) -> Result<EnvFile> {
+    // Whatever path comes in is read whole and handed to the webview, so this is
+    // a read of the user's disk on the webview's say-so. Only an open vault may
+    // ask for one — the drop target that calls this lives in the unlocked shell,
+    // and a locked app has no business reading files for anybody.
+    state.session.lock().unwrap().key()?;
     super::blocking(move || read_env_text(Path::new(&path))).await
 }
 
