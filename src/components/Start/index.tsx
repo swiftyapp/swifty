@@ -143,22 +143,11 @@ export function Start() {
   }, [])
 
   const create = useCallback(
-    (value: string, archiveRemote: boolean, fileId: string | null = null) =>
-      setupCreate(value, archiveRemote, fileId).then(finish),
+    (value: string) => setupCreate(value).then(finish),
     [finish]
   )
 
-  const createWithPassword = useCallback(
-    () => create(password, false),
-    [create, password]
-  )
-
-  // The pack the conflict screen just described, by id: an account can hold
-  // more than one, and "archive the old one" has to set aside that one.
-  const archiveAndCreate = useCallback(
-    () => create(password, true, useApp.getState().setupDrive.selectedId),
-    [create, password]
-  )
+  const createWithPassword = useCallback(() => create(password), [create, password])
 
   const openDrive = () => {
     connectDrive()
@@ -169,7 +158,7 @@ export function Start() {
     setPassword(value)
     // Coming back through the restore screen, Drive is already agreed: there is
     // no second step left to ask about.
-    if (driveLinked) return create(value, false)
+    if (driveLinked) return create(value)
     go('sync')
     return Promise.resolve()
   }
@@ -190,7 +179,7 @@ export function Start() {
         return <Sync onCreate={createWithPassword} onConflict={() => go('conflict')} />
       case 'conflict':
         return (
-          <Conflict onUnlockExisting={() => go('drive')} onArchive={archiveAndCreate} />
+          <Conflict onUnlockExisting={() => go('drive')} onStartFresh={createWithPassword} />
         )
       case 'drive':
         return (

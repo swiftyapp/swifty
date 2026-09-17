@@ -510,28 +510,6 @@ pub(crate) async fn read_capped(resp: &mut reqwest::Response, max_bytes: usize) 
     Ok(body)
 }
 
-/// Rename a file, leaving its id, content and parents alone.
-///
-/// A rename rather than a copy-and-delete: onboarding uses this to move a
-/// pre-existing remote vault aside, and the user's own Drive should keep the
-/// same object (revision history included) under its new name.
-pub async fn rename_file(client: &Client, token: &str, id: &str, name: &str) -> Result<()> {
-    let resp = client
-        .patch(format!("{FILES}/{id}"))
-        .bearer_auth(token)
-        .query(&[("fields", FILE_FIELDS)])
-        .json(&rename_body(name))
-        .send()
-        .await
-        .map_err(other)?;
-    check(resp).await.map(|_| ())
-}
-
-// `files.patch` merges: naming only `name` leaves every other field as it was.
-fn rename_body(name: &str) -> Value {
-    json!({ "name": name })
-}
-
 /// Overwrite a vault pack's content, returning its new head revision.
 pub async fn update_file(
     client: &Client,
@@ -559,7 +537,7 @@ pub async fn update_file(
 mod tests {
     use super::{
         collect_pages, escape, layout, list_query, multipart_body, oldest, parse_file,
-        parse_listing, parse_properties, parse_size, rename_body, DriveFile, FILE_FIELDS,
+        parse_listing, parse_properties, parse_size, DriveFile, FILE_FIELDS,
         LIST_FIELDS,
     };
     use serde_json::json;
@@ -742,15 +720,6 @@ mod tests {
             assert!(mask.contains("size"), "{mask}");
             assert!(mask.contains("modifiedTime"), "{mask}");
         }
-    }
-
-    // A rename must not disturb anything else about the file — `files.patch`
-    // merges, so the body naming only `name` is what keeps parents and content
-    // where they are.
-    #[test]
-    fn a_rename_patches_only_the_name() {
-        let body = rename_body("vault-archived-2024-05-04.rowel");
-        assert_eq!(body, json!({ "name": "vault-archived-2024-05-04.rowel" }));
     }
 
     // Binary content must survive the envelope byte for byte — the share is

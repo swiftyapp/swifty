@@ -237,14 +237,12 @@ async fn restore_off_thread(
 /// marked connected — the frontend's `enterMain` runs the first sync, which is
 /// what creates the folder and the pack on Drive.
 ///
-/// `file_id` names the pack "start fresh, archive the old one" is about: the
-/// one the user was shown, not whichever the account happens to list first. It
-/// is `None` whenever nothing is being archived.
+/// Whatever the account already holds is left exactly as it is: the new vault
+/// mints its own id and so syncs to a pack of its own, alongside the old one
+/// rather than over it.
 #[tauri::command]
 pub async fn setup_create(
     password: Zeroizing<String>,
-    archive_remote: bool,
-    file_id: Option<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
@@ -252,30 +250,10 @@ pub async fn setup_create(
     // so running it over an existing vault would leave that vault unopenable.
     guard_no_vault(&app)?;
     let _step = begin_step(&state)?;
-    let mut tokens = state.pending_drive.lock().unwrap().clone();
-
-    // Before the vault is created, not after: if Drive refuses, the user is
-    // left on a still-fresh install to try again, rather than holding a new
-    // vault whose first sync is about to overwrite the pack they asked to keep.
-    if archive_remote {
-        if let (Some(tokens), Some(file_id)) = (tokens.as_mut(), file_id.as_deref()) {
-            archive(&app, tokens, file_id).await?;
-        }
-    }
+    let tokens = state.pending_drive.lock().unwrap().clone();
 
     let (key, store) = create_off_thread(&app, password).await?;
     adopt(&app, &state, key, store, tokens.as_ref(), None)
-}
-
-/// Move the chosen pack aside so the vault about to be created can take its
-/// place. A pack that is no longer there fails as [`Error::NoRemoteVault`],
-/// the same way a restore of it would: the user is being asked about a vault
-/// the account does not hold, so the question has to be put again.
-async fn archive(app: &AppHandle, tokens: &mut sync::Tokens, file_id: &str) -> Result<()> {
-    let client = sync::http_client();
-    let token = sync::fresh_access_token(&client, app, tokens).await?;
-    let file = sync::setup::find_pack_by_id(&client, &token, file_id).await?;
-    sync::setup::archive_pack(&client, &token, &file, &sync::setup::today_utc()).await
 }
 
 // Argon2id + creating the encrypted DB: CPU-bound, same as the restore path.
@@ -298,8 +276,8 @@ pub(crate) async fn create_off_thread(
 /// leave a vault on disk with no session behind it and `guard_no_vault`
 /// refusing every retry: an install the user can neither finish nor start
 /// over. Removing what was just written puts them back on a fresh install,
-/// where the retry is one press away. (The remote pack an archive already
-/// renamed stays renamed; nothing about that is lost.)
+/// where the retry is one press away.
+///
 /// `vault_id` is the id the restored pack's own file name gave it, when it came
 /// from `Vaults/<id>.rowel`. Stamped here, inside the all-or-nothing, rather
 /// than after the fact.

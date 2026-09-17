@@ -228,7 +228,7 @@ describe('choosing a master password', () => {
     await act(async () => check.resolve(scored(STRONG)))
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
 
-    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false, fileId: null })
+    expect(calls('setup_create')).toContainEqual({ password: STRONG })
   })
 
   // A chunk that will not load leaves nothing to wait for: say so, and take
@@ -256,7 +256,7 @@ describe('the backup step', () => {
 
     await userEvent.click(await screen.findByTestId('setup-skip-drive-button'))
 
-    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false, fileId: null })
+    expect(calls('setup_create')).toContainEqual({ password: STRONG })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
@@ -270,7 +270,7 @@ describe('the backup step', () => {
 
     await act(async () => setupDriveProbed([]))
 
-    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false, fileId: null })
+    expect(calls('setup_create')).toContainEqual({ password: STRONG })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
@@ -344,24 +344,23 @@ describe('a Drive that already holds data', () => {
     expect(calls('setup_create')).toHaveLength(0)
   })
 
-  it('archives the old one when the new password is kept', async () => {
+  // Starting fresh moves nothing aside: the new vault takes an id of its own,
+  // so the create call says nothing about the pack already up there.
+  it('creates a vault beside the existing one when the new password is kept', async () => {
     render(<Start />)
     await reachConflict()
 
-    await userEvent.click(await screen.findByTestId('setup-archive-button'))
+    await userEvent.click(await screen.findByTestId('setup-start-fresh-button'))
 
-    expect(calls('setup_create')).toContainEqual({
-      password: STRONG,
-      archiveRemote: true,
-      fileId: REMOTE.id
-    })
+    expect(calls('setup_create')).toContainEqual({ password: STRONG })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
-  // With two vaults up there, "start fresh, archive the old one" has to set
-  // aside the one the user was shown and then chose — not whichever the
-  // account happens to list first.
-  it('archives the vault the user picked, not the one listed first', async () => {
+  // With two vaults up there, picking one on the restore screen and then
+  // starting a new vault instead leaves both exactly where they are: the new
+  // vault is created on its own and nothing up there is named, moved or asked
+  // about.
+  it('starting a new vault leaves the picked vault untouched', async () => {
     render(<Start />)
     await choosePassword()
     await userEvent.click(await screen.findByTestId('setup-connect-drive-button'))
@@ -372,13 +371,9 @@ describe('a Drive that already holds data', () => {
     await userEvent.click(await screen.findByTestId('setup-unlock-existing-button'))
     await userEvent.click(await screen.findByTestId(`drive-vault-${OTHER.id}`))
     await userEvent.click(screen.getByTestId('go-back-button'))
-    await userEvent.click(await screen.findByTestId('setup-archive-button'))
+    await userEvent.click(await screen.findByTestId('setup-start-fresh-button'))
 
-    expect(calls('setup_create')).toContainEqual({
-      password: STRONG,
-      archiveRemote: true,
-      fileId: OTHER.id
-    })
+    expect(calls('setup_create')).toContainEqual({ password: STRONG })
   })
 
   it('hands over to the restore screen without asking Google again', async () => {
@@ -492,7 +487,7 @@ describe('restoring from Google Drive', () => {
     await userEvent.type(screen.getByTestId('setup-confirm-password-input'), STRONG)
     await userEvent.click(screen.getByTestId('setup-continue-button'))
 
-    expect(calls('setup_create')).toContainEqual({ password: STRONG, archiveRemote: false, fileId: null })
+    expect(calls('setup_create')).toContainEqual({ password: STRONG })
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
