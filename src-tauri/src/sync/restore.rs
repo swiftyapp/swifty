@@ -5,10 +5,11 @@
 //! merges instead (the sync engine); replacing an existing DB with a remote
 //! snapshot would silently discard whatever had not been pushed yet.
 //!
-//! A pack carries its vault id inside the snapshot, so a restore usually needs
-//! to do nothing about identity. The one exception — a pack pushed before its
-//! vault had committed its id — is what [`adopt_vault_id_from_name`] is for,
-//! and a Drive restore should call it.
+//! A pack carries its vault id inside the snapshot, and a restore keeps it. A
+//! Drive restore then stamps the id the pack was *filed under* on top
+//! (`commands::setup`): the file name is where the account addresses the
+//! vault, and the snapshot can lag it — the engine commits an adopted id only
+//! after the run that pushed the pack has succeeded.
 
 // Reached from onboarding's `setup_restore_from_drive`, which is what supplies
 // the two things this path needs and no other caller can: the master password
@@ -21,11 +22,11 @@ use std::path::Path;
 
 use tauri::AppHandle;
 
-use super::{layout, pack};
+use super::pack;
 use crate::crypto::{self, KdfParams, VaultKey};
 use crate::error::{Error, Result};
 use crate::storage;
-use crate::store::{identity, SqliteStore, StoreError, VaultStore, SYNC_META_PREFIX};
+use crate::store::{SqliteStore, StoreError, SYNC_META_PREFIX};
 
 /// Restore the vault carried by `bytes` into this install's data dir.
 pub fn restore_from_pack(
@@ -79,38 +80,6 @@ pub fn restore_at(
             Err(e)
         }
     }
-}
-
-/// Give a restored vault the id the pack it came from was filed under, when the
-/// snapshot inside that pack does not already carry one.
-///
-/// `file_name` is the Drive name the pack was downloaded from — for a Drive
-/// restore, that name *is* the vault id (`layout::vault_id_of`). The window
-/// this closes: the sync engine commits an assigned or adopted id only once a
-/// whole run has succeeded, and the snapshot it pushed was taken before that
-/// write, so the first pack such a vault ever uploads knows its own name only
-/// by the file it sits in. A restore from that pack would otherwise mint a
-/// fresh id on its next sync and leave the account holding the same vault twice.
-///
-/// A name that is not a live pack's leaves the store alone, and so does a
-/// snapshot that already knows its id: the id inside the vault is the vault's
-/// own, and nothing about a file name outranks it.
-// Nothing in the crate calls it yet: its caller is onboarding's Drive restore
-// (`commands::setup`), which has to carry the pack's file name down from the
-// listing first. The rule lives here, beside the restore it qualifies, rather
-// than being written a second time over there.
-#[allow(dead_code)]
-pub fn adopt_vault_id_from_name(store: &impl VaultStore, file_name: &str) -> Result<()> {
-    if identity::vault_id(store)
-        .map_err(crate::session::store_err)?
-        .is_some()
-    {
-        return Ok(());
-    }
-    let Some(id) = layout::vault_id_of(file_name) else {
-        return Ok(());
-    };
-    identity::adopt_vault_id(store, id).map_err(crate::session::store_err)
 }
 
 // The write half, split out so `restore_at` has exactly one cleanup site.
@@ -179,7 +148,7 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::Record;
+    use crate::store::{identity, Record, VaultStore};
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -305,60 +274,6 @@ mod tests {
         let restored = identity::vault_id(&store).unwrap();
         assert!(restored.is_some());
         assert_eq!(restored, identity::vault_id(&source).unwrap());
-    }
-
-    // A pack pushed by a vault whose id had not been committed yet: the bytes
-    // are a real vault, but nothing inside them says which one. The name it was
-    // filed under on Drive is the only record, and this is what reads it.
-    #[test]
-    fn a_pack_without_an_id_inside_takes_the_one_its_name_carries() {
-        let dir = tmp_dir();
-        let key = key_for(PASSWORD);
-        let source = SqliteStore::open(&dir.join("vault.db"), &key.sqlcipher_key()).unwrap();
-        source.import(&[record("1")]).unwrap();
-        let bytes = pack::pack_store(
-            &source,
-            &key.sqlcipher_key(),
-            &params().to_json().unwrap(),
-            &dir.join("scratch"),
-        )
-        .unwrap();
-
-        let (db, sidecar) = fresh_target();
-        let (_, store) = restore_at(&db, &sidecar, &bytes, PASSWORD).unwrap();
-        assert_eq!(identity::vault_id(&store).unwrap(), None);
-
-        adopt_vault_id_from_name(&store, "a1b2c3.rowel").unwrap();
-        assert_eq!(
-            identity::vault_id(&store).unwrap().as_deref(),
-            Some("a1b2c3")
-        );
-    }
-
-    #[test]
-    fn the_id_inside_the_vault_outranks_the_name_it_was_filed_under() {
-        let (_, bytes) = packed_source();
-        let (db, sidecar) = fresh_target();
-        let (_, store) = restore_at(&db, &sidecar, &bytes, PASSWORD).unwrap();
-        let own = identity::vault_id(&store).unwrap();
-
-        adopt_vault_id_from_name(&store, "a1b2c3.rowel").unwrap();
-
-        assert_eq!(identity::vault_id(&store).unwrap(), own);
-    }
-
-    // A local `.rowel` backup the user picked off their disk, a legacy
-    // `vault.swsync`: names that say nothing about a vault id, and must not be
-    // turned into one.
-    #[test]
-    fn a_name_that_is_not_a_live_packs_leaves_the_vault_idless() {
-        let dir = tmp_dir();
-        let store = SqliteStore::open(&dir.join("vault.db"), &[9u8; 32]).unwrap();
-
-        for name in ["my backup.rowel", layout::LEGACY_VAULT_FILE, "a1b2c3"] {
-            adopt_vault_id_from_name(&store, name).unwrap();
-            assert_eq!(identity::vault_id(&store).unwrap(), None, "{name}");
-        }
     }
 
     #[test]
