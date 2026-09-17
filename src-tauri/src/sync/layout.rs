@@ -52,8 +52,8 @@ pub const LEGACY_VAULT_FILE: &str = "vault.swsync";
 /// pack now lives under. A listing alone therefore tells an upgraded device
 /// which vault to take on, and tells onboarding the file is not a vault. The
 /// tombstone's *content* is for devices still on the old build: a pack header
-/// with a format byte they do not know, so their sync stops with "update the
-/// app" instead of quietly starting a second vault.
+/// with a format byte they do not know (`pack::tombstone`), so their sync stops
+/// with "update the app" instead of quietly starting a second vault.
 pub const PROP_MOVED_TO: &str = "rowelMovedTo";
 
 /// The live pack of the vault with this id: `<vault-id>.rowel`.
