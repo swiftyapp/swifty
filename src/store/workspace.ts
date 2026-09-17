@@ -11,6 +11,7 @@ import {
   setupDriveRestoreFailed,
   type AppState
 } from './app'
+import { lockSettings } from './ui'
 
 /**
  * Workspaces are not state of their own: the launch probe reports which exist
@@ -68,19 +69,25 @@ export const createWorkspace = async (name: string, password: string) => {
 // The store, not the form, says a restore is running: the backend has claimed
 // the pending account for its length and refuses to give it up, so every
 // control that would (Cancel, Switch account) has to know to stand down — and
-// the form is not the only thing drawing them.
+// the form is not the only thing drawing them. Settings is held shut and on
+// its section for the same reason: closing it or moving away would have run the
+// same refused disconnect and then let the restore finish and switch
+// workspaces behind the user's back.
 export const restoreWorkspaceFromDrive = async (
   name: string,
   password: string,
   fileId: string
 ) => {
   setupDriveRestoring()
+  lockSettings(true)
   let result
   try {
     result = await workspaceRestoreFromDrive(name, password, fileId)
   } catch (error) {
     setupDriveRestoreFailed()
     throw error
+  } finally {
+    lockSettings(false)
   }
   clearSession()
   await enterMain(result)

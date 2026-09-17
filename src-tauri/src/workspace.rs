@@ -35,6 +35,18 @@ pub struct Workspace {
     /// the frontend shows a translated default label rather than a name in
     /// whatever language the install was first run in.
     pub name: Option<String>,
+    /// The vault id (see [`crate::store::identity`]) of the vault inside, as of
+    /// its last sync or its restore — `None` for a vault that has never had one,
+    /// which is a vault with no pack on Drive.
+    ///
+    /// Recorded here, outside the vault, for one reader: a Drive restore asking
+    /// whether the pack it was pointed at is already a workspace on this
+    /// device. Every workspace but the active one is locked, and the id inside
+    /// a locked vault is unreadable — so without this the check could only see
+    /// the open workspace, and a duplicate of a locked one went through. Not a
+    /// secret: the same id is the pack's file name in the user's own Drive.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vault_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -52,6 +64,7 @@ impl Default for Registry {
             workspaces: vec![Workspace {
                 id: PRIMARY_ID.to_string(),
                 name: None,
+                vault_id: None,
             }],
         }
     }
@@ -99,6 +112,41 @@ impl Registry {
     pub fn contains(&self, id: &str) -> bool {
         self.workspaces.iter().any(|w| w.id == id)
     }
+
+    /// The workspace other than `except` that holds the vault with this id, if
+    /// the registry knows of one. What a Drive restore asks before adding a
+    /// second workspace for a pack this device already syncs (see
+    /// [`Workspace::vault_id`] for why the registry is what knows).
+    pub fn holder_of(&self, vault_id: &str, except: &str) -> Option<&Workspace> {
+        self.workspaces
+            .iter()
+            .find(|w| w.id != except && w.vault_id.as_deref() == Some(vault_id))
+    }
+}
+
+/// Remember which vault the active workspace holds, once a sync has settled it.
+///
+/// Called from inside a sync run, at the moment the id is proved to be this
+/// vault's (see `sync::run`), so the registry learns of every vault that has a
+/// pack on Drive — which is exactly the set a restore could duplicate. A no-op
+/// when the record is already right, so a run does not rewrite the file.
+///
+/// Under `workspace_lock`, as every registry writer is: a rename or a create
+/// landing beside this must not save a copy that lacks the other's change.
+pub fn record_vault_id(app: &AppHandle, vault_id: &str) -> Result<()> {
+    let root = storage::root_dir(app)?;
+    let state = app.state::<AppState>();
+    let _paths = state.workspace_lock.lock().unwrap();
+    let active = state.active_workspace.lock().unwrap().clone();
+    let mut registry = Registry::load(&root);
+    let Some(workspace) = registry.workspaces.iter_mut().find(|w| w.id == active) else {
+        return Err(Error::NotFound);
+    };
+    if workspace.vault_id.as_deref() == Some(vault_id) {
+        return Ok(());
+    }
+    workspace.vault_id = Some(vault_id.to_string());
+    registry.save(&root)
 }
 
 /// Where a workspace's vault lives.
@@ -175,15 +223,65 @@ mod tests {
                 Workspace {
                     id: PRIMARY_ID.into(),
                     name: None,
+                    vault_id: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
+                    vault_id: Some("cafe".into()),
                 },
             ],
         };
         saved.save(&root).unwrap();
         assert_eq!(Registry::load(&root), saved);
+    }
+
+    // A registry written before vault ids were recorded still reads, and a
+    // workspace with no id is not written with a `null` for one.
+    #[test]
+    fn a_vault_id_is_optional_on_disk() {
+        let root = tmp_root();
+        fs::write(
+            root.join(REGISTRY_FILE),
+            r#"{"active":"default","workspaces":[{"id":"default","name":null}]}"#,
+        )
+        .unwrap();
+        let loaded = Registry::load(&root);
+        assert_eq!(loaded.workspaces[0].vault_id, None);
+
+        loaded.save(&root).unwrap();
+        let json = fs::read_to_string(root.join(REGISTRY_FILE)).unwrap();
+        assert!(!json.contains("vaultId"), "{json}");
+    }
+
+    // The question a restore asks: is this pack already a workspace here — any
+    // workspace but the one asking, which the caller has already compared live.
+    #[test]
+    fn the_holder_of_a_vault_is_any_other_workspace_recording_its_id() {
+        let registry = Registry {
+            active: PRIMARY_ID.into(),
+            workspaces: vec![
+                Workspace {
+                    id: PRIMARY_ID.into(),
+                    name: None,
+                    vault_id: Some("cafe".into()),
+                },
+                Workspace {
+                    id: "a1b2".into(),
+                    name: Some("Work".into()),
+                    vault_id: None,
+                },
+            ],
+        };
+        // Held by the primary, asked from the other workspace.
+        assert_eq!(
+            registry.holder_of("cafe", "a1b2").map(|w| w.id.as_str()),
+            Some(PRIMARY_ID)
+        );
+        // The asking workspace does not count as a holder of its own vault.
+        assert_eq!(registry.holder_of("cafe", PRIMARY_ID), None);
+        // Nobody recorded this one; a workspace that never synced has no id.
+        assert_eq!(registry.holder_of("beef", "a1b2"), None);
     }
 
     #[test]
@@ -194,6 +292,7 @@ mod tests {
             workspaces: vec![Workspace {
                 id: PRIMARY_ID.into(),
                 name: None,
+                vault_id: None,
             }],
         }
         .save(&root)

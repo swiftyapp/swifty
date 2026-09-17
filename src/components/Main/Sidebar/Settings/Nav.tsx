@@ -7,9 +7,11 @@ import { SECTIONS } from './sections'
 interface Props {
   section: Section
   onSelect: (section: Section) => void
+  /** Every other section is out of reach for now (see `settingsLocked`). */
+  disabled?: boolean
 }
 
-export default function Nav({ section, onSelect }: Props) {
+export default function Nav({ section, onSelect, disabled = false }: Props) {
   const { t } = useTranslation()
   return (
     <nav className="flex w-[220px] flex-none flex-col border-r border-line bg-list p-5">
@@ -25,12 +27,14 @@ export default function Nav({ section, onSelect }: Props) {
                 type="button"
                 aria-current={active ? 'page' : undefined}
                 data-testid={`settings-nav-${key}`}
+                disabled={disabled && !active}
                 onClick={() => onSelect(key)}
                 className={cx(
-                  'relative flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-sm px-2.5 text-left text-base transition-colors',
+                  'relative flex h-10 w-full items-center gap-2.5 rounded-sm px-2.5 text-left text-base transition-colors',
                   active
                     ? 'bg-tile text-text'
-                    : 'text-text2 hover:bg-hover hover:text-text focus-visible:bg-hover'
+                    : 'text-text2 hover:bg-hover hover:text-text focus-visible:bg-hover',
+                  disabled && !active ? 'cursor-default opacity-50' : 'cursor-pointer'
                 )}
               >
                 <Glyph size={16} />

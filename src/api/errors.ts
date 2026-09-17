@@ -130,7 +130,7 @@ export const describeError = (error: unknown): string => {
     case 'workspacePasswordRequired':
       return t('A workspace needs a master password')
     case 'vaultAlreadyOpen':
-      return t('This vault is the one already open here')
+      return t('This vault is already a workspace on this device')
     case 'fileTooLarge':
       return t('This file is too large')
     case 'fileNotText':

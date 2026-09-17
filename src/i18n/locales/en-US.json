@@ -552,7 +552,7 @@
   "Available in the primary workspace only": "Available in the primary workspace only",
   "A workspace needs a name": "A workspace needs a name",
   "A workspace needs a master password": "A workspace needs a master password",
-  "This vault is the one already open here": "This vault is the one already open here",
+  "This vault is already a workspace on this device": "This vault is already a workspace on this device",
   "This file is too large": "This file is too large",
   "This file is not text": "This file is not text",
   "The vault changed while this was running. Try again.": "The vault changed while this was running. Try again.",

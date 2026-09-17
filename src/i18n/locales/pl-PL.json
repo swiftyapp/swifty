@@ -568,7 +568,7 @@
   "Available in the primary workspace only": "Dostępne tylko w głównym obszarze roboczym",
   "A workspace needs a name": "Obszar roboczy musi mieć nazwę",
   "A workspace needs a master password": "Obszar roboczy musi mieć hasło główne",
-  "This vault is the one already open here": "Ten sejf jest tym, który jest tu już otwarty",
+  "This vault is already a workspace on this device": "Ten sejf jest już przestrzenią roboczą na tym urządzeniu",
   "This file is too large": "Ten plik jest zbyt duży",
   "This file is not text": "Ten plik nie jest plikiem tekstowym",
   "The vault changed while this was running. Try again.": "Sejf zmienił się w trakcie operacji. Spróbuj ponownie.",

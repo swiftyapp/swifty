@@ -552,7 +552,7 @@
   "Available in the primary workspace only": "Yalnızca birincil çalışma alanında kullanılabilir",
   "A workspace needs a name": "Çalışma alanının bir adı olmalı",
   "A workspace needs a master password": "Çalışma alanının bir ana şifresi olmalı",
-  "This vault is the one already open here": "Bu kasa, burada zaten açık olan kasanın ta kendisi",
+  "This vault is already a workspace on this device": "Bu kasa bu cihazda zaten bir çalışma alanı",
   "This file is too large": "Bu dosya çok büyük",
   "This file is not text": "Bu dosya bir metin dosyası değil",
   "The vault changed while this was running. Try again.": "İşlem sırasında kasa değişti. Yeniden deneyin.",

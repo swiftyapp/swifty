@@ -272,34 +272,28 @@ pub(crate) fn start_consent(app: &AppHandle, state: &AppState, purpose: AuthPurp
         AuthPurpose::Setup => None,
         _ => Some(state.session.lock().unwrap().cryptor()?),
     };
-    let started = sync::begin(app)?;
-    let displaced = state
-        .pending_auth
-        .lock()
-        .unwrap()
-        .replace(crate::state::PendingAuth {
-            verifier: started.verifier,
-            state: started.state,
-            cryptor,
-            purpose,
-            started: std::time::Instant::now(),
-            generation: sync::connection_generation(app),
-        });
-    // One consent at a time: a redirect for the flow this one replaced can no
-    // longer be matched, so that flow is over. If it was reporting on the other
-    // event family — a sync connect displaced by a workspace restore, or the
-    // reverse — its screen is still saying "waiting", and nothing else would
-    // ever tell it otherwise. Same family, same screen: it is already waiting
-    // for this one.
-    if let Some(old) = displaced {
-        if (old.purpose == AuthPurpose::Setup) != (purpose == AuthPurpose::Setup) {
-            fail(
-                app,
-                old.purpose,
-                "Sign-in cancelled: another one was started".into(),
-            );
-        }
+    // One consent at a time, and checked before Safari is opened for a second.
+    // Replacing the pending flow would orphan it: its redirect could never be
+    // matched again, and if it was reporting on the other event family (a sync
+    // connect displaced by a workspace restore, or the reverse) its screen
+    // would say "waiting" for good. A flow the user walked away from does not
+    // block for long — `on_resume` writes it off once the redirect has had its
+    // chance to arrive.
+    if state.pending_auth.lock().unwrap().is_some() {
+        return Err(crate::error::Error::Other(
+            "another Google sign-in is still waiting for its answer; finish or cancel it first"
+                .into(),
+        ));
     }
+    let started = sync::begin(app)?;
+    *state.pending_auth.lock().unwrap() = Some(crate::state::PendingAuth {
+        verifier: started.verifier,
+        state: started.state,
+        cryptor,
+        purpose,
+        started: std::time::Instant::now(),
+        generation: sync::connection_generation(app),
+    });
     // Onboarding announces itself on its own `setup:drive:*` family, because it
     // runs on a screen that knows nothing about sync settings.
     match purpose {

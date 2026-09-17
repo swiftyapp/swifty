@@ -187,6 +187,10 @@ pub async fn workspace_create(
         registry.workspaces.push(Workspace {
             id: id.clone(),
             name: Some(name),
+            // Minted at creation, but not recorded until a sync proves a pack
+            // exists for it: a vault with no pack cannot be duplicated from
+            // Drive, and that is the one question the record answers.
+            vault_id: None,
         });
         registry.active = id.clone();
         Ok(())
@@ -281,7 +285,7 @@ pub async fn workspace_restore_from_drive(
     // out for all of it, taking a vault away that they never asked to leave.
     let mut tokens = setup::peek_pending(&state)?;
     let (bytes, vault_id) = setup::download(&app, &mut tokens, &file_id, |vault_id| {
-        guard_other_vault(&state, vault_id)
+        guard_other_vault(&state, &root, vault_id)
     })
     .await?;
     // Whatever the refresh produced has to be kept, for the reason onboarding
@@ -318,6 +322,10 @@ pub async fn workspace_restore_from_drive(
         registry.workspaces.push(Workspace {
             id: id.clone(),
             name: Some(name),
+            // Known now, and this workspace arrives syncing: the record that
+            // turns away a second restore of the same pack is made with the
+            // first, not left to the sync that follows.
+            vault_id: Some(vault_id.clone()),
         });
         registry.active = id.clone();
         Ok(())
@@ -436,27 +444,33 @@ async fn restore_vault_in(
 
 /// Refuse a pack this device would end up holding twice.
 ///
-/// Restoring the open workspace's own vault beside itself would leave two
-/// workspaces syncing one pack, each merging over the other — a duplicate the
-/// user has no way to tell apart afterwards, since the two would look identical.
+/// Restoring a vault beside itself would leave two workspaces syncing one pack,
+/// each merging over the other — a duplicate the user has no way to tell apart
+/// afterwards, since the two would look identical.
 ///
-/// Only the *active* workspace can be asked. Every other one keeps its vault id
-/// inside its own encrypted database, and the app holds no key to a locked
-/// workspace — so a pack one of those already has is let through, and the two
-/// go on syncing the same pack. That is the visible case caught and the
-/// invisible ones left, not an oversight.
-fn guard_other_vault(state: &AppState, vault_id: &str) -> Result<()> {
+/// Two places know which vault a workspace holds. The open one is asked live,
+/// from the id in its own database. Every other workspace is locked and its
+/// database unreadable, so those are asked through the registry, which records
+/// each workspace's vault id as its syncs settle it (`Workspace::vault_id`).
+/// A workspace that never synced has no record there — and no pack on Drive to
+/// be restored from, so nothing is missed by that.
+fn guard_other_vault(state: &AppState, root: &Path, vault_id: &str) -> Result<()> {
     let session = state.session.lock().unwrap();
     // Locked, or held out by another whole-vault operation: nothing to compare
-    // against, and the lease below is what will turn that away.
-    let Ok(store) = session.store() else {
-        return Ok(());
-    };
-    if crate::store::identity::vault_id(store)
-        .map_err(store_err)?
-        .as_deref()
-        == Some(vault_id)
-    {
+    // against live, and the lease below is what will turn that away.
+    if let Ok(store) = session.store() {
+        if crate::store::identity::vault_id(store)
+            .map_err(store_err)?
+            .as_deref()
+            == Some(vault_id)
+        {
+            return Err(Error::VaultAlreadyOpen);
+        }
+    }
+    drop(session);
+
+    let active = state.active_workspace.lock().unwrap().clone();
+    if Registry::load(root).holder_of(vault_id, &active).is_some() {
         return Err(Error::VaultAlreadyOpen);
     }
     Ok(())
@@ -476,6 +490,7 @@ fn discard(root: &Path, id: &str) {
 mod tests {
     use super::*;
     use crate::store::identity;
+    use crate::workspace::PRIMARY_ID;
 
     fn store() -> SqliteStore {
         static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -500,15 +515,27 @@ mod tests {
         state
     }
 
-    // The one collision that can be seen: the vault the user is looking at as
-    // they pick which pack to restore.
+    // A data dir with no registry file: one primary, nothing recorded.
+    fn tmp_root() -> std::path::PathBuf {
+        static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "rowel-workspace-guard-{}-{}",
+            std::process::id(),
+            N.fetch_add(1, Ordering::SeqCst)
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    // The collision seen live: the vault the user is looking at as they pick
+    // which pack to restore.
     #[test]
     fn the_open_workspaces_own_vault_is_refused() {
         let store = store();
         identity::adopt_vault_id(&store, "a1b2").unwrap();
 
         assert!(matches!(
-            guard_other_vault(&open_with(store), "a1b2"),
+            guard_other_vault(&open_with(store), &tmp_root(), "a1b2"),
             Err(Error::VaultAlreadyOpen)
         ));
     }
@@ -519,20 +546,56 @@ mod tests {
         let store = store();
         identity::adopt_vault_id(&store, "a1b2").unwrap();
 
-        assert!(guard_other_vault(&open_with(store), "cafe").is_ok());
+        assert!(guard_other_vault(&open_with(store), &tmp_root(), "cafe").is_ok());
     }
 
     // A vault created before ids existed answers to no pack, so it cannot be
     // the one being restored.
     #[test]
     fn a_vault_with_no_id_collides_with_nothing() {
-        assert!(guard_other_vault(&open_with(store()), "a1b2").is_ok());
+        assert!(guard_other_vault(&open_with(store()), &tmp_root(), "a1b2").is_ok());
     }
 
-    // Nothing to compare against on a locked session. The lease the restore
-    // takes next is what turns that away, and it says `Locked` when it does.
+    // The collision seen through the registry: a workspace that is locked, and
+    // whose vault id a sync recorded — the one the live check cannot reach.
+    #[test]
+    fn a_locked_workspaces_recorded_vault_is_refused() {
+        let root = tmp_root();
+        Registry {
+            active: PRIMARY_ID.into(),
+            workspaces: vec![
+                Workspace {
+                    id: PRIMARY_ID.into(),
+                    name: None,
+                    vault_id: None,
+                },
+                Workspace {
+                    id: "b2c3".into(),
+                    name: Some("Work".into()),
+                    vault_id: Some("cafe".into()),
+                },
+            ],
+        }
+        .save(&root)
+        .unwrap();
+
+        // Asked from the open primary, which holds another vault entirely.
+        let store = store();
+        identity::adopt_vault_id(&store, "a1b2").unwrap();
+        let state = open_with(store);
+        assert!(matches!(
+            guard_other_vault(&state, &root, "cafe"),
+            Err(Error::VaultAlreadyOpen)
+        ));
+        // A pack nobody here holds is still fine.
+        assert!(guard_other_vault(&state, &root, "beef").is_ok());
+    }
+
+    // A locked session has nothing to compare against live, and the registry
+    // records nothing for this pack. The lease the restore takes next is what
+    // turns the locked session away, and it says `Locked` when it does.
     #[test]
     fn a_locked_workspace_is_left_to_the_lease_to_refuse() {
-        assert!(guard_other_vault(&AppState::default(), "a1b2").is_ok());
+        assert!(guard_other_vault(&AppState::default(), &tmp_root(), "a1b2").is_ok());
     }
 }

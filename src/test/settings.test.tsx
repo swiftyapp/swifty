@@ -8,10 +8,12 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import type { SyncStatus } from '@/api/sync'
 import type { SetupDriveFile } from '@/api/setup'
 import {
+  closeSettings,
   fileOpened,
   flowMain,
   initialApp,
   openSettings,
+  setSettingsSection,
   setSyncStatus,
   setupDriveFailed,
   setupDriveProbed,
@@ -623,6 +625,44 @@ describe('Settings › workspaces › restore from Drive', () => {
     expect(calls('setup_drive_disconnect')).toHaveLength(0)
   })
 
+  // Leaving Settings would unmount the row and run the same refused disconnect,
+  // then the restore would finish and switch workspaces behind the user's back.
+  // So Settings stays shut on its section — from the X, from the nav, and from
+  // anything else that reaches the store — until the restore lands.
+  it('holds Settings on the section while the restore runs', async () => {
+    mockCommandOnce('workspace_restore_from_drive', () => new Promise(() => {}))
+    await connect([VAULT])
+
+    await userEvent.type(screen.getByTestId('workspace-restore-name'), 'Work')
+    await userEvent.type(screen.getByTestId('workspace-restore-password'), 'pass')
+    await userEvent.click(screen.getByTestId('workspace-restore-submit'))
+
+    expect(screen.getByTestId('modal-close')).toBeDisabled()
+    expect(screen.getByTestId('settings-nav-sync')).toBeDisabled()
+    // The store refuses too, whoever asks.
+    closeSettings()
+    setSettingsSection('sync')
+    expect(useUi.getState().settings).toBe(true)
+    expect(useUi.getState().settingsSection).toBe('workspaces')
+  })
+
+  // A failed restore gives Settings back with the form.
+  it('releases Settings when the restore fails', async () => {
+    mockCommandOnce('workspace_restore_from_drive', () =>
+      Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })
+    )
+    await connect([VAULT])
+
+    await userEvent.type(screen.getByTestId('workspace-restore-name'), 'Work')
+    await userEvent.type(screen.getByTestId('workspace-restore-password'), 'wrong')
+    await userEvent.click(screen.getByTestId('workspace-restore-submit'))
+
+    await waitFor(() => expect(useUi.getState().settingsLocked).toBe(false))
+    expect(screen.getByTestId('modal-close')).toBeEnabled()
+    await userEvent.click(screen.getByTestId('modal-close'))
+    expect(useUi.getState().settings).toBe(false)
+  })
+
   // A failed restore hands the form back: the list and the pick are still
   // there, and so are Cancel and Switch account.
   it('hands the form back when the restore fails', async () => {
@@ -658,12 +698,13 @@ describe('Settings › workspaces › restore from Drive', () => {
     expect(useApp.getState().flow).not.toBe('main')
   })
 
-  // The one collision the backend can see: the vault open right now.
-  it('says so when the chosen vault is the one already open here', async () => {
+  // The pack is already a workspace here — the open one, or a locked one the
+  // registry remembers; the backend says which is not the point, only that it is.
+  it('says so when the chosen vault is already a workspace on this device', async () => {
     mockCommandOnce('workspace_restore_from_drive', () =>
       Promise.reject({
         kind: 'vaultAlreadyOpen',
-        message: 'this vault is already open in this workspace'
+        message: 'this vault is already a workspace on this device'
       })
     )
     await connect([VAULT])
@@ -673,7 +714,7 @@ describe('Settings › workspaces › restore from Drive', () => {
     await userEvent.click(screen.getByTestId('workspace-restore-submit'))
 
     expect(
-      await screen.findByText('This vault is the one already open here')
+      await screen.findByText('This vault is already a workspace on this device')
     ).toBeInTheDocument()
   })
 

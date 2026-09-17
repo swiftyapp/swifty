@@ -220,6 +220,13 @@ pub fn run(app: &AppHandle, cryptor: Cryptor, intent: Intent) -> Result<SyncOutc
             // id this run proved to be ours".
             local.adopt_vault_id(&resolved.id)?;
         }
+        // The registry's copy, for a Drive restore to check against once this
+        // workspace is locked (`workspace::record_vault_id`). Best effort: the
+        // vault's own record above is the one that addresses the pack, and a
+        // registry the next run will write again is not worth failing this one.
+        if let Err(e) = crate::workspace::record_vault_id(app, &resolved.id) {
+            log::warn!("could not record the vault id in the registry: {e}");
+        }
         Ok(())
     })?;
 

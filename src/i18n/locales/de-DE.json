@@ -552,7 +552,7 @@
   "Available in the primary workspace only": "Nur im primären Arbeitsbereich verfügbar",
   "A workspace needs a name": "Ein Arbeitsbereich braucht einen Namen",
   "A workspace needs a master password": "Ein Arbeitsbereich braucht ein Hauptpasswort",
-  "This vault is the one already open here": "Dieser Tresor ist genau der, der hier bereits geöffnet ist",
+  "This vault is already a workspace on this device": "Dieser Tresor ist auf diesem Gerät bereits ein Arbeitsbereich",
   "This file is too large": "Diese Datei ist zu groß",
   "This file is not text": "Diese Datei ist keine Textdatei",
   "The vault changed while this was running. Try again.": "Der Tresor hat sich währenddessen geändert. Bitte erneut versuchen.",

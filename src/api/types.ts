@@ -185,6 +185,12 @@ export interface UnlockResult {
 export interface Workspace {
   id: string
   name: string | null
+  /**
+   * The vault id of the vault inside, once a sync has settled one. The UI
+   * shows nothing of it; the backend keeps it to turn away a Drive restore of a
+   * pack that is already a workspace here.
+   */
+  vaultId?: string
 }
 
 // Which biometry this device gates with, straight from the OS (Apple reads
