@@ -2,20 +2,22 @@ import { useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import Masterpass from '@/components/elements/Masterpass'
 import Button from '@/components/elements/Button'
-import RadioList from '@/components/elements/RadioList'
+import DriveVaults from '@/components/elements/DriveVaults'
 import { isMobile } from '@/lib/platform'
 import type { UnlockResult } from '@/api/types'
 import { setupRestoreFromDrive } from '@/api/setup'
-import { useApp, selectedDriveFile, setupDriveSelect } from '@/store'
+import {
+  useApp,
+  selectedDriveFile,
+  setupDriveSelect,
+  connectDrive,
+  switchDriveAccount
+} from '@/store'
 import StepHeader from '../shared/StepHeader'
-import FoundFileCard from '../shared/FoundFileCard'
 import SpinnerCard from '../shared/SpinnerCard'
 import TextLink from '../shared/TextLink'
 import { COLUMN, ACTIONS, FOOTNOTE } from '../shared/layout'
 import { unsealError } from '../shared/errors'
-import { describeDriveFile } from '../shared/describe'
-import { useDates } from '@/hooks/useDates'
-import { connectDrive, switchDriveAccount } from '../shared/driveSession'
 
 interface Props {
   /** Nothing in this account: go and make some, with sync already wired up. */
@@ -31,7 +33,6 @@ interface Props {
 // redraws the screen.
 export default function Drive({ onStartFresh, onUseFile, onRestored }: Props) {
   const { t } = useTranslation()
-  const dates = useDates()
   const drive = useApp(state => state.setupDrive)
   const file = useApp(selectedDriveFile)
   const [password, setPassword] = useState('')
@@ -126,10 +127,8 @@ export default function Drive({ onStartFresh, onUseFile, onRestored }: Props) {
       </>
     )
 
-  // More than one vault in the account happens when separate installs have
-  // each synced their own primary here: two packs, two ids, and nothing but
-  // their dates and sizes to tell them apart — so the choice is the user's,
-  // and it is made before the password, which is per-vault.
+  // What the account holds decides the wording: a choice to make, or one vault
+  // to unlock. `DriveVaults` draws whichever of the two it is.
   const several = drive.files.length > 1
 
   return (
@@ -145,29 +144,11 @@ export default function Drive({ onStartFresh, onUseFile, onRestored }: Props) {
       />
 
       <div className={`${COLUMN} mt-9`}>
-        {several ? (
-          <RadioList
-            name={t('Vaults in this account')}
-            testidPrefix="drive-vault"
-            value={drive.selectedId ?? ''}
-            onChange={setupDriveSelect}
-            options={drive.files.map(vault => ({
-              value: vault.id,
-              label: t('Rowel vault'),
-              meta: describeDriveFile(vault, dates)
-            }))}
-          />
-        ) : (
-          file && (
-            <FoundFileCard
-              where="drive"
-              testid="drive-found-file"
-              name={t('Rowel vault')}
-              meta={describeDriveFile(file, dates)}
-              encrypted
-            />
-          )
-        )}
+        <DriveVaults
+          files={drive.files}
+          selectedId={drive.selectedId}
+          onSelect={setupDriveSelect}
+        />
 
         <div className="mt-6">
           <Masterpass
