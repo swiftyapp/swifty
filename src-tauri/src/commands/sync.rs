@@ -39,10 +39,14 @@ use crate::sync;
 /// Returns as soon as the session has a cryptor to give: the consent flow is a
 /// browser round trip, and the frontend hears how it went on `sync:status`
 /// rather than from this promise — the same story mobile tells.
+///
+/// Any workspace may connect: the token file resolves under the active
+/// workspace's directory, and the vault's own id names the pack it syncs
+/// (`Rowel/Vaults/<vault-id>.rowel`), so two workspaces share neither the
+/// account nor the file even when the user points them at the same Drive.
 #[cfg(desktop)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    crate::workspace::guard_primary(&app)?;
     spawn_consent(&app, &state, Follow::Run)
 }
 
@@ -58,7 +62,6 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    crate::workspace::guard_primary(&app)?;
     start_consent(&app, &state, AuthPurpose::Connect).inspect_err(|e| failed(&app, e.to_string()))
 }
 
@@ -124,7 +127,6 @@ pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(desktop)]
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    crate::workspace::guard_primary(&app)?;
     spawn_consent(&app, &state, Follow::Pull)
 }
 
@@ -132,7 +134,6 @@ pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_import(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    crate::workspace::guard_primary(&app)?;
     start_consent(&app, &state, AuthPurpose::Import).inspect_err(|e| failed(&app, e.to_string()))
 }
 

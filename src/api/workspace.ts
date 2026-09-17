@@ -4,9 +4,10 @@ import type { UnlockResult } from './types'
 /**
  * Additional encrypted databases. Each has its own master password and its own
  * file; only one is ever unlocked, so moving between them goes through the lock
- * screen. Sync and biometric unlock belong to the primary workspace, and the
- * backend rejects them elsewhere rather than letting a second vault quietly
- * take over the one Drive folder or the one enrolled key.
+ * screen. Each carries its own Drive connection and syncs its own pack, so sync
+ * is offered everywhere; biometric unlock still belongs to the primary, and the
+ * backend rejects it elsewhere rather than letting a second vault quietly take
+ * over the one enrolled key.
  */
 
 /**
