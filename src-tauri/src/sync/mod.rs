@@ -3,12 +3,7 @@
 //! name it uses comes from [`layout`].
 //!
 //! Which pack is *this* vault's is settled once per run, before the engine
-//! starts: see [`resolve_vault_id`]. That step is also where an install still
-//! keeping its pack at the pre-`Vaults/` `Rowel/vault.swsync` has it moved into
-//! place — leaving a tombstone at the old name, so a device still on the old
-//! build stops with "update the app" rather than quietly starting a second
-//! vault ([`pack::tombstone`]) — so the rest of this module only ever knows the
-//! one layout.
+//! starts: see [`resolve_vault_id`].
 //!
 //! The id that step settles on reaches the vault's `meta` table only *after*
 //! the run it was settled for has succeeded (see [`run`]): until the pack has
@@ -209,15 +204,9 @@ pub fn run(app: &AppHandle, cryptor: Cryptor, intent: Intent) -> Result<SyncOutc
     // was pointed at leaves this vault answering to the id it already had,
     // rather than to a pack it has never seen a record of.
     //
-    // The two ways that leaves the local vault behind both converge by
-    // themselves on the next run:
-    //
-    // * A run that failed after the legacy pack was moved leaves this vault
-    //   id-less and a tombstone naming the id the pack went to, so the next run
-    //   plans `Adopt` on that same id and merges it.
-    // * A run that failed after a plain `Assign` leaves this vault id-less and
-    //   the account untouched, so the next run mints an id again. Nothing was
-    //   pushed under the first one — the push is part of the run that failed.
+    // A run that failed after an `Assign` leaves this vault id-less and the
+    // account untouched, so the next run mints an id again. Nothing was pushed
+    // under the first one — the push is part of the run that failed.
     //
     // The price is that the pack this run pushed carries a snapshot taken
     // before the write, so the very first pack of an assigned or adopted vault
@@ -259,8 +248,8 @@ fn now_ms() -> i64 {
 /// What the vault-id resolution has to do before a run can address a pack.
 ///
 /// Split out from the Drive calls so the decision — the part with every
-/// upgrade and first-run case in it — is a pure function over three facts and
-/// can be read, and tested, on its own.
+/// first-run and import case in it — is a pure function over two facts and can
+/// be read, and tested, on its own.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum VaultIdPlan {
     /// Address `<id>.rowel`. Either it is already there, or the first push
@@ -271,43 +260,20 @@ enum VaultIdPlan {
     /// Take on an id the remote says is this vault's. The pull that follows is
     /// what brings its data in.
     Adopt(String),
-    /// A legacy pack and no local id: mint one, and move the pack in under it.
-    AssignAndMigrateLegacy,
     /// An import facing several live packs, with nothing to say which of them
     /// the user meant. Guessing would merge two vaults into one.
     Ambiguous,
 }
 
-/// What `Rowel/vault.swsync` is, as far as a listing can tell — which is as far
-/// as this needs to tell, since the marker rides in `appProperties` and costs
-/// no download.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Legacy {
-    /// Not there: an account that was never written to by a pre-`Vaults/`
-    /// build, or one whose migration has since been tidied away.
-    Absent,
-    /// A real pre-`Vaults/` pack, still waiting to be moved.
-    Pack,
-    /// The tombstone a migration left behind, naming the id the pack moved to.
-    MovedTo(String),
-}
-
 /// Decide which vault id this run addresses.
 ///
-/// `local` is the id in this vault's `meta` table, `legacy` what stands at
-/// `Rowel/vault.swsync`, and `live` the ids of the packs found in `Vaults/` (an
-/// absent folder is simply none of them).
+/// `local` is the id in this vault's `meta` table and `live` the ids of the
+/// packs found in `Vaults/` (an absent folder is simply none of them).
 ///
-/// The rule underneath the arms: a remote pack is only ever taken on when
-/// something *says* it is this vault's — the user asking for it (an import), or
-/// a tombstone this vault's own predecessor left. A pack that merely happens to
-/// be the only one in the account is not evidence of anything.
-fn plan_vault_id(
-    intent: Intent,
-    local: Option<&str>,
-    legacy: &Legacy,
-    live: &[&str],
-) -> VaultIdPlan {
+/// The rule underneath the arms: a remote pack is only ever taken on when the
+/// user *asks* for it, by importing. A pack that merely happens to be the only
+/// one in the account is not evidence of anything.
+fn plan_vault_id(intent: Intent, local: Option<&str>, live: &[&str]) -> VaultIdPlan {
     // An import is the one time the account's pack outranks this vault's own
     // name: the user asked for what is up there. With nothing up there it is an
     // ordinary run, and with several packs there is no telling which they meant.
@@ -322,19 +288,11 @@ fn plan_vault_id(
         }
     }
     match local {
-        // A vault with an id was born on a build that mints them, so it was
-        // never the vault the pre-`Vaults/` pack belongs to — whatever else the
-        // account holds, its own name is the answer. Migrating the legacy pack
-        // under this id would file a stranger's vault under it, and the merge
-        // would then refuse the very pack it had just renamed.
+        // Its own name is the answer, whatever else the account holds.
         Some(id) => VaultIdPlan::Use(id.to_string()),
-        // No id: either this vault *is* the pre-`Vaults/` one, or a run of it
-        // already moved that pack and failed before committing the id.
-        None => match legacy {
-            Legacy::Pack => VaultIdPlan::AssignAndMigrateLegacy,
-            Legacy::MovedTo(id) => VaultIdPlan::Adopt(id.clone()),
-            Legacy::Absent => VaultIdPlan::Assign,
-        },
+        // A vault that has never synced. Whatever packs are up there belong to
+        // other installs until the user says otherwise.
+        None => VaultIdPlan::Assign,
     }
 }
 
@@ -363,11 +321,9 @@ struct Resolved {
 /// Settle the vault id for this run, doing whatever Drive work [`plan_vault_id`]
 /// calls for.
 ///
-/// The one place the two layouts meet: afterwards the account holds this
-/// vault's pack under `Vaults/<id>.rowel` (or holds nothing yet, and the first
-/// push puts it there). The *local* vault is not touched here at all — an id
-/// this function minted lives in memory for as long as the run does, which is
-/// what keeps a failed run from leaving a vault pointed at a pack it never read.
+/// The *local* vault is not touched here at all — an id this function minted
+/// lives in memory for as long as the run does, which is what keeps a failed run
+/// from leaving a vault pointed at a pack it never read.
 async fn resolve_vault_id(
     app: &AppHandle,
     cryptor: &Cryptor,
@@ -377,15 +333,13 @@ async fn resolve_vault_id(
     let client = http_client();
     let token = auth::access_token(&client, app, cryptor).await?;
 
-    let root = drive::folder_id(&client, &token, layout::ROOT_FOLDER).await?;
-    let mut legacy_file = None;
     let mut live: Vec<String> = Vec::new();
-    if let Some(root) = &root {
-        legacy_file = drive::find_file(&client, &token, layout::LEGACY_VAULT_FILE, root).await?;
-        // A missing `Vaults/` is an account no build that knew about the folder
-        // has ever written to, which is the same answer as an empty one.
-        let vaults = drive::folder_id_in(&client, &token, layout::VAULTS_FOLDER, root).await?;
-        if let Some(vaults) = vaults {
+    // A missing `Rowel/` or `Vaults/` is an account nothing has ever synced to,
+    // which is the same answer as an empty folder.
+    if let Some(root) = drive::folder_id(&client, &token, layout::ROOT_FOLDER).await? {
+        if let Some(vaults) =
+            drive::folder_id_in(&client, &token, layout::VAULTS_FOLDER, &root).await?
+        {
             live = drive::list_folder(&client, &token, &vaults)
                 .await?
                 .iter()
@@ -394,109 +348,16 @@ async fn resolve_vault_id(
         }
     }
     let live: Vec<&str> = live.iter().map(String::as_str).collect();
-    let legacy = legacy_state(legacy_file.as_ref());
 
-    match plan_vault_id(intent, local.vault_id()?.as_deref(), &legacy, &live) {
+    match plan_vault_id(intent, local.vault_id()?.as_deref(), &live) {
         VaultIdPlan::Use(id) => Ok(Resolved { id, persist: false }),
         VaultIdPlan::Adopt(id) => Ok(Resolved { id, persist: true }),
         VaultIdPlan::Assign => Ok(Resolved {
             id: crate::crypto::random_hex_id(),
             persist: true,
         }),
-        VaultIdPlan::AssignAndMigrateLegacy => {
-            let id = crate::crypto::random_hex_id();
-            // Both of these were read off the very listing the plan was made
-            // from, so `Legacy::Pack` cannot be reached without them; the arm
-            // is the type system's share of that argument, not a case.
-            let (Some(root), Some(file)) = (root.as_deref(), &legacy_file) else {
-                return Err(Error::Other("the legacy vault file went missing".into()));
-            };
-            migrate_legacy(&client, &token, root, &file.id, &id).await?;
-            Ok(Resolved { id, persist: true })
-        }
         VaultIdPlan::Ambiguous => Err(Error::Other(ambiguous_vault_error())),
     }
-}
-
-/// Read what stands at `Rowel/vault.swsync` out of the listing alone.
-///
-/// The `PROP_MOVED_TO` property is what tells a migrated file from a real pack,
-/// and it comes back with every listing — so no build has to download a file to
-/// find out it is not a vault.
-fn legacy_state(file: Option<&drive::DriveFile>) -> Legacy {
-    let Some(file) = file else {
-        return Legacy::Absent;
-    };
-    match file.app_properties.get(layout::PROP_MOVED_TO) {
-        Some(id) if !id.is_empty() => Legacy::MovedTo(id.clone()),
-        _ => Legacy::Pack,
-    }
-}
-
-/// Move the pre-`Vaults/` pack to `Vaults/<vault_id>.rowel` and leave a
-/// tombstone standing in its place.
-///
-/// Moved, not re-uploaded: the file keeps its Drive id and its whole revision
-/// history, so a user who wants yesterday's vault back still has it — and the
-/// account is never left holding two packs, one of which quietly stops being
-/// written to.
-///
-/// The tombstone is what the *other* devices read. Without it a device still on
-/// the pre-`Vaults/` build finds nothing at the only name it knows, creates a
-/// fresh `vault.swsync`, and from then on both devices sync happily to
-/// different files; its content is a pack header that build cannot parse, so it
-/// stops with "update the app" instead. Its `PROP_MOVED_TO` property does the
-/// same job for devices that *are* upgraded, pointing them at the id the pack
-/// now answers to (see [`pack::tombstone`] and [`legacy_state`]).
-async fn migrate_legacy(
-    client: &Client,
-    token: &str,
-    root: &str,
-    legacy_file_id: &str,
-    vault_id: &str,
-) -> Result<()> {
-    let vaults = ensure_vaults_folder(client, token, root).await?;
-    let name = layout::vault_file_name(vault_id);
-    drive::move_file(client, token, legacy_file_id, &name, root, &vaults).await?;
-
-    // A migration that cannot leave its marker is undone rather than left
-    // half-done. The moved pack alone is not evidence of anything — this run's
-    // id is not committed yet, and an id-less vault never adopts a pack just
-    // for being the only one there — so the next run would mint a second vault
-    // beside the user's data. Putting the pack back leaves exactly the state
-    // this started from, and the next run migrates it again.
-    if let Err(e) = leave_tombstone(client, token, root, vault_id).await {
-        let put_back = drive::move_file(
-            client,
-            token,
-            legacy_file_id,
-            layout::LEGACY_VAULT_FILE,
-            &vaults,
-            root,
-        )
-        .await;
-        if let Err(undo) = put_back {
-            log::warn!("the legacy pack could not be put back after a failed migration: {undo}");
-        }
-        return Err(e);
-    }
-    Ok(())
-}
-
-// The marker itself: content for old builds, property for new ones. It goes up
-// as an opaque blob rather than under the vault MIME type, because it is
-// precisely not a vault.
-async fn leave_tombstone(client: &Client, token: &str, root: &str, vault_id: &str) -> Result<()> {
-    drive::create_file_with_properties(
-        client,
-        token,
-        layout::LEGACY_VAULT_FILE,
-        root,
-        &pack::tombstone(vault_id),
-        &[(layout::PROP_MOVED_TO, vault_id)],
-    )
-    .await
-    .map(|_| ())
 }
 
 /// `Rowel/Vaults`, created if this account has never had one.
@@ -648,103 +509,42 @@ impl Remote for DriveRemote {
 
 #[cfg(test)]
 mod tests {
-    use super::{legacy_state, plan_vault_id, Intent, Legacy, VaultIdPlan};
-    use crate::sync::drive::DriveFile;
-    use crate::sync::layout;
+    use super::{plan_vault_id, Intent, VaultIdPlan};
 
     const ID: &str = "a1b2c3";
     const OTHER: &str = "dddd";
 
-    fn plan(local: Option<&str>, legacy: Legacy, live: &[&str]) -> VaultIdPlan {
-        plan_vault_id(Intent::Sync, local, &legacy, live)
+    fn plan(local: Option<&str>, live: &[&str]) -> VaultIdPlan {
+        plan_vault_id(Intent::Sync, local, live)
     }
 
-    fn import(local: Option<&str>, legacy: Legacy, live: &[&str]) -> VaultIdPlan {
-        plan_vault_id(Intent::Import, local, &legacy, live)
+    fn import(local: Option<&str>, live: &[&str]) -> VaultIdPlan {
+        plan_vault_id(Intent::Import, local, live)
     }
 
-    // --- a vault that knows its own name ------------------------------------
+    // --- an ordinary run -----------------------------------------------------
 
     #[test]
     fn a_vault_that_knows_its_id_simply_uses_it() {
         // Its pack is there; and if it is not, the first push creates it.
-        assert_eq!(
-            plan(Some(ID), Legacy::Absent, &[ID]),
-            VaultIdPlan::Use(ID.into())
-        );
-        assert_eq!(
-            plan(Some(ID), Legacy::Absent, &[]),
-            VaultIdPlan::Use(ID.into())
-        );
+        assert_eq!(plan(Some(ID), &[ID]), VaultIdPlan::Use(ID.into()));
+        assert_eq!(plan(Some(ID), &[]), VaultIdPlan::Use(ID.into()));
         // Another vault's pack in the folder is none of this one's business.
         assert_eq!(
-            plan(Some(ID), Legacy::Absent, &[OTHER, "eeee"]),
+            plan(Some(ID), &[OTHER, "eeee"]),
             VaultIdPlan::Use(ID.into())
         );
     }
 
-    // A vault that has an id was created on a build that mints them, so the
-    // pre-`Vaults/` pack is somebody else's history: taking it over would file
-    // it under this vault's name and then fail to merge it, having already
-    // broken the promise that starting fresh leaves the old vault alone.
+    // The count is not evidence. A vault that has never synced has no claim on
+    // whatever single pack the account happens to hold — it could be another
+    // install's, and adopting it would push this vault's entries into it. The
+    // user asks for that explicitly, by importing.
     #[test]
-    fn a_vault_with_an_id_never_takes_over_the_legacy_pack() {
-        assert_eq!(
-            plan(Some(ID), Legacy::Pack, &[]),
-            VaultIdPlan::Use(ID.into())
-        );
-        assert_eq!(
-            plan(Some(ID), Legacy::Pack, &[ID]),
-            VaultIdPlan::Use(ID.into())
-        );
-        assert_eq!(
-            plan(Some(ID), Legacy::MovedTo(OTHER.into()), &[OTHER]),
-            VaultIdPlan::Use(ID.into())
-        );
-    }
-
-    // --- an id-less vault ----------------------------------------------------
-
-    #[test]
-    fn a_vault_from_before_ids_takes_the_legacy_pack_with_it() {
-        assert_eq!(
-            plan(None, Legacy::Pack, &[]),
-            VaultIdPlan::AssignAndMigrateLegacy
-        );
-    }
-
-    // The tombstone is this vault's own migration, seen from the far side of a
-    // run that moved the pack and then failed before committing the id.
-    #[test]
-    fn an_idless_vault_follows_the_tombstone_to_the_moved_pack() {
-        assert_eq!(
-            plan(None, Legacy::MovedTo(OTHER.into()), &[OTHER]),
-            VaultIdPlan::Adopt(OTHER.into())
-        );
-        // The pack it names has since been archived or deleted; addressing it
-        // anyway keeps the two devices on one name, and the first push recreates it.
-        assert_eq!(
-            plan(None, Legacy::MovedTo(OTHER.into()), &[]),
-            VaultIdPlan::Adopt(OTHER.into())
-        );
-    }
-
-    #[test]
-    fn an_idless_vault_with_no_legacy_file_mints_an_id() {
-        assert_eq!(plan(None, Legacy::Absent, &[]), VaultIdPlan::Assign);
-    }
-
-    // The count is not evidence. A vault that has never synced and was never
-    // the legacy one has no claim on whatever single pack the account happens
-    // to hold — it could be another install's, and adopting it would push this
-    // vault's entries into it. The user asks for that explicitly, by importing.
-    #[test]
-    fn an_idless_vault_does_not_adopt_a_pack_just_for_being_the_only_one() {
-        assert_eq!(plan(None, Legacy::Absent, &[OTHER]), VaultIdPlan::Assign);
-        assert_eq!(
-            plan(None, Legacy::Absent, &[OTHER, "eeee"]),
-            VaultIdPlan::Assign
-        );
+    fn a_vault_that_has_never_synced_mints_an_id_whatever_is_up_there() {
+        assert_eq!(plan(None, &[]), VaultIdPlan::Assign);
+        assert_eq!(plan(None, &[OTHER]), VaultIdPlan::Assign);
+        assert_eq!(plan(None, &[OTHER, "eeee"]), VaultIdPlan::Assign);
     }
 
     // --- "Import from Drive" -------------------------------------------------
@@ -753,83 +553,25 @@ mod tests {
     // nothing in it. Keeping that id would find nothing to import.
     #[test]
     fn an_import_takes_on_the_one_vault_the_account_holds() {
-        assert_eq!(
-            import(Some(ID), Legacy::Absent, &[OTHER]),
-            VaultIdPlan::Adopt(OTHER.into())
-        );
-        assert_eq!(
-            import(None, Legacy::Absent, &[OTHER]),
-            VaultIdPlan::Adopt(OTHER.into())
-        );
+        assert_eq!(import(Some(ID), &[OTHER]), VaultIdPlan::Adopt(OTHER.into()));
+        assert_eq!(import(None, &[OTHER]), VaultIdPlan::Adopt(OTHER.into()));
         // Already that vault: nothing to take on, and no reason to re-point a
         // vault that is already syncing to its own pack.
-        assert_eq!(
-            import(Some(ID), Legacy::Absent, &[ID]),
-            VaultIdPlan::Use(ID.into())
-        );
+        assert_eq!(import(Some(ID), &[ID]), VaultIdPlan::Use(ID.into()));
     }
 
     // The only way to reach it: an ordinary run never chooses between packs.
     #[test]
     fn an_import_refuses_to_guess_between_several_vaults() {
-        assert_eq!(
-            import(Some(ID), Legacy::Absent, &[OTHER, "eeee"]),
-            VaultIdPlan::Ambiguous
-        );
-        assert_eq!(
-            import(None, Legacy::Absent, &[OTHER, "eeee"]),
-            VaultIdPlan::Ambiguous
-        );
+        assert_eq!(import(Some(ID), &[OTHER, "eeee"]), VaultIdPlan::Ambiguous);
+        assert_eq!(import(None, &[OTHER, "eeee"]), VaultIdPlan::Ambiguous);
     }
 
-    // With nothing under `Vaults/` an import is an ordinary run: the same
-    // arms decide it, legacy pack and all.
+    // With nothing under `Vaults/` there is nothing to import, so the same arms
+    // as an ordinary run decide it.
     #[test]
     fn an_import_into_an_empty_account_behaves_like_a_sync() {
-        assert_eq!(
-            import(Some(ID), Legacy::Absent, &[]),
-            VaultIdPlan::Use(ID.into())
-        );
-        assert_eq!(
-            import(Some(ID), Legacy::Pack, &[]),
-            VaultIdPlan::Use(ID.into())
-        );
-        assert_eq!(
-            import(None, Legacy::Pack, &[]),
-            VaultIdPlan::AssignAndMigrateLegacy
-        );
-    }
-
-    // --- reading the legacy file off a listing -------------------------------
-
-    fn legacy_file(properties: &[(&str, &str)]) -> DriveFile {
-        DriveFile {
-            id: "file-1".into(),
-            name: layout::LEGACY_VAULT_FILE.into(),
-            created_time: "2024-01-01T00:00:00Z".into(),
-            modified_time: String::new(),
-            size: None,
-            head_revision: None,
-            app_properties: properties
-                .iter()
-                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                .collect(),
-        }
-    }
-
-    #[test]
-    fn the_marker_alone_tells_a_tombstone_from_a_pack() {
-        assert_eq!(legacy_state(None), Legacy::Absent);
-        assert_eq!(legacy_state(Some(&legacy_file(&[]))), Legacy::Pack);
-        assert_eq!(
-            legacy_state(Some(&legacy_file(&[(layout::PROP_MOVED_TO, ID)]))),
-            Legacy::MovedTo(ID.into())
-        );
-        // A marker with nothing in it names no vault, so the file is taken at
-        // face value: a pack, which is the answer that loses nothing.
-        assert_eq!(
-            legacy_state(Some(&legacy_file(&[(layout::PROP_MOVED_TO, "")]))),
-            Legacy::Pack
-        );
+        assert_eq!(import(Some(ID), &[]), VaultIdPlan::Use(ID.into()));
+        assert_eq!(import(None, &[]), VaultIdPlan::Assign);
     }
 }

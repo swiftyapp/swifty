@@ -11,13 +11,13 @@ import type { UnlockResult } from './types'
  * that names that choice back to the backend.
  *
  * `name` is the file's name in `Rowel/Vaults/`: the vault's own id, not a label
- * the user chose, so it is not shown. `vaultId` is that same id parsed out, and
- * is null for the legacy pack, which predates vaults having ids.
+ * the user chose, so it is not shown. `vaultId` is that same id parsed out —
+ * always present, since a file whose name carries no id is not a pack at all.
  */
 export interface SetupDriveFile {
   id: string
   name: string
-  vaultId: string | null
+  vaultId: string
   size: number
   modifiedTime: string
 }

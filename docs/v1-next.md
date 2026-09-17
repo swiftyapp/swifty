@@ -32,26 +32,20 @@ products solve it, don't patch symptoms.
 > **Drive layout, post-rebrand** — "one pack per vault under `Rowel/Vaults/`" replaced the
 > single `Rowel/vault.swsync`: packs are now `Vaults/<vault-id>.rowel` (same extension as the
 > local backup, which is the same bytes) and shares `Shares/<random>.rowelshare`, all named by
-> `sync::layout`. An upgraded install moves its legacy file into place on first sync, keeping
-> the Drive file id and its revision history; the `SWSY` magic bytes are a format tag and stay.
-> The move leaves a **tombstone** at `Rowel/vault.swsync`: a header carrying format byte `2`,
-> which a device still on the old build cannot parse, so its sync stops with "update the app"
-> instead of silently creating a second vault and diverging. New builds read the same file's
-> `rowelMovedTo` appProperty out of the listing to learn which pack the vault moved to. The
-> id a run settles on is written into the vault's `meta` only after that run has succeeded,
-> so a failed import never leaves a vault pointed at a pack it did not merge.
+> `sync::layout`; the `SWSY` magic bytes are a format tag and stay. The layout changed inside
+> the alpha with **no migration**: a device still on the old build has to be reset and restored
+> from Drive. The id a run settles on is written into the vault's `meta` only after that run
+> has succeeded, so a failed import never leaves a vault pointed at a pack it did not merge.
 >
-> Onboarding's probe lists every live pack it finds — plus the legacy file while that is still
-> a pack rather than a tombstone — and the first run picks which vault to restore or to
-> archive, so an account holding two installs' primaries never has one chosen for it.
+> Onboarding's probe lists every live pack it finds and the first run picks which vault to
+> restore or to archive, so an account holding two installs' primaries never has one chosen
+> for it.
 >
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a
 > foreign-vault error); OAuth scope audit (`drive.file`); per-workspace sync (drops
 > archive-by-rename — "start fresh" simply becomes a new vault — and adds a `vaultId`
-> appProperty on shares); drop the legacy `vault.swsync` fallback once
-> upgraded installs have migrated; **release gate: a production Google OAuth client ID (owner
-> task)**.
+> appProperty on shares); **release gate: a production Google OAuth client ID (owner task)**.
 
 Re-enable Google Drive sync on the new SQLite storage engine. Postponed during remediation;
 picking it back up now. **The storage groundwork already exists** — do not rebuild it:

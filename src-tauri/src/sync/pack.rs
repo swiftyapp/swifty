@@ -17,9 +17,6 @@
 //! There is no compression layer. The body is ciphertext, which does not
 //! compress, so a codec would only add a failure mode and a decode cost.
 //!
-//! The format byte is also how this app says "not a vault" to builds that are
-//! older than the thing it is saying it about: see [`tombstone`].
-//!
 //! This module is deliberately pure — paths and bytes, no `AppHandle`, no Tauri
 //! types — so the Drive provider can reuse it and the tests can drive it
 //! directly.
@@ -42,11 +39,6 @@ pub const MAX_PACK_BYTES: usize = 256 * 1024 * 1024;
 // changing it would make this build refuse files it wrote itself.
 const MAGIC: &[u8; 4] = b"SWSY";
 const FORMAT_V1: u8 = 1;
-// Not a pack at all: the marker [`tombstone`] leaves where a migrated pack used
-// to be. It is reserved here, in the one place format bytes are minted, so a
-// real format v2 can never be handed the number a shipped build already reads
-// as "not a vault".
-const FORMAT_MOVED: u8 = 2;
 const HEADER_LEN: usize = MAGIC.len() + 1 + 4;
 
 // A KDF descriptor is a ~150-byte JSON object. The cap turns a corrupt or
@@ -109,41 +101,16 @@ pub struct Unpacked {
     pub snapshot: Vec<u8>,
 }
 
-/// Wrap a SQLCipher snapshot in the pack header.
+/// Wrap a SQLCipher snapshot in the pack header: magic, the format byte, the
+/// length of the KDF descriptor, the descriptor, and then the snapshot.
 pub fn pack(kdf_params_json: &str, snapshot: &[u8]) -> Vec<u8> {
-    framed(FORMAT_V1, kdf_params_json.as_bytes(), snapshot)
-}
-
-/// The marker left behind at the pre-`Vaults/` `vault.swsync` once the pack it
-/// held has been moved to `Vaults/<vault_id>.rowel` (see `sync::layout`).
-///
-/// It is written for two readers at once, and neither of them downloads it
-/// twice. Its **content** is this same framing under [`FORMAT_MOVED`] — a
-/// format byte no released build knows — so a device still on the pre-`Vaults/`
-/// build stops at [`PackError::UnknownVersion`] ("update the app") instead of
-/// finding nothing, starting a second vault and diverging while both sides
-/// report success. Its **`appProperties`** marker (`layout::PROP_MOVED_TO`,
-/// written by the uploader) is for builds that do know this layout: it names
-/// the id the pack moved to, so a listing alone says which vault to take on.
-///
-/// The body is a whole, if tiny, framed section rather than an empty one, so
-/// the file can never be mistaken for a truncated pack: the old build reads the
-/// version before it reads anything else, but a reader that ever checks length
-/// first still finds the file complete.
-pub fn tombstone(vault_id: &str) -> Vec<u8> {
-    let body = serde_json::json!({ "movedTo": vault_id }).to_string();
-    framed(FORMAT_MOVED, body.as_bytes(), &[])
-}
-
-// The shared wire shape: magic, one format byte, the length of `head`, `head`,
-// and then whatever the format says follows it.
-fn framed(format: u8, head: &[u8], rest: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(HEADER_LEN + head.len() + rest.len());
+    let kdf = kdf_params_json.as_bytes();
+    let mut out = Vec::with_capacity(HEADER_LEN + kdf.len() + snapshot.len());
     out.extend_from_slice(MAGIC);
-    out.push(format);
-    out.extend_from_slice(&(head.len() as u32).to_le_bytes());
-    out.extend_from_slice(head);
-    out.extend_from_slice(rest);
+    out.push(FORMAT_V1);
+    out.extend_from_slice(&(kdf.len() as u32).to_le_bytes());
+    out.extend_from_slice(kdf);
+    out.extend_from_slice(snapshot);
     out
 }
 
@@ -305,40 +272,6 @@ mod tests {
         let snapshot = body();
 
         let got = unpack(&pack(&json, &snapshot)).unwrap();
-        assert_eq!(got.kdf_params_json, json);
-        assert_eq!(got.snapshot, snapshot);
-    }
-
-    // The whole point of the tombstone: an old build must read it as "update
-    // the app" and nothing else. `BadMagic` would read as "not a Rowel file"
-    // and `Truncated` as "your vault is damaged" — both of which invite exactly
-    // the fresh start this file exists to prevent.
-    #[test]
-    fn a_tombstone_reads_as_a_version_this_build_does_not_know() {
-        let bytes = tombstone("a1b2c3");
-
-        match unpack(&bytes) {
-            Err(PackError::UnknownVersion(2)) => {}
-            other => panic!("expected UnknownVersion(2), got {other:?}"),
-        }
-        // The id is in the body as well as in the Drive property, so a file
-        // pulled on its own still says where the pack went.
-        assert!(String::from_utf8_lossy(&bytes).contains(r#"{"movedTo":"a1b2c3"}"#));
-        // Still recognisably ours, and still a complete file.
-        assert_eq!(&bytes[..MAGIC.len()], MAGIC);
-        assert_eq!(bytes.len(), HEADER_LEN + r#"{"movedTo":"a1b2c3"}"#.len());
-    }
-
-    // Reserving the byte is only worth anything if v1 parsing is untouched by
-    // it: same header, same descriptor, same snapshot.
-    #[test]
-    fn a_tombstone_does_not_disturb_how_a_v1_pack_parses() {
-        let json = kdf_json();
-        let snapshot = body();
-
-        let packed = pack(&json, &snapshot);
-        assert_eq!(packed[MAGIC.len()], FORMAT_V1);
-        let got = unpack(&packed).unwrap();
         assert_eq!(got.kdf_params_json, json);
         assert_eq!(got.snapshot, snapshot);
     }

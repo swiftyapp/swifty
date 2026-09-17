@@ -532,49 +532,6 @@ fn rename_body(name: &str) -> Value {
     json!({ "name": name })
 }
 
-/// Move a file to `to_parent` under `new_name`, in one request.
-///
-/// The same object comes out the other side: its Drive id, its content and its
-/// revision history are all untouched, which is the whole reason this is a
-/// patch and not a copy-and-delete. Migrating the pre-`Vaults/` pack therefore
-/// costs no upload and loses no history, and a link to the old file still
-/// resolves.
-pub async fn move_file(
-    client: &Client,
-    token: &str,
-    id: &str,
-    new_name: &str,
-    from_parent: &str,
-    to_parent: &str,
-) -> Result<()> {
-    let (query, body) = move_request(new_name, from_parent, to_parent);
-    let resp = client
-        .patch(format!("{FILES}/{id}"))
-        .bearer_auth(token)
-        .query(&query)
-        .json(&body)
-        .send()
-        .await
-        .map_err(other)?;
-    check(resp).await.map(|_| ())
-}
-
-// Reparenting is a query parameter and renaming is a body field, so one
-// `files.patch` does both — and, because the patch merges, disturbs nothing
-// else about the file.
-fn move_request<'a>(
-    new_name: &str,
-    from_parent: &'a str,
-    to_parent: &'a str,
-) -> (Vec<(&'static str, &'a str)>, Value) {
-    let query = vec![
-        ("addParents", to_parent),
-        ("removeParents", from_parent),
-        ("fields", FILE_FIELDS),
-    ];
-    (query, json!({ "name": new_name }))
-}
-
 /// Overwrite a vault pack's content, returning its new head revision.
 pub async fn update_file(
     client: &Client,
@@ -601,9 +558,9 @@ pub async fn update_file(
 #[cfg(test)]
 mod tests {
     use super::{
-        collect_pages, escape, layout, list_query, move_request, multipart_body, oldest,
-        parse_file, parse_listing, parse_properties, parse_size, rename_body, DriveFile,
-        FILE_FIELDS, LIST_FIELDS,
+        collect_pages, escape, layout, list_query, multipart_body, oldest, parse_file,
+        parse_listing, parse_properties, parse_size, rename_body, DriveFile, FILE_FIELDS,
+        LIST_FIELDS,
     };
     use serde_json::json;
     use std::cell::RefCell;
@@ -794,19 +751,6 @@ mod tests {
     fn a_rename_patches_only_the_name() {
         let body = rename_body("vault-archived-2024-05-04.rowel");
         assert_eq!(body, json!({ "name": "vault-archived-2024-05-04.rowel" }));
-    }
-
-    // A move is one patch: the parents swap in the query, the name in the body.
-    // Splitting it in two would leave the file briefly in both folders — or, if
-    // the second call failed, in neither the caller expected.
-    #[test]
-    fn a_move_reparents_and_renames_in_a_single_patch() {
-        let (query, body) = move_request("a1b2c3.rowel", "root-folder", "vaults-folder");
-
-        assert!(query.contains(&("addParents", "vaults-folder")));
-        assert!(query.contains(&("removeParents", "root-folder")));
-        assert!(query.contains(&("fields", FILE_FIELDS)));
-        assert_eq!(body, json!({ "name": "a1b2c3.rowel" }));
     }
 
     // Binary content must survive the envelope byte for byte — the share is

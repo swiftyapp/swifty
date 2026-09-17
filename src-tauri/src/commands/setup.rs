@@ -169,7 +169,7 @@ pub async fn setup_restore_from_drive(
     *state.pending_drive.lock().unwrap() = Some(tokens.clone());
 
     let (key, store) = restore_off_thread(&app, bytes, password).await?;
-    adopt(&app, &state, key, store, Some(&tokens), vault_id.as_deref())
+    adopt(&app, &state, key, store, Some(&tokens), Some(&vault_id))
 }
 
 /// Restore from a `.rowel` backup on disk. Onboarding only.
@@ -210,7 +210,7 @@ async fn download(
     app: &AppHandle,
     tokens: &mut sync::Tokens,
     file_id: &str,
-) -> Result<(Vec<u8>, Option<String>)> {
+) -> Result<(Vec<u8>, String)> {
     let client = sync::http_client();
     let token = sync::fresh_access_token(&client, app, tokens).await?;
     let file = sync::setup::find_pack_by_id(&client, &token, file_id).await?;
@@ -314,7 +314,13 @@ fn adopt(
     // Id first, then metadata, tokens last: nothing else is written until the
     // one read that could fail has succeeded, so a failure here leaves no token
     // file sealed under a key that is about to be discarded.
-    let installed = stamp_vault_id(&store, vault_id).and_then(|()| {
+    let stamped = match vault_id {
+        Some(id) => stamp_vault_id(&store, id),
+        // A vault created from scratch, or restored from a backup file that no
+        // account addresses: it mints its own id on its first sync.
+        None => Ok(()),
+    };
+    let installed = stamped.and_then(|()| {
         let entries = list_metas(&store)?;
         if let Some(tokens) = tokens {
             sync::persist_tokens(app, &key.cryptor(), tokens)?;
@@ -350,11 +356,8 @@ fn adopt(
 /// written before ids were stamped into `meta` carries none at all, and this
 /// device has to reach `Vaults/<id>.rowel` on its very first sync — under a
 /// different id it would upload a second pack beside the one it just restored.
-fn stamp_vault_id(store: &SqliteStore, vault_id: Option<&str>) -> Result<()> {
-    match vault_id {
-        Some(id) => crate::store::identity::adopt_vault_id(store, id).map_err(store_err),
-        None => Ok(()),
-    }
+fn stamp_vault_id(store: &SqliteStore, vault_id: &str) -> Result<()> {
+    crate::store::identity::adopt_vault_id(store, vault_id).map_err(store_err)
 }
 
 /// Undo `create_vault` / `restore_from_pack`: remove the database (with its

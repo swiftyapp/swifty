@@ -7,9 +7,6 @@
 //!     <vault-id>-archived-<date>.rowel a pack set aside by "start fresh"
 //!   Shares/
 //!     <random>.rowelshare              one outstanding share
-//!   vault.swsync                       the pre-Vaults/ layout: a real pack until
-//!                                      migrated, then a tombstone saying where
-//!                                      the pack went (see PROP_MOVED_TO)
 //! ```
 //!
 //! Every folder name, file name and extension Drive ever sees is minted here,
@@ -42,20 +39,6 @@ pub const SHARE_EXTENSION: &str = "rowelshare";
 /// association declares.
 pub const VAULT_MIME: &str = "application/vnd.rowel";
 
-/// Where the single pack lived before vaults had ids: directly in
-/// [`ROOT_FOLDER`]. Read so an upgraded install can move it into place, and
-/// so a fresh install can still restore from an account nobody has migrated.
-pub const LEGACY_VAULT_FILE: &str = "vault.swsync";
-
-/// `appProperties` key on the tombstone left at [`LEGACY_VAULT_FILE`] once the
-/// pack has been moved into [`VAULTS_FOLDER`]; its value is the vault id the
-/// pack now lives under. A listing alone therefore tells an upgraded device
-/// which vault to take on, and tells onboarding the file is not a vault. The
-/// tombstone's *content* is for devices still on the old build: a pack header
-/// with a format byte they do not know (`pack::tombstone`), so their sync stops
-/// with "update the app" instead of quietly starting a second vault.
-pub const PROP_MOVED_TO: &str = "rowelMovedTo";
-
 /// The live pack of the vault with this id: `<vault-id>.rowel`.
 pub fn vault_file_name(vault_id: &str) -> String {
     format!("{vault_id}.{VAULT_EXTENSION}")
@@ -78,10 +61,9 @@ pub fn vault_id_of(file_name: &str) -> Option<&str> {
 
 /// The name a pack is set aside under when the user starts fresh on `date`
 /// (`YYYY-MM-DD`, UTC): the original stem, `-archived-<date>`, and the vault
-/// extension — so `vault.swsync` archives as `vault-archived-<date>.rowel`
-/// and `<id>.rowel` as `<id>-archived-<date>.rowel`. Same extension as a live
-/// pack, so the archive is still recognisably a Rowel vault the user could
-/// restore from.
+/// extension — so `<id>.rowel` archives as `<id>-archived-<date>.rowel`. Same
+/// extension as a live pack, so the archive is still recognisably a Rowel vault
+/// the user could restore from.
 pub fn archived_file_name(file_name: &str, date: &str) -> String {
     let stem = file_name
         .rsplit_once('.')
@@ -108,8 +90,7 @@ mod tests {
     #[test]
     fn only_an_exact_hex_stem_reads_as_a_live_vault() {
         assert_eq!(vault_id_of("a1b2c3-archived-2026-09-17.rowel"), None);
-        assert_eq!(vault_id_of("vault.swsync"), None);
-        assert_eq!(vault_id_of("vault-archived-2026-09-17.rowel"), None);
+        assert_eq!(vault_id_of("notes.txt"), None);
         assert_eq!(vault_id_of(".rowel"), None);
         assert_eq!(vault_id_of("A1B2.rowel"), None);
         assert_eq!(vault_id_of("a1b2.rowelshare"), None);
@@ -121,10 +102,6 @@ mod tests {
         assert_eq!(
             archived_file_name("a1b2.rowel", "2026-09-17"),
             "a1b2-archived-2026-09-17.rowel"
-        );
-        assert_eq!(
-            archived_file_name(LEGACY_VAULT_FILE, "2026-09-17"),
-            "vault-archived-2026-09-17.rowel"
         );
         assert_eq!(
             archived_file_name("noext", "2026-09-17"),
