@@ -228,24 +228,38 @@ fn all_public(addrs: &[SocketAddr]) -> bool {
 // Routable on the public internet, as opposed to this machine, its network or
 // nowhere. The list is the IANA special-purpose registry's, spelled out because
 // the standard library's `is_global` is not stable yet. An IPv6 address that
-// carries an IPv4 one (mapped, or NAT64's well-known prefix) is judged as that
-// address, or `::ffff:127.0.0.1` would be a loopback with a public face.
+// carries an IPv4 one (mapped, NAT64's well-known prefix, 6to4) is judged as
+// that address, or `::ffff:127.0.0.1` would be a loopback with a public face.
 fn is_public(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => is_public_v4(v4),
         IpAddr::V6(v6) => match embedded_v4(v6) {
             Some(v4) => is_public_v4(v4),
-            None => {
-                !(v6.is_unspecified()
-                    || v6.is_loopback()
-                    || v6.is_multicast()
-                    || v6.is_unique_local()
-                    || v6.is_unicast_link_local()
-                    // 2001:db8::/32, documentation.
-                    || (v6.segments()[0] == 0x2001 && v6.segments()[1] == 0xdb8))
-            }
+            None => is_public_v6(v6),
         },
     }
+}
+
+// IPv6 is an allowlist, not a blocklist: 2000::/3 is the one block IANA has
+// allocated for global unicast, so anything outside it is not public — the
+// unspecified address, loopback, link-local, unique-local, multicast,
+// discard-only, unassigned space, and both NAT64 prefixes. The local-use one,
+// 64:ff9b:1::/48 (RFC 8215), matters here: it carries an IPv4 address like the
+// well-known prefix does, but where it sits is the operator's choice of prefix
+// length and cannot be read out, so a blocklist would have to know every
+// deployment. The block rule refuses the whole prefix instead, which is right
+// regardless: it is by definition not routable on the public internet.
+//
+// Inside 2000::/3, the registry's own carve-outs: documentation (2001:db8::/32
+// and 3fff::/20), benchmarking (2001:2::/48) and the ORCHID ranges
+// (2001:10::/28, 2001:20::/28).
+fn is_public_v6(v6: Ipv6Addr) -> bool {
+    let s = v6.segments();
+    let global_unicast = s[0] & 0xe000 == 0x2000;
+    let carve_out = (s[0] == 0x2001
+        && (s[1] == 0xdb8 || (s[1] == 0x2 && s[2] == 0) || (0x10..0x30).contains(&s[1])))
+        || (s[0] == 0x3fff && s[1] & 0xf000 == 0);
+    global_unicast && !carve_out
 }
 
 fn is_public_v4(v4: Ipv4Addr) -> bool {
@@ -269,18 +283,24 @@ fn is_public_v4(v4: Ipv4Addr) -> bool {
         || a >= 240)
 }
 
-// The IPv4 address an IPv6 one stands for, if it does: `::ffff:a.b.c.d`, or
-// `64:ff9b::a.b.c.d` (NAT64's well-known prefix, RFC 6052).
+// The IPv4 address an IPv6 one stands for, if it does: `::ffff:a.b.c.d`;
+// `64:ff9b::a.b.c.d` (NAT64's well-known prefix, RFC 6052, always a /96); or
+// `2002:abcd:efgh::` (6to4, RFC 3056, the address in the second and third
+// groups). The local-use NAT64 prefix is not here — see `is_local_nat64`.
 fn embedded_v4(v6: Ipv6Addr) -> Option<Ipv4Addr> {
     if let Some(v4) = v6.to_ipv4_mapped() {
         return Some(v4);
     }
     let s = v6.segments();
-    (s[..6] == [0x64, 0xff9b, 0, 0, 0, 0]).then(|| {
-        let [a, b] = s[6].to_be_bytes();
-        let [c, d] = s[7].to_be_bytes();
+    let v4 = |hi: u16, lo: u16| {
+        let [a, b] = hi.to_be_bytes();
+        let [c, d] = lo.to_be_bytes();
         Ipv4Addr::new(a, b, c, d)
-    })
+    };
+    if s[..6] == [0x64, 0xff9b, 0, 0, 0, 0] {
+        return Some(v4(s[6], s[7]));
+    }
+    (s[0] == 0x2002).then(|| v4(s[1], s[2]))
 }
 
 async fn fetch_icon(url: Url, allowed: &impl Fn() -> bool) -> Option<String> {
@@ -447,6 +467,25 @@ mod tests {
             "::ffff:127.0.0.1",
             "::ffff:10.0.0.1",
             "64:ff9b::7f00:1",
+            // Local-use NAT64: refused whole, wherever the IPv4 address sits
+            // and whatever it is.
+            "64:ff9b:1::7f00:1",
+            "64:ff9b:1::808:808",
+            "64:ff9b:1:7f00:1::",
+            "64:ff9b:1:ffff:ffff:ffff:ffff:ffff",
+            // 6to4 carrying a private address.
+            "2002:7f00:1::",
+            "2002:a00:1::1",
+            // Discard-only, and space never allocated for global unicast.
+            "100::1",
+            "64:ff9b:2::1",
+            "1234::1",
+            // The carve-outs inside 2000::/3.
+            "2001:2::1",
+            "2001:10::1",
+            "2001:2f:ffff::1",
+            "3fff::1",
+            "3fff:fff::1",
         ] {
             assert!(!is_public(private.parse().unwrap()), "{private}");
         }
@@ -461,6 +500,14 @@ mod tests {
             "2606:2800:220:1:248:1893:25c8:1946",
             "::ffff:8.8.8.8",
             "64:ff9b::808:808",
+            "2002:808:808::1",
+            "2001:4860:4860::8888",
+            // Next door to the carve-outs.
+            "2001:db9::1",
+            "2001:2:1::1",
+            "2001:30::1",
+            "3fff:1000::1",
+            "2a00::1",
         ] {
             assert!(is_public(public.parse().unwrap()), "{public}");
         }
