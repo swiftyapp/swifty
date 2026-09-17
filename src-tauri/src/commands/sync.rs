@@ -95,7 +95,9 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 /// to turn a rejected promise into state itself.
 fn never_synced(app: &AppHandle, state: &State<'_, AppState>) -> Result<bool> {
     let session = state.session.lock().unwrap();
-    let store = session.store().inspect_err(|e| failed(app, e.to_string()))?;
+    let store = session
+        .store()
+        .inspect_err(|e| failed(app, e.to_string()))?;
     Ok(crate::store::identity::vault_id(store)
         .map_err(crate::session::store_err)?
         .is_none())
