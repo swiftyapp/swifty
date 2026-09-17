@@ -216,7 +216,7 @@ fn import(app: &AppHandle, cryptor: Cryptor) {
     // not. But if something is, the import did not happen — and the user pressed
     // it precisely to make it happen, so saying nothing would read as a success.
     if !launched {
-        finished(app, Some(import_not_started_error()));
+        not_started(app, import_not_started_error());
     }
 }
 
@@ -444,6 +444,20 @@ fn pending(app: &AppHandle) {
 /// The consent flow ended without a connection.
 fn failed(app: &AppHandle, why: String) {
     log::warn!("sync connect failed: {why}");
+    update(app, |run| {
+        run.pending = false;
+        run.error = Some(why);
+    });
+}
+
+/// A run the user asked for could not start because another one holds the
+/// claim. Only the message changes: the run that is in flight still owns
+/// `in_progress`, and reporting this as a finished run would tell the frontend
+/// that syncing stopped — re-enabling actions and showing an error — while
+/// Drive is being written to. The message stands until that run lands and
+/// reports for itself.
+fn not_started(app: &AppHandle, why: String) {
+    log::warn!("sync not started: {why}");
     update(app, |run| {
         run.pending = false;
         run.error = Some(why);
