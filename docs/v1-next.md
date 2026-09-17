@@ -33,8 +33,10 @@ products solve it, don't patch symptoms.
 > single `Rowel/vault.swsync`: packs are now `Vaults/<vault-id>.rowel` (same extension as the
 > local backup, which is the same bytes) and shares `Shares/<random>.rowelshare`, all named by
 > `sync::layout`; the `SWSY` magic bytes are a format tag and stay. The layout changed inside
-> the alpha with **no migration**: a device still on the old build has to be reset and restored
-> from Drive. The id a run settles on is written into the vault's `meta` only after that run
+> the alpha with **no migration**, and the old file is never read again — not by sync, not by
+> onboarding. Upgrade path: update the device that holds the vault first (its data is local and
+> its first sync pushes it to the new layout), then reset every other device and restore it from
+> that new pack. `Rowel/vault.swsync` can then be deleted by hand. The id a run settles on is written into the vault's `meta` only after that run
 > has succeeded, so a failed import never leaves a vault pointed at a pack it did not merge.
 >
 > Onboarding's probe lists every live pack it finds and the first run picks which vault to
