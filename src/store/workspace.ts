@@ -1,5 +1,5 @@
 import type { Workspace } from '@/api/types'
-import { workspaceCreate, workspaceSelect } from '@/api/workspace'
+import { workspaceCreate, workspaceRestoreFromDrive, workspaceSelect } from '@/api/workspace'
 import { PRIMARY_WORKSPACE } from '@/lib/workspace'
 import {
   useApp,
@@ -52,6 +52,22 @@ export const switchWorkspace = (id: string) => {
 // changes it without passing through a lock.
 export const createWorkspace = async (name: string, password: string) => {
   const result = await workspaceCreate(name, password)
+  clearSession()
+  await enterMain(result)
+  await refreshApp()
+}
+
+// Add a workspace by restoring one of the connected account's other vaults.
+// The same landing as a create — it arrives active and unlocked, so the
+// previous workspace's data goes first and the probe brings the new list on
+// screen — and the same landing as the first run's restore too: the result says
+// `syncConfigured`, which is what has `enterMain` run the first sync.
+export const restoreWorkspaceFromDrive = async (
+  name: string,
+  password: string,
+  fileId: string
+) => {
+  const result = await workspaceRestoreFromDrive(name, password, fileId)
   clearSession()
   await enterMain(result)
   await refreshApp()

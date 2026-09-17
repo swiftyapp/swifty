@@ -29,3 +29,32 @@ export const workspaceSelect = (id: string): Promise<void> =>
 /** Rename a workspace. Metadata only: the vault behind it is untouched. */
 export const workspaceRename = (id: string, name: string): Promise<void> =>
   call('workspace_rename', { id, name })
+
+/**
+ * Connect a Google account for a workspace that does not exist yet. The
+ * onboarding connect with its "no vault here" precondition dropped, so it
+ * answers on exactly the same events: `setup:drive:pending`, then one of
+ * `setup:drive:probed` / `setup:drive:error`. Nothing comes back through this
+ * promise; a rejection is a failure to start at all.
+ *
+ * The tokens it leaves pending are forgotten with `setupDriveDisconnect`, which
+ * both flows share.
+ */
+export const workspaceDriveConnect = (): Promise<void> => call('workspace_drive_connect')
+
+/**
+ * Make a new workspace out of one of the connected account's vaults. `fileId`
+ * is the pack the user picked from what the probe listed, `password` is that
+ * vault's own master password and `name` is the label the workspace gets here.
+ *
+ * Resolves like an unlock of the restored vault, with `syncConfigured: true` —
+ * the account is sealed under its key by the time this returns. A wrong
+ * password rejects as `invalidPassword` and changes nothing, so retrying costs
+ * only the typing.
+ */
+export const workspaceRestoreFromDrive = (
+  name: string,
+  password: string,
+  fileId: string
+): Promise<UnlockResult> =>
+  call('workspace_restore_from_drive', { name, password, fileId })

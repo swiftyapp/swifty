@@ -1,17 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import i18n, { changeLocale } from '@/i18n'
 import { dates } from '@/utils/time'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import type { SyncStatus } from '@/api/sync'
+import type { SetupDriveFile } from '@/api/setup'
 import {
   fileOpened,
   flowMain,
   initialApp,
   openSettings,
   setSyncStatus,
+  setupDriveFailed,
+  setupDriveProbed,
   useApp,
   usePrefs,
   useUi
@@ -521,5 +524,135 @@ describe('Settings › date format', () => {
     expect(await screen.findByText('2035-06-01')).toBeInTheDocument()
     expect(screen.getByText('2024-01-15')).toBeInTheDocument()
     expect(usePrefs.getState().dateFormat).toBe('YYYY-MM-DD')
+  })
+})
+
+// What the probe reports for a vault in `Rowel/Vaults/` — the same payload the
+// first run's picker is built from, because it is the same probe.
+const VAULT: SetupDriveFile = {
+  id: 'drive-file-1',
+  name: '9f3c1a2b4d5e6f708192a3b4c5d6e7f8.rowel',
+  vaultId: '9f3c1a2b4d5e6f708192a3b4c5d6e7f8',
+  size: 1_258_291,
+  modifiedTime: '2024-01-01T00:00:00.000Z'
+}
+
+// Another install's primary in the same account: a second pack, older, so the
+// probe lists it after the first.
+const OTHER_VAULT: SetupDriveFile = {
+  id: 'drive-file-2',
+  name: '11223344556677889900112233445566.rowel',
+  vaultId: '11223344556677889900112233445566',
+  size: 64_512,
+  modifiedTime: '2023-06-02T00:00:00.000Z'
+}
+
+describe('Settings › workspaces › restore from Drive', () => {
+  // Consent, then the probe's answer — which arrives as an event, never through
+  // the connect's promise.
+  const connect = async (files: SetupDriveFile[]) => {
+    await open()
+    await go('workspaces')
+    await userEvent.click(screen.getByTestId('workspace-restore-connect'))
+    await act(async () => setupDriveProbed(files))
+  }
+
+  it('restores the vault the user picked as a workspace of its own', async () => {
+    await connect([VAULT, OTHER_VAULT])
+
+    expect(calls('workspace_drive_connect')).toHaveLength(1)
+    // Two vaults is a choice, so both are offered rather than one picked.
+    expect(screen.getByTestId('drive-vault-drive-file-1')).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('drive-vault-drive-file-2'))
+
+    await userEvent.type(screen.getByTestId('workspace-restore-name'), 'Work')
+    await userEvent.type(screen.getByTestId('workspace-restore-password'), 'other-device-pass')
+    await act(async () => {
+      await userEvent.click(screen.getByTestId('workspace-restore-submit'))
+    })
+
+    expect(calls('workspace_restore_from_drive')).toEqual([
+      { name: 'Work', password: 'other-device-pass', fileId: 'drive-file-2' }
+    ])
+    // It arrives active and unlocked, so the app lands in main and re-probes —
+    // which is what brings the new workspace on screen.
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
+    expect(calls('app_status').length).toBeGreaterThan(0)
+    // Connected on arrival, so the first sync runs exactly as it does after the
+    // first run's restore. (`sync.configured` is not asserted: the re-probe
+    // that follows overwrites it from the fake backend's status, which knows
+    // nothing about the workspace that was just restored.)
+    expect(calls('sync_now')).toHaveLength(1)
+  })
+
+  // One vault in the account is not a choice: it is shown, not offered.
+  it("names the account's only vault without asking which", async () => {
+    await connect([VAULT])
+
+    expect(screen.getByTestId('drive-found-file')).toBeInTheDocument()
+    expect(screen.queryByTestId('drive-vault-drive-file-1')).not.toBeInTheDocument()
+  })
+
+  // Backing out has to reach the backend: tokens left pending would otherwise
+  // be adopted by whatever create or restore came next.
+  it('forgets the connected account when the dialog is cancelled', async () => {
+    await connect([VAULT])
+
+    await userEvent.click(screen.getByTestId('workspace-restore-cancel'))
+
+    expect(calls('setup_drive_disconnect')).toHaveLength(1)
+    expect(useApp.getState().setupDrive.status).toBe('idle')
+    expect(screen.getByTestId('workspace-restore-connect')).toBeInTheDocument()
+  })
+
+  it('blames the password only when the backend does', async () => {
+    mockCommandOnce('workspace_restore_from_drive', () =>
+      Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })
+    )
+    await connect([VAULT])
+
+    await userEvent.type(screen.getByTestId('workspace-restore-name'), 'Work')
+    await userEvent.type(screen.getByTestId('workspace-restore-password'), 'wrong')
+    await userEvent.click(screen.getByTestId('workspace-restore-submit'))
+
+    expect(
+      await screen.findByText(
+        "That isn't the password this was sealed with. Try the one you use on your other devices."
+      )
+    ).toBeInTheDocument()
+    expect(useApp.getState().flow).not.toBe('main')
+  })
+
+  // The one collision the backend can see: the vault open right now.
+  it('says so when the chosen vault is the one already open here', async () => {
+    mockCommandOnce('workspace_restore_from_drive', () =>
+      Promise.reject({
+        kind: 'vaultAlreadyOpen',
+        message: 'this vault is already open in this workspace'
+      })
+    )
+    await connect([VAULT])
+
+    await userEvent.type(screen.getByTestId('workspace-restore-name'), 'Copy')
+    await userEvent.type(screen.getByTestId('workspace-restore-password'), 'pass')
+    await userEvent.click(screen.getByTestId('workspace-restore-submit'))
+
+    expect(
+      await screen.findByText('This vault is the one already open here')
+    ).toBeInTheDocument()
+  })
+
+  it('reports a consent that never came back', async () => {
+    await open()
+    await go('workspaces')
+    await userEvent.click(screen.getByTestId('workspace-restore-connect'))
+    expect(screen.getByTestId('workspace-restore-waiting')).toBeInTheDocument()
+
+    await act(async () => setupDriveFailed('access_denied'))
+
+    expect(await screen.findByTestId('workspace-restore-error')).toHaveTextContent(
+      'access_denied'
+    )
+    expect(calls('workspace_restore_from_drive')).toHaveLength(0)
   })
 })

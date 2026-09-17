@@ -1,13 +1,16 @@
 import { setupDriveConnect, setupDriveDisconnect } from '@/api/setup'
+import { workspaceDriveConnect } from '@/api/workspace'
 import { setupDrivePending, setupDriveFailed, setupDriveReset } from './app'
 import { describeError } from '@/api/errors'
 
 /**
  * Connecting a Google account for a vault that does not exist yet.
  *
- * Which command starts the consent is the only thing a caller varies: the
- * backend has one entry point per precondition. Everything else is shared,
- * including the `setupDrive` slice the probe's answer lands in.
+ * Two screens do this — the first run, and Settings › Workspaces restoring one
+ * of the account's other vaults — and they differ in one thing: which command
+ * starts the consent, since the backend refuses onboarding's once a vault is on
+ * disk. Everything else is shared, including the `setupDrive` slice the probe's
+ * answer lands in, because only one of the two flows can ever be on screen.
  */
 
 type Connect = () => Promise<void>
@@ -36,7 +39,12 @@ const switchAccount = (connect: Connect): void => {
 /** Open the Google consent flow for a device that has no data yet. */
 export const connectDrive = (): void => start(setupDriveConnect)
 
+/** The same, for a device that has data and wants another of the account's. */
+export const connectWorkspaceDrive = (): void => start(workspaceDriveConnect)
+
 export const switchDriveAccount = (): void => switchAccount(setupDriveConnect)
+
+export const switchWorkspaceDriveAccount = (): void => switchAccount(workspaceDriveConnect)
 
 /** Drop the pending tokens and everything the probe said about them. */
 export const forgetDrive = (): void => {
