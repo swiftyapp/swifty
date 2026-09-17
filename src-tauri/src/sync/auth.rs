@@ -95,7 +95,10 @@ pub enum Redirect {
     Foreign,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+/// The OAuth grant. `Debug` is hand-written below: both tokens are bearer
+/// credentials for the user's Drive, and a derived impl would print them into
+/// whatever `{:?}` they reached.
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Tokens {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access_token: Option<String>,
@@ -103,6 +106,19 @@ pub struct Tokens {
     pub refresh_token: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<i64>,
+}
+
+impl std::fmt::Debug for Tokens {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Presence, never the value: that is all a log line needs to tell a
+        // connected account from a bare one.
+        let redacted = |token: &Option<String>| token.as_ref().map(|_| "<redacted>");
+        f.debug_struct("Tokens")
+            .field("access_token", &redacted(&self.access_token))
+            .field("refresh_token", &redacted(&self.refresh_token))
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
 }
 
 #[derive(Deserialize)]

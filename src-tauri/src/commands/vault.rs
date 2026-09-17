@@ -8,6 +8,7 @@ use crate::store::{migrate, Record, VaultStore};
 use crate::{crypto, save, storage, sync};
 use serde::Serialize;
 use tauri::{AppHandle, State};
+use zeroize::Zeroizing;
 
 // Decrypt one entry on demand (view/edit): fetch its payload and unseal it with
 // the session payload key. Nothing is cached in the session.
@@ -105,7 +106,7 @@ pub struct SwftxReport {
 #[tauri::command]
 pub async fn import_swftx(
     path: String,
-    password: String,
+    password: Zeroizing<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SwftxReport> {
@@ -162,7 +163,7 @@ pub async fn import_swftx(
 // have reclaimed.
 #[tauri::command]
 pub async fn export_vault(
-    password: String,
+    password: Zeroizing<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Option<String>> {

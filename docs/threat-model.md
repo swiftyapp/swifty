@@ -14,10 +14,14 @@ entry metadata for the list plus one decrypted entry at a time on reveal. The
 vault is a locally stored, encrypted SQLite database under the OS app-data
 directory. There is no account server and no backend that holds user secrets. The
 webview is locked down by a strict CSP (`default-src 'self'`, `connect-src
-'self'`, `object-src 'none'`, `frame-src 'none'`, `base-uri 'none'`; see
-`src-tauri/tauri.conf.json`), and external links are opened through the OS only
-for `http`/`https` URLs (`opener:allow-open-url` scope in
-`capabilities/default.json`).
+'self'`, `object-src 'none'`, `frame-src 'none'`, `base-uri 'none'`, and no
+`'unsafe-inline'` anywhere: the two `<style>` blocks in `index.html` run under
+the per-load nonce Tauri adds to `style-src`; see `src-tauri/tauri.conf.json`),
+and external links are opened through the OS only for `http`/`https` URLs
+(`opener:allow-open-url` scope in `capabilities/default.json`; plain `http` is
+kept because routers and intranet logins have no other address, and the scope
+exists to shut out `file:`, `javascript:` and custom schemes, not to upgrade
+transport).
 
 ## What sits on disk
 
@@ -69,13 +73,19 @@ Writes are **per-row and atomic** (WAL mode), not a whole-file rewrite: saving o
 edited entry re-seals only that row's payload. Deletes are **tombstones**
 (`deleted_at` is stamped and the row is retained so a later sync can propagate the
 deletion), not hard deletes. On-disk file and directory modes are tightened on
-Unix (`0600` file / `0700` dir); the Windows ACL equivalent for the database is
-still a TODO (`set_mode` no-ops off Unix in `sqlite.rs`). Plaintext exports and
-saved `.env` files, written through `storage::atomic_write_private`, are
+Unix (`0600` file / `0700` dir): the database file is created owner-only
+*before* SQLite opens it, so it — and the `-wal`/`-shm` files SQLite creates
+with the same mode — never spend the open under the umask's default. The
+Windows ACL equivalent for the database is still a TODO (`restrict` no-ops off
+Unix in `sqlite.rs`). Plaintext exports, saved `.env` files and the sealed
+Drive token file, written through `storage::atomic_write_private`, are
 owner-only on both: `0600` on Unix, and on Windows a protected DACL granting the
 current user and SYSTEM alone (`owner_only.rs`), supplied when the temp file is
 created so it never exists, even briefly, under the folder's inherited
-permissions.
+permissions. Every small state file beside the vault (the KDF and lockout
+sidecars, the settings, the biometric marker, the token file) is written by
+atomic rename, so a crash leaves the previous complete file rather than a
+truncated one.
 
 ### Key derivation (KDF)
 

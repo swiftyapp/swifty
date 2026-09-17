@@ -6,7 +6,16 @@ import i18n, { changeLocale } from '@/i18n'
 import { dates } from '@/utils/time'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import type { SyncStatus } from '@/api/sync'
-import { initialApp, openSettings, setSyncStatus, useApp, usePrefs, useUi } from '@/store'
+import {
+  fileOpened,
+  flowMain,
+  initialApp,
+  openSettings,
+  setSyncStatus,
+  useApp,
+  usePrefs,
+  useUi
+} from '@/store'
 import DateField from '@/components/elements/fields/DateField'
 import { FieldsProvider } from '@/components/elements/fields/context'
 import Footer from '@/components/Main/Body/Aside/Show/Footer'
@@ -348,6 +357,36 @@ describe('Settings › import', () => {
     await userEvent.click(screen.getByTestId('import-run-backup'))
 
     expect(await screen.findByText('Invalid password for backup')).toBeInTheDocument()
+  })
+
+  // A legacy vault double-clicked while this one is open: Settings opens on
+  // Import with it picked, as if from the tile, waiting for its password.
+  it('picks a .swftx the OS opened with the app and asks for its password', async () => {
+    flowMain()
+    render(<Settings />)
+
+    fileOpened('/tmp/old-vault.swftx')
+
+    expect(useUi.getState().settings).toBe(true)
+    expect(useUi.getState().settingsSection).toBe('import')
+    expect(await screen.findByText('old-vault.swftx')).toBeInTheDocument()
+    expect(document.querySelector('input[name="import_password"]')).toBeInTheDocument()
+    expect(useApp.getState().openedFile).toBeNull()
+  })
+
+  // One of our own backups is a whole sealed database; with a vault already
+  // open there is nothing to merge it into, and the section says so instead
+  // of asking for a password it could not use.
+  it('names a .rowel the OS opened and explains it is not imported', async () => {
+    flowMain()
+    render(<Settings />)
+
+    fileOpened('/tmp/Rowel backup 2026-09-15.rowel')
+
+    expect(await screen.findByText('Rowel backup 2026-09-15.rowel')).toBeInTheDocument()
+    expect(screen.getByTestId('import-rowel-notice')).toBeInTheDocument()
+    expect(document.querySelector('input[name="import_password"]')).not.toBeInTheDocument()
+    expect(calls('import_swftx')).toEqual([])
   })
 
   it('offers a tile per source and no format select', async () => {

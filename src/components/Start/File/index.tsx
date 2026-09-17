@@ -14,15 +14,17 @@ import { fileNameOf } from '../shared/describe'
 
 interface Props {
   onRestored: (result: UnlockResult) => Promise<void>
+  /** A backup already chosen — the one the OS opened the app with. */
+  initialPath?: string | null
 }
 
 // Restoring from a `.rowel` backup: pick the file, then unseal it with the
 // master password it was sealed under. Desktop only — a phone has nowhere to
 // drag a file from, and the backup it would need was saved on a machine that
 // does.
-export default function File({ onRestored }: Props) {
+export default function File({ onRestored, initialPath = null }: Props) {
   const { t } = useTranslation()
-  const [path, setPath] = useState<string | null>(null)
+  const [path, setPath] = useState<string | null>(initialPath)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)

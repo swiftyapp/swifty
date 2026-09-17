@@ -546,5 +546,6 @@
   "A workspace needs a master password": "A workspace needs a master password",
   "This file is too large": "This file is too large",
   "This file is not text": "This file is not text",
-  "The vault changed while this was running. Try again.": "The vault changed while this was running. Try again."
+  "The vault changed while this was running. Try again.": "The vault changed while this was running. Try again.",
+  "Backups restore a fresh install and are not imported into an existing vault.": "Backups restore a fresh install and are not imported into an existing vault."
 }

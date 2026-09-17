@@ -52,6 +52,18 @@ describe('App', () => {
     expect(unlistens).toHaveLength(first * 2)
   })
 
+  // A launch by double-clicking a backup: Rust parked the path because no
+  // listener existed yet, and the shell collects it once it has subscribed.
+  // Locked, it waits in the store for the unlock that can use it.
+  it('collects the backup the app was launched with', async () => {
+    seedApp({ initialized: true })
+    mockCommand('take_opened_file', () => '/tmp/Rowel backup.rowel')
+    render(<App />)
+
+    await waitFor(() => expect(useApp.getState().openedFile).toBe('/tmp/Rowel backup.rowel'))
+    expect(useApp.getState().flow).toBe('auth')
+  })
+
   it('stays on the lock screen when the probe keeps failing', async () => {
     useApp.setState({ status: null })
     mockCommand('app_status', () => Promise.reject({ kind: 'other', message: 'no backend' }))

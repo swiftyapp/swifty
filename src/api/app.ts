@@ -102,3 +102,11 @@ export const appStatus = (): Promise<AppStatus> => call('app_status')
  * reveals it anyway, so failing to call this costs a delay, not a window.
  */
 export const appReady = (): Promise<void> => call('app_ready')
+
+/**
+ * The backup the OS asked the app to open before this shell was listening for
+ * `file:opened` — a launch by double-clicking one. Rust hands it over once;
+ * null on every ordinary launch. Asked after subscribing to events (`App.tsx`),
+ * so anything opened from then on arrives as the event instead.
+ */
+export const takeOpenedFile = (): Promise<string | null> => call('take_opened_file')

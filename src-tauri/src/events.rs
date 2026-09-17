@@ -18,10 +18,19 @@ pub const IMPORT_PROGRESS: &str = "import:progress";
 pub const SETUP_DRIVE_PENDING: &str = "setup:drive:pending";
 pub const SETUP_DRIVE_PROBED: &str = "setup:drive:probed";
 pub const SETUP_DRIVE_ERROR: &str = "setup:drive:error";
+// Desktop only, like the file associations that produce it (`crate::opened`).
+#[cfg(desktop)]
+pub const FILE_OPENED: &str = "file:opened";
 
 #[derive(Serialize, Clone)]
 struct Entries {
     entries: Vec<EntryMetaDto>,
+}
+
+#[cfg(desktop)]
+#[derive(Serialize, Clone)]
+struct Opened<'a> {
+    path: &'a str,
 }
 
 #[derive(Serialize, Clone)]
@@ -70,4 +79,11 @@ pub fn setup_drive_probed(app: &AppHandle, file: Option<PackInfo>) {
 
 pub fn setup_drive_error(app: &AppHandle, error: &str) {
     let _ = app.emit(SETUP_DRIVE_ERROR, ErrorText { error });
+}
+
+/// The OS asked the app to open a backup (see `crate::opened`). Also parked for
+/// a webview that is not listening yet; this is the live half.
+#[cfg(desktop)]
+pub fn file_opened(app: &AppHandle, path: &str) {
+    let _ = app.emit(FILE_OPENED, Opened { path });
 }

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import Start from '@/components/Start'
 import type { SetupDriveFile } from '@/api/setup'
 import { open } from '@tauri-apps/plugin-dialog'
-import { setupDriveProbed, setupDriveFailed, useApp } from '@/store'
+import { fileOpened, setupDriveProbed, setupDriveFailed, useApp } from '@/store'
 import { evaluate, MIN_LENGTH, type Strength } from '@/services/strength'
 import { calls, mockCommandOnce } from './ipc'
 import { deferred, seedApp } from './utils'
@@ -502,6 +502,38 @@ describe('restoring from a backup file', () => {
     await userEvent.click(screen.getByTestId('restore-confirm-button'))
 
     expect(await screen.findByText('sync file is truncated')).toBeInTheDocument()
+  })
+
+  // Double-clicking a backup on a machine with no vault yet is asking to
+  // restore it: the flow opens on that step with the file already picked, and
+  // the store's copy is taken so nothing offers it a second time.
+  it('opens on the restore step, file picked, when the OS opened a .rowel with the app', async () => {
+    fileOpened('/tmp/Rowel backup 2026-09-15.rowel')
+    render(<Start />)
+
+    expect(await screen.findByTestId('restore-found-file')).toHaveTextContent(
+      'Rowel backup 2026-09-15.rowel'
+    )
+    expect(screen.getByTestId('restore-password-input')).toBeInTheDocument()
+    expect(useApp.getState().openedFile).toBeNull()
+
+    await userEvent.type(screen.getByTestId('restore-password-input'), STRONG)
+    await userEvent.click(screen.getByTestId('restore-confirm-button'))
+    expect(calls('setup_restore_from_file')).toContainEqual({
+      path: '/tmp/Rowel backup 2026-09-15.rowel',
+      password: STRONG
+    })
+  })
+
+  // A legacy `.swftx` cannot be restored — only imported into a vault — so the
+  // first run leaves it parked for Settings › Import once there is one.
+  it('leaves a .swftx the OS opened for the vault this flow ends in', () => {
+    fileOpened('/tmp/old-vault.swftx')
+    render(<Start />)
+
+    expect(screen.getByTestId('start-restore-button')).toBeInTheDocument()
+    expect(screen.queryByTestId('restore-found-file')).not.toBeInTheDocument()
+    expect(useApp.getState().openedFile).toBe('/tmp/old-vault.swftx')
   })
 })
 

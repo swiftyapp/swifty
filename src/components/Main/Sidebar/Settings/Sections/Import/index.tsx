@@ -8,8 +8,9 @@ import Result from './Result'
 export default function Import() {
   const { t } = useTranslation()
   const flow = useImport()
+  // Which tile lit: a `.rowel` has none, it came from the OS, not a tile.
   const active =
-    flow.picked === null
+    flow.picked === null || flow.picked.kind === 'rowel'
       ? null
       : flow.picked.kind === 'swftx'
         ? 'swftx'

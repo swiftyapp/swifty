@@ -28,9 +28,13 @@ use super::blocking;
 // Wrapped with the failed-unlock backoff (T-AUTH-3): a standing lockout is
 // enforced *before* deriving anything (so a locked-out caller never pays the
 // Argon2id cost), and a wrong password updates the lockout sidecar afterwards.
+//
+// The password arrives as `Zeroizing<String>`: deserialized straight into a
+// buffer that is scrubbed when it drops, so the plaintext does not outlive the
+// derive on whatever heap block the allocator gave it.
 #[tauri::command]
 pub async fn unlock(
-    password: String,
+    password: Zeroizing<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
@@ -91,7 +95,7 @@ pub async fn unlock(
 // Run the Argon2id derive + SQLCipher open (both CPU-bound) on a blocking thread.
 async fn unlock_off_thread(
     app: &AppHandle,
-    password: String,
+    password: Zeroizing<String>,
 ) -> Result<(VaultKey, SqliteStore, Vec<EntryMetaDto>)> {
     let app = app.clone();
     blocking(move || unlock_with_password(&app, &password)).await
@@ -243,8 +247,8 @@ fn biometric_material(state: &State<'_, AppState>) -> Result<Zeroizing<Vec<u8>>>
 // this command and does not poll while it is in flight.
 #[tauri::command]
 pub async fn change_master_password(
-    current: String,
-    new: String,
+    current: Zeroizing<String>,
+    new: Zeroizing<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<()> {
@@ -365,8 +369,8 @@ pub async fn change_master_password(
 // here, so a failure costs nothing but the error.
 async fn derive_both(
     app: &AppHandle,
-    current: String,
-    new: String,
+    current: Zeroizing<String>,
+    new: Zeroizing<String>,
 ) -> Result<(VaultKey, VaultKey, KdfParams)> {
     let app = app.clone();
     blocking(move || {

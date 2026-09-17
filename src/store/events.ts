@@ -6,7 +6,8 @@ import {
   setupDriveProbed,
   setupDriveFailed,
   clearSession,
-  showLockScreen
+  showLockScreen,
+  fileOpened
 } from './app'
 import { setEntries, loadArchive, runAudit } from './vault'
 import { useUi } from './ui'
@@ -42,7 +43,10 @@ export const subscribeToEvents = (): (() => void) => {
     on(EVENTS.vaultLocked, () => {
       clearSession()
       void showLockScreen()
-    })
+    }),
+    // A backup double-clicked while the app is up. The one opened *with* the
+    // app is collected separately, once this is listening (see `App.tsx`).
+    on(EVENTS.fileOpened, payload => fileOpened(payload.path))
   ]
 
   return () => {

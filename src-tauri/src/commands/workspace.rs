@@ -12,6 +12,7 @@ use std::sync::atomic::Ordering;
 
 use rand::RngCore;
 use tauri::{AppHandle, State};
+use zeroize::Zeroizing;
 
 use crate::error::{Error, Result};
 use crate::models::UnlockResult;
@@ -121,7 +122,7 @@ fn restore(state: &AppState, active: String, previous: Lease) {
 #[tauri::command]
 pub async fn workspace_create(
     name: String,
-    password: String,
+    password: Zeroizing<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
@@ -237,7 +238,7 @@ async fn create_vault_in(
     app: &AppHandle,
     root: &Path,
     id: &str,
-    password: String,
+    password: Zeroizing<String>,
 ) -> Result<(crate::crypto::VaultKey, crate::store::SqliteStore)> {
     let dir = workspace::dir_of(root, id);
     fs::create_dir_all(&dir)?;
