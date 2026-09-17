@@ -105,13 +105,18 @@ impl SqliteStore {
         // Connection hygiene: WAL for crash-safe per-row writes; NORMAL is the
         // durable/fast pairing for WAL; temp_store=MEMORY keeps sort/temp data
         // (plaintext metadata) off disk; busy_timeout absorbs the brief lock a
-        // second connection (e.g. a snapshot) can hold. No foreign_keys pragma:
-        // the schema has no relations. SQLCipher has no such default pragmas.
+        // second connection (e.g. a snapshot) can hold; secure_delete zeroes
+        // what a DELETE or a shrinking UPDATE frees, so a purged payload's
+        // ciphertext does not sit in a free page until that page is reused —
+        // which is what "delete forever" has to mean to anyone who later gets
+        // the database key. No foreign_keys pragma: the schema has no
+        // relations. SQLCipher has no such default pragmas.
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
              PRAGMA synchronous = NORMAL;
              PRAGMA temp_store = MEMORY;
-             PRAGMA busy_timeout = 5000;",
+             PRAGMA busy_timeout = 5000;
+             PRAGMA secure_delete = ON;",
         )
         .map_err(|e| wrong_key_or(existed, e))?;
 
@@ -325,11 +330,33 @@ impl SqliteStore {
     /// the tombstone has been pushed at least once, or the delete is lost
     /// instead of propagated) belongs to the sync engine, not the store.
     pub fn purge_tombstones_before(&self, cutoff_ms: i64) -> Result<usize> {
-        Ok(self.lock().execute(
+        let conn = self.lock();
+        let reclaimed = conn.execute(
             "DELETE FROM entries WHERE deleted_at IS NOT NULL AND deleted_at < ?1",
             params![cutoff_ms],
-        )?)
+        )?;
+        if reclaimed > 0 {
+            drop_wal_history(&conn);
+        }
+        Ok(reclaimed)
     }
+
+    /// Test seam: the current value of an integer pragma.
+    #[cfg(test)]
+    pub(crate) fn pragma_i64(&self, name: &str) -> Result<i64> {
+        Ok(self
+            .lock()
+            .query_row(&format!("PRAGMA {name}"), [], |r| r.get(0))?)
+    }
+}
+
+/// Fold the WAL back into the main file and truncate it. `secure_delete`
+/// zeroes freed content inside a page, but the page's *previous* image is
+/// still a frame in the WAL until a checkpoint overwrites it, so a purge
+/// checkpoints as well. Best effort: a snapshot connection holding a read
+/// lock makes the checkpoint partial, and the next one finishes the job.
+fn drop_wal_history(conn: &Connection) {
+    let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
 }
 
 impl VaultStore for SqliteStore {
@@ -456,7 +483,8 @@ impl VaultStore for SqliteStore {
     /// ordered sensibly for anything else reading timestamps.
     fn purge(&self, id: &str) -> Result<()> {
         let now = now_ms();
-        self.lock().execute(
+        let conn = self.lock();
+        let purged = conn.execute(
             "UPDATE entries
              SET payload = x'', title = '', tags = '[]', url_host = '',
                  card_brand = NULL, favorite = 0, has_passkey = 0,
@@ -465,6 +493,11 @@ impl VaultStore for SqliteStore {
              WHERE id = ?2 AND deleted_at IS NOT NULL",
             params![now, id],
         )?;
+        // The old payload is zeroed in place by `secure_delete`; this drops the
+        // WAL frame that still holds the page as it was before the update.
+        if purged > 0 {
+            drop_wal_history(&conn);
+        }
         Ok(())
     }
 

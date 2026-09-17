@@ -94,6 +94,8 @@ const DEFAULTS: Record<string, Handler> = {
   // nothing about a lock until the event lands, so the fake has to emit it too
   // — after this promise resolves, as the real one does.
   lock: () => emitEventSoon(EVENTS.vaultLocked, undefined),
+  // The idle-clock ping `Main` sends on mount and on input; nothing to answer.
+  touch_activity: () => undefined,
   unlock_biometric: () => session,
   enable_biometric: () => 'protected',
   disable_biometric: () => undefined,

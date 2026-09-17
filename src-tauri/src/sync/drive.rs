@@ -249,8 +249,19 @@ pub async fn find_file(
     Ok(oldest(find_all(client, token, &q).await?))
 }
 
-pub async fn read_file(client: &Client, token: &str, id: &str) -> Result<Vec<u8>> {
-    let resp = client
+/// Download a file's content, refusing anything over `max_bytes`.
+///
+/// The account is the user's own, but what sits in it is not under this app's
+/// control: a pack swapped for something enormous — by another client, by a
+/// bug in one — must fail with an error, not be buffered whole and take the
+/// process down with it.
+pub async fn read_file(
+    client: &Client,
+    token: &str,
+    id: &str,
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
+    let mut resp = client
         .get(format!("{FILES}/{id}"))
         .bearer_auth(token)
         .query(&[("alt", "media")])
@@ -258,14 +269,20 @@ pub async fn read_file(client: &Client, token: &str, id: &str) -> Result<Vec<u8>
         .await
         .map_err(other)?;
     let status = resp.status();
-    let body = resp.bytes().await.map_err(other)?;
     if !status.is_success() {
+        let body = read_capped(&mut resp, max_bytes).await.unwrap_or_default();
         return Err(Error::Other(format!(
             "Drive API {status}: {}",
             String::from_utf8_lossy(&body)
         )));
     }
-    Ok(body.to_vec())
+    if resp
+        .content_length()
+        .is_some_and(|len| len > max_bytes as u64)
+    {
+        return Err(Error::FileTooLarge);
+    }
+    read_capped(&mut resp, max_bytes).await
 }
 
 /// A folder in the account root.
@@ -431,14 +448,24 @@ pub async fn download_public(
     {
         return Err(Error::ShareTooLarge);
     }
-    read_capped(&mut resp, max_bytes).await
+    read_capped(&mut resp, max_bytes)
+        .await
+        .map_err(|e| match e {
+            Error::FileTooLarge => Error::ShareTooLarge,
+            e => e,
+        })
 }
 
-async fn read_capped(resp: &mut reqwest::Response, max_bytes: usize) -> Result<Vec<u8>> {
+/// Read a response body, failing with [`Error::FileTooLarge`] the moment it
+/// exceeds `max_bytes` — before the excess is ever held in memory. The check
+/// is on what arrives, not on `Content-Length`, so a body that lies about its
+/// size (or sends none) is bounded the same. Crate-visible: every download in
+/// the app has a cap, and this is the one loop that enforces one.
+pub(crate) async fn read_capped(resp: &mut reqwest::Response, max_bytes: usize) -> Result<Vec<u8>> {
     let mut body = Vec::new();
     while let Some(chunk) = resp.chunk().await.map_err(other)? {
         if body.len() + chunk.len() > max_bytes {
-            return Err(Error::ShareTooLarge);
+            return Err(Error::FileTooLarge);
         }
         body.extend_from_slice(&chunk);
     }

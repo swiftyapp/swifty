@@ -32,6 +32,12 @@ use crate::store::SqliteStore;
 /// The remote file name this format is stored under.
 pub const FILE_NAME: &str = "vault.swsync";
 
+/// The most a pack may be when pulled from Drive. A vault is metadata plus
+/// sealed payloads whose biggest members are 1 MiB env files, so a real pack is
+/// megabytes; the cap is there so a file that is not a real pack cannot be
+/// buffered whole before `unpack` gets to refuse it.
+pub const MAX_PACK_BYTES: usize = 256 * 1024 * 1024;
+
 const MAGIC: &[u8; 4] = b"SWSY";
 const FORMAT_V1: u8 = 1;
 const HEADER_LEN: usize = MAGIC.len() + 1 + 4;

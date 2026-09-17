@@ -81,7 +81,7 @@ impl<'a> SessionVault<'a> {
         let mut entries = Vec::new();
         for meta in metas.iter().filter(|m| m.kind == "login") {
             if let Some(record) = self.store.get(&meta.id).map_err(store_err)? {
-                entries.push(self.cipher.unseal(&record.payload)?);
+                entries.push(self.cipher.unseal(&record.id, &record.payload)?);
             }
         }
         Ok(entries)
@@ -166,7 +166,7 @@ impl SessionVault<'_> {
             .get(id)
             .map_err(store_err)?
             .ok_or(Error::NotFound)?;
-        self.cipher.unseal(&record.payload)
+        self.cipher.unseal(&record.id, &record.payload)
     }
 }
 

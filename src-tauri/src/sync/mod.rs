@@ -18,6 +18,7 @@ pub mod restore;
 pub mod setup;
 
 use std::sync::Mutex;
+use std::time::Duration;
 
 use reqwest::Client;
 use tauri::{async_runtime::block_on, AppHandle, Manager};
@@ -86,10 +87,35 @@ pub(crate) fn install_crypto_provider() {
     });
 }
 
-// Build an HTTPS client (see [`install_crypto_provider`] for why it comes first).
-pub(crate) fn http_client() -> Client {
+/// How long a connection may take to come up, and how long a response may go
+/// silent mid-body, before the request fails. Deadlines on the *stall*, not on
+/// the whole request: a pack upload on a slow link legitimately takes minutes,
+/// but a peer that stops answering must not hold a run — and with it the
+/// `syncing` flag, `sync_now` and every workspace switch — open until the
+/// process exits. Callers that know their body is small add a whole-request
+/// `timeout` on top (favicons, shares).
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+const READ_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// The builder every HTTPS client in the app starts from: provider installed
+/// (see [`install_crypto_provider`] for why that comes first), deadlines set.
+/// For a caller that needs one more setting — a redirect policy, a total
+/// timeout — on top of the shared ones.
+pub(crate) fn http_client_builder() -> reqwest::ClientBuilder {
     install_crypto_provider();
-    Client::new()
+    Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .read_timeout(READ_TIMEOUT)
+}
+
+// Build the shared HTTPS client.
+pub(crate) fn http_client() -> Client {
+    // Same failure mode as `Client::new`, which also panics: the builder only
+    // fails when the TLS backend cannot be set up, and nothing in this app
+    // works without it.
+    http_client_builder()
+        .build()
+        .expect("the HTTPS client could not be built")
 }
 
 pub fn is_configured(app: &AppHandle, cryptor: &Cryptor) -> bool {
@@ -225,7 +251,7 @@ impl Remote for DriveRemote {
             let Some(file) = self.locate(&client, &token).await? else {
                 return Ok(None);
             };
-            let bytes = drive::read_file(&client, &token, &file.id).await?;
+            let bytes = drive::read_file(&client, &token, &file.id, pack::MAX_PACK_BYTES).await?;
             Ok(Some(RemoteFile {
                 bytes,
                 revision: file.head_revision.unwrap_or_default(),

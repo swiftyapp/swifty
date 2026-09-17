@@ -6,6 +6,14 @@ export const unlock = (password: string): Promise<UnlockResult> =>
 
 export const lock = (): Promise<void> => call('lock')
 
+/**
+ * The user is at the keyboard: restart the inactivity clock. Rust arms the
+ * auto-lock for the whole of an unlocked session and re-arms it on every one
+ * of these, so the vault seals `autolockSecs` after the last sign of the user
+ * — wherever the window is. Sent throttled by `useActivityPing`.
+ */
+export const touchActivity = (): Promise<void> => call('touch_activity')
+
 export const unlockBiometric = (): Promise<UnlockResult> => call('unlock_biometric')
 
 /**

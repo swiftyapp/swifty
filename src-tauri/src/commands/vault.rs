@@ -20,7 +20,7 @@ pub fn reveal_entry(id: String, state: State<'_, AppState>) -> Result<Entry> {
         .get(&id)
         .map_err(store_err)?
         .ok_or(Error::NotFound)?;
-    cipher.unseal(&record.payload)
+    cipher.unseal(&record.id, &record.payload)
 }
 
 // Persist one entry: seal it into a fresh payload and upsert a single row

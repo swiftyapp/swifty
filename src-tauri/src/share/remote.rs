@@ -196,9 +196,9 @@ impl PublicFetch for DrivePublicFetch {
         let key = api_key()?;
         block_on(async {
             // Not the shared client: this request is made on a stranger's
-            // say-so, so it gets a deadline the account-bound calls do not.
-            crate::sync::install_crypto_provider();
-            let client = Client::builder()
+            // say-so, so on top of the shared stall deadlines it gets one for
+            // the whole request, which a 2 MiB cap makes reasonable.
+            let client = crate::sync::http_client_builder()
                 .timeout(FETCH_TIMEOUT)
                 .build()
                 .map_err(|e| Error::Other(e.to_string()))?;

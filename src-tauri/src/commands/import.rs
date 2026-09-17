@@ -248,7 +248,7 @@ pub async fn export_entries(
 fn to_imported(records: &[Record], cipher: &PayloadCipher) -> Result<Vec<ImportedEntry>> {
     records
         .iter()
-        .map(|r| Ok(entry_to_imported(&cipher.unseal(&r.payload)?)))
+        .map(|r| Ok(entry_to_imported(&cipher.unseal(&r.id, &r.payload)?)))
         .collect()
 }
 

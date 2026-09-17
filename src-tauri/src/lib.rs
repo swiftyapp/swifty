@@ -140,6 +140,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::auth::unlock,
             commands::auth::lock,
+            commands::auth::touch_activity,
             commands::auth::unlock_biometric,
             commands::auth::enable_biometric,
             commands::auth::disable_biometric,

@@ -123,7 +123,7 @@ pub fn seal(key: &ShareKey, entry: &Entry, expires_ms: i64) -> Result<Vec<u8>> {
         expires_at: expires_ms,
         entry: &sanitize(entry),
     })?;
-    let sealed = crate::crypto::seal_aead(key.as_ref(), &plaintext)?;
+    let sealed = crate::crypto::seal_aead(key.as_ref(), &[], &plaintext)?;
     // The recipient refuses anything over the cap, so a share this big would
     // upload fine and then fail everyone it was sent to. Refuse it here, where
     // the sender can still do something about it.
@@ -141,7 +141,7 @@ pub fn unseal(key: &ShareKey, blob: &[u8], now_ms: i64) -> Result<Entry> {
     // they have does not open this share. The AEAD error underneath says
     // nothing they can act on.
     let plaintext =
-        crate::crypto::unseal_aead(key.as_ref(), blob).map_err(|_| Error::ShareLinkInvalid)?;
+        crate::crypto::unseal_aead(key.as_ref(), &[], blob).map_err(|_| Error::ShareLinkInvalid)?;
 
     let envelope: Envelope<serde_json::Value> = serde_json::from_slice(&plaintext)?;
     if envelope.v != VERSION {
@@ -320,7 +320,7 @@ mod tests {
             &json!({"v": 2, "expiresAt": i64::MAX, "entry": {"shape": "unknown"}}),
         )
         .unwrap();
-        let blob = crate::crypto::seal_aead(key.as_ref(), &plaintext).unwrap();
+        let blob = crate::crypto::seal_aead(key.as_ref(), &[], &plaintext).unwrap();
         assert!(matches!(
             unseal(&key, &blob, NOW).unwrap_err(),
             Error::ShareTooNew
@@ -345,7 +345,7 @@ mod tests {
     fn crafted(key: &ShareKey, entry: serde_json::Value) -> Vec<u8> {
         let plaintext =
             serde_json::to_vec(&json!({"v": 1, "expiresAt": i64::MAX, "entry": entry})).unwrap();
-        crate::crypto::seal_aead(key.as_ref(), &plaintext).unwrap()
+        crate::crypto::seal_aead(key.as_ref(), &[], &plaintext).unwrap()
     }
 
     #[test]

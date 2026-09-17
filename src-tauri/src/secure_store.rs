@@ -181,6 +181,14 @@ const HELLO_CHALLENGE: &[u8] = b"rowel-biometric-v1";
 #[cfg(any(target_os = "windows", test))]
 const HELLO_WRAP_INFO: &[u8] = b"rowel windows-hello wrap";
 
+/// Bound into the wrap as associated data, so the blob can only ever be read
+/// back as a Hello-wrapped master and not as some other AEAD payload sealed
+/// under a colliding key. Empty today: this wrap is the only thing the
+/// wrapping key seals, and keeping the format as it was means an enrolment
+/// made before the AEAD grew an AAD parameter still unwraps.
+#[cfg(any(target_os = "windows", test))]
+const HELLO_WRAP_AAD: &[u8] = b"";
+
 #[cfg(any(target_os = "windows", test))]
 fn hello_wrapping_key(signature: &[u8]) -> Zeroizing<[u8; 32]> {
     Zeroizing::new(crate::crypto::hkdf_subkey(signature, HELLO_WRAP_INFO))
@@ -191,14 +199,15 @@ fn hello_wrapping_key(signature: &[u8]) -> Zeroizing<[u8; 32]> {
 /// reproducing the wrapping key needs a fresh Hello signature.
 #[cfg(any(target_os = "windows", test))]
 fn wrap_master(signature: &[u8], master: &[u8]) -> Result<Vec<u8>> {
-    crate::crypto::seal_aead(&*hello_wrapping_key(signature), master)
+    crate::crypto::seal_aead(&*hello_wrapping_key(signature), HELLO_WRAP_AAD, master)
 }
 
 /// Reverse of [`wrap_master`]. A blob that was tampered with, or a signature
 /// from a different Hello key, fails the GCM tag rather than yielding garbage.
 #[cfg(any(target_os = "windows", test))]
 fn unwrap_master(signature: &[u8], blob: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
-    crate::crypto::unseal_aead(&*hello_wrapping_key(signature), blob).map(Zeroizing::new)
+    crate::crypto::unseal_aead(&*hello_wrapping_key(signature), HELLO_WRAP_AAD, blob)
+        .map(Zeroizing::new)
 }
 
 /// Outcome of a protected-mode store attempt, classified so the enrollment
