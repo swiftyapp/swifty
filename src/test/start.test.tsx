@@ -525,6 +525,19 @@ describe('restoring from a backup file', () => {
     })
   })
 
+  // The picker is already up when the OS opens a backup: the screen key does
+  // not change, so the step has to adopt the file without being remounted.
+  it('adopts a .rowel the OS opens while the picker is already on screen', async () => {
+    render(<Start />)
+    await userEvent.click(screen.getByTestId('start-restore-button'))
+    expect(screen.getByTestId('restore-dropzone')).toBeInTheDocument()
+
+    act(() => fileOpened('/tmp/late.rowel'))
+
+    expect(await screen.findByTestId('restore-found-file')).toHaveTextContent('late.rowel')
+    expect(useApp.getState().openedFile).toBeNull()
+  })
+
   // A legacy `.swftx` cannot be restored — only imported into a vault — so the
   // first run leaves it parked for Settings › Import once there is one.
   it('leaves a .swftx the OS opened for the vault this flow ends in', () => {

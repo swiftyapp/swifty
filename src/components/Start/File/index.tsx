@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from 'react'
+import { useEffect, useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import Masterpass from '@/components/elements/Masterpass'
 import Button from '@/components/elements/Button'
@@ -25,6 +25,12 @@ interface Props {
 export default function File({ onRestored, initialPath = null }: Props) {
   const { t } = useTranslation()
   const [path, setPath] = useState<string | null>(initialPath)
+  // Also adopted when it changes while this screen is already up: the OS can
+  // open a backup with the picker on screen, and `Start` then keeps this
+  // component mounted rather than remounting it on the same `file` key.
+  useEffect(() => {
+    if (initialPath) setPath(initialPath)
+  }, [initialPath])
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
