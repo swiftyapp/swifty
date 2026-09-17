@@ -10,7 +10,6 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::Ordering;
 
-use rand::RngCore;
 use tauri::{AppHandle, State};
 
 use crate::error::{Error, Result};
@@ -138,7 +137,7 @@ pub async fn workspace_create(
     let _step = begin_step(&state)?;
 
     let root = storage::root_dir(&app)?;
-    let id = new_id();
+    let id = crate::crypto::random_hex_id();
 
     // The open session comes out on a lease and the paths move as one step
     // under the lock, so no command sees one workspace's key beside another's
@@ -240,13 +239,7 @@ async fn create_vault_in(
     password: String,
 ) -> Result<(crate::crypto::VaultKey, crate::store::SqliteStore)> {
     let dir = workspace::dir_of(root, id);
-    fs::create_dir_all(&dir)?;
-    // Same mode `SqliteStore::open` gives the directory it creates.
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(&dir, fs::Permissions::from_mode(0o700));
-    }
+    crate::store::create_private_dir(&dir)?;
     create_off_thread(app, password).await
 }
 
@@ -258,11 +251,3 @@ fn discard(root: &Path, id: &str) {
     let _ = fs::remove_dir_all(&dir);
 }
 
-// A workspace id is a directory name and nothing more: it is never shown, never
-// typed, and only has to be unique and filesystem-safe. 128 random bits of hex
-// is that, without a uuid dependency for it.
-fn new_id() -> String {
-    let mut bytes = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut bytes);
-    hex::encode(bytes)
-}

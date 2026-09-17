@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { EntryType } from '@/api/types'
-import { shareRevoke } from '@/api/share'
 import type { SshKeyPair } from '@/api/tools'
 import { loadArchive, setNoEntry, useVault, selectCurrent } from './vault'
 
@@ -194,10 +193,7 @@ export const unregisterDialog = (id: string) =>
     return { open }
   })
 
-/** Whether a modal surface owns the keyboard and the window. */
-export const useModalOpen = () => useDialogs(state => state.open.size > 0)
-
-/** The same answer outside React, for an event handler. */
+/** Whether a modal surface owns the keyboard and the window, for an event handler. */
 export const isModalOpen = () => useDialogs.getState().open.size > 0
 
 export const openPalette = () => useUi.setState({ palette: true })
@@ -236,19 +232,6 @@ export const queueOrphan = (fileId: string) =>
   }))
 export const dropOrphan = (fileId: string) =>
   useUi.setState(state => ({ orphans: state.orphans.filter(id => id !== fileId) }))
-
-// Take back every orphaned share that can be taken back now. One failing does
-// not stop the rest, and whatever still fails stays queued for the next
-// surface that calls this.
-export const revokeOrphans = async () => {
-  await Promise.all(
-    useUi.getState().orphans.map(fileId =>
-      shareRevoke(fileId)
-        .then(() => dropOrphan(fileId))
-        .catch(() => {})
-    )
-  )
-}
 
 // --- scanning ---------------------------------------------------------------------
 

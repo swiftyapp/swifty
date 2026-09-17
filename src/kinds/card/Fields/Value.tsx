@@ -11,6 +11,9 @@ import { verbatimInput } from '@/components/elements/inputProps'
 import { CheckGlyph, CopyGlyph } from '@/components/Main/icons'
 import { LABEL_TYPE, META_TYPE } from '@/components/elements/tokens'
 
+/** A mask is decoration rather than copy, so it never goes through `t()`. */
+const isMask = (placeholder: TKey | Mask): placeholder is Mask => placeholder.startsWith('•')
+
 // Opaque version of the hover wash (white/10 composited over the card's
 // ground), so a click doesn't visibly shift the ground but the value is fully
 // hidden under the check — no text/icon overlap. The card face is a gradient,
@@ -103,9 +106,7 @@ export default function Value({
         <input
           name={name}
           value={value}
-          // A mask falls through `t()` unchanged — an unknown key returns
-          // itself — so both cases go down the same path.
-          placeholder={t(placeholder as TKey)}
+          placeholder={isMask(placeholder) ? placeholder : t(placeholder)}
           maxLength={maxLength}
           {...verbatimInput}
           onChange={event => onChange(event.target.value)}

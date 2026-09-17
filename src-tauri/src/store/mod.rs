@@ -17,7 +17,7 @@ pub mod migrate;
 mod tests;
 
 pub use hash::{record_hash, state_digest};
-pub use sqlite::{SqliteStore, SYNC_META_PREFIX};
+pub use sqlite::{create_private_dir, SqliteStore, SYNC_META_PREFIX};
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

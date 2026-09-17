@@ -195,19 +195,15 @@ impl ImportedEntry {
     }
 }
 
-/// A normalized, plaintext passkey — mirrors `models::Passkey` field for field.
-/// Base64url values are carried through verbatim; this module never re-encodes.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct ImportedPasskey {
-    pub credential_id: String,
-    pub rp_id: String,
-    pub rp_name: Option<String>,
-    pub user_handle: String,
-    pub user_name: String,
-    pub user_display_name: String,
-    pub private_key: String,
-    pub counter: u32,
-    pub created_at: Option<String>,
+/// A passkey as an import parses it. It is the app's own [`crate::models::Passkey`]:
+/// the fields are identical and base64url values cross unchanged, so nothing
+/// is gained by a second struct and a pair of copy functions between them.
+pub type ImportedPasskey = crate::models::Passkey;
+
+/// Treat empty strings as absent so blank export fields never become `""`
+/// secrets. Shared by every parser that reads optional text.
+pub(crate) fn non_empty(s: Option<String>) -> Option<String> {
+    s.filter(|v| !v.is_empty())
 }
 
 /// A per-row parse failure. `row` is 1-based in the source file so it points a

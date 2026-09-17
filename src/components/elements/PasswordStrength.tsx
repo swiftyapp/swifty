@@ -1,13 +1,10 @@
 import { cx } from '@/utils/cx'
 import { useTranslation } from 'react-i18next'
-import type { TKey } from '@/i18n'
 import { MIN_LENGTH } from '@/services/strength'
 import { useStrength } from '@/hooks/useStrength'
 import Meter from './Meter'
-import { LEVEL_INK } from './levels'
+import { LEVEL_INK, LEVEL_LABELS } from './levels'
 import { META } from './tokens'
-
-const LABELS: TKey[] = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong']
 
 interface Props {
   password: string
@@ -44,7 +41,7 @@ export default function PasswordStrength({ password, error }: Props) {
         data-testid="password-strength-label"
         className={cx('flex-none', score !== null && LEVEL_INK[score])}
       >
-        {score !== null ? t(LABELS[score]) : ''}
+        {score !== null ? t(LEVEL_LABELS[score]) : ''}
       </span>
       {/* The same test id the Error element carries: this is the field's error,
           shown where the field's guidance already is. */}

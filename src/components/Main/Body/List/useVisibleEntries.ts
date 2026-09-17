@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { EntryMeta } from '@/api/types'
 import { useUi, useVault, usePrefs } from '@/store'
-import { filterEntries } from '@/services/entries'
+import { scopeEntries, searchIndex, searchEntries } from '@/services/entries'
 import { byTitle, byRecency } from './order'
 
 /**
@@ -38,11 +38,16 @@ export const useVisibleEntries = () => {
   const sort = usePrefs(state => state.sort)
   const rows = useRows()
 
+  const scoped = useMemo(() => scopeEntries(rows, { type, tag }), [rows, type, tag])
+  // One index per set of rows, searched on every keystroke: rebuilt when the
+  // rows or the chips change, not when the query does.
+  const index = useMemo(() => searchIndex(scoped), [scoped])
+
   return useMemo(() => {
-    const entries = filterEntries(rows, { type, tag, query })
     // A query comes back ranked by relevance; re-sorting it would throw the
     // ranking away and bury the closest match under whatever is newest.
-    if (query.trim()) return entries
-    return sort === 'alpha' ? byTitle(entries) : byRecency(entries)
-  }, [rows, type, tag, query, sort])
+    const trimmed = query.trim()
+    if (trimmed) return searchEntries(index, trimmed)
+    return sort === 'alpha' ? byTitle(scoped) : byRecency(scoped)
+  }, [scoped, index, query, sort])
 }

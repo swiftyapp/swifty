@@ -13,7 +13,7 @@
 use super::export::{
     ENVIRONMENT_LABEL, FINGERPRINT_LABEL, PASSPHRASE_LABEL, PUBLIC_KEY_LABEL, SCOPES_LABEL,
 };
-use super::{EntryKind, ImportResult, ImportedEntry, ImportedPasskey, Importer};
+use super::{non_empty, EntryKind, ImportResult, ImportedEntry, ImportedPasskey, Importer};
 use crate::otp::{self, OtpAlgorithm, OtpParams};
 use serde::Deserialize;
 use serde_json::Value;
@@ -402,7 +402,3 @@ fn rfc3339(secs: u64) -> Option<String> {
     chrono::DateTime::from_timestamp(secs, 0).map(|t| t.to_rfc3339())
 }
 
-// Treat empty strings as absent so blank export fields don't become "" secrets.
-fn non_empty(s: Option<String>) -> Option<String> {
-    s.filter(|v| !v.is_empty())
-}

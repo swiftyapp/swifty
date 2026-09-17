@@ -16,7 +16,6 @@ pub mod remote;
 #[cfg(test)]
 mod tests;
 
-use rand::RngCore;
 use serde::Serialize;
 use tauri::AppHandle;
 
@@ -148,9 +147,7 @@ fn active_share(file: &ShareFile) -> ActiveShare {
 /// A name that says nothing. Drive shows the owner a file list, so the name
 /// carries no title — only enough randomness never to collide.
 fn file_name() -> String {
-    let mut bytes = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut bytes);
-    format!("{}.swshare", hex::encode(bytes))
+    format!("{}.swshare", crate::crypto::random_hex_id())
 }
 
 fn rfc3339(ms: i64) -> String {
