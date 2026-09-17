@@ -460,6 +460,7 @@
   "Paste a share link": "Paste a share link",
   "This share has expired or was revoked": "This share has expired or was revoked",
   "This share was created in another workspace": "This share was created in another workspace",
+  "Sync this workspace once before sharing from it": "Sync this workspace once before sharing from it",
   "Add to vault": "Add to vault",
   "{{count}} secret field included_one": "{{count}} secret field included",
   "{{count}} secret field included_other": "{{count}} secret fields included",

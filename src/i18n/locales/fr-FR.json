@@ -15,6 +15,7 @@
   "Nothing recognized": "Rien de reconnu",
   "This share has expired or was revoked": "Ce partage a expiré ou a été révoqué",
   "This share was created in another workspace": "Ce partage a été créé dans un autre espace de travail",
+  "Sync this workspace once before sharing from it": "Synchronisez cet espace de travail une fois avant d’y partager",
   "Passwords do not match": "Les mots de passe ne correspondent pas",
   "Successfully changed password": "Mot de passe modifié avec succès",
   "Fill in the password": "Saisissez le mot de passe",

@@ -105,20 +105,25 @@ without its key. `vaultId` is the id of the vault that published the share
 and still show each vault only its own — and, because every listed row carries a
 Revoke, it is also what a revoke is checked against.
 
-A share carrying no `vaultId` predates the property. It is not shown to every
-vault, which would hand one workspace a Revoke over another's link: it belongs
-to whichever vault published it, and exactly one vault can be shown to be that
-one. Sharing is older than vault ids, but Drive sync back then ran in the
-primary workspace alone, so all the unmarked shares in an account came from the
-single vault that existed before ids did — the one whose pack the sync engine
-migrates out of the legacy `Rowel/vault.swsync`. That migration stamps them
-(`share::claim_unmarked`), and from then on they are ordinary shares of that
-vault. Until it does, or if it never runs, they are listed and revocable by
-nobody and the account-wide sweep clears them within their 24 hours. Listings
-follow `nextPageToken` to the end.
+A share carrying no `vaultId` predates the property and belongs to nobody. It is
+not shown to every vault, which would hand one workspace a Revoke over another's
+link, and it is not adopted by any: ownership is two concrete ids agreeing, and
+an absent id matches nothing. Such a share is listed by no vault, revocable by
+none, and removed by the account-wide sweep when its 24 hours are up — which is
+the whole of its remaining life, since every share written by this build carries
+an id. Listings follow `nextPageToken` to the end.
 
 ## 5. Lifetime and control
 
+- **Sending requires a synced vault**, not merely a connected one. Every share
+  is stamped with the publishing vault's id and every later list and revoke is
+  checked against it, so a vault with no id has nothing to publish a link
+  under — it could neither list nor take back what it sent. A vault keeps its id
+  only after a sync run has succeeded, so one that has just connected Drive, or
+  whose first run failed, is refused with `shareNeedsSync` ("sync this workspace
+  once before sharing from it"). The check sits in `commands::share::sendable`
+  alongside unlocked and sync-configured, which is why `share::create`, `list`
+  and `revoke` take a `&str` id rather than an optional one.
 - Fixed 24-hour lifetime in v1, backed by two guarantees that are not the same
   strength. **Rowel refuses to open** an envelope whose authenticated
   `expiresAt` has passed, whether or not the file is still there; that holds
@@ -132,7 +137,8 @@ follow `nextPageToken` to the end.
   share another vault published is refused with `shareNotOwned` and left where
   it is — the same test `list` applies, so a vault can revoke exactly what it
   can see — and a Drive file that is not a share of this app's is refused at any
-  id. The fetch is a `files.get`, not a listing: Drive's query index lags its
+  id. Ownership is two concrete ids agreeing, never two absences: a share with
+  no `vaultId` belongs to nobody at all. The fetch is a `files.get`, not a listing: Drive's query index lags its
   files, the send dialog offers Revoke seconds after the upload, and a share the
   index had not caught up with would otherwise read as already gone and be left
   live for its whole 24 hours. A file Drive no longer has does count as revoked.
@@ -160,7 +166,7 @@ time".
 
 | | Google account | Network | Env |
 |---|---|---|---|
-| Send | Drive connected (existing sync OAuth, `drive.file` scope) | yes | `GOOGLE_OAUTH_CLIENT_ID` |
+| Send | Drive connected and synced at least once (existing sync OAuth, `drive.file` scope) | yes | `GOOGLE_OAUTH_CLIENT_ID` |
 | Receive | none | yes | `GOOGLE_API_KEY` |
 
 The API key is a public identifier restricted to the Drive API, baked in at
@@ -169,12 +175,17 @@ receive, and the receive dialog says which key is missing.
 
 ## 7. Backend API
 
-`share::create(remote, entry, vault_id, now_ms) -> Created { link, file_id, expires_at }`
+`share::create(remote, entry, vault_id: &str, now_ms) -> Created { link, file_id, expires_at }`
 `share::open(fetch, link, now_ms) -> Entry` (sanitized, empty id, unexpired)
-`share::revoke(remote, file_id, vault_id)` (fetches by id; refuses anything not this vault's)
-`share::list(remote, vault_id, now_ms) -> Vec<ActiveShare>` (this vault's; also sweeps)
+`share::revoke(remote, file_id, vault_id: &str)` (fetches by id; refuses anything not this vault's)
+`share::list(remote, vault_id: &str, now_ms) -> Vec<ActiveShare>` (this vault's; also sweeps)
 `share::sweep(remote, now_ms) -> usize` (account-wide)
-`share::claim_unmarked(remote, vault_id) -> usize` (legacy shares, once, at migration)
+
+The vault id is a `&str` on all three sender-side verbs, not an `Option`: a
+share belongs to a vault by carrying that vault's id, and there is no such thing
+as a share owned by the absence of one. The commands supply it from
+`store::identity::vault_id` and refuse with `shareNeedsSync` when there is none
+(§5), so the verbs below never have to answer what a nameless vault may do.
 
 Generic over `ShareRemote` and `PublicFetch`, so the whole lifecycle is tested
 against an in-memory fake.

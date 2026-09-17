@@ -75,6 +75,13 @@ pub enum Error {
     #[error("this share was published by another vault")]
     ShareNotOwned,
 
+    /// Sharing asked for by a vault that has no id yet. The id is written by the
+    /// first successful sync, and every share is stamped with it, so a link
+    /// published before that run would be one no vault could later name as its
+    /// own — see [`crate::commands::share`].
+    #[error("sync this vault once before sharing from it")]
+    ShareNeedsSync,
+
     #[error("another setup step is still running")]
     SetupBusy,
 
@@ -140,6 +147,7 @@ impl Error {
             Error::ShareTooLarge => "shareTooLarge",
             Error::EntryTooLargeToShare => "entryTooLargeToShare",
             Error::ShareNotOwned => "shareNotOwned",
+            Error::ShareNeedsSync => "shareNeedsSync",
             Error::SetupBusy => "setupBusy",
             Error::SyncBusy => "syncBusy",
             Error::DriveNotConnected => "driveNotConnected",

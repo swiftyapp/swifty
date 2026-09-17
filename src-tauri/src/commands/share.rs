@@ -28,9 +28,9 @@ pub async fn share_create(
 ) -> Result<Created> {
     let (entry, vault_id, cryptor) = {
         let session = state.session.lock().unwrap();
-        sendable(&session)?;
-        let store = session.store()?;
-        let record = store
+        let vault_id = sendable(&session)?;
+        let record = session
+            .store()?
             .get(&entry_id)
             .map_err(store_err)?
             .ok_or(Error::NotFound)?;
@@ -38,7 +38,7 @@ pub async fn share_create(
             session
                 .payload_cipher()?
                 .unseal(&record.id, &record.payload)?,
-            identity::vault_id(store).map_err(store_err)?,
+            vault_id,
             session.cryptor()?,
         )
     };
@@ -47,7 +47,7 @@ pub async fn share_create(
         share::create(
             &share::drive_remote(&app, cryptor),
             &entry,
-            vault_id.as_deref(),
+            &vault_id,
             share::now_ms(),
         )
     })
@@ -71,14 +71,7 @@ pub async fn share_revoke(
     state: State<'_, AppState>,
 ) -> Result<()> {
     let (cryptor, vault_id) = sender_credentials(&state)?;
-    blocking(move || {
-        share::revoke(
-            &share::drive_remote(&app, cryptor),
-            &file_id,
-            vault_id.as_deref(),
-        )
-    })
-    .await
+    blocking(move || share::revoke(&share::drive_remote(&app, cryptor), &file_id, &vault_id)).await
 }
 
 /// This vault's outstanding shares, expired ones swept first. The account may
@@ -89,34 +82,79 @@ pub async fn share_list(app: AppHandle, state: State<'_, AppState>) -> Result<Ve
     blocking(move || {
         share::list(
             &share::drive_remote(&app, cryptor),
-            vault_id.as_deref(),
+            &vault_id,
             share::now_ms(),
         )
     })
     .await
 }
 
-/// What the sending side requires. Checked in this order because a locked
-/// session also reports `sync_configured == false`, and telling someone to
-/// connect Drive when they merely need to unlock is a dead end.
-fn sendable(session: &Session) -> Result<()> {
+/// What the sending side requires, answered with the thing every share is keyed
+/// to: the id of the vault asking.
+///
+/// Checked in this order because a locked session also reports
+/// `sync_configured == false`, and telling someone to connect Drive when they
+/// merely need to unlock is a dead end.
+///
+/// The id comes last because it is the subtlest of the three: a vault keeps it
+/// only after a sync run has succeeded, so one that has just connected Drive, or
+/// whose first run failed, is connected and still nameless. Sharing cannot
+/// proceed there — the id is what stamps a share as this vault's and what every
+/// later list and revoke is checked against, so a link published without one
+/// would belong to nobody, not even to the vault that handed it out.
+fn sendable(session: &Session) -> Result<String> {
     if !session.is_unlocked() {
         return Err(Error::Locked);
     }
     if !session.sync_configured {
         return Err(Error::SyncNotConfigured);
     }
-    Ok(())
+    identity::vault_id(session.store()?)
+        .map_err(store_err)?
+        .ok_or(Error::ShareNeedsSync)
 }
 
 /// What a sender-side Drive call needs: the cryptor that unwraps the account's
 /// tokens, and the id of the vault asking — which is what says whose shares
 /// these are. Both read under one lock, released before the network call.
-fn sender_credentials(state: &State<'_, AppState>) -> Result<(Cryptor, Option<String>)> {
+fn sender_credentials(state: &State<'_, AppState>) -> Result<(Cryptor, String)> {
     let session = state.session.lock().unwrap();
-    sendable(&session)?;
-    Ok((
-        session.cryptor()?,
-        identity::vault_id(session.store()?).map_err(store_err)?,
-    ))
+    let vault_id = sendable(&session)?;
+    Ok((session.cryptor()?, vault_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crypto::VaultKey;
+    use crate::store::SqliteStore;
+
+    fn open(dir: &tempfile::TempDir, sync_configured: bool) -> Session {
+        let key = VaultKey::legacy_from_password("pw");
+        let store = SqliteStore::open(&dir.path().join("vault.db"), &key.sqlcipher_key()).unwrap();
+        let mut session = Session::default();
+        session.set(key, store, sync_configured);
+        session
+    }
+
+    // Each refusal names the one thing standing in the way, in the order the
+    // user can act on them.
+    #[test]
+    fn sending_needs_an_unlocked_synced_vault_and_says_which_is_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(matches!(sendable(&Session::default()), Err(Error::Locked)));
+        assert!(matches!(
+            sendable(&open(&dir, false)),
+            Err(Error::SyncNotConfigured)
+        ));
+
+        // Unlocked and connected, and still nameless: the id is written by the
+        // first sync run that succeeds. This is the state the ownership rules
+        // once read as owning every share that had no id either.
+        let session = open(&dir, true);
+        assert!(matches!(sendable(&session), Err(Error::ShareNeedsSync)));
+
+        let id = identity::assign_vault_id(session.store().unwrap()).unwrap();
+        assert_eq!(sendable(&session).unwrap(), id);
+    }
 }

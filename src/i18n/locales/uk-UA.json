@@ -15,6 +15,7 @@
   "Nothing recognized": "Нічого не розпізнано",
   "This share has expired or was revoked": "Термін дії цього посилання минув або його відкликано",
   "This share was created in another workspace": "Це посилання створено в іншому робочому просторі",
+  "Sync this workspace once before sharing from it": "Синхронізуйте цей робочий простір один раз, перш ніж ділитися з нього",
   "Passwords do not match": "Паролі не збігаються",
   "Successfully changed password": "Пароль змінено",
   "Fill in the password": "Введіть пароль",

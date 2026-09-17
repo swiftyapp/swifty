@@ -15,6 +15,7 @@
   "Nothing recognized": "未识别到任何内容",
   "This share has expired or was revoked": "该分享已过期或已被撤销",
   "This share was created in another workspace": "此分享是在另一个工作区中创建的",
+  "Sync this workspace once before sharing from it": "请先同步此工作区一次，然后再从中分享",
   "Passwords do not match": "两次输入的密码不一致",
   "Successfully changed password": "密码修改成功",
   "Fill in the password": "请输入密码",

@@ -57,8 +57,9 @@ pub struct ShareFile {
     pub kind: Option<String>,
     /// The vault that published it (`vaultId`), and the only thing that says
     /// whose share this is. Absent on shares created before the property
-    /// existed, which belong to no vault this build can name until one claims
-    /// them — see [`crate::share::list`] and [`crate::share::claim_unmarked`].
+    /// existed, which are nobody's: no vault lists or revokes them, and the
+    /// account-wide sweep clears them when they expire — see
+    /// [`crate::share::list`].
     pub vault_id: Option<String>,
     pub created_ms: i64,
     /// Absent when the file predates expiry bookkeeping or carries a malformed
@@ -83,10 +84,6 @@ pub trait ShareRemote {
     /// after an upload depends on. The file may be anything the caller named, so
     /// the answer carries [`ShareFile::marked`] and the caller checks it.
     fn get(&self, id: &str) -> Result<Option<ShareFile>>;
-    /// Write `vaultId` onto an already-uploaded share, claiming it for that
-    /// vault. Only that one property changes: the file keeps its id, its
-    /// ciphertext and the rest of its bookkeeping.
-    fn set_vault_id(&self, id: &str, vault_id: &str) -> Result<()>;
 }
 
 /// Recipient side: no account, just the public download.
@@ -217,14 +214,6 @@ impl ShareRemote for DriveShareRemote {
             let token = self.token(&client).await?;
             let file = drive::get_file(&client, &token, id).await?;
             Ok(file.as_ref().map(parse_share_file))
-        })
-    }
-
-    fn set_vault_id(&self, id: &str, vault_id: &str) -> Result<()> {
-        block_on(async {
-            let client = http_client();
-            let token = self.token(&client).await?;
-            drive::update_properties(&client, &token, id, &[(PROP_VAULT_ID, vault_id)]).await
         })
     }
 }
@@ -411,20 +400,6 @@ impl ShareRemote for FakeShareRemote {
             .get(id)
             .map(|file| read_fake(id, file)))
     }
-
-    // Merges the one key, like the `files.patch` behind the real thing: a test
-    // that lost the entry id or the expiry here would be testing a Drive that
-    // does not exist.
-    fn set_vault_id(&self, id: &str, vault_id: &str) -> Result<()> {
-        match self.files.lock().unwrap().get_mut(id) {
-            Some(file) => {
-                file.properties
-                    .insert(PROP_VAULT_ID.to_string(), vault_id.to_string());
-                Ok(())
-            }
-            None => Err(Error::NotFound),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -551,38 +526,6 @@ mod tests {
         assert!(!got.marked);
 
         assert_eq!(remote.get("never-existed").unwrap(), None);
-    }
-
-    // Claiming an old share is a patch of one property, not a re-upload: the
-    // link already in circulation names this file id, so everything else about
-    // it has to survive untouched.
-    #[test]
-    fn claiming_a_share_sets_its_vault_and_disturbs_nothing_else() {
-        let remote = FakeShareRemote::new();
-        let id = remote
-            .upload(
-                "share.rowelshare",
-                b"sealed",
-                &[
-                    (PROP_SHARE, PROP_SHARE_VALUE),
-                    (PROP_ENTRY_ID, "entry-1"),
-                    (PROP_EXPIRES_AT, "1709300000000"),
-                ],
-            )
-            .unwrap();
-
-        remote.set_vault_id(&id, "a1b2").unwrap();
-
-        let listed = remote.list().unwrap();
-        assert_eq!(listed[0].vault_id.as_deref(), Some("a1b2"));
-        assert_eq!(listed[0].entry_id.as_deref(), Some("entry-1"));
-        assert_eq!(listed[0].expires_ms, Some(1_709_300_000_000));
-        assert_eq!(remote.bytes(&id).unwrap(), b"sealed");
-
-        assert!(matches!(
-            remote.set_vault_id("never-existed", "a1b2"),
-            Err(Error::NotFound)
-        ));
     }
 
     #[test]

@@ -15,6 +15,7 @@
   "Nothing recognized": "Hiçbir şey tanınmadı",
   "This share has expired or was revoked": "Bu paylaşımın süresi doldu veya iptal edildi",
   "This share was created in another workspace": "Bu paylaşım başka bir çalışma alanında oluşturuldu",
+  "Sync this workspace once before sharing from it": "Bu çalışma alanından paylaşmadan önce onu bir kez eşitleyin",
   "Passwords do not match": "Şifreler eşleşmiyor",
   "Successfully changed password": "Şifre başarıyla değiştirildi",
   "Fill in the password": "Şifreyi girin",

@@ -30,7 +30,12 @@ export interface ActiveShare {
   expiresAt: string
 }
 
-// Seal one entry, upload it, and return the link that opens it.
+/**
+ * Seal one entry, upload it, and return the link that opens it. Rejects with
+ * `shareNeedsSync` until this workspace has synced once: a share is stamped with
+ * the vault's id, and the id is what a later list or revoke finds it by, so a
+ * vault that has no id yet has nothing to publish a link under.
+ */
 export const shareCreate = (entryId: string): Promise<ShareCreated> =>
   call('share_create', { entryId })
 

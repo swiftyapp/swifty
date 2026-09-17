@@ -23,6 +23,7 @@ export type BackendErrorKind =
   | 'shareTooLarge'
   | 'entryTooLargeToShare'
   | 'shareNotOwned'
+  | 'shareNeedsSync'
   | 'setupBusy'
   | 'syncBusy'
   | 'driveNotConnected'
@@ -109,6 +110,8 @@ export const describeError = (error: unknown): string => {
       return t('This entry is too large to share. Shorten its note or fields.')
     case 'shareNotOwned':
       return t('This share was created in another workspace')
+    case 'shareNeedsSync':
+      return t('Sync this workspace once before sharing from it')
     case 'setupBusy':
       return t('Another setup step is still running')
     case 'syncBusy':
