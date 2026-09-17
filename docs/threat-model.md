@@ -60,8 +60,9 @@ Unix (`0600` file / `0700` dir); the Windows ACL equivalent for the database is
 still a TODO (`set_mode` no-ops off Unix in `sqlite.rs`). Plaintext exports and
 saved `.env` files, written through `storage::atomic_write_private`, are
 owner-only on both: `0600` on Unix, and on Windows a protected DACL granting the
-current user and SYSTEM alone (`owner_only.rs`), applied to the temp file before
-any bytes are written so the folder's inherited permissions never apply to it.
+current user and SYSTEM alone (`owner_only.rs`), supplied when the temp file is
+created so it never exists, even briefly, under the folder's inherited
+permissions.
 
 ### Key derivation (KDF)
 

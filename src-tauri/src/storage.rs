@@ -172,17 +172,18 @@ pub fn write_lockout_sidecar(app: &AppHandle, json: &str) -> Result<()> {
     atomic_write_file(&lockout_sidecar_path(app)?, json)
 }
 
-// Durably replace `path`: build a uniquely named temp sibling, fsync it,
-// atomically persist it over the target, then fsync the directory. The target
+// Durably replace `path`: create a uniquely named temp sibling, fsync it,
+// atomically rename it over the target, then fsync the directory. The target
 // ends up as either the complete old bytes or the complete new bytes — never a
 // truncated/empty file. `write` is injected so failure after a partial temp
-// write is testable; dropping NamedTempFile removes that partial sibling.
+// write is testable; the partial sibling is removed on every failure.
 //
-// `private` makes the temp sibling owner-readable *before* anything is written
-// into it (`owner_only::restrict_to_owner`: `0600` on Unix, a protected DACL on
-// Windows), so the bytes are never readable through the umask or the folder's
-// inherited permissions, and the replaced file keeps that restriction whatever
-// an existing file at `path` allowed.
+// `private` makes the temp sibling owner-readable from the instant it exists
+// (`owner_only::create_new`: `0600` on Unix, a protected DACL supplied at
+// creation on Windows), so there is no moment at which the umask or the
+// folder's inherited permissions govern it — a handle opened in such a moment
+// would keep its access after the permissions changed — and the replaced file
+// keeps that restriction whatever an existing file at `path` allowed.
 fn atomic_replace_with<F>(path: &Path, private: bool, write: F) -> Result<()>
 where
     F: FnOnce(&mut fs::File) -> std::io::Result<()>,
@@ -192,14 +193,13 @@ where
         .ok_or_else(|| Error::Other("destination has no parent directory".into()))?;
     fs::create_dir_all(parent)?;
 
-    let mut temp = tempfile::NamedTempFile::new_in(parent)?;
-    if private {
-        crate::owner_only::restrict_to_owner(temp.path())?;
-    }
-
-    write(temp.as_file_mut())?;
-    temp.as_file().sync_all()?;
-    temp.persist(path).map_err(|e| e.error)?;
+    let (temp_path, mut temp) = create_temp_sibling(path, private)?;
+    let staged = Staged(Some(temp_path));
+    write(&mut temp)?;
+    temp.sync_all()?;
+    drop(temp);
+    fs::rename(staged.path(), path)?;
+    staged.keep();
 
     // Persist the directory entry for the rename where the platform supports it
     // (opening a directory as a file fails on Windows — best-effort there).
@@ -207,6 +207,64 @@ where
         let _ = dir.sync_all();
     }
     Ok(())
+}
+
+// A temp sibling that is removed unless the replacement it was staged for goes
+// through. In `Drop` so every early exit — a failed write, sync or rename —
+// takes it with it.
+struct Staged(Option<PathBuf>);
+
+impl Staged {
+    fn path(&self) -> &Path {
+        self.0.as_deref().expect("kept only once")
+    }
+
+    fn keep(mut self) {
+        self.0.take();
+    }
+}
+
+impl Drop for Staged {
+    fn drop(&mut self) {
+        if let Some(path) = self.0.take() {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+
+// A fresh sibling of `path` — `<name>.<random>.tmp` beside it — created for
+// writing, and never over an existing file. Owner-only from creation when
+// `private`; otherwise a plain file that keeps the `0600` these temp files
+// have always had on Unix.
+fn create_temp_sibling(path: &Path, private: bool) -> Result<(PathBuf, fs::File)> {
+    let name = path
+        .file_name()
+        .ok_or_else(|| Error::Other("destination has no file name".into()))?;
+    for _ in 0..8 {
+        let mut candidate = name.to_os_string();
+        candidate.push(format!(".{:016x}.tmp", rand::random::<u64>()));
+        let candidate = path.with_file_name(candidate);
+        let created = if private {
+            crate::owner_only::create_new(&candidate)
+        } else {
+            let mut options = fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            options.open(&candidate)
+        };
+        match created {
+            Ok(file) => return Ok((candidate, file)),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Err(Error::Other(
+        "could not find a free name for a temporary sibling".into(),
+    ))
 }
 
 /// Atomically write the UTF-8 sidecars that gate vault opening and lockout.

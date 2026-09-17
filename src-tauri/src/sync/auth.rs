@@ -327,12 +327,13 @@ fn open_consent(app: &AppHandle, credentials: &Credentials) -> Result<Started> {
 /// Desktop: open the browser and block on the loopback listener until Google
 /// redirects to it, then exchange the code.
 ///
-/// The tokens land only if no disconnect ran while the browser was out (see
-/// [`persisted_if_current`]); a grant that arrives after one is revoked and
+/// The tokens land only if no disconnect ran since `generation` was read —
+/// which the caller does when the flow is *started*, not here on the worker,
+/// so a disconnect in the gap before the worker runs counts too (see
+/// [`persisted_if_current`]). A grant that arrives after one is revoked and
 /// reported instead of recreating the credential the disconnect removed.
 #[cfg(desktop)]
-pub fn authenticate(app: &AppHandle, cryptor: &Cryptor) -> Result<()> {
-    let generation = connection_generation(app);
+pub fn authenticate(app: &AppHandle, cryptor: &Cryptor, generation: u64) -> Result<()> {
     let tokens = obtain_tokens(app)?;
     if persisted_if_current(app, cryptor, &tokens, generation)? {
         return Ok(());

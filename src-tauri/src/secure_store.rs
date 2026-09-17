@@ -151,17 +151,28 @@ fn hello_key_store_available() -> bool {
 // the OS, so the wrap/unwrap round trip is testable on the machines we develop
 // on rather than only on Windows.
 
-/// The message the Hello key credential signs. Fixed on purpose: Hello signs
-/// with RSA PKCS#1 v1.5 over SHA-256 (Microsoft's Windows Hello guide: "We are
-/// using SHA256 as the hash algorithm and Pkcs1 for SignaturePadding"), a
-/// deterministic scheme, so signing a constant yields a byte-identical
-/// signature every time — which is what makes the derived wrapping key
-/// reproducible across unlocks. The `RequestSignAsync` reference itself does
-/// not name the scheme, so enrollment checks it (`assert_pkcs1_signature`)
-/// rather than trust the guide: a probabilistic scheme such as RSA-PSS would
-/// produce a blob no later unlock could open. Nothing is secret about the
-/// challenge — the secrecy is the private key, which lives in the TPM/Hello key
-/// store and only signs after a prompt.
+/// The message the Hello key credential signs. Fixed on purpose: the design
+/// relies on Hello signing with RSA PKCS#1 v1.5 over SHA-256, a deterministic
+/// scheme, so signing a constant yields a byte-identical signature every time —
+/// which is what makes the derived wrapping key reproducible across unlocks.
+///
+/// Microsoft's documentation disagrees with itself on the scheme. The Windows
+/// Hello developer guide says "We are using SHA256 as the hash algorithm and
+/// Pkcs1 for SignaturePadding" and ships server code that verifies with
+/// `RSASignaturePadding.Pkcs1`; the `KeyCredentialManager` class reference's
+/// remarks say "PKCS #1 RSA PSS with SHA256", which is probabilistic and would
+/// make this design unworkable. Practice sides with the guide: Bitwarden's
+/// desktop client ships this same construction ("a signing API, that
+/// deterministically signs a challenge, from which a windows hello key is
+/// derived" — `desktop_native/biometric/src/windows.rs`). Still, enrollment
+/// does not trust either page: it verifies the signature it just obtained as
+/// PKCS#1 v1.5 against the credential's own public key
+/// (`assert_pkcs1_signature`) and refuses to enroll otherwise, rather than
+/// store a blob no later prompt could open. One enrollment on a real Windows
+/// machine settles the question.
+///
+/// Nothing is secret about the challenge — the secrecy is the private key,
+/// which lives in the TPM/Hello key store and only signs after a prompt.
 #[cfg(target_os = "windows")]
 const HELLO_CHALLENGE: &[u8] = b"rowel-biometric-v1";
 

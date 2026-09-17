@@ -160,14 +160,18 @@ fn spawn_consent(app: &AppHandle, state: &State<'_, AppState>, follow: Follow) -
     // Key and flag under the workspace lock, as one step: a switch cannot land
     // between taking this workspace's key and announcing the flow that will
     // write with it (see `commands::workspace::guard_sync_idle`).
-    let cryptor = {
+    // The connection generation is read here too, synchronously, and carried
+    // to the worker: read on the worker instead, a disconnect landing before
+    // the worker starts would go unnoticed and the consent it was meant to
+    // cancel would be accepted (see `AppState::sync_generation`).
+    let (cryptor, generation) = {
         let _paths = state.workspace_lock.lock().unwrap();
         let cryptor = cryptor_or_report(app, state)?;
         pending(app);
-        cryptor
+        (cryptor, sync::connection_generation(app))
     };
     let app = app.clone();
-    super::detached(move || match sync::setup(&app, &cryptor) {
+    super::detached(move || match sync::setup(&app, &cryptor, generation) {
         // Either way the run is claimed before the consent is marked over, so
         // the flags overlap rather than leave a gap a workspace switch could
         // use — and the first upload cannot be skipped by one landing there.

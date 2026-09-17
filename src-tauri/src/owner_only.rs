@@ -1,52 +1,118 @@
-//! Make a file readable by its owner alone, on every platform the app writes
-//! plaintext secrets on.
+//! Create a file that only its owner can read, on every platform the app
+//! writes plaintext secrets on.
 //!
-//! Unix has a mode for it (`0600`). Windows has no chmod analog; the
-//! equivalent is a *protected* DACL — one that stops inheriting from the
-//! folder — granting access to the current user and to SYSTEM (which backup,
-//! indexing and antivirus services run as) and to nobody else. Either way it
-//! is applied to a freshly created, still-empty file, before any secret is
-//! written into it, so the bytes are never readable through the folder's own
-//! permissions even for a moment.
+//! The restriction is part of the *creation*, never applied afterwards: a file
+//! that exists for even a moment under the folder's own permissions can be
+//! opened in that moment, and a handle opened then keeps its access whatever
+//! the permissions become. Unix has a mode for this (`0600`). Windows has no
+//! chmod analog; the equivalent is a *protected* DACL — one that does not
+//! inherit from the folder — granting the current user and SYSTEM (which
+//! backup, indexing and antivirus services run as) and nobody else, handed to
+//! `CreateFile` in the security attributes so the file is born with it.
 
+use std::fs::{File, OpenOptions};
 use std::io;
 use std::path::Path;
 
+/// Create `path`, which must not exist yet, for writing — readable by its
+/// owner alone from the first instant.
 #[cfg(unix)]
-pub fn restrict_to_owner(path: &Path) -> io::Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+pub fn create_new(path: &Path) -> io::Result<File> {
+    use std::os::unix::fs::OpenOptionsExt;
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+}
+
+/// Create `path`, which must not exist yet, for writing — readable by its
+/// owner alone from the first instant.
+#[cfg(windows)]
+pub fn create_new(path: &Path) -> io::Result<File> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows::core::BOOL;
+    use windows::Win32::Security::SECURITY_ATTRIBUTES;
+
+    let descriptor = OwnerOnlyDescriptor::for_current_user()?;
+    let mut attributes = SECURITY_ATTRIBUTES {
+        nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+        lpSecurityDescriptor: descriptor.as_ptr(),
+        bInheritHandle: BOOL(0),
+    };
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .security_attributes((&mut attributes as *mut SECURITY_ATTRIBUTES).cast())
+        .open(path)
 }
 
 // The SDDL for "this user and SYSTEM, full access, nothing inherited". `P`
-// marks the DACL protected, and `SetNamedSecurityInfoW` is told the same with
-// `PROTECTED_DACL_SECURITY_INFORMATION`, so the folder's inheritable entries
-// are dropped rather than merged back in.
+// marks the DACL protected, which is what stops the folder's inheritable
+// entries from being merged into the new file's DACL at creation.
 #[cfg(windows)]
 fn owner_only_sddl(user_sid: &str) -> String {
     format!("D:P(A;;FA;;;{user_sid})(A;;FA;;;SY)")
 }
 
 #[cfg(windows)]
-pub fn restrict_to_owner(path: &Path) -> io::Result<()> {
-    use windows::core::{BOOL, HSTRING, PWSTR};
-    use windows::Win32::Foundation::{CloseHandle, LocalFree, ERROR_SUCCESS, HANDLE, HLOCAL};
-    use windows::Win32::Security::Authorization::{
-        ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
-        SetNamedSecurityInfoW, SDDL_REVISION_1, SE_FILE_OBJECT,
-    };
-    use windows::Win32::Security::{
-        GetSecurityDescriptorDacl, GetTokenInformation, TokenUser, ACL, DACL_SECURITY_INFORMATION,
-        PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, TOKEN_QUERY, TOKEN_USER,
-    };
-    use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+fn win(e: windows::core::Error) -> io::Error {
+    io::Error::other(e.to_string())
+}
 
-    fn win(e: windows::core::Error) -> io::Error {
-        io::Error::other(e.to_string())
+/// A self-relative security descriptor built from [`owner_only_sddl`], freed
+/// with the `LocalFree` its builder requires.
+#[cfg(windows)]
+struct OwnerOnlyDescriptor(windows::Win32::Security::PSECURITY_DESCRIPTOR);
+
+#[cfg(windows)]
+impl OwnerOnlyDescriptor {
+    fn for_current_user() -> io::Result<Self> {
+        use windows::core::HSTRING;
+        use windows::Win32::Security::Authorization::{
+            ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+        };
+        use windows::Win32::Security::PSECURITY_DESCRIPTOR;
+
+        let sddl = HSTRING::from(owner_only_sddl(&current_user_sid()?));
+        let mut descriptor = PSECURITY_DESCRIPTOR::default();
+        unsafe {
+            ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                &sddl,
+                SDDL_REVISION_1,
+                &mut descriptor,
+                None,
+            )
+        }
+        .map_err(win)?;
+        Ok(Self(descriptor))
     }
 
-    // The current user's SID, as the text SDDL wants.
-    let user_sid = unsafe {
+    fn as_ptr(&self) -> *mut core::ffi::c_void {
+        self.0 .0
+    }
+}
+
+#[cfg(windows)]
+impl Drop for OwnerOnlyDescriptor {
+    fn drop(&mut self) {
+        use windows::Win32::Foundation::{LocalFree, HLOCAL};
+        unsafe {
+            LocalFree(Some(HLOCAL(self.0 .0)));
+        }
+    }
+}
+
+// The current user's SID, as the text SDDL wants.
+#[cfg(windows)]
+fn current_user_sid() -> io::Result<String> {
+    use windows::core::PWSTR;
+    use windows::Win32::Foundation::{CloseHandle, LocalFree, HANDLE, HLOCAL};
+    use windows::Win32::Security::Authorization::ConvertSidToStringSidW;
+    use windows::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKEN_USER};
+    use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    unsafe {
         let mut token = HANDLE::default();
         OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token).map_err(win)?;
         // Sized probe first: it fails with ERROR_INSUFFICIENT_BUFFER and reports
@@ -73,68 +139,35 @@ pub fn restrict_to_owner(path: &Path) -> io::Result<()> {
             .to_string()
             .map_err(|e| io::Error::other(e.to_string()));
         LocalFree(Some(HLOCAL(text.0.cast())));
-        sid?
-    };
-
-    let sddl = HSTRING::from(owner_only_sddl(&user_sid));
-    let name = HSTRING::from(path.as_os_str());
-    unsafe {
-        let mut descriptor = PSECURITY_DESCRIPTOR::default();
-        ConvertStringSecurityDescriptorToSecurityDescriptorW(
-            &sddl,
-            SDDL_REVISION_1,
-            &mut descriptor,
-            None,
-        )
-        .map_err(win)?;
-        let mut present = BOOL(0);
-        let mut defaulted = BOOL(0);
-        let mut dacl: *mut ACL = std::ptr::null_mut();
-        let applied =
-            match GetSecurityDescriptorDacl(descriptor, &mut present, &mut dacl, &mut defaulted) {
-                Ok(()) if present.as_bool() && !dacl.is_null() => {
-                    let status = SetNamedSecurityInfoW(
-                        &name,
-                        SE_FILE_OBJECT,
-                        DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-                        None,
-                        None,
-                        Some(dacl.cast_const()),
-                        None,
-                    );
-                    if status == ERROR_SUCCESS {
-                        Ok(())
-                    } else {
-                        Err(io::Error::from_raw_os_error(status.0 as i32))
-                    }
-                }
-                Ok(()) => Err(io::Error::other(
-                    "the owner-only security descriptor carries no DACL",
-                )),
-                Err(e) => Err(win(e)),
-            };
-        LocalFree(Some(HLOCAL(descriptor.0)));
-        applied
+        sid
     }
 }
 
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
 
     #[test]
-    fn a_restricted_file_is_owner_readable_only_whatever_it_was_before() {
+    fn a_file_is_born_owner_readable_only() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("secret");
-        std::fs::write(&file, "s").unwrap();
-        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644)).unwrap();
 
-        restrict_to_owner(&file).unwrap();
-
+        let mut created = create_new(&file).unwrap();
+        // Before a byte is written, the mode is already in force.
         assert_eq!(
             std::fs::metadata(&file).unwrap().permissions().mode() & 0o777,
             0o600
+        );
+        created.write_all(b"s").unwrap();
+        drop(created);
+
+        assert_eq!(std::fs::read(&file).unwrap(), b"s");
+        // Never over an existing file: the caller picks a fresh sibling name.
+        assert_eq!(
+            create_new(&file).unwrap_err().kind(),
+            std::io::ErrorKind::AlreadyExists
         );
     }
 }
