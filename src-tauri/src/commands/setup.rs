@@ -485,6 +485,21 @@ pub(crate) fn current_attempt(state: &AppState) -> u64 {
     state.setup_attempt.load(Ordering::SeqCst)
 }
 
+/// Atomically make one consent attempt the completed connection. Cancellation
+/// and replacement advance the same counter, so exactly one side can win: a
+/// loser must roll back anything it wrote before trying this transition.
+pub(crate) fn complete_attempt(state: &AppState, attempt: u64) -> bool {
+    state
+        .setup_attempt
+        .compare_exchange(
+            attempt,
+            attempt.wrapping_add(1),
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        )
+        .is_ok()
+}
+
 /// Onboarding only. A device that already holds a vault has other routes to
 /// Drive (`sync_connect`, `workspace_restore_from_drive`), and every one of
 /// them merges or adds a workspace rather than replaces — which is the point:
@@ -704,6 +719,19 @@ mod tests {
         let (attempt, tokens) = peek_pending_attempt(&state).unwrap();
         assert_eq!(attempt, current);
         assert_eq!(tokens.access_token.as_deref(), Some("second"));
+    }
+
+    #[test]
+    fn cancellation_and_completion_have_exactly_one_winner() {
+        let completed = AppState::default();
+        let attempt = set_pending(&completed, "first");
+        assert!(complete_attempt(&completed, attempt));
+        assert!(!complete_attempt(&completed, attempt));
+
+        let cancelled = AppState::default();
+        let attempt = set_pending(&cancelled, "first");
+        abandon_attempt(&cancelled);
+        assert!(!complete_attempt(&cancelled, attempt));
     }
 
     // The event names are the frontend's contract.

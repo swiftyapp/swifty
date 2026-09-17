@@ -134,7 +134,7 @@ pub async fn sync_adopt_pending(app: AppHandle, state: State<'_, AppState>) -> R
     // Key, tokens and flag under the workspace lock, as one step: a switch
     // cannot land between taking this workspace's key and sealing the account
     // under it (see `commands::workspace::guard_sync_idle`).
-    {
+    let run = {
         let _paths = state.workspace_lock.lock().unwrap();
         // Still the workspace that asked? The tokens belonged to a connect the
         // user walked away from, so they go: a retry from the other workspace
@@ -163,10 +163,18 @@ pub async fn sync_adopt_pending(app: AppHandle, state: State<'_, AppState>) -> R
         // Keep a refresh-token rotation for a retry if the file write fails.
         current.tokens = tokens.clone();
         sync::persist_tokens(&app, &cryptor, &tokens)?;
-        if super::setup::current_attempt(&state) != attempt {
-            // Cancellation/replacement linearized while the file was being
-            // written. Remove only the credential file we just created; the
-            // newer pending account (whose report waits on this guard) survives.
+
+        // Claim the first run before clearing the pending status, so a workspace
+        // switch cannot land between those two busy flags. The claim is only
+        // started after the connection transition below has won.
+        let claim = claim_run(&state.syncing);
+
+        // This compare-and-swap is the connection's commit point. A cancel or a
+        // replacement advances the same generation before waiting for the
+        // pending-token guard, so it either wins here and makes us roll the file
+        // back, or arrives after this attempt is already connected. There is no
+        // unowned interval between clearing `pending` and calling `connected`.
+        if !super::setup::complete_attempt(&state, attempt) {
             sync::disconnect(&app)?;
             if pending
                 .as_ref()
@@ -176,14 +184,17 @@ pub async fn sync_adopt_pending(app: AppHandle, state: State<'_, AppState>) -> R
             }
             return Err(Error::DriveNotConnected);
         }
-        // Taken only once written: a failure above leaves it for a retry.
+
+        // Announce the committed connection while both the workspace and its run
+        // claim are still pinned. Only then retire the pending credentials.
+        connected(&app);
         *pending = None;
+        claim.map(|claim| (claim, cryptor))
+    };
+
+    if let Some((claim, cryptor)) = run {
+        spawn_run(&app, claim, cryptor);
     }
-    // The run is claimed before the connect is announced, so the flags overlap
-    // rather than leave a gap a workspace switch could use — and the first
-    // upload cannot be skipped by one landing there.
-    start_run(&app);
-    connected(&app);
     Ok(())
 }
 
@@ -560,6 +571,10 @@ fn start_run(app: &AppHandle) {
     };
     drop(paths);
 
+    spawn_run(app, claim, cryptor);
+}
+
+fn spawn_run(app: &AppHandle, claim: RunClaim, cryptor: Cryptor) {
     let app = app.clone();
     super::detached(move || {
         let _claim = claim;
