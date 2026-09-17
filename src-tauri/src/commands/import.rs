@@ -323,7 +323,7 @@ fn to_imported(records: &[Record], cipher: &PayloadCipher) -> Result<Vec<Importe
 
 // ImportedEntry -> a plaintext models::Entry, ready to be obscured + sealed.
 fn imported_to_entry(imp: &ImportedEntry) -> Entry {
-    let now = chrono::Utc::now().to_rfc3339();
+    let now = chrono::Utc::now();
     // The kind's own fields are set in the match below; everything else stays
     // at its default (None, so a field the kind does not own never serializes).
     let mut e = Entry {
@@ -346,10 +346,11 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
         // The star and the stamps the source carried, not this moment: an entry
         // stamped "now" on the way in is a newer copy of itself and wins every
         // last-writer-wins sync race against the vault it came from. Only a
-        // source that has no dates of its own falls back to now.
+        // source that has no dates of its own — or dates it cannot have — falls
+        // back to now; see `no_later_than`.
         favorite: imp.favorite,
-        created_at: imp.created_at.clone().or_else(|| Some(now.clone())),
-        updated_at: imp.updated_at.clone().or(Some(now)),
+        created_at: Some(no_later_than(imp.created_at.as_deref(), now)),
+        updated_at: Some(no_later_than(imp.updated_at.as_deref(), now)),
         password_updated_at: imp.password_updated_at.clone(),
         ..Default::default()
     };
@@ -406,6 +407,19 @@ fn imported_to_entry(imp: &ImportedEntry) -> Entry {
         EntryKind::Note => {}
     }
     e
+}
+
+// The stamp a source carried, kept verbatim — unless it is unreadable or lies
+// in the future, when it is `now` instead. A foreign file is untrusted input,
+// and sync settles a conflict purely by the greater `updated_at`
+// (`SqliteStore::merge_records`): an entry that arrived dated 2099 would beat
+// every edit anyone made to it afterwards, on every device, for good. The past
+// is what we want to keep (see the caller); only the future is refused.
+fn no_later_than(stamp: Option<&str>, now: chrono::DateTime<chrono::Utc>) -> String {
+    match stamp.and_then(|s| Some((s, chrono::DateTime::parse_from_rfc3339(s).ok()?))) {
+        Some((verbatim, parsed)) if parsed <= now => verbatim.to_owned(),
+        _ => now.to_rfc3339(),
+    }
 }
 
 // A plaintext (exposed) models::Entry -> ImportedEntry for export.
@@ -621,6 +635,36 @@ mod tests {
             .collect();
         store.import(&fresh).unwrap();
         assert_eq!(store.list().unwrap().len(), 2);
+    }
+
+    // Sync picks a conflict's winner by the greater `updated_at` alone, so a
+    // file dated in the future would outrank every later edit, everywhere. A
+    // stamp from the past is kept as written; the future — and a stamp that is
+    // not a date at all — becomes now.
+    #[test]
+    fn a_future_or_unreadable_stamp_is_clamped_to_now_and_a_past_one_kept() {
+        let before = chrono::Utc::now();
+        let mut row = login("s3cret");
+        row.created_at = Some("2020-01-02T03:04:05+00:00".into());
+        row.updated_at = Some("2099-01-01T00:00:00+00:00".into());
+        let entry = imported_to_entry(&row);
+        assert_eq!(
+            entry.created_at.as_deref(),
+            Some("2020-01-02T03:04:05+00:00")
+        );
+        let updated =
+            chrono::DateTime::parse_from_rfc3339(entry.updated_at.as_deref().unwrap()).unwrap();
+        assert!(
+            updated >= before && updated <= chrono::Utc::now(),
+            "{updated}"
+        );
+
+        row.updated_at = Some("yesterday-ish".into());
+        let entry = imported_to_entry(&row);
+        assert!(
+            chrono::DateTime::parse_from_rfc3339(entry.updated_at.as_deref().unwrap())
+                .is_ok_and(|t| t >= before)
+        );
     }
 
     // A near match is a real import: the same account with a rotated password is

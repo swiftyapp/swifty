@@ -121,8 +121,22 @@ pub fn set_labelled(entry: &mut ImportedEntry, mut take: impl FnMut(&str) -> Opt
     }
 }
 
+/// Every label [`set_labelled`] claims from a file's custom fields, in the order
+/// it asks. Learned by asking it — a scratch entry and a closure that only notes
+/// the label — so an exporter guarding against a collision (see
+/// [`to_bitwarden_json`]) cannot drift from what the importer will take.
+pub fn claimed_labels() -> Vec<String> {
+    let mut labels = Vec::new();
+    set_labelled(&mut ImportedEntry::default(), |label| {
+        labels.push(label.to_owned());
+        None
+    });
+    labels
+}
+
 /// Serialize to Bitwarden's unencrypted JSON export shape.
 pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8>> {
+    let claimed = claimed_labels();
     let items: Vec<_> = entries
         .iter()
         .map(|e| {
@@ -142,9 +156,24 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
             // first field wearing a label. A user's own extra may share one
             // ("Email" is a natural thing to call a field); written after ours,
             // it stays theirs on the way back instead of landing in our slot.
-            for (label, value, secret) in labelled_fields(e) {
-                let kind = if secret { FIELD_HIDDEN } else { FIELD_TEXT };
+            let ours = labelled_fields(e);
+            for (label, value, secret) in &ours {
+                let kind = if *secret { FIELD_HIDDEN } else { FIELD_TEXT };
                 push_field(&mut item, label, value, kind);
+            }
+            // That only holds if ours is there to be taken first. A label the
+            // importer claims that we had nothing to write under — the email is
+            // unset, the star is off and Bitwarden has a member for it anyway —
+            // still gets a field of ours, empty, when the user has one wearing
+            // it: the importer takes the empty one (an empty value sets no
+            // slot) and theirs stays theirs. Without a colliding extra nothing
+            // is written, so the usual export is unchanged.
+            for label in &claimed {
+                let written = ours.iter().any(|(l, _, _)| l == label);
+                let collides = e.extra.iter().any(|(l, _)| l.eq_ignore_ascii_case(label));
+                if !written && collides {
+                    push_field(&mut item, label, "", FIELD_TEXT);
+                }
             }
             // Then the user's extras, in their order. `fields` is only ever
             // written when there is something to write, so an export of a

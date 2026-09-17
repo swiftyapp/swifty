@@ -1457,6 +1457,43 @@ fn a_users_own_field_sharing_our_label_survives_a_bitwarden_round_trip() {
     assert_eq!(back.entries, entries);
 }
 
+// The same, when we have nothing of our own to write under the label: with the
+// email unset and the star off, the user's "Email" and "Favorite" fields used to
+// be the first — and so the only — match, and were moved into our slots. An
+// empty field of ours now goes ahead of each, so theirs come back as theirs.
+#[test]
+fn a_users_own_field_sharing_a_label_we_did_not_write_survives_a_bitwarden_round_trip() {
+    let mut login = starred_login();
+    login.email = None;
+    login.favorite = false;
+    login.extra = vec![
+        ("Email".into(), "the user's own note".into()),
+        ("favorite".into(), "yes, very".into()),
+    ];
+    let entries = vec![login];
+    let bytes = to_bitwarden_json(&entries).unwrap();
+    let out: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let fields: Vec<(&str, &str)> = out["items"][0]["fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| (f["name"].as_str().unwrap(), f["value"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        fields,
+        vec![
+            ("Favorite", ""),
+            ("Email", ""),
+            ("Email", "the user's own note"),
+            ("favorite", "yes, very"),
+        ]
+    );
+
+    let back = parse(Format::Bitwarden, &bytes);
+    assert!(back.errors.is_empty(), "{:?}", back.errors);
+    assert_eq!(back.entries, entries);
+}
+
 // A CXF `modifiedAt` written as a float or a string is read like `creationAt`
 // is, rather than failing the document.
 #[test]
