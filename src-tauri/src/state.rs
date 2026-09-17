@@ -172,6 +172,12 @@ pub struct AppState {
     // whole length (`commands::sync::RunClaim`), rather than a flag raised here
     // and lowered by hand on the thread that happens to end the run.
     pub syncing: Arc<AtomicBool>,
+    /// A run was asked for while `syncing` was held. The run in flight may have
+    /// packed before the write that asked, so it is run once more when it ends
+    /// (`commands::sync::spawn_run`), rather than leaving that write for the
+    /// next unlock. Raised *before* the claim is tried and lowered when it is
+    /// won, so no request can fall between a run's release and its check.
+    pub sync_rerun: AtomicBool,
     /// Which Drive connection is current, and the guard on the token file.
     ///
     /// A token refresh reads the file, awaits a network round trip, and writes
@@ -252,6 +258,7 @@ impl Default for AppState {
             active_workspace: Mutex::new(crate::workspace::PRIMARY_ID.to_string()),
             workspace_lock: Mutex::default(),
             syncing: Arc::default(),
+            sync_rerun: AtomicBool::default(),
             sync_generation: Mutex::default(),
             sync_runs: Mutex::default(),
             pending_drive: Mutex::default(),

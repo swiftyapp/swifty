@@ -270,14 +270,17 @@ export const claimOpenedFile = (): string | null => {
 /**
  * How long a write waits before it is published.
  *
- * A push is the whole vault, so firing one per keystroke-sized edit would send
- * the same snapshot over and over during a rename or a bulk import. The timer
- * resets on every write, so a burst costs exactly one push once it settles.
+ * A push is the whole vault, so firing one per write would send the same
+ * snapshot several times over during a run of quick edits. The timer resets on
+ * every write, so a burst costs one push once it settles — and two seconds is
+ * enough to settle a burst, since writes are form submits rather than
+ * keystrokes. A write that lands while a run is already in flight is not lost
+ * either: the backend keeps the request and runs once more when that run ends.
  * The debounce lives here rather than in the backend because the backend has
  * no write hook. A quit inside the window loses nothing: the next unlock runs
  * a sync anyway.
  */
-const SYNC_DEBOUNCE_MS = 30_000
+const SYNC_DEBOUNCE_MS = 2_000
 
 let syncTimer: ReturnType<typeof setTimeout> | undefined
 

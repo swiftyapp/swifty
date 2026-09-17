@@ -145,14 +145,22 @@ describe('auto-sync', () => {
     connected()
 
     await saveEntry({ type: 'login', title: 'One', username: 'u', password: 'p' })
-    await vi.advanceTimersByTimeAsync(20_000)
+    await vi.advanceTimersByTimeAsync(1_500)
     await saveEntry({ type: 'login', title: 'Two', username: 'u', password: 'p' })
 
     // The second write reset the timer, so nothing has gone out yet.
-    await vi.advanceTimersByTimeAsync(20_000)
+    await vi.advanceTimersByTimeAsync(1_500)
     expect(calls('sync_now')).toHaveLength(0)
 
-    await vi.advanceTimersByTimeAsync(20_000)
+    await vi.advanceTimersByTimeAsync(1_500)
+    expect(calls('sync_now')).toHaveLength(1)
+  })
+
+  it('publishes a save within a couple of seconds', async () => {
+    connected()
+
+    await saveEntry({ type: 'login', title: 'One', username: 'u', password: 'p' })
+    await vi.advanceTimersByTimeAsync(2_000)
     expect(calls('sync_now')).toHaveLength(1)
   })
 
@@ -176,7 +184,7 @@ describe('auto-sync', () => {
     setEntries([meta('a')])
 
     await deleteEntry('a')
-    await vi.advanceTimersByTimeAsync(30_000)
+    await vi.advanceTimersByTimeAsync(2_000)
     expect(calls('sync_now')).toHaveLength(1)
   })
 })
