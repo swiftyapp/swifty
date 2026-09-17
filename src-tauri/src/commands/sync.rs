@@ -195,12 +195,16 @@ fn spawn_consent(app: &AppHandle, state: &State<'_, AppState>, follow: Follow) -
 /// success: the user connected in order to see what was up there, and "nothing
 /// new" is an answer worth rendering.
 ///
+/// Run as an import, not a sync: this vault has an id and a pack name of its
+/// own, and an ordinary run would look for that pack, find nothing, and push
+/// the empty vault — the opposite of what the user pressed.
+///
 /// Blocking, and deliberately: `sync::run` drives Drive with `block_on`, so
 /// every caller has to be on the blocking pool (see [`start_run`]). The caller
 /// has already announced the run (`started`) — before the consent it follows was
 /// marked over, so a workspace switch never finds a moment with neither flag up.
 fn pull(app: &AppHandle, cryptor: Cryptor) {
-    match sync::run(app, cryptor) {
+    match sync::run(app, cryptor, sync::Intent::Import) {
         Ok(_) => {
             events::vault_merged(app, entry_metas(app));
             finished(app, None);
@@ -538,7 +542,7 @@ fn start_run(app: &AppHandle) {
     super::detached(move || {
         let _guard = RunGuard(app.clone());
         started(&app);
-        report(&app, sync::run(&app, cryptor));
+        report(&app, sync::run(&app, cryptor, sync::Intent::Sync));
     });
 }
 

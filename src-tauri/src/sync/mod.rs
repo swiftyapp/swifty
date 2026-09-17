@@ -172,8 +172,20 @@ pub(crate) async fn revoke(tokens: &Tokens) {
     }
 }
 
+/// Why a run was started, as far as choosing the pack goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Intent {
+    /// The ordinary run: this vault's own pack, whatever else the account holds.
+    Sync,
+    /// "Import from Drive": the user wants what the account already has
+    /// brought into this vault. If the account holds exactly one vault, this
+    /// vault takes on its id and merges with it — its own, usually empty, pack
+    /// would otherwise be the only thing an import ever found.
+    Import,
+}
+
 /// One full sync against Drive. Blocking: call it on a dedicated thread.
-pub fn run(app: &AppHandle, cryptor: Cryptor) -> Result<SyncOutcome> {
+pub fn run(app: &AppHandle, cryptor: Cryptor, intent: Intent) -> Result<SyncOutcome> {
     if !is_configured(app, &cryptor) {
         return Err(Error::SyncNotConfigured);
     }
@@ -181,7 +193,7 @@ pub fn run(app: &AppHandle, cryptor: Cryptor) -> Result<SyncOutcome> {
     // Which pack on Drive is this vault's, decided before a byte is pulled. A
     // failure here is a sync failure like any other: addressing the wrong pack
     // — or a second one — is the one mistake the merge cannot undo.
-    let vault_id = block_on(resolve_vault_id(app, &cryptor, &local))?;
+    let vault_id = block_on(resolve_vault_id(app, &cryptor, &local, intent))?;
     let remote = DriveRemote::new(app.clone(), cryptor, vault_id);
     let outcome = engine::sync(&remote, &local, now_ms())?;
     sweep_shares(app);
@@ -239,7 +251,18 @@ enum VaultIdPlan {
 /// `local` is the id in this vault's `meta` table, `legacy` whether
 /// `Rowel/vault.swsync` is still there, and `live` the ids of the packs found
 /// in `Vaults/` (an absent folder is simply none of them).
-fn plan_vault_id(local: Option<&str>, legacy: bool, live: &[&str]) -> VaultIdPlan {
+fn plan_vault_id(intent: Intent, local: Option<&str>, legacy: bool, live: &[&str]) -> VaultIdPlan {
+    // An import is the one time the account's pack outranks this vault's own
+    // name: the user asked for what is up there. With nothing up there it is an
+    // ordinary run, and with several packs there is no telling which they meant.
+    if intent == Intent::Import {
+        match live {
+            [] => {}
+            [only] if Some(*only) == local => return VaultIdPlan::Use((*only).to_string()),
+            [only] => return VaultIdPlan::Adopt((*only).to_string()),
+            _ => return VaultIdPlan::Ambiguous,
+        }
+    }
     match (local, legacy) {
         // A local id settles it outright; the legacy pack is only interesting
         // while `Vaults/` does not already hold this vault's pack.
@@ -257,8 +280,8 @@ fn plan_vault_id(local: Option<&str>, legacy: bool, live: &[&str]) -> VaultIdPla
 // Surfaced verbatim by the sync indicator, so it has to read as a sentence.
 fn ambiguous_vault_error() -> String {
     format!(
-        "this Google account holds more than one {} vault, and this device has no id saying which \
-         of them is its own; restore the one you want onto a fresh install instead",
+        "this Google account holds more than one {} vault and nothing says which of them is \
+         meant; restore the one you want onto a fresh install instead",
         crate::app::APP_NAME
     )
 }
@@ -273,6 +296,7 @@ async fn resolve_vault_id(
     app: &AppHandle,
     cryptor: &Cryptor,
     local: &impl LocalVault,
+    intent: Intent,
 ) -> Result<String> {
     let client = http_client();
     let token = auth::access_token(&client, app, cryptor).await?;
@@ -295,7 +319,13 @@ async fn resolve_vault_id(
     }
     let live: Vec<&str> = live.iter().map(String::as_str).collect();
 
-    let (id, migrate) = match plan_vault_id(local.vault_id()?.as_deref(), legacy.is_some(), &live) {
+    let plan = plan_vault_id(
+        intent,
+        local.vault_id()?.as_deref(),
+        legacy.is_some(),
+        &live,
+    );
+    let (id, migrate) = match plan {
         VaultIdPlan::Use(id) => (id, false),
         VaultIdPlan::Assign => (local.assign_vault_id()?, false),
         VaultIdPlan::Adopt(id) => {
@@ -469,24 +499,26 @@ impl Remote for DriveRemote {
 
 #[cfg(test)]
 mod tests {
-    use super::{plan_vault_id, VaultIdPlan};
+    use super::{plan_vault_id, Intent, VaultIdPlan};
 
     const ID: &str = "a1b2c3";
+
+    fn plan(local: Option<&str>, legacy: bool, live: &[&str]) -> VaultIdPlan {
+        plan_vault_id(Intent::Sync, local, legacy, live)
+    }
+
+    fn import(local: Option<&str>, legacy: bool, live: &[&str]) -> VaultIdPlan {
+        plan_vault_id(Intent::Import, local, legacy, live)
+    }
 
     #[test]
     fn a_vault_that_knows_its_id_simply_uses_it() {
         // Its pack is there; and if it is not, the first push creates it.
-        assert_eq!(
-            plan_vault_id(Some(ID), false, &[ID]),
-            VaultIdPlan::Use(ID.into())
-        );
-        assert_eq!(
-            plan_vault_id(Some(ID), false, &[]),
-            VaultIdPlan::Use(ID.into())
-        );
+        assert_eq!(plan(Some(ID), false, &[ID]), VaultIdPlan::Use(ID.into()));
+        assert_eq!(plan(Some(ID), false, &[]), VaultIdPlan::Use(ID.into()));
         // Another vault's pack in the folder is none of this one's business.
         assert_eq!(
-            plan_vault_id(Some(ID), false, &["dddd", "eeee"]),
+            plan(Some(ID), false, &["dddd", "eeee"]),
             VaultIdPlan::Use(ID.into())
         );
     }
@@ -494,9 +526,45 @@ mod tests {
     #[test]
     fn an_upgraded_install_moves_its_legacy_pack_under_its_own_id() {
         assert_eq!(
-            plan_vault_id(Some(ID), true, &[]),
+            plan(Some(ID), true, &[]),
             VaultIdPlan::MigrateLegacy(ID.into())
         );
+    }
+
+    // "Import from Drive" is asked by a vault that has an id of its own and,
+    // usually, nothing in it. Keeping that id would find nothing to import.
+    #[test]
+    fn an_import_takes_on_the_one_vault_the_account_holds() {
+        assert_eq!(
+            import(Some(ID), false, &["dddd"]),
+            VaultIdPlan::Adopt("dddd".into())
+        );
+        assert_eq!(
+            import(None, false, &["dddd"]),
+            VaultIdPlan::Adopt("dddd".into())
+        );
+        // Already that vault: nothing to take on.
+        assert_eq!(import(Some(ID), false, &[ID]), VaultIdPlan::Use(ID.into()));
+    }
+
+    #[test]
+    fn an_import_refuses_to_guess_between_several_vaults() {
+        assert_eq!(
+            import(Some(ID), false, &["dddd", "eeee"]),
+            VaultIdPlan::Ambiguous
+        );
+    }
+
+    // With nothing under `Vaults/` an import is an ordinary run: the legacy
+    // pack, if any, is moved in and merged the same way.
+    #[test]
+    fn an_import_into_an_empty_account_behaves_like_a_sync() {
+        assert_eq!(import(Some(ID), false, &[]), VaultIdPlan::Use(ID.into()));
+        assert_eq!(
+            import(Some(ID), true, &[]),
+            VaultIdPlan::MigrateLegacy(ID.into())
+        );
+        assert_eq!(import(None, true, &[]), VaultIdPlan::AssignAndMigrateLegacy);
     }
 
     // The migration already ran — on this device or another — and left the
@@ -505,40 +573,31 @@ mod tests {
     // back on top of the live pack's name.
     #[test]
     fn a_legacy_file_beside_an_already_migrated_pack_is_left_alone() {
-        assert_eq!(
-            plan_vault_id(Some(ID), true, &[ID]),
-            VaultIdPlan::Use(ID.into())
-        );
+        assert_eq!(plan(Some(ID), true, &[ID]), VaultIdPlan::Use(ID.into()));
     }
 
     #[test]
     fn a_vault_from_before_ids_takes_the_legacy_pack_with_it() {
-        assert_eq!(
-            plan_vault_id(None, true, &[]),
-            VaultIdPlan::AssignAndMigrateLegacy
-        );
+        assert_eq!(plan(None, true, &[]), VaultIdPlan::AssignAndMigrateLegacy);
     }
 
     #[test]
     fn an_idless_vault_adopts_the_one_pack_the_account_holds() {
         assert_eq!(
-            plan_vault_id(None, false, &["dddd"]),
+            plan(None, false, &["dddd"]),
             VaultIdPlan::Adopt("dddd".into())
         );
     }
 
     #[test]
     fn an_idless_vault_with_nothing_to_adopt_mints_an_id() {
-        assert_eq!(plan_vault_id(None, false, &[]), VaultIdPlan::Assign);
+        assert_eq!(plan(None, false, &[]), VaultIdPlan::Assign);
     }
 
     // Picking one would push this vault's entries into a stranger's pack and
     // pull theirs back. There is no evidence here to pick on, so it stops.
     #[test]
     fn an_idless_vault_facing_several_packs_refuses_to_guess() {
-        assert_eq!(
-            plan_vault_id(None, false, &["dddd", "eeee"]),
-            VaultIdPlan::Ambiguous
-        );
+        assert_eq!(plan(None, false, &["dddd", "eeee"]), VaultIdPlan::Ambiguous);
     }
 }
