@@ -21,7 +21,9 @@
 //! its tokens under the open vault — when the account is empty or already
 //! holds this vault. An account holding other vaults is offered to restore
 //! instead: every device connected to an account syncs the vaults it holds
-//! rather than adding a pack beside them.
+//! rather than adding a pack beside them. The adoption is bound to the
+//! workspace that started it: a switch during the probe is caught before the
+//! tokens are sealed, never after.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -98,13 +100,26 @@ pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
 /// `plan_vault_id` keeps an id the vault already has. Nothing pending is an
 /// error rather than a silent success: the frontend would otherwise show
 /// "Connected" over a vault with no token file.
+///
+/// The adoption is bound to the workspace that started it. The probe is a
+/// network round trip with no lock held, and a pending account is
+/// workspace-agnostic by design — onboarding and the Workspaces restore both
+/// adopt one with no vault open, so `commands::workspace::guard_sync_idle`
+/// does not treat it as busy and a switch may land while Google is answering.
+/// The workspace id and vault id are therefore read together under
+/// `workspace_lock` before the probe and checked again under it before anything
+/// is written ([`still_the_same_workspace`]): sealing the tokens under whichever
+/// vault happened to be open afterwards would give that vault the account, and
+/// its first sync would create a second pack beside the one the user meant.
 #[tauri::command]
 pub async fn sync_adopt_pending(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    // This vault's id, under the session lock alone: it is a read off `meta`.
-    let vault_id = {
-        let session = state.session.lock().unwrap();
-        let store = session.store()?;
-        crate::store::identity::vault_id(store).map_err(crate::session::store_err)?
+    // Which workspace is asking, and which vault it holds, as one read under
+    // the workspace lock: a switch moves both under that lock, so the pair
+    // cannot straddle one. Released before the network call below.
+    let (workspace, vault_id) = {
+        let _paths = state.workspace_lock.lock().unwrap();
+        let workspace = state.active_workspace.lock().unwrap().clone();
+        (workspace, open_vault_id(&state)?)
     };
     // Asked of the account on a copy of the pending tokens, and with no lock
     // held: this is a network round trip (see `AppState::workspace_lock`). The
@@ -121,6 +136,17 @@ pub async fn sync_adopt_pending(app: AppHandle, state: State<'_, AppState>) -> R
     // under it (see `commands::workspace::guard_sync_idle`).
     {
         let _paths = state.workspace_lock.lock().unwrap();
+        // Still the workspace that asked? The tokens belonged to a connect the
+        // user walked away from, so they go: a retry from the other workspace
+        // would only seal them under the wrong key again. A session that merely
+        // locked during the round trip is not a switch, and keeps them for a
+        // retry as before (`Error::Locked` from the read).
+        if !still_the_same_workspace(&state, &workspace, vault_id.as_deref())? {
+            super::setup::take_pending(&state);
+            return Err(Error::Other(
+                "the workspace changed while Google was answering; connect again from the workspace you want to sync".into(),
+            ));
+        }
         let cryptor = state.session.lock().unwrap().cryptor()?;
         // Still pending? A cancel during the round trip forgot the account, and
         // it must not come back through the copy.
@@ -143,6 +169,33 @@ pub async fn sync_adopt_pending(app: AppHandle, state: State<'_, AppState>) -> R
 /// no id yet can only ever be an empty account's first.
 fn may_adopt(vault_id: Option<&str>, packs: &[PackInfo]) -> bool {
     packs.is_empty() || vault_id.is_some_and(|id| packs.iter().any(|pack| pack.vault_id == id))
+}
+
+/// Is `workspace`, holding the vault with `vault_id`, still the one that is
+/// open? The caller holds `workspace_lock`, so what this reads is what the
+/// write that follows will address.
+///
+/// Both halves are checked: the same workspace re-unlocked is fine, a different
+/// workspace is not, and neither is a different vault behind the same paths — a
+/// restore over the workspace would be one. A locked session is neither answer
+/// and is reported as such (`Error::Locked`), since the caller treats it
+/// differently from a switch.
+fn still_the_same_workspace(
+    state: &AppState,
+    workspace: &str,
+    vault_id: Option<&str>,
+) -> Result<bool> {
+    if *state.active_workspace.lock().unwrap() != workspace {
+        return Ok(false);
+    }
+    Ok(open_vault_id(state)?.as_deref() == vault_id)
+}
+
+/// The open vault's id, under the session lock alone: it is a read off `meta`.
+fn open_vault_id(state: &AppState) -> Result<Option<String>> {
+    let session = state.session.lock().unwrap();
+    let store = session.store()?;
+    crate::store::identity::vault_id(store).map_err(crate::session::store_err)
 }
 
 /// Disconnect the sync provider for the workspace that is open: its token file
@@ -547,6 +600,7 @@ impl Drop for RunClaim {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::workspace::PRIMARY_ID;
 
     // An import and an ordinary sync are not two flows with two flags: they
     // take the same claim, so whichever gets there first is the only one that
@@ -603,5 +657,70 @@ mod tests {
         assert!(!may_adopt(Some("this-vault"), &packs));
         // Nor may an id-less vault be minted beside them.
         assert!(!may_adopt(None, &packs));
+    }
+
+    // An unlocked primary holding the vault `vault_id`, or one with no id yet.
+    fn open_primary(vault_id: Option<&str>) -> AppState {
+        use crate::crypto::VaultKey;
+        use crate::store::SqliteStore;
+
+        static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "rowel-sync-adopt-{}-{}.db",
+            std::process::id(),
+            N.fetch_add(1, Ordering::SeqCst)
+        ));
+        let store = SqliteStore::open(&path, &[9u8; 32]).unwrap();
+        if let Some(id) = vault_id {
+            crate::store::identity::adopt_vault_id(&store, id).unwrap();
+        }
+        // A key of the right shape; nothing here derives or opens anything with it.
+        let key = VaultKey::Argon2 {
+            master: zeroize::Zeroizing::new(vec![0u8; 32]),
+        };
+        let state = AppState::default();
+        state.session.lock().unwrap().set(key, store, false);
+        state
+    }
+
+    // The round trip to Google is the one gap `guard_sync_idle` does not close:
+    // the adoption must find, after it, exactly the workspace and vault it read
+    // before it.
+    #[test]
+    fn the_same_workspace_holding_the_same_vault_is_still_it() {
+        let state = open_primary(Some("a1b2"));
+        assert!(still_the_same_workspace(&state, PRIMARY_ID, Some("a1b2")).unwrap());
+    }
+
+    #[test]
+    fn another_workspace_is_not() {
+        let state = open_primary(Some("a1b2"));
+        *state.active_workspace.lock().unwrap() = "b2c3".into();
+        assert!(!still_the_same_workspace(&state, PRIMARY_ID, Some("a1b2")).unwrap());
+    }
+
+    // The paths did not move, but what is behind them did: a restore over the
+    // same workspace, say.
+    #[test]
+    fn the_same_workspace_holding_another_vault_is_not() {
+        let state = open_primary(Some("cafe"));
+        assert!(!still_the_same_workspace(&state, PRIMARY_ID, Some("a1b2")).unwrap());
+    }
+
+    // A vault that has not synced yet has no id on either side of the probe.
+    #[test]
+    fn a_vault_with_no_id_yet_is_still_it() {
+        let state = open_primary(None);
+        assert!(still_the_same_workspace(&state, PRIMARY_ID, None).unwrap());
+    }
+
+    // Locked mid-round-trip is not a switch: the caller leaves the tokens for a
+    // retry rather than dropping them.
+    #[test]
+    fn a_locked_session_is_neither_answer() {
+        assert!(matches!(
+            still_the_same_workspace(&AppState::default(), PRIMARY_ID, None),
+            Err(Error::Locked)
+        ));
     }
 }
