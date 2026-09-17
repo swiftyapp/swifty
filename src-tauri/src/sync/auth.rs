@@ -540,15 +540,23 @@ fn listen_for_code(listener: &TcpListener, state: &str) -> Result<String> {
 fn listen_for_code_until(listener: &TcpListener, state: &str, deadline: Instant) -> Result<String> {
     listener.set_nonblocking(true)?;
     loop {
+        // Checked on every pass, connection or not: a local process that keeps
+        // connecting without ever sending a request could otherwise hold the
+        // flow open past the deadline, one read timeout at a time. The same
+        // remaining time also bounds each read, so the last connection cannot
+        // stretch the wait either.
+        let Some(remaining) = deadline
+            .checked_duration_since(Instant::now())
+            .filter(|d| !d.is_zero())
+        else {
+            return Err(Error::Other(
+                "Google sign-in took too long; try again".into(),
+            ));
+        };
         let (mut stream, _) = match listener.accept() {
             Ok(connection) => connection,
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                if Instant::now() >= deadline {
-                    return Err(Error::Other(
-                        "Google sign-in took too long; try again".into(),
-                    ));
-                }
-                std::thread::sleep(ACCEPT_POLL);
+                std::thread::sleep(ACCEPT_POLL.min(remaining));
                 continue;
             }
             Err(e) => return Err(e.into()),
@@ -556,7 +564,7 @@ fn listen_for_code_until(listener: &TcpListener, state: &str, deadline: Instant)
         // Some platforms hand the accepted socket the listener's non-blocking
         // flag; the read below wants a plain deadline instead.
         stream.set_nonblocking(false)?;
-        stream.set_read_timeout(Some(REQUEST_TIMEOUT))?;
+        stream.set_read_timeout(Some(REQUEST_TIMEOUT.min(remaining)))?;
 
         let mut reader = BufReader::new(&stream);
         let mut request_line = String::new();
@@ -655,6 +663,40 @@ mod tests {
         let result = listen_for_code_until(&listener, "nonce", started);
         assert!(result.is_err());
         assert!(started.elapsed() < CONSENT_TIMEOUT);
+    }
+
+    // A local process that keeps connecting but never sends a request must
+    // not hold the flow open: each silent connection is bounded by what is
+    // left of the deadline, not by a fresh read timeout of its own.
+    #[cfg(desktop)]
+    #[test]
+    fn silent_connections_cannot_stretch_the_deadline() {
+        let listener = TcpListener::bind((HOST, 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let pest = {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                let mut held = Vec::new();
+                while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+                    if let Ok(stream) = std::net::TcpStream::connect(addr) {
+                        held.push(stream);
+                    }
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+            })
+        };
+
+        let deadline = Duration::from_millis(300);
+        let started = Instant::now();
+        let result = listen_for_code_until(&listener, "nonce", started + deadline);
+        stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        pest.join().unwrap();
+
+        assert!(result.is_err());
+        // Well inside one `REQUEST_TIMEOUT`: the deadline, not the per-socket
+        // read timeout, is what ended the wait.
+        assert!(started.elapsed() < deadline + Duration::from_secs(2));
     }
 
     #[test]
