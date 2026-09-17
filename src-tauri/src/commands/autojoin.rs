@@ -88,13 +88,17 @@ fn join_all(app: &AppHandle, password: &str) -> Result<()> {
 
     // No lock held from here on: everything below is network or the new
     // workspace's own files, and the registry writes take their own lock.
-    let packs = block_on(onboarding::probe(app, &mut tokens))?;
-    // The listing may have refreshed the tokens. The workspace they came from
-    // keeps the refreshed copy whether or not a candidate follows — and a
-    // disconnect that landed under the listing ends the task here.
+    let probed = block_on(onboarding::probe(app, &mut tokens));
+    // The listing may have refreshed the tokens — and refreshed them even if
+    // the listing itself then failed. The workspace they came from keeps the
+    // refreshed copy either way, before the failure is looked at: a rotated
+    // refresh token that lived only here would leave the workspace holding the
+    // retired one (as `auth::access_token` writes back before its own Drive
+    // call). A disconnect that landed under the listing ends the task here.
     if !account.settle(app, &state, &tokens)? {
         return Ok(());
     }
+    let packs = probed?;
     let held = held_vault_ids(&Registry::load(&root), own_vault_id.as_deref());
     let candidates = sync::remote_only(packs, &held);
     if candidates.is_empty() {
@@ -224,15 +228,17 @@ fn join_one(
     // The network half first, with nothing held. The pack is refused before
     // the download if a workspace here already holds it — a listing that
     // predates a restore the user made meanwhile.
-    let (bytes, vault_id) = block_on(onboarding::download(app, tokens, &pack.id, |vault_id| {
+    let downloaded = block_on(onboarding::download(app, tokens, &pack.id, |vault_id| {
         guard_other_vault(state, root, vault_id)
-    }))?;
-    // The round trips may have refreshed the tokens; the workspace they came
-    // from gets the refreshed copy before anything else does — and if the
-    // account was disconnected meanwhile, nothing does.
+    }));
+    // The round trips may have refreshed the tokens, whether or not the
+    // download after the refresh succeeded; the workspace they came from gets
+    // the refreshed copy before anything else does, the failure included — and
+    // if the account was disconnected meanwhile, nothing does.
     if !account.settle(app, state, tokens)? {
         return Err(Error::SyncNotConfigured);
     }
+    let (bytes, vault_id) = downloaded?;
 
     // Writing a workspace takes the exclusion a create or a restore takes. Busy
     // means one of those is running right now; this vault is left for the
