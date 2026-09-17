@@ -106,6 +106,12 @@ pub enum Error {
     #[error("a workspace needs a master password")]
     WorkspacePasswordRequired,
 
+    /// A Drive restore pointed at the vault the open workspace already holds.
+    /// Restoring it beside itself would leave one device with two workspaces
+    /// syncing the same pack, each overwriting the other's idea of it.
+    #[error("this vault is already open in this workspace")]
+    VaultAlreadyOpen,
+
     #[error("the file is too large")]
     FileTooLarge,
 
@@ -156,6 +162,7 @@ impl Error {
             Error::PrimaryWorkspaceOnly => "primaryWorkspaceOnly",
             Error::WorkspaceNameRequired => "workspaceNameRequired",
             Error::WorkspacePasswordRequired => "workspacePasswordRequired",
+            Error::VaultAlreadyOpen => "vaultAlreadyOpen",
             Error::FileTooLarge => "fileTooLarge",
             Error::FileNotText => "fileNotText",
             Error::Io(_) => "io",
