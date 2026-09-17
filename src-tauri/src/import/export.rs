@@ -50,9 +50,93 @@ pub const NOTE_LABEL: &str = "Note";
 pub const ENVIRONMENT_LABEL: &str = "Environment";
 pub const SCOPES_LABEL: &str = "Scopes";
 pub const EXPIRES_LABEL: &str = "Expires";
+/// The rest of what an entry holds that neither Bitwarden nor CXF has a member
+/// for: a login's second address, a card's PIN, the parts of an ID document
+/// beyond the number, the star, and when the password was last changed. Each
+/// travels as a labelled field and is read back under the same label — see
+/// [`labelled_fields`] and [`set_labelled`], the two halves of that trip.
+pub const EMAIL_LABEL: &str = "Email";
+pub const CARD_PIN_LABEL: &str = "PIN";
+pub const NATIONALITY_LABEL: &str = "Nationality";
+pub const BIRTH_DATE_LABEL: &str = "Date of birth";
+pub const SEX_LABEL: &str = "Sex";
+pub const ISSUE_DATE_LABEL: &str = "Issue date";
+/// Distinct from [`EXPIRES_LABEL`], which is an API key's: a passport and a
+/// token both expire, and the two must not land in each other's slot.
+pub const EXPIRY_DATE_LABEL: &str = "Expiry date";
+pub const AUTHORITY_LABEL: &str = "Authority";
+pub const PERSONAL_NUMBER_LABEL: &str = "Personal number";
+pub const PASSWORD_UPDATED_LABEL: &str = "Password updated";
+pub const FAVORITE_LABEL: &str = "Favorite";
+
+/// The values that have no member in any format we write, paired with the label
+/// they travel under and whether they are secret (a hidden Bitwarden field, a
+/// concealed CXF one). One table so a field cannot be written under one label
+/// and looked for under another. The star and the personal number are not here:
+/// Bitwarden has a member for each (`favorite`, `ssn`) and only CXF has to label
+/// them, which it does itself.
+pub fn labelled_fields(e: &ImportedEntry) -> Vec<(&'static str, &str, bool)> {
+    [
+        (EMAIL_LABEL, &e.email, false),
+        (CARD_PIN_LABEL, &e.card_pin, true),
+        (NATIONALITY_LABEL, &e.doc_nationality, false),
+        (BIRTH_DATE_LABEL, &e.doc_birth_date, false),
+        (SEX_LABEL, &e.doc_sex, false),
+        (ISSUE_DATE_LABEL, &e.doc_issue_date, false),
+        (EXPIRY_DATE_LABEL, &e.doc_expiry_date, false),
+        (AUTHORITY_LABEL, &e.doc_authority, false),
+        (PASSWORD_UPDATED_LABEL, &e.password_updated_at, false),
+    ]
+    .into_iter()
+    .filter_map(|(label, value, secret)| value.as_deref().map(|v| (label, v, secret)))
+    .collect()
+}
+
+/// The inverse of [`labelled_fields`]: fill the slots back in from whatever the
+/// importer can offer under a label. `take` is how each format finds one — a
+/// Bitwarden importer removes it from the custom fields it rode in, a CXF one
+/// reads it out of the `custom-fields` credential — so the slot list is written
+/// once and the two directions cannot drift.
+pub fn set_labelled(entry: &mut ImportedEntry, mut take: impl FnMut(&str) -> Option<String>) {
+    // Only when the label is there at all: a format with a member of its own
+    // for the star has already set it.
+    if let Some(value) = take(FAVORITE_LABEL) {
+        entry.favorite = value.eq_ignore_ascii_case("true");
+    }
+    for (label, slot) in [
+        (EMAIL_LABEL, &mut entry.email),
+        (CARD_PIN_LABEL, &mut entry.card_pin),
+        (NATIONALITY_LABEL, &mut entry.doc_nationality),
+        (BIRTH_DATE_LABEL, &mut entry.doc_birth_date),
+        (SEX_LABEL, &mut entry.doc_sex),
+        (ISSUE_DATE_LABEL, &mut entry.doc_issue_date),
+        (EXPIRY_DATE_LABEL, &mut entry.doc_expiry_date),
+        (AUTHORITY_LABEL, &mut entry.doc_authority),
+        (PERSONAL_NUMBER_LABEL, &mut entry.doc_personal_number),
+        (PASSWORD_UPDATED_LABEL, &mut entry.password_updated_at),
+    ] {
+        if let Some(value) = take(label) {
+            *slot = Some(value);
+        }
+    }
+}
+
+/// Every label [`set_labelled`] claims from a file's custom fields, in the order
+/// it asks. Learned by asking it — a scratch entry and a closure that only notes
+/// the label — so an exporter guarding against a collision (see
+/// [`to_bitwarden_json`]) cannot drift from what the importer will take.
+pub fn claimed_labels() -> Vec<String> {
+    let mut labels = Vec::new();
+    set_labelled(&mut ImportedEntry::default(), |label| {
+        labels.push(label.to_owned());
+        None
+    });
+    labels
+}
 
 /// Serialize to Bitwarden's unencrypted JSON export shape.
 pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8>> {
+    let claimed = claimed_labels();
     let items: Vec<_> = entries
         .iter()
         .map(|e| {
@@ -60,20 +144,42 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
                 "type": bw_type(e.kind),
                 "name": e.title,
                 "notes": e.notes,
+                // Bitwarden has a member for each of these, so they need no
+                // label: the star it also calls `favorite`, and its two dates
+                // are RFC 3339 like ours.
+                "favorite": e.favorite,
+                "creationDate": e.created_at,
+                "revisionDate": e.updated_at,
             });
-            // Extras go in Bitwarden's own custom fields, for every kind — and
-            // only when there are some, so an export of a vault without any is
-            // byte-identical to before.
-            if !e.extra.is_empty() {
-                item["fields"] = json!(e
-                    .extra
-                    .iter()
-                    .map(|(label, value)| json!({
-                        "name": label,
-                        "value": value,
-                        "type": FIELD_TEXT,
-                    }))
-                    .collect::<Vec<_>>());
+            // Everything Bitwarden has no member for goes into its custom
+            // fields under our labels — FIRST, because the importer takes the
+            // first field wearing a label. A user's own extra may share one
+            // ("Email" is a natural thing to call a field); written after ours,
+            // it stays theirs on the way back instead of landing in our slot.
+            let ours = labelled_fields(e);
+            for (label, value, secret) in &ours {
+                let kind = if *secret { FIELD_HIDDEN } else { FIELD_TEXT };
+                push_field(&mut item, label, value, kind);
+            }
+            // That only holds if ours is there to be taken first. A label the
+            // importer claims that we had nothing to write under — the email is
+            // unset, the star is off and Bitwarden has a member for it anyway —
+            // still gets a field of ours, empty, when the user has one wearing
+            // it: the importer takes the empty one (an empty value sets no
+            // slot) and theirs stays theirs. Without a colliding extra nothing
+            // is written, so the usual export is unchanged.
+            for label in &claimed {
+                let written = ours.iter().any(|(l, _, _)| l == label);
+                let collides = e.extra.iter().any(|(l, _)| l.eq_ignore_ascii_case(label));
+                if !written && collides {
+                    push_field(&mut item, label, "", FIELD_TEXT);
+                }
+            }
+            // Then the user's extras, in their order. `fields` is only ever
+            // written when there is something to write, so an export of a
+            // vault without any is byte-identical to before.
+            for (label, value) in &e.extra {
+                push_field(&mut item, label, value, FIELD_TEXT);
             }
             match e.kind {
                 EntryKind::Login => {
@@ -105,6 +211,9 @@ pub fn to_bitwarden_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8
                         "firstName": first,
                         "lastName": last,
                         "country": e.doc_country,
+                        // Bitwarden's one member for a national identifier;
+                        // the rest of the document rides as labelled fields.
+                        "ssn": e.doc_personal_number,
                     });
                     // Bitwarden holds exactly two document numbers, so the
                     // document's own type picks which slot this one goes in.
@@ -261,7 +370,6 @@ pub fn to_cxf_json(entries: &[ImportedEntry]) -> serde_json::Result<Vec<u8>> {
 /// has: a login is basic-auth plus a passkey each, plus TOTP and a note when
 /// set; notes ride along on cards too, since CXF has nowhere else to put them.
 fn cxf_item(e: &ImportedEntry) -> Value {
-    let now = now_secs();
     let mut credentials: Vec<Value> = Vec::new();
     match e.kind {
         EntryKind::Login => {
@@ -405,14 +513,54 @@ fn cxf_item(e: &ImportedEntry) -> Value {
     if let Some(notes) = &e.notes {
         credentials.push(json!({ "type": "note", "content": editable_value("string", notes) }));
     }
+    // What CXF has no credential member for — a login's email, a card's PIN,
+    // the rest of a document, the star — rides in a custom-fields credential
+    // under the labels the importer reads back, the way the ssh-key's extra
+    // parts do. Written only when there is something to write, so an export of
+    // a vault that uses none of them is unchanged.
+    let mut fields: Vec<Value> = labelled_fields(e)
+        .into_iter()
+        .map(|(label, value, secret)| {
+            let field_type = if secret { "concealed-string" } else { "string" };
+            json!({ "fieldType": field_type, "label": label, "value": value })
+        })
+        .collect();
+    // Bitwarden has a member for each of these two; CXF has neither.
+    if e.favorite {
+        fields.push(json!({ "fieldType": "string", "label": FAVORITE_LABEL, "value": "true" }));
+    }
+    if let Some(number) = &e.doc_personal_number {
+        fields.push(
+            json!({ "fieldType": "string", "label": PERSONAL_NUMBER_LABEL, "value": number }),
+        );
+    }
+    if !fields.is_empty() {
+        credentials.push(json!({
+            "type": "custom-fields",
+            "id": random_id(),
+            "label": APP_NAME,
+            "fields": fields,
+        }));
+    }
 
     let mut item = json!({
         "id": random_id(),
-        "creationAt": now,
-        "modifiedAt": now,
         "title": e.title,
         "credentials": credentials,
     });
+    // CXF dates an item in Unix seconds. An entry that has no date of its own
+    // is written without one rather than stamped with today's, so a round-trip
+    // does not invent history the vault never had.
+    put(
+        &mut item,
+        "creationAt",
+        unix_secs(&e.created_at).map(Value::from),
+    );
+    put(
+        &mut item,
+        "modifiedAt",
+        unix_secs(&e.updated_at).map(Value::from),
+    );
     put(
         &mut item,
         "scope",
@@ -494,6 +642,14 @@ fn now_secs() -> i64 {
     chrono::Utc::now().timestamp()
 }
 
+/// The app stores RFC 3339 strings; CXF dates in Unix seconds. A stamp we
+/// cannot parse is treated as no stamp rather than as the epoch.
+fn unix_secs(value: &Option<String>) -> Option<i64> {
+    chrono::DateTime::parse_from_rfc3339(value.as_deref()?)
+        .ok()
+        .map(|t| t.timestamp())
+}
+
 /// CXF ids are `b64url`. Sixteen random bytes, the same width as the app's own
 /// entry ids (`commands::import::new_id`), in the encoding the format asks for.
 fn random_id() -> String {
@@ -530,13 +686,31 @@ const COLUMNS: &[&str] = &[
     "body",
     "file_name",
     "tags",
+    // Added in version 3. They are last (bar the marker) so a version-2 sheet
+    // is this one with the tail missing, which reads back as absent.
+    "email",
+    "card_pin",
+    "doc_nationality",
+    "doc_birth_date",
+    "doc_sex",
+    "doc_issue_date",
+    "doc_expiry_date",
+    "doc_authority",
+    "doc_personal_number",
+    "favorite",
+    "created_at",
+    "updated_at",
+    "password_updated_at",
     CSV_VERSION_HEADER,
 ];
 
 /// Marks rows produced by Rowel so the importer may reverse spreadsheet
 /// escaping without guessing whether a leading apostrophe was user data.
 pub const CSV_VERSION_HEADER: &str = "_rowel_csv_version";
-pub const CSV_VERSION: &str = "2";
+/// 3 added a column for every field that had none (the star, the timestamps,
+/// the rest of a document). The importer reads any marked sheet, so a 2 still
+/// comes back whole — its missing columns simply read as absent.
+pub const CSV_VERSION: &str = "3";
 
 /// Serialize to a generic CSV. Every cell is passed through [`sanitize_cell`].
 pub fn to_generic_csv(entries: &[ImportedEntry]) -> csv::Result<Vec<u8>> {
@@ -571,6 +745,19 @@ pub fn to_generic_csv(entries: &[ImportedEntry]) -> csv::Result<Vec<u8>> {
             e.env_body.clone().unwrap_or_default(),
             e.env_file_name.clone().unwrap_or_default(),
             e.tags.join(";"),
+            e.email.clone().unwrap_or_default(),
+            e.card_pin.clone().unwrap_or_default(),
+            e.doc_nationality.clone().unwrap_or_default(),
+            e.doc_birth_date.clone().unwrap_or_default(),
+            e.doc_sex.clone().unwrap_or_default(),
+            e.doc_issue_date.clone().unwrap_or_default(),
+            e.doc_expiry_date.clone().unwrap_or_default(),
+            e.doc_authority.clone().unwrap_or_default(),
+            e.doc_personal_number.clone().unwrap_or_default(),
+            e.favorite.to_string(),
+            e.created_at.clone().unwrap_or_default(),
+            e.updated_at.clone().unwrap_or_default(),
+            e.password_updated_at.clone().unwrap_or_default(),
             CSV_VERSION.to_string(),
         ];
         wtr.write_record(row.iter().map(|c| sanitize_cell(c)))?;

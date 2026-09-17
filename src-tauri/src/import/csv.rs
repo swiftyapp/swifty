@@ -38,7 +38,8 @@ const OTP: &[&str] = &[
     "otp secret",
     "totp secret",
 ];
-// Rowel's own columns (see `export::COLUMNS`): no foreign sheet has them.
+// Rowel's own columns (see `export::COLUMNS`): no foreign sheet has them, so
+// each is its own name rather than an alias set.
 const TYPE: &[&str] = &["type"];
 const BODY: &[&str] = &["body"];
 const FILE_NAME: &[&str] = &["file_name"];
@@ -46,6 +47,36 @@ const API_KEY: &[&str] = &["api_key"];
 const ENVIRONMENT: &[&str] = &["environment"];
 const SCOPES: &[&str] = &["scopes"];
 const EXPIRES: &[&str] = &["expires"];
+const CARD_NUMBER: &[&str] = &["card_number"];
+const CARD_MONTH: &[&str] = &["card_month"];
+const CARD_YEAR: &[&str] = &["card_year"];
+const CARD_CVC: &[&str] = &["card_cvc"];
+const CARDHOLDER: &[&str] = &["cardholder"];
+const CARD_PIN: &[&str] = &["card_pin"];
+const DOC_TYPE: &[&str] = &["doc_type"];
+const DOC_NUMBER: &[&str] = &["doc_number"];
+const DOC_COUNTRY: &[&str] = &["doc_country"];
+const HOLDER_NAME: &[&str] = &["holder_name"];
+const DOC_NATIONALITY: &[&str] = &["doc_nationality"];
+const DOC_BIRTH_DATE: &[&str] = &["doc_birth_date"];
+const DOC_SEX: &[&str] = &["doc_sex"];
+const DOC_ISSUE_DATE: &[&str] = &["doc_issue_date"];
+const DOC_EXPIRY_DATE: &[&str] = &["doc_expiry_date"];
+const DOC_AUTHORITY: &[&str] = &["doc_authority"];
+const DOC_PERSONAL_NUMBER: &[&str] = &["doc_personal_number"];
+const SSH_PRIVATE_KEY: &[&str] = &["ssh_private_key"];
+const SSH_PUBLIC_KEY: &[&str] = &["ssh_public_key"];
+const SSH_FINGERPRINT: &[&str] = &["ssh_fingerprint"];
+const SSH_PASSPHRASE: &[&str] = &["ssh_passphrase"];
+const TAGS: &[&str] = &["tags"];
+// `username` on its own: the alias set above also answers to `email`, which is
+// a column of its own on our sheet and must not stand in for the username.
+const OWN_USERNAME: &[&str] = &["username"];
+const EMAIL: &[&str] = &["email"];
+const FAVORITE: &[&str] = &["favorite"];
+const CREATED_AT: &[&str] = &["created_at"];
+const UPDATED_AT: &[&str] = &["updated_at"];
+const PASSWORD_UPDATED_AT: &[&str] = &["password_updated_at"];
 const CSV_VERSION: &[&str] = &[super::export::CSV_VERSION_HEADER];
 
 // A parsed sheet: header names (normalized) and the data rows.
@@ -140,18 +171,34 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
         return result;
     };
     for (i, rec) in rows.records.iter().enumerate() {
-        let rowel =
-            get(&rows.headers, rec, CSV_VERSION).as_deref() == Some(super::export::CSV_VERSION);
+        // Any marker at all, not this version's: successive versions only add
+        // columns at the end, which read as absent when a sheet predates them,
+        // so an older Rowel export still comes back as what it was.
+        let rowel = get(&rows.headers, rec, CSV_VERSION).is_some();
         let cell = |aliases| get_decoded(&rows.headers, rec, aliases, rowel);
         let title = cell(TITLE).or_else(|| cell(URL)).or_else(|| cell(USERNAME));
         let Some(title) = title else {
             result.push_err(i + 2, "empty row");
             continue;
         };
-        // Every row of a foreign sheet is a login, and so is every row of our
-        // own that has a login's shape. An `env` row has none — no login column
-        // names the file — so it is the one kind the `type` column is read for,
-        // or the file would be dropped on the way back in.
+        // Our own sheet names every row's kind and writes every kind's columns,
+        // so it is read back by the `type` column alone — nothing is guessed
+        // from a row's shape, which is how cards, notes, identities and keys
+        // used to come back as logins with their own columns dropped.
+        if rowel {
+            match EntryKind::parse(cell(TYPE).unwrap_or_default().as_str()) {
+                Some(kind) => result
+                    .entries
+                    .push(rowel_row(&rows.headers, rec, kind, title)),
+                None => result.push_err(i + 2, "unknown entry type"),
+            }
+            continue;
+        }
+        // Below here the sheet is a foreign one, where every row is a login
+        // unless its shape says otherwise. An `env` row has no login's shape —
+        // no login column names the file — so it is one of the two kinds the
+        // `type` column is read for, or the file would be dropped on the way
+        // back in.
         if cell(TYPE).as_deref() == Some(EntryKind::Env.as_str()) {
             result.entries.push(ImportedEntry {
                 kind: EntryKind::Env,
@@ -193,6 +240,87 @@ fn parse_aliased(bytes: &[u8]) -> ImportResult {
         });
     }
     result
+}
+
+// One row of Rowel's own sheet, whose kind is already known: the columns that
+// belong to no kind, then the kind's own. Every cell goes through the version-2
+// unescaping, since the marker is what got us here.
+fn rowel_row(
+    headers: &[String],
+    rec: &StringRecord,
+    kind: EntryKind,
+    title: String,
+) -> ImportedEntry {
+    let cell = |aliases| get_decoded(headers, rec, aliases, true);
+    let mut entry = ImportedEntry {
+        kind,
+        title,
+        notes: cell(NOTES),
+        tags: cell(TAGS)
+            .map(|t| {
+                t.split(';')
+                    .map(|tag| tag.trim().to_string())
+                    .filter(|tag| !tag.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default(),
+        favorite: cell(FAVORITE).as_deref() == Some("true"),
+        created_at: cell(CREATED_AT),
+        updated_at: cell(UPDATED_AT),
+        ..Default::default()
+    };
+    match kind {
+        EntryKind::Login => {
+            entry.username = cell(OWN_USERNAME);
+            entry.password = cell(PASSWORD);
+            entry.url = cell(URL);
+            entry.otp = cell(OTP);
+            entry.email = cell(EMAIL);
+            entry.password_updated_at = cell(PASSWORD_UPDATED_AT);
+        }
+        EntryKind::Card => {
+            entry.card_number = cell(CARD_NUMBER);
+            entry.card_month = cell(CARD_MONTH);
+            entry.card_year = cell(CARD_YEAR);
+            entry.card_cvc = cell(CARD_CVC);
+            entry.cardholder = cell(CARDHOLDER);
+            entry.card_pin = cell(CARD_PIN);
+        }
+        EntryKind::Identity => {
+            entry.doc_type = cell(DOC_TYPE);
+            entry.doc_number = cell(DOC_NUMBER);
+            entry.doc_country = cell(DOC_COUNTRY);
+            entry.holder_name = cell(HOLDER_NAME);
+            entry.doc_nationality = cell(DOC_NATIONALITY);
+            entry.doc_birth_date = cell(DOC_BIRTH_DATE);
+            entry.doc_sex = cell(DOC_SEX);
+            entry.doc_issue_date = cell(DOC_ISSUE_DATE);
+            entry.doc_expiry_date = cell(DOC_EXPIRY_DATE);
+            entry.doc_authority = cell(DOC_AUTHORITY);
+            entry.doc_personal_number = cell(DOC_PERSONAL_NUMBER);
+        }
+        EntryKind::Ssh => {
+            entry.ssh_private_key = cell(SSH_PRIVATE_KEY);
+            entry.ssh_public_key = cell(SSH_PUBLIC_KEY);
+            entry.ssh_fingerprint = cell(SSH_FINGERPRINT);
+            entry.ssh_passphrase = cell(SSH_PASSPHRASE);
+        }
+        EntryKind::Env => {
+            // The file is the secret and the canonical form, so it is the one
+            // cell read untrimmed — its indent and trailing newline are data.
+            entry.env_body = decoded(get_verbatim(headers, rec, BODY), true);
+            entry.env_file_name = cell(FILE_NAME);
+        }
+        EntryKind::ApiKey => {
+            entry.url = cell(URL);
+            entry.api_key = cell(API_KEY);
+            entry.api_scopes = cell(SCOPES);
+            entry.api_expires = cell(EXPIRES);
+            entry.set_environment(cell(ENVIRONMENT));
+        }
+        EntryKind::Note => {}
+    }
+    entry
 }
 
 impl Importer for GenericCsv {

@@ -36,8 +36,20 @@ struct Account {
 struct Item {
     #[serde(default)]
     title: Option<String>,
-    #[serde(default, rename = "creationAt")]
+    // Lenient: exporters write this epoch second as a float or a string often
+    // enough, and a date nobody reads is no reason to fail the whole document.
+    #[serde(
+        default,
+        rename = "creationAt",
+        deserialize_with = "super::lenient_u64"
+    )]
     creation_at: Option<u64>,
+    #[serde(
+        default,
+        rename = "modifiedAt",
+        deserialize_with = "super::lenient_u64"
+    )]
+    modified_at: Option<u64>,
     #[serde(default)]
     scope: Option<Scope>,
     /// Pre-1.0 drafts put the urls straight on the item instead of in `scope`.
@@ -138,6 +150,7 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
     let Item {
         title,
         creation_at,
+        modified_at,
         scope,
         urls,
         tags,
@@ -195,12 +208,12 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
     let notes = note.clone().filter(|n| !n.is_empty());
 
     // A login is anything you can sign in with: a password, a passkey, or both.
-    if basic.is_some() || !passkeys.is_empty() {
+    let mut entry = if basic.is_some() || !passkeys.is_empty() {
         let (username, password) = match &basic {
             Some(c) => (text(&c.username), text(&c.password)),
             None => (None, None),
         };
-        result.entries.push(ImportedEntry {
+        ImportedEntry {
             kind: EntryKind::Login,
             title,
             // A passkey-only item has no basic-auth to name it; the
@@ -217,9 +230,9 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
             tags,
             passkeys,
             ..Default::default()
-        });
+        }
     } else if let Some(c) = ssh {
-        result.entries.push(ImportedEntry {
+        ImportedEntry {
             kind: EntryKind::Ssh,
             title,
             notes,
@@ -229,7 +242,7 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
             ssh_fingerprint: custom_field(&custom, FINGERPRINT_LABEL),
             ssh_passphrase: custom_field(&custom, PASSPHRASE_LABEL),
             ..Default::default()
-        });
+        }
     } else if let Some(c) = api {
         let mut entry = ImportedEntry {
             kind: EntryKind::ApiKey,
@@ -245,10 +258,10 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
             ..Default::default()
         };
         entry.set_environment(custom_field(&custom, ENVIRONMENT_LABEL));
-        result.entries.push(entry);
+        entry
     } else if let Some(c) = card {
         let (month, year) = expiry(&c.expiry_date);
-        result.entries.push(ImportedEntry {
+        ImportedEntry {
             kind: EntryKind::Card,
             title,
             notes,
@@ -259,18 +272,26 @@ fn map_item(item: Item, row: usize, result: &mut ImportResult) {
             card_cvc: text(&c.verification_number),
             cardholder: text(&c.full_name),
             ..Default::default()
-        });
+        }
     } else if note.is_some() {
-        result.entries.push(ImportedEntry {
+        ImportedEntry {
             kind: EntryKind::Note,
             title,
             notes,
             tags,
             ..Default::default()
-        });
+        }
     } else {
         result.push_err(row, "item has no supported credential");
-    }
+        return;
+    };
+    // What belongs to no kind: the item's own dates, and everything CXF has no
+    // member for, which the exporter put in the custom-fields credential the
+    // ssh-key's extras already travel in.
+    entry.created_at = created_at;
+    entry.updated_at = modified_at.and_then(rfc3339);
+    super::export::set_labelled(&mut entry, |label| custom_field(&custom, label));
+    result.entries.push(entry);
 }
 
 /// `credentialId`, `rpId` and `key` *are* the credential — without any one of

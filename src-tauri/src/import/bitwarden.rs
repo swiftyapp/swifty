@@ -22,8 +22,10 @@ struct Export {
 
 #[derive(Deserialize)]
 struct Item {
-    #[serde(rename = "type")]
-    kind: u8,
+    // Lenient: an item whose `type` is missing, unknown or written as a string
+    // is one bad row, and a strict member would fail the whole document.
+    #[serde(default, rename = "type", deserialize_with = "super::lenient_u64")]
+    kind: Option<u64>,
     #[serde(default)]
     name: Option<String>,
     #[serde(default)]
@@ -38,6 +40,14 @@ struct Item {
     ssh_key: Option<SshKey>,
     #[serde(default)]
     fields: Vec<Field>,
+    /// The star and the two dates Bitwarden keeps on every item, whatever its
+    /// type — read here so a re-import is a copy rather than a fresh entry.
+    #[serde(default)]
+    favorite: bool,
+    #[serde(default, rename = "creationDate")]
+    creation_date: Option<String>,
+    #[serde(default, rename = "revisionDate")]
+    revision_date: Option<String>,
 }
 
 /// Bitwarden's SSH key item: the three members are exactly the three the app
@@ -62,8 +72,8 @@ struct Field {
     name: Option<String>,
     #[serde(default)]
     value: Option<String>,
-    #[serde(default, rename = "type")]
-    kind: u8,
+    #[serde(default, rename = "type", deserialize_with = "super::lenient_u8")]
+    kind: Option<u8>,
 }
 
 pub const FIELD_TEXT: u8 = 0;
@@ -73,7 +83,7 @@ pub const FIELD_HIDDEN: u8 = 1;
 fn extras(fields: Vec<Field>) -> Vec<(String, String)> {
     fields
         .into_iter()
-        .filter(|f| matches!(f.kind, FIELD_TEXT | FIELD_HIDDEN))
+        .filter(|f| matches!(f.kind.unwrap_or(FIELD_TEXT), FIELD_TEXT | FIELD_HIDDEN))
         .map(|f| (f.name.unwrap_or_default(), f.value.unwrap_or_default()))
         .filter(|(name, value)| !name.is_empty() || !value.is_empty())
         .collect()
@@ -189,9 +199,10 @@ struct Card {
     code: Option<String>,
 }
 
-// Bitwarden's identity item is a whole address book; only the four members the
-// app has somewhere to put are read. Two document numbers, so which one is set
-// is also what says whether this is a licence or a passport.
+// Bitwarden's identity item is a whole address book; only the members the app
+// has somewhere to put are read — the rest of our own document travels as
+// labelled custom fields. Two document numbers, so which one is set is also
+// what says whether this is a licence or a passport.
 #[derive(Default, Deserialize)]
 struct Identity {
     #[serde(default, rename = "firstName")]
@@ -206,6 +217,9 @@ struct Identity {
     passport_number: Option<String>,
     #[serde(default, rename = "licenseNumber")]
     license_number: Option<String>,
+    /// Bitwarden's one national-identifier member; the app's personal number.
+    #[serde(default)]
+    ssn: Option<String>,
 }
 
 impl Identity {
@@ -238,9 +252,20 @@ impl Importer for Bitwarden {
             let title = item.name.clone().unwrap_or_default();
             // Custom fields are not a kind's business: every item type may
             // carry them, so they are read once, before the kind is decided.
-            let extra = extras(item.fields);
+            let mut extra = extras(item.fields);
+            // What belongs to no kind either: the star and the dates Bitwarden
+            // has members for, and the values it has none for, which are taken
+            // back out of the custom fields they rode in so they do not show up
+            // twice. Each arm below starts from this rather than the default.
+            let mut base = ImportedEntry {
+                favorite: item.favorite,
+                created_at: opt(item.creation_date),
+                updated_at: opt(item.revision_date),
+                ..Default::default()
+            };
+            super::export::set_labelled(&mut base, |label| take_labelled(&mut extra, label));
             match item.kind {
-                1 => {
+                Some(1) => {
                     let login = item.login.unwrap_or(Login {
                         username: None,
                         password: None,
@@ -268,17 +293,17 @@ impl Importer for Bitwarden {
                         otp: opt(login.totp),
                         passkeys,
                         extra,
-                        ..Default::default()
+                        ..base
                     });
                 }
-                2 => result.entries.push(ImportedEntry {
+                Some(2) => result.entries.push(ImportedEntry {
                     kind: EntryKind::Note,
                     title,
                     notes: opt(item.notes),
                     extra,
-                    ..Default::default()
+                    ..base
                 }),
-                3 => {
+                Some(3) => {
                     let card = item.card.unwrap_or(Card {
                         cardholder_name: None,
                         number: None,
@@ -296,10 +321,10 @@ impl Importer for Bitwarden {
                         card_cvc: opt(card.code),
                         cardholder: opt(card.cardholder_name),
                         extra,
-                        ..Default::default()
+                        ..base
                     });
                 }
-                4 => {
+                Some(4) => {
                     let identity = item.identity.unwrap_or_default();
                     // A licence number says "driver_license"; anything else —
                     // including an item with neither number — is a passport,
@@ -318,11 +343,15 @@ impl Importer for Bitwarden {
                         doc_number: licence.or_else(|| opt(identity.passport_number.clone())),
                         doc_country: opt(identity.country.clone()),
                         holder_name: identity.full_name(),
+                        // Bitwarden's own member wins; a file that carries the
+                        // number as a labelled field instead still keeps it.
+                        doc_personal_number: opt(identity.ssn.clone())
+                            .or_else(|| base.doc_personal_number.clone()),
                         extra,
-                        ..Default::default()
+                        ..base
                     });
                 }
-                5 => {
+                Some(5) => {
                     let key = item.ssh_key.unwrap_or_default();
                     // The passphrase is the one field that is ours, not the
                     // user's: it is taken back out of the extras it rode in.
@@ -341,10 +370,11 @@ impl Importer for Bitwarden {
                             .next()
                             .and_then(|(_, v)| opt(Some(v))),
                         extra,
-                        ..Default::default()
+                        ..base
                     });
                 }
-                other => result.push_err(row, format!("unsupported item type {other}")),
+                None => result.push_err(row, "item has no type"),
+                Some(other) => result.push_err(row, format!("unsupported item type {other}")),
             }
         }
         result
@@ -354,4 +384,14 @@ impl Importer for Bitwarden {
 // Treat empty strings as absent so blank export fields don't become "" secrets.
 fn opt(s: Option<String>) -> Option<String> {
     s.filter(|v| !v.is_empty())
+}
+
+// Remove the custom field labelled `label` (case-insensitively) and hand back
+// its value: a field of ours is not the user's, so it leaves the extras when it
+// is claimed — the same move the SSH passphrase makes in its own arm.
+fn take_labelled(extra: &mut Vec<(String, String)>, label: &str) -> Option<String> {
+    let at = extra
+        .iter()
+        .position(|(l, _)| l.eq_ignore_ascii_case(label))?;
+    opt(Some(extra.remove(at).1))
 }

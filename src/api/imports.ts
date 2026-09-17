@@ -23,6 +23,7 @@ export interface ImportReport {
   total: number // parsed entries (would-be import on a dry run)
   imported: number // entries written (0 on a dry run)
   skipped: number // rows that failed to parse
+  duplicates: number // rows identical to an entry already in the vault
   dryRun: boolean
   errors: RowError[]
   /** The refreshed live list after a real run; empty on a dry run. */
