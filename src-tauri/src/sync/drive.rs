@@ -510,6 +510,27 @@ pub(crate) async fn read_capped(resp: &mut reqwest::Response, max_bytes: usize) 
     Ok(body)
 }
 
+/// One file by id, or `None` when Drive says there is no such file.
+///
+/// This reads the object itself rather than searching for it, so unlike
+/// [`find_by_app_property`] it sees a file the query index has not caught up
+/// with yet — the difference between "no such share" and "a share uploaded
+/// seconds ago". A 404 is the only absence there is: every other failure stays
+/// a failure, because a caller must not read a network error as "already gone".
+pub async fn get_file(client: &Client, token: &str, id: &str) -> Result<Option<DriveFile>> {
+    let resp = client
+        .get(format!("{FILES}/{id}"))
+        .bearer_auth(token)
+        .query(&[("fields", FILE_FIELDS)])
+        .send()
+        .await
+        .map_err(other)?;
+    if resp.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+    Ok(parse_file(&check(resp).await?))
+}
+
 /// Set the named `appProperties` on an existing file, leaving every other
 /// property — and the content, the id and the revision history — alone.
 ///

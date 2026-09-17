@@ -126,13 +126,18 @@ follow `nextPageToken` to the end.
   removes the file, the ciphertext is still downloadable, and a leaked link
   plus a client that ignores the expiry decrypts it past the 24 hours. Every
   promise in the UI and in `docs/threat-model.md` is worded for that split.
-- **Revoke** deletes the file, after looking it up in the marker listing and
-  finding the asking vault's own `vaultId` on it. The file id in the request is
-  whatever the webview sent and authorizes nothing by itself, so a share another
-  vault published is refused with `shareNotOwned` and left where it is — the
-  same test `list` applies, so a vault can revoke exactly what it can see.
-  A share that is already gone counts as revoked. From the send dialog right
-  after creating the link, or later from Settings › Sync › Shared links.
+- **Revoke** fetches the file by id and deletes it only if it carries the
+  `rowelShare` marker and the asking vault's own `vaultId`. The id in the
+  request is whatever the webview sent and authorizes nothing by itself, so a
+  share another vault published is refused with `shareNotOwned` and left where
+  it is — the same test `list` applies, so a vault can revoke exactly what it
+  can see — and a Drive file that is not a share of this app's is refused at any
+  id. The fetch is a `files.get`, not a listing: Drive's query index lags its
+  files, the send dialog offers Revoke seconds after the upload, and a share the
+  index had not caught up with would otherwise read as already gone and be left
+  live for its whole 24 hours. A file Drive no longer has does count as revoked.
+  From the send dialog right after creating the link, or later from Settings ›
+  Sync › Shared links.
 - **Sweep** lists every marked share and deletes anything past `expiresAt`. It
   runs at the end of every successful sync and whenever the active shares list
   is opened. It stays account-wide where listing and revoking are per-vault: an
@@ -166,7 +171,7 @@ receive, and the receive dialog says which key is missing.
 
 `share::create(remote, entry, vault_id, now_ms) -> Created { link, file_id, expires_at }`
 `share::open(fetch, link, now_ms) -> Entry` (sanitized, empty id, unexpired)
-`share::revoke(remote, file_id, vault_id)` (refuses another vault's share)
+`share::revoke(remote, file_id, vault_id)` (fetches by id; refuses anything not this vault's)
 `share::list(remote, vault_id, now_ms) -> Vec<ActiveShare>` (this vault's; also sweeps)
 `share::sweep(remote, now_ms) -> usize` (account-wide)
 `share::claim_unmarked(remote, vault_id) -> usize` (legacy shares, once, at migration)

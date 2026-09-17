@@ -121,15 +121,22 @@ pub fn open(fetch: &impl PublicFetch, link: &str, now_ms: i64) -> Result<Entry> 
 ///
 /// The share has to be the asking vault's own. One account keeps every vault's
 /// shares in one folder, and `file_id` is whatever the caller sent — a bearer
-/// value that authorizes nothing by itself — so ownership is read back off the
-/// marker listing rather than taken on trust. The test is the one [`list`]
-/// applies, so a vault can revoke exactly what it can see and nothing more.
+/// value that authorizes nothing by itself — so the file is fetched and its
+/// `vaultId` read off Drive rather than taken on trust. It is the same test
+/// [`list`] applies, so a vault can revoke exactly what it can see and no more,
+/// and an unmarked file is not a share of ours at any id: refused, never
+/// deleted.
 ///
-/// A share that is no longer in the listing counts as revoked: the sweep,
-/// another device, or an earlier click of the same button all leave the caller
-/// with what it asked for, which is why the delete underneath is idempotent too.
+/// Fetched by id rather than looked up in the listing, because Drive's query
+/// index lags its files: the send dialog offers Revoke seconds after the upload,
+/// and a share the index has not caught up with would otherwise read as already
+/// gone and be silently left behind.
+///
+/// A file Drive no longer has does count as revoked: the sweep, another device,
+/// or an earlier click of the same button all leave the caller with what it
+/// asked for, which is why the delete underneath is idempotent too.
 pub fn revoke(remote: &impl ShareRemote, file_id: &str, vault_id: Option<&str>) -> Result<()> {
-    let Some(file) = remote.list()?.into_iter().find(|file| file.id == file_id) else {
+    let Some(file) = remote.get(file_id)? else {
         return Ok(());
     };
     if !owned_by(&file, vault_id) {
@@ -200,18 +207,21 @@ pub fn list(
         .collect())
 }
 
-/// Whether this vault may list `file` and revoke it. Plain equality, and the
-/// single rule both verbs go through: showing a share to a vault that may not
-/// delete it is a Revoke button that fails, and the reverse is one vault
-/// deleting another's link.
+/// Whether this vault may list `file` and revoke it. The single rule both verbs
+/// go through: showing a share to a vault that may not delete it is a Revoke
+/// button that fails, and the reverse is one vault deleting another's link.
 ///
-/// A share carrying no `vaultId` is therefore shown to nobody, rather than to
-/// everybody as it was when this filter first went in. Nothing is stranded by
-/// that: it is claimed by the vault that migrates the legacy pack (see
-/// [`claim_unmarked`]), and failing that it expires within its 24 hours and the
-/// account-wide [`sweep`] takes it.
+/// It has to be one of this app's shares before it can be anyone's, which a
+/// listing settles on its own but [`revoke`] does not — it is handed a file id,
+/// and an arbitrary Drive file carries no marker and so belongs to no vault.
+///
+/// A share carrying no `vaultId` is shown to nobody, rather than to everybody as
+/// it was when this filter first went in. Nothing is stranded by that: it is
+/// claimed by the vault that migrates the legacy pack (see [`claim_unmarked`]),
+/// and failing that it expires within its 24 hours and the account-wide
+/// [`sweep`] takes it.
 fn owned_by(file: &ShareFile, vault_id: Option<&str>) -> bool {
-    file.vault_id.as_deref() == vault_id
+    file.marked && file.vault_id.as_deref() == vault_id
 }
 
 fn active_share(file: &ShareFile) -> ActiveShare {

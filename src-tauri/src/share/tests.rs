@@ -164,6 +164,39 @@ fn revoking_what_is_already_gone_is_not_a_failure() {
     revoke(&remote, "never-existed", Some(VAULT)).unwrap();
 }
 
+// Revoke is handed a file id and fetches it directly, so it can be pointed at
+// any file in the account. Nothing without the marker is this app's to delete,
+// whoever asks — a vault with no id of its own included, which would otherwise
+// match the absent `vaultId` of a file that was never a share.
+#[test]
+fn a_file_that_is_not_a_share_is_refused_rather_than_deleted() {
+    let remote = FakeShareRemote::new();
+    let stray = remote.upload("holiday.jpg", b"not ours", &[]).unwrap();
+
+    for asking in [Some(VAULT), None] {
+        assert!(matches!(
+            revoke(&remote, &stray, asking).unwrap_err(),
+            Error::ShareNotOwned
+        ));
+    }
+    assert_eq!(remote.ids(), vec![stray]);
+}
+
+// The send dialog offers Revoke seconds after the upload, and Drive's query
+// index is not that quick. Revoke fetches the file instead of searching for it,
+// so a share no listing would find yet is still revocable — rather than read as
+// already gone and quietly left live for its whole 24 hours.
+#[test]
+fn a_share_the_listing_cannot_see_yet_is_still_revocable() {
+    let remote = FakeShareRemote::new();
+    let created = create(&remote, &entry(), Some(VAULT), NOW).unwrap();
+    remote.unindex(&created.file_id);
+
+    assert!(list(&remote, Some(VAULT), NOW).unwrap().is_empty());
+    revoke(&remote, &created.file_id, Some(VAULT)).unwrap();
+    assert!(remote.ids().is_empty());
+}
+
 // The finding this whole rule exists for: a file id is a bearer value the
 // webview hands in, so the vault that published the share — not the one that
 // asked — is what decides whether it may go.

@@ -43,6 +43,12 @@ const FETCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShareFile {
     pub id: String,
+    /// Whether the file carries the `rowelShare` marker — whether, in other
+    /// words, it is one of ours at all. Always true of anything a listing
+    /// returned, since that is the one thing a listing selects on. It is a field
+    /// for [`ShareRemote::get`], which reads whatever file id a caller handed
+    /// in and has to be able to say "that is not a share of this app's".
+    pub marked: bool,
     /// The sender's local entry id from appProperties (`entryId`), if present.
     /// An opaque UUID: the sender's UI resolves it to a title; Google learns
     /// nothing.
@@ -70,6 +76,13 @@ pub trait ShareRemote {
     fn delete(&self, id: &str) -> Result<()>;
     /// Every share file currently in the Shares folder.
     fn list(&self) -> Result<Vec<ShareFile>>;
+    /// One file by id, or `None` when there is no such file at all.
+    ///
+    /// Addressed rather than searched for, so it answers about a file the
+    /// listing index has not picked up yet — which is what a revoke moments
+    /// after an upload depends on. The file may be anything the caller named, so
+    /// the answer carries [`ShareFile::marked`] and the caller checks it.
+    fn get(&self, id: &str) -> Result<Option<ShareFile>>;
     /// Write `vaultId` onto an already-uploaded share, claiming it for that
     /// vault. Only that one property changes: the file keeps its id, its
     /// ciphertext and the rest of its bookkeeping.
@@ -86,6 +99,7 @@ pub trait PublicFetch {
 pub fn parse_share_file(file: &DriveFile) -> ShareFile {
     ShareFile {
         id: file.id.clone(),
+        marked: file.app_properties.get(PROP_SHARE).map(String::as_str) == Some(PROP_SHARE_VALUE),
         entry_id: file.app_properties.get(PROP_ENTRY_ID).cloned(),
         kind: file.app_properties.get(PROP_KIND).cloned(),
         vault_id: file.app_properties.get(PROP_VAULT_ID).cloned(),
@@ -197,6 +211,15 @@ impl ShareRemote for DriveShareRemote {
         })
     }
 
+    fn get(&self, id: &str) -> Result<Option<ShareFile>> {
+        block_on(async {
+            let client = http_client();
+            let token = self.token(&client).await?;
+            let file = drive::get_file(&client, &token, id).await?;
+            Ok(file.as_ref().map(parse_share_file))
+        })
+    }
+
     fn set_vault_id(&self, id: &str, vault_id: &str) -> Result<()> {
         block_on(async {
             let client = http_client();
@@ -252,6 +275,10 @@ pub(crate) struct FakeShareRemote {
     next: Mutex<i64>,
     /// Fails `make_public`, for the caller that has to clean up after it.
     fail_publishing: std::sync::atomic::AtomicBool,
+    /// Held, but not yet findable by a listing — Drive's query index lags the
+    /// files it indexes, and a share revoked seconds after it was uploaded is
+    /// exactly where that shows.
+    unindexed: Mutex<std::collections::BTreeSet<String>>,
 }
 
 #[cfg(test)]
@@ -269,6 +296,7 @@ impl FakeShareRemote {
             files: Mutex::new(Default::default()),
             next: Mutex::new(1),
             fail_publishing: std::sync::atomic::AtomicBool::new(false),
+            unindexed: Mutex::new(Default::default()),
         }
     }
 
@@ -276,6 +304,12 @@ impl FakeShareRemote {
     pub(crate) fn fail_publishing(&self) {
         self.fail_publishing
             .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Keep a file out of every later listing while `get` goes on answering for
+    /// it, the way Drive's index does until it catches up.
+    pub(crate) fn unindex(&self, id: &str) {
+        self.unindexed.lock().unwrap().insert(id.to_string());
     }
 
     /// Ids of every file currently held, oldest first.
@@ -289,6 +323,25 @@ impl FakeShareRemote {
 
     pub(crate) fn bytes(&self, id: &str) -> Option<Vec<u8>> {
         self.files.lock().unwrap().get(id).map(|f| f.bytes.clone())
+    }
+}
+
+/// One held file read as a share, the way [`parse_share_file`] reads a real
+/// listing row — shared by the fake's `list` and `get` so the two cannot come to
+/// disagree about the same file.
+#[cfg(test)]
+fn read_fake(id: &str, file: &FakeFile) -> ShareFile {
+    ShareFile {
+        id: id.to_string(),
+        marked: file.properties.get(PROP_SHARE).map(String::as_str) == Some(PROP_SHARE_VALUE),
+        entry_id: file.properties.get(PROP_ENTRY_ID).cloned(),
+        kind: file.properties.get(PROP_KIND).cloned(),
+        vault_id: file.properties.get(PROP_VAULT_ID).cloned(),
+        created_ms: file.created_ms,
+        expires_ms: file
+            .properties
+            .get(PROP_EXPIRES_AT)
+            .and_then(|v| v.parse().ok()),
     }
 }
 
@@ -337,26 +390,26 @@ impl ShareRemote for FakeShareRemote {
     // Selects on the marker exactly as the real listing does, so a caller that
     // forgets to set it finds out here.
     fn list(&self) -> Result<Vec<ShareFile>> {
+        let unindexed = self.unindexed.lock().unwrap();
         Ok(self
             .files
             .lock()
             .unwrap()
             .iter()
-            .filter(|(_, file)| {
-                file.properties.get(PROP_SHARE).map(String::as_str) == Some(PROP_SHARE_VALUE)
-            })
-            .map(|(id, file)| ShareFile {
-                id: id.clone(),
-                entry_id: file.properties.get(PROP_ENTRY_ID).cloned(),
-                kind: file.properties.get(PROP_KIND).cloned(),
-                vault_id: file.properties.get(PROP_VAULT_ID).cloned(),
-                created_ms: file.created_ms,
-                expires_ms: file
-                    .properties
-                    .get(PROP_EXPIRES_AT)
-                    .and_then(|v| v.parse().ok()),
-            })
+            .map(|(id, file)| read_fake(id, file))
+            .filter(|file| file.marked && !unindexed.contains(&file.id))
             .collect())
+    }
+
+    // Addressed, not searched: every file the fake holds answers here, marker or
+    // no marker, because that is what the caller has to be able to tell apart.
+    fn get(&self, id: &str) -> Result<Option<ShareFile>> {
+        Ok(self
+            .files
+            .lock()
+            .unwrap()
+            .get(id)
+            .map(|file| read_fake(id, file)))
     }
 
     // Merges the one key, like the `files.patch` behind the real thing: a test
@@ -412,6 +465,7 @@ mod tests {
         let parsed = parse_share_file(&drive_file(
             "2024-03-01T12:00:00.000Z",
             &[
+                (PROP_SHARE, PROP_SHARE_VALUE),
                 (PROP_ENTRY_ID, "entry-uuid"),
                 (PROP_KIND, "login"),
                 (PROP_EXPIRES_AT, "1709300000000"),
@@ -420,6 +474,7 @@ mod tests {
         ));
 
         assert_eq!(parsed.id, "f1");
+        assert!(parsed.marked);
         assert_eq!(parsed.entry_id.as_deref(), Some("entry-uuid"));
         assert_eq!(parsed.kind.as_deref(), Some("login"));
         assert_eq!(parsed.vault_id.as_deref(), Some("a1b2"));
@@ -427,9 +482,12 @@ mod tests {
         assert_eq!(parsed.expires_ms, Some(1_709_300_000_000));
     }
 
+    // A file with no marker is not this app's share, whatever else it carries —
+    // the one thing `revoke` has to be able to tell about an id it was handed.
     #[test]
     fn a_share_without_properties_reads_as_unknown_rather_than_failing() {
         let parsed = parse_share_file(&drive_file("2024-03-01T12:00:00.000Z", &[]));
+        assert!(!parsed.marked);
         assert_eq!(parsed.entry_id, None);
         assert_eq!(parsed.kind, None);
         assert_eq!(parsed.vault_id, None);
@@ -468,6 +526,31 @@ mod tests {
         assert_eq!(listed[0].kind.as_deref(), Some("login"));
         // Both files are held; only one is a share.
         assert_eq!(remote.ids().len(), 2);
+    }
+
+    // `get` addresses a file instead of searching for it, so it answers about
+    // things a listing never shows: the stray below, and — on the real Drive —
+    // a share the query index has not caught up with.
+    #[test]
+    fn getting_by_id_answers_for_any_file_and_says_which_are_shares() {
+        let remote = FakeShareRemote::new();
+        let share = remote
+            .upload(
+                "share.rowelshare",
+                b"sealed",
+                &[(PROP_SHARE, PROP_SHARE_VALUE), (PROP_VAULT_ID, "a1b2")],
+            )
+            .unwrap();
+        let stray = remote.upload("stray.bin", b"x", &[]).unwrap();
+
+        let got = remote.get(&share).unwrap().unwrap();
+        assert!(got.marked);
+        assert_eq!(got.vault_id.as_deref(), Some("a1b2"));
+
+        let got = remote.get(&stray).unwrap().unwrap();
+        assert!(!got.marked);
+
+        assert_eq!(remote.get("never-existed").unwrap(), None);
     }
 
     // Claiming an old share is a patch of one property, not a re-upload: the
