@@ -47,8 +47,8 @@ products solve it, don't patch symptoms.
 >
 > **Per-workspace sync** — every workspace now connects its own Drive account and syncs its own
 > pack, so `guard_primary` is left covering biometric unlock alone (one keychain slot per
-> install). Archive-by-rename went with it: "start fresh" over an account that already holds a
-> vault simply mints a new vault id, and the old pack stays where it is. Shares carry a
+> install). Archive-by-rename went with it (and "start fresh" beside an existing vault went
+> after it — see *Join, don't fork* below). Shares carry a
 > `vaultId` appProperty so each vault lists only its own, while the sweep stays account-wide.
 > Workspaces share no credentials and no pack, but they do share the OAuth *grant*: Google
 > retires one per account and client, across every workspace and every device. Disconnecting
@@ -68,6 +68,23 @@ products solve it, don't patch symptoms.
 > While a restore runs, Settings cannot be closed or moved off the section: the backend holds
 > the pending account for its length, so a Cancel or a navigation that appeared to back out
 > would have let the restore finish and switch workspaces behind the user's back.
+>
+> **Join, don't fork** — the account is the source of truth for which vaults exist: every
+> device connected to it syncs the vaults it holds, and a new pack is minted only into an
+> empty account (the first device) or by creating a workspace on a device that is already
+> connected. Connecting a vault that has never synced (Settings › Sync › Connect on a phone
+> that "started fresh", say) used to mint a second pack beside the desktop's; it now goes
+> through onboarding's keyless connect and probe (`sync_connect` forks on the vault id), shows
+> the account's vaults with the same picker and restore form Settings › Workspaces uses, and
+> only an *empty* account takes the vault as its first (`sync_adopt_pending`). The first run's
+> conflict screen lost "Start a new vault" for the same reason, and `plan_vault_id` refuses
+> to mint beside an existing vault as belt and braces. "Import from Google Drive" (the
+> `Intent::Import` merge) is gone: a pack is sealed under its own vault's KDF salt, so a vault
+> with a salt of its own could never decode it — the empty-vault hero's restore only ever
+> worked for a vault restored from that very pack. Joining therefore *is* the restore; the
+> vault that was open stays as a workspace of its own. Follow-ups: list the account's other
+> packs in Settings › Workspaces after every sync, restore them with the open workspace's
+> tokens rather than a second sign-in, and have a new workspace inherit the account.
 >
 > **Follow-ups (not blockers):** wire `sync::restore` into onboarding ("Restore from Drive"
 > on a fresh install); cross-device master-password-change flow (currently fails safe with a

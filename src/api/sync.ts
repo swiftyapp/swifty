@@ -30,6 +30,13 @@ export interface SyncStatus {
  * outcome arrives as `sync:status`, pending first and then either connected or
  * carrying an error. A rejection here is an immediate guard failure (no OAuth
  * client configured, vault locked) and has already been reported as status.
+ *
+ * A vault that has never synced is answered differently: the backend probes
+ * the account first and reports on `setup:drive:pending`, then one of
+ * `setup:drive:probed` / `setup:drive:error` — the same events the first run
+ * and Settings › Workspaces listen to. A probe that lists vaults means the user
+ * restores one of them (`workspaceRestoreFromDrive`); one that lists none means
+ * this vault is the account's first, and `syncAdoptPending` connects it.
  */
 export const syncConnect = (): Promise<void> => call('sync_connect')
 
@@ -37,5 +44,9 @@ export const syncDisconnect = (): Promise<void> => call('sync_disconnect')
 
 export const syncNow = (): Promise<void> => call('sync_now')
 
-/** Pull the remote pack into this vault. Reports through the same status. */
-export const syncImport = (): Promise<void> => call('sync_import')
+/**
+ * Make the account a probe found empty this vault's: the pending tokens are
+ * sealed under the open vault's key and the first sync runs. Reports through
+ * `sync:status` like a connect.
+ */
+export const syncAdoptPending = (): Promise<void> => call('sync_adopt_pending')

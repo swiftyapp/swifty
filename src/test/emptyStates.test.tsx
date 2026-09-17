@@ -40,7 +40,7 @@ describe('empty states', () => {
       expect(useUi.getState().addPicker).toBe(true)
     })
 
-    it('offers the import route into Settings while Drive is not connected', async () => {
+    it('offers the import route into Settings', async () => {
       seed([])
       render(<Main />)
 
@@ -49,13 +49,15 @@ describe('empty states', () => {
       expect(screen.queryByText('Restore from Google Drive')).not.toBeInTheDocument()
     })
 
-    it('swaps the secondary action for a Drive restore once sync is on', () => {
+    // A vault that syncs holds what its pack holds, so an empty one has nothing
+    // up there to pull; the account's other vaults are reached from Settings.
+    it('offers the same route once sync is on', () => {
       seed([])
       setSyncStatus({ ...initialApp.sync, configured: true })
       render(<Main />)
 
-      expect(screen.getByText('Restore from Google Drive')).toBeInTheDocument()
-      expect(screen.queryByText('Import from another app')).not.toBeInTheDocument()
+      expect(screen.getByText('Import from another app')).toBeInTheDocument()
+      expect(screen.queryByText('Restore from Google Drive')).not.toBeInTheDocument()
     })
   })
 

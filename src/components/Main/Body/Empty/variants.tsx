@@ -1,7 +1,5 @@
 import type { EntryType } from '@/api/types'
-import { syncImport } from '@/api/sync'
 import {
-  useApp,
   openAddPicker,
   openSettings,
   startEntry,
@@ -27,18 +25,10 @@ const Mark = ({ size }: { size: number }) => (
 // thing on screen worth looking at and it gets the full treatment.
 export function VaultEmpty() {
   const { t } = useTranslation()
-  const sync = useApp(state => state.sync)
 
-  // The spinner runs off the store, not off the promise: the backend reports
-  // every step through `sync:status` — the consent page opening, the answer,
-  // the pull. On mobile `sync_import` resolves the moment Safari is on screen,
-  // and a rejection has already been reported as status. On success the
-  // restored entries replace this screen; on failure the button comes back
-  // rather than spinning forever.
-  const restore = () => {
-    syncImport().catch(() => {})
-  }
-
+  // No Drive restore here: a vault that syncs holds what its pack holds, so an
+  // empty one has nothing up there to pull, and a vault that has never synced
+  // reaches the account's vaults through Settings › Sync › Connect.
   return (
     <EmptyState
       testid="empty-vault"
@@ -50,17 +40,9 @@ export function VaultEmpty() {
         onClick: openAddPicker,
         testid: 'create-first-entry-button'
       }}
-      secondary={
-        sync.configured
-          ? {
-              label: t('Restore from Google Drive'),
-              onClick: restore,
-              loading: sync.pending || sync.inProgress
-            }
-          : // Wrapped, and named: handed straight to onClick it took the click
-            // event as its section argument and Settings opened on none at all.
-            { label: t('Import from another app'), onClick: () => openSettings('import') }
-      }
+      // Wrapped, and named: handed straight to onClick it took the click event
+      // as its section argument and Settings opened on none at all.
+      secondary={{ label: t('Import from another app'), onClick: () => openSettings('import') }}
       hints={[
         { keys: chord('N'), label: t('add') },
         { keys: chord('K'), label: t('commands') }

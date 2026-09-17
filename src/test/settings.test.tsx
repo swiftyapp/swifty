@@ -16,6 +16,7 @@ import {
   setSettingsSection,
   setSyncStatus,
   setupDriveFailed,
+  setupDrivePending,
   setupDriveProbed,
   useApp,
   usePrefs,
@@ -152,6 +153,78 @@ describe('Settings › sync', () => {
     expect(screen.getByTestId('settings-sync-error')).toHaveTextContent(
       'no OAuth client configured'
     )
+  })
+
+  // A vault that has never synced is answered on the probe's events rather
+  // than on `sync:status`: the backend looks at the account before this vault
+  // is allowed to add a pack to it.
+  describe('on a vault that has never synced', () => {
+    it('waits on the probe, then takes an empty account as this vault', async () => {
+      await open()
+      await userEvent.click(screen.getByTestId('settings-drive-connect'))
+      await act(async () => setupDrivePending())
+      expect(await screen.findByText('Waiting for Google…')).toBeInTheDocument()
+
+      await act(async () => setupDriveProbed([]))
+
+      await waitFor(() => expect(calls('sync_adopt_pending')).toHaveLength(1))
+      // The probe's state is spent once the account is this vault's; from here
+      // on `sync:status` says the rest.
+      await waitFor(() => expect(useApp.getState().setupDrive.status).toBe('idle'))
+      report({ configured: true })
+      expect(await screen.findByText('Connected')).toBeInTheDocument()
+    })
+
+    // The account already says which vaults exist, so this vault does not add
+    // to them: the user restores one, with the same picker and form Settings ›
+    // Workspaces uses, and the vault that was open stays as its own workspace.
+    it('offers the account\'s vaults to restore instead of minting beside them', async () => {
+      await open()
+      await userEvent.click(screen.getByTestId('settings-drive-connect'))
+      await act(async () => setupDriveProbed([VAULT, OTHER_VAULT]))
+
+      expect(await screen.findByTestId('settings-drive-found')).toBeInTheDocument()
+      expect(screen.getByText('This account already holds a vault')).toBeInTheDocument()
+      expect(screen.getByTestId(`drive-vault-${VAULT.id}`)).toBeInTheDocument()
+      expect(calls('sync_adopt_pending')).toHaveLength(0)
+
+      await userEvent.click(screen.getByTestId(`drive-vault-${OTHER_VAULT.id}`))
+      await userEvent.type(screen.getByTestId('workspace-restore-name'), 'Personal')
+      await userEvent.type(screen.getByTestId('workspace-restore-password'), 'other-device-pass')
+      await act(async () => {
+        await userEvent.click(screen.getByTestId('workspace-restore-submit'))
+      })
+
+      expect(calls('workspace_restore_from_drive')).toContainEqual({
+        name: 'Personal',
+        password: 'other-device-pass',
+        fileId: OTHER_VAULT.id
+      })
+    })
+
+    it('cancels out of the offer by forgetting the account', async () => {
+      await open()
+      await userEvent.click(screen.getByTestId('settings-drive-connect'))
+      await act(async () => setupDriveProbed([VAULT]))
+
+      await userEvent.click(await screen.findByTestId('settings-drive-cancel'))
+
+      expect(calls('setup_drive_disconnect')).toHaveLength(1)
+      expect(screen.queryByTestId('settings-drive-found')).not.toBeInTheDocument()
+      expect(screen.getByTestId('settings-drive-connect')).toBeInTheDocument()
+    })
+
+    it('reports a probe that failed, and offers to try again', async () => {
+      await open()
+      await userEvent.click(screen.getByTestId('settings-drive-connect'))
+      await act(async () => setupDriveFailed('Google Drive did not answer'))
+
+      expect(await screen.findByTestId('settings-sync-error')).toHaveTextContent(
+        'Google Drive did not answer'
+      )
+      expect(screen.getByTestId('settings-drive-connect')).toBeInTheDocument()
+      expect(useApp.getState().sync.configured).toBe(false)
+    })
   })
 
   it('offers the encrypted backup behind its own control', async () => {

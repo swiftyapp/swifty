@@ -16,15 +16,14 @@ use crate::session::Session;
 pub enum AuthPurpose {
     /// Turn sync on for the vault that is open now.
     Connect,
-    /// Connect, then merge in whatever the account already holds.
-    Import,
     /// Connect an account with no vault to seal its tokens under, so the user
     /// can be shown what is up there and choose which of it to restore: the
-    /// first run, and the Settings flow that adds a workspace by restoring one
-    /// of the account's other vaults. Alone among the three, it has no session
-    /// and no cryptor — which is what the two callers have in common, and why
-    /// they share one purpose rather than being told apart here. What asked is
-    /// the frontend's to remember; the redirect does the same thing either way.
+    /// first run, the Settings flow that adds a workspace by restoring one of
+    /// the account's other vaults, and a sync connect on a vault that has never
+    /// synced. Alone of the two, it has no cryptor — which is what its callers
+    /// have in common, and why they share one purpose rather than being told
+    /// apart here. What asked is the frontend's to remember; the redirect does
+    /// the same thing either way.
     Setup,
 }
 

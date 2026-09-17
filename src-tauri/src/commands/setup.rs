@@ -288,9 +288,10 @@ async fn restore_off_thread(
 /// marked connected — the frontend's `enterMain` runs the first sync, which is
 /// what creates the folder and the pack on Drive.
 ///
-/// Whatever the account already holds is left exactly as it is: the new vault
-/// mints its own id and so syncs to a pack of its own, alongside the old one
-/// rather than over it.
+/// The account is expected to be empty when tokens are pending: the first run
+/// offers no way past a probe that found a vault except restoring it. A create
+/// that reached here beside one anyway would not fork the account — the first
+/// sync refuses to mint an id next to an existing vault (`sync::plan_vault_id`).
 #[tauri::command]
 pub async fn setup_create(
     password: Zeroizing<String>,
@@ -460,9 +461,10 @@ fn current_attempt(state: &AppState) -> u64 {
 }
 
 /// Onboarding only. A device that already holds a vault has other routes to
-/// Drive (`sync_connect`, `sync_import`), and every one of them merges rather
-/// than replaces — which is the point: nothing here may be reachable in a way
-/// that could overwrite a vault this device already has.
+/// Drive (`sync_connect`, `workspace_restore_from_drive`), and every one of
+/// them merges or adds a workspace rather than replaces — which is the point:
+/// nothing here may be reachable in a way that could overwrite a vault this
+/// device already has.
 fn guard_no_vault(app: &AppHandle) -> Result<()> {
     if storage::db_exists(app) {
         return Err(Error::AlreadySetUp);

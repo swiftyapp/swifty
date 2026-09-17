@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useApp, connectWorkspaceDrive, forgetDrive } from '@/store'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
-import RestoreForm from './RestoreForm'
+import DriveRestoreForm from '@/components/elements/DriveRestoreForm'
 
 // Adding a workspace that already exists somewhere else.
 //
@@ -75,7 +75,7 @@ export default function RestoreFromDrive() {
         </p>
       )}
       {(drive.status === 'found' || restoring) && (
-        <RestoreForm files={drive.files} selectedId={drive.selectedId} busy={restoring} />
+        <DriveRestoreForm files={drive.files} selectedId={drive.selectedId} busy={restoring} />
       )}
     </SettingsRow>
   )
