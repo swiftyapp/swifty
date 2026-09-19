@@ -594,7 +594,8 @@ mod tests {
 
         let open = |dir: &tempfile::TempDir, password: &str| {
             let key = VaultKey::legacy_from_password(password);
-            let store = SqliteStore::open(&dir.path().join("vault.db"), &key.sqlcipher_key());
+            let store =
+                SqliteStore::open(&dir.path().join("vault.db"), key.sqlcipher_key().as_slice());
             (key, store.unwrap())
         };
         let icon = Some("data:image/png;base64,AA");
