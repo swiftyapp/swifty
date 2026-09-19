@@ -5,15 +5,19 @@ import PrivacyScreen from '.'
 type Handler = (event: { payload: boolean }) => void
 
 let handlers: Handler[] = []
+let subscribes = true
+let focusedOnMount = true
 
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({
     onFocusChanged: (handler: Handler) => {
+      if (!subscribes) return Promise.reject(new Error('no window to listen to'))
       handlers.push(handler)
       return Promise.resolve(() => {
         handlers = handlers.filter(h => h !== handler)
       })
-    }
+    },
+    isFocused: () => Promise.resolve(focusedOnMount)
   })
 }))
 
@@ -33,11 +37,24 @@ const visibility = (state: DocumentVisibilityState) => {
   })
 }
 
+const hasFocus = (on: boolean) => vi.spyOn(document, 'hasFocus').mockReturnValue(on)
+
+const domFocus = (on: boolean) =>
+  act(() => {
+    window.dispatchEvent(new Event(on ? 'focus' : 'blur'))
+  })
+
 const cover = () => screen.queryByTestId('privacy-screen')
 
 describe('PrivacyScreen', () => {
   beforeEach(() => {
+    vi.restoreAllMocks()
+    // The ordinary case: the vault is in front of the user. jsdom reports the
+    // document unfocused, so the mounts that start away from the user say so.
+    hasFocus(true)
     handlers = []
+    subscribes = true
+    focusedOnMount = true
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       value: 'visible'
@@ -83,5 +100,50 @@ describe('PrivacyScreen', () => {
     await listening()
     unmount()
     expect(handlers).toHaveLength(0)
+  })
+
+  it('covers from the first frame when the vault unlocks in the background', async () => {
+    hasFocus(false)
+    focusedOnMount = false
+
+    render(<PrivacyScreen />)
+    expect(cover()).toBeInTheDocument()
+
+    await listening()
+    expect(cover()).toBeInTheDocument()
+  })
+
+  it('covers from the first frame when the document is already hidden', () => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden'
+    })
+
+    render(<PrivacyScreen />)
+    expect(cover()).toBeInTheDocument()
+  })
+
+  it('covers once the window reports it was never focused', async () => {
+    focusedOnMount = false
+
+    render(<PrivacyScreen />)
+    expect(cover()).not.toBeInTheDocument()
+
+    await waitFor(() => expect(cover()).toBeInTheDocument())
+  })
+
+  it('falls back to DOM focus events when the subscription fails', async () => {
+    subscribes = false
+
+    render(<PrivacyScreen />)
+    // Let the rejected subscription settle so the DOM listeners are in place.
+    await act(async () => {})
+    expect(cover()).not.toBeInTheDocument()
+
+    domFocus(false)
+    expect(cover()).toBeInTheDocument()
+
+    domFocus(true)
+    expect(cover()).not.toBeInTheDocument()
   })
 })

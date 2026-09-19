@@ -50,12 +50,15 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
 vi.mock('@tauri-apps/plugin-updater', () => ({ check: vi.fn() }))
 vi.mock('@tauri-apps/plugin-process', () => ({ relaunch: vi.fn() }))
 
-// The window's focus stream `useObscured` subscribes to. Focus never changes by
-// default, so the privacy cover stays off; a suite about it replaces this with a
-// mock that keeps the handlers (see PrivacyScreen/index.test.tsx).
+// The window's focus stream `useObscured` subscribes to, plus the focus state it
+// reconciles its first guess against — jsdom reports the document unfocused, so
+// without `isFocused` every suite would render behind the privacy cover. Focus
+// never changes by default, so the cover stays off; a suite about it replaces
+// this with a mock that keeps the handlers (see PrivacyScreen/index.test.tsx).
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({
-    onFocusChanged: vi.fn().mockResolvedValue(() => {})
+    onFocusChanged: vi.fn().mockResolvedValue(() => {}),
+    isFocused: vi.fn().mockResolvedValue(true)
   })
 }))
 
