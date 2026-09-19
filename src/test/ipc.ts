@@ -163,6 +163,8 @@ const DEFAULTS: Record<string, Handler> = {
   fetch_favicon: () => null,
   copy_to_clipboard: () => undefined,
   scan_image: reject({ kind: 'unrecognized', message: 'nothing recognized' }),
+  // The dialog Rust opens: nothing picked unless a test says otherwise.
+  pick_file: () => null,
 
   set_settings: ({ patch }) => {
     settings = { ...settings, ...(patch as Partial<Settings>) }
