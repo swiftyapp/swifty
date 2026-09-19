@@ -2,8 +2,8 @@ use crate::session;
 use crate::state::AppState;
 use crate::timer::Timer;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime};
 use tauri::{AppHandle, Manager, WindowEvent};
 
 // The bounds are the settings module's: it normalises the stored value with
@@ -29,6 +29,12 @@ pub struct AutoLock {
     /// `settings.json` at startup and re-set whenever the Settings row changes,
     /// so the value the user picked is in force from the first arming.
     timeout_secs: AtomicU64,
+    /// Wall-clock reading taken when the window last lost focus, cleared when
+    /// it comes back. The timer alone cannot be trusted across that gap: it
+    /// measures in `Instant`s, which do not advance while an Apple machine is
+    /// asleep and whose thread does not run at all while iOS has the process
+    /// suspended. This is what says how long the user was really away.
+    blurred_at: Mutex<Option<SystemTime>>,
 }
 
 impl Default for AutoLock {
@@ -36,6 +42,40 @@ impl Default for AutoLock {
         Self {
             timer: Timer::spawn(),
             timeout_secs: AtomicU64::new(DEFAULT_TIMEOUT_SECS),
+            blurred_at: Mutex::new(None),
+        }
+    }
+}
+
+/// What coming back owes the session: sealed, because the time away spent the
+/// whole timeout, or just put back on the clock.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Resume {
+    Lock,
+    Touch,
+}
+
+impl AutoLock {
+    /// The idle timeout in force, as the settings row last left it.
+    fn timeout(&self) -> Duration {
+        Duration::from_secs(self.timeout_secs.load(Ordering::SeqCst))
+    }
+
+    /// The window lost focus at `now`: remember when, so coming back can tell
+    /// how long the user was really away.
+    fn blur(&self, now: SystemTime) {
+        *self.blurred_at.lock().unwrap() = Some(now);
+    }
+
+    /// The window came back at `now`. Consumes the stored blur — a resume with
+    /// none, or a second resume after one was already spent, has nothing to
+    /// measure and so only re-arms.
+    fn resume(&self, now: SystemTime, timeout: Duration) -> Resume {
+        let blurred_at = self.blurred_at.lock().unwrap().take();
+        if blurred_at.is_some_and(|at| overdue(at, now, timeout)) {
+            Resume::Lock
+        } else {
+            Resume::Touch
         }
     }
 }
@@ -62,7 +102,7 @@ pub fn touch(app: &AppHandle) {
         return;
     }
     let state = app.state::<AutoLock>();
-    let timeout = Duration::from_secs(state.timeout_secs.load(Ordering::SeqCst));
+    let timeout = state.timeout();
     let app = app.clone();
     state.timer.arm(timeout, move || lock(&app));
 }
@@ -82,14 +122,41 @@ pub fn disarm(app: &AppHandle) {
 /// forwards both unchanged off Windows (`lib.rs:522`). Sending the app to the
 /// home screen therefore starts the same clock that alt-tabbing does.
 ///
-/// One iOS-only caveat, which no code here can fix: the timer thread does not
-/// run while iOS has the process suspended, so a lock that comes due in the
-/// background lands when the app is next resumed rather than at the second it
-/// was owed.
+/// Coming *back*, though, is not a fresh start if the time away already spent
+/// the whole timeout: the vault is locked instead of re-armed. Without that,
+/// resuming could cancel a lock that was already owed — on iOS the process is
+/// frozen while backgrounded, so on thaw the main thread's `Focused(true)` and
+/// the timer thread's expired wait race, and a focus event that wins would
+/// re-arm a full timeout over a vault left open for hours. The reading is a
+/// wall clock (`SystemTime`), not the timer's `Instant`, because a sleeping
+/// Apple machine does not advance the latter at all.
 pub fn handle_event(app: &AppHandle, event: &WindowEvent) {
-    if let WindowEvent::Focused(_) = event {
-        touch(app);
+    match event {
+        WindowEvent::Focused(false) => {
+            app.state::<AutoLock>().blur(SystemTime::now());
+            touch(app);
+        }
+        WindowEvent::Focused(true) => {
+            let resume = {
+                let state = app.state::<AutoLock>();
+                let timeout = state.timeout();
+                state.resume(SystemTime::now(), timeout)
+            };
+            match resume {
+                Resume::Lock => lock(app),
+                Resume::Touch => touch(app),
+            }
+        }
+        _ => {}
     }
+}
+
+/// Whether a window blurred at `blurred_at` has been away for its whole
+/// timeout by `now`. A clock that went backwards between the two readings —
+/// an NTP correction, the user changing the date — reads as no time at all,
+/// so a session is never sealed on the strength of a negative interval.
+fn overdue(blurred_at: SystemTime, now: SystemTime, timeout: Duration) -> bool {
+    now.duration_since(blurred_at).unwrap_or_default() >= timeout
 }
 
 /// The lock an idle timer or the tray asks for, which may well find the vault
@@ -99,4 +166,80 @@ pub fn handle_event(app: &AppHandle, event: &WindowEvent) {
 /// unlock is landing cannot clear the session that unlock just opened.
 pub fn lock(app: &AppHandle) {
     session::lock(app);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TIMEOUT: Duration = Duration::from_secs(300);
+    const A_DAY: Duration = Duration::from_secs(86_400);
+
+    // When the window lost focus. Any fixed reading will do: every test says
+    // what `now` is, so nothing here depends on the real clock.
+    fn blurred_at() -> SystemTime {
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_000)
+    }
+
+    #[test]
+    fn a_resume_inside_the_timeout_touches() {
+        let autolock = AutoLock::default();
+        autolock.blur(blurred_at());
+        assert_eq!(
+            autolock.resume(blurred_at() + TIMEOUT / 2, TIMEOUT),
+            Resume::Touch
+        );
+    }
+
+    // The whole point: time the machine spent asleep or suspended counts, and
+    // the timeout falling exactly due is due.
+    #[test]
+    fn a_resume_after_the_whole_timeout_locks() {
+        let autolock = AutoLock::default();
+
+        autolock.blur(blurred_at());
+        assert_eq!(
+            autolock.resume(blurred_at() + TIMEOUT, TIMEOUT),
+            Resume::Lock
+        );
+
+        autolock.blur(blurred_at());
+        assert_eq!(autolock.resume(blurred_at() + A_DAY, TIMEOUT), Resume::Lock);
+    }
+
+    // Focus gained with no blur behind it — the window raised at startup, a
+    // platform that repeats the event — has no absence to measure.
+    #[test]
+    fn a_resume_without_a_blur_touches() {
+        let autolock = AutoLock::default();
+        assert_eq!(
+            autolock.resume(blurred_at() + A_DAY, TIMEOUT),
+            Resume::Touch
+        );
+    }
+
+    // The resume that reads the blur consumes it, so a later focus event
+    // cannot lock again on a reading already spent.
+    #[test]
+    fn a_second_resume_touches_because_the_blur_was_consumed() {
+        let autolock = AutoLock::default();
+        autolock.blur(blurred_at());
+        assert_eq!(
+            autolock.resume(blurred_at() + TIMEOUT, TIMEOUT),
+            Resume::Lock
+        );
+        assert_eq!(
+            autolock.resume(blurred_at() + A_DAY, TIMEOUT),
+            Resume::Touch
+        );
+    }
+
+    // A clock that went backwards says nothing about how long the user was
+    // away, so it locks nothing; the timer is still there to come due.
+    #[test]
+    fn a_resume_on_a_clock_that_went_backwards_touches() {
+        let autolock = AutoLock::default();
+        autolock.blur(blurred_at() + A_DAY);
+        assert_eq!(autolock.resume(blurred_at(), TIMEOUT), Resume::Touch);
+    }
 }
