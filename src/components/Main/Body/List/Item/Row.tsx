@@ -41,16 +41,18 @@ export default function Row({ glyph, title, sub, flag, tint }: Props) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-[7px]">
+          {/* The phone's row is read at arm's length: a tier up on both
+              lines (16 / 13) where the desktop's list reads at 13 / 11. */}
           <span
             data-testid="entry-item-title"
-            className="truncate text-base font-medium text-text"
+            className="truncate text-base font-medium text-text max-md:text-lg"
           >
             {title}
           </span>
           {flag}
         </div>
         {sub && (
-          <div className={`mt-0.5 truncate ${META}`}>
+          <div className={`mt-0.5 truncate ${META} max-md:text-base`}>
             {sub}
           </div>
         )}

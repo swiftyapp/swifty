@@ -24,7 +24,9 @@ export default function KindChips() {
   return (
     <div
       data-testid="kinds-list"
-      className="mt-3.5 flex gap-[5px] overflow-x-auto pb-0.5"
+      // On the phone the strip bleeds through the column's 16px gutters, so
+      // chips scroll out under the screen's edge rather than being cut at it.
+      className="mt-3.5 flex gap-[5px] overflow-x-auto pb-0.5 max-md:-mx-4 max-md:gap-2 max-md:px-4"
     >
       <Chip
         testid="filter-all"

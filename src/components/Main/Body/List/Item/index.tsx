@@ -58,7 +58,10 @@ export default function Item({ entry }: Props) {
         // coarse — a touch laptop has a fine one too — and costs no render
         // branch.
         'flex cursor-pointer items-center gap-3 border-l-2 py-2.5 pl-[14px] pr-4 any-pointer-coarse:py-3.5',
-        'inset-shadow-hairline',
+        // The rule under the row: full-width in the desktop's list pane, and
+        // on the phone a rule from the text column to the edge, the way iOS
+        // separates rows — 16px gutter + 40px tile + the 14px gap it takes.
+        'inset-shadow-hairline max-md:gap-3.5 max-md:inset-shadow-none max-md:hairline-inset-[70px]',
         selected
           ? 'border-accent bg-sel'
           : 'border-transparent hover:bg-hover'

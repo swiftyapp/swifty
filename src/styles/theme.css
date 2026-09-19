@@ -495,6 +495,27 @@
 }
 
 /*
+ * A row's rule drawn from a left inset to the right edge — the way iOS
+ * separates list rows, starting under the text rather than framing the
+ * tile — as a pseudo-element, so it costs no layout and no wrapper.
+ * `hairline-inset-[70px]` for a length, `hairline-inset-4` on the spacing
+ * scale. The desktop's rows keep the full-width `inset-shadow-hairline`.
+ */
+@utility hairline-inset-* {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--c-line);
+    left: --spacing(--value(integer));
+    left: --value([length]);
+  }
+}
+
+/*
  * Busy text: the muted ink with a brighter band sweeping through the glyphs.
  * Gradient is clipped to the text, so it re-themes via the ink tokens.
  */
