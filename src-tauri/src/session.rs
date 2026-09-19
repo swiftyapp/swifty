@@ -261,7 +261,7 @@ pub fn open_with_key(app: &AppHandle, key: &VaultKey) -> Result<(SqliteStore, Ve
     // "wrong password" to someone whose disk is failing both misdiagnoses it
     // and locks them out for guessing right, so each cause keeps its own name.
     let store =
-        SqliteStore::open(&storage::db_path(app)?, &key.sqlcipher_key()).map_err(|e| match e {
+        SqliteStore::open(&storage::db_path(app)?, &*key.sqlcipher_key()).map_err(|e| match e {
             StoreError::WrongKey => Error::InvalidPassword,
             StoreError::SchemaNewer => Error::VaultTooNew,
             e => Error::Other(format!("could not open the vault: {e}")),
@@ -362,7 +362,7 @@ pub fn create_vault(app: &AppHandle, password: &str) -> Result<(VaultKey, Sqlite
         master: crypto::derive(password.as_bytes(), &params)?,
     };
     let store =
-        SqliteStore::open(&storage::db_path(app)?, &key.sqlcipher_key()).map_err(store_err)?;
+        SqliteStore::open(&storage::db_path(app)?, &*key.sqlcipher_key()).map_err(store_err)?;
     record_kdf_meta(&store, &params)?;
     // Born with an identity: what names this vault's pack on Drive, wherever
     // it is later synced from (`store::identity`).
@@ -573,7 +573,7 @@ mod epoch_tests {
     }
 
     fn store_in(dir: &tempfile::TempDir, key: &VaultKey) -> SqliteStore {
-        SqliteStore::open(&dir.path().join("vault.db"), &key.sqlcipher_key()).unwrap()
+        SqliteStore::open(&dir.path().join("vault.db"), &*key.sqlcipher_key()).unwrap()
     }
 
     fn unlocked(dir: &tempfile::TempDir) -> Session {

@@ -643,7 +643,7 @@ fn reopening_a_migrated_db_is_idempotent() {
 fn save_then_reveal_round_trips_one_row() {
     let key = argon2_key("pw", &argon2_params(b"salt-a-01234567890123456789012345"));
     let cipher = key.payload_cipher();
-    let store = SqliteStore::open(&tmp_db(), &key.sqlcipher_key()).unwrap();
+    let store = SqliteStore::open(&tmp_db(), &*key.sqlcipher_key()).unwrap();
 
     let entry = sample_entry();
     let payload = cipher.seal(&entry).unwrap();
@@ -683,7 +683,7 @@ fn argon2_descriptor_reproduces_key_and_opens() {
     // setup: derive, open, save a sealed entry.
     let key = argon2_key("master-pw", &params);
     {
-        let store = SqliteStore::open(&path, &key.sqlcipher_key()).unwrap();
+        let store = SqliteStore::open(&path, &*key.sqlcipher_key()).unwrap();
         let cipher = key.payload_cipher();
         let payload = cipher.seal(&sample_entry()).unwrap();
         store
@@ -698,7 +698,7 @@ fn argon2_descriptor_reproduces_key_and_opens() {
 
     // unlock: re-derive from the reloaded descriptor and reopen.
     let key2 = argon2_key("master-pw", &reloaded);
-    let store2 = SqliteStore::open(&path, &key2.sqlcipher_key()).unwrap();
+    let store2 = SqliteStore::open(&path, &*key2.sqlcipher_key()).unwrap();
     let revealed = key2
         .payload_cipher()
         .unseal("1", &store2.get("1").unwrap().unwrap().payload)
@@ -707,7 +707,7 @@ fn argon2_descriptor_reproduces_key_and_opens() {
 
     // A wrong password derives a different SQLCipher key → open fails.
     let wrong = argon2_key("wrong-pw", &reloaded);
-    assert!(SqliteStore::open(&path, &wrong.sqlcipher_key()).is_err());
+    assert!(SqliteStore::open(&path, &*wrong.sqlcipher_key()).is_err());
 }
 
 // Back-compat: a DB created with the legacy deterministic key (no sidecar) still
@@ -717,7 +717,7 @@ fn legacy_sidecarless_vault_opens() {
     let path = tmp_db();
     let key = VaultKey::legacy_from_password("master-pw");
     {
-        let store = SqliteStore::open(&path, &key.sqlcipher_key()).unwrap();
+        let store = SqliteStore::open(&path, &*key.sqlcipher_key()).unwrap();
         let payload = key.payload_cipher().seal(&sample_entry()).unwrap();
         store
             .upsert(&migrate::build_record(&sample_entry(), payload).unwrap())
@@ -725,7 +725,7 @@ fn legacy_sidecarless_vault_opens() {
     }
 
     let key2 = VaultKey::legacy_from_password("master-pw");
-    let store2 = SqliteStore::open(&path, &key2.sqlcipher_key()).unwrap();
+    let store2 = SqliteStore::open(&path, &*key2.sqlcipher_key()).unwrap();
     let revealed = key2
         .payload_cipher()
         .unseal("1", &store2.get("1").unwrap().unwrap().payload)
@@ -743,7 +743,7 @@ fn change_password_reseals_rekeys_and_new_descriptor_opens() {
         "old-pw",
         &argon2_params(b"salt-c-01234567890123456789012345"),
     );
-    let store = SqliteStore::open(&path, &old.sqlcipher_key()).unwrap();
+    let store = SqliteStore::open(&path, &*old.sqlcipher_key()).unwrap();
     let payload = old.payload_cipher().seal(&sample_entry()).unwrap();
     store
         .upsert(&migrate::build_record(&sample_entry(), payload).unwrap())
@@ -764,16 +764,16 @@ fn change_password_reseals_rekeys_and_new_descriptor_opens() {
         })
         .collect();
     store.import(&resealed).unwrap();
-    store.rekey(&new.sqlcipher_key()).unwrap();
+    store.rekey(&*new.sqlcipher_key()).unwrap();
     drop(store);
 
     // The old key no longer opens; the new descriptor + password does.
-    assert!(SqliteStore::open(&path, &old.sqlcipher_key()).is_err());
+    assert!(SqliteStore::open(&path, &*old.sqlcipher_key()).is_err());
     let reopened = argon2_key(
         "new-pw",
         &KdfParams::from_json(&new_params.to_json().unwrap()).unwrap(),
     );
-    let store2 = SqliteStore::open(&path, &reopened.sqlcipher_key()).unwrap();
+    let store2 = SqliteStore::open(&path, &*reopened.sqlcipher_key()).unwrap();
     let revealed = reopened
         .payload_cipher()
         .unseal("1", &store2.get("1").unwrap().unwrap().payload)
@@ -795,18 +795,18 @@ fn snapshot_then_rekey_then_restore_recovers_old_key() {
     );
 
     {
-        let store = SqliteStore::open(&path, &old.sqlcipher_key()).unwrap();
+        let store = SqliteStore::open(&path, &*old.sqlcipher_key()).unwrap();
         let payload = old.payload_cipher().seal(&sample_entry()).unwrap();
         store
             .upsert(&migrate::build_record(&sample_entry(), payload).unwrap())
             .unwrap();
         // Recovery point, then the destructive rekey.
-        store.snapshot_to(&backup, &old.sqlcipher_key()).unwrap();
+        store.snapshot_to(&backup, &*old.sqlcipher_key()).unwrap();
         let new = argon2_key(
             "new-pw",
             &argon2_params(b"salt-g-01234567890123456789012345"),
         );
-        store.rekey(&new.sqlcipher_key()).unwrap();
+        store.rekey(&*new.sqlcipher_key()).unwrap();
     } // connection closed
 
     // "Crash" rollback: drop stale WAL/SHM, copy the snapshot back over the DB.
@@ -818,7 +818,7 @@ fn snapshot_then_rekey_then_restore_recovers_old_key() {
     std::fs::copy(&backup, &path).unwrap();
 
     // The restored DB opens with the OLD key and the payload is intact.
-    let store = SqliteStore::open(&path, &old.sqlcipher_key()).unwrap();
+    let store = SqliteStore::open(&path, &*old.sqlcipher_key()).unwrap();
     let revealed = old
         .payload_cipher()
         .unseal("1", &store.get("1").unwrap().unwrap().payload)
@@ -863,7 +863,7 @@ fn import_swftx_reseals_across_passwords_and_upserts_by_id() {
         &argon2_params(b"salt-e-01234567890123456789012345"),
     );
     let cipher = key.payload_cipher();
-    let store = SqliteStore::open(&tmp_db(), &key.sqlcipher_key()).unwrap();
+    let store = SqliteStore::open(&tmp_db(), &*key.sqlcipher_key()).unwrap();
     for r in migrate::reseal_swftx(&file.entries, &src, &cipher).unwrap() {
         store.upsert(&r).unwrap();
     }
@@ -895,7 +895,7 @@ fn swftx_round_trip_preserves_a_starred_record() {
         &argon2_params(b"salt-h-01234567890123456789012345"),
     );
     let cipher = key.payload_cipher();
-    let source = SqliteStore::open(&tmp_db(), &key.sqlcipher_key()).unwrap();
+    let source = SqliteStore::open(&tmp_db(), &*key.sqlcipher_key()).unwrap();
     let entry = sample_entry();
     source
         .upsert(&migrate::build_record(&entry, cipher.seal(&entry).unwrap()).unwrap())
@@ -918,7 +918,7 @@ fn swftx_round_trip_preserves_a_starred_record() {
 
     // import_backup: decrypt the file and re-seal it into a fresh vault.
     let file: VaultData = out.decrypt_data(&blob).unwrap();
-    let restored = SqliteStore::open(&tmp_db(), &key.sqlcipher_key()).unwrap();
+    let restored = SqliteStore::open(&tmp_db(), &*key.sqlcipher_key()).unwrap();
     restored
         .import(&migrate::reseal_swftx(&file.entries, &out, &cipher).unwrap())
         .unwrap();

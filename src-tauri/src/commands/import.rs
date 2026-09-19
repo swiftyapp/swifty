@@ -538,7 +538,7 @@ mod tests {
         let key = VaultKey::Argon2 {
             master: crypto::derive(b"master-password", &params).unwrap(),
         };
-        let store = SqliteStore::open(path, &key.sqlcipher_key()).unwrap();
+        let store = SqliteStore::open(path, &*key.sqlcipher_key()).unwrap();
         (key, store)
     }
 

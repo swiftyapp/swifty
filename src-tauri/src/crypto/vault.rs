@@ -45,12 +45,13 @@ impl VaultKey {
         }
     }
 
-    /// The 32-byte SQLCipher key for this vault.
-    pub fn sqlcipher_key(&self) -> [u8; KEY_LEN] {
-        match self {
+    /// The 32-byte SQLCipher key for this vault. Zeroized when the caller drops
+    /// it, so a derived copy of the key never outlives its use.
+    pub fn sqlcipher_key(&self) -> Zeroizing<[u8; KEY_LEN]> {
+        Zeroizing::new(match self {
             Self::Argon2 { master } => hkdf_subkey(master, INFO_SQLCIPHER),
-            Self::Legacy { secret } => sqlcipher_key(&secret_str(secret)),
-        }
+            Self::Legacy { secret } => sqlcipher_key(secret_str(secret)),
+        })
     }
 
     /// The cipher that seals/unseals per-entry payloads for this vault.
@@ -59,7 +60,7 @@ impl VaultKey {
             Self::Argon2 { master } => {
                 PayloadCipher::Aead(Zeroizing::new(hkdf_subkey(master, INFO_PAYLOAD)))
             }
-            Self::Legacy { secret } => PayloadCipher::Legacy(Cryptor::new(&secret_str(secret))),
+            Self::Legacy { secret } => PayloadCipher::Legacy(Cryptor::new(secret_str(secret))),
         }
     }
 
@@ -67,9 +68,10 @@ impl VaultKey {
     pub fn cryptor(&self) -> Cryptor {
         match self {
             Self::Argon2 { master } => {
-                Cryptor::new(&STANDARD.encode(hkdf_subkey(master, INFO_LEGACY_CRYPTOR)))
+                let subkey = Zeroizing::new(hkdf_subkey(master, INFO_LEGACY_CRYPTOR));
+                Cryptor::new(&Zeroizing::new(STANDARD.encode(subkey.as_slice())))
             }
-            Self::Legacy { secret } => Cryptor::new(&secret_str(secret)),
+            Self::Legacy { secret } => Cryptor::new(secret_str(secret)),
         }
     }
 
@@ -85,9 +87,10 @@ impl VaultKey {
 }
 
 // The legacy secret is always UTF-8 (base64); fall back to empty on the
-// impossible non-UTF-8 case rather than panic.
-fn secret_str(secret: &[u8]) -> String {
-    String::from_utf8_lossy(secret).into_owned()
+// impossible non-UTF-8 case rather than panic. Borrowed from the zeroizing
+// storage rather than copied, so no un-scrubbed copy of the secret is made.
+fn secret_str(secret: &[u8]) -> &str {
+    std::str::from_utf8(secret).unwrap_or("")
 }
 
 /// Seals and unseals a single entry's payload. The stored payload is opaque
@@ -177,7 +180,7 @@ mod tests {
         let PayloadCipher::Aead(payload) = k.payload_cipher() else {
             panic!("argon2 vault must use the AEAD payload cipher");
         };
-        assert_ne!(sql, *payload, "sqlcipher and payload subkeys must differ");
+        assert_ne!(*sql, *payload, "sqlcipher and payload subkeys must differ");
     }
 
     #[test]
