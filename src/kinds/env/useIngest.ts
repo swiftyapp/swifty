@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { pickEnvFile } from '@/api/pickers'
+import { pickFileToRead } from '@/api/tools'
 import { describeError } from '@/api/errors'
 import { ingestDroppedEnvFile, ingestEnvFile, type IngestedEnv } from './ingest'
 
@@ -44,7 +44,9 @@ export function useEnvIngest(onFile: (file: IngestedEnv) => void) {
   const drop = (path: string) => run(() => ingestDroppedEnvFile(path))
   const pick = () =>
     run(async () => {
-      const path = await pickEnvFile()
+      // Any file may be a .env, so the dialog filters nothing; it runs in Rust
+      // so that the read that follows has a path the backend saw chosen.
+      const path = await pickFileToRead('env')
       return path ? ingestEnvFile(path) : null
     })
 

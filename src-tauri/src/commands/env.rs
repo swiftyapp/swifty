@@ -10,6 +10,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::error::{Error, Result};
+use crate::grants::PathGrants;
 use crate::state::AppState;
 
 // A real .env is a few kilobytes. Anything past this is not one, and reading
@@ -105,14 +106,28 @@ pub fn read_env_text(path: &Path) -> Result<EnvFile> {
 // user just pointed at — which may be a network mount. Off the IPC thread with
 // everything else that touches the disk.
 #[tauri::command]
-pub async fn read_env_file(path: String, state: State<'_, AppState>) -> Result<EnvFile> {
+pub async fn read_env_file(
+    path: String,
+    state: State<'_, AppState>,
+    grants: State<'_, PathGrants>,
+) -> Result<EnvFile> {
     // Whatever path comes in is read whole and handed to the webview, so this is
     // a read of the user's disk on the webview's say-so. Only an open vault may
     // ask for one — the drop target that calls this lives in the unlocked shell,
-    // and a locked app has no business reading files for anybody. The name is
-    // gated too, in `read_env_text`.
-    state.session.lock().unwrap().key()?;
-    super::blocking(move || read_env_text(Path::new(&path))).await
+    // and a locked app has no business reading files for anybody — and only for
+    // a path the user chose: dropped on the window or picked through
+    // `pick_file`, either of which granted it (see `grants`). The name is gated
+    // too, in `read_env_text`. A lock while the file is read discards the text:
+    // the session that asked for it is gone.
+    let epoch = super::unlocked_epoch(&state)?;
+    if !grants.take(Path::new(&path)) {
+        return Err(Error::Unsupported(
+            "this file was not chosen in the app".into(),
+        ));
+    }
+    let file = super::blocking(move || read_env_text(Path::new(&path))).await?;
+    super::same_session(&state, epoch)?;
+    Ok(file)
 }
 
 #[cfg(test)]

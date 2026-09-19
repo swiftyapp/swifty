@@ -128,9 +128,9 @@ fn local_path(path: &str) -> std::path::PathBuf {
 }
 
 /// The image types both OCR backends load and both entry points offer — the
-/// file dialog's filter and the window drop's own test. Kept in step with
-/// `IMAGE_EXTENSIONS` in `src/lib/fileTypes.ts`.
-const IMAGE_EXTENSIONS: [&str; 10] = [
+/// file dialog's filter (`commands::tools::pick_file`) and the window drop's
+/// own test. Kept in step with `IMAGE_EXTENSIONS` in `src/lib/fileTypes.ts`.
+pub(crate) const IMAGE_EXTENSIONS: [&str; 10] = [
     "png", "jpg", "jpeg", "heic", "heif", "webp", "tiff", "tif", "bmp", "gif",
 ];
 

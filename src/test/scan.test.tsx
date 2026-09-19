@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { open } from '@tauri-apps/plugin-dialog'
 import Main from '@/components/Main'
 import { useUi, useVault, startEntry } from '@/store'
 import {
@@ -185,7 +184,7 @@ describe('scanning from the picker', () => {
   it('routes a picked file like a drop', async () => {
     seed()
     seedApp({ scanSupported: true })
-    vi.mocked(open).mockResolvedValue('/Users/me/card.png')
+    mockCommand('pick_file', () => '/Users/me/card.png')
     mockCommand('scan_image', () => ({ kind: 'card', fields: CARD }))
     render(<Main />)
     await openFromRail()
@@ -194,13 +193,29 @@ describe('scanning from the picker', () => {
 
     await waitFor(() => expect(useVault.getState().creating).toBe('card'))
     expect(useUi.getState().addPicker).toBe(false)
+    // The dialog is the backend's, so it is asked for by kind — that is what
+    // lets it grant the path it then agrees to read (see `pickFileToRead`).
+    expect(calls('pick_file')).toContainEqual({ kind: 'image', label: 'Images' })
     expect(calls('scan_image')).toContainEqual({ path: '/Users/me/card.png' })
   })
 
   it('leaves the picker alone when the dialog is cancelled', async () => {
     seed()
     seedApp({ scanSupported: true })
-    vi.mocked(open).mockResolvedValue(null)
+    mockCommand('pick_file', () => null)
+    render(<Main />)
+    await openFromRail()
+
+    await userEvent.click(screen.getByTestId('add-scan-image'))
+
+    expect(screen.getByTestId('add-secret-modal')).toBeInTheDocument()
+    expect(calls('scan_image')).toHaveLength(0)
+  })
+
+  it('scans nothing when the dialog itself fails', async () => {
+    seed()
+    seedApp({ scanSupported: true })
+    mockCommand('pick_file', () => Promise.reject({ kind: 'unsupported', message: 'no picker' }))
     render(<Main />)
     await openFromRail()
 
