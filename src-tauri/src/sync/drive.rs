@@ -65,16 +65,35 @@ fn escape(value: &str) -> String {
     value.replace('\\', "\\\\").replace('\'', "\\'")
 }
 
-async fn check(resp: reqwest::Response) -> Result<Value> {
+/// The most of a Drive API JSON response — metadata, a listing page, an error
+/// — we will hold. Generous by a wide margin: a full listing page is tens of
+/// KiB. It is here so that no response body is ever buffered unbounded, the
+/// same rule the file downloads follow (see [`read_capped`]).
+const MAX_JSON_BYTES: usize = 4 * 1024 * 1024;
+
+/// The error for a non-success response, carrying whatever of the body could be
+/// read as the detail. A body that could *not* be read — oversized, or a
+/// transport failure part way through — says so: collapsing that into an empty
+/// string leaves `Drive API 500: ` and nothing to diagnose from.
+fn api_error(status: reqwest::StatusCode, body: Result<Vec<u8>>) -> Error {
+    let detail = match &body {
+        Ok(body) => String::from_utf8_lossy(body).into_owned(),
+        Err(e) => format!("<could not read body: {e}>"),
+    };
+    Error::Other(format!("Drive API {status}: {detail}"))
+}
+
+async fn check(mut resp: reqwest::Response) -> Result<Value> {
     let status = resp.status();
-    let body = resp.text().await.map_err(other)?;
     if !status.is_success() {
-        return Err(Error::Other(format!("Drive API {status}: {body}")));
+        let body = read_capped(&mut resp, MAX_JSON_BYTES).await;
+        return Err(api_error(status, body));
     }
+    let body = read_capped(&mut resp, MAX_JSON_BYTES).await?;
     if body.is_empty() {
         return Ok(Value::Null);
     }
-    serde_json::from_str(&body).map_err(other)
+    serde_json::from_slice(&body).map_err(other)
 }
 
 // Run a files.list query and return *every* match.
@@ -283,11 +302,8 @@ pub async fn read_file(
         .map_err(other)?;
     let status = resp.status();
     if !status.is_success() {
-        let body = read_capped(&mut resp, max_bytes).await.unwrap_or_default();
-        return Err(Error::Other(format!(
-            "Drive API {status}: {}",
-            String::from_utf8_lossy(&body)
-        )));
+        let body = read_capped(&mut resp, max_bytes).await;
+        return Err(api_error(status, body));
     }
     if resp
         .content_length()
@@ -474,11 +490,8 @@ pub async fn download_public(
         return Err(Error::ShareExpired);
     }
     if !status.is_success() {
-        let body = read_capped(&mut resp, max_bytes).await.unwrap_or_default();
-        return Err(Error::Other(format!(
-            "Drive API {status}: {}",
-            String::from_utf8_lossy(&body)
-        )));
+        let body = read_capped(&mut resp, max_bytes).await;
+        return Err(api_error(status, body));
     }
     if resp
         .content_length()
@@ -557,8 +570,8 @@ pub async fn update_file(
 #[cfg(test)]
 mod tests {
     use super::{
-        collect_pages, escape, layout, list_query, multipart_body, oldest, parse_file,
-        parse_listing, parse_properties, parse_size, DriveFile, FILE_FIELDS, LIST_FIELDS,
+        api_error, collect_pages, escape, layout, list_query, multipart_body, oldest, parse_file,
+        parse_listing, parse_properties, parse_size, DriveFile, Error, FILE_FIELDS, LIST_FIELDS,
     };
     use serde_json::json;
     use std::cell::RefCell;
@@ -755,5 +768,22 @@ mod tests {
         assert!(text.contains(layout::VAULT_MIME));
         assert!(body.ends_with(b"\r\n--rowel-boundary--"));
         assert!(body.windows(content.len()).any(|w| w == content));
+    }
+
+    // A failed response whose body cannot be read is the case worth keeping: it
+    // used to report `Drive API 500: ` — a status and nothing else to go on.
+    #[test]
+    fn an_unreadable_error_body_says_so_instead_of_reading_as_empty() {
+        let status = reqwest::StatusCode::INTERNAL_SERVER_ERROR;
+
+        let read = api_error(status, Ok(b"quota exceeded".to_vec()));
+        assert_eq!(
+            read.to_string(),
+            "Drive API 500 Internal Server Error: quota exceeded"
+        );
+
+        let unread = api_error(status, Err(Error::FileTooLarge)).to_string();
+        assert!(unread.starts_with("Drive API 500 Internal Server Error: <could not read body:"));
+        assert!(unread.contains(&Error::FileTooLarge.to_string()));
     }
 }

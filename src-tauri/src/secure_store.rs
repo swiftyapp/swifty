@@ -242,6 +242,7 @@ fn enroll(
 mod imp {
     use super::*;
     use crate::biometrics;
+    use security_framework::access_control::{ProtectionMode, SecAccessControl};
     use security_framework::passwords::{
         delete_generic_password_options, generic_password, set_generic_password_options,
         AccessControlOptions, PasswordOptions,
@@ -271,6 +272,31 @@ mod imp {
         opts
     }
 
+    // The access control the protected item is stored behind: the biometric
+    // constraint, and the protection class that says when the item is readable
+    // at all.
+    //
+    // `set_access_control_options` would build this for us, but it hardcodes
+    // `kSecAttrAccessibleWhenUnlocked` — no `ThisDeviceOnly`, so the item rides
+    // along in an encrypted backup and can be restored onto another device.
+    // `AccessibleWhenPasscodeSetThisDeviceOnly` is the strictest class there is:
+    // the key never leaves this device, and it stops existing if the user
+    // removes their passcode — which is the same moment biometrics stop meaning
+    // anything.
+    //
+    // Changing the class does not strand an existing enrolment: `retrieve` and
+    // `delete` query by service and account only — neither the class nor the
+    // access control is part of the lookup — so an item written under the old
+    // class still reads and still deletes. Re-enrolling (which `store` always
+    // does, deleting first) moves it to the new one.
+    fn access_control() -> Result<SecAccessControl> {
+        SecAccessControl::create_with_protection(
+            Some(ProtectionMode::AccessibleWhenPasscodeSetThisDeviceOnly),
+            AccessControlOptions::BIOMETRY_CURRENT_SET.bits(),
+        )
+        .map_err(map_err)
+    }
+
     // Ordinary keychain item: no access control, no entitlement, no OS gate.
     // The biometric check happens in `retrieve` before we ever read this.
     fn prompt_options() -> PasswordOptions {
@@ -285,7 +311,10 @@ mod imp {
         enroll(
             || {
                 let mut opts = protected_options();
-                opts.set_access_control_options(AccessControlOptions::BIOMETRY_CURRENT_SET);
+                match access_control() {
+                    Ok(control) => opts.set_access_control(control),
+                    Err(e) => return ProtectedOutcome::Failed(e),
+                }
                 match set_generic_password_options(key, opts) {
                     Ok(()) => ProtectedOutcome::Stored,
                     Err(e) if e.code() == ERR_MISSING_ENTITLEMENT => {

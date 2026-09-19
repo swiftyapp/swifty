@@ -15,6 +15,14 @@ const SYMBOLS: &str = "!@#$%^&*()+_-=}{[]|:;\"/?.><,`~";
 // Removed when excludeSimilarCharacters is set (mirrors `generate-password`).
 const SIMILAR: &str = "il1Lo0O";
 
+/// The longest password this will generate. The UI's slider stops at 48
+/// (`LENGTH_RANGE` in `src/services/generator.ts`); this leaves room well past
+/// it for a caller that wants one. The bound is what keeps `length` from being
+/// a memory request: the field is a u32 on the wire, and without a ceiling
+/// `{ length: 4294967295 }` asks for a 16 GiB allocation before a single
+/// character is chosen.
+const MAX_LENGTH: usize = 256;
+
 #[tauri::command]
 pub fn generate_password(options: GeneratorOptions) -> Result<String> {
     let exclude_similar = options.exclude_similar_characters.unwrap_or(false);
@@ -47,7 +55,7 @@ pub fn generate_password(options: GeneratorOptions) -> Result<String> {
         return Err(Error::Other("no character pool for generator".into()));
     }
 
-    let length = options.length.max(1) as usize;
+    let length = (options.length.max(1) as usize).min(MAX_LENGTH);
     let strict = options.strict.unwrap_or(false);
     let mut rng = rand::thread_rng();
     let mut chars: Vec<char> = Vec::with_capacity(length);
@@ -196,6 +204,22 @@ mod tests {
         o.exclude_similar_characters = Some(true);
         let pw = generate_password(o).unwrap();
         assert!(pw.chars().all(|c| !SIMILAR.contains(c)));
+    }
+
+    // A length is a request for memory as much as for characters, so it has a
+    // ceiling: the largest u32 asks for 16 GiB, and must not get it.
+    #[test]
+    fn caps_the_length() {
+        assert_eq!(
+            generate_password(opts(u32::MAX)).unwrap().chars().count(),
+            MAX_LENGTH
+        );
+        // Below the cap the asked-for length is still the one returned.
+        assert_eq!(
+            generate_password(opts(0)).unwrap().chars().count(),
+            1,
+            "a zero length still yields one character"
+        );
     }
 
     #[test]
