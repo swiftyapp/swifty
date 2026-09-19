@@ -33,7 +33,7 @@ export default function Read({ entry, revealed }: Props) {
 
   return (
     // `relative`: what the bottom action and its fade are pinned to.
-    <div className="relative flex min-h-0 flex-1 flex-col animate-sheet bg-detail text-text">
+    <div className="relative flex min-h-0 flex-1 flex-col animate-sheet bg-screen text-text">
       <NavRow entry={entry} onDelete={remove} />
 
       <div
@@ -57,7 +57,7 @@ export default function Read({ entry, revealed }: Props) {
             <Eyebrow
               entry={entry}
               revealed={revealed}
-              className="mb-1 flex items-center gap-2 truncate whitespace-nowrap"
+              className="mt-1 flex items-center gap-2 truncate whitespace-nowrap"
             />
           </Identity>
           {!entry.deletedAt && <Favorite entry={entry} className={`${TOUCH} flex-none`} />}

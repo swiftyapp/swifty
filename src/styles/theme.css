@@ -320,6 +320,7 @@
     'Roboto Mono', 'Liberation Mono', monospace;
 
   --color-app: var(--c-app);
+  --color-screen: var(--c-screen);
   --color-rail: var(--c-rail);
   --color-list: var(--c-list);
   --color-detail: var(--c-detail);
@@ -494,6 +495,27 @@
 }
 
 /*
+ * A row's rule drawn from a left inset to the right edge — the way iOS
+ * separates list rows, starting under the text rather than framing the
+ * tile — as a pseudo-element, so it costs no layout and no wrapper.
+ * `hairline-inset-[70px]` for a length, `hairline-inset-4` on the spacing
+ * scale. The desktop's rows keep the full-width `inset-shadow-hairline`.
+ */
+@utility hairline-inset-* {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--c-line);
+    left: --spacing(--value(integer));
+    left: --value([length]);
+  }
+}
+
+/*
  * Busy text: the muted ink with a brighter band sweeping through the glyphs.
  * Gradient is clipped to the text, so it re-themes via the ink tokens.
  */
@@ -521,6 +543,10 @@
   color-scheme: light;
 
   --c-app: #e7e8ea;
+  /* The phone shell's one ground (the mobile prototype's `--screen`): every
+   * compact screen is painted on it, and cards, fields and sheets sit white on
+   * top. The wide shell never uses it — its panes keep app/list/detail. */
+  --c-screen: #f4f4f6;
   --c-rail: #e4e5e8;
   --c-list: #f3f4f6;
   --c-detail: #ffffff;
@@ -630,6 +656,7 @@
   color-scheme: dark;
 
   --c-app: #0f1011;
+  --c-screen: #0e0f11;
   --c-rail: #131415;
   --c-list: #171819;
   --c-detail: #1b1c1e;

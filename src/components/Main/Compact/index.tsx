@@ -45,7 +45,10 @@ export default function Compact() {
         data-testid="compact-shell"
         style={viewportStyle(viewport)}
         // `relative` is what the floating tab bar and its fade are pinned to.
-        className="relative flex h-full min-h-0 flex-col"
+        // The ground is painted here as well as on each screen: a screen
+        // arrives by fading or sliding in, and without a ground under it the
+        // main root's darker `bg-app` would show through for that beat.
+        className="relative flex h-full min-h-0 flex-col bg-screen"
       >
         {/* Both entry branches are the same component in the same slot, so
             React keeps the instance — and with it the one reveal — across the

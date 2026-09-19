@@ -29,7 +29,7 @@ export default function Editor({ entry, type, revealed }: Props) {
   const heading = useHeading(type, entry)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col animate-rise bg-detail text-text">
+    <div className="flex min-h-0 flex-1 flex-col animate-rise bg-screen text-text">
       <NavRow draft={draft} title={heading} />
 
       {/* One scroller, declared a container so the rows fold themselves (see

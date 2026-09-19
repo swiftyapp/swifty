@@ -54,6 +54,30 @@ export const STACK_RAIL =
 // — and every editor's underline — ends at one x too.
 export const RAIL = 'flex w-[60px] flex-none items-center justify-end gap-1'
 
+/*
+ * The phone's row (`max-md:`, the compact shell's cut): a two-column grid,
+ * the label over the value in the first column and the rail in the second,
+ * spanning both lines and centred on the pair. Folded as a wrapped flex row
+ * the rail's 44pt buttons sat on the value's own line, stretching it to 44px
+ * and centring the value in it — a gap under every label. The fold's classes
+ * above still apply underneath; a grid simply ignores the wrap. The rail's
+ * glyphs are the prototype's 18px and its buttons touch, so two of them do
+ * not read as a toolbar.
+ */
+// The grid does not lean on the fold: a landscape phone (or a narrow window)
+// is under 768px with a container *over* 420px, where the fold's classes do
+// not fire — so the sigil is hidden, the label and rail let go of their fixed
+// columns and the slot under the value starts at the edge, here too.
+const PHONE = 'max-md:grid max-md:grid-cols-[minmax(0,1fr)_auto]'
+const PHONE_LABEL = 'max-md:col-start-1 max-md:row-start-1 max-md:w-full'
+const PHONE_SIGIL = 'max-md:hidden'
+const PHONE_VALUE = 'max-md:col-start-1 max-md:row-start-2'
+const PHONE_RAIL =
+  'max-md:col-start-2 max-md:row-span-2 max-md:row-start-1 max-md:w-auto max-md:gap-0 max-md:self-center max-md:[&_svg]:size-[18px]'
+// The strength meter and its stamp share one line under the value.
+const PHONE_BELOW =
+  'max-md:mt-2 max-md:flex-row max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-3 max-md:pl-0'
+
 // THE detail-row geometry: a w-32 micro-label column, the value, trailing
 // controls, then anything that belongs under the value. Read values and their
 // editors both render through it, so switching modes never moves a row.
@@ -67,8 +91,8 @@ export default function FieldRow({ label, prefix, actions, below, error, childre
     // Editing, each input draws its own underline, so the hairline between
     // rows would be a second line for the same job; the read view keeps it.
     // `group`: the read row's copy button only shows up on hover (see Field).
-    <div className={cx('item group px-3.5 py-3', !set && ROW_HAIRLINE)}>
-      <div className={`flex items-center gap-3 ${STACK}`}>
+    <div className={cx('item group px-3.5 py-3 max-md:px-4', !set && ROW_HAIRLINE)}>
+      <div className={`flex items-center gap-3 ${STACK} ${PHONE}`}>
         {labelled && (
           <>
             {/* A label never wraps: the column is sized for the longest of them
@@ -76,25 +100,27 @@ export default function FieldRow({ label, prefix, actions, below, error, childre
                 catalog, rather than folded onto a second line. */}
             <label
               htmlFor={id}
-              className={`w-32 flex-none whitespace-nowrap ${LABEL} ${STACK_LABEL}`}
+              className={`w-32 flex-none whitespace-nowrap ${LABEL} ${STACK_LABEL} ${PHONE_LABEL}`}
             >
               {t(label)}
             </label>
             {/* Held open with or without a sigil, so every value starts at one x. */}
-            <span className={`grid w-4 flex-none place-items-center text-text3 ${STACK_SIGIL}`}>
+            <span
+              className={`grid w-4 flex-none place-items-center text-text3 ${STACK_SIGIL} ${PHONE_SIGIL}`}
+            >
               {prefix}
             </span>
           </>
         )}
-        <div className="min-w-0 flex-1">{children(id)}</div>
+        <div className={`min-w-0 flex-1 ${PHONE_VALUE}`}>{children(id)}</div>
         {labelled ? (
-          <div className={`${RAIL} ${STACK_RAIL}`}>{actions}</div>
+          <div className={`${RAIL} ${STACK_RAIL} ${PHONE_RAIL}`}>{actions}</div>
         ) : (
           actions
         )}
       </div>
       {(below || error) && (
-        <div className={cx('mt-1.5 flex flex-col gap-1.5', labelled && VALUE_START)}>
+        <div className={cx('mt-1.5 flex flex-col gap-1.5', PHONE_BELOW, labelled && VALUE_START)}>
           {below}
           {error && <span className="text-base text-bad">{error}</span>}
         </div>

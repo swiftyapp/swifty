@@ -59,7 +59,7 @@ export const TAB_BAR_FADE = 'h-36'
  * are visibly the same control, put on different footings below.
  */
 export const ACTION_BUTTON =
-  'absolute flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-accent text-md font-medium text-accent-fg shadow-float transition-opacity disabled:cursor-default'
+  'absolute flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-accent text-lg font-semibold text-accent-fg shadow-float transition-opacity disabled:cursor-default'
 
 /**
  * A pushed screen's bottom action, on the same footing: a 54px button on

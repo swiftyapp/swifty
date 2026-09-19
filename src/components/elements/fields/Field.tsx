@@ -94,7 +94,14 @@ export default function Field({
   const masked = secure && !show
   const mask = masked ? MASK : undefined
   // The headline treatment is for a secret being read, not for its mask.
-  const ink = cx(VALUE_LINE, big && !masked ? 'text-xl tracking-secret' : 'text-base')
+  // A tier up on the phone (16px), where the desktop's 13 reads as a form; a
+  // masked secret also takes the secret's tracking there, so the dots sit
+  // apart the way the prototype draws them.
+  const ink = cx(
+    VALUE_LINE,
+    big && !masked ? 'text-xl tracking-secret' : 'text-base max-md:text-lg',
+    masked && 'max-md:tracking-secret'
+  )
   // Nothing to gloss about a mask, and nothing to gloss while typing.
   const gloss = !editing && !masked ? suffix?.(value) : undefined
 
@@ -160,13 +167,17 @@ export default function Field({
               // it says what it is and what pressing it does instead.
               aria-label={label ? `${t(label)} · ${t('Copy')}` : t('Copy')}
               onClick={() => copy(shown)}
-              className={cx(ink, 'cursor-pointer text-left', masked ? 'text-text2' : 'text-text')}
+              className={cx(
+                ink,
+                'cursor-pointer text-left',
+                masked ? 'text-text2 max-md:text-text' : 'text-text'
+              )}
               data-testid={`entry-value-${name}`}
             >
               {masked ? MASK_DOTS : shown}
             </button>
             {gloss && (
-              <span className="min-w-0 flex-none truncate text-base leading-6 text-text3">
+              <span className="min-w-0 flex-none truncate text-base leading-6 text-text3 max-md:text-md">
                 · {gloss}
               </span>
             )}

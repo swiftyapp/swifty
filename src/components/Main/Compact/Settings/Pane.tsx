@@ -27,7 +27,7 @@ export default function Pane({
   const { t } = useTranslation()
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col animate-sheet bg-list">
+    <div className="flex min-h-0 flex-1 flex-col animate-sheet bg-screen">
       <NavBar
         leading={
           <BackButton

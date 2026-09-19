@@ -191,7 +191,16 @@ Light and dark are both first-class. Only the `--c-*` tokens in
 `dark:` variants in components: a new surface is a new token defined in both
 palettes. Prototype-only colours map to existing tokens (`--list` → `bg-list`,
 `--card` → `bg-card`, `--tile` → `bg-tile`, `--field` → `bg-field`,
-`--glass` → new `bg-glass`).
+`--glass` → new `bg-glass`, `--screen` → new `bg-screen`).
+
+`bg-screen` is the phone's one ground: every compact screen — the tab roots,
+the pushed entry and form, a page sheet — is painted on it, and cards, the
+search field and the bottom sheet sit white (`bg-card`, `bg-detail`) on top.
+It is never used by the wide shell, whose panes keep `bg-app` / `bg-list` /
+`bg-detail`. A shared component that is a pane on the desktop and the whole
+screen on the phone (`ListColumn`, `SearchBox`) switches surface with
+Tailwind's `max-md:` variant — the same 768px cut `useLayout` picks the shell
+on — never with a prop.
 
 ## Testing
 
