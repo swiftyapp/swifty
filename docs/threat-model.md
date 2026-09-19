@@ -21,11 +21,17 @@ and external links are opened through the OS only for `http`/`https` URLs
 (`opener:allow-open-url` scope in `capabilities/default.json`; plain `http` is
 kept because routers and intranet logins have no other address, and the scope
 exists to shut out `file:`, `javascript:` and custom schemes, not to upgrade
-transport). Two commands read a path the webview names, and both are narrowed:
-`scan_image` (a photo of a card or identity document) refuses unless the session is unlocked and
-unless the extension is one of a fixed image list (`scan/mod.rs`), and
-`read_env_file` refuses unless the session holds a key and unless the file is
-named like a `.env` or parses as one, capped at 1 MiB (`commands/env.rs`).
+transport). Two commands read a path the webview names — `scan_image` (a photo
+of a card or identity document) and `read_env_file` — and neither trusts the
+path it is handed. A path is readable only if it was granted by one of two
+events the core itself observes: the OS file dialog run from Rust
+(`pick_file`), or an OS drag-and-drop onto the window (`PathGrants`, one-shot,
+consumed on use). The session must then still be the one that asked — the epoch
+is re-checked after the read, so a lock or a workspace switch mid-read discards
+the bytes. Only then is the file classified: the extension against a fixed
+image list (`scan/mod.rs`), the `.env` name-or-parse check and the 1 MiB cap
+(`commands/env.rs`). That classification is a sanity check on a file the user
+already chose, not the authorization; the grant is.
 
 ## What sits on disk
 
@@ -68,7 +74,10 @@ Inside the decrypted database:
   WAL mode the re-encrypted pages would land in `vault.db-wal` while the main
   file still opened under the *old* key. The rekey folds the WAL back and
   truncates it before returning (`sqlite.rs`), so no page under the old key
-  survives the change in either file.
+  survives the change in either file. The checkpoint is verified rather than
+  assumed: its busy column and its log-versus-checkpointed counts have to say
+  every frame was folded in. A checkpoint that fails fails the rekey, which
+  rolls the database back to the pre-change snapshot.
 - A small `meta` key/value table holds app data — the KDF descriptor and similar
   settings — not schema versioning (that rides SQLite's `user_version`).
 - **The favicon cache is inside SQLCipher.** A `favicons` table holds one row per
@@ -76,8 +85,11 @@ Inside the decrypted database:
   the whole of the icon cache (`store/sqlite.rs`, `favicon.rs`). It replaces the
   loose `icons/` files named after each host, which put the vault's host list,
   live and deleted, in the clear beside the encrypted database where any
-  file-level backup picked it up. The legacy directory is removed the first time
-  a lookup runs on an upgraded install.
+  file-level backup picked it up. Both the read and the write go through the
+  session epoch the command captured when it started (`Session::store_at(epoch)`),
+  so a lock or a workspace switch during a lookup discards the result rather
+  than writing it into whichever workspace is open when the fetch returns. The
+  legacy directory is removed at startup, not after a lookup.
 
 The practical shape of this two-layer design: an attacker who never obtains the
 key sees only SQLCipher ciphertext for everything. Metadata confidentiality rests
@@ -150,10 +162,15 @@ its header so another device can derive the key for the snapshot inside.
 >   counter. Only SQLCipher's own wrong-key failure counts; an I/O error or a
 >   schema-too-new refusal does not. The state is a plaintext sidecar beside the
 >   vault, `vault.lock.json` — it has to be, since a wrong password never opens
->   the database the counter would otherwise live in — and it fails open if it is
->   missing or unreadable, because it is a throttle rather than a security
->   boundary. So it bounds guessing *at this app's lock screen* and nothing else:
->   see "Offline brute force at scale" below.
+>   the database the counter would otherwise live in. It fails open only where
+>   the file says nothing: a sidecar that is absent, or JSON that does not parse,
+>   reads as "no lockout", because the throttle is not a security boundary. A
+>   sidecar the app cannot read at all is different — `LockoutState::load`
+>   propagates the I/O error out of `storage::read_lockout_sidecar` and
+>   `commands::auth::unlock` returns it, so the unlock fails rather than
+>   proceeding past a counter it could not consult. So it bounds guessing *at
+>   this app's lock screen* and nothing else: see "Offline brute force at scale"
+>   below.
 > - **Untrusted KDF parameters are bounded.** A descriptor is read off things
 >   this build did not write — a `.rowel` backup, a pack pulled from Drive, the
 >   sidecar on disk — and the Argon2 crate would otherwise accept a memory cost
@@ -209,10 +226,12 @@ carries them as part of the opaque payload and never sees them.
    never written anywhere, and is scrubbed when the task ends. How long that is:
    the task stops starting on new candidates 60 seconds in (`JOIN_BUDGET`), so
    the copy lives for at most that budget plus the one download in flight when
-   it ran out — each download bounded only by the Drive connect and read-stall
-   deadlines, so a large pack on a slow but steady link can stretch it by the
-   length of that download. Whatever was not tried stays on offer in Settings ›
-   Workspaces. Biometric unlock has no passphrase and does not do this.
+   it ran out — and that download is bounded by the 256 MiB cap over the slowest
+   rate that still counts as progress, not by a deadline, since a steady trickle
+   never trips the read-stall one. A large pack on a slow link stretches the
+   copy's life by the length of that download. Whatever was not tried stays on
+   offer in Settings › Workspaces. Biometric unlock has no passphrase and does
+   not do this.
 2. **Hold in Rust only.** The derived secret lives in the Rust session
    (`state.rs`, `Session.master_key`) wrapped in a zeroizing buffer, alongside the
    open encrypted store handle — never a fully decrypted vault. It never crosses
@@ -248,8 +267,12 @@ carries them as part of the opaque payload and never sees them.
    derived from the same master — both living on the blocking thread the run
    occupies. A lock ends the session but not that thread, so those copies
    outlive it until the run's thread does. What bounds them is the run, not the
-   lock: the Drive connect and read-stall deadlines, and the 256 MiB cap on the
-   pack being pulled.
+   lock — and that bound is a size, not a clock. The connect and read-stall
+   deadlines only end a download that stops making progress; one that keeps
+   trickling in resets the stall deadline with every chunk. So the lifetime of
+   those copies is the 256 MiB pack cap divided by the slowest rate that still
+   counts as progress, which on a slow but steady link is minutes rather than
+   seconds.
 4. **Optional biometric unlock (opt-in).** Instead of re-entering the passphrase,
    the same key material can be stored in the OS keychain behind a biometric gate
    (`secure_store.rs`):
@@ -343,7 +366,11 @@ Bringing existing data forward is an **explicit** action, and there are two path
   a screenshot of an unfocused window captures. The cover goes up on the focus
   event that precedes the snapshot, with no animation — a fade would hand the
   system a half-transparent frame — and it is mounted with the unlocked vault
-  only, never over the lock screen.
+  only, never over the lock screen. It starts *covered* when the document is
+  unfocused or hidden at mount, so a session that opens behind another window is
+  not briefly exposed to a snapshot, and reconciles against the window's own
+  `isFocused()` once that answer is in. If the window focus subscription fails,
+  it falls back to DOM `focus`/`blur` events rather than staying uncovered.
 - **Passive at-rest access and backups.** Because the database is SQLCipher-
   encrypted whole-file, file-level backups (Time Machine, disk images, cloud file
   backups) carry only ciphertext.
