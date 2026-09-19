@@ -1,9 +1,13 @@
-//! Website favicon fetch + on-disk cache, for list-row identity.
+//! Website favicon fetch + cache, for list-row identity.
 //!
 //! Privacy: icons are fetched directly from the host an entry already points
 //! at — never through a third-party favicon service — so the vault's host
-//! list is not shipped anywhere new. Misses are cached with a TTL so offline
-//! launches and dead hosts don't retry on every run.
+//! list is not shipped anywhere new. Nor is it written anywhere new: the cache
+//! is a table inside the open SQLCipher vault, so what it records — the hosts
+//! looked up, and which of them have no icon — is encrypted at rest with the
+//! rest of the vault's metadata rather than spelled out in file names beside
+//! it. Misses are cached with a TTL so offline launches and dead hosts don't
+//! retry on every run.
 //!
 //! The result crosses IPC as a `data:` URI, which keeps the webview CSP's
 //! `img-src 'self' data:` intact. Remote SVG is refused outright — an SVG is
@@ -17,19 +21,18 @@
 //! unless every address is public, and connected to those very addresses. See
 //! [`get`].
 
-use std::fs;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
-use std::path::Path;
 use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use reqwest::redirect::Policy;
 use reqwest::{Client, Response};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use url::{Host, Url};
 
 use crate::error::Result;
+use crate::state::AppState;
 use crate::storage;
 
 const MAX_ICON_BYTES: usize = 256 * 1024;
@@ -49,13 +52,18 @@ const SAFE_TYPES: [&str; 6] = [
     "image/webp",
 ];
 
-// The favicon for `host` as a data: URI, or None when it has none. Disk-cached
-// both ways. Touches no vault state, but the caller gates it on an unlocked
-// session all the same (`commands::tools::fetch_favicon`): the hosts come out
-// of the vault, and a locked app has no business making requests about them.
-// `allowed` is that gate, asked again before every request this makes — a
-// lookup is several round trips, and a lock that lands in the middle of one
-// ends it there rather than after the icon has been fetched.
+// The favicon for `host` as a data: URI, or None when it has none. Cached both
+// ways, in the vault's own database, so the cache is per workspace and sealed
+// with everything else it holds.
+//
+// The caller gates this on an unlocked session
+// (`commands::tools::fetch_favicon`): the hosts come out of the vault, and a
+// locked app has no business making requests about them. `allowed` is that
+// gate, asked again before every request this makes — a lookup is several
+// round trips, and a lock that lands in the middle of one ends it there rather
+// than after the icon has been fetched. A lock that lands before the result is
+// written costs the cache entry, not the icon: the caller is answered either
+// way, and the next unlocked lookup re-fetches it.
 pub async fn fetch(
     app: &AppHandle,
     host: &str,
@@ -64,38 +72,47 @@ pub async fn fetch(
     let Some(host) = safe_host(host) else {
         return Ok(None);
     };
-    let dir = storage::icons_dir(app)?;
-    fs::create_dir_all(&dir)?;
+    // The plaintext cache this one replaced, cleared the first time a lookup
+    // runs on an upgraded install.
+    storage::remove_legacy_icons_dir(app);
 
-    let hit = dir.join(format!("{host}.uri"));
-    if let Ok(uri) = fs::read_to_string(&hit) {
-        return Ok(Some(uri));
+    if let Some(cached) = cached(app, &host) {
+        return Ok(cached);
     }
-    let miss = dir.join(format!("{host}.miss"));
-    if fresh_miss(&miss) {
-        return Ok(None);
-    }
+    let found = lookup(&host, &allowed).await;
+    cache(app, &host, found.as_deref());
+    Ok(found)
+}
 
-    match lookup(&host, &allowed).await {
-        Some(uri) => {
-            let _ = fs::write(&hit, &uri);
-            let _ = fs::remove_file(&miss);
-            Ok(Some(uri))
-        }
-        None => {
-            let _ = fs::write(&miss, b"");
-            Ok(None)
-        }
+// The store lives behind the session mutex, which is taken for the length of
+// the DB call and no longer — never across the network lookup between these
+// two, which takes seconds and would hold every other command out for them.
+// A locked vault has no store: the read is a miss and the write is skipped.
+fn cached(app: &AppHandle, host: &str) -> Option<Option<String>> {
+    let state = app.state::<AppState>();
+    let session = state.session.lock().unwrap();
+    session
+        .store()
+        .ok()?
+        .get_favicon(host, MISS_TTL.as_millis() as i64)
+        .ok()?
+}
+
+fn cache(app: &AppHandle, host: &str, uri: Option<&str>) {
+    let state = app.state::<AppState>();
+    let session = state.session.lock().unwrap();
+    if let Ok(store) = session.store() {
+        let _ = store.put_favicon(host, uri);
     }
 }
 
-// Hostnames double as cache file names, so reject anything that isn't a plain
-// DNS name (no slashes, no traversal, no URL metacharacters). Also refuses
-// what a public website is never called: an IP literal, or a name under a
-// suffix that only resolves on the local network. An entry's host is the
-// user's own data, but a request to `192.168.1.1` or `nas.local` from a
-// password manager is a probe of the LAN the user did not ask for, and the
-// answer would be cached under the vault's icons for good.
+// Hostnames are the cache's primary key and the name every request is aimed
+// at, so reject anything that isn't a plain DNS name (no slashes, no
+// traversal, no URL metacharacters). Also refuses what a public website is
+// never called: an IP literal, or a name under a suffix that only resolves on
+// the local network. An entry's host is the user's own data, but a request to
+// `192.168.1.1` or `nas.local` from a password manager is a probe of the LAN
+// the user did not ask for, and the answer would be cached for good.
 fn safe_host(host: &str) -> Option<String> {
     let host = host.trim().trim_end_matches('.').to_ascii_lowercase();
     let ok = !host.is_empty()
@@ -117,14 +134,6 @@ const LOCAL_SUFFIXES: [&str; 5] = [".local", ".localhost", ".internal", ".home.a
 // (an IPv6 literal has colons).
 fn is_ip_literal(host: &str) -> bool {
     host.parse::<std::net::Ipv4Addr>().is_ok()
-}
-
-fn fresh_miss(path: &Path) -> bool {
-    fs::metadata(path)
-        .and_then(|m| m.modified())
-        .ok()
-        .and_then(|at| at.elapsed().ok())
-        .is_some_and(|age| age < MISS_TTL)
 }
 
 // Declared icons from the homepage <head> first (usually crisp PNGs), then
