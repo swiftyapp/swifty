@@ -7,6 +7,22 @@ type Handler = (event: { payload: boolean }) => void
 let handlers: Handler[] = []
 let subscribes = true
 let focusedOnMount = true
+// Holds the one-shot `isFocused` answer open, so a test can choose whether it
+// lands before or after the subscription settles.
+let pendingFocused: Promise<boolean> | undefined
+let answerFocused: ((on: boolean) => void) | undefined
+
+const deferFocused = () => {
+  pendingFocused = new Promise<boolean>(resolve => {
+    answerFocused = resolve
+  })
+}
+
+const sayFocused = async (on: boolean) => {
+  await act(async () => {
+    answerFocused?.(on)
+  })
+}
 
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({
@@ -17,7 +33,7 @@ vi.mock('@tauri-apps/api/window', () => ({
         handlers = handlers.filter(h => h !== handler)
       })
     },
-    isFocused: () => Promise.resolve(focusedOnMount)
+    isFocused: () => pendingFocused ?? Promise.resolve(focusedOnMount)
   })
 }))
 
@@ -44,6 +60,12 @@ const domFocus = (on: boolean) =>
     window.dispatchEvent(new Event(on ? 'focus' : 'blur'))
   })
 
+// A failing subscription rejects through `.then().catch()`, so the fallback is
+// a couple of microtask ticks behind the render rather than one.
+const settle = async () => {
+  for (let tick = 0; tick < 3; tick++) await act(async () => {})
+}
+
 const cover = () => screen.queryByTestId('privacy-screen')
 
 describe('PrivacyScreen', () => {
@@ -55,6 +77,8 @@ describe('PrivacyScreen', () => {
     handlers = []
     subscribes = true
     focusedOnMount = true
+    pendingFocused = undefined
+    answerFocused = undefined
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       value: 'visible'
@@ -145,5 +169,57 @@ describe('PrivacyScreen', () => {
 
     domFocus(true)
     expect(cover()).not.toBeInTheDocument()
+  })
+
+  it('keeps the cover when the subscription fails after the window said it was not focused', async () => {
+    subscribes = false
+    focusedOnMount = false
+    // The DOM still claims focus — the guess the fallback would otherwise make,
+    // and the one that would strip the cover back off.
+    hasFocus(true)
+
+    render(<PrivacyScreen />)
+    await settle()
+
+    expect(cover()).toBeInTheDocument()
+  })
+
+  it('covers when the window says it is not focused after the fallback is already in place', async () => {
+    subscribes = false
+    hasFocus(true)
+    deferFocused()
+
+    render(<PrivacyScreen />)
+    await settle()
+    expect(cover()).not.toBeInTheDocument()
+
+    await sayFocused(false)
+    expect(cover()).toBeInTheDocument()
+  })
+
+  it('lets a focus event outrank the window reconciliation that lands after it', async () => {
+    deferFocused()
+
+    render(<PrivacyScreen />)
+    await focus(false)
+    expect(cover()).toBeInTheDocument()
+
+    await sayFocused(true)
+    expect(cover()).toBeInTheDocument()
+  })
+
+  it('lets a DOM focus event outrank the window reconciliation that lands after it', async () => {
+    subscribes = false
+    hasFocus(true)
+    deferFocused()
+
+    render(<PrivacyScreen />)
+    await settle()
+
+    domFocus(false)
+    expect(cover()).toBeInTheDocument()
+
+    await sayFocused(true)
+    expect(cover()).toBeInTheDocument()
   })
 })

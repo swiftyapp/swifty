@@ -40,13 +40,23 @@ export function useObscured(): boolean {
     // the listener that is about to arrive (same shape as `useWebviewDragDrop`).
     let alive = true
     let unlisten: (() => void) | undefined
-    // Set once the window itself has spoken; the `isFocused` answer is a
-    // reconciliation of the *initial* guess, so a focus event that overtakes it
-    // wins — it is the newer fact.
+    // Two separate facts, because they answer different questions. `reported`
+    // is "an event told us", `reconciled` is "the one-shot `isFocused` answered
+    // the initial guess". An event is always the newer fact, so it overrides a
+    // reconciliation that lands after it; but a reconciliation that has already
+    // spoken is still far better than re-guessing from the DOM, which is what
+    // the fallback would otherwise do.
     let reported = false
+    let reconciled = false
 
-    const onDomFocus = () => setFocused(true)
-    const onDomBlur = () => setFocused(false)
+    const onDomFocus = () => {
+      reported = true
+      setFocused(true)
+    }
+    const onDomBlur = () => {
+      reported = true
+      setFocused(false)
+    }
     let domFallback = false
 
     // If the IPC subscription never lands (no window label, a webview that
@@ -55,10 +65,16 @@ export function useObscured(): boolean {
     // it leaves secrets on screen. The DOM's own focus events are the coarser
     // but always-available signal, so switch to them — silently, because the
     // project makes no console calls and there is no user-facing failure here.
+    //
+    // Seeding from `document.hasFocus()` is only a guess, and jsdom aside, a
+    // webview that has resigned active can still report the document focused.
+    // So it is used *only* when nothing better has spoken: if an event or the
+    // `isFocused` reconciliation already answered, that answer stands and this
+    // just attaches the listeners.
     const fallBackToDom = () => {
       if (!alive || domFallback) return
       domFallback = true
-      if (!reported) setFocused(document.hasFocus())
+      if (!reported && !reconciled) setFocused(document.hasFocus())
       window.addEventListener('focus', onDomFocus)
       window.addEventListener('blur', onDomBlur)
     }
@@ -79,7 +95,11 @@ export function useObscured(): boolean {
     win
       .isFocused()
       .then(isFocused => {
-        if (alive && !reported) setFocused(isFocused)
+        if (!alive || reported) return
+        // Also applies when the fallback already ran and seeded from the DOM:
+        // this is the window's own answer, so it replaces that guess.
+        reconciled = true
+        setFocused(isFocused)
       })
       .catch(() => {
         // Nothing to reconcile with: the DOM guess made at mount stands.
