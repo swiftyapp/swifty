@@ -1,3 +1,4 @@
+use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -159,6 +160,62 @@ impl fmt::Debug for Entry {
     }
 }
 
+impl Entry {
+    /// The entry as the webview may see it: the same row with every passkey's
+    /// private key blanked.
+    ///
+    /// A passkey's private key is the one secret on an entry that nothing in
+    /// the UI renders, edits or needs — it is used only by the authenticator,
+    /// which lives in the core. So it never crosses the IPC boundary: a reveal
+    /// hands out the credential's identity (who it is for, when it was made)
+    /// and nothing that could sign with it. [`Entry::restore_passkey_keys`] is
+    /// the other half — how a save puts back what was never sent.
+    pub fn redacted(&self) -> Entry {
+        let mut entry = self.clone();
+        for passkey in entry.passkeys.iter_mut().flatten() {
+            passkey.private_key.clear();
+        }
+        entry
+    }
+
+    /// Whether any passkey on this entry arrived without its private key, and
+    /// so needs the stored row to complete it.
+    pub fn has_blank_passkey_key(&self) -> bool {
+        self.passkeys
+            .iter()
+            .flatten()
+            .any(|p| p.private_key.is_empty())
+    }
+
+    /// Put back the passkey private keys the webview was never given, taking
+    /// each from the entry being replaced, matched on `credential_id`.
+    ///
+    /// Only the passkeys still on `self` are completed, in the order `self`
+    /// lists them — so an edit that drops one drops it, and one that reorders
+    /// them reorders them. A blank key whose credential id is not in the stored
+    /// row cannot be completed by anyone: rather than save a passkey that can
+    /// never sign, the save is refused ([`Error::NotFound`], since what is
+    /// missing is the stored credential this one claims to be).
+    pub fn restore_passkey_keys(&mut self, stored: Option<&Entry>) -> Result<()> {
+        let held: &[Passkey] = stored
+            .and_then(|e| e.passkeys.as_deref())
+            .unwrap_or_default();
+        for passkey in self.passkeys.iter_mut().flatten() {
+            if !passkey.private_key.is_empty() {
+                continue;
+            }
+            let key = held
+                .iter()
+                .find(|p| p.credential_id == passkey.credential_id)
+                .map(|p| p.private_key.as_str())
+                .filter(|k| !k.is_empty())
+                .ok_or(Error::NotFound)?;
+            passkey.private_key = key.to_string();
+        }
+        Ok(())
+    }
+}
+
 /// A single WebAuthn credential held by a login entry. Only P-256 ECDSA is
 /// supported, so there is no algorithm field. `credential_id`, `user_handle` and
 /// `private_key` are base64url and are stored exactly as the source gave them —
@@ -175,7 +232,11 @@ pub struct Passkey {
     pub user_handle: String,
     pub user_name: String,
     pub user_display_name: String,
-    /// PKCS#8 DER, base64url.
+    /// PKCS#8 DER, base64url. Blank on its way out to the webview (see
+    /// [`Entry::redacted`]) and blank on its way back in (see
+    /// [`Entry::restore_passkey_keys`]), so it is omitted rather than sent as
+    /// an empty string — and a payload that carries one is always a real key.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub private_key: String,
     #[serde(default)]
     pub counter: u32,
@@ -331,6 +392,113 @@ pub type Audit = HashMap<String, AuditItem>;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn passkey(credential_id: &str, private_key: &str) -> Passkey {
+        Passkey {
+            credential_id: credential_id.into(),
+            rp_id: "acme.test".into(),
+            rp_name: None,
+            user_handle: "dWgx".into(),
+            user_name: "alice".into(),
+            user_display_name: "Alice".into(),
+            private_key: private_key.into(),
+            counter: 0,
+            created_at: None,
+        }
+    }
+
+    fn login(passkeys: Vec<Passkey>) -> Entry {
+        Entry {
+            id: "l1".into(),
+            kind: "login".into(),
+            title: "Site".into(),
+            passkeys: Some(passkeys),
+            ..Entry::default()
+        }
+    }
+
+    // What a reveal hands the webview: the credential, without the one part of
+    // it that can sign. Blank rather than absent in memory, so the save that
+    // comes back is recognizable as one that needs its keys put back.
+    #[test]
+    fn redacting_blanks_every_passkey_private_key() {
+        let entry = login(vec![passkey("c1", "k1"), passkey("c2", "k2")]);
+        let out = entry.redacted();
+
+        assert!(out.has_blank_passkey_key());
+        assert!(out
+            .passkeys
+            .as_ref()
+            .unwrap()
+            .iter()
+            .all(|p| p.private_key.is_empty()));
+        // The credential is otherwise intact, and the original untouched.
+        assert_eq!(out.passkeys.as_ref().unwrap()[1].credential_id, "c2");
+        assert_eq!(entry.passkeys.as_ref().unwrap()[0].private_key, "k1");
+
+        // Blank means omitted on the wire: the field never reaches the webview.
+        let json = serde_json::to_value(&out).unwrap();
+        assert!(json["passkeys"][0].get("privateKey").is_none());
+    }
+
+    // An entry with no passkeys, or with keys already in hand, needs nothing
+    // from the stored row.
+    #[test]
+    fn an_entry_without_blank_keys_needs_no_merge() {
+        assert!(!login(vec![]).has_blank_passkey_key());
+        assert!(!login(vec![passkey("c1", "k1")]).has_blank_passkey_key());
+        assert!(!Entry::default().has_blank_passkey_key());
+    }
+
+    // The save's half of the redaction: keys come back off the stored row,
+    // matched by credential id — and the edit's own order is what is kept.
+    #[test]
+    fn saving_merges_blank_keys_back_from_the_stored_entry() {
+        let stored = login(vec![passkey("c1", "k1"), passkey("c2", "k2")]);
+        let mut incoming = stored.redacted();
+        incoming.passkeys.as_mut().unwrap().reverse();
+        incoming.title = "Renamed".into();
+
+        incoming.restore_passkey_keys(Some(&stored)).unwrap();
+
+        let passkeys = incoming.passkeys.unwrap();
+        assert_eq!(passkeys[0].credential_id, "c2");
+        assert_eq!(passkeys[0].private_key, "k2");
+        assert_eq!(passkeys[1].private_key, "k1");
+    }
+
+    // Dropping a passkey in the editor drops it: only what came back is filled.
+    #[test]
+    fn a_removed_passkey_is_not_put_back() {
+        let stored = login(vec![passkey("c1", "k1"), passkey("c2", "k2")]);
+        let mut incoming = login(vec![passkey("c2", "")]);
+
+        incoming.restore_passkey_keys(Some(&stored)).unwrap();
+
+        let passkeys = incoming.passkeys.unwrap();
+        assert_eq!(passkeys.len(), 1);
+        assert_eq!(passkeys[0].credential_id, "c2");
+        assert_eq!(passkeys[0].private_key, "k2");
+    }
+
+    // A keyless passkey nobody can complete — a credential id the stored row
+    // does not hold, or no stored row at all — is refused rather than saved as
+    // a credential that could never sign.
+    #[test]
+    fn a_blank_key_with_no_stored_match_is_refused() {
+        let stored = login(vec![passkey("c1", "k1")]);
+        let mut unknown = login(vec![passkey("c9", "")]);
+        assert!(matches!(
+            unknown.restore_passkey_keys(Some(&stored)),
+            Err(Error::NotFound)
+        ));
+
+        let mut fresh = login(vec![passkey("c1", "")]);
+        assert!(matches!(
+            fresh.restore_passkey_keys(None),
+            Err(Error::NotFound)
+        ));
+    }
 
     // Pre-passkey JSON stays readable, and an entry without passkeys serializes
     // exactly as it did before the field existed.
