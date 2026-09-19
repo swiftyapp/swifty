@@ -2,7 +2,7 @@
 //! overwrite write, `.swftx` export copy.
 
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
@@ -318,9 +318,79 @@ fn read_file(path: &PathBuf) -> Result<String> {
     Ok(fs::read_to_string(path)?)
 }
 
+/// Read a whole file the user pointed at, refusing anything past `cap`.
+///
+/// Every decision here is made on one open handle, and there is no `stat`
+/// before it: a `stat` and the open that follows are two different files
+/// whenever the path is swapped in between, so anything the first one settled
+/// the second would have to settle again. The handle is the one thing that
+/// cannot be exchanged under us. What it has to say is that this is a regular
+/// file: a FIFO reports a length of zero and then serves bytes for as long as a
+/// writer feels like it, and a device serves them without end.
+///
+/// `take(cap + 1)` is what bounds the read. The extra byte is how a file at
+/// the cap is told from one past it without trusting any reported length — if
+/// it arrives, the file is too large and nothing beyond it is ever read.
+pub fn read_regular_file_capped(path: &Path, cap: u64) -> Result<Vec<u8>> {
+    let file = open_without_blocking(path)?;
+    if !file.metadata()?.file_type().is_file() {
+        return Err(not_a_regular_file());
+    }
+
+    let mut bytes = Vec::new();
+    file.take(cap.saturating_add(1)).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > cap {
+        return Err(Error::FileTooLarge);
+    }
+    Ok(bytes)
+}
+
+/// Open for reading without letting the open itself block: `O_NONBLOCK` is what
+/// makes opening a writer-less FIFO return a handle instead of parking until
+/// some writer turns up, which is what lets the check above be made on the
+/// handle rather than guessed at from a `stat` beforehand. On a regular file the
+/// flag means nothing — it governs the open and, afterwards, reads of the very
+/// things this refuses.
+#[cfg(unix)]
+fn open_without_blocking(path: &Path) -> Result<fs::File> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    Ok(fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(path)?)
+}
+
+/// No such flag off Unix, and no FIFO at a user-picked path to need it: a
+/// Windows named pipe is addressed as `\\.\pipe\...`, not as a file in a folder.
+#[cfg(not(unix))]
+fn open_without_blocking(path: &Path) -> Result<fs::File> {
+    Ok(fs::File::open(path)?)
+}
+
+fn not_a_regular_file() -> Error {
+    Error::Other("that path is not a regular file".into())
+}
+
+// The producer's own ceiling, so the cap turns away only files that cannot be
+// one of its backups. The legacy Electron app set no aggregate limit of its
+// own, but V8 set one for it: the whole hex-encoded backup was a single
+// JavaScript string, and a string cannot be longer than `String::kMaxLength` —
+// 2^30 - 25 characters, just under 1 GiB, on 64-bit V8 since 6.2, and
+// 2^29 - 24, just under 512 MiB, before that. Nothing that app could ever have
+// written therefore reaches 1 GiB, whatever the vault inside it held.
+//
+// The number exists only so a file that is not a backup of ours cannot be
+// buffered and decoded before the AES-GCM tag — checked at the very end of all
+// of it — gets to reject it. Decoding shrinks rather than grows: the hex halves
+// the bytes and the base64 inside takes another 3/4 of that, so the peak is the
+// file plus about half of it again, not a multiple.
+const MAX_BACKUP_BYTES: u64 = 1024 * 1024 * 1024;
+
 // Read an arbitrary backup file chosen by the user (absolute path).
 pub fn read_backup(path: &str) -> Result<String> {
-    Ok(fs::read_to_string(path)?)
+    let bytes = read_regular_file_capped(Path::new(path), MAX_BACKUP_BYTES)?;
+    String::from_utf8(bytes).map_err(|_| Error::FileNotText)
 }
 
 pub fn read_gdrive(app: &AppHandle) -> Result<String> {
@@ -398,7 +468,10 @@ pub fn sync_configured(app: &AppHandle) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{atomic_replace_with, atomic_write_file, remove_if_present};
+    use super::{
+        atomic_replace_with, atomic_write_file, read_backup, read_regular_file_capped,
+        remove_if_present, Error,
+    };
     use std::fs;
     use std::io::{self, Write};
     use std::path::{Path, PathBuf};
@@ -419,6 +492,58 @@ mod tests {
         let mut tmp = path.to_path_buf().into_os_string();
         tmp.push(".tmp");
         PathBuf::from(tmp)
+    }
+
+    #[test]
+    fn a_file_past_the_cap_is_refused_without_being_read_whole() {
+        let path = tmp_sidecar().with_file_name("huge.swftx");
+        // Sized, not written: a sparse 64 MiB file against a 16-byte cap, so a
+        // pass that buffered it whole would be doing something this one does not.
+        let file = fs::File::create(&path).unwrap();
+        file.set_len(64 * 1024 * 1024).unwrap();
+        drop(file);
+
+        let err = read_regular_file_capped(&path, 16).unwrap_err();
+        assert!(matches!(err, Error::FileTooLarge), "{err}");
+    }
+
+    #[test]
+    fn a_file_exactly_at_the_cap_is_accepted() {
+        let path = tmp_sidecar().with_file_name("exact.swftx");
+        fs::write(&path, "deadbeef").unwrap();
+        assert_eq!(read_regular_file_capped(&path, 8).unwrap(), b"deadbeef");
+    }
+
+    #[test]
+    fn a_directory_is_not_a_file_to_read() {
+        let dir = tmp_sidecar().parent().unwrap().to_path_buf();
+        let err = read_regular_file_capped(&dir, 1024).unwrap_err();
+        assert!(matches!(err, Error::Other(_) | Error::Io(_)), "{err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_fifo_is_refused_rather_than_opened() {
+        let path = tmp_sidecar().with_file_name("pipe.swftx");
+        let made = std::process::Command::new("mkfifo")
+            .arg(&path)
+            .status()
+            .unwrap();
+        assert!(made.success());
+
+        // Nothing is writing to this pipe, so a blocking open would park here
+        // until something did rather than fail — the test finishing is half of
+        // what it asserts, and `O_NONBLOCK` is what makes it finish.
+        let err = read_regular_file_capped(&path, 1024).unwrap_err();
+        assert!(matches!(err, Error::Other(_)), "{err}");
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn a_backup_under_the_cap_is_read_whole() {
+        let path = tmp_sidecar().with_file_name("small.swftx");
+        fs::write(&path, "deadbeef").unwrap();
+        assert_eq!(read_backup(path.to_str().unwrap()).unwrap(), "deadbeef");
     }
 
     #[test]

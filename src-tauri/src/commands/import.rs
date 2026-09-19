@@ -6,7 +6,6 @@
 //! `import_swftx`, so payload sealing is never reimplemented here.
 
 use std::collections::{HashMap, HashSet};
-use std::fs;
 use std::path::Path;
 
 use serde::Serialize;
@@ -20,6 +19,7 @@ use crate::models::{Entry, EntryMetaDto, ExtraField};
 use crate::save;
 use crate::session::{list_metas, live_records, store_err};
 use crate::state::AppState;
+use crate::storage;
 use crate::store::{migrate, Record, SqliteStore, VaultStore};
 
 // Bound the input: a foreign export should never be gigabytes or millions of rows.
@@ -103,11 +103,7 @@ pub async fn import_entries(
 
     let emitter = app.clone();
     let parsed = super::blocking(move || -> Result<Parsed> {
-        let meta = fs::metadata(&path)?;
-        if meta.len() > MAX_BYTES {
-            return Err(Error::FileTooLarge);
-        }
-        let bytes = fs::read(&path)?;
+        let bytes = storage::read_regular_file_capped(Path::new(&path), MAX_BYTES)?;
 
         let fmt = if format.eq_ignore_ascii_case("auto") {
             let name = Path::new(&path)
