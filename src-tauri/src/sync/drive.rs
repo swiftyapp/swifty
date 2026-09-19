@@ -65,16 +65,28 @@ fn escape(value: &str) -> String {
     value.replace('\\', "\\\\").replace('\'', "\\'")
 }
 
-async fn check(resp: reqwest::Response) -> Result<Value> {
+/// The most of a Drive API JSON response — metadata, a listing page, an error
+/// — we will hold. Generous by a wide margin: a full listing page is tens of
+/// KiB. It is here so that no response body is ever buffered unbounded, the
+/// same rule the file downloads follow (see [`read_capped`]).
+const MAX_JSON_BYTES: usize = 4 * 1024 * 1024;
+
+async fn check(mut resp: reqwest::Response) -> Result<Value> {
     let status = resp.status();
-    let body = resp.text().await.map_err(other)?;
     if !status.is_success() {
-        return Err(Error::Other(format!("Drive API {status}: {body}")));
+        let body = read_capped(&mut resp, MAX_JSON_BYTES)
+            .await
+            .unwrap_or_default();
+        return Err(Error::Other(format!(
+            "Drive API {status}: {}",
+            String::from_utf8_lossy(&body)
+        )));
     }
+    let body = read_capped(&mut resp, MAX_JSON_BYTES).await?;
     if body.is_empty() {
         return Ok(Value::Null);
     }
-    serde_json::from_str(&body).map_err(other)
+    serde_json::from_slice(&body).map_err(other)
 }
 
 // Run a files.list query and return *every* match.

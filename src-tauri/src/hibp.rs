@@ -23,6 +23,12 @@ const PREFIX_LEN: usize = 5;
 // does not open a socket per password, nor hammer a public API.
 const MAX_IN_FLIGHT: usize = 8;
 
+// The most of a range response we will hold. A padded range is a few tens of
+// KiB; a MiB is room to spare. The cap matters because `MAX_IN_FLIGHT` of these
+// are buffered at once, and the endpoint is not ours: without it, an unbounded
+// body (or eight) is buffered straight into memory.
+const MAX_RANGE_BYTES: usize = 1024 * 1024;
+
 // SHA-1 hex (uppercase, 40 chars) of the password. SHA-1 is required by the
 // HIBP range API and is not used here for any security property.
 fn sha1_hex(password: &str) -> String {
@@ -50,7 +56,7 @@ fn is_breached(suffix: &str, body: &str) -> bool {
 }
 
 async fn fetch_range(client: &Client, prefix: &str) -> Result<String> {
-    let resp = client
+    let mut resp = client
         .get(range_url(prefix))
         .header("User-Agent", "Rowel-Password-Manager")
         // Every range has a different number of suffixes, so the size of the
@@ -65,7 +71,16 @@ async fn fetch_range(client: &Client, prefix: &str) -> Result<String> {
     if !resp.status().is_success() {
         return Err(Error::Other(format!("HIBP {}", resp.status())));
     }
-    resp.text().await.map_err(|e| Error::Other(e.to_string()))
+    // Capped while streaming, like every other download in the app — see
+    // `sync::drive::read_capped`. The body is ASCII `SUFFIX:count` lines, so a
+    // lossy decode costs nothing and keeps the error cases to the two below.
+    let body = crate::sync::drive::read_capped(&mut resp, MAX_RANGE_BYTES)
+        .await
+        .map_err(|e| match e {
+            Error::FileTooLarge => Error::Other("HIBP range response too large".into()),
+            e => e,
+        })?;
+    Ok(String::from_utf8_lossy(&body).into_owned())
 }
 
 async fn is_pwned(client: &Client, password: &str) -> Result<bool> {
