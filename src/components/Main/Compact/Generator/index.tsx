@@ -31,7 +31,7 @@ export default function Generator() {
     // `relative`: what the bottom action is pinned to.
     <div
       data-testid="generator-screen"
-      className="relative flex min-h-0 flex-1 flex-col animate-fade bg-list pt-[env(safe-area-inset-top)]"
+      className="relative flex min-h-0 flex-1 flex-col animate-fade bg-screen pt-[env(safe-area-inset-top)]"
     >
       <div className={`${ROOT_HEADER} px-4`}>
         <Heading title={t('Generator')} />

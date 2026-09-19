@@ -320,6 +320,7 @@
     'Roboto Mono', 'Liberation Mono', monospace;
 
   --color-app: var(--c-app);
+  --color-screen: var(--c-screen);
   --color-rail: var(--c-rail);
   --color-list: var(--c-list);
   --color-detail: var(--c-detail);
@@ -521,6 +522,10 @@
   color-scheme: light;
 
   --c-app: #e7e8ea;
+  /* The phone shell's one ground (the mobile prototype's `--screen`): every
+   * compact screen is painted on it, and cards, fields and sheets sit white on
+   * top. The wide shell never uses it — its panes keep app/list/detail. */
+  --c-screen: #f4f4f6;
   --c-rail: #e4e5e8;
   --c-list: #f3f4f6;
   --c-detail: #ffffff;
@@ -630,6 +635,7 @@
   color-scheme: dark;
 
   --c-app: #0f1011;
+  --c-screen: #0e0f11;
   --c-rail: #131415;
   --c-list: #171819;
   --c-detail: #1b1c1e;

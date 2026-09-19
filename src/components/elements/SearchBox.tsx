@@ -57,6 +57,11 @@ export default function SearchBox({
         // of the same accent lifts it off the column. Hover stands down while
         // focused so the lit surface never flickers under the pointer.
         'border-transparent [&:hover:not(:focus-within)]:bg-text/10',
+        // On the phone the well is the one light thing on the grey ground —
+        // the detail surface with a hairline edge, as the prototype draws its
+        // field — not a tint darker than the screen, which left the ground the
+        // brightest thing in view and made it read as white.
+        'max-md:border-line max-md:bg-detail',
         'focus-within:border-accent-line focus-within:bg-detail focus-within:ring-3 focus-within:ring-accent-soft',
         // The slow tier: a field switching on should be seen doing it.
         'transition-[border-color,background-color,box-shadow] duration-300',

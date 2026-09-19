@@ -66,7 +66,10 @@ export default function ListColumn({
       onKeyDown={health ? undefined : onKeyDown}
       // The column fills whatever its caller gives it: 348px of the wide shell,
       // the whole phone screen on compact.
-      className="flex min-h-0 min-w-0 flex-1 flex-col bg-list"
+      // The column is the wide shell's list pane, and the whole screen on the
+      // phone, where it takes the shell's ground (the same 768px cut as
+      // `useLayout`) so the list and the screens pushed over it share one.
+      className="flex min-h-0 min-w-0 flex-1 flex-col bg-list max-md:bg-screen"
     >
       <div className="flex-none px-4 pb-2.5">
         <div className={header}>

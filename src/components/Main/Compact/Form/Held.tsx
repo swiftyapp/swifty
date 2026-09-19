@@ -31,7 +31,7 @@ export default function Held({ entry, type, children }: Props) {
   const heading = useHeading(type, entry)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col animate-rise bg-detail text-text">
+    <div className="flex min-h-0 flex-1 flex-col animate-rise bg-screen text-text">
       <NavBar
         title={heading}
         leading={

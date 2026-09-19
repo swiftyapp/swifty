@@ -84,67 +84,72 @@ export default function TabBar() {
           a hard edge. Purely decorative, so it never eats a tap. */}
       <div
         aria-hidden
-        className={`pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-b from-transparent to-app ${TAB_BAR_FADE}`}
+        className={`pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-b from-transparent to-screen ${TAB_BAR_FADE}`}
       />
-      <nav
-        data-testid="tab-bar"
-        className={`absolute z-10 grid grid-cols-5 items-center rounded-full border border-line2 bg-glass px-1.5 shadow-float backdrop-blur-xl ${TAB_BAR} ${TAB_BAR_NOTCH}`}
-      >
-        {/* The lens: one slot wide inside the bar's 6px paddings, moved by
-            whole slots. Leaving for a view with no tab (the archive) fades it
-            where it stands rather than sending it flying home. */}
-        <span
-          aria-hidden
-          data-testid="tab-lens"
-          style={{ transform: `translateX(${at * 100}%)` }}
-          className={cx(
-            'absolute inset-y-1 left-1.5 w-[calc((100%-12px)/5)] rounded-full bg-accent-soft transition-[transform,opacity] duration-300 ease-spring',
-            slot === null && 'opacity-0'
-          )}
-        />
-        <Tab
-          label={t('All Items')}
-          testid="tab-items"
-          selected={onList('items')}
-          onClick={list('items')}
+      {/* The shadow rides on this unmasked box: a mask clips everything its
+          element paints to the border box, and a box-shadow lies wholly outside
+          it, so on the pill itself the shadow was declared and never seen. */}
+      <div className={`absolute z-10 rounded-full shadow-float ${TAB_BAR}`}>
+        <nav
+          data-testid="tab-bar"
+          className={`relative grid h-full grid-cols-5 items-center rounded-full border border-line2 bg-glass px-1.5 backdrop-blur-xl ${TAB_BAR_NOTCH}`}
         >
-          <GridRailGlyph />
-        </Tab>
-        <Tab
-          label={t('Favorites')}
-          testid="tab-favorites"
-          selected={onList('favorites')}
-          onClick={list('favorites')}
-        >
-          <StarRailGlyph />
-        </Tab>
-        {/* The notch's slot: nothing here, the disc rests over it. */}
-        <div aria-hidden />
-        {/* The two non-list roots are one screen slot between them, so each
-            closes the other: tapping a tab always lands where it says. */}
-        <Tab
-          label={t('Generator')}
-          testid="tab-generator"
-          selected={generator}
-          onClick={() => {
-            closeSettings()
-            openGenerator()
-          }}
-        >
-          <DicesRailGlyph />
-        </Tab>
-        <Tab
-          label={t('Settings')}
-          testid="tab-settings"
-          selected={settings}
-          onClick={() => {
-            closeGenerator()
-            openSettings()
-          }}
-        >
-          <GearRailGlyph />
-        </Tab>
-      </nav>
+          {/* The lens: one slot wide inside the bar's 6px paddings, moved by
+              whole slots. Leaving for a view with no tab (the archive) fades it
+              where it stands rather than sending it flying home. */}
+          <span
+            aria-hidden
+            data-testid="tab-lens"
+            style={{ transform: `translateX(${at * 100}%)` }}
+            className={cx(
+              'absolute inset-y-1 left-1.5 w-[calc((100%-12px)/5)] rounded-full bg-accent-soft transition-[transform,opacity] duration-300 ease-spring',
+              slot === null && 'opacity-0'
+            )}
+          />
+          <Tab
+            label={t('All Items')}
+            testid="tab-items"
+            selected={onList('items')}
+            onClick={list('items')}
+          >
+            <GridRailGlyph />
+          </Tab>
+          <Tab
+            label={t('Favorites')}
+            testid="tab-favorites"
+            selected={onList('favorites')}
+            onClick={list('favorites')}
+          >
+            <StarRailGlyph />
+          </Tab>
+          {/* The notch's slot: nothing here, the disc rests over it. */}
+          <div aria-hidden />
+          {/* The two non-list roots are one screen slot between them, so each
+              closes the other: tapping a tab always lands where it says. */}
+          <Tab
+            label={t('Generator')}
+            testid="tab-generator"
+            selected={generator}
+            onClick={() => {
+              closeSettings()
+              openGenerator()
+            }}
+          >
+            <DicesRailGlyph />
+          </Tab>
+          <Tab
+            label={t('Settings')}
+            testid="tab-settings"
+            selected={settings}
+            onClick={() => {
+              closeGenerator()
+              openSettings()
+            }}
+          >
+            <GearRailGlyph />
+          </Tab>
+        </nav>
+      </div>
       <AddTab />
     </>
   )

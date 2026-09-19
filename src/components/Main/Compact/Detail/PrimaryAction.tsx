@@ -26,7 +26,7 @@ export default function PrimaryAction({ entry, revealed }: Props) {
 
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent to-detail" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-linear-to-b from-transparent to-screen" />
       <button
         type="button"
         data-testid="primary-action-button"

@@ -33,7 +33,7 @@ export default function Read({ entry, revealed }: Props) {
 
   return (
     // `relative`: what the bottom action and its fade are pinned to.
-    <div className="relative flex min-h-0 flex-1 flex-col animate-sheet bg-detail text-text">
+    <div className="relative flex min-h-0 flex-1 flex-col animate-sheet bg-screen text-text">
       <NavRow entry={entry} onDelete={remove} />
 
       <div
