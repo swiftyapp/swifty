@@ -46,18 +46,29 @@ pub fn save_entry(mut entry: Entry, state: State<'_, AppState>) -> Result<EntryM
 }
 
 // The other half of the reveal's redaction: an entry coming back from the
-// webview carries its passkeys without their private keys, so they are read off
-// the row being replaced and matched by credential id (see
-// `Entry::restore_passkey_keys`). The stored row is unsealed only when there is
-// a blank key to fill, so an ordinary save costs nothing extra. The unsealed
-// row is handed over whole so the keys move rather than copy, and what is left
-// of it is scrubbed and dropped inside `Entry::restore_passkey_keys`.
+// webview carries its passkeys without their private keys, so every one of them
+// is read off the row being replaced and matched by credential id (see
+// `Entry::restore_passkey_keys`). The stored row is unsealed only when the
+// entry has a passkey at all, so an ordinary save costs nothing extra. The
+// unsealed row is handed over whole so the keys move rather than copy, and what
+// is left of it is scrubbed and dropped inside `Entry::restore_passkey_keys`.
+//
+// A save that carries a private key of its own is refused outright. Passkeys
+// only ever enter the vault through Rust — import and sync — and a reveal
+// redacts, so there is no path by which the webview came to hold one: a key
+// here is one it invented, and honouring it would let it overwrite the key the
+// core holds for that credential with something it can sign with itself.
 fn restore_passkey_keys(
     entry: &mut Entry,
     store: &SqliteStore,
     cipher: &PayloadCipher,
 ) -> Result<()> {
-    if !entry.has_blank_passkey_key() {
+    if entry.has_supplied_passkey_key() {
+        return Err(Error::Unsupported(
+            "a passkey's private key cannot be set from here".into(),
+        ));
+    }
+    if !entry.has_passkeys() {
         return Ok(());
     }
     let stored = store
@@ -366,14 +377,59 @@ mod tests {
         ));
     }
 
-    // Nothing blank, nothing to do: an ordinary save never unseals the old row.
+    // No passkeys, nothing to do: an ordinary save never unseals the old row.
     #[test]
-    fn a_save_with_no_blank_key_is_left_alone() {
+    fn a_save_without_passkeys_is_left_alone() {
         let dir = tempfile::tempdir().unwrap();
         let (store, cipher) = open(&dir);
 
-        let mut entry = login(vec![passkey("c1", "k1")]);
+        let mut entry = login(vec![]);
         restore_passkey_keys(&mut entry, &store, &cipher).unwrap();
-        assert_eq!(entry.passkeys.unwrap()[0].private_key, "k1");
+        assert!(entry.passkeys.unwrap().is_empty());
+    }
+
+    // A save carrying a private key is one the webview could only have made up
+    // — a reveal never hands one out — so it is refused rather than written
+    // over the key the core holds.
+    #[test]
+    fn a_save_that_supplies_a_private_key_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, cipher) = open(&dir);
+        save(&store, &cipher, &login(vec![passkey("c1", "k1")]));
+
+        let mut forged = login(vec![passkey("c1", "theirs")]);
+        assert!(matches!(
+            restore_passkey_keys(&mut forged, &store, &cipher),
+            Err(Error::Unsupported(_))
+        ));
+
+        // The stored key is untouched.
+        let record = store.get("l1").unwrap().unwrap();
+        let stored: Entry = cipher.unseal(&record.id, &record.payload).unwrap();
+        assert_eq!(stored.passkeys.unwrap()[0].private_key, "k1");
+    }
+
+    // One unknown credential refuses the whole save, and the passkey listed
+    // before it does not walk off with the stored key on the way out.
+    #[test]
+    fn an_unknown_credential_refuses_the_save_and_moves_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, cipher) = open(&dir);
+        save(
+            &store,
+            &cipher,
+            &login(vec![passkey("c1", "k1"), passkey("c2", "k2")]),
+        );
+
+        let mut incoming = login(vec![passkey("c1", ""), passkey("c9", "")]);
+        assert!(matches!(
+            restore_passkey_keys(&mut incoming, &store, &cipher),
+            Err(Error::NotFound)
+        ));
+        assert!(incoming
+            .passkeys
+            .unwrap()
+            .iter()
+            .all(|p| p.private_key.is_empty()));
     }
 }
