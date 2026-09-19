@@ -47,6 +47,39 @@ impl Default for AutoLock {
     }
 }
 
+/// What coming back owes the session: sealed, because the time away spent the
+/// whole timeout, or just put back on the clock.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Resume {
+    Lock,
+    Touch,
+}
+
+impl AutoLock {
+    /// The idle timeout in force, as the settings row last left it.
+    fn timeout(&self) -> Duration {
+        Duration::from_secs(self.timeout_secs.load(Ordering::SeqCst))
+    }
+
+    /// The window lost focus at `now`: remember when, so coming back can tell
+    /// how long the user was really away.
+    fn blur(&self, now: SystemTime) {
+        *self.blurred_at.lock().unwrap() = Some(now);
+    }
+
+    /// The window came back at `now`. Consumes the stored blur — a resume with
+    /// none, or a second resume after one was already spent, has nothing to
+    /// measure and so only re-arms.
+    fn resume(&self, now: SystemTime, timeout: Duration) -> Resume {
+        let blurred_at = self.blurred_at.lock().unwrap().take();
+        if blurred_at.is_some_and(|at| overdue(at, now, timeout)) {
+            Resume::Lock
+        } else {
+            Resume::Touch
+        }
+    }
+}
+
 pub fn set_timeout(app: &AppHandle, secs: u64) {
     let autolock = app.state::<AutoLock>();
     autolock
@@ -69,7 +102,7 @@ pub fn touch(app: &AppHandle) {
         return;
     }
     let state = app.state::<AutoLock>();
-    let timeout = Duration::from_secs(state.timeout_secs.load(Ordering::SeqCst));
+    let timeout = state.timeout();
     let app = app.clone();
     state.timer.arm(timeout, move || lock(&app));
 }
@@ -100,17 +133,18 @@ pub fn disarm(app: &AppHandle) {
 pub fn handle_event(app: &AppHandle, event: &WindowEvent) {
     match event {
         WindowEvent::Focused(false) => {
-            *app.state::<AutoLock>().blurred_at.lock().unwrap() = Some(SystemTime::now());
+            app.state::<AutoLock>().blur(SystemTime::now());
             touch(app);
         }
         WindowEvent::Focused(true) => {
-            let state = app.state::<AutoLock>();
-            let blurred_at = state.blurred_at.lock().unwrap().take();
-            let timeout = Duration::from_secs(state.timeout_secs.load(Ordering::SeqCst));
-            if blurred_at.is_some_and(|at| overdue(at, SystemTime::now(), timeout)) {
-                lock(app);
-            } else {
-                touch(app);
+            let resume = {
+                let state = app.state::<AutoLock>();
+                let timeout = state.timeout();
+                state.resume(SystemTime::now(), timeout)
+            };
+            match resume {
+                Resume::Lock => lock(app),
+                Resume::Touch => touch(app),
             }
         }
         _ => {}
@@ -139,31 +173,73 @@ mod tests {
     use super::*;
 
     const TIMEOUT: Duration = Duration::from_secs(300);
+    const A_DAY: Duration = Duration::from_secs(86_400);
+
+    // When the window lost focus. Any fixed reading will do: every test says
+    // what `now` is, so nothing here depends on the real clock.
+    fn blurred_at() -> SystemTime {
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_000)
+    }
 
     #[test]
-    fn a_short_absence_is_not_overdue() {
-        let blurred_at = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000);
-        assert!(!overdue(blurred_at, blurred_at + TIMEOUT / 2, TIMEOUT));
+    fn a_resume_inside_the_timeout_touches() {
+        let autolock = AutoLock::default();
+        autolock.blur(blurred_at());
+        assert_eq!(
+            autolock.resume(blurred_at() + TIMEOUT / 2, TIMEOUT),
+            Resume::Touch
+        );
     }
 
     // The whole point: time the machine spent asleep or suspended counts, and
     // the timeout falling exactly due is due.
     #[test]
-    fn an_absence_of_the_whole_timeout_is_overdue() {
-        let blurred_at = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000);
-        assert!(overdue(blurred_at, blurred_at + TIMEOUT, TIMEOUT));
-        assert!(overdue(
-            blurred_at,
-            blurred_at + Duration::from_secs(86_400),
-            TIMEOUT
-        ));
+    fn a_resume_after_the_whole_timeout_locks() {
+        let autolock = AutoLock::default();
+
+        autolock.blur(blurred_at());
+        assert_eq!(
+            autolock.resume(blurred_at() + TIMEOUT, TIMEOUT),
+            Resume::Lock
+        );
+
+        autolock.blur(blurred_at());
+        assert_eq!(autolock.resume(blurred_at() + A_DAY, TIMEOUT), Resume::Lock);
+    }
+
+    // Focus gained with no blur behind it — the window raised at startup, a
+    // platform that repeats the event — has no absence to measure.
+    #[test]
+    fn a_resume_without_a_blur_touches() {
+        let autolock = AutoLock::default();
+        assert_eq!(
+            autolock.resume(blurred_at() + A_DAY, TIMEOUT),
+            Resume::Touch
+        );
+    }
+
+    // The resume that reads the blur consumes it, so a later focus event
+    // cannot lock again on a reading already spent.
+    #[test]
+    fn a_second_resume_touches_because_the_blur_was_consumed() {
+        let autolock = AutoLock::default();
+        autolock.blur(blurred_at());
+        assert_eq!(
+            autolock.resume(blurred_at() + TIMEOUT, TIMEOUT),
+            Resume::Lock
+        );
+        assert_eq!(
+            autolock.resume(blurred_at() + A_DAY, TIMEOUT),
+            Resume::Touch
+        );
     }
 
     // A clock that went backwards says nothing about how long the user was
     // away, so it locks nothing; the timer is still there to come due.
     #[test]
-    fn a_clock_that_went_backwards_is_not_overdue() {
-        let blurred_at = SystemTime::UNIX_EPOCH + Duration::from_secs(86_400);
-        assert!(!overdue(blurred_at, blurred_at - TIMEOUT, TIMEOUT));
+    fn a_resume_on_a_clock_that_went_backwards_touches() {
+        let autolock = AutoLock::default();
+        autolock.blur(blurred_at() + A_DAY);
+        assert_eq!(autolock.resume(blurred_at(), TIMEOUT), Resume::Touch);
     }
 }
