@@ -598,7 +598,8 @@ fn challenge(verifier: &str) -> String {
 // `std` has no accept-with-timeout, so the listener is non-blocking and polled
 // against the deadline. Browsers also open connections that are not the
 // answer (a favicon request, a speculative connection that sends nothing), so
-// anything that is not the callback is answered 404 and the wait goes on.
+// anything that is not this request's answer — another path, or a callback
+// that does not echo our `state` — is answered 404 and the wait goes on.
 #[cfg(desktop)]
 fn listen_for_code(listener: &TcpListener, state: &str) -> Result<String> {
     listen_for_code_until(listener, state, Instant::now() + CONSENT_TIMEOUT)
@@ -646,13 +647,23 @@ fn listen_for_code_until(listener: &TcpListener, state: &str, deadline: Instant)
             let _ = stream.write_all(NOT_FOUND.as_bytes());
             continue;
         }
-        let url = Url::parse(&format!("http://{HOST}{path}")).map_err(other)?;
+        let Ok(url) = Url::parse(&format!("http://{HOST}{path}")) else {
+            let _ = stream.write_all(NOT_FOUND.as_bytes());
+            continue;
+        };
         let code = match parse_redirect(&url, state) {
             Redirect::Code(code) => Ok(code),
             Redirect::Denied(error) => Err(Error::Other(error)),
-            Redirect::Foreign => Err(Error::Other(
-                "the browser's reply did not match this sign-in request".into(),
-            )),
+            // Not Google's answer to *our* request. Anything that can reach
+            // this port — another local process, or a page in the same
+            // browser — could otherwise end the sign-in with a bare hit on the
+            // callback path, leaving the real redirect to a dead port. Treated
+            // like any other unknown path: answered, and the wait goes on
+            // until the real answer or the deadline.
+            Redirect::Foreign => {
+                let _ = stream.write_all(NOT_FOUND.as_bytes());
+                continue;
+            }
         };
 
         let _ = stream.write_all(response_html(code.as_ref().err()).as_bytes());
@@ -662,6 +673,24 @@ fn listen_for_code_until(listener: &TcpListener, state: &str, deadline: Instant)
 
 #[cfg(desktop)]
 const NOT_FOUND: &str = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+
+// The error shown on the page comes off the redirect's query string, so it is
+// Google's text but not ours: escaped rather than trusted.
+#[cfg(desktop)]
+fn escape_html(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
 
 #[cfg(desktop)]
 fn response_html(error: Option<&Error>) -> String {
@@ -674,7 +703,10 @@ fn response_html(error: Option<&Error>) -> String {
         ),
         Some(error) => (
             "400 Bad Request",
-            format!("<h2>Failed to connect your Google Drive account.</h2><p>{error}</p>"),
+            format!(
+                "<h2>Failed to connect your Google Drive account.</h2><p>{}</p>",
+                escape_html(&error.to_string())
+            ),
         ),
     };
     format!(
@@ -765,6 +797,50 @@ mod tests {
         // Well inside one `REQUEST_TIMEOUT`: the deadline, not the per-socket
         // read timeout, is what ended the wait.
         assert!(started.elapsed() < deadline + Duration::from_secs(2));
+    }
+
+    // A hit on the callback path that is not an answer to this request must
+    // not end the flow: anything on the machine can reach the loopback port,
+    // and the real redirect is still on its way.
+    #[cfg(desktop)]
+    #[test]
+    fn a_foreign_callback_leaves_the_flow_waiting() {
+        let listener = TcpListener::bind((HOST, 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let browser = std::thread::spawn(move || {
+            let mut stray = std::net::TcpStream::connect(addr).unwrap();
+            stray
+                .write_all(b"GET /auth/callback?code=stray&state=someone-elses HTTP/1.1\r\n\r\n")
+                .unwrap();
+            // The server closes it after the 404, which is what ends this read.
+            let mut answer = String::new();
+            std::io::Read::read_to_string(&mut stray, &mut answer).unwrap();
+            assert!(answer.starts_with("HTTP/1.1 404"), "{answer}");
+
+            let mut real = std::net::TcpStream::connect(addr).unwrap();
+            real.write_all(b"GET /auth/callback?code=4/abc&state=nonce HTTP/1.1\r\n\r\n")
+                .unwrap();
+            let mut answer = String::new();
+            std::io::Read::read_to_string(&mut real, &mut answer).unwrap();
+            assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
+        });
+
+        let code = listen_for_code_until(&listener, "nonce", Instant::now() + REQUEST_TIMEOUT);
+        browser.join().unwrap();
+        assert_eq!(code.unwrap(), "4/abc");
+    }
+
+    // Google's error text lands in the page as text, not as markup.
+    #[cfg(desktop)]
+    #[test]
+    fn the_failure_page_escapes_the_error() {
+        let page = response_html(Some(&Error::Other(
+            "<script>alert('x' & \"y\")</script>".into(),
+        )));
+        assert!(
+            page.contains("&lt;script&gt;alert(&#39;x&#39; &amp; &quot;y&quot;)&lt;/script&gt;")
+        );
+        assert!(!page.contains("<script>"));
     }
 
     #[test]
