@@ -26,9 +26,15 @@ interface BaseEntry {
 }
 
 // A WebAuthn credential held by a login entry. Only P-256 ECDSA is supported,
-// so there is no algorithm field. credentialId/userHandle/privateKey are
-// base64url and are carried verbatim — never re-encoded. privateKey is a secret
-// and only ever arrives inside a revealed entry.
+// so there is no algorithm field. credentialId and userHandle are base64url and
+// are carried verbatim — never re-encoded.
+//
+// The private key is deliberately absent: it is the one part of a credential
+// that can sign, nothing here renders or edits it, and the authenticator that
+// uses it lives in Rust. So a reveal blanks it (`Entry::redacted`) and a save
+// sends the passkey back without it — the core puts it back from the row being
+// replaced, matched by credentialId. Dropping a passkey from this list still
+// drops it; what the webview cannot do is carry the key around.
 export interface Passkey {
   credentialId: string
   rpId: string
@@ -36,7 +42,6 @@ export interface Passkey {
   userHandle: string
   userName: string
   userDisplayName: string
-  privateKey: string // PKCS#8 DER, base64url
   counter: number
   createdAt?: string // RFC3339
 }
