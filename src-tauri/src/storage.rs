@@ -318,8 +318,18 @@ fn read_file(path: &PathBuf) -> Result<String> {
     Ok(fs::read_to_string(path)?)
 }
 
+// A `.swftx` is hex-of-base64 of a JSON vault, so it is already several times
+// the size of what it holds; past this it is not a backup of ours. The cap is
+// checked before the read because decoding triples the allocation again, and
+// the AES-GCM tag is only checked at the end of all of it — an unbounded file
+// would be read and expanded whole before anything could reject it.
+const MAX_BACKUP_BYTES: u64 = 64 * 1024 * 1024;
+
 // Read an arbitrary backup file chosen by the user (absolute path).
 pub fn read_backup(path: &str) -> Result<String> {
+    if fs::metadata(path)?.len() > MAX_BACKUP_BYTES {
+        return Err(Error::FileTooLarge);
+    }
     Ok(fs::read_to_string(path)?)
 }
 
@@ -398,7 +408,10 @@ pub fn sync_configured(app: &AppHandle) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{atomic_replace_with, atomic_write_file, remove_if_present};
+    use super::{
+        atomic_replace_with, atomic_write_file, read_backup, remove_if_present, Error,
+        MAX_BACKUP_BYTES,
+    };
     use std::fs;
     use std::io::{self, Write};
     use std::path::{Path, PathBuf};
@@ -419,6 +432,25 @@ mod tests {
         let mut tmp = path.to_path_buf().into_os_string();
         tmp.push(".tmp");
         PathBuf::from(tmp)
+    }
+
+    #[test]
+    fn a_backup_past_the_cap_is_refused_before_it_is_read() {
+        let path = tmp_sidecar().with_file_name("huge.swftx");
+        // Sized, not written: the point is that nothing reads or decodes it.
+        let file = fs::File::create(&path).unwrap();
+        file.set_len(MAX_BACKUP_BYTES + 1).unwrap();
+        drop(file);
+
+        let err = read_backup(path.to_str().unwrap()).unwrap_err();
+        assert!(matches!(err, Error::FileTooLarge), "{err}");
+    }
+
+    #[test]
+    fn a_backup_under_the_cap_is_read_whole() {
+        let path = tmp_sidecar().with_file_name("small.swftx");
+        fs::write(&path, "deadbeef").unwrap();
+        assert_eq!(read_backup(path.to_str().unwrap()).unwrap(), "deadbeef");
     }
 
     #[test]
