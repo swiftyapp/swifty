@@ -2,8 +2,8 @@ use crate::session;
 use crate::state::AppState;
 use crate::timer::Timer;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime};
 use tauri::{AppHandle, Manager, WindowEvent};
 
 // The bounds are the settings module's: it normalises the stored value with
@@ -29,6 +29,12 @@ pub struct AutoLock {
     /// `settings.json` at startup and re-set whenever the Settings row changes,
     /// so the value the user picked is in force from the first arming.
     timeout_secs: AtomicU64,
+    /// Wall-clock reading taken when the window last lost focus, cleared when
+    /// it comes back. The timer alone cannot be trusted across that gap: it
+    /// measures in `Instant`s, which do not advance while an Apple machine is
+    /// asleep and whose thread does not run at all while iOS has the process
+    /// suspended. This is what says how long the user was really away.
+    blurred_at: Mutex<Option<SystemTime>>,
 }
 
 impl Default for AutoLock {
@@ -36,6 +42,7 @@ impl Default for AutoLock {
         Self {
             timer: Timer::spawn(),
             timeout_secs: AtomicU64::new(DEFAULT_TIMEOUT_SECS),
+            blurred_at: Mutex::new(None),
         }
     }
 }
@@ -82,14 +89,40 @@ pub fn disarm(app: &AppHandle) {
 /// forwards both unchanged off Windows (`lib.rs:522`). Sending the app to the
 /// home screen therefore starts the same clock that alt-tabbing does.
 ///
-/// One iOS-only caveat, which no code here can fix: the timer thread does not
-/// run while iOS has the process suspended, so a lock that comes due in the
-/// background lands when the app is next resumed rather than at the second it
-/// was owed.
+/// Coming *back*, though, is not a fresh start if the time away already spent
+/// the whole timeout: the vault is locked instead of re-armed. Without that,
+/// resuming could cancel a lock that was already owed — on iOS the process is
+/// frozen while backgrounded, so on thaw the main thread's `Focused(true)` and
+/// the timer thread's expired wait race, and a focus event that wins would
+/// re-arm a full timeout over a vault left open for hours. The reading is a
+/// wall clock (`SystemTime`), not the timer's `Instant`, because a sleeping
+/// Apple machine does not advance the latter at all.
 pub fn handle_event(app: &AppHandle, event: &WindowEvent) {
-    if let WindowEvent::Focused(_) = event {
-        touch(app);
+    match event {
+        WindowEvent::Focused(false) => {
+            *app.state::<AutoLock>().blurred_at.lock().unwrap() = Some(SystemTime::now());
+            touch(app);
+        }
+        WindowEvent::Focused(true) => {
+            let state = app.state::<AutoLock>();
+            let blurred_at = state.blurred_at.lock().unwrap().take();
+            let timeout = Duration::from_secs(state.timeout_secs.load(Ordering::SeqCst));
+            if blurred_at.is_some_and(|at| overdue(at, SystemTime::now(), timeout)) {
+                lock(app);
+            } else {
+                touch(app);
+            }
+        }
+        _ => {}
     }
+}
+
+/// Whether a window blurred at `blurred_at` has been away for its whole
+/// timeout by `now`. A clock that went backwards between the two readings —
+/// an NTP correction, the user changing the date — reads as no time at all,
+/// so a session is never sealed on the strength of a negative interval.
+fn overdue(blurred_at: SystemTime, now: SystemTime, timeout: Duration) -> bool {
+    now.duration_since(blurred_at).unwrap_or_default() >= timeout
 }
 
 /// The lock an idle timer or the tray asks for, which may well find the vault
@@ -99,4 +132,38 @@ pub fn handle_event(app: &AppHandle, event: &WindowEvent) {
 /// unlock is landing cannot clear the session that unlock just opened.
 pub fn lock(app: &AppHandle) {
     session::lock(app);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TIMEOUT: Duration = Duration::from_secs(300);
+
+    #[test]
+    fn a_short_absence_is_not_overdue() {
+        let blurred_at = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000);
+        assert!(!overdue(blurred_at, blurred_at + TIMEOUT / 2, TIMEOUT));
+    }
+
+    // The whole point: time the machine spent asleep or suspended counts, and
+    // the timeout falling exactly due is due.
+    #[test]
+    fn an_absence_of_the_whole_timeout_is_overdue() {
+        let blurred_at = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000);
+        assert!(overdue(blurred_at, blurred_at + TIMEOUT, TIMEOUT));
+        assert!(overdue(
+            blurred_at,
+            blurred_at + Duration::from_secs(86_400),
+            TIMEOUT
+        ));
+    }
+
+    // A clock that went backwards says nothing about how long the user was
+    // away, so it locks nothing; the timer is still there to come due.
+    #[test]
+    fn a_clock_that_went_backwards_is_not_overdue() {
+        let blurred_at = SystemTime::UNIX_EPOCH + Duration::from_secs(86_400);
+        assert!(!overdue(blurred_at, blurred_at - TIMEOUT, TIMEOUT));
+    }
 }
