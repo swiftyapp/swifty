@@ -3,7 +3,6 @@
 //! never parsed here — the frontend owns the format — and never logged: the
 //! contents are the secret.
 
-use std::fs;
 use std::path::Path;
 
 use serde::Serialize;
@@ -11,6 +10,7 @@ use tauri::State;
 
 use crate::error::{Error, Result};
 use crate::state::AppState;
+use crate::storage::read_regular_file_capped;
 
 // A real .env is a few kilobytes. Anything past this is not one, and reading
 // it whole into the webview would only ever be a mistake.
@@ -26,11 +26,8 @@ pub struct EnvFile {
 // The command's body, split out so the two refusals can be tested without a
 // Tauri runtime around them.
 pub fn read_env_text(path: &Path) -> Result<EnvFile> {
-    let meta = fs::metadata(path)?;
-    if meta.len() > MAX_BYTES {
-        return Err(Error::FileTooLarge);
-    }
-    let body = String::from_utf8(fs::read(path)?).map_err(|_| Error::FileNotText)?;
+    let bytes = read_regular_file_capped(path, MAX_BYTES)?;
+    let body = String::from_utf8(bytes).map_err(|_| Error::FileNotText)?;
     let file_name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -54,6 +51,7 @@ pub async fn read_env_file(path: String, state: State<'_, AppState>) -> Result<E
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     fn scratch(name: &str, bytes: &[u8]) -> std::path::PathBuf {
         let path = std::env::temp_dir().join(format!("rowel-env-{}-{name}", std::process::id()));

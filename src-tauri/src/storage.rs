@@ -2,7 +2,7 @@
 //! overwrite write, `.swftx` export copy.
 
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
@@ -318,19 +318,59 @@ fn read_file(path: &PathBuf) -> Result<String> {
     Ok(fs::read_to_string(path)?)
 }
 
-// A `.swftx` is hex-of-base64 of a JSON vault, so it is already several times
-// the size of what it holds; past this it is not a backup of ours. The cap is
-// checked before the read because decoding triples the allocation again, and
-// the AES-GCM tag is only checked at the end of all of it — an unbounded file
-// would be read and expanded whole before anything could reject it.
-const MAX_BACKUP_BYTES: u64 = 64 * 1024 * 1024;
+/// Read a whole file the user pointed at, refusing anything past `cap`.
+///
+/// Every decision here is made on one open handle. A `stat` followed by a
+/// `read` is two different files whenever the path is swapped in between, so
+/// the size that was checked need not be the size that is read; the handle is
+/// the one thing that cannot be exchanged under us. It also has to *be* a
+/// regular file: a FIFO reports a length of zero and then serves bytes for as
+/// long as a writer feels like it, and a device serves them without end.
+///
+/// `take(cap + 1)` is what bounds the read. The extra byte is how a file at
+/// the cap is told from one past it without trusting any reported length — if
+/// it arrives, the file is too large and nothing beyond it is ever read.
+pub fn read_regular_file_capped(path: &Path, cap: u64) -> Result<Vec<u8>> {
+    // The one thing the handle cannot answer, because opening a FIFO with no
+    // writer blocks before it can be asked. This look is about not hanging, not
+    // about trusting what it says — the refusal that counts is the next one,
+    // which a path swapped after this stat still runs into.
+    if !fs::metadata(path)?.file_type().is_file() {
+        return Err(not_a_regular_file());
+    }
+    let file = fs::File::open(path)?;
+    if !file.metadata()?.file_type().is_file() {
+        return Err(not_a_regular_file());
+    }
+
+    let mut bytes = Vec::new();
+    file.take(cap.saturating_add(1)).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > cap {
+        return Err(Error::FileTooLarge);
+    }
+    Ok(bytes)
+}
+
+fn not_a_regular_file() -> Error {
+    Error::Other("that path is not a regular file".into())
+}
+
+// A `.swftx` is hex-of-base64 of a JSON vault, so the file on disk is already
+// ~2.7x the JSON inside it — and that JSON carries whole file bodies, up to a
+// 1 MiB env file each (`commands::env`), each base64'd again. A legacy vault
+// with a few dozen such entries is therefore tens of megabytes as a backup,
+// which 64 MiB could plausibly turn away. This is the same cap the sync engine
+// puts on a pack (`sync::pack::MAX_PACK_BYTES`), holding the same vault in a
+// denser encoding: nothing the old app could write fits in one and not the
+// other, and the number exists only so a file that is not a backup of ours
+// cannot be buffered and hex/base64-expanded before the AES-GCM tag — checked
+// at the very end of all of it — gets to reject it.
+const MAX_BACKUP_BYTES: u64 = 256 * 1024 * 1024;
 
 // Read an arbitrary backup file chosen by the user (absolute path).
 pub fn read_backup(path: &str) -> Result<String> {
-    if fs::metadata(path)?.len() > MAX_BACKUP_BYTES {
-        return Err(Error::FileTooLarge);
-    }
-    Ok(fs::read_to_string(path)?)
+    let bytes = read_regular_file_capped(Path::new(path), MAX_BACKUP_BYTES)?;
+    String::from_utf8(bytes).map_err(|_| Error::FileNotText)
 }
 
 pub fn read_gdrive(app: &AppHandle) -> Result<String> {
@@ -409,8 +449,8 @@ pub fn sync_configured(app: &AppHandle) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        atomic_replace_with, atomic_write_file, read_backup, remove_if_present, Error,
-        MAX_BACKUP_BYTES,
+        atomic_replace_with, atomic_write_file, read_backup, read_regular_file_capped,
+        remove_if_present, Error,
     };
     use std::fs;
     use std::io::{self, Write};
@@ -435,15 +475,47 @@ mod tests {
     }
 
     #[test]
-    fn a_backup_past_the_cap_is_refused_before_it_is_read() {
+    fn a_file_past_the_cap_is_refused_without_being_read_whole() {
         let path = tmp_sidecar().with_file_name("huge.swftx");
-        // Sized, not written: the point is that nothing reads or decodes it.
+        // Sized, not written: a sparse 64 MiB file against a 16-byte cap, so a
+        // pass that buffered it whole would be doing something this one does not.
         let file = fs::File::create(&path).unwrap();
-        file.set_len(MAX_BACKUP_BYTES + 1).unwrap();
+        file.set_len(64 * 1024 * 1024).unwrap();
         drop(file);
 
-        let err = read_backup(path.to_str().unwrap()).unwrap_err();
+        let err = read_regular_file_capped(&path, 16).unwrap_err();
         assert!(matches!(err, Error::FileTooLarge), "{err}");
+    }
+
+    #[test]
+    fn a_file_exactly_at_the_cap_is_accepted() {
+        let path = tmp_sidecar().with_file_name("exact.swftx");
+        fs::write(&path, "deadbeef").unwrap();
+        assert_eq!(read_regular_file_capped(&path, 8).unwrap(), b"deadbeef");
+    }
+
+    #[test]
+    fn a_directory_is_not_a_file_to_read() {
+        let dir = tmp_sidecar().parent().unwrap().to_path_buf();
+        let err = read_regular_file_capped(&dir, 1024).unwrap_err();
+        assert!(matches!(err, Error::Other(_) | Error::Io(_)), "{err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_fifo_is_refused_rather_than_opened() {
+        let path = tmp_sidecar().with_file_name("pipe.swftx");
+        let made = std::process::Command::new("mkfifo")
+            .arg(&path)
+            .status()
+            .unwrap();
+        assert!(made.success());
+
+        // Nothing is writing to this pipe, so a pass that opened it would hang
+        // here rather than fail — the test finishing is half of what it asserts.
+        let err = read_regular_file_capped(&path, 1024).unwrap_err();
+        assert!(matches!(err, Error::Other(_)), "{err}");
+        let _ = fs::remove_file(&path);
     }
 
     #[test]
