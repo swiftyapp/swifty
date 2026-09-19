@@ -32,8 +32,10 @@ export default function Row({ glyph, title, sub, flag, tint }: Props) {
     <>
       <div
         className={cx(
-          // The tile grows with the row it sits in (see Item/index.tsx).
-          'grid h-[30px] w-[30px] flex-none place-items-center overflow-hidden rounded-lg any-pointer-coarse:h-10 any-pointer-coarse:w-10',
+          // The tile grows with the row it sits in (see Item/index.tsx) — and
+          // is 40px on the phone shell whatever the pointer, since the row's
+          // inset rule is measured from it (16px gutter + tile + 14px gap).
+          'grid h-[30px] w-[30px] flex-none place-items-center overflow-hidden rounded-lg any-pointer-coarse:h-10 any-pointer-coarse:w-10 max-md:h-10 max-md:w-10',
           tint ? KIND_TINT[tint] : 'bg-tile text-text2'
         )}
       >
