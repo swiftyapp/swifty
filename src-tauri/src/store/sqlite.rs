@@ -177,7 +177,18 @@ impl SqliteStore {
     /// key afterwards. Used by change-master-password after the payloads have
     /// been re-encrypted under the new app key.
     pub fn rekey(&self, new_key: &[u8]) -> Result<()> {
-        self.lock().execute_batch(&key_pragma("rekey", new_key))?;
+        let conn = self.lock();
+        conn.execute_batch(&key_pragma("rekey", new_key))?;
+        // `PRAGMA rekey` is an ordinary write transaction that rewrites every
+        // page, so in WAL mode the re-encrypted pages land in `vault.db-wal`
+        // and the main file still opens under the OLD password until something
+        // checkpoints. A password change must not leave old-key pages behind in
+        // either file, so fold the WAL back and truncate it here — and *check*
+        // that it happened. A checkpoint this one cannot complete would leave
+        // old-key pages behind while the caller went on to record the new KDF
+        // params and drop its rollback snapshot, so the failure is propagated
+        // and the caller (see `auth::rekey`) restores the pre-change vault.
+        checkpoint_truncate(&conn)?;
         Ok(())
     }
 
@@ -355,7 +366,29 @@ impl SqliteStore {
 /// checkpoints as well. Best effort: a snapshot connection holding a read
 /// lock makes the checkpoint partial, and the next one finishes the job.
 fn drop_wal_history(conn: &Connection) {
-    let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
+    let _ = checkpoint_truncate(conn);
+}
+
+/// The same checkpoint, but verified. `PRAGMA wal_checkpoint` reports a
+/// blocked or partial checkpoint in its result row rather than as a statement
+/// error, so running it with `execute_batch` succeeds even when nothing was
+/// folded back. The row is (busy, log, checkpointed): `busy = 1` means another
+/// connection's lock stopped it, and `log != checkpointed` means only part of
+/// the WAL made it into the main file. `log = -1` is "not in WAL mode" — there
+/// is no write-ahead log to fold, which is a complete checkpoint by definition.
+fn checkpoint_truncate(conn: &Connection) -> Result<()> {
+    let (busy, log, checkpointed): (i64, i64, i64) =
+        conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+        })?;
+    if busy != 0 || (log >= 0 && log != checkpointed) {
+        return Err(StoreError::Other(format!(
+            "WAL checkpoint did not complete (busy={busy}, log={log}, \
+             checkpointed={checkpointed}); the write-ahead log may still hold \
+             pages of the previous database"
+        )));
+    }
+    Ok(())
 }
 
 impl VaultStore for SqliteStore {
@@ -696,3 +729,48 @@ fn restrict(_path: &Path) -> Result<()> {
 
 #[cfg(not(unix))]
 fn set_mode(_path: &Path, _mode: u32) {}
+
+// Lives here rather than in `store::tests` because it drives a second raw
+// connection at the same key, which needs this module's private helpers.
+#[cfg(test)]
+mod checkpoint_tests {
+    use super::*;
+
+    const KEY: &[u8] = &[0x11; 32];
+
+    /// A checkpoint that cannot complete must fail the rekey, not be swallowed:
+    /// the caller records the new KDF params and drops its rollback snapshot on
+    /// success, so a silent partial checkpoint would leave a vault whose main
+    /// file still opens under the previous password.
+    #[test]
+    fn rekey_fails_when_the_checkpoint_cannot_complete() {
+        let dir = std::env::temp_dir().join(format!("rowel-checkpoint-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        create_private_dir(&dir).unwrap();
+        let path = dir.join("vault.db");
+        let store = SqliteStore::open(&path, KEY).unwrap();
+        store.meta_set("k", "v").unwrap();
+        // Report the blocked checkpoint at once instead of sitting out the
+        // connection's five-second busy timeout first.
+        store
+            .lock()
+            .execute_batch("PRAGMA busy_timeout = 0;")
+            .unwrap();
+
+        // A second connection parked in a read transaction: in WAL mode its
+        // read-mark keeps the log from being reset, so the TRUNCATE checkpoint
+        // reports itself busy instead of erroring out.
+        let reader = Connection::open(&path).unwrap();
+        reader.execute_batch(&key_pragma("key", KEY)).unwrap();
+        reader
+            .execute_batch("BEGIN; SELECT count(*) FROM meta;")
+            .unwrap();
+
+        let err = store.rekey(&[0x22; 32]).unwrap_err();
+        assert!(
+            err.to_string().contains("WAL checkpoint did not complete"),
+            "expected a checkpoint failure, got: {err}"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+}

@@ -599,6 +599,11 @@ fn rekey_reencrypts_db_in_place() {
     store.rekey(KEY2).unwrap();
     // The live handle keeps working after rekey.
     assert_eq!(store.get("1").unwrap().unwrap().payload, b"durable");
+    // Rekey checkpoints: the re-encrypted pages are in the main file and no
+    // frame of the old-key database is left behind in the WAL. Without this,
+    // `vault.db` alone still opens under the previous password.
+    let wal = path.with_file_name("vault.db-wal");
+    assert_eq!(wal.metadata().map(|m| m.len()).unwrap_or(0), 0);
     drop(store);
 
     // Reopening requires the new key; the old key no longer opens it.
