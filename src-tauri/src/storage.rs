@@ -95,15 +95,20 @@ pub fn sync_scratch_dir(app: &AppHandle) -> Result<PathBuf> {
 // user has an account at, including ones they had deleted — sitting beside the
 // encrypted database for any file-level backup to pick up. The cache now lives
 // in a `favicons` table inside the SQLCipher vault, so this directory is only
-// ever leftovers: removed whole, once, the first time a favicon is looked up
-// (`favicon::fetch`). Best effort — the icons are re-fetched regardless, and a
-// directory we could not remove is not worth failing a lookup over.
+// ever leftovers: removed whole, once, at startup (`lib.rs`). At startup
+// rather than at the first lookup, because the list is on disk whether or not
+// this install ever looks an icon up again — an empty vault, a workspace whose
+// rows have no hosts, every host rejected — and a cache that is never read is
+// exactly the one that would keep it forever. Best effort: a directory we
+// could not remove is logged, not fatal, and is tried again next launch.
 pub fn remove_legacy_icons_dir(app: &AppHandle) {
     let Ok(dir) = root_dir(app).map(|root| root.join("icons")) else {
         return;
     };
     if dir.exists() {
-        let _ = fs::remove_dir_all(&dir);
+        if let Err(e) = fs::remove_dir_all(&dir) {
+            log::warn!("could not remove the legacy favicon directory: {e}");
+        }
     }
 }
 
