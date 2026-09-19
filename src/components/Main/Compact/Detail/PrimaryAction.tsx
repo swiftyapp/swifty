@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import type { Entry, EntryMeta } from '@/api/types'
 import { cx } from '@/utils/cx'
 import { usePrimaryAction } from '../../Body/Aside/Show/usePrimaryAction'
-import { CheckGlyph } from '../../icons'
+import { CheckGlyph, CopyGlyph } from '../../icons'
 import { ACTION_BUTTON, PRIMARY_ACTION } from '../chrome'
 
 interface Props {
@@ -42,7 +42,11 @@ export default function PrimaryAction({ entry, revealed }: Props) {
             {t('Copied')}
           </>
         ) : (
-          t(label)
+          <>
+            {/* Every kind's primary action is a copy, so the glyph says so. */}
+            <CopyGlyph size={18} />
+            {t(label)}
+          </>
         )}
       </button>
     </>

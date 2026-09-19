@@ -25,7 +25,9 @@ export default function Eyebrow({ entry, revealed, className }: Props) {
     fromKind ?? (entry.urlHost ? { text: entry.urlHost } : null)
 
   return (
-    <div className={`${className} ${LABEL}`}>
+    // On the phone it sits under the title as a plain 13px line rather than a
+    // tracked uppercase label — the prototype's "aws.amazon.com · Work".
+    <div className={`${className} ${LABEL} max-md:text-base max-md:normal-case max-md:tracking-[0]`}>
       <span className="text-text2">{t(kind.label)}</span>
       {segment && (
         <>

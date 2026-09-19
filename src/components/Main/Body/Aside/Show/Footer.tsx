@@ -70,7 +70,9 @@ export default function Footer({
       // Narrow: a strip with two ends needs two ends to have. Below 420px of
       // container the cells stack instead, tags first, and the stamps give up
       // the right edge they were holding against the header's actions.
-      className="mt-5 flex items-start gap-10 border-t border-line pt-4 @max-[420px]:flex-col @max-[420px]:gap-4"
+      // On the phone the cards above already draw the edge, so the footer is
+      // a quiet block under them rather than a ruled section of its own.
+      className="mt-5 flex items-start gap-10 border-t border-line pt-4 @max-[420px]:flex-col @max-[420px]:gap-4 max-md:border-0 max-md:px-1 max-md:pt-0"
     >
       {filed && (
         <Cell label="Tags" className="min-w-0 flex-1">

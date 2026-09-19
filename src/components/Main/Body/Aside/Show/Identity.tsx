@@ -39,7 +39,7 @@ export default function Identity({ entry, tile, glyph, className, children }: Pr
         className={cx(
           'grid',
           tile,
-          'flex-none place-items-center overflow-hidden rounded-lg bg-tile text-text2'
+          'flex-none place-items-center overflow-hidden rounded-lg bg-tile text-text2 max-md:rounded-xl'
         )}
       >
         {icon ? (
@@ -51,11 +51,13 @@ export default function Identity({ entry, tile, glyph, className, children }: Pr
         )}
       </div>
       {/* Given an eyebrow, the title stops being the row's only text and the
-          two share a column; without one it is the row itself. */}
+          two share a column, the name first and its address under it (the
+          phone header's "aws.amazon.com · Work"); without one it is the row
+          itself. */}
       {children ? (
         <div className="min-w-0 flex-1">
-          {children}
           {title}
+          {children}
         </div>
       ) : (
         title

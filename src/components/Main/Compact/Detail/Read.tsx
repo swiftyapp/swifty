@@ -57,7 +57,7 @@ export default function Read({ entry, revealed }: Props) {
             <Eyebrow
               entry={entry}
               revealed={revealed}
-              className="mb-1 flex items-center gap-2 truncate whitespace-nowrap"
+              className="mt-1 flex items-center gap-2 truncate whitespace-nowrap"
             />
           </Identity>
           {!entry.deletedAt && <Favorite entry={entry} className={`${TOUCH} flex-none`} />}

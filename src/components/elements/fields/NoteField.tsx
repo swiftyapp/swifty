@@ -39,11 +39,11 @@ export default function NoteField({
               grow(event.currentTarget)
               set(event.target.value)
             }}
-            className="block min-h-6 w-full resize-none overflow-hidden border-b border-line2 bg-transparent text-base leading-relaxed text-text outline-none transition-colors placeholder:text-text2 focus:border-accent-line"
+            className="block min-h-6 w-full resize-none overflow-hidden border-b border-line2 bg-transparent text-base leading-relaxed text-text outline-none transition-colors placeholder:text-text2 focus:border-accent-line max-md:text-md"
           />
         ) : (
           <div
-            className="whitespace-pre-wrap break-words text-base leading-relaxed text-text2"
+            className="whitespace-pre-wrap break-words text-base leading-relaxed text-text2 max-md:text-md"
             data-testid={`entry-value-${name}`}
           >
             {value}
