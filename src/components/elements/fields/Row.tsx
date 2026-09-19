@@ -64,14 +64,19 @@ export const RAIL = 'flex w-[60px] flex-none items-center justify-end gap-1'
  * glyphs are the prototype's 18px and its buttons touch, so two of them do
  * not read as a toolbar.
  */
+// The grid does not lean on the fold: a landscape phone (or a narrow window)
+// is under 768px with a container *over* 420px, where the fold's classes do
+// not fire — so the sigil is hidden, the label and rail let go of their fixed
+// columns and the slot under the value starts at the edge, here too.
 const PHONE = 'max-md:grid max-md:grid-cols-[minmax(0,1fr)_auto]'
-const PHONE_LABEL = 'max-md:col-start-1 max-md:row-start-1'
+const PHONE_LABEL = 'max-md:col-start-1 max-md:row-start-1 max-md:w-full'
+const PHONE_SIGIL = 'max-md:hidden'
 const PHONE_VALUE = 'max-md:col-start-1 max-md:row-start-2'
 const PHONE_RAIL =
-  'max-md:col-start-2 max-md:row-span-2 max-md:row-start-1 max-md:gap-0 max-md:self-center max-md:[&_svg]:size-[18px]'
+  'max-md:col-start-2 max-md:row-span-2 max-md:row-start-1 max-md:w-auto max-md:gap-0 max-md:self-center max-md:[&_svg]:size-[18px]'
 // The strength meter and its stamp share one line under the value.
 const PHONE_BELOW =
-  'max-md:mt-2 max-md:flex-row max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-3'
+  'max-md:mt-2 max-md:flex-row max-md:flex-wrap max-md:items-center max-md:justify-between max-md:gap-x-3 max-md:pl-0'
 
 // THE detail-row geometry: a w-32 micro-label column, the value, trailing
 // controls, then anything that belongs under the value. Read values and their
@@ -100,7 +105,9 @@ export default function FieldRow({ label, prefix, actions, below, error, childre
               {t(label)}
             </label>
             {/* Held open with or without a sigil, so every value starts at one x. */}
-            <span className={`grid w-4 flex-none place-items-center text-text3 ${STACK_SIGIL}`}>
+            <span
+              className={`grid w-4 flex-none place-items-center text-text3 ${STACK_SIGIL} ${PHONE_SIGIL}`}
+            >
               {prefix}
             </span>
           </>
