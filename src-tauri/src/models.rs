@@ -2,6 +2,7 @@ use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
+use zeroize::Zeroize;
 
 // A vault entry. Kept as a single flat struct (rather than an enum) so it
 // round-trips the untyped legacy object shape; `kind` discriminates
@@ -170,12 +171,22 @@ impl Entry {
     /// hands out the credential's identity (who it is for, when it was made)
     /// and nothing that could sign with it. [`Entry::restore_passkey_keys`] is
     /// the other half — how a save puts back what was never sent.
-    pub fn redacted(&self) -> Entry {
-        let mut entry = self.clone();
-        for passkey in entry.passkeys.iter_mut().flatten() {
-            passkey.private_key.clear();
+    ///
+    /// It consumes the entry and scrubs the keys where they lie: a copy that
+    /// was cloned and then cleared would leave the key bytes on the heap for
+    /// whatever reads freed memory next.
+    pub fn redacted(mut self) -> Entry {
+        self.zeroize_passkey_keys();
+        self
+    }
+
+    /// Scrub every passkey private key on this entry, leaving each blank.
+    /// [`Zeroize`] for `String` overwrites the bytes before emptying it, which
+    /// `String::clear` on its own does not.
+    fn zeroize_passkey_keys(&mut self) {
+        for passkey in self.passkeys.iter_mut().flatten() {
+            passkey.private_key.zeroize();
         }
-        entry
     }
 
     /// Whether any passkey on this entry arrived without its private key, and
@@ -196,21 +207,34 @@ impl Entry {
     /// row cannot be completed by anyone: rather than save a passkey that can
     /// never sign, the save is refused ([`Error::NotFound`], since what is
     /// missing is the stored credential this one claims to be).
-    pub fn restore_passkey_keys(&mut self, stored: Option<&Entry>) -> Result<()> {
-        let held: &[Passkey] = stored
-            .and_then(|e| e.passkeys.as_deref())
+    ///
+    /// The stored entry is consumed: each key is moved across rather than
+    /// copied, and whatever is left of it — the keys of passkeys the edit
+    /// dropped, or all of them if the merge failed — is scrubbed here rather
+    /// than left on the heap for its drop.
+    pub fn restore_passkey_keys(&mut self, mut stored: Option<Entry>) -> Result<()> {
+        let merged = self.take_passkey_keys(stored.as_mut());
+        if let Some(stored) = stored.as_mut() {
+            stored.zeroize_passkey_keys();
+        }
+        merged
+    }
+
+    fn take_passkey_keys(&mut self, stored: Option<&mut Entry>) -> Result<()> {
+        let held: &mut [Passkey] = stored
+            .and_then(|e| e.passkeys.as_deref_mut())
             .unwrap_or_default();
         for passkey in self.passkeys.iter_mut().flatten() {
             if !passkey.private_key.is_empty() {
                 continue;
             }
             let key = held
-                .iter()
+                .iter_mut()
                 .find(|p| p.credential_id == passkey.credential_id)
-                .map(|p| p.private_key.as_str())
+                .map(|p| std::mem::take(&mut p.private_key))
                 .filter(|k| !k.is_empty())
                 .ok_or(Error::NotFound)?;
-            passkey.private_key = key.to_string();
+            passkey.private_key = key;
         }
         Ok(())
     }
@@ -432,9 +456,8 @@ mod tests {
             .unwrap()
             .iter()
             .all(|p| p.private_key.is_empty()));
-        // The credential is otherwise intact, and the original untouched.
+        // The credential is otherwise intact.
         assert_eq!(out.passkeys.as_ref().unwrap()[1].credential_id, "c2");
-        assert_eq!(entry.passkeys.as_ref().unwrap()[0].private_key, "k1");
 
         // Blank means omitted on the wire: the field never reaches the webview.
         let json = serde_json::to_value(&out).unwrap();
@@ -455,11 +478,11 @@ mod tests {
     #[test]
     fn saving_merges_blank_keys_back_from_the_stored_entry() {
         let stored = login(vec![passkey("c1", "k1"), passkey("c2", "k2")]);
-        let mut incoming = stored.redacted();
+        let mut incoming = stored.clone().redacted();
         incoming.passkeys.as_mut().unwrap().reverse();
         incoming.title = "Renamed".into();
 
-        incoming.restore_passkey_keys(Some(&stored)).unwrap();
+        incoming.restore_passkey_keys(Some(stored)).unwrap();
 
         let passkeys = incoming.passkeys.unwrap();
         assert_eq!(passkeys[0].credential_id, "c2");
@@ -473,7 +496,7 @@ mod tests {
         let stored = login(vec![passkey("c1", "k1"), passkey("c2", "k2")]);
         let mut incoming = login(vec![passkey("c2", "")]);
 
-        incoming.restore_passkey_keys(Some(&stored)).unwrap();
+        incoming.restore_passkey_keys(Some(stored)).unwrap();
 
         let passkeys = incoming.passkeys.unwrap();
         assert_eq!(passkeys.len(), 1);
@@ -489,7 +512,7 @@ mod tests {
         let stored = login(vec![passkey("c1", "k1")]);
         let mut unknown = login(vec![passkey("c9", "")]);
         assert!(matches!(
-            unknown.restore_passkey_keys(Some(&stored)),
+            unknown.restore_passkey_keys(Some(stored)),
             Err(Error::NotFound)
         ));
 

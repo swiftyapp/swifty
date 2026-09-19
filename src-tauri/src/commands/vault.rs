@@ -49,7 +49,9 @@ pub fn save_entry(mut entry: Entry, state: State<'_, AppState>) -> Result<EntryM
 // webview carries its passkeys without their private keys, so they are read off
 // the row being replaced and matched by credential id (see
 // `Entry::restore_passkey_keys`). The stored row is unsealed only when there is
-// a blank key to fill, so an ordinary save costs nothing extra.
+// a blank key to fill, so an ordinary save costs nothing extra. The unsealed
+// row is handed over whole so the keys move rather than copy, and what is left
+// of it is scrubbed and dropped inside `Entry::restore_passkey_keys`.
 fn restore_passkey_keys(
     entry: &mut Entry,
     store: &SqliteStore,
@@ -63,7 +65,7 @@ fn restore_passkey_keys(
         .map_err(store_err)?
         .map(|record| cipher.unseal(&record.id, &record.payload))
         .transpose()?;
-    entry.restore_passkey_keys(stored.as_ref())
+    entry.restore_passkey_keys(stored)
 }
 
 // Tombstone one entry (retained for sync); it drops out of the list.
@@ -309,7 +311,8 @@ mod tests {
 
     fn open(dir: &tempfile::TempDir) -> (SqliteStore, PayloadCipher) {
         let key = VaultKey::legacy_from_password("pw");
-        let store = SqliteStore::open(&dir.path().join("vault.db"), &key.sqlcipher_key()).unwrap();
+        let store = SqliteStore::open(&dir.path().join("vault.db"), key.sqlcipher_key().as_slice())
+            .unwrap();
         (store, key.payload_cipher())
     }
 
