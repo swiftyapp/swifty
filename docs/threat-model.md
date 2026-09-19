@@ -21,7 +21,11 @@ and external links are opened through the OS only for `http`/`https` URLs
 (`opener:allow-open-url` scope in `capabilities/default.json`; plain `http` is
 kept because routers and intranet logins have no other address, and the scope
 exists to shut out `file:`, `javascript:` and custom schemes, not to upgrade
-transport).
+transport). Two commands read a path the webview names, and both are narrowed:
+`scan_image` (a photo of a card or identity document) refuses unless the session is unlocked and
+unless the extension is one of a fixed image list (`scan/mod.rs`), and
+`read_env_file` refuses unless the session holds a key and unless the file is
+named like a `.env` or parses as one, capped at 1 MiB (`commands/env.rs`).
 
 ## What sits on disk
 
@@ -59,9 +63,21 @@ Inside the decrypted database:
   tombstone leaves zeros in the freed pages rather than the old ciphertext,
   and a purge also checkpoints and truncates the write-ahead log so the page's
   previous image does not linger there. Someone who later obtains the database
-  key finds no purged secrets in free space.
+  key finds no purged secrets in free space. A master-password change re-encrypts
+  every page through `PRAGMA rekey`, which is an ordinary write transaction: in
+  WAL mode the re-encrypted pages would land in `vault.db-wal` while the main
+  file still opened under the *old* key. The rekey folds the WAL back and
+  truncates it before returning (`sqlite.rs`), so no page under the old key
+  survives the change in either file.
 - A small `meta` key/value table holds app data — the KDF descriptor and similar
   settings — not schema versioning (that rides SQLite's `user_version`).
+- **The favicon cache is inside SQLCipher.** A `favicons` table holds one row per
+  host — `host`, `uri` (NULL records a miss, aged out by `fetched_at`) — and is
+  the whole of the icon cache (`store/sqlite.rs`, `favicon.rs`). It replaces the
+  loose `icons/` files named after each host, which put the vault's host list,
+  live and deleted, in the clear beside the encrypted database where any
+  file-level backup picked it up. The legacy directory is removed the first time
+  a lookup runs on an upgraded install.
 
 The practical shape of this two-layer design: an attacker who never obtains the
 key sees only SQLCipher ciphertext for everything. Metadata confidentiality rests
@@ -89,41 +105,55 @@ truncated one.
 
 ### Key derivation (KDF)
 
-From the master password the core derives two keys:
+From the master password the core derives one **Argon2id** master key — `m=64
+MiB, t=3, p=4`, a fresh 32-byte random salt, the password fed in directly with
+no pre-hash (`crypto/kdf.rs`) — and from that master two independent subkeys by
+`HKDF-SHA256` under distinct context labels (`crypto/vault.rs`):
 
-- **The SQLCipher database key** — `HKDF-SHA256` over the session secret with a
-  fixed context salt (`crypto::sqlcipher_key`). SQLCipher opens the file with this
-  raw key; a wrong password derives a wrong key and the open fails verification,
-  which the app surfaces as an invalid password.
-- **The payload key** — `PBKDF2-HMAC-SHA512`, 100,000 iterations, with a per-value
-  random 64-byte salt (the legacy `Cryptor`, `ring`-backed, in
-  `crypto/mod.rs`). This is the key that seals each entry payload and each nested
-  secret field.
+- **The SQLCipher database key** — the `sqlcipher-db-key` subkey. SQLCipher opens
+  the file with this raw key; a wrong password derives a wrong key and the open
+  fails verification, which the app surfaces as an invalid password.
+- **The payload key** — the payload subkey, used directly as an AES-256-GCM key
+  with a fresh random nonce per value and no per-payload KDF. This is the key
+  that seals each entry payload and each nested secret field.
 
-Both are derived from the same `secret` = `base64(SHA512(master password))`, a
-pre-hash kept for byte-compatibility with the legacy `.swftx` vault format. The
-KDF descriptor recorded in the `meta` table is currently the placeholder string
-`pbkdf2-sha512-100000`.
+One KDF pass covers both, and neither subkey reveals the other.
 
-> **Shipped vs. in progress (honest KDF status):**
-> - **Argon2id is landed as a primitive, not yet as the live derivation.**
->   `crypto/kdf.rs` ships a memory-hard **Argon2id** implementation
->   (`m=64 MiB, t=3, p=4`), a versioned, self-describing `KdfParams` descriptor
->   (Argon2id or PBKDF2-SHA512, each carrying its salt), a fresh 32-byte random
->   salt for new params, and a `derive()` dispatcher — all unit-tested, including
->   a known-answer vector. But `setup`, `unlock`, `change_master_password`, and
->   the import paths still derive keys through the PBKDF2/HKDF path above; the
->   `meta` descriptor is a placeholder for the upgrade. Wiring Argon2id into the
->   live path — and persisting its salt/params where they can be read *before* the
->   database is opened (a plaintext sidecar, since Argon2 parameters must be known
->   to derive the key that opens the encrypted DB) — is **in progress**. Once
->   wired, new vaults derive with Argon2id and PBKDF2 remains only to **read
->   legacy `.swftx` backups**.
-> - **PBKDF2 strength.** 100,000 iterations of PBKDF2-HMAC-SHA512 is below current
->   OWASP guidance (~210k), and the `SHA-512` pre-hash adds no strength. This is
->   precisely why Argon2id is the target primitive.
-> - **Attempt throttling.** There is no failed-unlock backoff, so offline guessing
->   against a stolen database is bounded only by the KDF cost.
+The parameters and the salt have to be readable *before* the encrypted database
+can be opened, so they live in a plaintext sidecar beside it, `vault.kdf.json`
+(`storage::KDF_SIDECAR_FILE`). It holds nothing secret — an algorithm tag, three
+costs and a salt — and it is authoritative: `create_vault` writes it before the
+database exists, and `derive_key` reads it on every unlock. The same descriptor
+is mirrored into `meta` for reference, and it is what a `.rowel` pack carries in
+its header so another device can derive the key for the snapshot inside.
+
+> **Where the KDF stands:**
+> - **Argon2id is the live derivation.** `session::create_vault` mints
+>   `KdfParams::default_argon2id`, writes the sidecar, and derives the master;
+>   `session::derive_key` re-derives it from that sidecar on every unlock,
+>   feeding the password to Argon2id directly — no `SHA-512` pre-hash on this
+>   path. A restore derives from the descriptor the pack carries in its header,
+>   and a password change writes fresh params and a fresh sidecar (rolling both
+>   back together if it is interrupted). A database that exists with *no*
+>   sidecar predates this wiring (an interim/dev vault) and still opens under the
+>   old deterministic key, but it cannot sync — `SessionVault::capture` refuses a
+>   vault with no descriptor to put in the pack header.
+> - **PBKDF2 is the legacy path.** `PBKDF2-HMAC-SHA512` at 100,000 iterations over
+>   `base64(SHA512(password))` — the Electron-era `Cryptor` — survives to read
+>   legacy `.swftx` backups and to open those sidecar-less vaults. Nothing new is
+>   sealed under it. It remains a shape `KdfParams` can parse, which is why the
+>   bound below applies to it too.
+> - **Failed unlocks are throttled.** Three attempts are free; each wrong password
+>   after that doubles the wait — 2s, 4s, 8s, … capped at five minutes
+>   (`FREE_ATTEMPTS` and `MAX_DELAY_SECS` in `auth.rs`). `commands::auth::unlock`
+>   refuses outright while a lockout stands, and a successful unlock resets the
+>   counter. Only SQLCipher's own wrong-key failure counts; an I/O error or a
+>   schema-too-new refusal does not. The state is a plaintext sidecar beside the
+>   vault, `vault.lock.json` — it has to be, since a wrong password never opens
+>   the database the counter would otherwise live in — and it fails open if it is
+>   missing or unreadable, because it is a throttle rather than a security
+>   boundary. So it bounds guessing *at this app's lock screen* and nothing else:
+>   see "Offline brute force at scale" below.
 > - **Untrusted KDF parameters are bounded.** A descriptor is read off things
 >   this build did not write — a `.rowel` backup, a pack pulled from Drive, the
 >   sidecar on disk — and the Argon2 crate would otherwise accept a memory cost
@@ -196,17 +226,57 @@ carries them as part of the opaque payload and never sees them.
    unlocked session and re-armed by every sign of the user — input in the
    webview, throttled to one ping every few seconds (`touch_activity`), and the
    window gaining or losing focus — so the vault seals that long after the
-   *last* one whether the window is in front or behind. Every lock, including
+   *last* one whether the window is in front or behind. **Coming back is not a
+   fresh start when the time away already spent the whole timeout**: the focus
+   event locks instead of re-arming, and it judges by the wall clock rather than
+   the timer's `Instant`, which does not advance across a sleeping Mac or a
+   suspended iOS process (`autolock::handle_event`). Every lock, including
    a workspace switch, also **clears the clipboard** if it still holds a secret
    the app copied, so a copied password does not outlive the session it came
-   from even with the clipboard timeout set to "Never" (not on iOS, where the
-   pasteboard expiry set at copy time is the clear).
+   from even with the clipboard timeout set to "Never". On iOS the clear is the
+   expiry instead — reading the pasteboard back to compare would raise the system
+   paste banner over a value the user never asked to paste — and **every iOS
+   write now carries one**: what the user asked for, or a 24-hour cap when they
+   asked for "Never", and never longer than that cap
+   (`IOS_MAX_PASTEBOARD_TTL`). On Linux the copy carries no concealed marker at
+   all: off Apple and Windows `commands/clipboard.rs` falls back to a plain
+   write, so a clipboard manager there may record the value.
+
+   One thing a lock does not reach: a sync run in flight holds key copies of its
+   own. `SessionVault::capture` copies the SQLCipher key into the run's vault
+   handle (`sync/engine.rs`), and the run's `DriveRemote` owns a `Cryptor`
+   derived from the same master — both living on the blocking thread the run
+   occupies. A lock ends the session but not that thread, so those copies
+   outlive it until the run's thread does. What bounds them is the run, not the
+   lock: the Drive connect and read-stall deadlines, and the 256 MiB cap on the
+   pack being pulled.
 4. **Optional biometric unlock (opt-in).** Instead of re-entering the passphrase,
    the same key material can be stored in the OS keychain behind a biometric gate
    (`secure_store.rs`):
-   - **macOS:** a data-protection Keychain item with a `SecAccessControl` of
-     `kSecAccessControlBiometryCurrentSet`. Touch ID is enforced by the OS on
-     *read*, and the item auto-invalidates if the enrolled fingerprints change.
+   - **macOS (`GateMode::Protected`):** a data-protection Keychain item with a
+     `SecAccessControl` of `kSecAccessControlBiometryCurrentSet` and a protection
+     class of `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` — so the item
+     never rides along in an encrypted backup to be restored onto another
+     device, and it stops existing the moment the user removes their passcode,
+     which is the same moment biometrics stop meaning anything. Touch ID is
+     enforced by the OS on *read*, and the item auto-invalidates if the enrolled
+     fingerprints change.
+   - **macOS fallback (`GateMode::Prompt`):** the data-protection keychain is the
+     only one that honours a biometric `SecAccessControl`, and reaching it needs
+     the profile-gated `keychain-access-groups` entitlement. A build without it
+     is refused with `errSecMissingEntitlement`, and `secure_store.rs` then
+     stores the key as an **ordinary keychain item — no access control, no OS
+     gate** — under an account of its own, and makes the app's own `LAContext`
+     policy evaluation the gate, run before the read. That is a weaker
+     guarantee, and deliberately a different one: the biometric check is enforced
+     in-process, so it binds this app and not the keychain, where the OS would
+     have refused the read outright. The mode is recorded at enrollment and never
+     re-derived — an item is never read under a gate it was not stored behind —
+     and the Settings row names which one is in force rather than letting the two
+     read as one feature. The release build does not ship the fallback by
+     accident: `scripts/check-macos-entitlements.mjs`, run from
+     `.github/workflows/release.yml`, fails the build when the bundle requests a
+     profile-gated entitlement that no embedded provisioning profile grants.
    - **Windows:** only an AES-256-GCM blob goes into Credential Manager, sealed
      under a key derived from a Windows Hello key-credential signature, so
      opening it requires passing the Hello prompt rather than merely being the
@@ -265,6 +335,15 @@ Bringing existing data forward is an **explicit** action, and there are two path
   offline-first with no account server, no telemetry, and no phone-home. The only
   outbound request at launch is the signed updater check to GitHub Releases; Drive
   sync (when enabled) runs from the Rust core over HTTPS, not from the webview.
+- **The app-switcher snapshot.** While the unlocked vault is on screen but the
+  window is not in front of the user, an opaque cover is drawn over the whole of
+  it (`components/elements/PrivacyScreen`). iOS snapshots the webview for the app
+  switcher the moment the scene resigns active and keeps that image on disk until
+  the app is foregrounded; the same image is what Mission Control shows and what
+  a screenshot of an unfocused window captures. The cover goes up on the focus
+  event that precedes the snapshot, with no animation — a fade would hand the
+  system a half-transparent frame — and it is mounted with the unlocked vault
+  only, never over the lock screen.
 - **Passive at-rest access and backups.** Because the database is SQLCipher-
   encrypted whole-file, file-level backups (Time Machine, disk images, cloud file
   backups) carry only ciphertext.
@@ -333,13 +412,18 @@ fresh random 256-bit AES-GCM key and uploaded to the sender's own Drive as an
 - **A known master passphrase.** The passphrase is the single root of trust.
   Whoever knows it can decrypt the vault; there is no second factor on the
   encryption itself.
-- **Offline brute force at scale.** There is no failed-unlock throttling yet, so a
-  stolen database can be attacked offline, bounded only by the KDF cost. That cost
-  is the PBKDF2 parameters described above until Argon2id is wired into the live
-  path.
+- **Offline brute force at scale.** The failed-unlock backoff described above is
+  local state — a counter in a sidecar beside the vault — so it bounds guessing
+  at this app's lock screen and nothing else. Someone holding a stolen copy of
+  the database deletes the sidecar, or never runs Rowel at all, and attacks the
+  file directly. What bounds that is the KDF cost alone: one Argon2id derivation
+  at `m=64 MiB, t=3, p=4` per guess, which is why the primitive rather than the
+  throttle is the defence that matters here.
 - **The clipboard window.** Copied secrets go to the system clipboard. Rowel
-  marks them as concealed and auto-clears after a timeout (and on lock), but
-  other apps can read the clipboard during that window.
+  marks them as concealed where the platform has a marker for it and auto-clears
+  after a timeout (and on lock), but other apps can read the clipboard during
+  that window — and on Linux there is no marker to set, so a clipboard manager
+  may keep a copy of its own that no clear of ours reaches.
 - **Rollback through Drive's revision history.** Sync is a whole-state merge:
   a device pulls the pack, merges it, and pushes the union. Deletions travel as
   tombstones, and tombstones are reclaimed after 90 days so the vault does not
@@ -363,6 +447,6 @@ that keeps each entry's secrets sealed until reveal, keys that are derived on
 unlock, held only in the Rust process, and zeroized on lock, and the absence of
 any server that could be breached. It assumes the user's device and operating
 system are trustworthy while the vault is unlocked. It does not try to defend a
-device that is already compromised. The move to Argon2id for live key derivation
-is landing incrementally: the primitive and its versioned descriptor are merged,
-and the live derivation path is being wired over from PBKDF2.
+device that is already compromised. Live key derivation is Argon2id, from a
+versioned descriptor in a sidecar beside the vault; PBKDF2 remains only to read
+what older formats wrote.
