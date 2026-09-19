@@ -50,6 +50,15 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
 vi.mock('@tauri-apps/plugin-updater', () => ({ check: vi.fn() }))
 vi.mock('@tauri-apps/plugin-process', () => ({ relaunch: vi.fn() }))
 
+// The window's focus stream `useObscured` subscribes to. Focus never changes by
+// default, so the privacy cover stays off; a suite about it replaces this with a
+// mock that keeps the handlers (see PrivacyScreen/index.test.tsx).
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({
+    onFocusChanged: vi.fn().mockResolvedValue(() => {})
+  })
+}))
+
 // The drag-drop stream `useFileDrop` subscribes to. Nothing drops a file by
 // default; a suite that needs to replaces this with a mock that keeps the
 // handlers (see envIngest.test.tsx).
