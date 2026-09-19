@@ -35,16 +35,33 @@ bump version → run Release manually from Actions → CI builds all three platf
 
 A minisign keypair signs every update artifact; the app verifies it with the
 public key embedded in `src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
-The public key is committed. The private key lives outside the repo, for
-example at `~/.tauri/rowel.key`. To regenerate:
+The public key is committed; the private key lives outside the repo at
+**`~/.tauri/swifty.key`**.
+
+That filename predates the Swifty → Rowel rebrand and is deliberately left
+alone. Do not generate a `rowel.key` to replace it: the public half of this
+keypair is compiled into every installer already in the wild, so a new keypair
+silently breaks auto-update for every existing install. The name is cosmetic;
+the key is not.
+
+Confirm the private key on disk matches what ships:
 
 ```sh
-bun run tauri signer generate -w ~/.tauri/rowel.key
+diff <(base64 -d < ~/.tauri/swifty.key.pub) \
+     <(jq -r .plugins.updater.pubkey src-tauri/tauri.conf.json | base64 -d)
 ```
 
-Then put the new `~/.tauri/rowel.key.pub` contents into
-`plugins.updater.pubkey`. **If you lose the private key, existing installs can
-no longer auto-update** and need a fresh manual install.
+Regenerating is a last resort — for a compromised key, not a rename. It strands
+every existing install on its current version, and each user has to download a
+fresh build by hand. If you genuinely must:
+
+```sh
+bun run tauri signer generate -w ~/.tauri/swifty.key
+```
+
+then put the new `~/.tauri/swifty.key.pub` contents into
+`plugins.updater.pubkey`. **If you lose the private key you have no choice**:
+existing installs can no longer auto-update and need a fresh manual install.
 
 ### 2. GitHub repository secrets
 
@@ -59,7 +76,7 @@ onto the env names the Tauri bundler expects.
 | `APPLE_ID` | Apple ID email of the developer account. |
 | `APPLE_ID_PASSWORD` | An **app-specific password** (appleid.apple.com → Sign-In and Security → App-Specific Passwords). Not your account password. |
 | `APPLE_TEAM_ID` | `UFBL3F444A`. |
-| `TAURI_SIGNING_PRIVATE_KEY` | Contents of `~/.tauri/rowel.key`. |
+| `TAURI_SIGNING_PRIVATE_KEY` | Contents of `~/.tauri/swifty.key` (pre-rebrand name, see above — do not regenerate). |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for that key (empty if generated without one). |
 | `GOOGLE_OAUTH_CLIENT_ID` | Desktop-app OAuth client id from Google Cloud Console, baked in at compile time for Google Drive sync (`src-tauri/src/sync/auth.rs`). Unset → Drive sync reports "not configured". |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | The matching client secret. |

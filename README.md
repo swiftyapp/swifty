@@ -192,8 +192,10 @@ is ignored on iOS and must never be shipped in a mobile binary.
 Release builds are signed for `tauri-plugin-updater`. The public key lives in
 `src-tauri/tauri.conf.json`; the matching **private key is never committed** and
 is provided to CI via the `TAURI_SIGNING_PRIVATE_KEY` (and
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) secrets. Generate a keypair with
-`bun run tauri signer generate -w ~/.rowel/updater.key`.
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) secrets. The project's key already exists
+at `~/.tauri/swifty.key` and must not be regenerated — its public half is
+compiled into every installer already released. See
+[docs/releasing.md](docs/releasing.md#1-updater-signing-keypair).
 
 ## Security
 
