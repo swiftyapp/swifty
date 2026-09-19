@@ -177,7 +177,14 @@ impl SqliteStore {
     /// key afterwards. Used by change-master-password after the payloads have
     /// been re-encrypted under the new app key.
     pub fn rekey(&self, new_key: &[u8]) -> Result<()> {
-        self.lock().execute_batch(&key_pragma("rekey", new_key))?;
+        let conn = self.lock();
+        conn.execute_batch(&key_pragma("rekey", new_key))?;
+        // `PRAGMA rekey` is an ordinary write transaction that rewrites every
+        // page, so in WAL mode the re-encrypted pages land in `vault.db-wal`
+        // and the main file still opens under the OLD password until something
+        // checkpoints. A password change must not leave old-key pages behind in
+        // either file, so fold the WAL back and truncate it here.
+        drop_wal_history(&conn);
         Ok(())
     }
 

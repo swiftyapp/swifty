@@ -311,13 +311,22 @@ pub fn disconnect(app: &AppHandle) -> Result<()> {
 /// Re-seal the token file under `new` — a password change moved the vault key
 /// it was sealed with. Read and write under the token-file guard, so a
 /// disconnect cannot land between them and have its delete undone by the write.
+///
+/// The generation moves too, exactly as [`disconnect`] moves it: a sync run
+/// that captured the *old* cryptor can be awaiting a token refresh right now,
+/// and its write-back would re-seal the file under the key the change just
+/// retired — leaving credentials no later unlock could decrypt. Bumping here
+/// makes that write-back's [`persisted_if_current`] return `Ok(false)`, so the
+/// in-flight run winds down and leaves the freshly re-sealed file alone.
 pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()> {
     let state = app_state(app);
-    let _generation = state.sync_generation.lock().unwrap();
+    let mut generation = state.sync_generation.lock().unwrap();
     let Some(tokens) = read_tokens(app, old) else {
         return Ok(());
     };
-    write_tokens(app, new, &tokens)
+    write_tokens(app, new, &tokens)?;
+    *generation += 1;
+    Ok(())
 }
 
 // --- OAuth flow ---
@@ -430,12 +439,15 @@ pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -
     // disk is now out of date — afterwards the tokens look fresh either way.
     let refreshing = needs_refresh(&tokens);
     let token = fresh_access_token(client, app, &mut tokens).await?;
-    // Skipping the write is the whole point: re-creating the file would undo
-    // the disconnect. The caller still gets this token for the request it is
-    // in the middle of, which is harmless — the file is gone, so nothing after
-    // this can refresh again.
+    // Skipping the write is the whole point: it would undo the disconnect that
+    // deleted the file, or re-seal it under the key a password change just
+    // retired. The caller still gets this token for the request it is in the
+    // middle of, which is harmless — either way nothing after this refreshes
+    // against the stale file again.
     if refreshing && !persisted_if_current(app, cryptor, &tokens, generation)? {
-        log::info!("Drive disconnected mid-refresh; not writing the refreshed tokens back");
+        log::info!(
+            "the Drive connection moved on mid-refresh; not writing the refreshed tokens back"
+        );
     }
     Ok(token)
 }
@@ -443,9 +455,10 @@ pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -
 /// Write the tokens if the connection they belong to is still `generation`,
 /// and say whether they were. Compared and written under the guard a disconnect
 /// bumps and deletes under: a bare compare would leave a gap for the disconnect
-/// to land in and have its delete undone by the write. `false` means the
-/// account was disconnected since `generation` was read, and nothing was
-/// written; whatever the tokens were for is the caller's to wind down.
+/// to land in and have its delete undone by the write. `false` means the token
+/// file moved out from under `generation` — disconnected, or re-sealed by a
+/// password change ([`reseal_tokens`]) — and nothing was written; whatever the
+/// tokens were for is the caller's to wind down.
 pub(crate) fn persisted_if_current(
     app: &AppHandle,
     cryptor: &Cryptor,
