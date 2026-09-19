@@ -610,7 +610,7 @@ mod tests {
         cache(&session, "ex.com", asked_in, icon);
         assert_eq!(
             cached(&session, "ex.com", asked_in),
-            Some(Some(icon.unwrap().to_string()))
+            Some(icon.map(str::to_string))
         );
 
         // The vault locks and a second workspace is opened while the lookup
@@ -642,7 +642,7 @@ mod tests {
         cache(&session, "other.com", now, icon);
         assert_eq!(
             cached(&session, "other.com", now),
-            Some(Some(icon.unwrap().to_string()))
+            Some(icon.map(str::to_string))
         );
     }
 
