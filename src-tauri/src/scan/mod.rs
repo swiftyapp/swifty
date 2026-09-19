@@ -89,11 +89,19 @@ pub fn scan_lines(lines: &[String]) -> Option<ScanResult> {
 /// user's own, so passing bytes would only add a copy of a card photo to
 /// memory without removing a read of the file.
 pub async fn scan(path: String) -> Result<ScanResult> {
+    // The path is the webview's word for a file on the user's disk, so it is
+    // checked before anything opens it: only the image types the pickers offer
+    // are scannable, and a scan of anything else is a read this has no business
+    // doing. Refused as "nothing recognized" — which is what it is.
+    let file = local_path(&path);
+    if !is_image(&file) {
+        return Err(Error::Unrecognized);
+    }
     tauri::async_runtime::spawn_blocking(move || {
         let ocr = platform_ocr().ok_or_else(|| {
             Error::Unsupported("scanning is not available on this platform".into())
         })?;
-        let mut lines = ocr.recognize(&local_path(&path))?;
+        let mut lines = ocr.recognize(&file)?;
         let found = scan_lines(&lines);
         // The recognized lines are the card number in the clear; the parsed
         // result is all that may outlive this call.
@@ -117,6 +125,21 @@ fn local_path(path: &str) -> std::path::PathBuf {
         .filter(|u| u.scheme() == "file")
         .and_then(|u| u.to_file_path().ok())
         .unwrap_or_else(|| std::path::PathBuf::from(path))
+}
+
+/// The image types both OCR backends load and both entry points offer — the
+/// file dialog's filter and the window drop's own test. Kept in step with
+/// `IMAGE_EXTENSIONS` in `src/lib/fileTypes.ts`.
+const IMAGE_EXTENSIONS: [&str; 10] = [
+    "png", "jpg", "jpeg", "heic", "heif", "webp", "tiff", "tif", "bmp", "gif",
+];
+
+/// Whether a path names one of those, by extension alone: the file is not
+/// opened to find out, which is the point.
+fn is_image(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| IMAGE_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
 }
 
 /// Whether this platform can scan at all, so the UI can leave the affordance

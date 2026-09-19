@@ -4,13 +4,24 @@
 
 use tauri::{AppHandle, State};
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::scan::ScanResult;
 use crate::state::AppState;
 use crate::{favicon, scan};
 
+/// Read a card or an identity document out of the image at `path`.
+///
+/// Unlocked vaults only. The scanner reads a file the webview named and hands
+/// back what it found in it, so a locked app must not run one for anybody: the
+/// only surfaces that scan live in the unlocked shell, and the refusal is an
+/// error rather than a silent miss because a real scan never asks while locked.
+/// `scan` itself refuses a path that is not one of the image types the pickers
+/// offer, before the file is opened.
 #[tauri::command]
-pub async fn scan_image(path: String) -> Result<ScanResult> {
+pub async fn scan_image(state: State<'_, AppState>, path: String) -> Result<ScanResult> {
+    if !state.session.lock().unwrap().is_unlocked() {
+        return Err(Error::Locked);
+    }
     scan::scan(path).await
 }
 
