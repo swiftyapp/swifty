@@ -26,7 +26,11 @@ of a card or identity document) and `read_env_file` — and neither trusts the
 path it is handed. A path is readable only if it was granted by one of two
 events the core itself observes: the OS file dialog run from Rust
 (`pick_file`), or an OS drag-and-drop onto the window (`PathGrants`, one-shot,
-consumed on use). The session must then still be the one that asked — the epoch
+consumed on use). A grant carries the purpose it was made for — the picker's
+kind (`image` or `env`), or for a drop the file's kind — and each reader spends
+only a grant of its own purpose: a path the user chose in an env-file dialog
+cannot be read by `scan_image`, so the dialog's framing is part of what was
+consented to. The session must then still be the one that asked — the epoch
 is re-checked after the read, so a lock or a workspace switch mid-read discards
 the bytes. Only then is the file classified: the extension against a fixed
 image list (`scan/mod.rs`), the `.env` name-or-parse check and the 1 MiB cap
