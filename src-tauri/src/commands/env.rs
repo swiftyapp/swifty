@@ -10,7 +10,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::error::{Error, Result};
-use crate::grants::PathGrants;
+use crate::grants::{PathGrants, Purpose};
 use crate::state::AppState;
 
 // A real .env is a few kilobytes. Anything past this is not one, and reading
@@ -115,12 +115,13 @@ pub async fn read_env_file(
     // a read of the user's disk on the webview's say-so. Only an open vault may
     // ask for one — the drop target that calls this lives in the unlocked shell,
     // and a locked app has no business reading files for anybody — and only for
-    // a path the user chose: dropped on the window or picked through
-    // `pick_file`, either of which granted it (see `grants`). The name is gated
-    // too, in `read_env_text`. A lock while the file is read discards the text:
-    // the session that asked for it is gone.
+    // a path the user chose as an env file: dropped on the window or picked
+    // through the env `pick_file`, either of which granted it for this read
+    // (see `grants`). The name is gated too, in `read_env_text`. A lock while
+    // the file is read discards the text: the session that asked for it is
+    // gone.
     let epoch = super::unlocked_epoch(&state)?;
-    if !grants.take(Path::new(&path)) {
+    if !grants.take(Path::new(&path), Purpose::Env) {
         return Err(Error::Unsupported(
             "this file was not chosen in the app".into(),
         ));
