@@ -90,11 +90,26 @@ pub fn sync_scratch_dir(app: &AppHandle) -> Result<PathBuf> {
     Ok(workspace_dir(app)?.join("sync-scratch"))
 }
 
-// Cached website favicons (list-row identity). Safe to wipe; refetched lazily.
-// On the root, not per workspace: a favicon is public web content, so caching it
-// once serves every workspace and leaks nothing about which of them uses it.
-pub fn icons_dir(app: &AppHandle) -> Result<PathBuf> {
-    Ok(root_dir(app)?.join("icons"))
+// Favicons used to be cached as loose `{host}.uri` / `{host}.miss` files here.
+// The file *names* were the vault's host list in the clear — every site the
+// user has an account at, including ones they had deleted — sitting beside the
+// encrypted database for any file-level backup to pick up. The cache now lives
+// in a `favicons` table inside the SQLCipher vault, so this directory is only
+// ever leftovers: removed whole, once, at startup (`lib.rs`). At startup
+// rather than at the first lookup, because the list is on disk whether or not
+// this install ever looks an icon up again — an empty vault, a workspace whose
+// rows have no hosts, every host rejected — and a cache that is never read is
+// exactly the one that would keep it forever. Best effort: a directory we
+// could not remove is logged, not fatal, and is tried again next launch.
+pub fn remove_legacy_icons_dir(app: &AppHandle) {
+    let Ok(dir) = root_dir(app).map(|root| root.join("icons")) else {
+        return;
+    };
+    if dir.exists() {
+        if let Err(e) = fs::remove_dir_all(&dir) {
+            log::warn!("could not remove the legacy favicon directory: {e}");
+        }
+    }
 }
 
 // Whether the SQLite store has been created (non-empty file present).

@@ -91,7 +91,8 @@ pub async fn scan_image(
 /// The gate is the *session the request came from*, not "some session is
 /// unlocked": a lookup is several round trips, and the vault can lock — or
 /// lock and reopen — while one is in flight. `favicon::fetch` asks again
-/// before each request, so a lock mid-lookup ends it at the next step.
+/// before each request, so a lock mid-lookup ends it at the next step, and
+/// caches the answer against that session's store or not at all.
 #[tauri::command]
 pub async fn fetch_favicon(
     app: AppHandle,
@@ -101,6 +102,5 @@ pub async fn fetch_favicon(
     let Ok(epoch) = super::unlocked_epoch(&state) else {
         return Ok(None);
     };
-    let same_session = || super::same_session(&state, epoch).is_ok();
-    favicon::fetch(&app, &host, same_session).await
+    favicon::fetch(&app, &host, epoch).await
 }
