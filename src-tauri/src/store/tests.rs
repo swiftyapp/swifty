@@ -623,6 +623,109 @@ fn future_schema_fails_as_schema_newer_not_wrong_key() {
     }
 }
 
+const DAY_MS: i64 = 24 * 60 * 60 * 1000;
+const MISS_TTL_MS: i64 = 7 * DAY_MS;
+
+#[test]
+fn favicon_round_trips_an_icon_and_a_miss() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    // Nothing recorded is not the same answer as "recorded: no icon".
+    assert_eq!(store.get_favicon("ex.com", MISS_TTL_MS).unwrap(), None);
+
+    store
+        .put_favicon("ex.com", Some("data:image/png;base64,AA"))
+        .unwrap();
+    store.put_favicon("nope.com", None).unwrap();
+
+    assert_eq!(
+        store.get_favicon("ex.com", MISS_TTL_MS).unwrap(),
+        Some(Some("data:image/png;base64,AA".into()))
+    );
+    assert_eq!(
+        store.get_favicon("nope.com", MISS_TTL_MS).unwrap(),
+        Some(None)
+    );
+}
+
+// One row per host: a host that gains an icon after a recorded miss keeps the
+// icon, not both answers.
+#[test]
+fn favicon_put_replaces_the_previous_answer() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    store.put_favicon("ex.com", None).unwrap();
+    store
+        .put_favicon("ex.com", Some("data:image/png;base64,BB"))
+        .unwrap();
+    assert_eq!(
+        store.get_favicon("ex.com", MISS_TTL_MS).unwrap(),
+        Some(Some("data:image/png;base64,BB".into()))
+    );
+
+    store.put_favicon("ex.com", None).unwrap();
+    assert_eq!(
+        store.get_favicon("ex.com", MISS_TTL_MS).unwrap(),
+        Some(None)
+    );
+}
+
+// A miss is only as good as its TTL: past it the host is due for a retry, and
+// the caller must see the same "nothing usable" it sees for a host never
+// looked up. A hit has no TTL at all.
+#[test]
+fn a_miss_expires_but_a_hit_does_not() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    store.put_favicon("nope.com", None).unwrap();
+    store
+        .put_favicon("ex.com", Some("data:image/png;base64,CC"))
+        .unwrap();
+
+    // A TTL of zero makes every recorded miss stale, whatever the clock says.
+    assert_eq!(store.get_favicon("nope.com", 0).unwrap(), None);
+    assert_eq!(
+        store.get_favicon("ex.com", 0).unwrap(),
+        Some(Some("data:image/png;base64,CC".into()))
+    );
+}
+
+// The cache is vault data, so it is inside the encrypted database and travels
+// with it — a reopen finds it, and it is subject to the same key.
+#[test]
+fn favicons_survive_a_reopen() {
+    let path = tmp_db();
+    {
+        let store = SqliteStore::open(&path, KEY).unwrap();
+        store
+            .put_favicon("ex.com", Some("data:image/png;base64,DD"))
+            .unwrap();
+    }
+    let store = SqliteStore::open(&path, KEY).unwrap();
+    assert_eq!(
+        store.get_favicon("ex.com", MISS_TTL_MS).unwrap(),
+        Some(Some("data:image/png;base64,DD".into()))
+    );
+}
+
+// The favicons table arrived as a migration, so a vault created by an earlier
+// build gains it on open rather than failing every lookup.
+#[test]
+fn the_favicons_table_is_migrated_into_an_existing_vault() {
+    let path = tmp_db();
+    {
+        let store = SqliteStore::open(&path, KEY).unwrap();
+        store.upsert(&rec("1", b"x")).unwrap();
+        // Rewind to the schema the build before this table stamped, and drop
+        // the table it did not have.
+        store.drop_favicons_for_test().unwrap();
+    }
+    let store = SqliteStore::open(&path, KEY).unwrap();
+    assert_eq!(store.list().unwrap().len(), 1);
+    store.put_favicon("ex.com", None).unwrap();
+    assert_eq!(
+        store.get_favicon("ex.com", MISS_TTL_MS).unwrap(),
+        Some(None)
+    );
+}
+
 #[test]
 fn reopening_a_migrated_db_is_idempotent() {
     let path = tmp_db();

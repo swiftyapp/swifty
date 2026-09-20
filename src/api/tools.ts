@@ -54,6 +54,20 @@ export const getAudit = (checkBreaches: boolean): Promise<Audit> =>
 
 // What the OS text recognizer read out of one image: the kind of secret it is,
 // and its fields keyed exactly like that kind's draft.
+/**
+ * The OS file dialog for a file the backend will then read, opened from Rust
+ * rather than through the dialog plugin here: `scanImage` and `readEnvFile`
+ * only read a path the backend itself watched the user choose, and the picker
+ * that runs there is what makes the choice one it saw. `null` when the dialog
+ * was dismissed.
+ *
+ * `label` names the filter in the dialog's own chrome, so it comes from the
+ * catalogue the webview owns. `'env'` takes any file — an env file may be
+ * named anything.
+ */
+export const pickFileToRead = (kind: 'image' | 'env', label?: string): Promise<string | null> =>
+  call('pick_file', { kind, label: label ?? null })
+
 export interface ScanResult {
   kind: 'card' | 'identity'
   fields: Record<string, string>
@@ -62,9 +76,10 @@ export interface ScanResult {
 /**
  * Recognize a card or an identity document in the image at `path`.
  *
- * The path is the one the user already has (a drop, or the file dialog) — the
- * image is read where it lies and never copied. Rejects `unrecognized` when the
- * text is there but says neither.
+ * The path is the one the user already has (a drop, or `pickFileToRead`) — the
+ * image is read where it lies and never copied. A path from anywhere else is
+ * refused: the backend reads only what it saw the user choose. Rejects
+ * `unrecognized` when the text is there but says neither.
  */
 export const scanImage = (path: string): Promise<ScanResult> => call('scan_image', { path })
 
