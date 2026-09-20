@@ -80,6 +80,31 @@ fn data_round_trip() {
     assert_eq!(back, value);
 }
 
+// The owned path is what an import takes: it consumes the blob and unseals in
+// place, so it has to read exactly what the borrowed one reads — and still
+// refuse a ciphertext that was edited under it, since decrypting in place is
+// the easy way to hand back unauthenticated bytes.
+#[test]
+fn owned_data_round_trip_rejects_a_tampered_ciphertext() {
+    let cryptor = Cryptor::new(&hash_secret("master-pw"));
+    let value = serde_json::json!({ "entries": [], "n": 42, "s": "два" });
+    let blob = cryptor.encrypt_data(&value).unwrap();
+
+    let back: Value = cryptor.decrypt_data_owned(blob.clone()).unwrap();
+    assert_eq!(back, value);
+
+    // Flip the last ciphertext byte, well past `salt ‖ iv ‖ tag`.
+    let mut bytes = hex::decode(STANDARD.decode(&blob).unwrap()).unwrap();
+    let last = bytes.len() - 1;
+    bytes[last] ^= 0xff;
+    let tampered = STANDARD.encode(hex::encode(&bytes));
+
+    assert!(cryptor
+        .decrypt_data_owned::<Value>(tampered.clone())
+        .is_err());
+    assert!(cryptor.decrypt_data::<Value>(&tampered).is_err());
+}
+
 #[test]
 fn obscure_expose_round_trip() {
     let cryptor = Cryptor::new(&hash_secret("master-pw"));

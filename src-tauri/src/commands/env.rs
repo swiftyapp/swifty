@@ -3,7 +3,6 @@
 //! never parsed here — the frontend owns the format — and never logged: the
 //! contents are the secret.
 
-use std::fs;
 use std::path::Path;
 
 use serde::Serialize;
@@ -12,6 +11,7 @@ use tauri::State;
 use crate::error::{Error, Result};
 use crate::grants::{PathGrants, Purpose};
 use crate::state::AppState;
+use crate::storage::read_regular_file_capped;
 
 // A real .env is a few kilobytes. Anything past this is not one, and reading
 // it whole into the webview would only ever be a mistake.
@@ -81,15 +81,12 @@ fn looks_like_env(text: &str) -> bool {
 // The command's body, split out so the refusals can be tested without a Tauri
 // runtime around them.
 pub fn read_env_text(path: &Path) -> Result<EnvFile> {
+    let bytes = read_regular_file_capped(path, MAX_BYTES)?;
+    let body = String::from_utf8(bytes).map_err(|_| Error::FileNotText)?;
     let file_name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let meta = fs::metadata(path)?;
-    if meta.len() > MAX_BYTES {
-        return Err(Error::FileTooLarge);
-    }
-    let body = String::from_utf8(fs::read(path)?).map_err(|_| Error::FileNotText)?;
     // Whatever path arrives is read whole and handed back, so what leaves here
     // is held to being an env file: named like one, or — since the drop target
     // claims a file that merely reads like one — written like one. A key, a
@@ -134,6 +131,7 @@ pub async fn read_env_file(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     // The file keeps the name the test asked for — the name is what is being
     // tested — so the per-process part is the directory.

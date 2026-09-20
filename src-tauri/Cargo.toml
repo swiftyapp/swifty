@@ -82,6 +82,13 @@ ssh-key = { version = "0.6.7", default-features = false, features = [
 # them needs the same attribute macro passkey-authenticator declares them with.
 async-trait = "0.1"
 
+# Only for `O_NONBLOCK`, the flag that keeps opening a user-chosen path from
+# parking on a FIFO with no writer (`storage::read_regular_file_capped`). Every
+# Unix target already links it — it is in the locked graph under tauri, ring and
+# most of the rest — so this names what is there rather than adding to it.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 # Desktop-only (the `desktop` cfg alias tauri-build defines is this same
 # predicate). None of these support a mobile target.
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
