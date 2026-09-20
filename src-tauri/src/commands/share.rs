@@ -131,7 +131,7 @@ mod tests {
 
     fn open(dir: &tempfile::TempDir, sync_configured: bool) -> Session {
         let key = VaultKey::legacy_from_password("pw");
-        let store = SqliteStore::open(&dir.path().join("vault.db"), &key.sqlcipher_key()).unwrap();
+        let store = SqliteStore::open(&dir.path().join("vault.db"), &*key.sqlcipher_key()).unwrap();
         let mut session = Session::default();
         session.set(key, store, sync_configured);
         session

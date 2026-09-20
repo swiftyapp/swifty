@@ -194,13 +194,14 @@ pub async fn export_vault(
         }
         // A connection of its own, so the whole-database copy below does not
         // borrow the session's for its duration.
-        (key, crate::session::open_snapshot_source(&app, &key)?)
+        let source = crate::session::open_snapshot_source(&app, &*key)?;
+        (key, source)
     };
 
     let bytes = super::blocking(move || {
         Ok(sync::pack::pack_store(
             &source,
-            &key,
+            &*key,
             &kdf_params_json,
             &scratch,
         )?)

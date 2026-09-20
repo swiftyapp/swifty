@@ -105,7 +105,7 @@ fn install(
     // Same split `session::open_with_key` draws: only the key verification is
     // a wrong password. A snapshot this build cannot write or read for any
     // other reason is a restore failure, and says so.
-    let store = SqliteStore::open(db_path, &key.sqlcipher_key()).map_err(|e| match e {
+    let store = SqliteStore::open(db_path, &*key.sqlcipher_key()).map_err(|e| match e {
         StoreError::WrongKey => Error::InvalidPassword,
         StoreError::SchemaNewer => Error::VaultTooNew,
         e => Error::Other(format!("could not open the restored vault: {e}")),
@@ -199,7 +199,7 @@ mod tests {
     fn packed_source() -> (SqliteStore, Vec<u8>) {
         let dir = tmp_dir();
         let key = key_for(PASSWORD);
-        let store = SqliteStore::open(&dir.join("vault.db"), &key.sqlcipher_key()).unwrap();
+        let store = SqliteStore::open(&dir.join("vault.db"), &*key.sqlcipher_key()).unwrap();
         store.import(&[record("1"), record("2")]).unwrap();
         // Bookkeeping the restore must not inherit.
         store.meta_set("sync_last_digest", "deadbeef").unwrap();
@@ -209,7 +209,7 @@ mod tests {
 
         let bytes = pack::pack_store(
             &store,
-            &key.sqlcipher_key(),
+            &*key.sqlcipher_key(),
             &params().to_json().unwrap(),
             &dir.join("scratch"),
         )
@@ -305,12 +305,12 @@ mod tests {
     fn a_snapshot_from_a_future_build_says_so_and_still_cleans_up() {
         let dir = tmp_dir();
         let key = key_for(PASSWORD);
-        let store = SqliteStore::open(&dir.join("vault.db"), &key.sqlcipher_key()).unwrap();
+        let store = SqliteStore::open(&dir.join("vault.db"), &*key.sqlcipher_key()).unwrap();
         store.import(&[record("1")]).unwrap();
         store.set_user_version(99).unwrap();
         let bytes = pack::pack_store(
             &store,
-            &key.sqlcipher_key(),
+            &*key.sqlcipher_key(),
             &params().to_json().unwrap(),
             &dir.join("scratch"),
         )

@@ -249,7 +249,7 @@ impl SessionVault {
     fn with_session<T>(&self, f: impl FnOnce(&Session) -> Result<T>) -> Result<T> {
         let state = self.app.state::<AppState>();
         let session = state.session.lock().unwrap();
-        if *self.key != session.key()?.sqlcipher_key() {
+        if *self.key != *session.key()?.sqlcipher_key() {
             return Err(Error::Other("the vault key changed during sync".into()));
         }
         f(&session)

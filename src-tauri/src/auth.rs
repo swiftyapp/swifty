@@ -280,7 +280,7 @@ fn roll_back(
 fn publish_snapshot(store: &SqliteStore, old_key: &VaultKey, paths: &RekeyPaths) -> Result<()> {
     let _ = fs::remove_file(&paths.staging);
     store
-        .snapshot_to(&paths.staging, &old_key.sqlcipher_key())
+        .snapshot_to(&paths.staging, &*old_key.sqlcipher_key())
         .map_err(store_err)?;
     // Durable before the rename, so the marker never points at bytes that a
     // power loss could still take back. Opened for write, not read: on Windows
@@ -411,7 +411,7 @@ fn rekey_vault(
         .map(|r| reseal_record(r, &old_cipher, &new_cipher))
         .collect::<Result<_>>()?;
     store.import(&resealed).map_err(store_err)?;
-    store.rekey(&new_key.sqlcipher_key()).map_err(store_err)?;
+    store.rekey(&*new_key.sqlcipher_key()).map_err(store_err)?;
     record_kdf_meta(store, params)?;
     storage::atomic_write_file(sidecar, &params.to_json()?)?;
     Ok(())
@@ -554,7 +554,7 @@ mod recovery_tests {
             title: "before".into(),
             ..Default::default()
         };
-        let store = SqliteStore::open(db, &key.sqlcipher_key()).unwrap();
+        let store = SqliteStore::open(db, &*key.sqlcipher_key()).unwrap();
         let payload = key.payload_cipher().seal(&entry).unwrap();
         store
             .upsert(&migrate::build_record(&entry, payload).unwrap())
@@ -563,7 +563,7 @@ mod recovery_tests {
     }
 
     fn title_under(db: &Path, key: &VaultKey) -> String {
-        let store = SqliteStore::open(db, &key.sqlcipher_key()).unwrap();
+        let store = SqliteStore::open(db, &*key.sqlcipher_key()).unwrap();
         let record = store.get("1").unwrap().unwrap();
         key.payload_cipher()
             .unseal(&record.id, &record.payload)
@@ -732,7 +732,7 @@ mod recovery_tests {
                 .map(|r| reseal_record(r, &old.payload_cipher(), &new.payload_cipher()).unwrap())
                 .collect();
             store.import(&resealed).unwrap();
-            store.rekey(&new.sqlcipher_key()).unwrap();
+            store.rekey(&*new.sqlcipher_key()).unwrap();
         }
 
         assert!(restore_rekey_backup(&p).unwrap());
