@@ -9,6 +9,7 @@ pub mod crypto;
 mod error;
 mod events;
 mod favicon;
+mod grants;
 mod hibp;
 mod import;
 mod locale;
@@ -120,11 +121,16 @@ pub fn run() {
                 .build(),
         )
         .manage(AppState::default())
+        .manage(grants::PathGrants::default())
         .manage(autolock::AutoLock::default())
         .manage(settings::SettingsState::default())
         .setup(|app| {
             // Preferences first: the shell and the auto-lock both open on them.
             settings::boot(app.handle());
+            // The plaintext favicon directory the in-vault cache replaced: the
+            // vault's host list in the clear, so it goes on the first launch
+            // that can see it, whether or not this one looks an icon up.
+            storage::remove_legacy_icons_dir(app.handle());
             // Which workspace was open last. Read before the window exists, so
             // the lock screen the user lands on is that workspace's.
             let registry = workspace::Registry::load(&storage::root_dir(app.handle())?);
@@ -186,6 +192,7 @@ pub fn run() {
             commands::generator::generate_ssh_key,
             commands::generator::generate_otp,
             commands::audit::get_audit,
+            commands::tools::pick_file,
             commands::tools::scan_image,
             commands::tools::fetch_favicon,
             commands::clipboard::copy_to_clipboard,

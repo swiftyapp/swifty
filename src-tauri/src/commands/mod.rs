@@ -21,6 +21,34 @@ pub mod vault;
 pub mod workspace;
 
 use crate::error::{Error, Result};
+use crate::session::Epoch;
+use crate::state::AppState;
+
+// --- the session a read belongs to ------------------------------------------
+//
+// A command that reads on the vault's behalf and awaits in the middle can have
+// the vault lock — or lock and reopen — under it. The result was asked for by
+// the session that is gone, so it is not handed to the one that took its
+// place: the epoch is taken before the work and checked again after it.
+
+/// The open session's epoch, or `Locked`.
+pub(crate) fn unlocked_epoch(state: &AppState) -> Result<Epoch> {
+    let session = state.session.lock().unwrap();
+    if !session.is_unlocked() {
+        return Err(Error::Locked);
+    }
+    Ok(session.epoch())
+}
+
+/// `Locked` unless the session `epoch` was taken from is still the open one.
+pub(crate) fn same_session(state: &AppState, epoch: Epoch) -> Result<()> {
+    let session = state.session.lock().unwrap();
+    if session.is_unlocked() && session.epoch() == epoch {
+        Ok(())
+    } else {
+        Err(Error::Locked)
+    }
+}
 
 // --- getting off the async runtime ------------------------------------------
 //

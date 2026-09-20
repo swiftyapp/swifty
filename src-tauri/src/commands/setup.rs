@@ -389,6 +389,10 @@ fn adopt(
                 .lock()
                 .unwrap()
                 .set(key, store, sync_configured);
+            // A vault created or restored at first run is an open vault, and
+            // it goes on the idle clock here rather than waiting for the
+            // frontend's first activity ping.
+            crate::autolock::touch(app);
             take_pending(state);
             Ok(UnlockResult {
                 entries,

@@ -2,7 +2,7 @@
 //! picture into lines, and everything that can be wrong about a scan is wrong
 //! about the lines.
 
-use super::{card, local_path, mrz, scan_lines};
+use super::{card, is_image, local_path, mrz, scan_lines};
 
 // The ICAO 9303 specimen document (Utopia / ANNA MARIA ERIKSSON), the one set
 // of MRZ lines whose every check digit is published.
@@ -243,4 +243,43 @@ fn a_plain_path_is_left_alone() {
     for path in ["/Users/a/card.png", r"C:\Users\a\card.png", "card.png"] {
         assert_eq!(local_path(path), std::path::PathBuf::from(path));
     }
+}
+
+#[test]
+fn takes_the_image_types_the_pickers_offer() {
+    for path in [
+        "/Users/a/card.png",
+        "/Users/a/card.JPG",
+        "/var/mobile/IMG_0001.HEIC",
+        "photo.jpeg",
+        "shot.webp",
+        "scan.tiff",
+        "scan.tif",
+        "old.bmp",
+        "loop.gif",
+        "live.heif",
+    ] {
+        assert!(is_image(&local_path(path)), "{path}");
+    }
+}
+
+// A path the scanner has no business opening never reaches the recognizer —
+// nor, more to the point, the disk.
+#[test]
+fn refuses_anything_that_is_not_an_image() {
+    for path in [
+        "/Users/a/notes.txt",
+        "/Users/a/.ssh/id_ed25519",
+        "/etc/passwd",
+        "card.png.txt",
+        "card",
+    ] {
+        assert!(!is_image(&local_path(path)), "{path}");
+    }
+}
+
+#[tokio::test]
+async fn a_scan_of_a_non_image_is_refused() {
+    let err = super::scan("/Users/a/notes.txt".into()).await.unwrap_err();
+    assert!(matches!(err, crate::error::Error::Unrecognized), "{err}");
 }
