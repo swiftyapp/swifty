@@ -4,7 +4,6 @@ import { act, render, renderHook, screen, waitFor } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { FieldsProvider } from '@/components/elements/fields'
 import type { DraftValue, EntryDraft } from '@/kinds/draft'
-import { open } from '@tauri-apps/plugin-dialog'
 import Fields from '@/kinds/env/Fields'
 import { useEnvIngest } from '@/kinds/env/useIngest'
 import Main from '@/components/Main'
@@ -215,7 +214,9 @@ describe('the editor drop zone', () => {
 
 describe('interactive env ingestion', () => {
   it('surfaces picker failures through the shared request lifecycle', async () => {
-    vi.mocked(open).mockRejectedValue({ kind: 'fileTooLarge', message: 'the file is too large' })
+    mockCommand('pick_file', () =>
+      Promise.reject({ kind: 'fileTooLarge', message: 'the file is too large' })
+    )
     const consume = vi.fn()
     const { result } = renderHook(() => useEnvIngest(consume))
 
@@ -223,6 +224,19 @@ describe('interactive env ingestion', () => {
 
     expect(result.current.error).toContain('This file is too large')
     expect(consume).not.toHaveBeenCalled()
+  })
+
+  it('reads the file the backend dialog gave it, unfiltered', async () => {
+    mockCommand('pick_file', () => '/Users/me/code/api/.env.production')
+    mockCommand('read_env_file', () => FILE)
+    const consume = vi.fn()
+    const { result } = renderHook(() => useEnvIngest(consume))
+
+    await act(() => result.current.pick())
+
+    expect(calls('pick_file')).toContainEqual({ kind: 'env', label: null })
+    expect(calls('read_env_file')).toContainEqual({ path: '/Users/me/code/api/.env.production' })
+    expect(consume).toHaveBeenCalledTimes(1)
   })
 
   it('lets only the newest read publish a result', async () => {
