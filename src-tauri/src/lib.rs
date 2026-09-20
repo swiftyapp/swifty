@@ -127,6 +127,10 @@ pub fn run() {
         .setup(|app| {
             // Preferences first: the shell and the auto-lock both open on them.
             settings::boot(app.handle());
+            // The plaintext favicon directory the in-vault cache replaced: the
+            // vault's host list in the clear, so it goes on the first launch
+            // that can see it, whether or not this one looks an icon up.
+            storage::remove_legacy_icons_dir(app.handle());
             // Which workspace was open last. Read before the window exists, so
             // the lock screen the user lands on is that workspace's.
             let registry = workspace::Registry::load(&storage::root_dir(app.handle())?);
