@@ -5,6 +5,7 @@ import Modal from '@/components/elements/Modal'
 import Sheet from '@/components/elements/Sheet'
 import CopyToast from '@/components/elements/CopyToast'
 import NoticeToast from '@/components/elements/NoticeToast'
+import PrivacyScreen from '@/components/elements/PrivacyScreen'
 import Wide from './Wide'
 import Compact from './Compact'
 import Palette from './Palette'
@@ -44,6 +45,10 @@ export function Main() {
       </FrameProvider>
       <CopyToast />
       <NoticeToast />
+      {/* Over everything, including the overlays above — and only here, because
+          the unlocked vault is the only screen with secrets on it to keep out
+          of the app switcher. */}
+      <PrivacyScreen />
     </div>
   )
 }
