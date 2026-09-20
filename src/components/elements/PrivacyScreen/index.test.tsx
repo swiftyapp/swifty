@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import PrivacyScreen from '.'
+import { RECHECK_MS } from './useObscured'
 
 type Handler = (event: { payload: boolean }) => void
 
 let handlers: Handler[] = []
 let subscribes = true
 let focusedOnMount = true
+// How many times the window has been asked `isFocused`: the mount-time
+// reconciliation and every re-check while covered.
+let asked = 0
 // Holds the one-shot `isFocused` answer open, so a test can choose whether it
 // lands before or after the subscription settles.
 let pendingFocused: Promise<boolean> | undefined
@@ -33,9 +37,15 @@ vi.mock('@tauri-apps/api/window', () => ({
         handlers = handlers.filter(h => h !== handler)
       })
     },
-    isFocused: () => pendingFocused ?? Promise.resolve(focusedOnMount)
+    isFocused: () => {
+      asked++
+      return pendingFocused ?? Promise.resolve(focusedOnMount)
+    }
   })
 }))
+
+// Long enough for at least one re-check to have run.
+const aRecheck = () => new Promise(resolve => setTimeout(resolve, RECHECK_MS + 50))
 
 const listening = () => waitFor(() => expect(handlers.length).toBeGreaterThan(0))
 
@@ -77,6 +87,7 @@ describe('PrivacyScreen', () => {
     handlers = []
     subscribes = true
     focusedOnMount = true
+    asked = 0
     pendingFocused = undefined
     answerFocused = undefined
     Object.defineProperty(document, 'visibilityState', {
@@ -206,6 +217,58 @@ describe('PrivacyScreen', () => {
 
     await sayFocused(true)
     expect(cover()).toBeInTheDocument()
+  })
+
+  // The Face ID unlock on iOS: the vault mounts while the system sheet still
+  // has the scene inactive, the window says "not focused", and no focus event
+  // ever follows. The cover has to find its own way back down.
+  it('lifts the cover once the window, asked again, says it is focused', async () => {
+    focusedOnMount = false
+
+    render(<PrivacyScreen />)
+    await waitFor(() => expect(cover()).toBeInTheDocument())
+
+    focusedOnMount = true
+    await waitFor(() => expect(cover()).not.toBeInTheDocument(), { timeout: 2000 })
+
+    // Uncovered, there is nothing left to ask about.
+    const settled = asked
+    await act(aRecheck)
+    expect(asked).toBe(settled)
+  })
+
+  it('keeps the cover while the window keeps saying it is not focused', async () => {
+    focusedOnMount = false
+
+    render(<PrivacyScreen />)
+    await waitFor(() => expect(cover()).toBeInTheDocument())
+    const before = asked
+
+    await act(aRecheck)
+    expect(asked).toBeGreaterThan(before)
+    expect(cover()).toBeInTheDocument()
+  })
+
+  it('ignores a re-check answer from before a blur event', async () => {
+    render(<PrivacyScreen />)
+    await focus(false)
+    expect(cover()).toBeInTheDocument()
+
+    // Hold the next re-check open, and wait until it has been sent.
+    const before = asked
+    deferFocused()
+    await waitFor(() => expect(asked).toBeGreaterThan(before))
+
+    // The window blurs again while that answer is still on its way...
+    await focus(false)
+    // ...so a "focused" from before the blur is stale, and must not lift the cover.
+    await sayFocused(true)
+    expect(cover()).toBeInTheDocument()
+
+    // The next re-check asks afresh, and that answer counts.
+    pendingFocused = undefined
+    focusedOnMount = true
+    await waitFor(() => expect(cover()).not.toBeInTheDocument(), { timeout: 2000 })
   })
 
   it('lets a DOM focus event outrank the window reconciliation that lands after it', async () => {
