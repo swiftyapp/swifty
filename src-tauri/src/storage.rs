@@ -121,7 +121,10 @@ pub fn db_exists(app: &AppHandle) -> bool {
         .is_some_and(|m| m.len() > 0)
 }
 
-fn gdrive_path(app: &AppHandle) -> Result<PathBuf> {
+// Public to the crate because the sync token file's guarded transitions are
+// built on a plain path (`sync::auth::TokenFile`) so they can be exercised
+// without an `AppHandle`.
+pub(crate) fn gdrive_path(app: &AppHandle) -> Result<PathBuf> {
     Ok(workspace_dir(app)?.join(GDRIVE_FILE))
 }
 
@@ -326,7 +329,7 @@ pub fn atomic_write_private(path: &Path, data: &[u8]) -> Result<()> {
 }
 
 // Read a file as utf8, returning "" when it doesn't exist (legacy ensure-file).
-fn read_file(path: &PathBuf) -> Result<String> {
+pub(crate) fn read_file(path: &Path) -> Result<String> {
     if !path.exists() {
         return Ok(String::new());
     }
@@ -338,21 +341,16 @@ pub fn read_backup(path: &str) -> Result<String> {
     Ok(fs::read_to_string(path)?)
 }
 
-pub fn read_gdrive(app: &AppHandle) -> Result<String> {
-    read_file(&gdrive_path(app)?)
-}
-
-// The sealed Drive tokens. Atomic, so a crash mid-write leaves the previous
-// grant rather than a truncated file that reads as "not connected" — and
-// owner-only from creation, like every other secret the app writes: the seal is
-// the real protection, the mode is the second line.
-pub fn write_gdrive(app: &AppHandle, data: &str) -> Result<()> {
-    atomic_write_private(&gdrive_path(app)?, data.as_bytes())
-}
-
-// The same, into a workspace directory named outright rather than the active
-// one: for a workspace being made *beside* the open one, whose paths must stay
-// where they are (`commands::autojoin`).
+// The sealed Drive tokens, into a workspace directory named outright rather
+// than the active one: for a workspace being made *beside* the open one, whose
+// paths must stay where they are (`commands::autojoin`). The active
+// workspace's own token file is read and written by `sync::auth::TokenFile`,
+// which holds its path.
+//
+// Atomic, so a crash mid-write leaves the previous grant rather than a
+// truncated file that reads as "not connected" — and owner-only from creation,
+// like every other secret the app writes: the seal is the real protection, the
+// mode is the second line.
 pub fn write_gdrive_in(dir: &Path, data: &str) -> Result<()> {
     atomic_write_private(&dir.join(GDRIVE_FILE), data.as_bytes())
 }
@@ -366,7 +364,7 @@ pub fn remove_gdrive(app: &AppHandle) -> Result<()> {
 }
 
 // The file-level half, on a plain path so it is testable without an `AppHandle`.
-fn remove_if_present(path: &Path) -> Result<()> {
+pub(crate) fn remove_if_present(path: &Path) -> Result<()> {
     match fs::remove_file(path) {
         Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.into()),
         _ => Ok(()),
