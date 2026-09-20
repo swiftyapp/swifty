@@ -58,8 +58,13 @@ export function useObscured(): boolean {
   useEffect(() => {
     if (focused) return
     let alive = true
+    // One question in flight at a time: a round trip slower than the interval
+    // would otherwise stack calls whose answers land in no particular order.
+    let asking = false
     const win = getCurrentWindow()
     const recheck = () => {
+      if (asking) return
+      asking = true
       const at = spoke.current
       win
         .isFocused()
@@ -68,6 +73,9 @@ export function useObscured(): boolean {
         })
         .catch(() => {
           // No answer is no news: the next tick asks again.
+        })
+        .finally(() => {
+          asking = false
         })
     }
     const id = window.setInterval(recheck, RECHECK_MS)
