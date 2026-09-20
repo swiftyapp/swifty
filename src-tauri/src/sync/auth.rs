@@ -256,10 +256,117 @@ fn matches_redirect_uri(url: &Url, redirect_uri: &str) -> bool {
 
 // --- token persistence (encrypted `auth/gdrive.swftx`) ---
 
+/// The encrypted token file, and the connection generation that says which
+/// account the tokens in it belong to.
+///
+/// The two move together — a disconnect deletes and bumps, a password change's
+/// re-seal rewrites and bumps — and a refresh's write-back is only allowed if
+/// the generation it read is still the one on the file. So they are paired
+/// here, and every transition takes the generation's mutex for its whole
+/// length: a bare compare would leave a gap between it and the write for a
+/// disconnect to land in. On a plain path rather than an `AppHandle`, so the
+/// transitions can be exercised against a scratch directory.
+struct TokenFile<'a> {
+    path: std::path::PathBuf,
+    /// `AppState::sync_generation` in the app; a bare mutex in a test.
+    generation: &'a std::sync::Mutex<u64>,
+}
+
+impl<'a> TokenFile<'a> {
+    fn new(path: std::path::PathBuf, generation: &'a std::sync::Mutex<u64>) -> Self {
+        Self { path, generation }
+    }
+
+    /// The active workspace's token file and the app's connection generation.
+    fn of(app: &'a AppHandle) -> Result<Self> {
+        Ok(Self::new(
+            storage::gdrive_path(app)?,
+            &app_state(app).inner().sync_generation,
+        ))
+    }
+
+    fn read(&self, cryptor: &Cryptor) -> Option<Tokens> {
+        let blob = storage::read_file(&self.path)
+            .ok()
+            .filter(|b| !b.is_empty())?;
+        let json = cryptor.decrypt(&blob).ok()?;
+        serde_json::from_str(&json).ok()
+    }
+
+    /// Seal the tokens under `cryptor` and write them. Atomic, so a crash
+    /// mid-write leaves the previous grant rather than a truncated file that
+    /// reads as "not connected" — and owner-only from creation.
+    fn write(&self, cryptor: &Cryptor, tokens: &Tokens) -> Result<()> {
+        let json = serde_json::to_string(tokens)?;
+        storage::atomic_write_private(&self.path, cryptor.encrypt(&json)?.as_bytes())
+    }
+
+    /// The tokens together with the generation they belong to, read as one:
+    /// the pair is what a write-back is later judged against, and reading them
+    /// separately would let a disconnect slip between and hand back tokens
+    /// stamped with a generation that never held them.
+    fn snapshot(&self, cryptor: &Cryptor) -> Result<(u64, Tokens)> {
+        let generation = self.generation.lock().unwrap();
+        let tokens = self.read(cryptor).ok_or(Error::SyncNotConfigured)?;
+        Ok((*generation, tokens))
+    }
+
+    /// Bump the generation and delete the file under one hold of the guard, so
+    /// a refresh's write-back and a re-seal (which take the same guard) either
+    /// see the old generation and finish before this runs, or see the new one
+    /// and leave the file gone.
+    fn disconnect(&self) -> Result<()> {
+        let mut generation = self.generation.lock().unwrap();
+        *generation += 1;
+        storage::remove_if_present(&self.path)
+    }
+
+    /// Read with `old` and write back with `new`, under the guard so a
+    /// disconnect cannot land between them and have its delete undone by the
+    /// write.
+    ///
+    /// The generation moves too, exactly as [`TokenFile::disconnect`] moves it:
+    /// a sync run that captured the *old* cryptor can be awaiting a token
+    /// refresh right now, and its write-back would re-seal the file under the
+    /// key the change just retired — leaving credentials no later unlock could
+    /// decrypt. Bumping here makes that write-back's
+    /// [`TokenFile::persist_if_current`] return `Ok(false)`, so the in-flight
+    /// run winds down and leaves the freshly re-sealed file alone.
+    ///
+    /// No file is no connection to re-seal: nothing is written and the
+    /// generation stands.
+    fn reseal(&self, old: &Cryptor, new: &Cryptor) -> Result<()> {
+        let mut generation = self.generation.lock().unwrap();
+        let Some(tokens) = self.read(old) else {
+            return Ok(());
+        };
+        self.write(new, &tokens)?;
+        *generation += 1;
+        Ok(())
+    }
+
+    /// Write the tokens if the connection they belong to is still
+    /// `generation`, and say whether it was. `false` means the token file
+    /// moved out from under `generation` — disconnected, or re-sealed by a
+    /// password change — and nothing was written; whatever the tokens were for
+    /// is the caller's to wind down.
+    fn persist_if_current(
+        &self,
+        cryptor: &Cryptor,
+        tokens: &Tokens,
+        generation: u64,
+    ) -> Result<bool> {
+        let current = self.generation.lock().unwrap();
+        if *current != generation {
+            return Ok(false);
+        }
+        self.write(cryptor, tokens)?;
+        Ok(true)
+    }
+}
+
 pub fn read_tokens(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
-    let blob = storage::read_gdrive(app).ok().filter(|b| !b.is_empty())?;
-    let json = cryptor.decrypt(&blob).ok()?;
-    serde_json::from_str(&json).ok()
+    TokenFile::of(app).ok()?.read(cryptor)
 }
 
 /// Seal the tokens under `cryptor` and write them.
@@ -268,8 +375,7 @@ pub fn read_tokens(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
 /// before a vault key exists to seal them with, and persists them only once the
 /// restore or create it is driving has produced one.
 pub fn write_tokens(app: &AppHandle, cryptor: &Cryptor, tokens: &Tokens) -> Result<()> {
-    let json = serde_json::to_string(tokens)?;
-    storage::write_gdrive(app, &cryptor.encrypt(&json)?)
+    TokenFile::of(app)?.write(cryptor, tokens)
 }
 
 /// [`write_tokens`] into a named workspace directory rather than the active
@@ -297,27 +403,18 @@ pub fn is_configured(app: &AppHandle, cryptor: &Cryptor) -> bool {
 /// and still usable, so the only honest answer is that the account is *not*
 /// disconnected.
 ///
-/// The connection generation is bumped and the file deleted under one hold of
-/// the token-file guard, so a refresh's write-back and a password change's
-/// re-seal (both of which take the same guard) either see the old generation
-/// and finish before this runs, or see the new one and leave the file gone.
+/// The generation and the file move together ([`TokenFile::disconnect`]), so
+/// an in-flight refresh cannot put the file back.
 pub fn disconnect(app: &AppHandle) -> Result<()> {
-    let state = app_state(app);
-    let mut generation = state.sync_generation.lock().unwrap();
-    *generation += 1;
-    storage::remove_gdrive(app)
+    TokenFile::of(app)?.disconnect()
 }
 
 /// Re-seal the token file under `new` — a password change moved the vault key
-/// it was sealed with. Read and write under the token-file guard, so a
-/// disconnect cannot land between them and have its delete undone by the write.
+/// it was sealed with. See [`TokenFile::reseal`]: the connection generation
+/// moves with it, so a refresh that captured the old cryptor cannot write the
+/// file back under the key the change just retired.
 pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()> {
-    let state = app_state(app);
-    let _generation = state.sync_generation.lock().unwrap();
-    let Some(tokens) = read_tokens(app, old) else {
-        return Ok(());
-    };
-    write_tokens(app, new, &tokens)
+    TokenFile::of(app)?.reseal(old, new)
 }
 
 // --- OAuth flow ---
@@ -420,45 +517,34 @@ pub async fn access_token(client: &Client, app: &AppHandle, cryptor: &Cryptor) -
     // call — see `AppState::workspace_lock`), so a disconnect can delete the
     // token file in that window; the generation is what lets the write-back
     // notice.
-    let state = app_state(app);
-    let (generation, mut tokens) = {
-        let generation = state.sync_generation.lock().unwrap();
-        let tokens = read_tokens(app, cryptor).ok_or(Error::SyncNotConfigured)?;
-        (*generation, tokens)
-    };
+    let (generation, mut tokens) = TokenFile::of(app)?.snapshot(cryptor)?;
     // Asked before the call, because that is what says whether the file on
     // disk is now out of date — afterwards the tokens look fresh either way.
     let refreshing = needs_refresh(&tokens);
     let token = fresh_access_token(client, app, &mut tokens).await?;
-    // Skipping the write is the whole point: re-creating the file would undo
-    // the disconnect. The caller still gets this token for the request it is
-    // in the middle of, which is harmless — the file is gone, so nothing after
-    // this can refresh again.
+    // Skipping the write is the whole point: it would undo the disconnect that
+    // deleted the file, or re-seal it under the key a password change just
+    // retired. The caller still gets this token for the request it is in the
+    // middle of, which is harmless — either way nothing after this refreshes
+    // against the stale file again.
     if refreshing && !persisted_if_current(app, cryptor, &tokens, generation)? {
-        log::info!("Drive disconnected mid-refresh; not writing the refreshed tokens back");
+        log::info!(
+            "the Drive connection moved on mid-refresh; not writing the refreshed tokens back"
+        );
     }
     Ok(token)
 }
 
-/// Write the tokens if the connection they belong to is still `generation`,
-/// and say whether they were. Compared and written under the guard a disconnect
-/// bumps and deletes under: a bare compare would leave a gap for the disconnect
-/// to land in and have its delete undone by the write. `false` means the
-/// account was disconnected since `generation` was read, and nothing was
-/// written; whatever the tokens were for is the caller's to wind down.
+/// [`TokenFile::persist_if_current`] on the active workspace's token file:
+/// write the tokens if the connection they belong to is still `generation`,
+/// and say whether it was.
 pub(crate) fn persisted_if_current(
     app: &AppHandle,
     cryptor: &Cryptor,
     tokens: &Tokens,
     generation: u64,
 ) -> Result<bool> {
-    let state = app_state(app);
-    let current = state.sync_generation.lock().unwrap();
-    if *current != generation {
-        return Ok(false);
-    }
-    write_tokens(app, cryptor, tokens)?;
-    Ok(true)
+    TokenFile::of(app)?.persist_if_current(cryptor, tokens, generation)
 }
 
 fn app_state(app: &AppHandle) -> tauri::State<'_, crate::state::AppState> {
@@ -936,5 +1022,111 @@ mod tests {
         assert_eq!(parse_redirect(&missing, "nonce-1"), Redirect::Foreign);
         let denied = Url::parse(&format!("{REDIRECT}?error=access_denied")).unwrap();
         assert_eq!(parse_redirect(&denied, "nonce-1"), Redirect::Foreign);
+    }
+
+    // --- the token file's guarded transitions ---
+
+    use crate::crypto::hash_secret;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Mutex;
+
+    fn tmp_token_path() -> PathBuf {
+        static N: AtomicU64 = AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "rowel-auth-tokens-{}-{}",
+            std::process::id(),
+            N.fetch_add(1, Ordering::SeqCst)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir.join("gdrive.swftx")
+    }
+
+    fn cryptor(password: &str) -> Cryptor {
+        Cryptor::new(&hash_secret(password))
+    }
+
+    fn tokens(access: &str) -> Tokens {
+        Tokens {
+            access_token: Some(access.into()),
+            refresh_token: Some("refresh-1".into()),
+            expires_at: Some(4_102_444_800),
+        }
+    }
+
+    // The re-seal a password change runs has to take the connection with it:
+    // a refresh that read the file under the old key is awaiting Google right
+    // now, and its write-back would seal the tokens under the key the change
+    // just retired — leaving a file no later unlock could open.
+    #[test]
+    fn a_refresh_holding_the_old_generation_cannot_write_after_a_reseal() {
+        let (old, new) = (cryptor("old-pw"), cryptor("new-pw"));
+        let generation = Mutex::new(7);
+        let file = TokenFile::new(tmp_token_path(), &generation);
+        file.write(&old, &tokens("access-1")).unwrap();
+
+        let (held_generation, mut held) = file.snapshot(&old).unwrap();
+        file.reseal(&old, &new).unwrap();
+        held.access_token = Some("access-2-refreshed".into());
+
+        assert!(!file
+            .persist_if_current(&old, &held, held_generation)
+            .unwrap());
+        assert!(file.read(&old).is_none());
+        let survivor = file.read(&new).expect("re-sealed under the new key");
+        assert_eq!(survivor.access_token.as_deref(), Some("access-1"));
+    }
+
+    // The same guard against the other transition: a disconnect deleted the
+    // file, and the refresh it raced must not write it back into existence.
+    #[test]
+    fn a_refresh_holding_the_old_generation_cannot_resurrect_a_disconnected_file() {
+        let cryptor = cryptor("pw");
+        let generation = Mutex::new(0);
+        let file = TokenFile::new(tmp_token_path(), &generation);
+        file.write(&cryptor, &tokens("access-1")).unwrap();
+
+        let (held_generation, mut held) = file.snapshot(&cryptor).unwrap();
+        file.disconnect().unwrap();
+        held.access_token = Some("access-2-refreshed".into());
+
+        assert!(!file
+            .persist_if_current(&cryptor, &held, held_generation)
+            .unwrap());
+        assert!(!file.path.exists());
+    }
+
+    // Nothing moved in the meantime, so the refreshed tokens land — otherwise
+    // the guard would quietly cost every refresh its write-back.
+    #[test]
+    fn a_refresh_holding_the_current_generation_writes_back() {
+        let cryptor = cryptor("pw");
+        let generation = Mutex::new(3);
+        let file = TokenFile::new(tmp_token_path(), &generation);
+        file.write(&cryptor, &tokens("access-1")).unwrap();
+
+        let (held_generation, mut held) = file.snapshot(&cryptor).unwrap();
+        held.access_token = Some("access-2-refreshed".into());
+
+        assert!(file
+            .persist_if_current(&cryptor, &held, held_generation)
+            .unwrap());
+        let written = file.read(&cryptor).unwrap();
+        assert_eq!(written.access_token.as_deref(), Some("access-2-refreshed"));
+    }
+
+    // No token file is no connection to re-seal: a password change on a vault
+    // that never connected Drive is a no-op, and must not spend a generation
+    // some in-flight refresh is holding.
+    #[test]
+    fn a_reseal_with_no_token_file_moves_nothing() {
+        let (old, new) = (cryptor("old-pw"), cryptor("new-pw"));
+        let generation = Mutex::new(5);
+        let file = TokenFile::new(tmp_token_path(), &generation);
+
+        file.reseal(&old, &new).unwrap();
+
+        assert_eq!(*generation.lock().unwrap(), 5);
+        assert!(!file.path.exists());
     }
 }
