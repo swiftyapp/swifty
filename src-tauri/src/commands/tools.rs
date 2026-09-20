@@ -1,17 +1,81 @@
-//! The commands whose work lives outside `commands/`: image scanning and
-//! favicon lookup. Each module owns its logic; this is only where the IPC
-//! surface is declared.
+//! The commands whose work lives outside `commands/`: the file picker, image
+//! scanning and favicon lookup. Each module owns its logic; this is only where
+//! the IPC surface is declared.
+
+use std::path::Path;
 
 use tauri::{AppHandle, State};
+use tauri_plugin_dialog::DialogExt;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
+use crate::grants::PathGrants;
 use crate::scan::ScanResult;
 use crate::state::AppState;
 use crate::{favicon, scan};
 
+/// The OS file dialog, for a file the backend will then read: `kind` is
+/// `"image"` (filtered to what the scanner opens) or `"env"` (any file, since
+/// an env file may be named anything). The path picked, or `None` when the
+/// dialog was dismissed.
+///
+/// Run from Rust rather than through the dialog plugin's JS API so the choice
+/// is one the backend witnessed: the picked path is granted (see `grants`)
+/// before the webview hears of it, and `scan_image` / `read_env_file` read
+/// only granted paths. `label` is the filter's name in the dialog's own chrome,
+/// translated by the webview, which owns the catalogue.
 #[tauri::command]
-pub async fn scan_image(path: String) -> Result<ScanResult> {
-    scan::scan(path).await
+pub async fn pick_file(
+    app: AppHandle,
+    grants: State<'_, PathGrants>,
+    kind: String,
+    label: Option<String>,
+) -> Result<Option<String>> {
+    let mut dialog = app.dialog().file();
+    match kind.as_str() {
+        "image" => {
+            let label = label.unwrap_or_else(|| "Images".into());
+            dialog = dialog.add_filter(label, &scan::IMAGE_EXTENSIONS);
+        }
+        "env" => {}
+        other => return Err(Error::Unsupported(format!("no {other} picker"))),
+    }
+    // The dialog blocks its caller until the user answers, so it runs on the
+    // blocking pool, not a runtime worker.
+    let Some(picked) = super::blocking(move || Ok(dialog.blocking_pick_file())).await? else {
+        return Ok(None);
+    };
+    let path = picked
+        .into_path()
+        .map_err(|_| Error::Unsupported("the picked file has no local path".into()))?;
+    grants.grant(&path);
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+/// Read a card or an identity document out of the image at `path`.
+///
+/// Unlocked vaults only. The scanner reads a file the webview named and hands
+/// back what it found in it, so a locked app must not run one for anybody: the
+/// only surfaces that scan live in the unlocked shell, and the refusal is an
+/// error rather than a silent miss because a real scan never asks while locked.
+/// The path has to be one the user chose — picked through `pick_file` or
+/// dropped on the window — and `scan` itself refuses one that is not an image
+/// type the pickers offer, before the file is opened. A lock while the scan
+/// runs discards what it read: the session that asked is gone.
+#[tauri::command]
+pub async fn scan_image(
+    state: State<'_, AppState>,
+    grants: State<'_, PathGrants>,
+    path: String,
+) -> Result<ScanResult> {
+    let epoch = super::unlocked_epoch(&state)?;
+    if !grants.take(Path::new(&path)) {
+        return Err(Error::Unsupported(
+            "this file was not chosen in the app".into(),
+        ));
+    }
+    let result = scan::scan(path).await?;
+    super::same_session(&state, epoch)?;
+    Ok(result)
 }
 
 /// The icon for a host the entry list is showing. Unlocked vaults only: the
@@ -30,12 +94,8 @@ pub async fn fetch_favicon(
     state: State<'_, AppState>,
     host: String,
 ) -> Result<Option<String>> {
-    let epoch = {
-        let session = state.session.lock().unwrap();
-        if !session.is_unlocked() {
-            return Ok(None);
-        }
-        session.epoch()
+    let Ok(epoch) = super::unlocked_epoch(&state) else {
+        return Ok(None);
     };
     favicon::fetch(&app, &host, epoch).await
 }

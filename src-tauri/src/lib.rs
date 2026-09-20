@@ -9,6 +9,7 @@ pub mod crypto;
 mod error;
 mod events;
 mod favicon;
+mod grants;
 mod hibp;
 mod import;
 mod locale;
@@ -120,6 +121,7 @@ pub fn run() {
                 .build(),
         )
         .manage(AppState::default())
+        .manage(grants::PathGrants::default())
         .manage(autolock::AutoLock::default())
         .manage(settings::SettingsState::default())
         .setup(|app| {
@@ -190,6 +192,7 @@ pub fn run() {
             commands::generator::generate_ssh_key,
             commands::generator::generate_otp,
             commands::audit::get_audit,
+            commands::tools::pick_file,
             commands::tools::scan_image,
             commands::tools::fetch_favicon,
             commands::clipboard::copy_to_clipboard,
