@@ -1,6 +1,7 @@
-use crate::{autolock, commands};
+use crate::grants::{PathGrants, Purpose};
+use crate::{autolock, commands, scan};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{AppHandle, Manager, WebviewWindowBuilder};
+use tauri::{AppHandle, DragDropEvent, Manager, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_opener::OpenerExt;
 
 const MAIN: &str = "main";
@@ -51,10 +52,31 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let handle = app.clone();
     window.on_window_event(move |event| {
         autolock::handle_event(&handle, event);
+        // The OS delivers a drop as this window event, and tauri raises the
+        // webview's `drag-drop` from the same one — so the paths are granted
+        // here before the frontend can ask to read them (see `grants`).
+        //
+        // A drop has no dialog to frame it, so what the user chose it as comes
+        // from the file itself — by the same test the frontend routes the drop
+        // with: an extension the scanner opens makes it an image, anything else
+        // an env file, which may be named anything (`read_env_file` applies its
+        // own name-or-content check to those). So a dropped photo cannot be
+        // read back as text, nor a dropped `.env` be OCRed.
+        if let WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) = event {
+            let grants = handle.state::<PathGrants>();
+            for path in paths {
+                let purpose = if scan::is_image(path) {
+                    Purpose::Image
+                } else {
+                    Purpose::Env
+                };
+                grants.grant(path, purpose);
+            }
+        }
         // Coming back to the foreground is how a consent flow the user walked
         // away from gets noticed (see `commands::sync::on_resume`).
         #[cfg(mobile)]
-        if let tauri::WindowEvent::Focused(true) = event {
+        if let WindowEvent::Focused(true) = event {
             crate::commands::sync::on_resume(&handle);
         }
     });

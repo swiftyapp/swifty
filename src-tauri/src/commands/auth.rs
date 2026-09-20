@@ -76,6 +76,11 @@ pub async fn unlock(
                 .lock()
                 .unwrap()
                 .set(key, store, sync_configured);
+            // The idle clock starts with the session, not with the frontend's
+            // first activity ping: a webview that never sends one (a build
+            // whose bundle failed, a page left untouched) would otherwise leave
+            // the vault open for good.
+            crate::autolock::touch(&app);
             if let Some(password) = join {
                 super::autojoin::with_password(&app, password);
             }
@@ -191,6 +196,8 @@ pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Res
         .lock()
         .unwrap()
         .set(key, store, sync_configured);
+    // As in `unlock`: the session arms its own idle clock.
+    crate::autolock::touch(&app);
     Ok(UnlockResult {
         entries,
         sync_configured,
