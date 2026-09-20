@@ -8,7 +8,7 @@ use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::error::{Error, Result};
-use crate::grants::PathGrants;
+use crate::grants::{PathGrants, Purpose};
 use crate::scan::ScanResult;
 use crate::state::AppState;
 use crate::{favicon, scan};
@@ -21,8 +21,10 @@ use crate::{favicon, scan};
 /// Run from Rust rather than through the dialog plugin's JS API so the choice
 /// is one the backend witnessed: the picked path is granted (see `grants`)
 /// before the webview hears of it, and `scan_image` / `read_env_file` read
-/// only granted paths. `label` is the filter's name in the dialog's own chrome,
-/// translated by the webview, which owns the catalogue.
+/// only granted paths. The grant carries the `kind` the dialog was opened as,
+/// so a file chosen from the env picker cannot be spent on a scan instead.
+/// `label` is the filter's name in the dialog's own chrome, translated by the
+/// webview, which owns the catalogue.
 #[tauri::command]
 pub async fn pick_file(
     app: AppHandle,
@@ -31,14 +33,15 @@ pub async fn pick_file(
     label: Option<String>,
 ) -> Result<Option<String>> {
     let mut dialog = app.dialog().file();
-    match kind.as_str() {
+    let purpose = match kind.as_str() {
         "image" => {
             let label = label.unwrap_or_else(|| "Images".into());
             dialog = dialog.add_filter(label, &scan::IMAGE_EXTENSIONS);
+            Purpose::Image
         }
-        "env" => {}
+        "env" => Purpose::Env,
         other => return Err(Error::Unsupported(format!("no {other} picker"))),
-    }
+    };
     // The dialog blocks its caller until the user answers, so it runs on the
     // blocking pool, not a runtime worker.
     let Some(picked) = super::blocking(move || Ok(dialog.blocking_pick_file())).await? else {
@@ -47,7 +50,7 @@ pub async fn pick_file(
     let path = picked
         .into_path()
         .map_err(|_| Error::Unsupported("the picked file has no local path".into()))?;
-    grants.grant(&path);
+    grants.grant(&path, purpose);
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
@@ -57,10 +60,12 @@ pub async fn pick_file(
 /// back what it found in it, so a locked app must not run one for anybody: the
 /// only surfaces that scan live in the unlocked shell, and the refusal is an
 /// error rather than a silent miss because a real scan never asks while locked.
-/// The path has to be one the user chose — picked through `pick_file` or
-/// dropped on the window — and `scan` itself refuses one that is not an image
-/// type the pickers offer, before the file is opened. A lock while the scan
-/// runs discards what it read: the session that asked is gone.
+/// The path has to be one the user chose *as an image* — picked through the
+/// image `pick_file` or dropped on the window as one — so a file chosen from
+/// the unfiltered env dialog is refused here rather than OCRed; and `scan`
+/// itself refuses one that is not an image type the pickers offer, before the
+/// file is opened. A lock while the scan runs discards what it read: the
+/// session that asked is gone.
 #[tauri::command]
 pub async fn scan_image(
     state: State<'_, AppState>,
@@ -68,7 +73,7 @@ pub async fn scan_image(
     path: String,
 ) -> Result<ScanResult> {
     let epoch = super::unlocked_epoch(&state)?;
-    if !grants.take(Path::new(&path)) {
+    if !grants.take(Path::new(&path), Purpose::Image) {
         return Err(Error::Unsupported(
             "this file was not chosen in the app".into(),
         ));

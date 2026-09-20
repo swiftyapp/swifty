@@ -136,7 +136,7 @@ pub(crate) const IMAGE_EXTENSIONS: [&str; 10] = [
 
 /// Whether a path names one of those, by extension alone: the file is not
 /// opened to find out, which is the point.
-fn is_image(path: &Path) -> bool {
+pub(crate) fn is_image(path: &Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
         .is_some_and(|e| IMAGE_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
