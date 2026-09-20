@@ -271,12 +271,16 @@ carries them as part of the opaque payload and never sees them.
    derived from the same master — both living on the blocking thread the run
    occupies. A lock ends the session but not that thread, so those copies
    outlive it until the run's thread does. What bounds them is the run, not the
-   lock — and that bound is a size, not a clock. The connect and read-stall
-   deadlines only end a download that stops making progress; one that keeps
-   trickling in resets the stall deadline with every chunk. So the lifetime of
-   those copies is the 256 MiB pack cap divided by the slowest rate that still
-   counts as progress, which on a slow but steady link is minutes rather than
-   seconds.
+   lock — and the run has no whole-request deadline. The sync client's
+   deadlines (`sync/mod.rs`: 15 s to connect, 60 s of silence mid-body) end a
+   download that stops making progress; one that keeps trickling in resets the
+   stall deadline with every chunk, so the 256 MiB pack cap bounds a download
+   only in principle, at one chunk per stall window. An upload has less than
+   that: the read deadline watches the response, not the body being sent, so a
+   server that drains the pack slowly holds the run for as long as it takes. A
+   slow but steady transfer in either direction therefore keeps those key copies
+   alive for as long as it lasts. This is a **residual**: closing it means a
+   whole-run deadline, or a lock that aborts the run, and neither exists today.
 4. **Optional biometric unlock (opt-in).** Instead of re-entering the passphrase,
    the same key material can be stored in the OS keychain behind a biometric gate
    (`secure_store.rs`):
