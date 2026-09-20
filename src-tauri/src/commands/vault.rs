@@ -1,10 +1,11 @@
 use crate::app::APP_NAME;
+use crate::crypto::PayloadCipher;
 use crate::error::{Error, Result};
 use crate::events;
 use crate::models::{Entry, EntryMetaDto, VaultData};
 use crate::session::{derive_key, list_deleted_metas, list_metas, meta_dto_of, store_err};
 use crate::state::AppState;
-use crate::store::{migrate, Record, VaultStore};
+use crate::store::{migrate, Record, SqliteStore, VaultStore};
 use crate::{crypto, save, storage, sync};
 use serde::Serialize;
 use tauri::{AppHandle, State};
@@ -12,6 +13,10 @@ use zeroize::Zeroizing;
 
 // Decrypt one entry on demand (view/edit): fetch its payload and unseal it with
 // the session payload key. Nothing is cached in the session.
+//
+// What goes out is `Entry::redacted`: the passkey private keys stay in the core,
+// where the authenticator that needs them lives. Nothing in the webview reads
+// one, so nothing there should hold one.
 #[tauri::command]
 pub fn reveal_entry(id: String, state: State<'_, AppState>) -> Result<Entry> {
     let session = state.session.lock().unwrap();
@@ -21,22 +26,57 @@ pub fn reveal_entry(id: String, state: State<'_, AppState>) -> Result<Entry> {
         .get(&id)
         .map_err(store_err)?
         .ok_or(Error::NotFound)?;
-    cipher.unseal(&record.id, &record.payload)
+    Ok(cipher.unseal(&record.id, &record.payload)?.redacted())
 }
 
 // Persist one entry: seal it into a fresh payload and upsert a single row
 // (metadata + payload), stamping updated_at. No whole-vault rewrite.
 #[tauri::command]
-pub fn save_entry(entry: Entry, state: State<'_, AppState>) -> Result<EntryMetaDto> {
+pub fn save_entry(mut entry: Entry, state: State<'_, AppState>) -> Result<EntryMetaDto> {
     let session = state.session.lock().unwrap();
     let cipher = session.payload_cipher()?;
     let store = session.store()?;
 
+    restore_passkey_keys(&mut entry, store, &cipher)?;
     let payload = cipher.seal(&entry)?;
     let record = migrate::build_record(&entry, payload)?;
     store.upsert(&record).map_err(store_err)?;
 
     meta_dto_of(store, &record.id)
+}
+
+// The other half of the reveal's redaction: an entry coming back from the
+// webview carries its passkeys without their private keys, so every one of them
+// is read off the row being replaced and matched by credential id (see
+// `Entry::restore_passkey_keys`). The stored row is unsealed only when the
+// entry has a passkey at all, so an ordinary save costs nothing extra. The
+// unsealed row is handed over whole so the keys move rather than copy, and what
+// is left of it is scrubbed and dropped inside `Entry::restore_passkey_keys`.
+//
+// A save that carries a private key of its own is refused outright. Passkeys
+// only ever enter the vault through Rust — import and sync — and a reveal
+// redacts, so there is no path by which the webview came to hold one: a key
+// here is one it invented, and honouring it would let it overwrite the key the
+// core holds for that credential with something it can sign with itself.
+fn restore_passkey_keys(
+    entry: &mut Entry,
+    store: &SqliteStore,
+    cipher: &PayloadCipher,
+) -> Result<()> {
+    if entry.has_supplied_passkey_key() {
+        return Err(Error::Unsupported(
+            "a passkey's private key cannot be set from here".into(),
+        ));
+    }
+    if !entry.has_passkeys() {
+        return Ok(());
+    }
+    let stored = store
+        .get(&entry.id)
+        .map_err(store_err)?
+        .map(|record| cipher.unseal(&record.id, &record.payload))
+        .transpose()?;
+    entry.restore_passkey_keys(stored)
 }
 
 // Tombstone one entry (retained for sync); it drops out of the list.
@@ -250,5 +290,150 @@ pub async fn save_env_file(
         Err(Error::Unsupported(
             "saving a file is a desktop action".into(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crypto::VaultKey;
+    use crate::models::Passkey;
+    use crate::store::SqliteStore;
+
+    fn passkey(credential_id: &str, private_key: &str) -> Passkey {
+        Passkey {
+            credential_id: credential_id.into(),
+            rp_id: "acme.test".into(),
+            rp_name: None,
+            user_handle: "dWgx".into(),
+            user_name: "alice".into(),
+            user_display_name: "Alice".into(),
+            private_key: private_key.into(),
+            counter: 0,
+            created_at: None,
+        }
+    }
+
+    fn login(passkeys: Vec<Passkey>) -> Entry {
+        Entry {
+            id: "l1".into(),
+            kind: "login".into(),
+            title: "Site".into(),
+            passkeys: Some(passkeys),
+            ..Entry::default()
+        }
+    }
+
+    fn open(dir: &tempfile::TempDir) -> (SqliteStore, PayloadCipher) {
+        let key = VaultKey::legacy_from_password("pw");
+        let store = SqliteStore::open(&dir.path().join("vault.db"), key.sqlcipher_key().as_slice())
+            .unwrap();
+        (store, key.payload_cipher())
+    }
+
+    fn save(store: &SqliteStore, cipher: &PayloadCipher, entry: &Entry) {
+        let payload = cipher.seal(entry).unwrap();
+        store
+            .upsert(&migrate::build_record(entry, payload).unwrap())
+            .unwrap();
+    }
+
+    // The round trip the webview makes: what a reveal hands out carries no
+    // private key, and the save that comes back is completed from the row it
+    // replaces — so the key survives an edit it never travelled through.
+    #[test]
+    fn a_reveal_hides_the_passkey_key_and_the_save_puts_it_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, cipher) = open(&dir);
+        save(&store, &cipher, &login(vec![passkey("c1", "k1")]));
+
+        let record = store.get("l1").unwrap().unwrap();
+        let revealed = cipher
+            .unseal(&record.id, &record.payload)
+            .unwrap()
+            .redacted();
+        assert_eq!(revealed.passkeys.as_ref().unwrap()[0].private_key, "");
+
+        let mut incoming = revealed;
+        incoming.title = "Renamed".into();
+        restore_passkey_keys(&mut incoming, &store, &cipher).unwrap();
+        assert_eq!(incoming.passkeys.as_ref().unwrap()[0].private_key, "k1");
+
+        // And it is the completed entry that lands, not the blanked one.
+        save(&store, &cipher, &incoming);
+        let record = store.get("l1").unwrap().unwrap();
+        let stored: Entry = cipher.unseal(&record.id, &record.payload).unwrap();
+        assert_eq!(stored.title, "Renamed");
+        assert_eq!(stored.passkeys.unwrap()[0].private_key, "k1");
+    }
+
+    // A keyless passkey the stored row cannot account for — here a brand new
+    // entry, which has no stored row at all — is refused.
+    #[test]
+    fn a_keyless_passkey_with_nothing_to_merge_from_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, cipher) = open(&dir);
+
+        let mut fresh = login(vec![passkey("c1", "")]);
+        assert!(matches!(
+            restore_passkey_keys(&mut fresh, &store, &cipher),
+            Err(Error::NotFound)
+        ));
+    }
+
+    // No passkeys, nothing to do: an ordinary save never unseals the old row.
+    #[test]
+    fn a_save_without_passkeys_is_left_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, cipher) = open(&dir);
+
+        let mut entry = login(vec![]);
+        restore_passkey_keys(&mut entry, &store, &cipher).unwrap();
+        assert!(entry.passkeys.unwrap().is_empty());
+    }
+
+    // A save carrying a private key is one the webview could only have made up
+    // — a reveal never hands one out — so it is refused rather than written
+    // over the key the core holds.
+    #[test]
+    fn a_save_that_supplies_a_private_key_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, cipher) = open(&dir);
+        save(&store, &cipher, &login(vec![passkey("c1", "k1")]));
+
+        let mut forged = login(vec![passkey("c1", "theirs")]);
+        assert!(matches!(
+            restore_passkey_keys(&mut forged, &store, &cipher),
+            Err(Error::Unsupported(_))
+        ));
+
+        // The stored key is untouched.
+        let record = store.get("l1").unwrap().unwrap();
+        let stored: Entry = cipher.unseal(&record.id, &record.payload).unwrap();
+        assert_eq!(stored.passkeys.unwrap()[0].private_key, "k1");
+    }
+
+    // One unknown credential refuses the whole save, and the passkey listed
+    // before it does not walk off with the stored key on the way out.
+    #[test]
+    fn an_unknown_credential_refuses_the_save_and_moves_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, cipher) = open(&dir);
+        save(
+            &store,
+            &cipher,
+            &login(vec![passkey("c1", "k1"), passkey("c2", "k2")]),
+        );
+
+        let mut incoming = login(vec![passkey("c1", ""), passkey("c9", "")]);
+        assert!(matches!(
+            restore_passkey_keys(&mut incoming, &store, &cipher),
+            Err(Error::NotFound)
+        ));
+        assert!(incoming
+            .passkeys
+            .unwrap()
+            .iter()
+            .all(|p| p.private_key.is_empty()));
     }
 }

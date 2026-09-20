@@ -143,11 +143,25 @@ carries them as part of the opaque payload and never sees them.
 
 - **The private key never leaves the core.** `src-tauri/src/passkey/` unseals a
   login, converts the stored PKCS#8 key to a COSE key in memory, signs, and drops
-  it. No command returns a private key to the webview. The one way a passkey
-  leaves the app is an **explicit user-initiated export** (a `.rowel` backup,
-  which is the encrypted vault snapshot itself, or Bitwarden JSON, which is
-  plaintext by construction and carries the key as base64url) — the same
-  deliberate exposure the password export already is.
+  it. No command returns a private key to the webview: `reveal_entry` hands out
+  `Entry::redacted`, which blanks every passkey's `private_key` (blank is omitted
+  on the wire, so the field is absent from the frontend `Passkey` type too), and
+  a share is sanitized of its passkeys altogether before it is sealed. The
+  webview therefore sees a credential's identity — which site, which account,
+  when it was made — and nothing that could sign with it.
+- **A save puts the key back rather than trusting the webview for it.** Since an
+  edit comes back without the keys it was never given, `save_entry` unseals the
+  row it is replacing and copies each `private_key` across, matched on
+  `credential_id` (`Entry::restore_passkey_keys`). Only the passkeys still on the
+  incoming entry are completed, in the order it lists them, so removing one in
+  the editor removes it and reordering reorders. A blank key whose credential id
+  is not in the stored row — or that has no stored row at all — is refused
+  (`NotFound`) rather than saved as a credential that could never sign. The
+  stored row is unsealed only when a blank key is present.
+- The one way a passkey key leaves the app is an **explicit user-initiated
+  export** (a `.rowel` backup, which is the encrypted vault snapshot itself, or
+  Bitwarden JSON, which is plaintext by construction and carries the key as
+  base64url) — the same deliberate exposure the password export already is.
 - **User verification is the unlocked session plus the user's consent.** The
   vault being unlocked is the identity half of WebAuthn's "user verified" bit;
   the intent half is asked for on every registration and sign-in through the

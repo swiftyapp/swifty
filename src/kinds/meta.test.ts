@@ -207,7 +207,6 @@ describe('isValid', () => {
       userHandle: 'dWgx',
       userName: 'alice',
       userDisplayName: 'Alice',
-      privateKey: 'cGsx',
       counter: 0
     }
 

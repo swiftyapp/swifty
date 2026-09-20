@@ -334,7 +334,6 @@ const PASSKEY: Passkey = {
   userHandle: 'dWgx',
   userName: 'alice@acme.test',
   userDisplayName: 'Alice',
-  privateKey: 'cHJpdmF0ZS1rZXk',
   counter: 0,
   createdAt: '2024-02-01T00:00:00.000Z'
 }
@@ -360,16 +359,16 @@ describe('Passkeys on a login', () => {
     expect(await screen.findByText('acme.test')).toBeInTheDocument()
   })
 
-  // The private key is the credential itself, and the handle and credential id
-  // name it to the site and to nobody else. None of the three has any business
-  // on screen — or on a clipboard, so no row offers a copy button either.
-  it('never puts the private key, user handle or credential id on screen', async () => {
+  // The private key never leaves Rust (see `Passkey` in `@/api/types`), and the
+  // handle and credential id name the credential to the site and to nobody
+  // else. Neither has any business on screen — or on a clipboard, so no row
+  // offers a copy button either.
+  it('never puts the user handle or credential id on screen', async () => {
     mockCommand('reveal_entry', () => passkeyLogin())
     const { container } = render(<Show entry={loginMeta()} />)
 
     await screen.findByText('Passkeys')
     const rendered = container.textContent ?? ''
-    expect(rendered).not.toContain(PASSKEY.privateKey)
     expect(rendered).not.toContain(PASSKEY.userHandle)
     expect(rendered).not.toContain(PASSKEY.credentialId)
   })
