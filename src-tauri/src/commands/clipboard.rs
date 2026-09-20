@@ -191,6 +191,28 @@ fn should_clear(written: &str, current: Option<&str>) -> bool {
     current == Some(written)
 }
 
+/// The longest a secret may sit on the iOS pasteboard when the user's clipboard
+/// timeout is "Never".
+///
+/// `ExpirationDate` is the only clear iOS gets: `clear_on_lock` is a no-op
+/// there, because comparing before clearing means reading the pasteboard back,
+/// which raises the iOS 16+ paste banner over a value the user never asked to
+/// paste. Without an expiry, "Never" would leave the secret on the pasteboard
+/// forever — across a lock, and past the point the user has forgotten it is
+/// there. A day is long past any real use of a copied password, and still an
+/// end.
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+const IOS_MAX_PASTEBOARD_TTL: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// The expiry every iOS pasteboard write carries: what the user asked for, or
+/// the cap when they asked for nothing — and never longer than the cap.
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+fn ios_expiry(clear_after: Option<Duration>) -> Duration {
+    clear_after
+        .unwrap_or(IOS_MAX_PASTEBOARD_TTL)
+        .min(IOS_MAX_PASTEBOARD_TTL)
+}
+
 #[cfg(target_os = "macos")]
 fn write_concealed(_app: &AppHandle, value: &str, _clear_after: Option<Duration>) -> Result<()> {
     use objc2_app_kit::NSPasteboard;
@@ -281,7 +303,8 @@ fn write_windows(value: &str) -> Result<()> {
 // options dictionary: `LocalOnly` keeps the secret off Universal Clipboard (no
 // other device ever sees it), and `ExpirationDate` has the system drop the item
 // on its own, which is a stronger clear than a timer this process may never live
-// to run.
+// to run. Every write gets an expiry — the user's, or the cap above when they
+// asked for none.
 #[cfg(target_os = "ios")]
 fn write_concealed(_app: &AppHandle, value: &str, clear_after: Option<Duration>) -> Result<()> {
     use objc2::runtime::AnyObject;
@@ -298,14 +321,16 @@ fn write_concealed(_app: &AppHandle, value: &str, clear_after: Option<Duration>)
     let item = NSDictionary::from_slices(&[&*uti], &[text]);
 
     let local_only = NSNumber::numberWithBool(true);
-    let mut keys: Vec<&UIPasteboardOption> = vec![unsafe { UIPasteboardOptionLocalOnly }];
-    let mut values: Vec<&AnyObject> = vec![&local_only];
-    // Bound outside the `if` so it outlives the borrow the dictionary takes.
-    let expires = clear_after.map(|d| NSDate::dateWithTimeIntervalSinceNow(d.as_secs_f64()));
-    if let Some(date) = &expires {
-        keys.push(unsafe { UIPasteboardOptionExpirationDate });
-        values.push(date);
-    }
+    // Bound outside the vectors so they outlive the borrow the dictionary takes.
+    let expires = NSDate::dateWithTimeIntervalSinceNow(ios_expiry(clear_after).as_secs_f64());
+    let (local_only_key, expires_key) = unsafe {
+        (
+            UIPasteboardOptionLocalOnly,
+            UIPasteboardOptionExpirationDate,
+        )
+    };
+    let keys: Vec<&UIPasteboardOption> = vec![local_only_key, expires_key];
+    let values: Vec<&AnyObject> = vec![&local_only, &expires];
 
     unsafe {
         UIPasteboard::generalPasteboard().setItems_options(
@@ -325,7 +350,27 @@ fn write_concealed(app: &AppHandle, value: &str, _clear_after: Option<Duration>)
 
 #[cfg(test)]
 mod tests {
-    use super::should_clear;
+    use super::{ios_expiry, should_clear, IOS_MAX_PASTEBOARD_TTL};
+    use std::time::Duration;
+
+    // "Never" on iOS means "until the pasteboard expires", not "forever": the
+    // lock cannot clear it there, so the write-time expiry has to.
+    #[test]
+    fn never_still_expires_on_ios() {
+        assert_eq!(ios_expiry(None), IOS_MAX_PASTEBOARD_TTL);
+    }
+
+    #[test]
+    fn a_chosen_timeout_is_kept_and_bounded_by_the_cap() {
+        assert_eq!(
+            ios_expiry(Some(Duration::from_secs(30))),
+            Duration::from_secs(30)
+        );
+        assert_eq!(
+            ios_expiry(Some(Duration::from_secs(u32::MAX as u64))),
+            IOS_MAX_PASTEBOARD_TTL
+        );
+    }
 
     #[test]
     fn clears_only_when_value_unchanged() {
