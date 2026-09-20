@@ -238,6 +238,10 @@ pub async fn workspace_create(
     {
         return Err(Error::Locked);
     }
+    // The new vault is open now, and the Argon2id derive above took a while:
+    // put it on the idle clock from here rather than from whenever the webview
+    // next reports activity.
+    crate::autolock::touch(&app);
     Ok(UnlockResult {
         entries: vec![],
         sync_configured: syncing,
@@ -515,6 +519,9 @@ async fn restore_workspace(
     if !state.session.lock().unwrap().adopt(claim, key, store, true) {
         return Err(Error::Locked);
     }
+    // As in `workspace_create`: the restored vault is open, so its idle clock
+    // starts here.
+    crate::autolock::touch(app);
     super::autojoin::with_password(app, join);
     Ok(UnlockResult {
         entries,

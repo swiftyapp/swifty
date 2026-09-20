@@ -1,9 +1,13 @@
-//! Website favicon fetch + on-disk cache, for list-row identity.
+//! Website favicon fetch + cache, for list-row identity.
 //!
 //! Privacy: icons are fetched directly from the host an entry already points
 //! at — never through a third-party favicon service — so the vault's host
-//! list is not shipped anywhere new. Misses are cached with a TTL so offline
-//! launches and dead hosts don't retry on every run.
+//! list is not shipped anywhere new. Nor is it written anywhere new: the cache
+//! is a table inside the open SQLCipher vault, so what it records — the hosts
+//! looked up, and which of them have no icon — is encrypted at rest with the
+//! rest of the vault's metadata rather than spelled out in file names beside
+//! it. Misses are cached with a TTL so offline launches and dead hosts don't
+//! retry on every run.
 //!
 //! The result crosses IPC as a `data:` URI, which keeps the webview CSP's
 //! `img-src 'self' data:` intact. Remote SVG is refused outright — an SVG is
@@ -17,20 +21,19 @@
 //! unless every address is public, and connected to those very addresses. See
 //! [`get`].
 
-use std::fs;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
-use std::path::Path;
 use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 use reqwest::redirect::Policy;
 use reqwest::{Client, Response};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use url::{Host, Url};
 
 use crate::error::Result;
-use crate::storage;
+use crate::session::{Epoch, Session};
+use crate::state::AppState;
 
 const MAX_ICON_BYTES: usize = 256 * 1024;
 const MAX_HTML_BYTES: usize = 512 * 1024;
@@ -49,53 +52,76 @@ const SAFE_TYPES: [&str; 6] = [
     "image/webp",
 ];
 
-// The favicon for `host` as a data: URI, or None when it has none. Disk-cached
-// both ways. Touches no vault state, but the caller gates it on an unlocked
-// session all the same (`commands::tools::fetch_favicon`): the hosts come out
-// of the vault, and a locked app has no business making requests about them.
-// `allowed` is that gate, asked again before every request this makes — a
-// lookup is several round trips, and a lock that lands in the middle of one
-// ends it there rather than after the icon has been fetched.
-pub async fn fetch(
-    app: &AppHandle,
-    host: &str,
-    allowed: impl Fn() -> bool,
-) -> Result<Option<String>> {
+// The favicon for `host` as a data: URI, or None when it has none. Cached both
+// ways, in the vault's own database, so the cache is per workspace and sealed
+// with everything else it holds.
+//
+// The caller gates this on an unlocked session
+// (`commands::tools::fetch_favicon`): the hosts come out of the vault, and a
+// locked app has no business making requests about them. `epoch` is that gate
+// — the session the request came from — and everything here is asked against
+// it: every request this makes, so a lock that lands in the middle of a lookup
+// ends it there rather than after the icon has been fetched, and both ends of
+// the cache, so the answer is read from and written to that session's vault or
+// no vault at all. A lock that lands before the result is written costs the
+// cache entry, not the icon: the caller is answered either way, and the next
+// unlocked lookup re-fetches it.
+pub async fn fetch(app: &AppHandle, host: &str, epoch: Epoch) -> Result<Option<String>> {
     let Some(host) = safe_host(host) else {
         return Ok(None);
     };
-    let dir = storage::icons_dir(app)?;
-    fs::create_dir_all(&dir)?;
-
-    let hit = dir.join(format!("{host}.uri"));
-    if let Ok(uri) = fs::read_to_string(&hit) {
-        return Ok(Some(uri));
+    if let Some(cached) = with_session(app, |session| cached(session, &host, epoch)) {
+        return Ok(cached);
     }
-    let miss = dir.join(format!("{host}.miss"));
-    if fresh_miss(&miss) {
-        return Ok(None);
-    }
+    let allowed = || {
+        with_session(app, |session| {
+            session.is_unlocked() && session.epoch() == epoch
+        })
+    };
+    let found = lookup(&host, &allowed).await;
+    with_session(app, |session| {
+        cache(session, &host, epoch, found.as_deref())
+    });
+    Ok(found)
+}
 
-    match lookup(&host, &allowed).await {
-        Some(uri) => {
-            let _ = fs::write(&hit, &uri);
-            let _ = fs::remove_file(&miss);
-            Ok(Some(uri))
-        }
-        None => {
-            let _ = fs::write(&miss, b"");
-            Ok(None)
-        }
+// The session mutex, held for the length of one memory read or DB call and no
+// longer — never across the network lookup between them, which takes seconds
+// and would hold every other command out for them.
+fn with_session<T>(app: &AppHandle, f: impl FnOnce(&Session) -> T) -> T {
+    let state = app.state::<AppState>();
+    let session = state.session.lock().unwrap();
+    f(&session)
+}
+
+// Both ends of the cache go through the store of the session `epoch` was read
+// from, and no other. A lookup takes seconds, and in that time the vault can
+// lock and a different workspace be opened — a different SQLCipher database —
+// so the store that happens to be in the session when the network answers is
+// not necessarily the one that asked. `store_at` refuses that as it refuses a
+// plain lock: the read is a miss and the write is dropped, rather than one
+// workspace's host and icon landing in another's `favicons` table.
+fn cached(session: &Session, host: &str, epoch: Epoch) -> Option<Option<String>> {
+    session
+        .store_at(epoch)
+        .ok()?
+        .get_favicon(host, MISS_TTL.as_millis() as i64)
+        .ok()?
+}
+
+fn cache(session: &Session, host: &str, epoch: Epoch, uri: Option<&str>) {
+    if let Ok(store) = session.store_at(epoch) {
+        let _ = store.put_favicon(host, uri);
     }
 }
 
-// Hostnames double as cache file names, so reject anything that isn't a plain
-// DNS name (no slashes, no traversal, no URL metacharacters). Also refuses
-// what a public website is never called: an IP literal, or a name under a
-// suffix that only resolves on the local network. An entry's host is the
-// user's own data, but a request to `192.168.1.1` or `nas.local` from a
-// password manager is a probe of the LAN the user did not ask for, and the
-// answer would be cached under the vault's icons for good.
+// Hostnames are the cache's primary key and the name every request is aimed
+// at, so reject anything that isn't a plain DNS name (no slashes, no
+// traversal, no URL metacharacters). Also refuses what a public website is
+// never called: an IP literal, or a name under a suffix that only resolves on
+// the local network. An entry's host is the user's own data, but a request to
+// `192.168.1.1` or `nas.local` from a password manager is a probe of the LAN
+// the user did not ask for, and the answer would be cached for good.
 fn safe_host(host: &str) -> Option<String> {
     let host = host.trim().trim_end_matches('.').to_ascii_lowercase();
     let ok = !host.is_empty()
@@ -117,14 +143,6 @@ const LOCAL_SUFFIXES: [&str; 5] = [".local", ".localhost", ".internal", ".home.a
 // (an IPv6 literal has colons).
 fn is_ip_literal(host: &str) -> bool {
     host.parse::<std::net::Ipv4Addr>().is_ok()
-}
-
-fn fresh_miss(path: &Path) -> bool {
-    fs::metadata(path)
-        .and_then(|m| m.modified())
-        .ok()
-        .and_then(|at| at.elapsed().ok())
-        .is_some_and(|age| age < MISS_TTL)
 }
 
 // Declared icons from the homepage <head> first (usually crisp PNGs), then
@@ -563,6 +581,69 @@ mod tests {
     fn ignores_links_without_icon_rel_or_href() {
         let html = r#"<link rel="preload" href="/x.woff2"><link rel="icon">"#;
         assert!(icon_hrefs(html).is_empty());
+    }
+
+    // The cache is a table inside the open vault, and a lookup outlives the
+    // session that asked for it: by the time the network answers, the vault
+    // may be locked, or another workspace — another database — may be open.
+    // Neither may be written to.
+    #[test]
+    fn only_the_session_that_asked_is_read_and_written() {
+        use crate::crypto::VaultKey;
+        use crate::store::SqliteStore;
+
+        let open = |dir: &tempfile::TempDir, password: &str| {
+            let key = VaultKey::legacy_from_password(password);
+            let store =
+                SqliteStore::open(&dir.path().join("vault.db"), key.sqlcipher_key().as_slice());
+            (key, store.unwrap())
+        };
+        let icon = Some("data:image/png;base64,AA");
+
+        let first_dir = tempfile::tempdir().unwrap();
+        let (key, store) = open(&first_dir, "first");
+        let mut session = Session::default();
+        session.set(key, store, false);
+        let asked_in = session.epoch();
+
+        assert_eq!(cached(&session, "ex.com", asked_in), None, "nothing yet");
+        cache(&session, "ex.com", asked_in, icon);
+        assert_eq!(
+            cached(&session, "ex.com", asked_in),
+            Some(icon.map(str::to_string))
+        );
+
+        // The vault locks and a second workspace is opened while the lookup
+        // for `other.com` is still in flight.
+        session.clear();
+        cache(&session, "other.com", asked_in, icon);
+        let second_dir = tempfile::tempdir().unwrap();
+        let (key, store) = open(&second_dir, "second");
+        session.set(key, store, false);
+
+        cache(&session, "other.com", asked_in, icon);
+        assert_eq!(
+            session
+                .store()
+                .unwrap()
+                .get_favicon("other.com", MISS_TTL.as_millis() as i64)
+                .unwrap(),
+            None,
+            "the first workspace's host must not land in the second's vault"
+        );
+        assert_eq!(
+            cached(&session, "ex.com", asked_in),
+            None,
+            "nor may the second workspace be read on the first's behalf"
+        );
+
+        // The session in front of it is cached as usual.
+        let now = session.epoch();
+        cache(&session, "other.com", now, icon);
+        assert_eq!(
+            cached(&session, "other.com", now),
+            Some(icon.map(str::to_string))
+        );
     }
 
     #[test]

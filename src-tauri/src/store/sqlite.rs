@@ -68,6 +68,21 @@ fn migration_list() -> Vec<M<'static>> {
             "ALTER TABLE entries ADD COLUMN file_name TEXT;
              ALTER TABLE entries ADD COLUMN var_count INTEGER;",
         ),
+        // The website-favicon cache. It used to be loose files named after the
+        // host under the app-data dir, which put the vault's host list — live
+        // and deleted — in the clear beside the encrypted database, where any
+        // file-level backup picked it up. In here it gets what the rest of the
+        // metadata gets: SQLCipher at rest. `uri` NULL is a recorded miss (the
+        // host has no icon), which is why the presence of the row and the
+        // presence of an icon are two different questions; `fetched_at` is what
+        // ages a miss out.
+        M::up(
+            "CREATE TABLE favicons (
+           host       TEXT PRIMARY KEY,
+           uri        TEXT,
+           fetched_at INTEGER NOT NULL
+         );",
+        ),
     ]
 }
 
@@ -338,6 +353,61 @@ impl SqliteStore {
             drop_wal_history(&conn);
         }
         Ok(reclaimed)
+    }
+
+    /// The cached favicon for `host`, if the cache still answers for it:
+    ///
+    /// - `None` — nothing usable. Either the host was never looked up, or the
+    ///   only thing recorded is a miss older than `miss_ttl_ms`, which is due
+    ///   to be retried.
+    /// - `Some(None)` — a fresh miss: the host was looked up and has no icon.
+    /// - `Some(Some(uri))` — the cached icon.
+    ///
+    /// A hit never ages out: an icon that was right once stays rendered, and
+    /// re-fetching every site's artwork on a timer would be a periodic
+    /// broadcast of the vault's host list. Only misses expire, so a site that
+    /// gains an icon (or was offline when we asked) is asked again. The TTL is
+    /// the caller's policy, not the store's.
+    pub fn get_favicon(&self, host: &str, miss_ttl_ms: i64) -> Result<Option<Option<String>>> {
+        let row: Option<(Option<String>, i64)> = self
+            .lock()
+            .query_row(
+                "SELECT uri, fetched_at FROM favicons WHERE host = ?1",
+                params![host],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?;
+        Ok(match row {
+            Some((Some(uri), _)) => Some(Some(uri)),
+            Some((None, fetched_at)) => {
+                (now_ms().saturating_sub(fetched_at) < miss_ttl_ms).then_some(None)
+            }
+            None => None,
+        })
+    }
+
+    /// Record the lookup for `host`: its icon, or `None` for "has none".
+    /// Re-stamps `fetched_at`, so a repeated miss restarts its TTL rather than
+    /// being retried on every launch once the first one aged out.
+    pub fn put_favicon(&self, host: &str, uri: Option<&str>) -> Result<()> {
+        self.lock().execute(
+            "INSERT INTO favicons (host, uri, fetched_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(host) DO UPDATE SET uri = excluded.uri, fetched_at = excluded.fetched_at",
+            params![host, uri, now_ms()],
+        )?;
+        Ok(())
+    }
+
+    /// Test seam: put the DB back the way the build before the favicon cache
+    /// left it — no `favicons` table, stamped at the version that preceded it
+    /// — so a test can watch the migration land on an existing vault.
+    #[cfg(test)]
+    pub(crate) fn drop_favicons_for_test(&self) -> Result<()> {
+        let previous = schema_version() - 1;
+        self.lock().execute_batch(&format!(
+            "DROP TABLE favicons; PRAGMA user_version = {previous};"
+        ))?;
+        Ok(())
     }
 
     /// Test seam: the current value of an integer pragma.
