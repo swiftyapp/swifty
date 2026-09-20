@@ -372,20 +372,26 @@ fn not_a_regular_file() -> Error {
     Error::Other("that path is not a regular file".into())
 }
 
-// The producer's own ceiling, so the cap turns away only files that cannot be
-// one of its backups. The legacy Electron app set no aggregate limit of its
-// own, but V8 set one for it: the whole hex-encoded backup was a single
-// JavaScript string, and a string cannot be longer than `String::kMaxLength` —
-// 2^30 - 25 characters, just under 1 GiB, on 64-bit V8 since 6.2, and
-// 2^29 - 24, just under 512 MiB, before that. Nothing that app could ever have
-// written therefore reaches 1 GiB, whatever the vault inside it held.
+// What the importer can afford to hold, not what the old app could write. The
+// import decodes the file one layer at a time and frees each layer as the next
+// is built from it, so the peak is the file plus the base64 output beside it
+// for that one step — about 1.75x the file — and every step after that is
+// smaller. The app ships on iOS, where a foreground process on a 3 GB device is
+// killed around 1.3 GiB resident (an approximate, device-dependent figure), so
+// 256 MiB peaks at well under half a gigabyte and stays far inside that with
+// the app's own baseline on top.
 //
-// The number exists only so a file that is not a backup of ours cannot be
-// buffered and decoded before the AES-GCM tag — checked at the very end of all
-// of it — gets to reject it. Decoding shrinks rather than grows: the hex halves
-// the bytes and the base64 inside takes another 3/4 of that, so the peak is the
-// file plus about half of it again, not a multiple.
-const MAX_BACKUP_BYTES: u64 = 1024 * 1024 * 1024;
+// It turns away no real backup. A vault is text only — there are no
+// attachments — and a typical entry is a few hundred bytes of fields, about a
+// kilobyte once hex-encoded and wrapped in base64, so 256 MiB is on the order
+// of a quarter of a million entries. (Nothing the legacy Electron app wrote
+// came near even the old limit: the whole hex backup was one V8 string, and
+// those stop just under 1 GiB.)
+//
+// The cap also has to exist at all so that a file which is not a backup of ours
+// cannot be buffered and decoded before the AES-GCM tag — checked at the very
+// end of all of it — gets to reject it.
+const MAX_BACKUP_BYTES: u64 = 256 * 1024 * 1024;
 
 // Read an arbitrary backup file chosen by the user (absolute path).
 pub fn read_backup(path: &str) -> Result<String> {

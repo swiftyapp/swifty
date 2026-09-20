@@ -127,9 +127,12 @@ pub async fn import_swftx(
     let records = super::blocking(move || -> Result<Vec<Record>> {
         let blob = storage::read_backup(&path)?;
         let src_cryptor = crypto::Cryptor::new(&crypto::hash_secret(&password));
-        // Validate the source password before touching the store.
+        // Validate the source password before touching the store. The blob goes
+        // in by value: the file is freed as soon as it has been decoded, so the
+        // loop below runs with the decrypted vault alone, not with the file it
+        // came out of still beside it.
         let src: VaultData = src_cryptor
-            .decrypt_data(&blob)
+            .decrypt_data_owned(blob)
             .map_err(|_| Error::InvalidPassword)?;
 
         let total = src.entries.len();

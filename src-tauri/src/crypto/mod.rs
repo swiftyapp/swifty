@@ -3,9 +3,9 @@
 //! for whole-object blobs. See `legacy/src/main/application/cryptor/index.js`.
 
 use aes_gcm::aead::consts::U16;
-use aes_gcm::aead::{Aead, KeyInit, Payload};
+use aes_gcm::aead::{Aead, AeadInOut, KeyInit, Payload};
 use aes_gcm::aes::Aes256;
-use aes_gcm::{AesGcm, Nonce};
+use aes_gcm::{AesGcm, Nonce, Tag};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use rand::RngCore;
 use serde::{de::DeserializeOwned, Serialize};
@@ -190,26 +190,29 @@ impl Cryptor {
 
     /// Reverse of [`encrypt`](Self::encrypt).
     pub fn decrypt(&self, hexstr: &str) -> Result<String> {
-        let bytes = hex::decode(hexstr).map_err(err)?;
-        if bytes.len() < SALT_LEN + IV_LEN + TAG_LEN {
+        self.decrypt_bytes(hex::decode(hexstr).map_err(err)?)
+    }
+
+    /// The AES half of [`decrypt`](Self::decrypt), taking `salt ‖ iv ‖ tag ‖
+    /// ciphertext` by value and unsealing the ciphertext where it already lies.
+    /// The plaintext is that same buffer with the header drained off its front,
+    /// so nothing the size of the message is ever held twice — which is what
+    /// keeps a whole-vault blob from costing a second copy of itself.
+    fn decrypt_bytes(&self, mut bytes: Vec<u8>) -> Result<String> {
+        const HEADER: usize = SALT_LEN + IV_LEN + TAG_LEN;
+        if bytes.len() < HEADER {
             return Err(Error::Crypto("ciphertext too short".into()));
         }
-        let (salt, rest) = bytes.split_at(SALT_LEN);
-        let (iv, rest) = rest.split_at(IV_LEN);
-        let (tag, ciphertext) = rest.split_at(TAG_LEN);
+        let cipher = self.cipher(&bytes[..SALT_LEN])?;
+        let nonce = to_nonce(&bytes[SALT_LEN..SALT_LEN + IV_LEN])?;
+        let tag = Tag::<U16>::try_from(&bytes[SALT_LEN + IV_LEN..HEADER])
+            .map_err(|_| Error::Crypto("invalid tag length".into()))?;
 
-        // Reassemble `ciphertext ‖ tag` for aes-gcm.
-        let mut sealed = Vec::with_capacity(ciphertext.len() + TAG_LEN);
-        sealed.extend_from_slice(ciphertext);
-        sealed.extend_from_slice(tag);
-
-        let cipher = self.cipher(salt)?;
-        let payload = Payload {
-            msg: &sealed,
-            aad: &[],
-        };
-        let plain = cipher.decrypt(&to_nonce(iv)?, payload).map_err(err)?;
-        String::from_utf8(plain).map_err(err)
+        cipher
+            .decrypt_inout_detached(&nonce, &[], (&mut bytes[HEADER..]).into(), &tag)
+            .map_err(err)?;
+        bytes.drain(..HEADER);
+        String::from_utf8(bytes).map_err(err)
     }
 
     /// `base64( encrypt( JSON.stringify(data) ) )` — the on-disk blob (double-encoded).
@@ -220,8 +223,27 @@ impl Cryptor {
 
     /// Reverse of [`encrypt_data`](Self::encrypt_data).
     pub fn decrypt_data<T: DeserializeOwned>(&self, blob: &str) -> Result<T> {
-        let hexstr = String::from_utf8(STANDARD.decode(blob).map_err(err)?).map_err(err)?;
-        Ok(serde_json::from_str(&self.decrypt(&hexstr)?)?)
+        self.decrypt_hex_bytes(STANDARD.decode(blob).map_err(err)?)
+    }
+
+    /// [`decrypt_data`](Self::decrypt_data) for a blob the caller is done with:
+    /// it takes the string by value and frees it the moment the base64 layer is
+    /// off, so an import of a file the size of a whole vault holds the file and
+    /// its decoding together only for that one step. Each layer after it is
+    /// smaller than the one it came from and replaces it.
+    pub fn decrypt_data_owned<T: DeserializeOwned>(&self, blob: String) -> Result<T> {
+        let hexstr = STANDARD.decode(blob.as_bytes()).map_err(err)?;
+        drop(blob);
+        self.decrypt_hex_bytes(hexstr)
+    }
+
+    /// The shared tail of both: hex text in, parsed value out, dropping each
+    /// encoding as the next one is built from it.
+    fn decrypt_hex_bytes<T: DeserializeOwned>(&self, hexstr: Vec<u8>) -> Result<T> {
+        let bytes = hex::decode(&hexstr).map_err(err)?;
+        drop(hexstr);
+        let json = self.decrypt_bytes(bytes)?;
+        Ok(serde_json::from_str(&json)?)
     }
 
     /// Encrypt an entry's sensitive fields in place, each stored as raw hex.
