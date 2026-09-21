@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '@/App'
 import LockScreen from '@/components/Auth/LockScreen'
-import { useApp } from '@/store'
+import { flowSetup, useApp } from '@/store'
 import { setLayout } from './layout'
 import { calls, mockCommand } from './ipc'
 import { seedApp } from './utils'
@@ -13,13 +13,22 @@ import { seedApp } from './utils'
 // vault straight after the hold.
 let inFront = true
 let asked = 0
+// One answer held open, so a test can act while the window is still being asked.
+let heldFocus: Promise<boolean> | undefined
+let releaseFocus: ((on: boolean) => void) | undefined
+
+const holdFocus = () => {
+  heldFocus = new Promise<boolean>(resolve => {
+    releaseFocus = resolve
+  })
+}
 
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({
     onFocusChanged: () => Promise.resolve(() => {}),
     isFocused: () => {
       asked++
-      return Promise.resolve(inFront)
+      return heldFocus ?? Promise.resolve(inFront)
     }
   })
 }))
@@ -29,7 +38,32 @@ beforeEach(() => {
   setLayout('compact')
   inFront = true
   asked = 0
+  heldFocus = undefined
+  releaseFocus = undefined
 })
+
+// Drive a biometric unlock to the point where the window is being asked and
+// the current ask is held open: the vault is open in Rust, the hold is over,
+// and the answer that would let the flow in has not landed.
+const unlockedAndAsking = async () => {
+  mockCommand('unlock_biometric', () => ({ entries: [], syncConfigured: false }))
+  inFront = false
+  const view = render(<LockScreen biometric />)
+
+  await userEvent.click(screen.getByTestId('biometric-tile'))
+  await waitFor(() => expect(asked).toBeGreaterThan(1), { timeout: 3000 })
+  holdFocus()
+  const sent = asked
+  await waitFor(() => expect(asked).toBeGreaterThan(sent))
+  expect(useApp.getState().flow).toBe('auth')
+  return view
+}
+
+// Let a released answer reach the continuation that was waiting on it.
+const answerLands = () => act(async () => {})
+
+// `enterMain` runs one audit per entry, so the audit calls count the entries.
+const entries = () => calls('get_audit').length
 
 describe('lock screen on compact', () => {
   it('leads with the biometric tile and keeps the passphrase one tap away', async () => {
@@ -75,6 +109,37 @@ describe('lock screen on compact', () => {
 
     inFront = true
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
+  })
+
+  // A layout remount while the window is still being asked: the unmount hands
+  // the unlock on at once, and the answer that lands afterwards must not enter
+  // a second time.
+  it('enters exactly once when unmounted while the window is being asked', async () => {
+    const { unmount } = await unlockedAndAsking()
+
+    unmount()
+    expect(useApp.getState().flow).toBe('main')
+    expect(entries()).toBe(1)
+
+    releaseFocus?.(true)
+    await answerLands()
+    expect(entries()).toBe(1)
+  })
+
+  // The flow left the lock screen before the unmount, so the held unlock
+  // describes a session someone else has replaced: dropped, and the answer
+  // that lands afterwards cannot bring it back.
+  it('drops the unlock when the flow moved on before the unmount', async () => {
+    const { unmount } = await unlockedAndAsking()
+
+    flowSetup()
+    unmount()
+    expect(useApp.getState().flow).toBe('setup')
+
+    releaseFocus?.(true)
+    await answerLands()
+    expect(useApp.getState().flow).toBe('setup')
+    expect(entries()).toBe(0)
   })
 
   it('blames the prompt, not the passphrase, when biometrics fail', async () => {
