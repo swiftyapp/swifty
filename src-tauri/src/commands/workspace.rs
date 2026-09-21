@@ -853,14 +853,17 @@ async fn restore_vault_in(
 // travelled carries none, so it falls back to the short-id label every added
 // vault starts under.
 fn settle_name(store: &SqliteStore, typed: String, vault_id: &str) -> Result<String> {
+    let (packed, packed_ms) = identity::vault_name(store).map_err(store_err)?;
     if !typed.is_empty() {
-        identity::set_vault_name(store, &typed, auth::now_ms()).map_err(store_err)?;
+        // Over the stamp the pack carries, not this device's clock alone (see
+        // [`identity::rename_stamp`]): the sync that runs straight after the
+        // restore would otherwise hand the packed name back and skip the push,
+        // and the name the user typed here would be gone before they saw it.
+        let at_ms = identity::rename_stamp(packed_ms, auth::now_ms());
+        identity::set_vault_name(store, &typed, at_ms).map_err(store_err)?;
         return Ok(typed);
     }
-    Ok(match identity::vault_name(store).map_err(store_err)? {
-        (Some(packed), _) => packed,
-        (None, _) => super::autojoin::label(vault_id),
-    })
+    Ok(packed.unwrap_or_else(|| super::autojoin::label(vault_id)))
 }
 
 /// Refuse a pack this device would end up holding twice.
@@ -1172,5 +1175,28 @@ mod tests {
         let (name, at_ms) = identity::vault_name(&store).unwrap();
         assert_eq!(name.as_deref(), Some("Home"));
         assert!(at_ms > 1);
+    }
+
+    // The pack was named by a device whose clock runs ahead of this one. Stamped
+    // `now`, the typed name would read as the older of the two: the sync that
+    // follows the restore would put the packed name back and skip the upload,
+    // because both sides would then agree — losing the override in silence.
+    #[test]
+    fn a_typed_name_outranks_a_pack_stamped_in_the_future() {
+        let store = store();
+        // Far enough ahead that no real clock reaches it during the test.
+        let packed_ms = auth::now_ms() + 60 * 60 * 1000;
+        identity::set_vault_name(&store, "Work", packed_ms).unwrap();
+
+        assert_eq!(
+            settle_name(&store, "Home".into(), "9f3c1a2b").unwrap(),
+            "Home"
+        );
+        let (name, at_ms) = identity::vault_name(&store).unwrap();
+        assert_eq!(name.as_deref(), Some("Home"));
+        assert!(identity::name_wins(
+            (name.as_deref(), at_ms),
+            (Some("Work"), packed_ms)
+        ));
     }
 }
