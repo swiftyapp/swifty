@@ -34,6 +34,42 @@ pub const GDRIVE_FILE: &str = "auth/gdrive.swftx";
 // Its contents name the gate the key was enrolled behind (`secure_store::GateMode`)
 // — not a secret: it says *how* the key is gated, never anything about the key.
 pub const BIOMETRIC_FILE: &str = "biometric.enabled";
+// Working space for the sync engine, inside the workspace's own directory (see
+// `sync_scratch_dir`).
+const SYNC_SCRATCH_DIR: &str = "sync-scratch";
+
+// What one workspace's vault is made of, named in one place so the two flows
+// that move a whole vault — the delete that parks it out of the way, and the
+// promotion that carries a survivor into the root — can never disagree about
+// what a vault is.
+//
+// The rekey pair is part of it. A password change interrupted by a crash leaves
+// its snapshots beside the database, and they are half of the vault until the
+// next unlock reconciles them (`auth::recover_interrupted_rekey`): a promotion
+// that left them behind would hand that unlock a rekeyed database with no
+// sidecar to roll it back to, and one left in the root would roll the *deleted*
+// vault back over the promoted one.
+//
+// Split only by what it takes to move each: a database is its main file plus
+// whatever `-wal`/`-shm` siblings it has, which the two helpers below move and
+// remove as one.
+const VAULT_DB_FILES: [&str; 2] = [DB_FILE, DB_REKEY_BACKUP_FILE];
+const VAULT_SIDECAR_FILES: [&str; 4] = [
+    KDF_SIDECAR_FILE,
+    KDF_SIDECAR_REKEY_BACKUP_FILE,
+    LOCKOUT_SIDECAR_FILE,
+    GDRIVE_FILE,
+];
+
+// What a workspace keeps beside its vault and never takes with it. The
+// biometric marker names the one keychain item this install has, and deleting
+// the vault it was enrolled for deletes that item (`workspace_delete`) — a
+// marker that travelled would claim an enrollment that no longer exists. The
+// scratch directory is a sync run's working space, made again on demand.
+//
+// Both still belong to the workspace that holds them, so a delete moves them
+// out of the way rather than removing them: what it moves it can put back.
+const WORKSPACE_LOCAL_FILES: [&str; 1] = [BIOMETRIC_FILE];
 
 // The data dir for the whole install: what every workspace hangs off, and where
 // the workspace registry itself lives.
@@ -87,7 +123,7 @@ pub fn db_path(app: &AppHandle) -> Result<PathBuf> {
 // inherit the 0700 directory mode. Everything written here is SQLCipher
 // ciphertext, and every writer removes its own files (see `pack::Scratch`).
 pub fn sync_scratch_dir(app: &AppHandle) -> Result<PathBuf> {
-    Ok(workspace_dir(app)?.join("sync-scratch"))
+    Ok(workspace_dir(app)?.join(SYNC_SCRATCH_DIR))
 }
 
 // Favicons used to be cached as loose `{host}.uri` / `{host}.miss` files here.
@@ -183,6 +219,61 @@ pub fn rename_db_files(from: &Path, to: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+// Move a workspace's vault from one directory to another, whole: every file of
+// the set that is there, each database with its siblings. What is not there is
+// skipped — a local vault has no token file, a cleanly closed database no WAL,
+// and only an interrupted password change leaves a rekey pair.
+//
+// Renames only, so the move is reversible until something removes the source:
+// both callers (the promotion into the root, and the delete that stages a
+// doomed workspace away) have to be able to put every file back.
+pub fn move_vault_files(from: &Path, to: &Path) -> Result<()> {
+    for file in VAULT_DB_FILES {
+        move_one(&from.join(file), &to.join(file), rename_db_files)?;
+    }
+    for file in VAULT_SIDECAR_FILES {
+        move_one(&from.join(file), &to.join(file), rename_one)?;
+    }
+    Ok(())
+}
+
+// A whole workspace directory's contents: its vault and what it keeps beside
+// it. What a delete moves out of the way, so that a failure anywhere after it
+// leaves the directory exactly as it was.
+pub fn move_workspace_files(from: &Path, to: &Path) -> Result<()> {
+    move_vault_files(from, to)?;
+    for file in WORKSPACE_LOCAL_FILES {
+        move_one(&from.join(file), &to.join(file), rename_one)?;
+    }
+    // A directory, moved by the same rename as any file.
+    move_one(
+        &from.join(SYNC_SCRATCH_DIR),
+        &to.join(SYNC_SCRATCH_DIR),
+        rename_one,
+    )
+}
+
+// One entry moved only if it is there, with the target's directory made first:
+// the token file lives in a subdirectory of its own, which a root that never
+// synced does not have, and a staging directory does not exist at all yet.
+fn move_one(
+    source: &Path,
+    target: &Path,
+    rename: impl Fn(&Path, &Path) -> Result<()>,
+) -> Result<()> {
+    if !source.exists() {
+        return Ok(());
+    }
+    if let Some(parent) = target.parent() {
+        crate::store::create_private_dir(parent)?;
+    }
+    rename(source, target)
+}
+
+fn rename_one(from: &Path, to: &Path) -> Result<()> {
+    Ok(fs::rename(from, to)?)
 }
 
 // Preferences belong to the install, not to a vault, so they sit on the root
@@ -510,8 +601,10 @@ pub fn sync_configured(app: &AppHandle) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        atomic_replace_with, atomic_write_file, read_backup, read_regular_file_capped,
-        remove_if_present, Error,
+        atomic_replace_with, atomic_write_file, move_vault_files, move_workspace_files,
+        read_backup, read_regular_file_capped, remove_if_present, Error, BIOMETRIC_FILE, DB_FILE,
+        DB_REKEY_BACKUP_FILE, GDRIVE_FILE, KDF_SIDECAR_FILE, KDF_SIDECAR_REKEY_BACKUP_FILE,
+        LOCKOUT_SIDECAR_FILE, SYNC_SCRATCH_DIR,
     };
     use std::fs;
     use std::io::{self, Write};
@@ -638,6 +731,83 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), "complete old bytes");
         assert_eq!(fs::read_dir(path.parent().unwrap()).unwrap().count(), 1);
+    }
+
+    // Every file of the set, laid out as a workspace holds them.
+    fn seed_vault(dir: &Path) -> [&'static str; 6] {
+        let files = [
+            DB_FILE,
+            DB_REKEY_BACKUP_FILE,
+            KDF_SIDECAR_FILE,
+            KDF_SIDECAR_REKEY_BACKUP_FILE,
+            LOCKOUT_SIDECAR_FILE,
+            GDRIVE_FILE,
+        ];
+        fs::create_dir_all(dir.join("auth")).unwrap();
+        for file in files {
+            fs::write(dir.join(file), file).unwrap();
+        }
+        fs::write(dir.join("vault.db-wal"), "wal").unwrap();
+        files
+    }
+
+    // The set is this module's answer to "what a vault is", and a move has to
+    // take all of it: the database with its WAL, the pair an interrupted
+    // password change left behind, the backoff state and the sealed account.
+    #[test]
+    fn a_moved_vault_takes_every_file_it_is_made_of() {
+        let from = tmp_sidecar().parent().unwrap().to_path_buf();
+        let to = from.join("moved");
+        let files = seed_vault(&from);
+        fs::write(from.join(BIOMETRIC_FILE), "protected").unwrap();
+        fs::create_dir_all(from.join(SYNC_SCRATCH_DIR)).unwrap();
+
+        move_vault_files(&from, &to).unwrap();
+
+        for file in files {
+            assert_eq!(fs::read_to_string(to.join(file)).unwrap(), file);
+            assert!(!from.join(file).exists(), "{file} was left behind");
+        }
+        assert_eq!(fs::read_to_string(to.join("vault.db-wal")).unwrap(), "wal");
+        // What is not the vault stays where it is.
+        assert!(from.join(BIOMETRIC_FILE).exists());
+        assert!(from.join(SYNC_SCRATCH_DIR).exists());
+    }
+
+    // The whole directory's contents, which is what a delete has to be able to
+    // put back — the marker and the scratch included.
+    #[test]
+    fn a_moved_workspace_takes_what_sits_beside_its_vault_too() {
+        let from = tmp_sidecar().parent().unwrap().to_path_buf();
+        let to = from.join("moved");
+        seed_vault(&from);
+        fs::write(from.join(BIOMETRIC_FILE), "protected").unwrap();
+        fs::create_dir_all(from.join(SYNC_SCRATCH_DIR)).unwrap();
+
+        move_workspace_files(&from, &to).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(to.join(BIOMETRIC_FILE)).unwrap(),
+            "protected"
+        );
+        assert!(to.join(SYNC_SCRATCH_DIR).is_dir());
+        assert!(!from.join(BIOMETRIC_FILE).exists());
+        assert!(!from.join(SYNC_SCRATCH_DIR).exists());
+    }
+
+    // A local vault has no token file and a cleanly closed one no WAL: a move
+    // takes what is there and does not fail over what is not.
+    #[test]
+    fn moving_a_vault_skips_the_files_it_does_not_have() {
+        let from = tmp_sidecar().parent().unwrap().to_path_buf();
+        let to = from.join("moved");
+        fs::write(from.join(DB_FILE), "db").unwrap();
+        fs::write(from.join(KDF_SIDECAR_FILE), "kdf").unwrap();
+
+        move_vault_files(&from, &to).unwrap();
+
+        assert_eq!(fs::read_to_string(to.join(DB_FILE)).unwrap(), "db");
+        assert!(!to.join(GDRIVE_FILE).exists());
     }
 
     // The delete behind a Drive disconnect: gone is the goal, so already-gone is

@@ -675,7 +675,7 @@ pub async fn workspace_delete(
     // registry is re-read inside it (a rename could have landed while the
     // derive ran), the session ends before its files move, and the paths and
     // the file on disk change together.
-    let (ended_session, was_primary) = {
+    let (ended_session, was_primary, applied) = {
         let _paths = state.workspace_lock.lock().unwrap();
         let registry = Registry::load(&root);
         let deletion = registry.without(&id)?;
@@ -690,24 +690,18 @@ pub async fn workspace_delete(
             state.session.lock().unwrap().clear();
         }
 
-        // Files first, registry after — the opposite order to a create, and for
-        // the same reason it records the registry last there: whichever of the
-        // two a failure lands between, what is left has to be recoverable. A
-        // row whose files are gone deletes again cleanly; a file set nothing
-        // names is one the user has no way to reach or remove.
-        match &deletion.promoted {
-            // The primary's files are named one by one rather than removed with
-            // their directory: that directory is the root, and it holds the
-            // registry and every other workspace.
-            Some(promote) => {
-                remove_vault_files(&root);
-                promote_into_root(&root, promote)?;
-            }
-            None => discard(&root, &id),
+        // Staged, so that whichever step a failure lands on, what is left is
+        // either the old layout or a record that can be finished without the
+        // password (`workspace::apply_deletion`). Nothing is removed until the
+        // registry that no longer names this workspace is on disk — the
+        // opposite order to a create, which records the registry last for the
+        // same reason: a file set nothing names is one the user has no way to
+        // reach, and no way to prove a password against either.
+        let applied = workspace::apply_deletion(&root, &id, &deletion);
+        if applied.is_ok() {
+            *state.active_workspace.lock().unwrap() = deletion.registry.active.clone();
         }
-        deletion.registry.save(&root)?;
-        *state.active_workspace.lock().unwrap() = deletion.registry.active.clone();
-        (ends_session, deletion.promoted.is_some())
+        (ends_session, deletion.promoted.is_some(), applied)
     };
 
     // Off the lock, because a keychain delete is a blocking call into the OS.
@@ -716,7 +710,7 @@ pub async fn workspace_delete(
     // other files above. Best effort, like every other unenroll on a path the
     // user cannot retry: an item we could not reach is overwritten by the next
     // enrollment.
-    if was_primary {
+    if was_primary && applied.is_ok() {
         let _ = blocking(|| crate::secure_store::Platform.delete()).await;
     }
 
@@ -724,12 +718,15 @@ pub async fn workspace_delete(
     // session is over, the sync status the frontend holds belongs to a
     // workspace it is no longer looking at, and the lock is announced last so
     // the re-probe it triggers finds the new active workspace already in place.
+    // Said for a failed delete too: the session was closed before the files
+    // moved, so a vault the user was in is locked whether or not the delete
+    // went through, and the frontend has to hear it either way.
     if ended_session {
         crate::session::sealed(&app);
         super::sync::switched(&app);
         crate::events::vault_locked(&app);
     }
-    Ok(())
+    applied
 }
 
 // Prove `password` opens the vault in `dir`.
@@ -877,60 +874,6 @@ pub(crate) fn discard(root: &Path, id: &str) {
     storage::remove_db_files(&dir.join(storage::DB_FILE));
     let _ = fs::remove_file(dir.join(storage::KDF_SIDECAR_FILE));
     let _ = fs::remove_dir_all(&dir);
-}
-
-// Everything belonging to one vault, named file by file rather than removed
-// with its directory — which is what `discard` cannot do for the primary, whose
-// directory is the root the registry and every other workspace live in.
-//
-// The rekey backups are in the set for the promotion's sake: a password change
-// interrupted by a crash leaves them beside the database, and one left in the
-// root would have the next unlock's recovery copy the *deleted* vault back over
-// the promoted one (`auth::recover_interrupted_rekey`).
-fn remove_vault_files(dir: &Path) {
-    storage::remove_db_files(&dir.join(storage::DB_FILE));
-    storage::remove_db_files(&dir.join(storage::DB_REKEY_BACKUP_FILE));
-    for file in [
-        storage::KDF_SIDECAR_FILE,
-        storage::KDF_SIDECAR_REKEY_BACKUP_FILE,
-        storage::LOCKOUT_SIDECAR_FILE,
-        storage::BIOMETRIC_FILE,
-        storage::GDRIVE_FILE,
-    ] {
-        let _ = fs::remove_file(dir.join(file));
-    }
-    let _ = fs::remove_dir_all(dir.join("sync-scratch"));
-}
-
-// Move a surviving workspace's vault into the root, where the next unlock looks
-// for the primary's: `dir_of` resolves `PRIMARY_ID` to the root itself, so a
-// promotion is a move of files, not a change of paths.
-//
-// The database (with its WAL siblings), the descriptor that opens it and the
-// sealed Drive token — the same set `discard` removes, which is everything a
-// workspace is. The emptied directory goes last.
-fn promote_into_root(root: &Path, id: &str) -> Result<()> {
-    let from = workspace::dir_of(root, id);
-
-    let db = from.join(storage::DB_FILE);
-    if db.exists() {
-        storage::rename_db_files(&db, &root.join(storage::DB_FILE))?;
-    }
-    for file in [storage::KDF_SIDECAR_FILE, storage::GDRIVE_FILE] {
-        let source = from.join(file);
-        if !source.exists() {
-            continue;
-        }
-        let target = root.join(file);
-        // The token file lives in a subdirectory of its own (`GDRIVE_FILE`),
-        // which a root that never synced does not have.
-        if let Some(parent) = target.parent() {
-            crate::store::create_private_dir(parent)?;
-        }
-        fs::rename(&source, &target)?;
-    }
-    let _ = fs::remove_dir_all(&from);
-    Ok(())
 }
 
 #[cfg(test)]
@@ -1109,111 +1052,6 @@ mod tests {
         let root = tmp_root();
         assert!(!name_the_open_vault(&open_with(store()), &root, "b2c3", "Home", 20).unwrap());
         assert!(!name_the_open_vault(&AppState::default(), &root, PRIMARY_ID, "Home", 20).unwrap());
-    }
-
-    fn wal_of(path: &Path) -> std::path::PathBuf {
-        let mut name = path.as_os_str().to_owned();
-        name.push("-wal");
-        std::path::PathBuf::from(name)
-    }
-
-    // A vault's files, with contents that say which vault they came from.
-    fn seed_vault(dir: &Path, tag: &str) {
-        fs::create_dir_all(dir.join("auth")).unwrap();
-        fs::write(dir.join(storage::DB_FILE), format!("{tag}-db")).unwrap();
-        fs::write(wal_of(&dir.join(storage::DB_FILE)), format!("{tag}-wal")).unwrap();
-        fs::write(dir.join(storage::KDF_SIDECAR_FILE), format!("{tag}-kdf")).unwrap();
-        fs::write(dir.join(storage::GDRIVE_FILE), format!("{tag}-token")).unwrap();
-    }
-
-    // The whole point of the promotion: `dir_of(root, PRIMARY_ID)` is the root,
-    // so the survivor's files have to *be* in the root for the next unlock to
-    // find them — the WAL included, since the database without it is an older
-    // vault.
-    #[test]
-    fn a_promoted_workspace_lands_where_the_next_unlock_looks() {
-        let root = tmp_root();
-        seed_vault(&root, "primary");
-        fs::write(root.join(storage::BIOMETRIC_FILE), "protected").unwrap();
-        fs::write(root.join(storage::DB_REKEY_BACKUP_FILE), "primary-backup").unwrap();
-        let from = workspace::dir_of(&root, "a1b2");
-        seed_vault(&from, "work");
-
-        remove_vault_files(&root);
-        promote_into_root(&root, "a1b2").unwrap();
-
-        let read = |path: std::path::PathBuf| fs::read_to_string(path).unwrap();
-        assert_eq!(read(root.join(storage::DB_FILE)), "work-db");
-        assert_eq!(read(wal_of(&root.join(storage::DB_FILE))), "work-wal");
-        assert_eq!(read(root.join(storage::KDF_SIDECAR_FILE)), "work-kdf");
-        assert_eq!(read(root.join(storage::GDRIVE_FILE)), "work-token");
-        // The enrollment marker and the interrupted change's snapshot belonged
-        // to the vault that is gone; either one left here would be read as the
-        // promoted vault's.
-        assert!(!root.join(storage::BIOMETRIC_FILE).exists());
-        assert!(!root.join(storage::DB_REKEY_BACKUP_FILE).exists());
-        // Nothing is left at the old address either.
-        assert!(!from.exists());
-    }
-
-    // The primary's directory is the root, which also holds the registry and
-    // every other workspace — so its files are named one by one and the
-    // directory itself stays.
-    #[test]
-    fn removing_the_primarys_files_leaves_the_root_it_shares() {
-        let root = tmp_root();
-        seed_vault(&root, "primary");
-        let other = workspace::dir_of(&root, "a1b2");
-        seed_vault(&other, "work");
-        Registry {
-            active: PRIMARY_ID.into(),
-            workspaces: vec![
-                Workspace {
-                    id: PRIMARY_ID.into(),
-                    name: None,
-                    vault_id: None,
-                },
-                Workspace {
-                    id: "a1b2".into(),
-                    name: Some("Work".into()),
-                    vault_id: None,
-                },
-            ],
-        }
-        .save(&root)
-        .unwrap();
-
-        remove_vault_files(&root);
-
-        assert!(!root.join(storage::DB_FILE).exists());
-        assert!(!wal_of(&root.join(storage::DB_FILE)).exists());
-        assert!(!root.join(storage::KDF_SIDECAR_FILE).exists());
-        assert!(!root.join(storage::GDRIVE_FILE).exists());
-        // What a delete must never take with it.
-        assert_eq!(Registry::load(&root).workspaces.len(), 2);
-        assert_eq!(
-            fs::read_to_string(other.join(storage::DB_FILE)).unwrap(),
-            "work-db"
-        );
-    }
-
-    // A local workspace has no token file and a cleanly closed one no WAL: a
-    // promotion moves what is there and does not fail over what is not.
-    #[test]
-    fn promoting_a_workspace_with_no_account_moves_what_it_has() {
-        let root = tmp_root();
-        let from = workspace::dir_of(&root, "a1b2");
-        fs::create_dir_all(&from).unwrap();
-        fs::write(from.join(storage::DB_FILE), "work-db").unwrap();
-        fs::write(from.join(storage::KDF_SIDECAR_FILE), "work-kdf").unwrap();
-
-        promote_into_root(&root, "a1b2").unwrap();
-
-        assert_eq!(
-            fs::read_to_string(root.join(storage::DB_FILE)).unwrap(),
-            "work-db"
-        );
-        assert!(!root.join(storage::GDRIVE_FILE).exists());
     }
 
     // The proof a delete asks for, on files rather than on the session — which
