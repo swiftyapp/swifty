@@ -8,9 +8,27 @@ import { setLayout } from './layout'
 import { calls, mockCommand } from './ipc'
 import { seedApp } from './utils'
 
+// Whether the window says it is in front, and how often it has been asked.
+// In front by default, as in the global mock, so every other test enters the
+// vault straight after the hold.
+let inFront = true
+let asked = 0
+
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({
+    onFocusChanged: () => Promise.resolve(() => {}),
+    isFocused: () => {
+      asked++
+      return Promise.resolve(inFront)
+    }
+  })
+}))
+
 beforeEach(() => {
   vi.clearAllMocks()
   setLayout('compact')
+  inFront = true
+  asked = 0
 })
 
 describe('lock screen on compact', () => {
@@ -36,6 +54,26 @@ describe('lock screen on compact', () => {
     await userEvent.click(screen.getByTestId('biometric-tile'))
 
     expect(calls('unlock_biometric')).toHaveLength(1)
+    await waitFor(() => expect(useApp.getState().flow).toBe('main'))
+  })
+
+  // On iOS the Face ID sheet leaves the scene inactive while it comes down. A
+  // vault entered behind it would draw its privacy cover on first sight, so the
+  // unlock holds at the mascot until the window says it is in front.
+  it('enters the vault only once the window is in front', async () => {
+    mockCommand('unlock_biometric', () => ({ entries: [], syncConfigured: false }))
+    inFront = false
+    render(<LockScreen biometric />)
+
+    await userEvent.click(screen.getByTestId('biometric-tile'))
+
+    // A second ask means the hold is over and the first "no" was heard: the
+    // vault is open in Rust, and the screen is still the lock screen.
+    await waitFor(() => expect(asked).toBeGreaterThan(1), { timeout: 3000 })
+    expect(useApp.getState().flow).toBe('auth')
+    expect(screen.getByTestId('unlock-status')).toHaveTextContent('Unsealing')
+
+    inFront = true
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
   })
 
