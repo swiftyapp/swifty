@@ -978,6 +978,40 @@ mod tests {
         assert!(!DeleteJournal::path(&root).exists());
     }
 
+    // A crash inside the undo itself, between a database and its WAL: the
+    // promoted vault's `vault.db` is back at its own address and its `-wal` is
+    // still in the root. The launch that picks the undo up again has to carry
+    // that `-wal` after it — the registry still names the workspace, and both
+    // files have to end up together at the address it names, or the workspace
+    // reopens the older vault the `-wal` was holding the pages for. The
+    // deleted primary's own `-wal` comes back to the root behind it, so the
+    // stranded one must not be written over either.
+    #[test]
+    fn an_undo_interrupted_between_a_database_and_its_wal_is_finished_next_launch() {
+        let root = tmp_root();
+        seed_vault(&root, "primary");
+        let from = dir_of(&root, "a1b2");
+        seed_vault(&from, "work");
+        two_workspaces(&root);
+        interrupt_delete(&root, PRIMARY_ID, Some("a1b2"));
+        // The undo got the promoted database home and stopped there.
+        fs::rename(root.join(storage::DB_FILE), from.join(storage::DB_FILE)).unwrap();
+
+        recover_interrupted_delete(&root);
+
+        assert_eq!(read(from.join(storage::DB_FILE)), "work-db");
+        assert_eq!(read(wal_of(&from.join(storage::DB_FILE))), "work-wal");
+        assert_eq!(read(from.join(storage::GDRIVE_FILE)), "work-token");
+        assert_eq!(read(root.join(storage::DB_FILE)), "primary-db");
+        assert_eq!(read(wal_of(&root.join(storage::DB_FILE))), "primary-wal");
+        assert_eq!(
+            read(root.join(storage::LOCKOUT_SIDECAR_FILE)),
+            "primary-lockout"
+        );
+        assert!(!staging(&root).exists());
+        assert!(!DeleteJournal::path(&root).exists());
+    }
+
     // A crash just after the registry write: the delete is committed — the file
     // on disk no longer names the deleted workspace — so the launch that finds
     // the journal clears away what the moves left rather than undoing them.
