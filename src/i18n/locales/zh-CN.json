@@ -523,6 +523,7 @@
   "Personal": "个人",
   "Workspaces": "工作区",
   "Workspace name": "工作区名称",
+  "Workspace name (optional)": "工作区名称（可选）",
   "New workspace": "新建工作区",
   "In your Google account": "在你的 Google 账号中",
   "Added “{{name}}” from your Google account": "已从你的 Google 账号添加“{{name}}”",

@@ -24,7 +24,7 @@ use std::sync::atomic::Ordering;
 use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
-use crate::auth;
+use crate::auth::{self, LockoutState};
 use crate::crypto::{KdfParams, VaultKey};
 use crate::error::{Error, Result};
 use crate::models::{EntryMetaDto, UnlockResult};
@@ -391,6 +391,11 @@ enum Account {
 }
 
 /// Turn the pack `file_id` into a workspace, unlocked with `password`.
+///
+/// `name` is optional: left blank, the workspace takes the name the vault
+/// carries inside its pack (see [`crate::store::identity`]), which is the name
+/// the user gave it on the device they already have it on. A typed one is a
+/// rename, and travels back out the same way.
 async fn restore_workspace(
     app: &AppHandle,
     state: &AppState,
@@ -401,9 +406,6 @@ async fn restore_workspace(
     account: Account,
 ) -> Result<UnlockResult> {
     let name = name.trim().to_string();
-    if name.is_empty() {
-        return Err(Error::WorkspaceNameRequired);
-    }
     if password.is_empty() {
         return Err(Error::WorkspacePasswordRequired);
     }
@@ -471,8 +473,13 @@ async fn restore_workspace(
     // Kept past the restore for the account's *other* vaults: the ones this
     // password opens too are added beside this one (`commands::autojoin`).
     let join = password.clone();
-    let restored = restore_vault_in(app, &root, &id, bytes, password, &vault_id, &tokens).await;
-    let (key, store, entries) = match restored {
+    let restored = restore_vault_in(app, &root, &id, bytes, password, &vault_id, &tokens)
+        .await
+        .and_then(|(key, store, entries)| {
+            let name = settle_name(&store, name, &vault_id)?;
+            Ok((key, store, entries, name))
+        });
+    let (key, store, entries, name) = match restored {
         Ok(restored) => restored,
         Err(e) => {
             // Leave no trace of a workspace that never opened — the token file
@@ -597,7 +604,7 @@ fn name_the_open_vault(
     root: &Path,
     id: &str,
     name: &str,
-    at_ms: i64,
+    now_ms: i64,
 ) -> Result<bool> {
     let _paths = state.workspace_lock.lock().unwrap();
     if *state.active_workspace.lock().unwrap() != id {
@@ -608,6 +615,11 @@ fn name_the_open_vault(
         return Ok(false);
     };
     let (previous, previous_ms) = identity::vault_name(store).map_err(store_err)?;
+    // Derived from the name it replaces, not from this device's clock alone:
+    // see [`identity::rename_stamp`]. The pair was read a line ago and is
+    // written back under the same guard, so it is the stamp this rename has to
+    // beat.
+    let at_ms = identity::rename_stamp(previous_ms, now_ms);
     identity::set_vault_name(store, name, at_ms).map_err(store_err)?;
 
     // A rename is one action. Telling the user it failed while the vault keeps
@@ -666,10 +678,42 @@ pub async fn workspace_delete(
     // about cost them no Argon2id wait.
     Registry::load(&root).without(&id)?;
 
+    // Under the target's own failed-attempt backoff, exactly as `unlock` runs
+    // under the open workspace's. This command proves a password on demand and
+    // takes no session, so it is reachable from the lock screen — without this
+    // it would be a way to guess a workspace's master password at full speed
+    // while the unlock beside it escalates.
+    let dir = workspace::dir_of(&root, &id);
+    let lockout = LockoutState::load_in(&dir)?;
+    let now = auth::now_ms();
+    if let Some(refusal) = auth::locked_out(lockout, now) {
+        return Err(refusal);
+    }
+
     // Argon2id and a SQLCipher open, so off the command thread — and on the
     // target's own files, whether it is the open workspace or a locked one.
-    let dir = workspace::dir_of(&root, &id);
-    blocking(move || verify_password_in(&dir, &password)).await?;
+    let target = dir.clone();
+    match blocking(move || verify_password_in(&target, &password)).await {
+        Ok(()) => {
+            // Reset here rather than leave it to the removal below: the delete
+            // can still be refused after the proof (a sync in flight, a staging
+            // failure), and a proven password must not leave attempts standing
+            // against a workspace that is still there.
+            if lockout != LockoutState::default() {
+                if let Err(e) = LockoutState::default().save_in(&dir) {
+                    log::warn!("failed to reset lockout sidecar: {e}");
+                }
+            }
+        }
+        Err(Error::InvalidPassword) => {
+            let (updated, refusal) = auth::penalize(lockout, now);
+            if let Err(e) = updated.save_in(&dir) {
+                log::warn!("failed to persist lockout sidecar: {e}");
+            }
+            return Err(refusal);
+        }
+        Err(e) => return Err(e),
+    }
 
     // Everything from here is one step under the lock, as a switch is: the
     // registry is re-read inside it (a rename could have landed while the
@@ -830,6 +874,28 @@ async fn restore_vault_in(
         Ok((key, store, entries))
     })
     .await
+}
+
+// What the restored workspace is called.
+//
+// A `typed` name is a rename: stamped into the vault's `meta` exactly as
+// `workspace_rename` stamps one, so the next sync carries it to the user's
+// other devices. A blank one takes the name the pack already carries — the one
+// the user gave the vault wherever they made it — and a pack from before names
+// travelled carries none, so it falls back to the short-id label every added
+// vault starts under.
+fn settle_name(store: &SqliteStore, typed: String, vault_id: &str) -> Result<String> {
+    let (packed, packed_ms) = identity::vault_name(store).map_err(store_err)?;
+    if !typed.is_empty() {
+        // Over the stamp the pack carries, not this device's clock alone (see
+        // [`identity::rename_stamp`]): the sync that runs straight after the
+        // restore would otherwise hand the packed name back and skip the push,
+        // and the name the user typed here would be gone before they saw it.
+        let at_ms = identity::rename_stamp(packed_ms, auth::now_ms());
+        identity::set_vault_name(store, &typed, at_ms).map_err(store_err)?;
+        return Ok(typed);
+    }
+    Ok(packed.unwrap_or_else(|| super::autojoin::label(vault_id)))
 }
 
 /// Refuse a pack this device would end up holding twice.
@@ -1015,6 +1081,27 @@ mod tests {
         );
     }
 
+    // The vault holds a name stamped by a device whose clock runs ahead of this
+    // one. Stamped `now` the rename would read as the older of the two, and the
+    // next pull would hand the old name straight back; it has to outrank what it
+    // replaces instead.
+    #[test]
+    fn a_rename_outranks_a_name_stamped_by_a_faster_clock() {
+        let root = tmp_root();
+        let store = store();
+        identity::set_vault_name(&store, "Work", 5_000).unwrap();
+        let state = open_with(store);
+
+        assert!(name_the_open_vault(&state, &root, PRIMARY_ID, "Home", 20).unwrap());
+        let session = state.session.lock().unwrap();
+        let (name, at_ms) = identity::vault_name(session.store().unwrap()).unwrap();
+        assert_eq!(name.as_deref(), Some("Home"));
+        assert!(identity::name_wins(
+            (name.as_deref(), at_ms),
+            (Some("Work"), 5_000)
+        ));
+    }
+
     // The rollback, which is only safe because the mirror and the undo happen
     // under the one session guard: no sync run can have seen "Home", so putting
     // "Work" back cannot overwrite a name adopted in between.
@@ -1076,6 +1163,72 @@ mod tests {
         assert!(matches!(
             verify_password_in(&dir, "wrong-password"),
             Err(Error::InvalidPassword)
+        ));
+    }
+
+    // Leaving the field blank is what most restores will do: the vault already
+    // has a name, and it is the one the user knows it by.
+    #[test]
+    fn a_blank_name_takes_the_one_the_pack_carries() {
+        let store = store();
+        identity::set_vault_name(&store, "Work", 1_700_000_000_000).unwrap();
+
+        assert_eq!(
+            settle_name(&store, String::new(), "9f3c1a2b").unwrap(),
+            "Work"
+        );
+        // Untouched: nothing was renamed, so nothing new is owed to the account.
+        assert_eq!(
+            identity::vault_name(&store).unwrap(),
+            (Some("Work".into()), 1_700_000_000_000)
+        );
+    }
+
+    // A pack written before names travelled carries none.
+    #[test]
+    fn a_blank_name_over_a_nameless_pack_falls_back_to_the_label() {
+        assert_eq!(
+            settle_name(&store(), String::new(), "9f3c1a2b").unwrap(),
+            "Vault 9f3c1a"
+        );
+    }
+
+    // A typed name overrides the pack's, and goes into the vault stamped — so
+    // the next sync carries it to every other device.
+    #[test]
+    fn a_typed_name_wins_and_is_written_into_the_vault() {
+        let store = store();
+        identity::set_vault_name(&store, "Work", 1).unwrap();
+
+        assert_eq!(
+            settle_name(&store, "Home".into(), "9f3c1a2b").unwrap(),
+            "Home"
+        );
+        let (name, at_ms) = identity::vault_name(&store).unwrap();
+        assert_eq!(name.as_deref(), Some("Home"));
+        assert!(at_ms > 1);
+    }
+
+    // The pack was named by a device whose clock runs ahead of this one. Stamped
+    // `now`, the typed name would read as the older of the two: the sync that
+    // follows the restore would put the packed name back and skip the upload,
+    // because both sides would then agree — losing the override in silence.
+    #[test]
+    fn a_typed_name_outranks_a_pack_stamped_in_the_future() {
+        let store = store();
+        // Far enough ahead that no real clock reaches it during the test.
+        let packed_ms = auth::now_ms() + 60 * 60 * 1000;
+        identity::set_vault_name(&store, "Work", packed_ms).unwrap();
+
+        assert_eq!(
+            settle_name(&store, "Home".into(), "9f3c1a2b").unwrap(),
+            "Home"
+        );
+        let (name, at_ms) = identity::vault_name(&store).unwrap();
+        assert_eq!(name.as_deref(), Some("Home"));
+        assert!(identity::name_wins(
+            (name.as_deref(), at_ms),
+            (Some("Work"), packed_ms)
         ));
     }
 }

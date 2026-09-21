@@ -15,8 +15,9 @@ interface Props {
   busy: boolean
   /**
    * Restore the picked vault as a workspace called `name`, unlocked with
-   * `password`. A rejection is shown under the password field — a wrong one
-   * as the same sentence every unseal uses.
+   * `password`. An empty `name` leaves the naming to the backend, which takes
+   * the one the vault carries in its pack. A rejection is shown under the
+   * password field — a wrong one as the same sentence every unseal uses.
    */
   onRestore: (name: string, password: string, fileId: string) => Promise<void>
   /**
@@ -34,6 +35,9 @@ interface Props {
  * vault on Drive" flow, whichever account the vault came from. The list and
  * the pick are the caller's — they outlive a wrong password — so this only
  * draws them.
+ *
+ * The name is optional: a vault carries its own, given wherever it was made,
+ * and most restores want exactly that one. Typing one renames it everywhere.
  */
 export default function DriveRestoreForm({
   files,
@@ -49,7 +53,6 @@ export default function DriveRestoreForm({
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [nameError, setNameError] = useState<string | null>(null)
 
   const change = (event: ChangeEvent<HTMLInputElement>) => {
     setError(null)
@@ -58,10 +61,8 @@ export default function DriveRestoreForm({
 
   const submit = () => {
     if (busy || !selectedId) return
-    const label = name.trim()
-    if (!label) return setNameError(t('Fill in the name'))
     setError(null)
-    onRestore(label, password, selectedId).catch((err: unknown) => {
+    onRestore(name.trim(), password, selectedId).catch((err: unknown) => {
       setError(
         unsealError(
           t,
@@ -79,19 +80,11 @@ export default function DriveRestoreForm({
         type="text"
         className={inputClass}
         data-testid={`${testid}-name`}
-        placeholder={t('Workspace name')}
+        placeholder={t('Workspace name (optional)')}
         value={name}
         disabled={busy}
-        onChange={event => {
-          setNameError(null)
-          setName(event.target.value)
-        }}
+        onChange={event => setName(event.target.value)}
       />
-      {nameError && (
-        <div data-testid={`${testid}-name-error`} className="text-base text-bad">
-          {nameError}
-        </div>
-      )}
       <Masterpass
         placeholder={t('Master password')}
         testid={`${testid}-password`}

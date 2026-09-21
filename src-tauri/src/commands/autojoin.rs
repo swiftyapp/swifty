@@ -279,6 +279,10 @@ fn join_one(
 /// `password`, the vault stamped with the id its file name gave it (as every
 /// restore stamps it), and the account sealed under the new key — into `dir`
 /// outright, since the active paths belong to the open workspace and stay put.
+///
+/// The name comes back with it: the vault carries its own (see
+/// [`crate::store::identity`]), so a vault the user named on another device
+/// arrives here under that name rather than under a short id nobody chose.
 fn install(
     dir: &Path,
     bytes: &[u8],
@@ -294,16 +298,23 @@ fn install(
         password,
     )?;
     crate::store::identity::adopt_vault_id(&store, vault_id).map_err(store_err)?;
+    let name = match crate::store::identity::vault_name(&store).map_err(store_err)? {
+        // A pack written before names travelled carries none, and falls back to
+        // the label every added vault used to start under.
+        (None, _) => label(vault_id),
+        (Some(name), _) => name,
+    };
     sync::persist_tokens_in(dir, &key.cryptor(), tokens)?;
     // Closed before the registry names it: the next unlock of it opens fresh.
     drop(store);
-    Ok(label(vault_id))
+    Ok(name)
 }
 
-/// What the added workspace is called until the user renames it. The vault's
-/// own id, shortened: the one thing that tells two of them apart, and the same
-/// thing Drive shows in the file name.
-fn label(vault_id: &str) -> String {
+/// What an added workspace is called when its pack carries no name of its own.
+/// The vault's id, shortened: the one thing that tells two of them apart, and
+/// the same thing Drive shows in the file name. Shared with the Drive restores
+/// in `commands::workspace`, which name a nameless pack the same way.
+pub(crate) fn label(vault_id: &str) -> String {
     let short: String = vault_id.chars().take(6).collect();
     format!("Vault {short}")
 }
@@ -311,12 +322,82 @@ fn label(vault_id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::crypto::{self, KdfParams, VaultKey};
+    use crate::store::{identity, SqliteStore};
+    use crate::sync::pack;
     use crate::workspace::PRIMARY_ID;
+
+    const PASSWORD: &str = "correct horse battery staple";
+
+    // Low-cost Argon2id keeps these tests fast; production uses the defaults.
+    fn params() -> KdfParams {
+        KdfParams::argon2id(b"salt-autojoin-012345678901234567", 256, 1, 1)
+    }
+
+    fn tmp_dir() -> std::path::PathBuf {
+        static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "rowel-autojoin-{}-{}",
+            std::process::id(),
+            N.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    // A pack as the account would hold it, named or not.
+    fn packed(name: Option<&str>) -> Vec<u8> {
+        let dir = tmp_dir();
+        let key = VaultKey::Argon2 {
+            master: crypto::derive(PASSWORD.as_bytes(), &params()).unwrap(),
+        };
+        let store = SqliteStore::open(&dir.join("vault.db"), &*key.sqlcipher_key()).unwrap();
+        identity::assign_vault_id(&store).unwrap();
+        if let Some(name) = name {
+            identity::set_vault_name(&store, name, 1_700_000_000_000).unwrap();
+        }
+        pack::pack_store(
+            &store,
+            &*key.sqlcipher_key(),
+            &params().to_json().unwrap(),
+            &dir.join("scratch"),
+        )
+        .unwrap()
+    }
 
     #[test]
     fn the_label_is_the_vault_id_shortened() {
         assert_eq!(label("9f3c1a2b4d5e6f70"), "Vault 9f3c1a");
         assert_eq!(label("ab"), "Vault ab");
+    }
+
+    // The name the user gave the vault on another device travels in the pack,
+    // so the workspace added here is the one they already know by that name.
+    #[test]
+    fn an_installed_vault_takes_the_name_its_pack_carries() {
+        let dir = tmp_dir().join("workspace");
+        let name = install(
+            &dir,
+            &packed(Some("Work")),
+            PASSWORD,
+            "9f3c1a2b",
+            &Tokens::default(),
+        );
+        assert_eq!(name.unwrap(), "Work");
+    }
+
+    // A pack written before names travelled carries none, and falls back.
+    #[test]
+    fn an_unnamed_pack_still_gets_the_short_id_label() {
+        let dir = tmp_dir().join("workspace");
+        let name = install(
+            &dir,
+            &packed(None),
+            PASSWORD,
+            "9f3c1a2b",
+            &Tokens::default(),
+        );
+        assert_eq!(name.unwrap(), "Vault 9f3c1a");
     }
 
     // The open vault counts as held even before a sync has recorded it: a pack

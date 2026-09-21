@@ -291,14 +291,14 @@ pub fn write_settings(app: &AppHandle, json: &str) -> Result<()> {
     atomic_write_file(&settings_path(app)?, json)
 }
 
-fn lockout_sidecar_path(app: &AppHandle) -> Result<PathBuf> {
-    Ok(workspace_dir(app)?.join(LOCKOUT_SIDECAR_FILE))
-}
-
 // The failed-unlock backoff state JSON, or `None` when absent (no failed
 // attempts recorded yet, or a fresh vault).
-pub fn read_lockout_sidecar(app: &AppHandle) -> Result<Option<String>> {
-    let path = lockout_sidecar_path(app)?;
+//
+// On a directory rather than on the app, because the backoff belongs to the
+// workspace whose password is being proved, which is not always the active one:
+// `workspace_delete` proves a locked workspace's password against its own files.
+pub fn read_lockout_sidecar_in(dir: &Path) -> Result<Option<String>> {
+    let path = dir.join(LOCKOUT_SIDECAR_FILE);
     if !path.exists() {
         return Ok(None);
     }
@@ -307,8 +307,17 @@ pub fn read_lockout_sidecar(app: &AppHandle) -> Result<Option<String>> {
 
 // Write (or overwrite) the backoff state sidecar, atomically (same durability
 // rationale as the KDF sidecar: never leave a torn/partial file behind).
+pub fn write_lockout_sidecar_in(dir: &Path, json: &str) -> Result<()> {
+    atomic_write_file(&dir.join(LOCKOUT_SIDECAR_FILE), json)
+}
+
+// The same pair for the workspace that is open, which is what an unlock asks.
+pub fn read_lockout_sidecar(app: &AppHandle) -> Result<Option<String>> {
+    read_lockout_sidecar_in(&workspace_dir(app)?)
+}
+
 pub fn write_lockout_sidecar(app: &AppHandle, json: &str) -> Result<()> {
-    atomic_write_file(&lockout_sidecar_path(app)?, json)
+    write_lockout_sidecar_in(&workspace_dir(app)?, json)
 }
 
 // Durably replace `path`: create a uniquely named temp sibling, fsync it,

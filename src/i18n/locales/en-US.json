@@ -531,6 +531,7 @@
   "Personal": "Personal",
   "Workspaces": "Workspaces",
   "Workspace name": "Workspace name",
+  "Workspace name (optional)": "Workspace name (optional)",
   "New workspace": "New workspace",
   "In your Google account": "In your Google account",
   "Added “{{name}}” from your Google account": "Added “{{name}}” from your Google account",

@@ -531,6 +531,7 @@
   "Personal": "Kişisel",
   "Workspaces": "Çalışma alanları",
   "Workspace name": "Çalışma alanı adı",
+  "Workspace name (optional)": "Çalışma alanı adı (isteğe bağlı)",
   "New workspace": "Yeni çalışma alanı",
   "In your Google account": "Google hesabında",
   "Added “{{name}}” from your Google account": "Google hesabından “{{name}}” eklendi",

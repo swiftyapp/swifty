@@ -43,10 +43,21 @@ pub struct LockoutState {
 }
 
 impl LockoutState {
+    // The workspace that is open — what an unlock throttles.
+    pub fn load(app: &AppHandle) -> Result<Self> {
+        Self::parse(storage::read_lockout_sidecar(app)?)
+    }
+
+    // Any workspace, by its directory. A delete proves the *target* workspace's
+    // password, which may be a locked one, so its backoff is the one that counts.
+    pub fn load_in(dir: &Path) -> Result<Self> {
+        Self::parse(storage::read_lockout_sidecar_in(dir)?)
+    }
+
     // Missing or unparseable sidecar reads as "no lockout" — this state is a
     // throttle, not a security boundary, so failing open here is fine.
-    pub fn load(app: &AppHandle) -> Result<Self> {
-        match storage::read_lockout_sidecar(app)? {
+    fn parse(json: Option<String>) -> Result<Self> {
+        match json {
             Some(json) => Ok(serde_json::from_str(&json).unwrap_or_else(|e| {
                 log::warn!("lockout sidecar is unreadable, resetting: {e}");
                 Self::default()
@@ -58,6 +69,28 @@ impl LockoutState {
     pub fn save(&self, app: &AppHandle) -> Result<()> {
         storage::write_lockout_sidecar(app, &serde_json::to_string(self)?)
     }
+
+    pub fn save_in(&self, dir: &Path) -> Result<()> {
+        storage::write_lockout_sidecar_in(dir, &serde_json::to_string(self)?)
+    }
+}
+
+// The refusal owed to a caller that asked while `state` is still locked out, or
+// `None` when the attempt may go ahead. Every password proof the app offers
+// asks this first, so none of them is a way around the others' backoff.
+pub fn locked_out(state: LockoutState, now_ms: i64) -> Option<Error> {
+    (state.locked_until_ms > now_ms).then(|| Error::TooManyAttempts {
+        retry_after_secs: retry_after_secs(state.locked_until_ms, now_ms),
+    })
+}
+
+// One more wrong password: the state to persist, and the error the caller owes
+// the user — `TooManyAttempts` once the escalation has started, so the UI can
+// say how long, and a plain `InvalidPassword` while the attempts are still free.
+pub fn penalize(state: LockoutState, now_ms: i64) -> (LockoutState, Error) {
+    let updated = record_failed_attempt(state, now_ms);
+    let refusal = locked_out(updated, now_ms).unwrap_or(Error::InvalidPassword);
+    (updated, refusal)
 }
 
 pub fn now_ms() -> i64 {
@@ -530,6 +563,129 @@ mod lockout_tests {
         // fails open (no lockout) rather than erroring the whole unlock flow.
         let parsed: std::result::Result<LockoutState, _> = serde_json::from_str("not json");
         assert!(parsed.is_err());
+    }
+
+    // --- the policy both password proofs share ------------------------------
+
+    #[test]
+    fn a_live_wait_is_the_only_thing_that_refuses() {
+        let free = LockoutState {
+            failed_attempts: 2,
+            locked_until_ms: 0,
+        };
+        assert!(locked_out(free, NOW).is_none());
+
+        let expired = LockoutState {
+            failed_attempts: 9,
+            locked_until_ms: NOW - 1,
+        };
+        assert!(
+            locked_out(expired, NOW).is_none(),
+            "a wait that has run out"
+        );
+
+        let live = LockoutState {
+            failed_attempts: 9,
+            locked_until_ms: NOW + 4_000,
+        };
+        match locked_out(live, NOW) {
+            Some(Error::TooManyAttempts { retry_after_secs }) => assert_eq!(retry_after_secs, 4),
+            other => panic!("expected TooManyAttempts, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_free_failure_is_reported_as_a_wrong_password() {
+        let (updated, refusal) = penalize(LockoutState::default(), NOW);
+        assert_eq!(updated.failed_attempts, 1);
+        assert!(matches!(refusal, Error::InvalidPassword));
+    }
+
+    // Past the free attempts the caller owes the wait, not a bare refusal — so
+    // the UI can say how long rather than inviting an immediate retry.
+    #[test]
+    fn a_failure_that_escalates_is_reported_as_the_wait() {
+        let mut state = LockoutState::default();
+        for _ in 0..FREE_ATTEMPTS {
+            state = record_failed_attempt(state, NOW);
+        }
+        let (updated, refusal) = penalize(state, NOW);
+        assert_eq!(updated.failed_attempts, FREE_ATTEMPTS + 1);
+        match refusal {
+            Error::TooManyAttempts { retry_after_secs } => assert_eq!(retry_after_secs, 2),
+            other => panic!("expected TooManyAttempts, got {other:?}"),
+        }
+    }
+
+    // --- the sidecar on a directory of its own ------------------------------
+
+    #[test]
+    fn a_directorys_lockout_round_trips() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = LockoutState {
+            failed_attempts: 5,
+            locked_until_ms: NOW,
+        };
+        state.save_in(dir.path()).unwrap();
+        assert_eq!(LockoutState::load_in(dir.path()).unwrap(), state);
+    }
+
+    // A workspace nobody has guessed at yet, and one whose sidecar will not
+    // parse, both read as "no lockout" rather than failing the command.
+    #[test]
+    fn a_missing_or_corrupt_sidecar_reads_as_no_lockout() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(
+            LockoutState::load_in(dir.path()).unwrap(),
+            LockoutState::default()
+        );
+
+        fs::write(dir.path().join(storage::LOCKOUT_SIDECAR_FILE), "not json").unwrap();
+        assert_eq!(
+            LockoutState::load_in(dir.path()).unwrap(),
+            LockoutState::default()
+        );
+    }
+
+    // What `workspace_delete` now does per wrong guess: the escalation persists
+    // against that workspace's own directory, so the next attempt is refused
+    // before any Argon2id runs.
+    #[test]
+    fn repeated_failures_against_a_directory_escalate() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let mut state = LockoutState::load_in(dir.path()).unwrap();
+        for _ in 0..=FREE_ATTEMPTS {
+            let (updated, _) = penalize(state, NOW);
+            updated.save_in(dir.path()).unwrap();
+            state = LockoutState::load_in(dir.path()).unwrap();
+        }
+
+        assert_eq!(state.failed_attempts, FREE_ATTEMPTS + 1);
+        assert!(
+            locked_out(state, NOW).is_some(),
+            "the next guess must be refused before the derive"
+        );
+    }
+
+    // Two workspaces are throttled apart: guessing at one must not lock the
+    // other, which is the whole reason the state lives beside each vault.
+    #[test]
+    fn one_workspaces_lockout_does_not_reach_another() {
+        let guessed = tempfile::tempdir().unwrap();
+        let untouched = tempfile::tempdir().unwrap();
+
+        let (locked, _) = penalize(
+            LockoutState {
+                failed_attempts: FREE_ATTEMPTS,
+                locked_until_ms: 0,
+            },
+            NOW,
+        );
+        locked.save_in(guessed.path()).unwrap();
+
+        assert!(locked_out(LockoutState::load_in(guessed.path()).unwrap(), NOW).is_some());
+        assert!(locked_out(LockoutState::load_in(untouched.path()).unwrap(), NOW).is_none());
     }
 }
 
