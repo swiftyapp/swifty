@@ -604,7 +604,7 @@ fn name_the_open_vault(
     root: &Path,
     id: &str,
     name: &str,
-    at_ms: i64,
+    now_ms: i64,
 ) -> Result<bool> {
     let _paths = state.workspace_lock.lock().unwrap();
     if *state.active_workspace.lock().unwrap() != id {
@@ -615,6 +615,11 @@ fn name_the_open_vault(
         return Ok(false);
     };
     let (previous, previous_ms) = identity::vault_name(store).map_err(store_err)?;
+    // Derived from the name it replaces, not from this device's clock alone:
+    // see [`identity::rename_stamp`]. The pair was read a line ago and is
+    // written back under the same guard, so it is the stamp this rename has to
+    // beat.
+    let at_ms = identity::rename_stamp(previous_ms, now_ms);
     identity::set_vault_name(store, name, at_ms).map_err(store_err)?;
 
     // A rename is one action. Telling the user it failed while the vault keeps
@@ -1039,6 +1044,27 @@ mod tests {
             Registry::load(&root).workspaces[0].name.as_deref(),
             Some("Home")
         );
+    }
+
+    // The vault holds a name stamped by a device whose clock runs ahead of this
+    // one. Stamped `now` the rename would read as the older of the two, and the
+    // next pull would hand the old name straight back; it has to outrank what it
+    // replaces instead.
+    #[test]
+    fn a_rename_outranks_a_name_stamped_by_a_faster_clock() {
+        let root = tmp_root();
+        let store = store();
+        identity::set_vault_name(&store, "Work", 5_000).unwrap();
+        let state = open_with(store);
+
+        assert!(name_the_open_vault(&state, &root, PRIMARY_ID, "Home", 20).unwrap());
+        let session = state.session.lock().unwrap();
+        let (name, at_ms) = identity::vault_name(session.store().unwrap()).unwrap();
+        assert_eq!(name.as_deref(), Some("Home"));
+        assert!(identity::name_wins(
+            (name.as_deref(), at_ms),
+            (Some("Work"), 5_000)
+        ));
     }
 
     // The rollback, which is only safe because the mirror and the undo happen

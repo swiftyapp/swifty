@@ -84,6 +84,21 @@ pub fn set_vault_name(store: &impl VaultStore, name: &str, at_ms: i64) -> Result
     store.meta_set_many(&[(META_VAULT_NAME, name), (META_VAULT_NAME_MS, &at_ms)])
 }
 
+/// The stamp to write for a rename the user just made here, over a vault that
+/// currently holds a name stamped `held_ms`.
+///
+/// A rename made here must outrank whatever this vault held, whichever clock
+/// wrote it; wall-clock is only a tie-breaker between devices. Taking `now_ms`
+/// alone loses the rename whenever the held stamp came from a device running
+/// ahead of this one: it reads as older, the next sync hands the old name back,
+/// and the push is skipped because both sides then agree — the user's explicit
+/// choice gone with no error to show for it. One past the held stamp is the
+/// smallest stamp [`name_wins`] still lets through, so a skewed clock costs the
+/// rename nothing but its place in wall-clock order.
+pub fn rename_stamp(held_ms: i64, now_ms: i64) -> i64 {
+    now_ms.max(held_ms.saturating_add(1))
+}
+
 /// Whether `candidate` should replace `held` as the vault's name.
 ///
 /// One total order over the pair, used by both halves of a sync run — the
@@ -164,6 +179,29 @@ mod tests {
         set_vault_name(&store, "Work", 500).unwrap();
         set_vault_name(&store, "", 0).unwrap();
         assert_eq!(vault_name(&store).unwrap(), (None, 0));
+    }
+
+    // The ordinary case: this clock is the later one, so the rename is stamped
+    // when it happened and keeps its place among the other devices' renames.
+    #[test]
+    fn a_rename_is_stamped_now_when_now_is_already_the_later_clock() {
+        assert_eq!(
+            rename_stamp(1_600_000_000_000, 1_700_000_000_000),
+            1_700_000_000_000
+        );
+        assert_eq!(rename_stamp(0, 1_700_000_000_000), 1_700_000_000_000);
+    }
+
+    // The held name was written by a device running ahead of this one. Stamped
+    // `now` the rename would read as the older of the two and be undone by the
+    // next pull, so it takes the smallest stamp that still outranks what it
+    // replaces.
+    #[test]
+    fn a_rename_over_a_stamp_from_a_faster_clock_still_outranks_it() {
+        let held = 1_700_000_000_000;
+        let stamp = rename_stamp(held, 1_600_000_000_000);
+        assert_eq!(stamp, held + 1);
+        assert!(name_wins((Some("Home"), stamp), (Some("Work"), held)));
     }
 
     #[test]
