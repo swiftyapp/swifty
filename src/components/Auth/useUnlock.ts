@@ -7,9 +7,18 @@ import { errorKind, isTooManyAttempts } from '@/api/errors'
 import { enterMain, useApp } from '@/store'
 import type { MascotState } from '@/components/elements/Mascot'
 import { unsealError } from '@/components/Start/shared/errors'
+import { untilFocused } from '@/utils/untilFocused'
 
 // How long the mascot gets to celebrate before the vault fades in.
 const SUCCESS_HOLD_MS = 650
+
+// How long, past the hold, the unlock waits for the window to be in front.
+// On iOS the Face ID sheet leaves the scene inactive while it comes down, and
+// a vault that mounts behind it is asked to draw its privacy cover on first
+// sight — a flash the user reads as the app breaking. Entering only once the
+// window says it is focused keeps the cover down on the way in. Bounded: a
+// user who really did swipe away gets in (covered) rather than waiting forever.
+const FOCUS_WAIT_MS = 3000
 
 // The password is blamed only when the backend said `invalidPassword`. An open
 // can also fail on I/O, a stuck lock or a corrupt file — none of which counted
@@ -97,18 +106,25 @@ export function useUnlock(): Unlock {
   useEffect(
     () => () => {
       clearTimeout(holdTimer.current)
-      if (pending.current && useApp.getState().flow === 'auth') void enterMain(pending.current)
+      const result = pending.current
+      pending.current = null
+      if (result && useApp.getState().flow === 'auth') void enterMain(result)
     },
     []
   )
 
-  // Let the mascot celebrate before the vault takes over.
+  // Let the mascot celebrate, then wait for the window to be in front, before
+  // the vault takes over. Whoever clears `pending` first — this, or the
+  // unmount above — is the one that enters.
   const holdThenEnter = (result: UnlockResult) => {
     setPhase('success')
     pending.current = result
     holdTimer.current = window.setTimeout(() => {
-      pending.current = null
-      void enterMain(result)
+      void untilFocused(FOCUS_WAIT_MS).then(() => {
+        if (pending.current !== result) return
+        pending.current = null
+        void enterMain(result)
+      })
     }, SUCCESS_HOLD_MS)
   }
 
