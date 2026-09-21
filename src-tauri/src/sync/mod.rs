@@ -250,9 +250,30 @@ pub fn run(app: &AppHandle, cryptor: Cryptor) -> Result<SyncOutcome> {
         Ok(())
     })?;
 
+    if outcome.renamed {
+        adopt_name(app, &local);
+    }
     publish_remote_vaults(app, &resolved.id, resolved.packs);
     sweep_shares(app);
     Ok(outcome)
+}
+
+/// The run pulled a newer name for this vault. The vault's own copy is already
+/// written (the engine did it); this puts it in the registry too, which is what
+/// `app_status` reports and the header and Settings list draw from, and tells
+/// the frontend to re-read it.
+///
+/// Best effort, like [`workspace::record_vault_id`] beside it: a registry the
+/// next run will write again is not worth failing this one.
+fn adopt_name(app: &AppHandle, local: &impl LocalVault) {
+    let Ok((Some(name), _)) = local.name() else {
+        return;
+    };
+    if let Err(e) = crate::workspace::record_vault_name(app, &name) {
+        log::warn!("could not record the vault name in the registry: {e}");
+        return;
+    }
+    crate::events::workspace_renamed(app);
 }
 
 /// Tell the frontend which of the account's vaults are not on this device, so

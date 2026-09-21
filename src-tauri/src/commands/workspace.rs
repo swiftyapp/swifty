@@ -24,13 +24,14 @@ use std::sync::atomic::Ordering;
 use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
+use crate::auth;
 use crate::crypto::VaultKey;
 use crate::error::{Error, Result};
 use crate::models::{EntryMetaDto, UnlockResult};
 use crate::session::{list_metas, store_err, Lease};
 use crate::state::AppState;
 use crate::storage;
-use crate::store::SqliteStore;
+use crate::store::{identity, SqliteStore};
 use crate::sync::{self, restore};
 use crate::workspace::{self, Registry, Workspace};
 
@@ -530,6 +531,13 @@ async fn restore_workspace(
 }
 
 /// Give a workspace a (new) label. Ids never change; only this does.
+///
+/// The name goes into the vault as well as into the registry, so it travels in
+/// the pack and reaches the user's other devices (see [`crate::store::identity`]
+/// and `sync::engine`). Only the active workspace is unlocked, though, and only
+/// an unlocked vault can be written to: renaming any other one is still a
+/// rename — the list draws from the registry — it just does not reach Drive
+/// until that vault is next opened, which is where `commands::auth` seeds it.
 #[tauri::command]
 pub fn workspace_rename(
     id: String,
@@ -542,6 +550,9 @@ pub fn workspace_rename(
         return Err(Error::WorkspaceNameRequired);
     }
 
+    let in_vault =
+        workspace::active_id(&app) == id && name_the_open_vault(&state, &name, auth::now_ms())?;
+
     let root = storage::root_dir(&app)?;
     update_registry(&state, &root, |registry| {
         let workspace = registry
@@ -551,7 +562,26 @@ pub fn workspace_rename(
             .ok_or(Error::NotFound)?;
         workspace.name = Some(name);
         Ok(())
-    })
+    })?;
+
+    // The same request an entry save makes: the new name is a change to the
+    // vault, and it reaches the account the way every other one does.
+    if in_vault {
+        super::sync::request_run_if_ready(&app, &state);
+    }
+    Ok(())
+}
+
+// Write the name into the open vault's `meta`, stamped so another device can
+// tell which of two renames came last. `false` when there is no open vault to
+// write to — the registry keeps the name on its own.
+fn name_the_open_vault(state: &AppState, name: &str, at_ms: i64) -> Result<bool> {
+    let session = state.session.lock().unwrap();
+    let Ok(store) = session.store() else {
+        return Ok(false);
+    };
+    identity::set_vault_name(store, name, at_ms).map_err(store_err)?;
+    Ok(true)
 }
 
 // Argon2id + creating the encrypted DB, off the command thread. The directory

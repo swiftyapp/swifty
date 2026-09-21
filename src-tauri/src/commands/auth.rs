@@ -81,6 +81,7 @@ pub async fn unlock(
             // whose bundle failed, a page left untouched) would otherwise leave
             // the vault open for good.
             crate::autolock::touch(&app);
+            seed_vault_name(&app, &state);
             if let Some(password) = join {
                 super::autojoin::with_password(&app, password);
             }
@@ -103,6 +104,29 @@ pub async fn unlock(
             }
         }
         Err(e) => Err(e),
+    }
+}
+
+// A vault named before the name lived inside it: copy the registry's label into
+// `meta` so the first sync publishes it instead of leaving the user's other
+// devices unnamed. A workspace with no label keeps none — the frontend goes on
+// showing its translated default.
+//
+// Best effort, and the registry is read before the session lock is taken, since
+// that is the order every other reader of the two takes them in.
+fn seed_vault_name(app: &AppHandle, state: &AppState) {
+    let Some(name) = crate::workspace::active_name(app) else {
+        return;
+    };
+    let session = state.session.lock().unwrap();
+    let Ok(store) = session.store() else {
+        return;
+    };
+    if !matches!(crate::store::identity::vault_name(store), Ok((None, _))) {
+        return;
+    }
+    if let Err(e) = crate::store::identity::set_vault_name(store, &name, auth::now_ms()) {
+        log::warn!("could not seed the vault name from the registry: {e}");
     }
 }
 
@@ -196,8 +220,10 @@ pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Res
         .lock()
         .unwrap()
         .set(key, store, sync_configured);
-    // As in `unlock`: the session arms its own idle clock.
+    // As in `unlock`: the session arms its own idle clock, and a vault named
+    // before names lived inside it takes the registry's label.
     crate::autolock::touch(&app);
+    seed_vault_name(&app, &state);
     Ok(UnlockResult {
         entries,
         sync_configured,

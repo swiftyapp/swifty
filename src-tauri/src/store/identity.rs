@@ -10,6 +10,11 @@
 //! Vaults created before ids existed have none; sync assigns one the first
 //! time it needs it (or adopts the one the remote already carries).
 //!
+//! The vault's *name* lives here for the same reason: a label kept only in this
+//! device's workspace registry is a label the user's other devices never see.
+//! It carries a stamp because two devices can rename the same vault, and the
+//! later rename has to win (see `sync::engine`).
+//!
 //! Like `migrate`, this reaches for the app's crypto to mint ids; it is a
 //! boundary helper, not part of the pure [`VaultStore`] trait.
 
@@ -35,6 +40,31 @@ pub fn assign_vault_id(store: &impl VaultStore) -> Result<String> {
 /// upgraded install found under `Vaults/`.
 pub fn adopt_vault_id(store: &impl VaultStore, id: &str) -> Result<()> {
     store.meta_set(META_VAULT_ID, id)
+}
+
+/// `meta` keys the vault's name is stored under: the label, and the ms-epoch
+/// stamp it was last set at.
+pub const META_VAULT_NAME: &str = "vault_name";
+pub const META_VAULT_NAME_MS: &str = "vault_name_updated_ms";
+
+/// The vault's name and when it was set. A vault nobody has named reads as
+/// `(None, 0)`, which loses to every stamped name there is.
+pub fn vault_name(store: &impl VaultStore) -> Result<(Option<String>, i64)> {
+    let name = store
+        .meta_get(META_VAULT_NAME)?
+        .filter(|name| !name.is_empty());
+    let at_ms = store
+        .meta_get(META_VAULT_NAME_MS)?
+        .and_then(|ms| ms.parse().ok())
+        .unwrap_or(0);
+    Ok((name, at_ms))
+}
+
+/// Name the vault, stamping when. The stamp travels with the name so another
+/// device can tell which of two renames came last.
+pub fn set_vault_name(store: &impl VaultStore, name: &str, at_ms: i64) -> Result<()> {
+    store.meta_set(META_VAULT_NAME, name)?;
+    store.meta_set(META_VAULT_NAME_MS, &at_ms.to_string())
 }
 
 #[cfg(test)]
@@ -74,5 +104,26 @@ mod tests {
         let store = store();
         store.meta_set(META_VAULT_ID, "").unwrap();
         assert_eq!(vault_id(&store).unwrap(), None);
+    }
+
+    #[test]
+    fn a_name_round_trips_with_the_stamp_it_was_set_at() {
+        let store = store();
+        assert_eq!(vault_name(&store).unwrap(), (None, 0));
+
+        set_vault_name(&store, "Work", 1_700_000_000_000).unwrap();
+        assert_eq!(
+            vault_name(&store).unwrap(),
+            (Some("Work".to_string()), 1_700_000_000_000)
+        );
+    }
+
+    // A vault named before the stamp existed still reads, and reads as the
+    // oldest name there is — so the first device to rename it wins.
+    #[test]
+    fn a_name_with_no_stamp_reads_as_stamped_zero() {
+        let store = store();
+        store.meta_set(META_VAULT_NAME, "Work").unwrap();
+        assert_eq!(vault_name(&store).unwrap(), (Some("Work".to_string()), 0));
     }
 }

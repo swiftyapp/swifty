@@ -20,6 +20,7 @@ pub const SETUP_DRIVE_PROBED: &str = "setup:drive:probed";
 pub const SETUP_DRIVE_ERROR: &str = "setup:drive:error";
 pub const WORKSPACES_REMOTE: &str = "workspaces:remote";
 pub const WORKSPACES_ADDED: &str = "workspaces:added";
+pub const WORKSPACES_RENAMED: &str = "workspaces:renamed";
 // Desktop only, like the file associations that produce it (`crate::opened`).
 #[cfg(desktop)]
 pub const FILE_OPENED: &str = "file:opened";
@@ -103,6 +104,13 @@ struct Added<'a> {
 /// The frontend re-probes for the new list and says so; nothing switches.
 pub fn workspace_added(app: &AppHandle, name: &str) {
     let _ = app.emit(WORKSPACES_ADDED, Added { name });
+}
+
+/// A sync pulled a newer name for the open workspace. No payload: the names
+/// live on `app_status`, which the frontend re-reads, so the header and the
+/// Workspaces list redraw from the one answer rather than from two.
+pub fn workspace_renamed(app: &AppHandle) {
+    let _ = app.emit(WORKSPACES_RENAMED, ());
 }
 
 /// The OS asked the app to open a backup (see `crate::opened`). Also parked for
