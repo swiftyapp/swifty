@@ -24,7 +24,7 @@ use std::sync::atomic::Ordering;
 use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
-use crate::auth;
+use crate::auth::{self, LockoutState};
 use crate::crypto::{KdfParams, VaultKey};
 use crate::error::{Error, Result};
 use crate::models::{EntryMetaDto, UnlockResult};
@@ -678,10 +678,42 @@ pub async fn workspace_delete(
     // about cost them no Argon2id wait.
     Registry::load(&root).without(&id)?;
 
+    // Under the target's own failed-attempt backoff, exactly as `unlock` runs
+    // under the open workspace's. This command proves a password on demand and
+    // takes no session, so it is reachable from the lock screen — without this
+    // it would be a way to guess a workspace's master password at full speed
+    // while the unlock beside it escalates.
+    let dir = workspace::dir_of(&root, &id);
+    let lockout = LockoutState::load_in(&dir)?;
+    let now = auth::now_ms();
+    if let Some(refusal) = auth::locked_out(lockout, now) {
+        return Err(refusal);
+    }
+
     // Argon2id and a SQLCipher open, so off the command thread — and on the
     // target's own files, whether it is the open workspace or a locked one.
-    let dir = workspace::dir_of(&root, &id);
-    blocking(move || verify_password_in(&dir, &password)).await?;
+    let target = dir.clone();
+    match blocking(move || verify_password_in(&target, &password)).await {
+        Ok(()) => {
+            // Reset here rather than leave it to the removal below: the delete
+            // can still be refused after the proof (a sync in flight, a staging
+            // failure), and a proven password must not leave attempts standing
+            // against a workspace that is still there.
+            if lockout != LockoutState::default() {
+                if let Err(e) = LockoutState::default().save_in(&dir) {
+                    log::warn!("failed to reset lockout sidecar: {e}");
+                }
+            }
+        }
+        Err(Error::InvalidPassword) => {
+            let (updated, refusal) = auth::penalize(lockout, now);
+            if let Err(e) = updated.save_in(&dir) {
+                log::warn!("failed to persist lockout sidecar: {e}");
+            }
+            return Err(refusal);
+        }
+        Err(e) => return Err(e),
+    }
 
     // Everything from here is one step under the lock, as a switch is: the
     // registry is re-read inside it (a rename could have landed while the

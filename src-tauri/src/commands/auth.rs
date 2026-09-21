@@ -51,10 +51,8 @@ pub async fn unlock(
 
     let lockout = LockoutState::load(&app)?;
     let now = auth::now_ms();
-    if lockout.locked_until_ms > now {
-        return Err(Error::TooManyAttempts {
-            retry_after_secs: auth::retry_after_secs(lockout.locked_until_ms, now),
-        });
+    if let Some(refusal) = auth::locked_out(lockout, now) {
+        return Err(refusal);
     }
 
     // A second copy of the password, for the one thing that may outlive the
@@ -91,17 +89,11 @@ pub async fn unlock(
             })
         }
         Err(Error::InvalidPassword) => {
-            let updated = auth::record_failed_attempt(lockout, now);
+            let (updated, refusal) = auth::penalize(lockout, now);
             if let Err(e) = updated.save(&app) {
                 log::warn!("failed to persist lockout sidecar: {e}");
             }
-            if updated.locked_until_ms > now {
-                Err(Error::TooManyAttempts {
-                    retry_after_secs: auth::retry_after_secs(updated.locked_until_ms, now),
-                })
-            } else {
-                Err(Error::InvalidPassword)
-            }
+            Err(refusal)
         }
         Err(e) => Err(e),
     }

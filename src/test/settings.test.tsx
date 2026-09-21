@@ -863,6 +863,25 @@ describe('Settings › workspaces › delete', () => {
     expect(screen.getByTestId('workspace-delete-dialog')).toBeInTheDocument()
   })
 
+  // The delete proves a password on demand and takes no session, so it runs
+  // under the target workspace's failed-attempt backoff exactly as an unlock
+  // does. Once that escalates the user is told how long, not just "wrong".
+  it('reports the backoff rather than the password once attempts escalate', async () => {
+    mockCommandOnce('workspace_delete', () =>
+      Promise.reject({ kind: 'tooManyAttempts', message: 'too many attempts', retryAfterSecs: 8 })
+    )
+    await openDelete('w2')
+
+    await userEvent.type(screen.getByTestId('workspace-delete-password'), 'wrong')
+    await userEvent.type(screen.getByTestId('workspace-delete-confirm'), 'Work')
+    await userEvent.click(screen.getByTestId('workspace-delete-submit'))
+
+    expect(await screen.findByTestId('workspace-delete-error')).toHaveTextContent(
+      'Too many failed attempts. Try again in 8s'
+    )
+    expect(screen.getByTestId('workspace-delete-dialog')).toBeInTheDocument()
+  })
+
   // A device always has a vault to open, and the control says so rather than
   // letting the user find out from a rejection.
   it('withdraws the delete when there is only one workspace', async () => {
