@@ -912,6 +912,21 @@ describe('Settings › workspaces › restore from Drive', () => {
     expect(calls('sync_now')).toHaveLength(1)
   })
 
+  // The vault already has a name, given wherever it was made, and it travels in
+  // the pack — so leaving the field blank is a restore, not a validation error.
+  it('restores without a name and lets the pack supply one', async () => {
+    await connect([VAULT])
+
+    await userEvent.type(screen.getByTestId('workspace-restore-password'), 'other-device-pass')
+    await act(async () => {
+      await userEvent.click(screen.getByTestId('workspace-restore-submit'))
+    })
+
+    expect(calls('workspace_restore_from_drive')).toEqual([
+      { name: '', password: 'other-device-pass', fileId: VAULT.id }
+    ])
+  })
+
   // One vault in the account is not a choice: it is shown, not offered.
   it("names the account's only vault without asking which", async () => {
     await connect([VAULT])

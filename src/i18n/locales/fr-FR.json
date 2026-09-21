@@ -539,6 +539,7 @@
   "Personal": "Personnel",
   "Workspaces": "Espaces de travail",
   "Workspace name": "Nom de l’espace de travail",
+  "Workspace name (optional)": "Nom de l’espace de travail (facultatif)",
   "New workspace": "Nouvel espace de travail",
   "In your Google account": "Dans votre compte Google",
   "Added “{{name}}” from your Google account": "« {{name}} » ajouté depuis votre compte Google",

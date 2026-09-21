@@ -547,6 +547,7 @@
   "Personal": "Личное",
   "Workspaces": "Рабочие пространства",
   "Workspace name": "Название пространства",
+  "Workspace name (optional)": "Название пространства (необязательно)",
   "New workspace": "Новое рабочее пространство",
   "In your Google account": "В вашем аккаунте Google",
   "Added “{{name}}” from your Google account": "Добавлено «{{name}}» из вашего аккаунта Google",

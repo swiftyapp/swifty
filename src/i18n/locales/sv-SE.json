@@ -531,6 +531,7 @@
   "Personal": "Personlig",
   "Workspaces": "Arbetsytor",
   "Workspace name": "Arbetsytans namn",
+  "Workspace name (optional)": "Arbetsytans namn (valfritt)",
   "New workspace": "Ny arbetsyta",
   "In your Google account": "I ditt Google-konto",
   "Added “{{name}}” from your Google account": "”{{name}}” har lagts till från ditt Google-konto",

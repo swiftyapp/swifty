@@ -383,6 +383,15 @@ fn adopt(
     });
     match installed {
         Ok(entries) => {
+            // A restored pack carries the vault's name, and the header reads the
+            // registry — so the primary arrives under the name the user's other
+            // devices show it by rather than under the default label. A pack
+            // with no name leaves the entry as it was.
+            if let Ok((Some(name), _)) = crate::store::identity::vault_name(&store) {
+                if let Err(e) = crate::workspace::record_vault_name(app, &name) {
+                    log::warn!("cannot record the restored vault's name: {e}");
+                }
+            }
             let sync_configured = tokens.is_some();
             state
                 .session

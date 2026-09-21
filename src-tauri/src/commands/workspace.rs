@@ -391,6 +391,11 @@ enum Account {
 }
 
 /// Turn the pack `file_id` into a workspace, unlocked with `password`.
+///
+/// `name` is optional: left blank, the workspace takes the name the vault
+/// carries inside its pack (see [`crate::store::identity`]), which is the name
+/// the user gave it on the device they already have it on. A typed one is a
+/// rename, and travels back out the same way.
 async fn restore_workspace(
     app: &AppHandle,
     state: &AppState,
@@ -401,9 +406,6 @@ async fn restore_workspace(
     account: Account,
 ) -> Result<UnlockResult> {
     let name = name.trim().to_string();
-    if name.is_empty() {
-        return Err(Error::WorkspaceNameRequired);
-    }
     if password.is_empty() {
         return Err(Error::WorkspacePasswordRequired);
     }
@@ -471,8 +473,13 @@ async fn restore_workspace(
     // Kept past the restore for the account's *other* vaults: the ones this
     // password opens too are added beside this one (`commands::autojoin`).
     let join = password.clone();
-    let restored = restore_vault_in(app, &root, &id, bytes, password, &vault_id, &tokens).await;
-    let (key, store, entries) = match restored {
+    let restored = restore_vault_in(app, &root, &id, bytes, password, &vault_id, &tokens)
+        .await
+        .and_then(|(key, store, entries)| {
+            let name = settle_name(&store, name, &vault_id)?;
+            Ok((key, store, entries, name))
+        });
+    let (key, store, entries, name) = match restored {
         Ok(restored) => restored,
         Err(e) => {
             // Leave no trace of a workspace that never opened — the token file
@@ -832,6 +839,25 @@ async fn restore_vault_in(
     .await
 }
 
+// What the restored workspace is called.
+//
+// A `typed` name is a rename: stamped into the vault's `meta` exactly as
+// `workspace_rename` stamps one, so the next sync carries it to the user's
+// other devices. A blank one takes the name the pack already carries — the one
+// the user gave the vault wherever they made it — and a pack from before names
+// travelled carries none, so it falls back to the short-id label every added
+// vault starts under.
+fn settle_name(store: &SqliteStore, typed: String, vault_id: &str) -> Result<String> {
+    if !typed.is_empty() {
+        identity::set_vault_name(store, &typed, auth::now_ms()).map_err(store_err)?;
+        return Ok(typed);
+    }
+    Ok(match identity::vault_name(store).map_err(store_err)? {
+        (Some(packed), _) => packed,
+        (None, _) => super::autojoin::label(vault_id),
+    })
+}
+
 /// Refuse a pack this device would end up holding twice.
 ///
 /// Restoring a vault beside itself would leave two workspaces syncing one pack,
@@ -1077,5 +1103,48 @@ mod tests {
             verify_password_in(&dir, "wrong-password"),
             Err(Error::InvalidPassword)
         ));
+    }
+
+    // Leaving the field blank is what most restores will do: the vault already
+    // has a name, and it is the one the user knows it by.
+    #[test]
+    fn a_blank_name_takes_the_one_the_pack_carries() {
+        let store = store();
+        identity::set_vault_name(&store, "Work", 1_700_000_000_000).unwrap();
+
+        assert_eq!(
+            settle_name(&store, String::new(), "9f3c1a2b").unwrap(),
+            "Work"
+        );
+        // Untouched: nothing was renamed, so nothing new is owed to the account.
+        assert_eq!(
+            identity::vault_name(&store).unwrap(),
+            (Some("Work".into()), 1_700_000_000_000)
+        );
+    }
+
+    // A pack written before names travelled carries none.
+    #[test]
+    fn a_blank_name_over_a_nameless_pack_falls_back_to_the_label() {
+        assert_eq!(
+            settle_name(&store(), String::new(), "9f3c1a2b").unwrap(),
+            "Vault 9f3c1a"
+        );
+    }
+
+    // A typed name overrides the pack's, and goes into the vault stamped — so
+    // the next sync carries it to every other device.
+    #[test]
+    fn a_typed_name_wins_and_is_written_into_the_vault() {
+        let store = store();
+        identity::set_vault_name(&store, "Work", 1).unwrap();
+
+        assert_eq!(
+            settle_name(&store, "Home".into(), "9f3c1a2b").unwrap(),
+            "Home"
+        );
+        let (name, at_ms) = identity::vault_name(&store).unwrap();
+        assert_eq!(name.as_deref(), Some("Home"));
+        assert!(at_ms > 1);
     }
 }
