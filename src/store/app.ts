@@ -115,6 +115,7 @@ export const initialApp: AppState = {
     pending: false,
     inProgress: false,
     error: null,
+    errorKind: null,
     lastSyncedAt: null,
     seq: 0
   },

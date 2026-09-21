@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use chrono::{SecondsFormat, Utc};
 use serde::Serialize;
 
+use crate::error::Error;
 use crate::session::Session;
 
 /// Why a mobile consent flow was started — which decides what happens once the
@@ -83,7 +84,7 @@ pub struct SyncRun {
     pub pending: bool,
     pub in_progress: bool,
     /// What the last connect or run failed with, until the next one starts.
-    pub error: Option<String>,
+    pub error: Option<SyncFailure>,
     /// RFC 3339 time of the last run of *this workspace* that succeeded in this
     /// process.
     pub last_synced_at: Option<String>,
@@ -106,7 +107,7 @@ impl SyncRun {
     /// and the error belong to this workspace alone — another workspace's
     /// success never stands in for this one's, and its failure is not this
     /// one's to report.
-    pub fn finish(&mut self, error: Option<String>) {
+    pub fn finish(&mut self, error: Option<SyncFailure>) {
         self.in_progress = false;
         if error.is_none() {
             self.last_synced_at = Some(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true));
@@ -121,9 +122,31 @@ impl SyncRun {
             configured,
             pending: self.pending,
             in_progress: self.in_progress,
-            error: self.error.clone(),
+            error: self.error.as_ref().map(|e| e.message.clone()),
+            error_kind: self.error.as_ref().map(|e| e.kind.to_string()),
             last_synced_at: self.last_synced_at.clone(),
             seq: self.seq,
+        }
+    }
+}
+
+/// A failed connect or run, kept as both halves.
+///
+/// The message is what the user reads; the kind is [`crate::error::Error::kind`],
+/// so a screen can recognise one particular failure — a vault deleted from the
+/// account on another device, say — without matching on English prose the way
+/// every rejection the frontend gets is spared from doing.
+#[derive(Debug, Clone)]
+pub struct SyncFailure {
+    pub kind: &'static str,
+    pub message: String,
+}
+
+impl From<&Error> for SyncFailure {
+    fn from(error: &Error) -> Self {
+        Self {
+            kind: error.kind(),
+            message: error.to_string(),
         }
     }
 }
@@ -144,6 +167,9 @@ pub struct SyncStatus {
     pub pending: bool,
     pub in_progress: bool,
     pub error: Option<String>,
+    /// The kind of the failure `error` describes — see [`SyncFailure`]. Always
+    /// set together with it.
+    pub error_kind: Option<String>,
     pub last_synced_at: Option<String>,
     /// Monotonic within the process; see [`SyncRun::seq`].
     pub seq: u64,
@@ -287,7 +313,8 @@ mod tests {
     // Every transition the app makes goes through `SyncRun::transition`, so the
     // tests below reach the run state the way `commands::sync` does.
     fn finish(state: &AppState, error: Option<&str>) {
-        state.sync_run(|run| run.transition(|run| run.finish(error.map(String::from))));
+        let failure = error.map(|why| SyncFailure::from(&Error::Other(why.into())));
+        state.sync_run(|run| run.transition(|run| run.finish(failure)));
     }
 
     #[test]

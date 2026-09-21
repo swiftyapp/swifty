@@ -34,6 +34,8 @@ pub const SHARES_FOLDER: &str = "Shares";
 pub const VAULT_EXTENSION: &str = "rowel";
 /// Extension of a sealed share envelope.
 pub const SHARE_EXTENSION: &str = "rowelshare";
+/// Extension of the marker left where a deleted vault's pack used to be.
+pub const DELETED_EXTENSION: &str = "deleted";
 /// MIME type a vault pack is uploaded under; the same one the desktop file
 /// association declares.
 pub const VAULT_MIME: &str = "application/vnd.rowel";
@@ -55,6 +57,19 @@ pub fn vault_id_of(file_name: &str) -> Option<&str> {
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
     is_hex.then_some(id)
+}
+
+/// The marker left in place of a vault deleted from the account:
+/// `<vault-id>.deleted`.
+///
+/// Deliberately not a `.rowel` name, so [`vault_id_of`] passes over it and
+/// every listing built on that — onboarding's probe, auto-join, the "other
+/// vaults in this account" offer — sees the vault as gone. The one thing that
+/// reads it is a run whose own pack has disappeared: the marker is what tells
+/// "another device deleted this vault" apart from "this vault has never
+/// pushed", which would otherwise put the pack straight back.
+pub fn deleted_marker_name(vault_id: &str) -> String {
+    format!("{vault_id}.{DELETED_EXTENSION}")
 }
 
 /// A share file's name: `token` is random and the name says nothing else —
@@ -81,6 +96,14 @@ mod tests {
         assert_eq!(vault_id_of("A1B2.rowel"), None);
         assert_eq!(vault_id_of("a1b2.rowelshare"), None);
         assert_eq!(vault_id_of("a1b2"), None);
+    }
+
+    // The marker a "delete everywhere" leaves has to be invisible to every
+    // listing that asks which vaults the account holds.
+    #[test]
+    fn a_deleted_vaults_marker_is_not_a_pack() {
+        assert_eq!(deleted_marker_name("a1b2c3"), "a1b2c3.deleted");
+        assert_eq!(vault_id_of(&deleted_marker_name("a1b2c3")), None);
     }
 
     #[test]

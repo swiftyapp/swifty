@@ -6,10 +6,13 @@ import { unsealError } from '@/components/Start/shared/errors'
 import { workspaceLabel } from '@/lib/workspace'
 import Frame from '@/components/elements/Frame'
 import Button from '@/components/elements/Button'
+import Segmented from '@/components/elements/Segmented'
 import { inputClass } from '@/components/elements/formStyles'
 import { verbatimInput } from '@/components/elements/inputProps'
 
 const TITLE_ID = 'workspace-delete-title'
+
+type Scope = 'device' | 'everywhere'
 
 /**
  * Confirming the one destructive thing Settings › Workspaces can do.
@@ -20,22 +23,34 @@ const TITLE_ID = 'workspace-delete-title'
  * opened to check it against the session), and the label typed out, which is
  * what makes "this one" deliberate.
  *
+ * A workspace that syncs also gets the choice of taking the vault out of the
+ * Google account with it (`syncs`); one that does not is only ever a local
+ * delete, and is not offered a scope to pick from at all.
+ *
  * In a `Frame`, so the phone gets the same dialog as a sheet.
  */
 export default function DeleteWorkspace({
   workspace,
+  syncs = false,
   onClose
 }: {
   workspace: Workspace
+  /** Offer "Delete everywhere" — this workspace has a vault on Drive. */
+  syncs?: boolean
   onClose: () => void
 }) {
   const { t } = useTranslation()
   const label = workspaceLabel(workspace, t)
   const [password, setPassword] = useState('')
   const [typed, setTyped] = useState('')
+  const [scope, setScope] = useState<Scope>('device')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // The local delete is the default, and the only scope when there is no
+  // account copy to act on — so a `syncs` that turns off mid-dialog cannot
+  // leave the wider choice standing.
+  const everywhere = syncs && scope === 'everywhere'
   const ready = password.length > 0 && typed.trim() === label
 
   // Nothing to close on success: deleting the open workspace ends its session,
@@ -45,7 +60,7 @@ export default function DeleteWorkspace({
     if (!ready || busy) return
     setBusy(true)
     setError(null)
-    deleteWorkspace(workspace.id, password)
+    deleteWorkspace(workspace.id, password, everywhere)
       .then(onClose)
       .catch((err: unknown) => {
         setError(
@@ -69,10 +84,29 @@ export default function DeleteWorkspace({
         <h2 id={TITLE_ID} className="text-lg font-semibold tracking-display">
           {t('Delete {{name}}?', { name: label })}
         </h2>
+        {syncs && (
+          <div className="mt-4">
+            <Segmented<Scope>
+              options={[
+                { value: 'device', label: t('Remove from this device') },
+                { value: 'everywhere', label: t('Delete everywhere') }
+              ]}
+              value={scope}
+              onChange={setScope}
+              name={t('What to delete')}
+              testidPrefix="workspace-delete-scope"
+            />
+          </div>
+        )}
+
         <p className="mt-1.5 text-base text-text2">
-          {t(
-            'This removes the workspace and everything in it from this device. A copy on Google Drive is left where it is, so the account still holds it.'
-          )}
+          {everywhere
+            ? t(
+                'This removes the workspace from this device and deletes its copy in Google Drive. Your other devices will stop syncing it.'
+              )
+            : t(
+                'This removes the workspace and everything in it from this device. A copy on Google Drive is left where it is, so the account still holds it.'
+              )}
         </p>
 
         <label className="mt-5 block">

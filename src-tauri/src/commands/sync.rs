@@ -39,7 +39,7 @@ use crate::models::EntryMetaDto;
 use crate::session::list_metas;
 #[cfg(mobile)]
 use crate::state::AuthPurpose;
-use crate::state::{AppState, SyncRun, SyncStatus};
+use crate::state::{AppState, SyncFailure, SyncRun, SyncStatus};
 use crate::sync;
 use crate::sync::setup::PackInfo;
 
@@ -66,7 +66,7 @@ use crate::sync::setup::PackInfo;
 #[cfg(desktop)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle) -> Result<()> {
-    super::setup::connect_pending(&app).inspect_err(|e| failed(&app, e.to_string()))
+    super::setup::connect_pending(&app).inspect_err(|e| failed(&app, e))
 }
 
 /// Start the consent flow and return — see [`on_redirect`] for the other half.
@@ -81,7 +81,7 @@ pub fn sync_connect(app: AppHandle) -> Result<()> {
 #[cfg(mobile)]
 #[tauri::command]
 pub fn sync_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    super::setup::connect_pending(&app, &state).inspect_err(|e| failed(&app, e.to_string()))
+    super::setup::connect_pending(&app, &state).inspect_err(|e| failed(&app, e))
 }
 
 /// Make the account a connect left pending this vault's — if the account will
@@ -464,11 +464,12 @@ fn update(app: &AppHandle, change: impl FnOnce(&mut SyncRun)) {
 
 /// A connect could not start, or the account could not be adopted: said as
 /// status, so the row shows it next to the button that asked.
-fn failed(app: &AppHandle, why: String) {
-    log::warn!("sync connect failed: {why}");
+fn failed(app: &AppHandle, error: &Error) {
+    log::warn!("sync connect failed: {error}");
+    let failure = SyncFailure::from(error);
     update(app, |run| {
         run.pending = false;
-        run.error = Some(why);
+        run.error = Some(failure);
     });
 }
 
@@ -500,11 +501,12 @@ fn started(app: &AppHandle) {
 }
 
 /// A run ended — see [`SyncRun::finish`] for what that leaves standing.
-fn finished(app: &AppHandle, error: Option<String>) {
-    if let Some(why) = &error {
+fn finished(app: &AppHandle, error: Option<&Error>) {
+    if let Some(why) = error {
         log::warn!("sync failed: {why}");
     }
-    update(app, |run| run.finish(error));
+    let failure = error.map(SyncFailure::from);
+    update(app, |run| run.finish(failure));
 }
 
 /// The whole of sync as the frontend should see it right now.
@@ -650,7 +652,7 @@ fn report(app: &AppHandle, result: Result<sync::engine::SyncOutcome>) {
             }
             finished(app, None);
         }
-        Err(e) => finished(app, Some(e.to_string())),
+        Err(e) => finished(app, Some(&e)),
     }
 }
 
@@ -670,7 +672,7 @@ fn entry_metas(app: &AppHandle) -> Vec<EntryMetaDto> {
 /// be taken on the thread that decides to run — under `workspace_lock`, before
 /// anything else can be told a run is under way — and then moved onto the thread
 /// that does the running.
-struct RunClaim(Arc<AtomicBool>);
+pub(super) struct RunClaim(Arc<AtomicBool>);
 
 /// Claim the run, or `None` if one is already in flight.
 fn claim_run(syncing: &Arc<AtomicBool>) -> Option<RunClaim> {
@@ -678,6 +680,19 @@ fn claim_run(syncing: &Arc<AtomicBool>) -> Option<RunClaim> {
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .ok()
         .map(|_| RunClaim(Arc::clone(syncing)))
+}
+
+/// The same claim, for a flow that is not a run but must not have one beside it
+/// — the "delete everywhere" whose Drive work a run could otherwise look into
+/// mid-flight (`commands::workspace::workspace_delete`). Refusing with
+/// `SyncBusy` is what `commands::workspace::guard_sync_idle` answers when it
+/// finds the flag raised, so the two agree on what a busy sync means.
+///
+/// Taken rather than merely checked, and held by the caller for its whole
+/// length. Any rerun request raised meanwhile is left standing (unlike
+/// [`claim_and_settle`]): this holder is not a run and serves nobody's request.
+pub(super) fn claim_or_busy(state: &AppState) -> Result<RunClaim> {
+    claim_run(&state.syncing).ok_or(Error::SyncBusy)
 }
 
 // Releases the claim however the run ends, panics included — a wedged flag

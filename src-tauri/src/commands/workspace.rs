@@ -97,10 +97,21 @@ pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) 
 /// switch mid-flight would seal one workspace's account under another's
 /// directory, and the next sync from there would publish into the wrong pack.
 fn guard_sync_idle(state: &AppState) -> Result<()> {
-    // The active workspace's run state is the only one that can have a flow in
-    // it: starting one takes the lock this caller is holding.
-    let busy = state.syncing.load(Ordering::SeqCst)
-        || state.sync_run(|run| run.pending || run.in_progress);
+    if state.syncing.load(Ordering::SeqCst) {
+        return Err(Error::SyncBusy);
+    }
+    guard_sync_flows_idle(state)
+}
+
+/// The rest of [`guard_sync_idle`], for a caller that took the run claim itself
+/// rather than checking it ([`workspace_delete`]): reading `syncing` would only
+/// find that caller's own hold, and what is left to refuse are the flows the
+/// claim does not cover.
+///
+/// The active workspace's run state is the only one that can have a flow in it:
+/// starting one takes the lock this caller is holding.
+fn guard_sync_flows_idle(state: &AppState) -> Result<()> {
+    let busy = state.sync_run(|run| run.pending || run.in_progress);
     #[cfg(mobile)]
     let busy = busy || state.pending_auth.lock().unwrap().is_some();
     if busy {
@@ -640,14 +651,23 @@ fn name_the_open_vault(
     Ok(true)
 }
 
-/// Remove a workspace's vault from this device.
+/// Remove a workspace's vault from this device, and — with `everywhere` — from
+/// the Google account it syncs to as well.
 ///
-/// Local only: whatever the vault has on Drive is left where it is, so the
-/// account still holds it and another device — or this one, later — can restore
-/// it as a workspace again. `password` is the target's own master password,
-/// proved against the target's own files rather than against the session,
-/// because the workspace being deleted is usually a locked one whose key is
-/// nowhere in memory.
+/// Local by default: whatever the vault has on Drive is left where it is, so
+/// the account still holds it and another device — or this one, later — can
+/// restore it as a workspace again. `password` is the target's own master
+/// password, proved against the target's own files rather than against the
+/// session, because the workspace being deleted is usually a locked one whose
+/// key is nowhere in memory.
+///
+/// `everywhere` adds one step in front of all of that: the vault's pack is
+/// removed from Drive and a marker left in its place ([`sync::delete_pack`]),
+/// which is what has the account's other devices stop syncing it instead of
+/// uploading their copy back. It runs *before* anything local is touched, so a
+/// network failure leaves the workspace here and the user with something to
+/// retry from — the tokens are sealed under this vault's key, and deleting it
+/// first would take the only way back to the account with it.
 ///
 /// Deleting the primary is the case that moves files: the root is its
 /// directory, so the first surviving workspace is promoted into it and takes
@@ -662,6 +682,7 @@ fn name_the_open_vault(
 pub async fn workspace_delete(
     id: String,
     password: Zeroizing<String>,
+    everywhere: bool,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<()> {
@@ -691,19 +712,23 @@ pub async fn workspace_delete(
     }
 
     // Argon2id and a SQLCipher open, so off the command thread — and on the
-    // target's own files, whether it is the open workspace or a locked one.
+    // target's own files, whether it is the open workspace or a locked one. The
+    // key comes back rather than being thrown away: a "delete everywhere" has
+    // to unseal that workspace's own token file with it, and deriving a second
+    // time would be another Argon2id wait for nothing.
     let target = dir.clone();
-    match blocking(move || verify_password_in(&target, &password)).await {
-        Ok(()) => {
+    let key = match blocking(move || verify_password_in(&target, &password)).await {
+        Ok(key) => {
             // Reset here rather than leave it to the removal below: the delete
-            // can still be refused after the proof (a sync in flight, a staging
-            // failure), and a proven password must not leave attempts standing
-            // against a workspace that is still there.
+            // can still be refused after the proof (a sync in flight, a Drive
+            // failure, a staging failure), and a proven password must not leave
+            // attempts standing against a workspace that is still there.
             if lockout != LockoutState::default() {
                 if let Err(e) = LockoutState::default().save_in(&dir) {
                     log::warn!("failed to reset lockout sidecar: {e}");
                 }
             }
+            key
         }
         Err(Error::InvalidPassword) => {
             let (updated, refusal) = auth::penalize(lockout, now);
@@ -713,6 +738,21 @@ pub async fn workspace_delete(
             return Err(refusal);
         }
         Err(e) => return Err(e),
+    };
+
+    // One exclusion over the whole delete, network included, and the same one a
+    // run takes: a run starting beside the Drive work below could read the pack
+    // gone before its marker was written and upload this vault straight back, or
+    // push into the middle of the local deletion. Taken after the derive, so an
+    // Argon2id wait costs sync nothing, and held to the end of the function —
+    // every exit path releases it (`RunClaim`).
+    let _claim = super::sync::claim_or_busy(&state)?;
+
+    // The network, before a single local file moves: what it fails to do, the
+    // user can try again, and only while the workspace is still here to try it
+    // from.
+    if everywhere {
+        delete_remote_pack(&app, &root, &id, &dir, &key).await?;
     }
 
     // Everything from here is one step under the lock, as a switch is: the
@@ -723,7 +763,9 @@ pub async fn workspace_delete(
         let _paths = state.workspace_lock.lock().unwrap();
         let registry = Registry::load(&root);
         let deletion = registry.without(&id)?;
-        guard_sync_idle(&state)?;
+        // The claim above is this delete's own, so only the flows beside it are
+        // asked about here.
+        guard_sync_flows_idle(&state)?;
 
         // The open workspace is left open unless this delete disturbs it: it is
         // the one going away, or the one whose directory is about to become the
@@ -773,7 +815,41 @@ pub async fn workspace_delete(
     applied
 }
 
-// Prove `password` opens the vault in `dir`.
+// Take the vault of workspace `id` out of the account it syncs to.
+//
+// Both facts this needs are readable without opening the workspace, which is
+// the point: the vault id is the registry's copy (`Workspace::vault_id`, put
+// there by the runs that settled it), and the tokens are that workspace's own
+// sealed file, unsealed with the key the password just proved.
+//
+// A workspace with no vault id has no pack up there — it never synced, or never
+// finished a first run — and one with no token file at all never connected an
+// account: both have nothing to delete and nothing to mark. A token file that
+// is there but cannot be read is neither, and fails the delete instead: the
+// pack may well be live, and going on would destroy the workspace the retry
+// would have to come from (`sync::read_tokens_in`).
+async fn delete_remote_pack(
+    app: &AppHandle,
+    root: &Path,
+    id: &str,
+    dir: &Path,
+    key: &VaultKey,
+) -> Result<()> {
+    let vault_id = Registry::load(root)
+        .workspaces
+        .into_iter()
+        .find(|w| w.id == id)
+        .and_then(|w| w.vault_id);
+    let Some(vault_id) = vault_id else {
+        return Ok(());
+    };
+    let Some(mut tokens) = sync::read_tokens_in(dir, &key.cryptor())? else {
+        return Ok(());
+    };
+    sync::delete_pack(app, &mut tokens, &vault_id).await
+}
+
+// Prove `password` opens the vault in `dir`, and hand back the key that did it.
 //
 // The same proof an unlock makes, on a path instead of on the app's: read that
 // workspace's own descriptor, derive, and let SQLCipher answer. It has to work
@@ -781,7 +857,7 @@ pub async fn workspace_delete(
 // to compare against the session the way `change_master_password` does.
 //
 // Argon2id: run it off the main thread.
-fn verify_password_in(dir: &Path, password: &str) -> Result<()> {
+fn verify_password_in(dir: &Path, password: &str) -> Result<VaultKey> {
     let sidecar = dir.join(storage::KDF_SIDECAR_FILE);
     let key = if sidecar.exists() {
         let params = KdfParams::from_json(&fs::read_to_string(sidecar)?)?;
@@ -801,7 +877,7 @@ fn verify_password_in(dir: &Path, password: &str) -> Result<()> {
         StoreError::SchemaNewer => Error::VaultTooNew,
         e => Error::Other(format!("could not open the vault: {e}")),
     })?;
-    Ok(())
+    Ok(key)
 }
 
 // Argon2id + creating the encrypted DB, off the command thread. The directory

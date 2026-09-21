@@ -1,4 +1,5 @@
 import { call } from './client'
+import { describeError, type BackendErrorKind } from './errors'
 
 /**
  * The whole of what the frontend knows about sync, carried by every
@@ -14,6 +15,13 @@ export interface SyncStatus {
   inProgress: boolean
   /** What the last connect or run failed with, until the next one starts. */
   error: string | null
+  /**
+   * The kind of that failure, always set alongside `error`. A failed run is
+   * reported as status rather than as a rejected promise, so this is what lets
+   * a screen recognise one particular failure without reading the English
+   * sentence Rust built — the same contract every rejection has.
+   */
+  errorKind: BackendErrorKind | null
   /** ISO time of the last run that succeeded in this process, or null. */
   lastSyncedAt: string | null
   /**
@@ -24,6 +32,23 @@ export interface SyncStatus {
    */
   seq: number
 }
+
+/**
+ * The last failure as copy the user can read, or null when there was none.
+ * `describeError` over the two halves the status carries, so a sync failure
+ * reads the same as the identical failure raised from a command.
+ */
+export const syncErrorText = (sync: SyncStatus): string | null =>
+  sync.error === null
+    ? null
+    : describeError({ kind: sync.errorKind ?? 'other', message: sync.error })
+
+/**
+ * This vault's pack was deleted from the account on another device, so its runs
+ * stop here until it is removed from this one too (`workspaceDelete`).
+ */
+export const syncDeletedRemotely = (sync: SyncStatus): boolean =>
+  sync.errorKind === 'vaultDeletedRemotely'
 
 /**
  * Start the Google consent flow for the open vault. Returns immediately on

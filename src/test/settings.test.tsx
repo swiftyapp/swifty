@@ -832,7 +832,9 @@ describe('Settings › workspaces › delete', () => {
       await userEvent.click(screen.getByTestId('workspace-delete-submit'))
     })
 
-    expect(calls('workspace_delete')).toEqual([{ id: 'w2', password: 'work-pass' }])
+    expect(calls('workspace_delete')).toEqual([
+      { id: 'w2', password: 'work-pass', everywhere: false }
+    ])
     // The probe is what carries the list, so a delete ends by re-reading it.
     expect(calls('app_status').length).toBeGreaterThan(0)
     await waitFor(() =>
@@ -890,6 +892,73 @@ describe('Settings › workspaces › delete', () => {
 
     expect(screen.getByTestId('workspace-delete-default')).toBeDisabled()
     expect(screen.getByTestId('workspace-delete-last')).toBeInTheDocument()
+  })
+
+  // A workspace with a vault id has a pack in the account, so it is offered the
+  // wider scope — and the wider scope is what the backend is told.
+  it('deletes everywhere when that scope is chosen', async () => {
+    mockCommand('workspace_delete', () => undefined)
+    seedApp({
+      workspaces: [
+        { id: 'default', name: null },
+        { id: 'w2', name: 'Work', vaultId: 'cafe' }
+      ],
+      activeWorkspace: 'default'
+    })
+    await open()
+    await go('workspaces')
+    await userEvent.click(screen.getByTestId('workspace-delete-w2'))
+
+    await userEvent.click(screen.getByTestId('workspace-delete-scope-everywhere'))
+    expect(screen.getByText(/deletes its copy in Google Drive/)).toBeInTheDocument()
+
+    await userEvent.type(screen.getByTestId('workspace-delete-password'), 'work-pass')
+    await userEvent.type(screen.getByTestId('workspace-delete-confirm'), 'Work')
+    await act(async () => {
+      await userEvent.click(screen.getByTestId('workspace-delete-submit'))
+    })
+
+    expect(calls('workspace_delete')).toEqual([
+      { id: 'w2', password: 'work-pass', everywhere: true }
+    ])
+  })
+
+  // No vault id and no connection: there is nothing in an account to delete, so
+  // the choice is not put on screen at all.
+  it('offers no scope for a workspace that does not sync', async () => {
+    await openDelete('w2')
+
+    expect(
+      screen.queryByTestId('workspace-delete-scope-everywhere')
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/A copy on Google Drive is left where it is/)
+    ).toBeInTheDocument()
+  })
+
+  // Another device ran the delete: this one's runs stop with the typed error,
+  // and the row offers the local delete that finishes the job here.
+  it('offers the local delete when the vault was deleted on another device', async () => {
+    two()
+    await open()
+    await go('workspaces')
+    await act(async () =>
+      report({
+        configured: true,
+        error: 'this vault was deleted from Google Drive on another device',
+        errorKind: 'vaultDeletedRemotely'
+      })
+    )
+
+    expect(
+      screen.getByText('This vault was deleted from Google Drive on another device.')
+    ).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('workspace-delete-stranded'))
+
+    expect(screen.getByRole('heading', { name: 'Delete Personal?' })).toBeInTheDocument()
+    expect(
+      screen.queryByTestId('workspace-delete-scope-everywhere')
+    ).not.toBeInTheDocument()
   })
 })
 

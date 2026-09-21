@@ -71,6 +71,7 @@ export const appStatusDefault = (): AppStatus => ({
     pending: false,
     inProgress: false,
     error: null,
+    errorKind: null,
     lastSyncedAt: null,
     seq: 0
   },

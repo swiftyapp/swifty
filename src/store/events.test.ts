@@ -115,6 +115,7 @@ describe('sync:status', () => {
       pending: false,
       inProgress: false,
       error: 'Drive API 403',
+      errorKind: 'other' as const,
       lastSyncedAt: '2024-01-01T00:00:00.000Z',
       seq: 1
     }

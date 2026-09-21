@@ -35,6 +35,7 @@ export type BackendErrorKind =
   | 'lastWorkspace'
   | 'vaultAlreadyOpen'
   | 'vaultNotInAccount'
+  | 'vaultDeletedRemotely'
   | 'fileTooLarge'
   | 'fileNotText'
   | 'io'
@@ -137,6 +138,8 @@ export const describeError = (error: unknown): string => {
       return t('This vault is already a workspace on this device')
     case 'vaultNotInAccount':
       return t('This Google account holds other vaults')
+    case 'vaultDeletedRemotely':
+      return t('This vault was deleted from Google Drive on another device.')
     case 'fileTooLarge':
       return t('This file is too large')
     case 'fileNotText':
