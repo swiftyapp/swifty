@@ -24,13 +24,14 @@ use std::sync::atomic::Ordering;
 use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
+use crate::auth;
 use crate::crypto::VaultKey;
 use crate::error::{Error, Result};
 use crate::models::{EntryMetaDto, UnlockResult};
 use crate::session::{list_metas, store_err, Lease};
 use crate::state::AppState;
 use crate::storage;
-use crate::store::SqliteStore;
+use crate::store::{identity, SqliteStore};
 use crate::sync::{self, restore};
 use crate::workspace::{self, Registry, Workspace};
 
@@ -530,6 +531,13 @@ async fn restore_workspace(
 }
 
 /// Give a workspace a (new) label. Ids never change; only this does.
+///
+/// The name goes into the vault as well as into the registry, so it travels in
+/// the pack and reaches the user's other devices (see [`crate::store::identity`]
+/// and `sync::engine`). Only the active workspace is unlocked, though, and only
+/// an unlocked vault can be written to: renaming any other one is still a
+/// rename — the list draws from the registry — it just does not reach Drive
+/// until that vault is next opened, which is where `commands::auth` seeds it.
 #[tauri::command]
 pub fn workspace_rename(
     id: String,
@@ -543,15 +551,79 @@ pub fn workspace_rename(
     }
 
     let root = storage::root_dir(&app)?;
-    update_registry(&state, &root, |registry| {
-        let workspace = registry
-            .workspaces
-            .iter_mut()
-            .find(|w| w.id == id)
-            .ok_or(Error::NotFound)?;
-        workspace.name = Some(name);
-        Ok(())
-    })
+
+    // The vault is the source of truth — it is the copy that travels — and the
+    // registry mirrors it, through the very same call a pulled rename mirrors
+    // with, so the two paths cannot drift apart. A workspace whose vault is not
+    // open has no truth to write: the registry is its only copy, and its
+    // failures stay the caller's as they always were.
+    if !name_the_open_vault(&state, &root, &id, &name, auth::now_ms())? {
+        return update_registry(&state, &root, |registry| {
+            let workspace = registry
+                .workspaces
+                .iter_mut()
+                .find(|w| w.id == id)
+                .ok_or(Error::NotFound)?;
+            workspace.name = Some(name);
+            Ok(())
+        });
+    }
+
+    // The same request an entry save makes: the new name is a change to the
+    // vault, and it reaches the account the way every other one does.
+    super::sync::request_run_if_ready(&app, &state);
+    Ok(())
+}
+
+/// Write the name into the open vault's `meta` — stamped, so another device can
+/// tell which of two renames came last — and mirror it into the registry, as
+/// one step. `false` when `id` is not the workspace that is open: a locked one
+/// keeps its name in the registry alone, and the caller writes that.
+///
+/// `workspace_lock` and then the session: together, and in this order, as
+/// `workspace_select` takes them. A sync run takes the session lock per
+/// operation rather than for its length (`sync::engine::SessionVault`), so any
+/// interval between these two writes is one a run can slip into — reading the
+/// vault's new name and publishing a rename this command is about to reject, or
+/// adopting a newer name from another device for the undo below to clobber.
+/// Leaving no interval is what makes the undo safe without a compare: the pair
+/// goes back under the very guard that replaced it, before anything else can
+/// have read it. The registry's save is one small atomic file write, which is
+/// short enough to hold the session across.
+fn name_the_open_vault(
+    state: &AppState,
+    root: &Path,
+    id: &str,
+    name: &str,
+    at_ms: i64,
+) -> Result<bool> {
+    let _paths = state.workspace_lock.lock().unwrap();
+    if *state.active_workspace.lock().unwrap() != id {
+        return Ok(false);
+    }
+    let session = state.session.lock().unwrap();
+    let Ok(store) = session.store() else {
+        return Ok(false);
+    };
+    let (previous, previous_ms) = identity::vault_name(store).map_err(store_err)?;
+    identity::set_vault_name(store, name, at_ms).map_err(store_err)?;
+
+    // A rename is one action. Telling the user it failed while the vault keeps
+    // the new name — and publishes it to every other device on the next run —
+    // is the worst of both, so a mirror that will not take it puts the vault
+    // back the way it was. Rolling back rather than succeeding quietly because
+    // the registry is what the header and the workspace list read: a name only
+    // the vault holds is a rename the user cannot see here. Best effort, since
+    // the rename is already failing; an empty name is how a vault that had none
+    // is put back to having none.
+    if let Err(e) = workspace::record_vault_name_locked(root, id, name) {
+        let previous = previous.as_deref().unwrap_or("");
+        if let Err(e) = identity::set_vault_name(store, previous, previous_ms) {
+            log::warn!("could not put the vault's previous name back: {e}");
+        }
+        return Err(e);
+    }
+    Ok(true)
 }
 
 // Argon2id + creating the encrypted DB, off the command thread. The directory
@@ -781,5 +853,70 @@ mod tests {
     #[test]
     fn a_locked_workspace_is_left_to_the_lease_to_refuse() {
         assert!(guard_other_vault(&AppState::default(), &tmp_root(), "a1b2").is_ok());
+    }
+
+    // A "data dir" that is a file: the registry reads as the default single
+    // workspace, and saving it cannot create anything beneath.
+    fn unwritable_root() -> std::path::PathBuf {
+        let path = tmp_root().join("not-a-directory");
+        fs::write(&path, "").unwrap();
+        path
+    }
+
+    // The rename the user asked for, in both copies, in one step.
+    #[test]
+    fn naming_the_open_vault_writes_the_registry_with_it() {
+        let root = tmp_root();
+        let state = open_with(store());
+
+        assert!(name_the_open_vault(&state, &root, PRIMARY_ID, "Home", 20).unwrap());
+        let session = state.session.lock().unwrap();
+        assert_eq!(
+            identity::vault_name(session.store().unwrap()).unwrap(),
+            (Some("Home".into()), 20)
+        );
+        assert_eq!(
+            Registry::load(&root).workspaces[0].name.as_deref(),
+            Some("Home")
+        );
+    }
+
+    // The rollback, which is only safe because the mirror and the undo happen
+    // under the one session guard: no sync run can have seen "Home", so putting
+    // "Work" back cannot overwrite a name adopted in between.
+    #[test]
+    fn a_registry_that_will_not_take_the_name_puts_the_vaults_name_back() {
+        let store = store();
+        identity::set_vault_name(&store, "Work", 10).unwrap();
+        let state = open_with(store);
+
+        assert!(name_the_open_vault(&state, &unwritable_root(), PRIMARY_ID, "Home", 20).is_err());
+        let session = state.session.lock().unwrap();
+        assert_eq!(
+            identity::vault_name(session.store().unwrap()).unwrap(),
+            (Some("Work".into()), 10)
+        );
+    }
+
+    // A vault that had no name is put back to having none, not to an empty one.
+    #[test]
+    fn an_unnamed_vault_is_put_back_unnamed() {
+        let state = open_with(store());
+
+        assert!(name_the_open_vault(&state, &unwritable_root(), PRIMARY_ID, "Home", 20).is_err());
+        let session = state.session.lock().unwrap();
+        assert_eq!(
+            identity::vault_name(session.store().unwrap()).unwrap(),
+            (None, 0)
+        );
+    }
+
+    // Any workspace but the open one — and the open one while it is locked —
+    // has no vault to write to, and is left to the registry alone.
+    #[test]
+    fn only_the_open_workspace_has_a_vault_to_name() {
+        let root = tmp_root();
+        assert!(!name_the_open_vault(&open_with(store()), &root, "b2c3", "Home", 20).unwrap());
+        assert!(!name_the_open_vault(&AppState::default(), &root, PRIMARY_ID, "Home", 20).unwrap());
     }
 }

@@ -270,19 +270,24 @@ pub fn sync_disconnect(app: AppHandle, state: State<'_, AppState>) -> Result<()>
 /// reports the rest.
 #[tauri::command]
 pub fn sync_now(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    // Both of these are silent no-ops rather than errors. This is a routine
-    // call, not a user action: the debounced auto-sync fires on a timer and can
-    // easily land just after an auto-lock, or on a vault that was never
-    // connected — neither is a sync failure to put in front of the user.
+    request_run_if_ready(&app, &state);
+    Ok(())
+}
+
+/// Ask for a run after a local change, on a vault that can serve one.
+///
+/// A locked or unconnected vault is a silent no-op rather than an error. This
+/// is a routine call, not a user action: the debounced auto-sync fires on a
+/// timer and can easily land just after an auto-lock, or on a vault that was
+/// never connected — neither is a sync failure to put in front of the user.
+pub(crate) fn request_run_if_ready(app: &AppHandle, state: &AppState) {
     let ready = {
         let session = state.session.lock().unwrap();
         session.is_unlocked() && session.sync_configured
     };
-    if !ready {
-        return Ok(());
+    if ready {
+        start_run(app);
     }
-    start_run(&app);
-    Ok(())
 }
 
 // --- the mobile consent flow ---

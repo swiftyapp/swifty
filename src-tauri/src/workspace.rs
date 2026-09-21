@@ -134,19 +134,84 @@ impl Registry {
 /// Under `workspace_lock`, as every registry writer is: a rename or a create
 /// landing beside this must not save a copy that lacks the other's change.
 pub fn record_vault_id(app: &AppHandle, vault_id: &str) -> Result<()> {
+    update_active(app, |workspace| {
+        if workspace.vault_id.as_deref() == Some(vault_id) {
+            return false;
+        }
+        workspace.vault_id = Some(vault_id.to_string());
+        true
+    })
+}
+
+/// Mirror a name a sync just adopted from another device into the registry.
+///
+/// The vault carries its own name (see [`crate::store::identity`]), but the
+/// workspace list and the header read the registry — every workspace but the
+/// active one is locked, so the registry is the only copy they can reach.
+pub fn record_vault_name(app: &AppHandle, name: &str) -> Result<()> {
+    update_active(app, named(name))
+}
+
+/// [`record_vault_name`] for a caller that already holds `workspace_lock`.
+///
+/// What `workspace_rename` mirrors through: it writes the vault's own copy and
+/// this one without letting go in between, so it cannot take the lock again
+/// here (see `commands::workspace::name_the_open_vault`).
+pub(crate) fn record_vault_name_locked(root: &Path, active: &str, name: &str) -> Result<()> {
+    update_active_locked(root, active, named(name))
+}
+
+// The single edit both mirrors make, so the two callers cannot drift apart.
+fn named(name: &str) -> impl FnOnce(&mut Workspace) -> bool + '_ {
+    move |workspace| {
+        if workspace.name.as_deref() == Some(name) {
+            return false;
+        }
+        workspace.name = Some(name.to_string());
+        true
+    }
+}
+
+/// The active workspace's registry label, if it has one.
+pub fn active_name(app: &AppHandle) -> Option<String> {
+    let root = storage::root_dir(app).ok()?;
+    let state = app.state::<AppState>();
+    let _paths = state.workspace_lock.lock().unwrap();
+    let active = state.active_workspace.lock().unwrap().clone();
+    Registry::load(&root)
+        .workspaces
+        .into_iter()
+        .find(|w| w.id == active)
+        .and_then(|w| w.name)
+}
+
+/// Change the active workspace's registry entry, saving only if `change`
+/// reports it changed something — so a sync run does not rewrite the file on
+/// every pass.
+fn update_active(app: &AppHandle, change: impl FnOnce(&mut Workspace) -> bool) -> Result<()> {
     let root = storage::root_dir(app)?;
     let state = app.state::<AppState>();
     let _paths = state.workspace_lock.lock().unwrap();
     let active = state.active_workspace.lock().unwrap().clone();
-    let mut registry = Registry::load(&root);
+    update_active_locked(&root, &active, change)
+}
+
+/// [`update_active`]'s core, for a caller that already holds `workspace_lock`
+/// and already knows which workspace is active — one with more than the
+/// registry to write, which must not let go of the lock between the two.
+fn update_active_locked(
+    root: &Path,
+    active: &str,
+    change: impl FnOnce(&mut Workspace) -> bool,
+) -> Result<()> {
+    let mut registry = Registry::load(root);
     let Some(workspace) = registry.workspaces.iter_mut().find(|w| w.id == active) else {
         return Err(Error::NotFound);
     };
-    if workspace.vault_id.as_deref() == Some(vault_id) {
+    if !change(workspace) {
         return Ok(());
     }
-    workspace.vault_id = Some(vault_id.to_string());
-    registry.save(&root)
+    registry.save(root)
 }
 
 /// Where a workspace's vault lives.

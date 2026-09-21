@@ -109,6 +109,11 @@ pub trait VaultStore: Send {
     fn meta_get(&self, key: &str) -> Result<Option<String>>;
     /// Write a `meta` value.
     fn meta_set(&self, key: &str, value: &str) -> Result<()>;
+    /// Write several `meta` values as one step: either every pair lands or none
+    /// of them does. Values that only mean anything together — a value and the
+    /// stamp it was set at — must not be split across two writes, or a failure
+    /// between them leaves the pair disagreeing (see [`identity::set_vault_name`]).
+    fn meta_set_many(&self, pairs: &[(&str, &str)]) -> Result<()>;
     /// List live entries' metadata (excludes tombstones).
     fn list(&self) -> Result<Vec<EntryMeta>>;
     /// List tombstoned entries' metadata — what the Trash shows. Excludes rows

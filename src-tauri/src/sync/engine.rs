@@ -82,9 +82,9 @@ pub trait Remote {
 /// is a superset of the one the digest was taken from — never a rollback — and
 /// the write's own debounced sync settles whatever is left over.
 pub trait LocalVault {
-    /// Open a pulled `.rowel` pack and read its records out. The local
-    /// database is not touched: the snapshot goes into its own scratch DB.
-    fn decode(&self, pack_bytes: &[u8]) -> Result<Vec<Record>>;
+    /// Open a pulled `.rowel` pack and read it out. The local database is not
+    /// touched: the snapshot goes into its own scratch DB.
+    fn decode(&self, pack_bytes: &[u8]) -> Result<Snapshot>;
     /// Last-writer-wins merge of `incoming`; returns the rows written.
     fn merge(&self, incoming: &[Record]) -> Result<usize>;
     /// Fingerprint of the whole entry table, tombstones included.
@@ -108,6 +108,27 @@ pub trait LocalVault {
     /// Take on an id this run has proved to be this vault's, whether it was
     /// read off the remote or minted for it.
     fn adopt_vault_id(&self, id: &str) -> Result<()>;
+
+    // The vault's name, which unlike the id is a value two devices can each
+    // change. It lives beside the entries rather than among them, so the engine
+    // reads and writes it itself — see [`sync`] for how it is settled.
+    //
+    /// This vault's name and the stamp it was set at; `(None, 0)` when nobody
+    /// has named it.
+    fn name(&self) -> Result<(Option<String>, i64)>;
+    /// Take on a name the pull proved to beat this vault's (see
+    /// `identity::name_wins`), with the stamp it was set at elsewhere — not the
+    /// time it arrived here.
+    fn adopt_name(&self, name: &str, at_ms: i64) -> Result<()>;
+}
+
+/// A pulled pack, opened: the entries in it and the name it was pushed under.
+pub struct Snapshot {
+    pub records: Vec<Record>,
+    /// The name in the pack's `meta`, with the ms-epoch stamp it was set at.
+    /// `(None, 0)` for a pack pushed before names travelled.
+    pub name: Option<String>,
+    pub name_ms: i64,
 }
 
 /// What one run did, for the caller's events and logs.
@@ -118,9 +139,13 @@ pub struct SyncOutcome {
     pub merged: usize,
     /// Whether a new snapshot was uploaded.
     pub pushed: bool,
+    /// Whether the pull carried a newer name for this vault. The caller mirrors
+    /// it into the workspace registry, which is what the UI draws from.
+    pub renamed: bool,
 }
 
-/// Run one sync: pull, merge, and push if — and only if — the two digests differ.
+/// Run one sync: pull, merge, and push if — and only if — the two sides differ,
+/// in their entries or in the vault name that travels beside them.
 ///
 /// `settle` is the caller's chance to write down whatever this run has just
 /// proved — in practice the vault id the provider resolved (see `sync::run`).
@@ -153,8 +178,21 @@ pub fn sync<R: Remote, L: LocalVault>(
             Some(file) => Some(local.decode(&file.bytes)?),
             None => None,
         };
-        if let Some(records) = &incoming {
-            outcome.merged += local.merge(records)?;
+        if let Some(snapshot) = &incoming {
+            outcome.merged += local.merge(&snapshot.records)?;
+            // The name is last-writer-wins too, but on its own stamp: a rename
+            // is a change to the vault that leaves no row in the entry table.
+            // `identity::name_wins` is the whole decision — a total order, so a
+            // tie in the stamp still settles on one of the two names rather
+            // than on whatever each device happens to hold.
+            if let Some(name) = &snapshot.name {
+                let held = local.name()?;
+                if identity::name_wins((Some(name), snapshot.name_ms), (held.0.as_deref(), held.1))
+                {
+                    local.adopt_name(name, snapshot.name_ms)?;
+                    outcome.renamed = true;
+                }
+            }
         }
 
         // 4. Settle the identity, now that the pull is in and nothing has gone
@@ -163,8 +201,9 @@ pub fn sync<R: Remote, L: LocalVault>(
             settle()?;
         }
 
-        if let Some(records) = &incoming {
-            // 5. The push decision is digest inequality, nothing else.
+        if let Some(snapshot) = &incoming {
+            // 5. The push decision is that the two sides differ — in their
+            // entries, or in the name that travels beside them.
             //
             // Not the dirty flag, and not "the merge changed something":
             // both miss the case where local is a strict superset of remote
@@ -174,7 +213,22 @@ pub fn sync<R: Remote, L: LocalVault>(
             // change-driven heuristic concludes "in sync" and leaves our
             // entries missing from the remote forever. The digests still
             // differ, so this pushes.
-            if local.digest()? == state_digest(records) {
+            //
+            // The name is compared beside the digest rather than folded into
+            // it: it is not in the entry table, so a rename with nothing else
+            // to say would otherwise never leave this device. The comparison is
+            // the same `name_wins` the adopt above used, so the two agree by
+            // construction: this pushes exactly when the name here beats the
+            // remote's, which is exactly when the adopt declined to take it.
+            // Anything else — equal pairs, or a remote that just won — has
+            // nothing to say and stops here.
+            let held = local.name()?;
+            if local.digest()? == state_digest(&snapshot.records)
+                && !identity::name_wins(
+                    (held.0.as_deref(), held.1),
+                    (snapshot.name.as_deref(), snapshot.name_ms),
+                )
+            {
                 return Ok(outcome);
             }
         }
@@ -280,7 +334,7 @@ impl SessionVault {
 }
 
 impl LocalVault for SessionVault {
-    fn decode(&self, pack_bytes: &[u8]) -> Result<Vec<Record>> {
+    fn decode(&self, pack_bytes: &[u8]) -> Result<Snapshot> {
         decode_pack(pack_bytes, &self.kdf_params_json, &self.key, &self.scratch)
     }
 
@@ -321,6 +375,14 @@ impl LocalVault for SessionVault {
     fn adopt_vault_id(&self, id: &str) -> Result<()> {
         self.with_store(|store| identity::adopt_vault_id(store, id).map_err(store_err))
     }
+
+    fn name(&self) -> Result<(Option<String>, i64)> {
+        self.with_store(|store| identity::vault_name(store).map_err(store_err))
+    }
+
+    fn adopt_name(&self, name: &str, at_ms: i64) -> Result<()> {
+        self.with_store(|store| identity::set_vault_name(store, name, at_ms).map_err(store_err))
+    }
 }
 
 // --- shared implementations -------------------------------------------------
@@ -338,7 +400,7 @@ fn decode_pack(
     expected_kdf_params_json: &str,
     key: &[u8],
     scratch_dir: &Path,
-) -> Result<Vec<Record>> {
+) -> Result<Snapshot> {
     let unpacked = pack::unpack(bytes).map_err(remote_pack_error)?;
     if unpacked.kdf_params_json != expected_kdf_params_json {
         return Err(Error::Other(foreign_vault_error()));
@@ -346,13 +408,14 @@ fn decode_pack(
     records_from_snapshot(&unpacked.snapshot, key, scratch_dir)
 }
 
-/// Open a pulled snapshot in a throwaway database and export its records.
+/// Open a pulled snapshot in a throwaway database and export what syncs: its
+/// records, and the name the pushing device held.
 ///
 /// The snapshot must land on disk before SQLCipher can read it, so it goes to a
 /// uniquely named scratch file that a guard removes on every exit path. The
 /// local vault is never opened, written, or replaced here: a hostile or broken
 /// remote can only ever fail this function.
-fn records_from_snapshot(snapshot: &[u8], key: &[u8], scratch_dir: &Path) -> Result<Vec<Record>> {
+fn records_from_snapshot(snapshot: &[u8], key: &[u8], scratch_dir: &Path) -> Result<Snapshot> {
     fs::create_dir_all(scratch_dir)?;
     let scratch = Scratch(scratch_dir.join(scratch_name("remote")));
     fs::write(&scratch.0, snapshot)?;
@@ -363,7 +426,12 @@ fn records_from_snapshot(snapshot: &[u8], key: &[u8], scratch_dir: &Path) -> Res
         StoreError::SchemaNewer => Error::VaultTooNew,
         _ => Error::Other("Remote vault file is invalid".into()),
     })?;
-    store.export_for_sync().map_err(store_err)
+    let (name, name_ms) = identity::vault_name(&store).map_err(store_err)?;
+    Ok(Snapshot {
+        records: store.export_for_sync().map_err(store_err)?,
+        name,
+        name_ms,
+    })
 }
 
 // A pack this build cannot parse is corruption, except for a format stamped by
@@ -504,10 +572,21 @@ mod tests {
         fn pack_bytes(&self) -> Vec<u8> {
             pack::pack_store(&self.store, KEY, &kdf_json(), &self.scratch).unwrap()
         }
+
+        // What `workspace_rename` does to the vault it renames.
+        fn rename(&self, name: &str, at_ms: i64) {
+            identity::set_vault_name(&self.store, name, at_ms).unwrap();
+        }
+
+        // What `commands::auth::seed_vault_name` does on the first unlock of a
+        // vault named before names lived inside one.
+        fn seed_name(&self, name: &str) {
+            identity::set_vault_name(&self.store, name, identity::MIGRATED_NAME_MS).unwrap();
+        }
     }
 
     impl LocalVault for Device {
-        fn decode(&self, pack_bytes: &[u8]) -> Result<Vec<Record>> {
+        fn decode(&self, pack_bytes: &[u8]) -> Result<Snapshot> {
             decode_pack(pack_bytes, &kdf_json(), KEY, &self.scratch)
         }
         fn merge(&self, incoming: &[Record]) -> Result<usize> {
@@ -536,6 +615,12 @@ mod tests {
         }
         fn adopt_vault_id(&self, id: &str) -> Result<()> {
             identity::adopt_vault_id(&self.store, id).map_err(store_err)
+        }
+        fn name(&self) -> Result<(Option<String>, i64)> {
+            identity::vault_name(&self.store).map_err(store_err)
+        }
+        fn adopt_name(&self, name: &str, at_ms: i64) -> Result<()> {
+            identity::set_vault_name(&self.store, name, at_ms).map_err(store_err)
         }
     }
 
@@ -624,7 +709,16 @@ mod tests {
     // Read a drive's contents back as records, using a scratch dir of its own.
     fn remote_records(remote: &FakeRemote) -> Vec<Record> {
         let unpacked = pack::unpack(&remote.content().unwrap()).unwrap();
-        records_from_snapshot(&unpacked.snapshot, KEY, &tmp_dir()).unwrap()
+        records_from_snapshot(&unpacked.snapshot, KEY, &tmp_dir())
+            .unwrap()
+            .records
+    }
+
+    // The name a drive's pack carries in its own `meta`.
+    fn remote_name(remote: &FakeRemote) -> (Option<String>, i64) {
+        let unpacked = pack::unpack(&remote.content().unwrap()).unwrap();
+        let snapshot = records_from_snapshot(&unpacked.snapshot, KEY, &tmp_dir()).unwrap();
+        (snapshot.name, snapshot.name_ms)
     }
 
     #[test]
@@ -638,7 +732,8 @@ mod tests {
             outcome,
             SyncOutcome {
                 merged: 0,
-                pushed: true
+                pushed: true,
+                renamed: false
             }
         );
         assert_eq!(remote_records(&remote), a.store.export_for_sync().unwrap());
@@ -686,7 +781,8 @@ mod tests {
             outcome,
             SyncOutcome {
                 merged: 0,
-                pushed: false
+                pushed: false,
+                renamed: false
             }
         );
         assert_eq!(remote.uploads(), 1);
@@ -910,6 +1006,144 @@ mod tests {
         sync(&remote, &a, NOW).unwrap();
 
         assert!(fs::read_dir(&a.scratch).unwrap().next().is_none());
+    }
+
+    // --- the vault's name ---------------------------------------------------
+    //
+    // A rename is a change to the vault that leaves no row in the entry table,
+    // so it has a decision of its own on both sides of a run.
+
+    #[test]
+    fn a_rename_on_one_device_reaches_the_other() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let b = Device::new();
+        let remote = FakeRemote::default();
+        a.rename("Work", NOW);
+
+        sync(&remote, &a, NOW).unwrap();
+        assert_eq!(remote_name(&remote), (Some("Work".into()), NOW));
+
+        let outcome = sync(&remote, &b, NOW).unwrap();
+        assert!(outcome.renamed);
+        assert_eq!(b.name().unwrap(), (Some("Work".into()), NOW));
+        assert!(!outcome.pushed, "B matched the remote, name included");
+    }
+
+    #[test]
+    fn an_older_remote_name_does_not_overwrite_a_newer_local_one() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let b = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+
+        b.rename("Old", NOW - DAY_MS);
+        sync(&remote, &b, NOW).unwrap();
+
+        a.rename("New", NOW);
+        let outcome = sync(&remote, &a, NOW).unwrap();
+
+        assert!(
+            !outcome.renamed,
+            "the remote's name is the older of the two"
+        );
+        assert_eq!(a.name().unwrap(), (Some("New".into()), NOW));
+        assert!(outcome.pushed, "and the newer name goes out");
+        assert_eq!(remote_name(&remote), (Some("New".into()), NOW));
+    }
+
+    // Nothing but the name changed, so a digest-only decision would call this
+    // "in sync" and leave the other devices with the old label for good.
+    #[test]
+    fn a_name_change_on_its_own_is_enough_to_push() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+        sync(&remote, &a, NOW).unwrap();
+
+        a.rename("Work", NOW);
+        assert!(sync(&remote, &a, NOW).unwrap().pushed);
+        assert_eq!(remote.uploads(), 2);
+        assert_eq!(remote_name(&remote), (Some("Work".into()), NOW));
+    }
+
+    // The other half: once both sides hold the same name and stamp, neither has
+    // anything to say — a run that pushed on the strength of the name alone
+    // must not push again on every run after it.
+    #[test]
+    fn two_devices_agreeing_on_a_name_stop_pushing() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let b = Device::new();
+        let remote = FakeRemote::default();
+        a.rename("Work", NOW);
+
+        sync(&remote, &a, NOW).unwrap();
+        sync(&remote, &b, NOW).unwrap();
+        let uploads = remote.uploads();
+
+        assert!(!sync(&remote, &a, NOW).unwrap().pushed);
+        assert!(!sync(&remote, &b, NOW).unwrap().pushed);
+        assert_eq!(remote.uploads(), uploads);
+    }
+
+    // Two renames in the same millisecond: the stamp cannot separate them, so
+    // strict recency would reject both and leave each device pushing its own
+    // name at the other for good. The name itself breaks the tie, the same way
+    // the merge breaks one on the record hash, so the two land on one value.
+    #[test]
+    fn two_renames_in_the_same_millisecond_converge() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let b = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+        a.rename("Home", NOW);
+        b.rename("Work", NOW);
+
+        // Each device runs until it has seen the other's name.
+        sync(&remote, &a, NOW).unwrap();
+        sync(&remote, &b, NOW).unwrap();
+        sync(&remote, &a, NOW).unwrap();
+
+        assert_eq!(a.name().unwrap(), b.name().unwrap());
+        assert_eq!(remote_name(&remote), a.name().unwrap());
+
+        // And it is settled: neither has anything left to say.
+        let uploads = remote.uploads();
+        assert!(!sync(&remote, &a, NOW).unwrap().pushed);
+        assert!(!sync(&remote, &b, NOW).unwrap().pushed);
+        assert_eq!(remote.uploads(), uploads);
+    }
+
+    // A label migrated out of this device's registry says only "before this
+    // build", so it must lose to a name a device actually chose — otherwise an
+    // install that upgrades late in a rollout overwrites everyone else's.
+    #[test]
+    fn a_migrated_label_loses_to_a_stamped_remote_name() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let b = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+        a.rename("Work", NOW);
+        sync(&remote, &a, NOW).unwrap();
+
+        b.seed_name("Old laptop");
+        let outcome = sync(&remote, &b, NOW).unwrap();
+
+        assert!(outcome.renamed);
+        assert_eq!(b.name().unwrap(), (Some("Work".into()), NOW));
+        assert!(!outcome.pushed, "a stale label has nothing to publish");
+    }
+
+    // The other half: when nobody has named the vault, the migrated label is
+    // the only name there is and it still has to reach the other devices.
+    #[test]
+    fn a_migrated_label_reaches_a_remote_with_no_name() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+        sync(&remote, &a, NOW).unwrap();
+
+        a.seed_name("Old laptop");
+
+        assert!(sync(&remote, &a, NOW).unwrap().pushed);
+        assert_eq!(
+            remote_name(&remote),
+            (Some("Old laptop".into()), identity::MIGRATED_NAME_MS)
+        );
     }
 
     // --- settling the vault id ---------------------------------------------

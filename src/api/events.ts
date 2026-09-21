@@ -49,6 +49,12 @@ export interface EventPayloads {
    */
   'workspaces:added': { name: string }
   /**
+   * A sync pulled a newer name for the open workspace — it was renamed on
+   * another device. No payload: names live on `app_status`, so the frontend
+   * re-reads that and the header and Workspaces list redraw from it.
+   */
+  'workspaces:renamed': void
+  /**
    * The OS opened a backup with the app — a double-clicked `.rowel` or
    * `.swftx`. Rust also parks the path for a shell that was not yet listening
    * (`takeOpenedFile` in `api/app`), so a launch by double-click and an open
@@ -78,6 +84,7 @@ export const EVENTS: { [K in EventName as Camel<K>]: K } = {
   setupDriveError: 'setup:drive:error',
   workspacesRemote: 'workspaces:remote',
   workspacesAdded: 'workspaces:added',
+  workspacesRenamed: 'workspaces:renamed',
   fileOpened: 'file:opened'
 }
 
