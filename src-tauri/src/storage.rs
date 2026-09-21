@@ -163,6 +163,28 @@ pub fn remove_db_files(path: &Path) {
     }
 }
 
+// Move a SQLite database *and* its WAL/SHM siblings, for the one caller that
+// relocates a whole vault (promoting a workspace into the root when the primary
+// is deleted). The main file alone is not the database: a `-wal` left behind
+// holds committed pages the moved file does not, and the next open would read
+// an older vault back with no sign that anything was lost. Siblings that are
+// not there are skipped — a cleanly closed database has none.
+pub fn rename_db_files(from: &Path, to: &Path) -> Result<()> {
+    fs::rename(from, to)?;
+    for suffix in ["-wal", "-shm"] {
+        let sibling = |path: &Path| {
+            let mut name = path.as_os_str().to_owned();
+            name.push(suffix);
+            PathBuf::from(name)
+        };
+        let source = sibling(from);
+        if source.exists() {
+            fs::rename(source, sibling(to))?;
+        }
+    }
+    Ok(())
+}
+
 // Preferences belong to the install, not to a vault, so they sit on the root
 // and follow the user across workspaces.
 pub fn settings_path(app: &AppHandle) -> Result<PathBuf> {

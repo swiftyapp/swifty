@@ -106,6 +106,13 @@ pub enum Error {
     #[error("a workspace needs a master password")]
     WorkspacePasswordRequired,
 
+    /// A delete aimed at the only workspace this device has. The app has to
+    /// have a vault to open, and there would be no way back to one from an
+    /// install with none — so the way out of a workspace you no longer want is
+    /// to make (or restore) another one beside it first.
+    #[error("this is the only workspace on this device")]
+    LastWorkspace,
+
     /// A Drive restore pointed at a vault a workspace on this device already
     /// holds — the open one, or a locked one the registry remembers the vault
     /// id of. Restoring it beside itself would leave one device with two
@@ -170,6 +177,7 @@ impl Error {
             Error::PrimaryWorkspaceOnly => "primaryWorkspaceOnly",
             Error::WorkspaceNameRequired => "workspaceNameRequired",
             Error::WorkspacePasswordRequired => "workspacePasswordRequired",
+            Error::LastWorkspace => "lastWorkspace",
             Error::VaultAlreadyOpen => "vaultAlreadyOpen",
             Error::VaultNotInAccount => "vaultNotInAccount",
             Error::FileTooLarge => "fileTooLarge",

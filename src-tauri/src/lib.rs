@@ -215,6 +215,7 @@ pub fn run() {
             commands::workspace::workspace_restore_from_drive,
             commands::workspace::workspace_restore_from_account,
             commands::workspace::workspace_rename,
+            commands::workspace::workspace_delete,
             // E2E-only vault reset. `generate_handler!` honours per-command
             // attributes, so in a release build the match arm — and with it the
             // only reference to the (also cfg'd-out) module — simply is not

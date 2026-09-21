@@ -1,6 +1,7 @@
 import type { Workspace } from '@/api/types'
 import {
   workspaceCreate,
+  workspaceDelete,
   workspaceRestoreFromAccount,
   workspaceRestoreFromDrive,
   workspaceSelect
@@ -50,6 +51,16 @@ export const switchWorkspace = (id: string) => {
     void refreshApp()
     throw error
   })
+}
+
+// Remove a workspace's vault from this device. The probe is what carries the
+// list, so re-reading it is the whole update here — and when the deleted one
+// was the open one the backend has already announced the lock, which routes to
+// the survivor's lock screen by the one path every lock takes. Rejections are
+// the caller's to show: the dialog has the password field to put them under.
+export const deleteWorkspace = async (id: string, password: string) => {
+  await workspaceDelete(id, password)
+  await refreshApp()
 }
 
 // Create a workspace and open it. It arrives active and unlocked, so this is an

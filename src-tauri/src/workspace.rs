@@ -122,6 +122,60 @@ impl Registry {
             .iter()
             .find(|w| w.id != except && w.vault_id.as_deref() == Some(vault_id))
     }
+
+    /// The registry as it will read once `id` is gone from this device.
+    ///
+    /// Deleting the primary is the one case that moves another workspace: the
+    /// root *is* the primary's directory ([`dir_of`]), and an install with a
+    /// registry but nothing in the root is one whose next unlock opens nothing.
+    /// So the first survivor is promoted — it takes `PRIMARY_ID` and keeps its
+    /// name and vault id, which are what the user knows it by and what a Drive
+    /// restore compares against. First in registry order rather than by name or
+    /// by age, so the same install always promotes the same workspace.
+    ///
+    /// `active` is kept pointing at a workspace that still exists, and under
+    /// whatever id it answers to afterwards.
+    pub fn without(&self, id: &str) -> Result<Deletion> {
+        if !self.contains(id) {
+            return Err(Error::NotFound);
+        }
+        if self.workspaces.len() < 2 {
+            return Err(Error::LastWorkspace);
+        }
+
+        let mut workspaces: Vec<Workspace> = self
+            .workspaces
+            .iter()
+            .filter(|w| w.id != id)
+            .cloned()
+            .collect();
+        // Before `active` is resolved: the promoted workspace answers to its
+        // new id from here on, and `active` may be naming it.
+        let promoted = (id == PRIMARY_ID)
+            .then(|| std::mem::replace(&mut workspaces[0].id, PRIMARY_ID.to_string()));
+
+        let active = if self.active == id {
+            workspaces[0].id.clone()
+        } else if promoted.as_deref() == Some(self.active.as_str()) {
+            PRIMARY_ID.to_string()
+        } else {
+            self.active.clone()
+        };
+        Ok(Deletion {
+            registry: Registry { active, workspaces },
+            promoted,
+        })
+    }
+}
+
+/// What [`Registry::without`] worked out: the file to save, and the workspace
+/// whose files the caller has to move into the root before saving it.
+#[derive(Debug, PartialEq)]
+pub struct Deletion {
+    pub registry: Registry,
+    /// The id the promoted workspace's directory still has on disk, when the
+    /// primary was the one deleted. `None` for every other delete.
+    pub promoted: Option<String>,
 }
 
 /// Remember which vault the active workspace holds, once a sync has settled it.
@@ -374,6 +428,118 @@ mod tests {
         let root = tmp_root();
         fs::write(root.join(REGISTRY_FILE), "{ not json").unwrap();
         assert_eq!(Registry::load(&root), Registry::default());
+    }
+
+    // Three workspaces in registry order, the middle one named and syncing.
+    fn three(active: &str) -> Registry {
+        Registry {
+            active: active.into(),
+            workspaces: vec![
+                Workspace {
+                    id: PRIMARY_ID.into(),
+                    name: None,
+                    vault_id: Some("beef".into()),
+                },
+                Workspace {
+                    id: "a1b2".into(),
+                    name: Some("Work".into()),
+                    vault_id: Some("cafe".into()),
+                },
+                Workspace {
+                    id: "c3d4".into(),
+                    name: Some("Side".into()),
+                    vault_id: None,
+                },
+            ],
+        }
+    }
+
+    // The ordinary delete: one row goes, nothing else moves, and no files have
+    // to follow it anywhere.
+    #[test]
+    fn deleting_a_workspace_that_is_not_the_primary_only_drops_its_row() {
+        let deletion = three(PRIMARY_ID).without("a1b2").unwrap();
+
+        assert_eq!(deletion.promoted, None);
+        assert_eq!(deletion.registry.active, PRIMARY_ID);
+        assert_eq!(
+            deletion
+                .registry
+                .workspaces
+                .iter()
+                .map(|w| w.id.as_str())
+                .collect::<Vec<_>>(),
+            [PRIMARY_ID, "c3d4"]
+        );
+    }
+
+    // The root is the primary's directory, so someone has to move into it. The
+    // first survivor does, under the primary's id — and keeps the name the user
+    // gave it and the vault id a restore compares against.
+    #[test]
+    fn deleting_the_primary_promotes_the_first_survivor_into_it() {
+        let deletion = three(PRIMARY_ID).without(PRIMARY_ID).unwrap();
+
+        assert_eq!(deletion.promoted.as_deref(), Some("a1b2"));
+        assert_eq!(
+            deletion.registry.workspaces[0],
+            Workspace {
+                id: PRIMARY_ID.into(),
+                name: Some("Work".into()),
+                vault_id: Some("cafe".into()),
+            }
+        );
+        // The one that was not promoted is untouched, and still second.
+        assert_eq!(deletion.registry.workspaces[1].id, "c3d4");
+    }
+
+    // The next unlock resolves `active`, so it may never name a workspace that
+    // has just gone.
+    #[test]
+    fn deleting_the_active_workspace_moves_active_to_the_first_survivor() {
+        let deletion = three("c3d4").without("c3d4").unwrap();
+        assert_eq!(deletion.registry.active, PRIMARY_ID);
+
+        // Deleting the primary while it is active lands on the promoted one,
+        // which is in the root and answers to the primary's id.
+        let deletion = three(PRIMARY_ID).without(PRIMARY_ID).unwrap();
+        assert_eq!(deletion.registry.active, PRIMARY_ID);
+    }
+
+    // The active workspace was the one promoted: it is still active, but its
+    // files are in the root now and it answers to the primary's id.
+    #[test]
+    fn an_active_workspace_promoted_into_the_root_stays_active_as_the_primary() {
+        let deletion = three("a1b2").without(PRIMARY_ID).unwrap();
+
+        assert_eq!(deletion.promoted.as_deref(), Some("a1b2"));
+        assert_eq!(deletion.registry.active, PRIMARY_ID);
+    }
+
+    // Untouched when this delete is about neither of them.
+    #[test]
+    fn an_active_workspace_nobody_moved_stays_where_it_was() {
+        let deletion = three("c3d4").without("a1b2").unwrap();
+        assert_eq!(deletion.registry.active, "c3d4");
+        assert_eq!(deletion.promoted, None);
+    }
+
+    // A device always has a vault: there is no screen an install with none
+    // could show, and no way back to one from there.
+    #[test]
+    fn the_only_workspace_cannot_be_deleted() {
+        assert!(matches!(
+            Registry::default().without(PRIMARY_ID),
+            Err(Error::LastWorkspace)
+        ));
+    }
+
+    #[test]
+    fn a_workspace_that_is_not_in_the_registry_cannot_be_deleted() {
+        assert!(matches!(
+            three(PRIMARY_ID).without("gone"),
+            Err(Error::NotFound)
+        ));
     }
 
     #[test]
