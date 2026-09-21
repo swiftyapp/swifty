@@ -97,10 +97,21 @@ pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) 
 /// switch mid-flight would seal one workspace's account under another's
 /// directory, and the next sync from there would publish into the wrong pack.
 fn guard_sync_idle(state: &AppState) -> Result<()> {
-    // The active workspace's run state is the only one that can have a flow in
-    // it: starting one takes the lock this caller is holding.
-    let busy = state.syncing.load(Ordering::SeqCst)
-        || state.sync_run(|run| run.pending || run.in_progress);
+    if state.syncing.load(Ordering::SeqCst) {
+        return Err(Error::SyncBusy);
+    }
+    guard_sync_flows_idle(state)
+}
+
+/// The rest of [`guard_sync_idle`], for a caller that took the run claim itself
+/// rather than checking it ([`workspace_delete`]): reading `syncing` would only
+/// find that caller's own hold, and what is left to refuse are the flows the
+/// claim does not cover.
+///
+/// The active workspace's run state is the only one that can have a flow in it:
+/// starting one takes the lock this caller is holding.
+fn guard_sync_flows_idle(state: &AppState) -> Result<()> {
+    let busy = state.sync_run(|run| run.pending || run.in_progress);
     #[cfg(mobile)]
     let busy = busy || state.pending_auth.lock().unwrap().is_some();
     if busy {
@@ -729,6 +740,14 @@ pub async fn workspace_delete(
         Err(e) => return Err(e),
     };
 
+    // One exclusion over the whole delete, network included, and the same one a
+    // run takes: a run starting beside the Drive work below could read the pack
+    // gone before its marker was written and upload this vault straight back, or
+    // push into the middle of the local deletion. Taken after the derive, so an
+    // Argon2id wait costs sync nothing, and held to the end of the function —
+    // every exit path releases it (`RunClaim`).
+    let _claim = super::sync::claim_or_busy(&state)?;
+
     // The network, before a single local file moves: what it fails to do, the
     // user can try again, and only while the workspace is still here to try it
     // from.
@@ -744,7 +763,9 @@ pub async fn workspace_delete(
         let _paths = state.workspace_lock.lock().unwrap();
         let registry = Registry::load(&root);
         let deletion = registry.without(&id)?;
-        guard_sync_idle(&state)?;
+        // The claim above is this delete's own, so only the flows beside it are
+        // asked about here.
+        guard_sync_flows_idle(&state)?;
 
         // The open workspace is left open unless this delete disturbs it: it is
         // the one going away, or the one whose directory is about to become the
@@ -801,8 +822,12 @@ pub async fn workspace_delete(
 // there by the runs that settled it), and the tokens are that workspace's own
 // sealed file, unsealed with the key the password just proved.
 //
-// A workspace missing either has no pack up there — it never synced, or never
-// finished a first run — so there is nothing to delete and nothing to mark.
+// A workspace with no vault id has no pack up there — it never synced, or never
+// finished a first run — and one with no token file at all never connected an
+// account: both have nothing to delete and nothing to mark. A token file that
+// is there but cannot be read is neither, and fails the delete instead: the
+// pack may well be live, and going on would destroy the workspace the retry
+// would have to come from (`sync::read_tokens_in`).
 async fn delete_remote_pack(
     app: &AppHandle,
     root: &Path,
@@ -818,7 +843,7 @@ async fn delete_remote_pack(
     let Some(vault_id) = vault_id else {
         return Ok(());
     };
-    let Some(mut tokens) = sync::read_tokens_in(dir, &key.cryptor()) else {
+    let Some(mut tokens) = sync::read_tokens_in(dir, &key.cryptor())? else {
         return Ok(());
     };
     sync::delete_pack(app, &mut tokens, &vault_id).await

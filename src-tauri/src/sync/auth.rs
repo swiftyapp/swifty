@@ -377,8 +377,37 @@ pub fn read_tokens(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
 /// [`read_tokens`] from a named workspace directory rather than the active
 /// workspace's — the twin of [`write_tokens_in`], for a caller acting on a
 /// workspace that is very likely locked (`commands::workspace::workspace_delete`).
-pub fn read_tokens_in(dir: &std::path::Path, cryptor: &Cryptor) -> Option<Tokens> {
-    read_sealed(&dir.join(storage::GDRIVE_FILE), cryptor)
+///
+/// Strict where [`read_sealed`] shrugs: `Ok(None)` is no token file at all, and
+/// every other failure is an error. That caller is about to delete the only
+/// copy of these credentials, and a file it could not read is not a workspace
+/// that never connected — folding the two together would leave the vault's pack
+/// live on Drive and take the workspace needed to retry the delete with it.
+pub fn read_tokens_in(dir: &std::path::Path, cryptor: &Cryptor) -> Result<Option<Tokens>> {
+    let path = dir.join(storage::GDRIVE_FILE);
+    let blob = match std::fs::read_to_string(&path) {
+        Ok(blob) => blob,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+    // An empty file is a write that did not finish, not an absent one: the
+    // grant it was meant to hold may still be live at Google.
+    if blob.trim().is_empty() {
+        return Err(Error::Other(unreadable_tokens_error()));
+    }
+    let json = cryptor
+        .decrypt(&blob)
+        .map_err(|_| Error::Other(unreadable_tokens_error()))?;
+    let tokens =
+        serde_json::from_str(&json).map_err(|_| Error::Other(unreadable_tokens_error()))?;
+    Ok(Some(tokens))
+}
+
+// One message for every way the file can be there and unusable: the user can
+// do the same thing about all of them, and none of them says which vault key
+// or which byte was wrong.
+fn unreadable_tokens_error() -> String {
+    "this workspace's saved Google account could not be read".into()
 }
 
 /// Seal the tokens under `cryptor` and write them.
@@ -1043,7 +1072,7 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Mutex;
 
-    fn tmp_token_path() -> PathBuf {
+    fn tmp_dir() -> PathBuf {
         static N: AtomicU64 = AtomicU64::new(0);
         let dir = std::env::temp_dir().join(format!(
             "rowel-auth-tokens-{}-{}",
@@ -1051,7 +1080,19 @@ mod tests {
             N.fetch_add(1, Ordering::SeqCst)
         ));
         std::fs::create_dir_all(&dir).unwrap();
-        dir.join("gdrive.swftx")
+        dir
+    }
+
+    fn tmp_token_path() -> PathBuf {
+        tmp_dir().join("gdrive.swftx")
+    }
+
+    // A workspace directory, with the subfolder the token file lives in — as
+    // `workspace::dir_of` hands one to a delete.
+    fn tmp_workspace_dir() -> PathBuf {
+        let dir = tmp_dir();
+        std::fs::create_dir_all(dir.join(storage::GDRIVE_FILE).parent().unwrap()).unwrap();
+        dir
     }
 
     fn cryptor(password: &str) -> Cryptor {
@@ -1125,6 +1166,33 @@ mod tests {
             .unwrap());
         let written = file.read(&cryptor).unwrap();
         assert_eq!(written.access_token.as_deref(), Some("access-2-refreshed"));
+    }
+
+    // A workspace's own token file, read for a delete that is about to remove
+    // it: only a file that is not there means "this workspace never connected".
+    // Anything present and unusable has to stop the delete, because the grant it
+    // was written from may still be live at Google and the pack it reaches still
+    // up there.
+    #[test]
+    fn a_workspaces_tokens_tell_an_absent_file_from_an_unreadable_one() {
+        let dir = tmp_workspace_dir();
+        let key = cryptor("pw");
+        let path = dir.join(storage::GDRIVE_FILE);
+
+        assert!(read_tokens_in(&dir, &key).unwrap().is_none());
+
+        write_tokens_in(&dir, &key, &tokens("access-1")).unwrap();
+        let read = read_tokens_in(&dir, &key).unwrap().unwrap();
+        assert_eq!(read.access_token.as_deref(), Some("access-1"));
+
+        // A write that never finished, bytes that are not a sealed blob, and a
+        // seal this vault's key does not open.
+        std::fs::write(&path, "").unwrap();
+        assert!(read_tokens_in(&dir, &key).is_err());
+        std::fs::write(&path, "not a sealed token file").unwrap();
+        assert!(read_tokens_in(&dir, &key).is_err());
+        write_tokens_in(&dir, &cryptor("another-pw"), &tokens("access-1")).unwrap();
+        assert!(read_tokens_in(&dir, &key).is_err());
     }
 
     // No token file is no connection to re-seal: a password change on a vault

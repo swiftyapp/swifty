@@ -672,7 +672,7 @@ fn entry_metas(app: &AppHandle) -> Vec<EntryMetaDto> {
 /// be taken on the thread that decides to run — under `workspace_lock`, before
 /// anything else can be told a run is under way — and then moved onto the thread
 /// that does the running.
-struct RunClaim(Arc<AtomicBool>);
+pub(super) struct RunClaim(Arc<AtomicBool>);
 
 /// Claim the run, or `None` if one is already in flight.
 fn claim_run(syncing: &Arc<AtomicBool>) -> Option<RunClaim> {
@@ -680,6 +680,19 @@ fn claim_run(syncing: &Arc<AtomicBool>) -> Option<RunClaim> {
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .ok()
         .map(|_| RunClaim(Arc::clone(syncing)))
+}
+
+/// The same claim, for a flow that is not a run but must not have one beside it
+/// — the "delete everywhere" whose Drive work a run could otherwise look into
+/// mid-flight (`commands::workspace::workspace_delete`). Refusing with
+/// `SyncBusy` is what `commands::workspace::guard_sync_idle` answers when it
+/// finds the flag raised, so the two agree on what a busy sync means.
+///
+/// Taken rather than merely checked, and held by the caller for its whole
+/// length. Any rerun request raised meanwhile is left standing (unlike
+/// [`claim_and_settle`]): this holder is not a run and serves nobody's request.
+pub(super) fn claim_or_busy(state: &AppState) -> Result<RunClaim> {
+    claim_run(&state.syncing).ok_or(Error::SyncBusy)
 }
 
 // Releases the claim however the run ends, panics included — a wedged flag

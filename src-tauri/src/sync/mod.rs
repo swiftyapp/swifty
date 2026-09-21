@@ -94,11 +94,12 @@ pub(crate) fn persist_tokens_in(
 }
 
 /// The account sealed in the workspace directory `dir`, unsealed with that
-/// workspace's own key — `None` when it has none and therefore does not sync.
+/// workspace's own key — `Ok(None)` when it has no token file at all and
+/// therefore does not sync, and an error when it has one that cannot be read.
 ///
 /// No connection generation, unlike [`current_account`]: the caller of this is
 /// a delete, which spends the tokens once and never writes them back.
-pub(crate) fn read_tokens_in(dir: &std::path::Path, cryptor: &Cryptor) -> Option<Tokens> {
+pub(crate) fn read_tokens_in(dir: &std::path::Path, cryptor: &Cryptor) -> Result<Option<Tokens>> {
     auth::read_tokens_in(dir, cryptor)
 }
 
@@ -436,8 +437,8 @@ async fn resolve_vault_id(
     Ok(Resolved { id, persist, packs })
 }
 
-/// Take this vault out of the account: its pack goes, and a marker takes its
-/// place so the other devices syncing it stop rather than push it back.
+/// Take this vault out of the account: a marker goes where its pack is, and the
+/// pack goes, so the other devices syncing it stop rather than push it back.
 ///
 /// Both halves matter. Deleting the pack alone would leave every other device
 /// seeing an account with no pack for a vault it holds — which reads as a first
@@ -445,9 +446,21 @@ async fn resolve_vault_id(
 /// what [`DriveRemote::fetch`] recognises; it is not a `.rowel` name, so no
 /// listing counts it as a vault (see [`layout::deleted_marker_name`]).
 ///
-/// Nothing to delete is success: a marker already there is another device
-/// having done this, and no `Rowel/Vaults/` at all is an account this vault
-/// never reached.
+/// The order is the invariant here, and it is the marker first. These are two
+/// Drive calls with a window between them, and a run — on this device or
+/// another — that looks into that window must never find "no pack, no marker":
+/// that is exactly the first-sync reading that puts the pack back. A marker
+/// beside a still-live pack is the harmless half-state instead:
+/// [`DriveRemote::fetch`] only consults it when the pack is missing, and
+/// [`may_create_pack`] stops a run that pulled before the delete from
+/// re-creating one after it.
+///
+/// The folders are created when the account has none ([`ensure_vaults_path`]).
+/// A vault whose id is settled has a pack up there or had one, and leaving an
+/// unmarked empty account behind — `Rowel/` deleted by hand, say — is leaving
+/// another device's ordinary push to recreate the folders and the pack. A pack
+/// that is not there needs no deleting, and a marker already there is another
+/// device having done this.
 pub(crate) async fn delete_pack(
     app: &AppHandle,
     tokens: &mut Tokens,
@@ -455,21 +468,7 @@ pub(crate) async fn delete_pack(
 ) -> Result<()> {
     let client = http_client();
     let token = fresh_access_token(&client, app, tokens).await?;
-
-    let Some(root) = drive::folder_id(&client, &token, layout::ROOT_FOLDER).await? else {
-        return Ok(());
-    };
-    let Some(vaults) = drive::folder_id_in(&client, &token, layout::VAULTS_FOLDER, &root).await?
-    else {
-        return Ok(());
-    };
-
-    // The pack first: a marker beside a live pack would stop this vault's other
-    // devices while their copy was still up there to be read.
-    let pack = layout::vault_file_name(vault_id);
-    if let Some(file) = drive::find_file(&client, &token, &pack, &vaults).await? {
-        drive::delete_file(&client, &token, &file.id).await?;
-    }
+    let (_, vaults) = ensure_vaults_path(&client, &token).await?;
 
     let marker = layout::deleted_marker_name(vault_id);
     if drive::find_file(&client, &token, &marker, &vaults)
@@ -478,15 +477,27 @@ pub(crate) async fn delete_pack(
     {
         drive::create_file(&client, &token, &marker, &vaults, &[]).await?;
     }
+
+    let pack = layout::vault_file_name(vault_id);
+    if let Some(file) = drive::find_file(&client, &token, &pack, &vaults).await? {
+        drive::delete_file(&client, &token, &file.id).await?;
+    }
     Ok(())
 }
 
-/// `Rowel/Vaults`, created if this account has never had one.
-async fn ensure_vaults_folder(client: &Client, token: &str, root: &str) -> Result<String> {
-    match drive::folder_id_in(client, token, layout::VAULTS_FOLDER, root).await? {
-        Some(id) => Ok(id),
-        None => drive::create_folder_in(client, token, layout::VAULTS_FOLDER, Some(root)).await,
-    }
+/// `Rowel/Vaults`, with either folder created if this account has never had it.
+/// The root id comes back too, so a caller that caches the pair
+/// ([`DriveRemote::ensure_vaults`]) does not list it a second time.
+async fn ensure_vaults_path(client: &Client, token: &str) -> Result<(String, String)> {
+    let root = match drive::folder_id(client, token, layout::ROOT_FOLDER).await? {
+        Some(id) => id,
+        None => drive::create_folder(client, token, layout::ROOT_FOLDER).await?,
+    };
+    let vaults = match drive::folder_id_in(client, token, layout::VAULTS_FOLDER, &root).await? {
+        Some(id) => id,
+        None => drive::create_folder_in(client, token, layout::VAULTS_FOLDER, Some(&root)).await?,
+    };
+    Ok((root, vaults))
 }
 
 /// [`Remote`] over one vault's pack, `Rowel/Vaults/<vault-id>.rowel`.
@@ -551,17 +562,10 @@ impl DriveRemote {
         if let Some(id) = self.vaults(client, token).await? {
             return Ok(id);
         }
-        let root = match self.root(client, token).await? {
-            Some(id) => id,
-            None => {
-                let id = drive::create_folder(client, token, layout::ROOT_FOLDER).await?;
-                *self.root.lock().unwrap() = Some(id.clone());
-                id
-            }
-        };
-        let id = ensure_vaults_folder(client, token, &root).await?;
-        *self.vaults.lock().unwrap() = Some(id.clone());
-        Ok(id)
+        let (root, vaults) = ensure_vaults_path(client, token).await?;
+        *self.root.lock().unwrap() = Some(root);
+        *self.vaults.lock().unwrap() = Some(vaults.clone());
+        Ok(vaults)
     }
 
     async fn locate(&self, client: &Client, token: &str) -> Result<Option<drive::DriveFile>> {
@@ -601,6 +605,24 @@ fn pack_missing(marker: bool) -> Result<Option<RemoteFile>> {
         return Err(Error::VaultDeletedRemotely);
     }
     Ok(None)
+}
+
+/// Whether a push may *create* this vault's pack, given whether a deletion
+/// marker sits where it would go.
+///
+/// A run that pulled before a [`delete_pack`] and pushes after it would
+/// otherwise put the pack back — this run read an account that still held the
+/// vault, so nothing earlier in it has any reason to stop. The marker is the
+/// one thing that outlives the pack, so the create path asks for it.
+///
+/// Only the create path. Finding the pack there means the delete has not
+/// reached it (or never will), and an update is the ordinary push every run
+/// makes — it pays no extra listing for this.
+fn may_create_pack(marker: bool) -> Result<()> {
+    if marker {
+        return Err(Error::VaultDeletedRemotely);
+    }
+    Ok(())
 }
 
 impl Remote for DriveRemote {
@@ -644,6 +666,7 @@ impl Remote for DriveRemote {
             let revision = match drive::find_file(&client, &token, &name, &vaults).await? {
                 Some(file) => drive::update_file(&client, &token, &file.id, bytes).await?,
                 None => {
+                    may_create_pack(self.marker(&client, &token).await?)?;
                     drive::create_file(&client, &token, &name, &vaults, bytes)
                         .await?
                         .head_revision
@@ -656,7 +679,10 @@ impl Remote for DriveRemote {
 
 #[cfg(test)]
 mod tests {
-    use super::{pack_missing, plan_vault_id, remote_only, setup::PackInfo, Error, VaultIdPlan};
+    use super::{
+        may_create_pack, pack_missing, plan_vault_id, remote_only, setup::PackInfo, Error,
+        VaultIdPlan,
+    };
     use std::collections::HashSet;
 
     const ID: &str = "a1b2c3";
@@ -722,6 +748,19 @@ mod tests {
         assert!(matches!(pack_missing(false), Ok(None)));
         assert!(matches!(
             pack_missing(true),
+            Err(Error::VaultDeletedRemotely)
+        ));
+    }
+
+    // The other half of the same marker, on the way out: a run that pulled
+    // before a "delete everywhere" and pushes after it finds no pack to update,
+    // and creating one there would undo the delete on every device. The run
+    // that simply has not pushed yet still may.
+    #[test]
+    fn a_push_may_not_create_a_pack_the_marker_says_was_deleted() {
+        assert!(may_create_pack(false).is_ok());
+        assert!(matches!(
+            may_create_pack(true),
             Err(Error::VaultDeletedRemotely)
         ));
     }
