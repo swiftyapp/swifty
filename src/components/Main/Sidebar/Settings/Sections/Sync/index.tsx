@@ -9,7 +9,13 @@ import {
   setupDriveSelect,
   switchWorkspaceDriveAccount
 } from '@/store'
-import { syncAdoptPending, syncConnect, syncDisconnect, syncNow } from '@/api/sync'
+import {
+  syncAdoptPending,
+  syncConnect,
+  syncDisconnect,
+  syncErrorText,
+  syncNow
+} from '@/api/sync'
 import { describeError, errorKind } from '@/api/errors'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
@@ -32,6 +38,9 @@ export default function Sync() {
   // account is probed first, and whether this vault may join it is the
   // backend's to say (`syncAdoptPending`).
   const drive = useApp(state => state.setupDrive)
+  // The last failure as copy: said from the catalogue where Rust named a kind
+  // the frontend has words for, and in Rust's own words otherwise.
+  const syncFailure = syncErrorText(sync)
 
   // Leaving the section forgets a probe's pending account, as Settings ›
   // Workspaces does: a sign-in the user walked away from is never adopted later.
@@ -158,7 +167,7 @@ export default function Sync() {
         </SettingsRow>
         {/* A connect that never got as far as being connected has no Sync
             group to report itself in, so it says so here instead. */}
-        {!sync.configured && sync.error && <ErrorNote message={sync.error} />}
+        {!sync.configured && syncFailure && <ErrorNote message={syncFailure} />}
         {drive.status === 'error' && (
           <ErrorNote message={drive.error || t('Something went wrong')} />
         )}
@@ -181,7 +190,7 @@ export default function Sync() {
               </Button>
             }
           />
-          {sync.error && <ErrorNote message={sync.error} />}
+          {syncFailure && <ErrorNote message={syncFailure} />}
           <SharesRow />
         </SettingsGroup>
       )}

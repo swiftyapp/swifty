@@ -127,6 +127,13 @@ pub enum Error {
     #[error("this Google account holds other vaults")]
     VaultNotInAccount,
 
+    /// The pack this vault syncs is gone from the account and a marker sits
+    /// where it was — another device ran a "delete everywhere" on it. The run
+    /// stops here rather than reading the empty folder as a first sync and
+    /// uploading the vault again, which would undo the delete on every device.
+    #[error("this vault was deleted from Google Drive on another device")]
+    VaultDeletedRemotely,
+
     #[error("the file is too large")]
     FileTooLarge,
 
@@ -149,8 +156,11 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl Error {
-    // The discriminant the frontend switches on.
-    fn kind(&self) -> &'static str {
+    // The discriminant the frontend switches on. Crate-visible because sync
+    // reports a failed run as status rather than as a rejection, and carries
+    // the kind alongside the message so a screen can recognise one failure
+    // without matching on English prose (see `state::SyncFailure`).
+    pub(crate) fn kind(&self) -> &'static str {
         match self {
             Error::InvalidPassword => "invalidPassword",
             Error::VaultTooNew => "vaultTooNew",
@@ -180,6 +190,7 @@ impl Error {
             Error::LastWorkspace => "lastWorkspace",
             Error::VaultAlreadyOpen => "vaultAlreadyOpen",
             Error::VaultNotInAccount => "vaultNotInAccount",
+            Error::VaultDeletedRemotely => "vaultDeletedRemotely",
             Error::FileTooLarge => "fileTooLarge",
             Error::FileNotText => "fileNotText",
             Error::Io(_) => "io",

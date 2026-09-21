@@ -153,6 +153,22 @@ mod tests {
         assert!(restorable_packs(Vec::new()).is_empty());
     }
 
+    // The marker a "delete everywhere" leaves behind is not a vault to offer:
+    // onboarding, auto-join and the "other vaults in this account" list all
+    // read this, and a deleted vault must not come back through any of them.
+    #[test]
+    fn a_deleted_vaults_marker_is_not_offered() {
+        let files = vec![
+            drive_file(
+                "f1",
+                &layout::deleted_marker_name("a1b2"),
+                "2024-01-01T00:00:00.000Z",
+            ),
+            drive_file("f2", "cafe.rowel", "2024-01-01T00:00:00.000Z"),
+        ];
+        assert_eq!(ids(&restorable_packs(files)), ["f2"]);
+    }
+
     // Every vault the account holds, so the user picks rather than having one
     // picked for them — newest first, whatever order Drive listed them in.
     #[test]

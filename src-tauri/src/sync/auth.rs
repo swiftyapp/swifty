@@ -286,11 +286,7 @@ impl<'a> TokenFile<'a> {
     }
 
     fn read(&self, cryptor: &Cryptor) -> Option<Tokens> {
-        let blob = storage::read_file(&self.path)
-            .ok()
-            .filter(|b| !b.is_empty())?;
-        let json = cryptor.decrypt(&blob).ok()?;
-        serde_json::from_str(&json).ok()
+        read_sealed(&self.path, cryptor)
     }
 
     /// Seal the tokens under `cryptor` and write them. Atomic, so a crash
@@ -365,8 +361,24 @@ impl<'a> TokenFile<'a> {
     }
 }
 
+/// The tokens sealed in the file at `path`, if there are any to read. An
+/// absent, empty or undecryptable file all mean the same thing — not connected
+/// — so none of them is an error.
+fn read_sealed(path: &std::path::Path, cryptor: &Cryptor) -> Option<Tokens> {
+    let blob = storage::read_file(path).ok().filter(|b| !b.is_empty())?;
+    let json = cryptor.decrypt(&blob).ok()?;
+    serde_json::from_str(&json).ok()
+}
+
 pub fn read_tokens(app: &AppHandle, cryptor: &Cryptor) -> Option<Tokens> {
     TokenFile::of(app).ok()?.read(cryptor)
+}
+
+/// [`read_tokens`] from a named workspace directory rather than the active
+/// workspace's — the twin of [`write_tokens_in`], for a caller acting on a
+/// workspace that is very likely locked (`commands::workspace::workspace_delete`).
+pub fn read_tokens_in(dir: &std::path::Path, cryptor: &Cryptor) -> Option<Tokens> {
+    read_sealed(&dir.join(storage::GDRIVE_FILE), cryptor)
 }
 
 /// Seal the tokens under `cryptor` and write them.

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useApp, selectWorkspaces, selectActiveWorkspace, switchWorkspace } from '@/store'
 import { messageOf } from '@/api/errors'
+import { syncDeletedRemotely, syncErrorText } from '@/api/sync'
 import { workspaceLabel } from '@/lib/workspace'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
@@ -11,6 +12,7 @@ export default function WorkspaceList() {
   const { t } = useTranslation()
   const list = useApp(selectWorkspaces)
   const active = useApp(selectActiveWorkspace)
+  const sync = useApp(state => state.sync)
   // The one way a switch is refused: a sync flow is mid-flight in this
   // workspace, and moving the paths under it would land its files elsewhere.
   const [error, setError] = useState<string | null>(null)
@@ -21,6 +23,18 @@ export default function WorkspaceList() {
   // the app comes back on a survivor's lock screen.
   const last = list.length < 2
   const chosen = list.find(workspace => workspace.id === deleting)
+
+  // The account's copy of *this* vault is gone — deleted from another device —
+  // so its runs stop here until this workspace goes too. The delete offered for
+  // it is the local one: there is nothing left on Drive to remove.
+  const strandedHere = syncDeletedRemotely(sync)
+
+  // Whether a workspace has a copy on Drive to delete along with it. The open
+  // one is answered by its live connection; a locked one by the vault id the
+  // registry recorded when a run of its settled one, which is the only thing
+  // about it readable from here.
+  const syncs = (id: string, vaultId?: string) =>
+    id === active ? sync.configured && !strandedHere : vaultId !== undefined
 
   return (
     <>
@@ -63,6 +77,24 @@ export default function WorkspaceList() {
           />
         )
       })}
+      {strandedHere && (
+        <div
+          data-testid="workspace-deleted-remotely"
+          className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-base text-text2"
+        >
+          <span className="text-bad">{syncErrorText(sync)}</span>
+          <Button
+            variant="pale"
+            size="md"
+            className="text-bad hover:text-bad"
+            testid="workspace-delete-stranded"
+            disabled={last}
+            onClick={() => setDeleting(active)}
+          >
+            {t('Delete it here too')}
+          </Button>
+        </div>
+      )}
       {last && (
         <div data-testid="workspace-delete-last" className="px-4 py-3 text-base text-text2">
           {t('Your only workspace cannot be deleted. Add another one first.')}
@@ -74,7 +106,11 @@ export default function WorkspaceList() {
         </div>
       )}
       {chosen && (
-        <DeleteWorkspace workspace={chosen} onClose={() => setDeleting(null)} />
+        <DeleteWorkspace
+          workspace={chosen}
+          syncs={syncs(chosen.id, chosen.vaultId)}
+          onClose={() => setDeleting(null)}
+        />
       )}
     </>
   )

@@ -1,5 +1,5 @@
 import type { TKey } from '@/i18n'
-import type { SyncStatus } from '@/api/sync'
+import { syncErrorText, type SyncStatus } from '@/api/sync'
 
 export type SyncTone = 'local' | 'idle' | 'loading' | 'good' | 'bad'
 
@@ -14,10 +14,11 @@ export interface SyncView {
    */
   message: TKey
   /**
-   * The backend's own words, when it has any, shown verbatim in place of
-   * `message`. A Drive API string is not a catalogue key, so looking one up
-   * could only ever miss; keeping it a separate field is what lets `message`
-   * stay honestly typed instead of casting an arbitrary string to `TKey`.
+   * What the failure was, shown in place of `message`. Translated where the
+   * backend named a kind the catalogues cover (`syncErrorText`) and the
+   * backend's own words otherwise. Either way it is a sentence, not a
+   * catalogue key, which is what lets `message` stay honestly typed instead of
+   * casting an arbitrary string to `TKey`.
    */
   detail?: string
 }
@@ -35,7 +36,11 @@ export const syncView = (sync: SyncStatus): SyncView => {
     return { tone: 'local', message: 'Changes are saved on this device only' }
   if (sync.inProgress) return { tone: 'loading', message: 'Syncing…' }
   if (sync.error !== null)
-    return { tone: 'bad', message: 'Something went wrong', detail: sync.error }
+    return {
+      tone: 'bad',
+      message: 'Something went wrong',
+      detail: syncErrorText(sync) ?? undefined
+    }
   // Connected, but nothing has landed yet. Deliberately not `loading`: if the
   // first run never starts, a spinner here would turn on at unlock and never
   // stop. A quiet cloud with no badge claims nothing instead.

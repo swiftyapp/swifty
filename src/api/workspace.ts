@@ -36,16 +36,23 @@ export const workspaceRename = (id: string, name: string): Promise<void> =>
  * backend derives from its descriptor and lets the database answer; a wrong one
  * rejects as `invalidPassword` and nothing is removed.
  *
- * Local only: whatever the vault has on Google Drive is left there, so the
- * account still holds it and it can be restored as a workspace again.
+ * Local by default: whatever the vault has on Google Drive is left there, so
+ * the account still holds it and it can be restored as a workspace again. With
+ * `everywhere`, the vault's copy on Drive goes first and a marker takes its
+ * place, which is what has the account's other devices stop syncing it instead
+ * of uploading theirs back — and the Drive step runs before anything local is
+ * removed, so a network failure leaves the workspace here to try again from.
  *
  * Refused as `lastWorkspace` when it is the only workspace left. Deleting the
  * active one ends its session, so `vault:locked` arrives and the app comes back
  * on the survivor's lock screen — there is nothing to do with this promise but
  * report what went wrong.
  */
-export const workspaceDelete = (id: string, password: string): Promise<void> =>
-  call('workspace_delete', { id, password })
+export const workspaceDelete = (
+  id: string,
+  password: string,
+  everywhere: boolean
+): Promise<void> => call('workspace_delete', { id, password, everywhere })
 
 /**
  * Connect a Google account for a workspace that does not exist yet. The

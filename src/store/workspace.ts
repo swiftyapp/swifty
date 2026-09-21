@@ -53,13 +53,18 @@ export const switchWorkspace = (id: string) => {
   })
 }
 
-// Remove a workspace's vault from this device. The probe is what carries the
-// list, so re-reading it is the whole update here — and when the deleted one
-// was the open one the backend has already announced the lock, which routes to
-// the survivor's lock screen by the one path every lock takes. Rejections are
-// the caller's to show: the dialog has the password field to put them under.
-export const deleteWorkspace = async (id: string, password: string) => {
-  await workspaceDelete(id, password)
+// Remove a workspace's vault from this device, and with `everywhere` from the
+// account it syncs to as well. The probe is what carries the list, so re-reading
+// it is the whole update here — and when the deleted one was the open one the
+// backend has already announced the lock, which routes to the survivor's lock
+// screen by the one path every lock takes. Rejections are the caller's to show:
+// the dialog has the password field to put them under.
+export const deleteWorkspace = async (
+  id: string,
+  password: string,
+  everywhere: boolean
+) => {
+  await workspaceDelete(id, password, everywhere)
   await refreshApp()
 }
 
