@@ -116,8 +116,9 @@ pub trait LocalVault {
     /// This vault's name and the stamp it was set at; `(None, 0)` when nobody
     /// has named it.
     fn name(&self) -> Result<(Option<String>, i64)>;
-    /// Take on a name the pull proved to be newer than this vault's, with the
-    /// stamp it was set at elsewhere — not the time it arrived here.
+    /// Take on a name the pull proved to beat this vault's (see
+    /// `identity::name_wins`), with the stamp it was set at elsewhere — not the
+    /// time it arrived here.
     fn adopt_name(&self, name: &str, at_ms: i64) -> Result<()>;
 }
 
@@ -181,9 +182,13 @@ pub fn sync<R: Remote, L: LocalVault>(
             outcome.merged += local.merge(&snapshot.records)?;
             // The name is last-writer-wins too, but on its own stamp: a rename
             // is a change to the vault that leaves no row in the entry table.
-            // A tie keeps what this device holds.
+            // `identity::name_wins` is the whole decision — a total order, so a
+            // tie in the stamp still settles on one of the two names rather
+            // than on whatever each device happens to hold.
             if let Some(name) = &snapshot.name {
-                if snapshot.name_ms > local.name()?.1 {
+                let held = local.name()?;
+                if identity::name_wins((Some(name), snapshot.name_ms), (held.0.as_deref(), held.1))
+                {
                     local.adopt_name(name, snapshot.name_ms)?;
                     outcome.renamed = true;
                 }
@@ -211,11 +216,18 @@ pub fn sync<R: Remote, L: LocalVault>(
             //
             // The name is compared beside the digest rather than folded into
             // it: it is not in the entry table, so a rename with nothing else
-            // to say would otherwise never leave this device. Both sides hold
-            // the same name and stamp once the adopt above has run, so two
-            // devices in agreement still push nothing.
+            // to say would otherwise never leave this device. The comparison is
+            // the same `name_wins` the adopt above used, so the two agree by
+            // construction: this pushes exactly when the name here beats the
+            // remote's, which is exactly when the adopt declined to take it.
+            // Anything else — equal pairs, or a remote that just won — has
+            // nothing to say and stops here.
+            let held = local.name()?;
             if local.digest()? == state_digest(&snapshot.records)
-                && local.name()? == (snapshot.name.clone(), snapshot.name_ms)
+                && !identity::name_wins(
+                    (held.0.as_deref(), held.1),
+                    (snapshot.name.as_deref(), snapshot.name_ms),
+                )
             {
                 return Ok(outcome);
             }
@@ -564,6 +576,12 @@ mod tests {
         // What `workspace_rename` does to the vault it renames.
         fn rename(&self, name: &str, at_ms: i64) {
             identity::set_vault_name(&self.store, name, at_ms).unwrap();
+        }
+
+        // What `commands::auth::seed_vault_name` does on the first unlock of a
+        // vault named before names lived inside one.
+        fn seed_name(&self, name: &str) {
+            identity::set_vault_name(&self.store, name, identity::MIGRATED_NAME_MS).unwrap();
         }
     }
 
@@ -1063,6 +1081,69 @@ mod tests {
         assert!(!sync(&remote, &a, NOW).unwrap().pushed);
         assert!(!sync(&remote, &b, NOW).unwrap().pushed);
         assert_eq!(remote.uploads(), uploads);
+    }
+
+    // Two renames in the same millisecond: the stamp cannot separate them, so
+    // strict recency would reject both and leave each device pushing its own
+    // name at the other for good. The name itself breaks the tie, the same way
+    // the merge breaks one on the record hash, so the two land on one value.
+    #[test]
+    fn two_renames_in_the_same_millisecond_converge() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let b = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+        a.rename("Home", NOW);
+        b.rename("Work", NOW);
+
+        // Each device runs until it has seen the other's name.
+        sync(&remote, &a, NOW).unwrap();
+        sync(&remote, &b, NOW).unwrap();
+        sync(&remote, &a, NOW).unwrap();
+
+        assert_eq!(a.name().unwrap(), b.name().unwrap());
+        assert_eq!(remote_name(&remote), a.name().unwrap());
+
+        // And it is settled: neither has anything left to say.
+        let uploads = remote.uploads();
+        assert!(!sync(&remote, &a, NOW).unwrap().pushed);
+        assert!(!sync(&remote, &b, NOW).unwrap().pushed);
+        assert_eq!(remote.uploads(), uploads);
+    }
+
+    // A label migrated out of this device's registry says only "before this
+    // build", so it must lose to a name a device actually chose — otherwise an
+    // install that upgrades late in a rollout overwrites everyone else's.
+    #[test]
+    fn a_migrated_label_loses_to_a_stamped_remote_name() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let b = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+        a.rename("Work", NOW);
+        sync(&remote, &a, NOW).unwrap();
+
+        b.seed_name("Old laptop");
+        let outcome = sync(&remote, &b, NOW).unwrap();
+
+        assert!(outcome.renamed);
+        assert_eq!(b.name().unwrap(), (Some("Work".into()), NOW));
+        assert!(!outcome.pushed, "a stale label has nothing to publish");
+    }
+
+    // The other half: when nobody has named the vault, the migrated label is
+    // the only name there is and it still has to reach the other devices.
+    #[test]
+    fn a_migrated_label_reaches_a_remote_with_no_name() {
+        let a = Device::seeded(&[record("1", 200, b"one")]);
+        let remote = FakeRemote::default();
+        sync(&remote, &a, NOW).unwrap();
+
+        a.seed_name("Old laptop");
+
+        assert!(sync(&remote, &a, NOW).unwrap().pushed);
+        assert_eq!(
+            remote_name(&remote),
+            (Some("Old laptop".into()), identity::MIGRATED_NAME_MS)
+        );
     }
 
     // --- settling the vault id ---------------------------------------------

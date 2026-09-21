@@ -112,6 +112,12 @@ pub async fn unlock(
 // devices unnamed. A workspace with no label keeps none — the frontend goes on
 // showing its translated default.
 //
+// Stamped `MIGRATED_NAME_MS`, never `now`: the label predates stamps entirely,
+// so it says nothing about when the user chose it. Stamping it now would let a
+// device that upgrades late in a rollout outrank a rename another device has
+// already published — the migrated label must lose to every real rename, and
+// win only against a vault nobody has named.
+//
 // Best effort, and the registry is read before the session lock is taken, since
 // that is the order every other reader of the two takes them in.
 fn seed_vault_name(app: &AppHandle, state: &AppState) {
@@ -125,7 +131,11 @@ fn seed_vault_name(app: &AppHandle, state: &AppState) {
     if !matches!(crate::store::identity::vault_name(store), Ok((None, _))) {
         return;
     }
-    if let Err(e) = crate::store::identity::set_vault_name(store, &name, auth::now_ms()) {
+    if let Err(e) = crate::store::identity::set_vault_name(
+        store,
+        &name,
+        crate::store::identity::MIGRATED_NAME_MS,
+    ) {
         log::warn!("could not seed the vault name from the registry: {e}");
     }
 }

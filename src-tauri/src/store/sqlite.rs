@@ -421,6 +421,17 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Test seam: make writing one `meta` key fail, so a test can watch a batch
+    /// that trips over it take the keys written before it back down.
+    #[cfg(test)]
+    pub(crate) fn refuse_meta_key_for_test(&self, key: &str) -> Result<()> {
+        self.lock().execute_batch(&format!(
+            "CREATE TRIGGER refuse_meta BEFORE INSERT ON meta WHEN NEW.key = '{key}'
+             BEGIN SELECT RAISE(ABORT, 'refused'); END;"
+        ))?;
+        Ok(())
+    }
+
     /// Test seam: the current value of an integer pragma.
     #[cfg(test)]
     pub(crate) fn pragma_i64(&self, name: &str) -> Result<i64> {
@@ -473,6 +484,21 @@ impl VaultStore for SqliteStore {
 
     fn meta_set(&self, key: &str, value: &str) -> Result<()> {
         self.lock().execute(META_UPSERT, params![key, value])?;
+        Ok(())
+    }
+
+    fn meta_set_many(&self, pairs: &[(&str, &str)]) -> Result<()> {
+        let mut conn = self.lock();
+        let tx = conn.transaction()?;
+        {
+            let mut write = tx.prepare(META_UPSERT)?;
+            for (key, value) in pairs {
+                write.execute(params![key, value])?;
+            }
+        }
+        // Returning early above drops the transaction unread, which rolls back
+        // whatever of the batch had already been written.
+        tx.commit()?;
         Ok(())
     }
 

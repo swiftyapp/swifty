@@ -550,38 +550,76 @@ pub fn workspace_rename(
         return Err(Error::WorkspaceNameRequired);
     }
 
-    let in_vault =
-        workspace::active_id(&app) == id && name_the_open_vault(&state, &name, auth::now_ms())?;
+    // The vault is the source of truth — it is the copy that travels — and the
+    // registry mirrors it, through the very same call a pulled rename mirrors
+    // with, so the two paths cannot drift apart. A workspace whose vault is not
+    // open has no truth to write: the registry is its only copy, and its
+    // failures stay the caller's as they always were.
+    let previous = if workspace::active_id(&app) == id {
+        name_the_open_vault(&state, &name, auth::now_ms())?
+    } else {
+        None
+    };
 
-    let root = storage::root_dir(&app)?;
-    update_registry(&state, &root, |registry| {
-        let workspace = registry
-            .workspaces
-            .iter_mut()
-            .find(|w| w.id == id)
-            .ok_or(Error::NotFound)?;
-        workspace.name = Some(name);
-        Ok(())
-    })?;
+    let Some(previous) = previous else {
+        let root = storage::root_dir(&app)?;
+        return update_registry(&state, &root, |registry| {
+            let workspace = registry
+                .workspaces
+                .iter_mut()
+                .find(|w| w.id == id)
+                .ok_or(Error::NotFound)?;
+            workspace.name = Some(name);
+            Ok(())
+        });
+    };
+
+    // A rename is one action. Telling the user it failed while the vault keeps
+    // the new name — and publishes it to every other device on the next run —
+    // is the worst of both, so a mirror that will not take it puts the vault
+    // back the way it was. Rolling back rather than succeeding quietly because
+    // the registry is what the header and the workspace list read: a name only
+    // the vault holds is a rename the user cannot see here.
+    if let Err(e) = workspace::record_vault_name(&app, &name) {
+        restore_vault_name(&state, previous);
+        return Err(e);
+    }
 
     // The same request an entry save makes: the new name is a change to the
     // vault, and it reaches the account the way every other one does.
-    if in_vault {
-        super::sync::request_run_if_ready(&app, &state);
-    }
+    super::sync::request_run_if_ready(&app, &state);
     Ok(())
 }
 
 // Write the name into the open vault's `meta`, stamped so another device can
-// tell which of two renames came last. `false` when there is no open vault to
-// write to — the registry keeps the name on its own.
-fn name_the_open_vault(state: &AppState, name: &str, at_ms: i64) -> Result<bool> {
+// tell which of two renames came last, and hand back the pair it replaced so a
+// failed mirror can put it back. `None` when there is no open vault to write to
+// — a locked workspace keeps its name in the registry alone.
+fn name_the_open_vault(
+    state: &AppState,
+    name: &str,
+    at_ms: i64,
+) -> Result<Option<(Option<String>, i64)>> {
     let session = state.session.lock().unwrap();
     let Ok(store) = session.store() else {
-        return Ok(false);
+        return Ok(None);
     };
+    let previous = identity::vault_name(store).map_err(store_err)?;
     identity::set_vault_name(store, name, at_ms).map_err(store_err)?;
-    Ok(true)
+    Ok(Some(previous))
+}
+
+// Undo `name_the_open_vault`. Best effort: the rename is already failing, and
+// an empty name is how a vault that had none is put back to having none.
+fn restore_vault_name(state: &AppState, (name, at_ms): (Option<String>, i64)) {
+    let session = state.session.lock().unwrap();
+    let Ok(store) = session.store() else {
+        return;
+    };
+    let previous = name.as_deref().unwrap_or("");
+    if let Err(e) = identity::set_vault_name(store, previous, at_ms) {
+        log::warn!("could not put the vault's previous name back: {e}");
+    }
 }
 
 // Argon2id + creating the encrypted DB, off the command thread. The directory

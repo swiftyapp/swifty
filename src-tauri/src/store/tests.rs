@@ -537,6 +537,39 @@ fn meta_get_set() {
     assert_eq!(store.meta_get("schema_version").unwrap(), None);
 }
 
+#[test]
+fn meta_set_many_writes_every_pair() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    store
+        .meta_set_many(&[("vault_name", "Work"), ("vault_name_updated_ms", "7")])
+        .unwrap();
+    assert_eq!(
+        store.meta_get("vault_name").unwrap().as_deref(),
+        Some("Work")
+    );
+    assert_eq!(
+        store.meta_get("vault_name_updated_ms").unwrap().as_deref(),
+        Some("7")
+    );
+}
+
+// The point of the batch: a pair that only means anything together must never
+// be left half-written. A name under the stamp of the name before it is a
+// rename every other device then reads as stale and refuses.
+#[test]
+fn a_failed_batch_writes_none_of_its_pairs() {
+    let store = SqliteStore::open(&tmp_db(), KEY).unwrap();
+    store
+        .refuse_meta_key_for_test("vault_name_updated_ms")
+        .unwrap();
+
+    let failed = store.meta_set_many(&[("vault_name", "Work"), ("vault_name_updated_ms", "7")]);
+
+    assert!(failed.is_err());
+    assert_eq!(store.meta_get("vault_name").unwrap(), None);
+    assert_eq!(store.meta_get("vault_name_updated_ms").unwrap(), None);
+}
+
 // The one open failure that may reach the user as "wrong password": it is the
 // only one that names the key, and the only one the unlock lockout counts.
 #[test]

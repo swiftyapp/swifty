@@ -47,6 +47,18 @@ pub fn adopt_vault_id(store: &impl VaultStore, id: &str) -> Result<()> {
 pub const META_VAULT_NAME: &str = "vault_name";
 pub const META_VAULT_NAME_MS: &str = "vault_name_updated_ms";
 
+/// The stamp a name gets when it was *migrated* into the vault rather than
+/// chosen in it — the label this device's workspace registry already held (see
+/// `commands::auth::seed_vault_name`).
+///
+/// Such a label says nothing about when the user picked it, only that it
+/// predates the build that put names inside vaults. Stamping it `now` would let
+/// an old device joining a staggered rollout outrank a rename another device
+/// published yesterday, so it takes the smallest stamp that still counts as
+/// named: one past the `0` an unnamed vault reads as. Every real rename beats
+/// it, and it still beats a vault nobody has named.
+pub const MIGRATED_NAME_MS: i64 = 1;
+
 /// The vault's name and when it was set. A vault nobody has named reads as
 /// `(None, 0)`, which loses to every stamped name there is.
 pub fn vault_name(store: &impl VaultStore) -> Result<(Option<String>, i64)> {
@@ -61,10 +73,28 @@ pub fn vault_name(store: &impl VaultStore) -> Result<(Option<String>, i64)> {
 }
 
 /// Name the vault, stamping when. The stamp travels with the name so another
-/// device can tell which of two renames came last.
+/// device can tell which of two renames came last — which is why the two go
+/// down as one write: a new name left under the stamp of the name before it
+/// reads as stale everywhere, and the rename would never leave this device.
+///
+/// An empty `name` is how a vault is put back to unnamed; [`vault_name`] reads
+/// it as `None`.
 pub fn set_vault_name(store: &impl VaultStore, name: &str, at_ms: i64) -> Result<()> {
-    store.meta_set(META_VAULT_NAME, name)?;
-    store.meta_set(META_VAULT_NAME_MS, &at_ms.to_string())
+    let at_ms = at_ms.to_string();
+    store.meta_set_many(&[(META_VAULT_NAME, name), (META_VAULT_NAME_MS, &at_ms)])
+}
+
+/// Whether `candidate` should replace `held` as the vault's name.
+///
+/// One total order over the pair, used by both halves of a sync run — the
+/// adopt and the push decision — so the two agree by construction and two
+/// devices comparing the same two names always pick the same winner. The later
+/// stamp wins; when the stamps are equal (two renames in the same millisecond,
+/// which strict recency cannot separate) the name itself breaks the tie, the
+/// way `SqliteStore::merge_records` breaks a timestamp tie on the record hash.
+/// Unnamed sorts below every name, so `(None, 0)` loses to all of them.
+pub fn name_wins(candidate: (Option<&str>, i64), held: (Option<&str>, i64)) -> bool {
+    (candidate.1, candidate.0) > (held.1, held.0)
 }
 
 #[cfg(test)]
@@ -125,5 +155,42 @@ mod tests {
         let store = store();
         store.meta_set(META_VAULT_NAME, "Work").unwrap();
         assert_eq!(vault_name(&store).unwrap(), (Some("Work".to_string()), 0));
+    }
+
+    // How a rename that could not be mirrored is put back.
+    #[test]
+    fn an_empty_name_reads_as_unnamed_again() {
+        let store = store();
+        set_vault_name(&store, "Work", 500).unwrap();
+        set_vault_name(&store, "", 0).unwrap();
+        assert_eq!(vault_name(&store).unwrap(), (None, 0));
+    }
+
+    #[test]
+    fn the_later_stamp_wins() {
+        assert!(name_wins((Some("New"), 2), (Some("Old"), 1)));
+        assert!(!name_wins((Some("Old"), 1), (Some("New"), 2)));
+    }
+
+    // Two devices renaming in the same millisecond: the stamp cannot separate
+    // them, so the name does. Whichever side runs the comparison, it picks the
+    // same winner — which is what makes the two converge instead of pushing at
+    // each other forever.
+    #[test]
+    fn a_tied_stamp_is_broken_by_the_name_itself() {
+        assert!(name_wins((Some("Work"), 5), (Some("Home"), 5)));
+        assert!(!name_wins((Some("Home"), 5), (Some("Work"), 5)));
+        // And a pair never beats itself, so agreement is the end of it.
+        assert!(!name_wins((Some("Work"), 5), (Some("Work"), 5)));
+    }
+
+    #[test]
+    fn any_name_beats_an_unnamed_vault_and_a_real_rename_beats_a_migrated_label() {
+        assert!(name_wins((Some("Work"), MIGRATED_NAME_MS), (None, 0)));
+        assert!(!name_wins((None, 0), (Some("Work"), MIGRATED_NAME_MS)));
+        assert!(name_wins(
+            (Some("Work"), 500),
+            (Some("Laptop"), MIGRATED_NAME_MS)
+        ));
     }
 }
