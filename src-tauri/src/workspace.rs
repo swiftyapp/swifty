@@ -10,6 +10,7 @@
 //! Exactly one workspace is unlocked at a time. Switching locks the current one
 //! and marks another active; the next unlock opens that one's database.
 
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -122,6 +123,270 @@ impl Registry {
             .iter()
             .find(|w| w.id != except && w.vault_id.as_deref() == Some(vault_id))
     }
+
+    /// The registry as it will read once `id` is gone from this device.
+    ///
+    /// Deleting the primary is the one case that moves another workspace: the
+    /// root *is* the primary's directory ([`dir_of`]), and an install with a
+    /// registry but nothing in the root is one whose next unlock opens nothing.
+    /// So the first survivor is promoted — it takes `PRIMARY_ID` and keeps its
+    /// name and vault id, which are what the user knows it by and what a Drive
+    /// restore compares against. First in registry order rather than by name or
+    /// by age, so the same install always promotes the same workspace.
+    ///
+    /// `active` is kept pointing at a workspace that still exists, and under
+    /// whatever id it answers to afterwards.
+    pub fn without(&self, id: &str) -> Result<Deletion> {
+        if !self.contains(id) {
+            return Err(Error::NotFound);
+        }
+        if self.workspaces.len() < 2 {
+            return Err(Error::LastWorkspace);
+        }
+
+        let mut workspaces: Vec<Workspace> = self
+            .workspaces
+            .iter()
+            .filter(|w| w.id != id)
+            .cloned()
+            .collect();
+        // Before `active` is resolved: the promoted workspace answers to its
+        // new id from here on, and `active` may be naming it.
+        let promoted = (id == PRIMARY_ID)
+            .then(|| std::mem::replace(&mut workspaces[0].id, PRIMARY_ID.to_string()));
+
+        let active = if self.active == id {
+            workspaces[0].id.clone()
+        } else if promoted.as_deref() == Some(self.active.as_str()) {
+            PRIMARY_ID.to_string()
+        } else {
+            self.active.clone()
+        };
+        Ok(Deletion {
+            registry: Registry { active, workspaces },
+            promoted,
+        })
+    }
+}
+
+/// What [`Registry::without`] worked out: the file to save, and the workspace
+/// whose files have to be moved into the root before it is saved. The decision
+/// only — [`apply_deletion`] is what carries it out on disk.
+#[derive(Debug, PartialEq)]
+pub struct Deletion {
+    pub registry: Registry,
+    /// The id the promoted workspace's directory still has on disk, when the
+    /// primary was the one deleted. `None` for every other delete.
+    pub promoted: Option<String>,
+}
+
+/// Where a delete parks files until it is safe to remove them, under the root.
+const STAGING_DIR: &str = "deleting";
+
+/// The record a delete leaves while the files and the registry are out of step,
+/// beside the registry it is about.
+const DELETE_JOURNAL_FILE: &str = "delete.json";
+
+/// What a delete was doing when it was interrupted.
+///
+/// The registry is what says a vault exists at all, so the order of a delete is
+/// forced: nothing may be removed until the registry that no longer names it
+/// has been saved. Otherwise a failure in between leaves the file on disk
+/// naming a workspace whose files are gone — and a retry cannot repair that,
+/// because proving the password needs the database that went.
+///
+/// So every step before the save is a rename into `deleting/`, and this says
+/// which workspace was going and which was promoted into its place. It is read
+/// once per launch (see [`recover_interrupted_delete`]).
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeleteJournal {
+    id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    promoted: Option<String>,
+}
+
+impl DeleteJournal {
+    fn path(root: &Path) -> PathBuf {
+        root.join(DELETE_JOURNAL_FILE)
+    }
+
+    /// Atomic, like the registry it shadows: a torn journal is one the recovery
+    /// below could not act on.
+    fn write(&self, root: &Path) -> Result<()> {
+        storage::atomic_write_file(&Self::path(root), &serde_json::to_string(self)?)
+    }
+
+    /// `None` for every launch but the interrupted one, for the cost of the
+    /// single read. A journal that will not parse is left where it is: there is
+    /// nothing to act on, and removing it would throw away the one record that
+    /// says a delete was in flight.
+    fn read(root: &Path) -> Option<Self> {
+        let json = fs::read_to_string(Self::path(root)).ok()?;
+        match serde_json::from_str(&json) {
+            Ok(journal) => Some(journal),
+            Err(e) => {
+                log::warn!("cannot read the interrupted-delete journal: {e}");
+                None
+            }
+        }
+    }
+
+    fn remove(root: &Path) -> Result<()> {
+        storage::remove_if_present(&Self::path(root))
+    }
+}
+
+fn staging(root: &Path) -> PathBuf {
+    root.join(STAGING_DIR)
+}
+
+/// Carry out on disk the deletion [`Registry::without`] decided.
+///
+/// The doomed workspace's files are staged out of the way, the survivor — when
+/// the primary is the one going — is moved into the root, the registry is
+/// saved, and only then is anything removed. Every step before the save is a
+/// rename, so a failure puts all of them back and reports it: the user's old
+/// layout is intact and a retry can prove the password again.
+pub fn apply_deletion(root: &Path, id: &str, deletion: &Deletion) -> Result<()> {
+    // A journal that is still here is one an earlier delete could not undo and
+    // the last launch could not resolve. Starting a second delete over it would
+    // replace the only record of where the first one's files went, so this one
+    // waits for the launch that clears it.
+    if DeleteJournal::path(root).exists() {
+        return Err(Error::Other(unfinished_delete_error()));
+    }
+    let journal = DeleteJournal {
+        id: id.to_string(),
+        promoted: deletion.promoted.clone(),
+    };
+    journal.write(root)?;
+    match stage_and_save(root, &journal, &deletion.registry) {
+        Ok(()) => {
+            finish_delete(root, &journal);
+            Ok(())
+        }
+        Err(e) => {
+            if let Err(undone) = roll_back_delete(root, &journal) {
+                // The journal stays behind, so the next launch tries again.
+                log::error!("could not undo a workspace delete that failed: {undone}");
+            }
+            Err(e)
+        }
+    }
+}
+
+// Surfaced verbatim where the delete was asked for, so it has to read as a
+// sentence.
+fn unfinished_delete_error() -> String {
+    "an earlier workspace delete on this device has not been finished; restart the app and try \
+     again"
+        .into()
+}
+
+// The moves, and the registry write that commits them. Nothing here removes
+// anything.
+fn stage_and_save(root: &Path, journal: &DeleteJournal, registry: &Registry) -> Result<()> {
+    stage_out(root, &journal.id)?;
+    if let Some(promoted) = &journal.promoted {
+        // Into the root, where the next unlock looks for the primary's vault:
+        // `dir_of` resolves `PRIMARY_ID` to the root itself, so a promotion is
+        // a move of files, not a change of paths.
+        storage::move_vault_files(&dir_of(root, promoted), root)?;
+    }
+    registry.save(root)
+}
+
+// Everything the doomed workspace owns, out of the root's way.
+//
+// A workspace with a directory of its own is one rename, which is all-or-
+// nothing already. The primary's files share the root with the registry and
+// every other workspace, so they go one by one into a partial name that is
+// renamed into place once they are all there — as the rekey snapshot publishes
+// itself (`auth::publish_snapshot`), and for the same reason: `deleting/<id>`
+// exists only if the staging finished, which is what tells a rollback whether
+// what is left in the root is the promoted workspace's or still the deleted
+// one's.
+fn stage_out(root: &Path, id: &str) -> Result<()> {
+    let staged = staging(root).join(id);
+    let from = dir_of(root, id);
+    if id != PRIMARY_ID {
+        crate::store::create_private_dir(&staging(root))?;
+        return Ok(fs::rename(&from, &staged)?);
+    }
+    let partial = staging(root).join(format!("{id}.partial"));
+    crate::store::create_private_dir(&partial)?;
+    storage::move_workspace_files(&from, &partial)?;
+    Ok(fs::rename(&partial, &staged)?)
+}
+
+// Put every move back, in the order the staging can be told apart: the
+// promotion first, so the root is clear of the survivor's files before the
+// staged ones come back on top of them — and only once `deleting/<id>` says the
+// staging finished, since until then what is in the root is the deleted
+// workspace's own.
+fn roll_back_delete(root: &Path, journal: &DeleteJournal) -> Result<()> {
+    let staged = staging(root).join(&journal.id);
+    let back = dir_of(root, &journal.id);
+    if staged.exists() {
+        if let Some(promoted) = &journal.promoted {
+            storage::move_vault_files(root, &dir_of(root, promoted))?;
+        }
+        if journal.id == PRIMARY_ID {
+            storage::move_workspace_files(&staged, &back)?;
+        } else {
+            crate::store::create_private_dir(back.parent().unwrap_or(root))?;
+            fs::rename(&staged, &back)?;
+        }
+    } else {
+        // The staging never finished: its partial name holds whatever did move,
+        // and nothing was promoted over it.
+        let partial = staging(root).join(format!("{}.partial", journal.id));
+        storage::move_workspace_files(&partial, &back)?;
+    }
+    let _ = fs::remove_dir_all(staging(root));
+    DeleteJournal::remove(root)
+}
+
+// The delete is committed — the registry no longer names the workspace, so what
+// is staged is beyond anyone's reach. Best effort: leftovers cost nothing, and
+// the journal goes last so a failure here is one the next launch finishes.
+fn finish_delete(root: &Path, journal: &DeleteJournal) {
+    let _ = fs::remove_dir_all(staging(root));
+    if let Some(promoted) = &journal.promoted {
+        // Emptied by the promotion; what the vault did not take with it (the
+        // biometric marker, a sync run's scratch) goes with the directory.
+        let _ = fs::remove_dir_all(dir_of(root, promoted));
+    }
+    if let Err(e) = DeleteJournal::remove(root) {
+        log::warn!("could not retire the delete journal: {e}");
+    }
+}
+
+/// Finish or undo a workspace delete that a crash caught between its file moves
+/// and the registry write. Called once per launch, before anything reads the
+/// registry or opens a vault.
+///
+/// The registry on disk is what says whether the delete was committed: the old
+/// one still names the workspace that went — under its own id, or, when the
+/// primary went, under the id the promotion gave up. So one lookup decides
+/// between putting the moves back and clearing away what they left.
+pub fn recover_interrupted_delete(root: &Path) {
+    let Some(journal) = DeleteJournal::read(root) else {
+        return;
+    };
+    let named = journal.promoted.as_deref().unwrap_or(&journal.id);
+    if Registry::load(root).contains(named) {
+        match roll_back_delete(root, &journal) {
+            Ok(()) => log::warn!("undid an interrupted workspace delete; nothing was removed"),
+            // Kept for the next launch rather than reported: there is no vault
+            // open yet, and no user to tell.
+            Err(e) => log::error!("could not undo an interrupted workspace delete: {e}"),
+        }
+        return;
+    }
+    log::warn!("clearing up after a workspace delete that was interrupted once committed");
+    finish_delete(root, &journal);
 }
 
 /// Remember which vault the active workspace holds, once a sync has settled it.
@@ -376,10 +641,399 @@ mod tests {
         assert_eq!(Registry::load(&root), Registry::default());
     }
 
+    // Three workspaces in registry order, the middle one named and syncing.
+    fn three(active: &str) -> Registry {
+        Registry {
+            active: active.into(),
+            workspaces: vec![
+                Workspace {
+                    id: PRIMARY_ID.into(),
+                    name: None,
+                    vault_id: Some("beef".into()),
+                },
+                Workspace {
+                    id: "a1b2".into(),
+                    name: Some("Work".into()),
+                    vault_id: Some("cafe".into()),
+                },
+                Workspace {
+                    id: "c3d4".into(),
+                    name: Some("Side".into()),
+                    vault_id: None,
+                },
+            ],
+        }
+    }
+
+    // The ordinary delete: one row goes, nothing else moves, and no files have
+    // to follow it anywhere.
+    #[test]
+    fn deleting_a_workspace_that_is_not_the_primary_only_drops_its_row() {
+        let deletion = three(PRIMARY_ID).without("a1b2").unwrap();
+
+        assert_eq!(deletion.promoted, None);
+        assert_eq!(deletion.registry.active, PRIMARY_ID);
+        assert_eq!(
+            deletion
+                .registry
+                .workspaces
+                .iter()
+                .map(|w| w.id.as_str())
+                .collect::<Vec<_>>(),
+            [PRIMARY_ID, "c3d4"]
+        );
+    }
+
+    // The root is the primary's directory, so someone has to move into it. The
+    // first survivor does, under the primary's id — and keeps the name the user
+    // gave it and the vault id a restore compares against.
+    #[test]
+    fn deleting_the_primary_promotes_the_first_survivor_into_it() {
+        let deletion = three(PRIMARY_ID).without(PRIMARY_ID).unwrap();
+
+        assert_eq!(deletion.promoted.as_deref(), Some("a1b2"));
+        assert_eq!(
+            deletion.registry.workspaces[0],
+            Workspace {
+                id: PRIMARY_ID.into(),
+                name: Some("Work".into()),
+                vault_id: Some("cafe".into()),
+            }
+        );
+        // The one that was not promoted is untouched, and still second.
+        assert_eq!(deletion.registry.workspaces[1].id, "c3d4");
+    }
+
+    // The next unlock resolves `active`, so it may never name a workspace that
+    // has just gone.
+    #[test]
+    fn deleting_the_active_workspace_moves_active_to_the_first_survivor() {
+        let deletion = three("c3d4").without("c3d4").unwrap();
+        assert_eq!(deletion.registry.active, PRIMARY_ID);
+
+        // Deleting the primary while it is active lands on the promoted one,
+        // which is in the root and answers to the primary's id.
+        let deletion = three(PRIMARY_ID).without(PRIMARY_ID).unwrap();
+        assert_eq!(deletion.registry.active, PRIMARY_ID);
+    }
+
+    // The active workspace was the one promoted: it is still active, but its
+    // files are in the root now and it answers to the primary's id.
+    #[test]
+    fn an_active_workspace_promoted_into_the_root_stays_active_as_the_primary() {
+        let deletion = three("a1b2").without(PRIMARY_ID).unwrap();
+
+        assert_eq!(deletion.promoted.as_deref(), Some("a1b2"));
+        assert_eq!(deletion.registry.active, PRIMARY_ID);
+    }
+
+    // Untouched when this delete is about neither of them.
+    #[test]
+    fn an_active_workspace_nobody_moved_stays_where_it_was() {
+        let deletion = three("c3d4").without("a1b2").unwrap();
+        assert_eq!(deletion.registry.active, "c3d4");
+        assert_eq!(deletion.promoted, None);
+    }
+
+    // A device always has a vault: there is no screen an install with none
+    // could show, and no way back to one from there.
+    #[test]
+    fn the_only_workspace_cannot_be_deleted() {
+        assert!(matches!(
+            Registry::default().without(PRIMARY_ID),
+            Err(Error::LastWorkspace)
+        ));
+    }
+
+    #[test]
+    fn a_workspace_that_is_not_in_the_registry_cannot_be_deleted() {
+        assert!(matches!(
+            three(PRIMARY_ID).without("gone"),
+            Err(Error::NotFound)
+        ));
+    }
+
     #[test]
     fn the_primary_is_the_root_and_everything_else_is_a_subdirectory() {
         let root = Path::new("/data");
         assert_eq!(dir_of(root, PRIMARY_ID), root);
         assert_eq!(dir_of(root, "a1b2"), root.join("workspaces").join("a1b2"));
+    }
+
+    fn wal_of(path: &Path) -> PathBuf {
+        let mut name = path.as_os_str().to_owned();
+        name.push("-wal");
+        PathBuf::from(name)
+    }
+
+    fn read(path: PathBuf) -> String {
+        fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+    }
+
+    // A vault's files, with contents that say which vault they came from. The
+    // whole set, the pair an interrupted password change leaves and the
+    // failed-unlock backoff included: a delete has to move exactly what a
+    // workspace is, not a subset of it.
+    fn seed_vault(dir: &Path, tag: &str) {
+        fs::create_dir_all(dir.join("auth")).unwrap();
+        for (file, what) in [
+            (storage::DB_FILE, "db"),
+            (storage::DB_REKEY_BACKUP_FILE, "db-backup"),
+            (storage::KDF_SIDECAR_FILE, "kdf"),
+            (storage::KDF_SIDECAR_REKEY_BACKUP_FILE, "kdf-backup"),
+            (storage::LOCKOUT_SIDECAR_FILE, "lockout"),
+            (storage::GDRIVE_FILE, "token"),
+        ] {
+            fs::write(dir.join(file), format!("{tag}-{what}")).unwrap();
+        }
+        fs::write(wal_of(&dir.join(storage::DB_FILE)), format!("{tag}-wal")).unwrap();
+    }
+
+    // The primary, and one workspace that would be promoted in its place.
+    fn two_workspaces(root: &Path) -> Registry {
+        let registry = Registry {
+            active: PRIMARY_ID.into(),
+            workspaces: vec![
+                Workspace {
+                    id: PRIMARY_ID.into(),
+                    name: None,
+                    vault_id: None,
+                },
+                Workspace {
+                    id: "a1b2".into(),
+                    name: Some("Work".into()),
+                    vault_id: Some("cafe".into()),
+                },
+            ],
+        };
+        registry.save(root).unwrap();
+        registry
+    }
+
+    // A delete stopped where a crash would stop it: every move made, the
+    // registry not yet saved. The same steps the real one takes, minus the
+    // save.
+    fn interrupt_delete(root: &Path, id: &str, promoted: Option<&str>) {
+        let journal = DeleteJournal {
+            id: id.into(),
+            promoted: promoted.map(str::to_string),
+        };
+        journal.write(root).unwrap();
+        stage_out(root, id).unwrap();
+        if let Some(promoted) = promoted {
+            storage::move_vault_files(&dir_of(root, promoted), root).unwrap();
+        }
+    }
+
+    // The whole point of the promotion: `dir_of(root, PRIMARY_ID)` is the root,
+    // so the survivor's files have to *be* in the root for the next unlock to
+    // find them — the WAL included, since the database without it is an older
+    // vault, and the rekey pair and the backoff state, which are as much the
+    // survivor's as its database is.
+    #[test]
+    fn a_promoted_workspace_lands_where_the_next_unlock_looks() {
+        let root = tmp_root();
+        seed_vault(&root, "primary");
+        fs::write(root.join(storage::BIOMETRIC_FILE), "protected").unwrap();
+        let from = dir_of(&root, "a1b2");
+        seed_vault(&from, "work");
+        let deletion = two_workspaces(&root).without(PRIMARY_ID).unwrap();
+
+        apply_deletion(&root, PRIMARY_ID, &deletion).unwrap();
+
+        assert_eq!(read(root.join(storage::DB_FILE)), "work-db");
+        assert_eq!(read(wal_of(&root.join(storage::DB_FILE))), "work-wal");
+        assert_eq!(read(root.join(storage::KDF_SIDECAR_FILE)), "work-kdf");
+        assert_eq!(read(root.join(storage::GDRIVE_FILE)), "work-token");
+        // Left behind, these would strand the promoted vault: the next unlock's
+        // recovery would find a snapshot with no pair to roll back to, and the
+        // backoff the survivor had earned would be reset.
+        assert_eq!(
+            read(root.join(storage::DB_REKEY_BACKUP_FILE)),
+            "work-db-backup"
+        );
+        assert_eq!(
+            read(root.join(storage::KDF_SIDECAR_REKEY_BACKUP_FILE)),
+            "work-kdf-backup"
+        );
+        assert_eq!(
+            read(root.join(storage::LOCKOUT_SIDECAR_FILE)),
+            "work-lockout"
+        );
+        // Nothing of the survivor's is left at its old address, and nothing of
+        // the deleted vault's in the root — its enrollment marker included,
+        // whose keychain item goes with the key that is gone.
+        assert!(!from.exists());
+        assert!(!root.join(storage::BIOMETRIC_FILE).exists());
+        assert!(!staging(&root).exists());
+        assert!(!DeleteJournal::path(&root).exists());
+
+        let registry = Registry::load(&root);
+        assert_eq!(registry.workspaces.len(), 1);
+        assert_eq!(registry.workspaces[0].id, PRIMARY_ID);
+        assert_eq!(registry.workspaces[0].name.as_deref(), Some("Work"));
+    }
+
+    // A workspace with a directory of its own takes it with it, and the root it
+    // shares with the registry and the primary's vault is left alone.
+    #[test]
+    fn deleting_a_workspace_of_its_own_leaves_the_root_alone() {
+        let root = tmp_root();
+        seed_vault(&root, "primary");
+        let gone = dir_of(&root, "a1b2");
+        seed_vault(&gone, "work");
+        let deletion = two_workspaces(&root).without("a1b2").unwrap();
+
+        apply_deletion(&root, "a1b2", &deletion).unwrap();
+
+        assert!(!gone.exists());
+        assert_eq!(read(root.join(storage::DB_FILE)), "primary-db");
+        assert_eq!(read(root.join(storage::GDRIVE_FILE)), "primary-token");
+        assert_eq!(Registry::load(&root).workspaces.len(), 1);
+        assert!(!staging(&root).exists());
+        assert!(!DeleteJournal::path(&root).exists());
+    }
+
+    // The registry write is the last step before anything is removed, and here
+    // it cannot succeed (a directory stands where the file goes). Nothing has
+    // been removed at that point, so every move has to come back — otherwise
+    // the user is left with a registry naming vaults whose files are gone, and
+    // no way to prove a password against them again.
+    #[test]
+    fn a_failed_delete_puts_the_old_layout_back() {
+        let root = tmp_root();
+        seed_vault(&root, "primary");
+        fs::write(root.join(storage::BIOMETRIC_FILE), "protected").unwrap();
+        let from = dir_of(&root, "a1b2");
+        seed_vault(&from, "work");
+        let deletion = two_workspaces(&root).without(PRIMARY_ID).unwrap();
+        fs::remove_file(root.join(REGISTRY_FILE)).unwrap();
+        fs::create_dir(root.join(REGISTRY_FILE)).unwrap();
+
+        assert!(apply_deletion(&root, PRIMARY_ID, &deletion).is_err());
+
+        assert_eq!(read(root.join(storage::DB_FILE)), "primary-db");
+        assert_eq!(read(wal_of(&root.join(storage::DB_FILE))), "primary-wal");
+        assert_eq!(read(root.join(storage::KDF_SIDECAR_FILE)), "primary-kdf");
+        assert_eq!(read(root.join(storage::GDRIVE_FILE)), "primary-token");
+        assert_eq!(read(root.join(storage::BIOMETRIC_FILE)), "protected");
+        assert_eq!(read(from.join(storage::DB_FILE)), "work-db");
+        assert_eq!(
+            read(from.join(storage::LOCKOUT_SIDECAR_FILE)),
+            "work-lockout"
+        );
+        assert!(!staging(&root).exists());
+        assert!(!DeleteJournal::path(&root).exists());
+    }
+
+    // A record that is still on disk is a delete nothing could undo: the next
+    // one waits for the launch that resolves it rather than writing over the
+    // only note of where the first one's files went.
+    #[test]
+    fn a_delete_does_not_start_over_one_that_was_never_resolved() {
+        let root = tmp_root();
+        seed_vault(&root, "primary");
+        seed_vault(&dir_of(&root, "a1b2"), "work");
+        let deletion = two_workspaces(&root).without("a1b2").unwrap();
+        DeleteJournal {
+            id: "c3d4".into(),
+            promoted: None,
+        }
+        .write(&root)
+        .unwrap();
+
+        assert!(matches!(
+            apply_deletion(&root, "a1b2", &deletion),
+            Err(Error::Other(_))
+        ));
+        assert_eq!(
+            read(dir_of(&root, "a1b2").join(storage::DB_FILE)),
+            "work-db"
+        );
+    }
+
+    // A crash between the moves and the registry write: the registry still
+    // names the workspace that was being promoted, so the launch that finds the
+    // journal puts every file back where it was.
+    #[test]
+    fn an_interrupted_delete_the_registry_never_recorded_is_undone() {
+        let root = tmp_root();
+        seed_vault(&root, "primary");
+        let from = dir_of(&root, "a1b2");
+        seed_vault(&from, "work");
+        two_workspaces(&root);
+        interrupt_delete(&root, PRIMARY_ID, Some("a1b2"));
+
+        recover_interrupted_delete(&root);
+
+        assert_eq!(read(root.join(storage::DB_FILE)), "primary-db");
+        assert_eq!(read(wal_of(&root.join(storage::DB_FILE))), "primary-wal");
+        assert_eq!(read(root.join(storage::GDRIVE_FILE)), "primary-token");
+        assert_eq!(read(from.join(storage::DB_FILE)), "work-db");
+        assert_eq!(
+            read(from.join(storage::DB_REKEY_BACKUP_FILE)),
+            "work-db-backup"
+        );
+        assert!(!staging(&root).exists());
+        assert!(!DeleteJournal::path(&root).exists());
+    }
+
+    // A crash inside the undo itself, between a database and its WAL: the
+    // promoted vault's `vault.db` is back at its own address and its `-wal` is
+    // still in the root. The launch that picks the undo up again has to carry
+    // that `-wal` after it — the registry still names the workspace, and both
+    // files have to end up together at the address it names, or the workspace
+    // reopens the older vault the `-wal` was holding the pages for. The
+    // deleted primary's own `-wal` comes back to the root behind it, so the
+    // stranded one must not be written over either.
+    #[test]
+    fn an_undo_interrupted_between_a_database_and_its_wal_is_finished_next_launch() {
+        let root = tmp_root();
+        seed_vault(&root, "primary");
+        let from = dir_of(&root, "a1b2");
+        seed_vault(&from, "work");
+        two_workspaces(&root);
+        interrupt_delete(&root, PRIMARY_ID, Some("a1b2"));
+        // The undo got the promoted database home and stopped there.
+        fs::rename(root.join(storage::DB_FILE), from.join(storage::DB_FILE)).unwrap();
+
+        recover_interrupted_delete(&root);
+
+        assert_eq!(read(from.join(storage::DB_FILE)), "work-db");
+        assert_eq!(read(wal_of(&from.join(storage::DB_FILE))), "work-wal");
+        assert_eq!(read(from.join(storage::GDRIVE_FILE)), "work-token");
+        assert_eq!(read(root.join(storage::DB_FILE)), "primary-db");
+        assert_eq!(read(wal_of(&root.join(storage::DB_FILE))), "primary-wal");
+        assert_eq!(
+            read(root.join(storage::LOCKOUT_SIDECAR_FILE)),
+            "primary-lockout"
+        );
+        assert!(!staging(&root).exists());
+        assert!(!DeleteJournal::path(&root).exists());
+    }
+
+    // A crash just after the registry write: the delete is committed — the file
+    // on disk no longer names the deleted workspace — so the launch that finds
+    // the journal clears away what the moves left rather than undoing them.
+    #[test]
+    fn an_interrupted_delete_the_registry_recorded_is_finished() {
+        let root = tmp_root();
+        seed_vault(&root, "primary");
+        let from = dir_of(&root, "a1b2");
+        seed_vault(&from, "work");
+        let deletion = two_workspaces(&root).without(PRIMARY_ID).unwrap();
+        interrupt_delete(&root, PRIMARY_ID, Some("a1b2"));
+        deletion.registry.save(&root).unwrap();
+
+        recover_interrupted_delete(&root);
+
+        assert_eq!(read(root.join(storage::DB_FILE)), "work-db");
+        assert_eq!(
+            read(root.join(storage::LOCKOUT_SIDECAR_FILE)),
+            "work-lockout"
+        );
+        assert!(!from.exists());
+        assert!(!staging(&root).exists());
+        assert!(!DeleteJournal::path(&root).exists());
     }
 }

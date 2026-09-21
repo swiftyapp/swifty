@@ -1,4 +1,4 @@
-//! Creating, restoring, switching and renaming workspaces.
+//! Creating, restoring, switching, renaming and deleting workspaces.
 //!
 //! Only one workspace is ever unlocked, so every command here starts by
 //! clearing the session: switching *is* locking what is open and pointing the
@@ -25,16 +25,18 @@ use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
 use crate::auth;
-use crate::crypto::VaultKey;
+use crate::crypto::{KdfParams, VaultKey};
 use crate::error::{Error, Result};
 use crate::models::{EntryMetaDto, UnlockResult};
+use crate::secure_store::KeyStore;
 use crate::session::{list_metas, store_err, Lease};
 use crate::state::AppState;
 use crate::storage;
-use crate::store::{identity, SqliteStore};
+use crate::store::{identity, SqliteStore, StoreError};
 use crate::sync::{self, restore};
 use crate::workspace::{self, Registry, Workspace};
 
+use super::blocking;
 use super::setup::{self, begin_step, create_off_thread};
 
 /// Lock whatever is open and make `id` the workspace the app addresses.
@@ -626,6 +628,138 @@ fn name_the_open_vault(
     Ok(true)
 }
 
+/// Remove a workspace's vault from this device.
+///
+/// Local only: whatever the vault has on Drive is left where it is, so the
+/// account still holds it and another device — or this one, later — can restore
+/// it as a workspace again. `password` is the target's own master password,
+/// proved against the target's own files rather than against the session,
+/// because the workspace being deleted is usually a locked one whose key is
+/// nowhere in memory.
+///
+/// Deleting the primary is the case that moves files: the root is its
+/// directory, so the first surviving workspace is promoted into it and takes
+/// `PRIMARY_ID` (see [`Registry::without`]). The biometric enrollment goes with
+/// it — the one keychain item held the deleted vault's key.
+///
+/// Ends like a switch whenever the workspace the paths point at is the one
+/// going away or the one being promoted: same guards, same `vault:locked`, so
+/// the frontend lands on the survivor's lock screen by the one path it takes
+/// for every lock.
+#[tauri::command]
+pub async fn workspace_delete(
+    id: String,
+    password: Zeroizing<String>,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<()> {
+    if password.is_empty() {
+        return Err(Error::WorkspacePasswordRequired);
+    }
+    // The same exclusion a create, a restore and a password change take: those
+    // write the very files this removes, and a switch may not move the paths
+    // while the promotion below is rewriting where they point.
+    let _step = begin_step(&state)?;
+    let root = storage::root_dir(&app)?;
+
+    // Asked before the derive, so the only refusals the user can do nothing
+    // about cost them no Argon2id wait.
+    Registry::load(&root).without(&id)?;
+
+    // Argon2id and a SQLCipher open, so off the command thread — and on the
+    // target's own files, whether it is the open workspace or a locked one.
+    let dir = workspace::dir_of(&root, &id);
+    blocking(move || verify_password_in(&dir, &password)).await?;
+
+    // Everything from here is one step under the lock, as a switch is: the
+    // registry is re-read inside it (a rename could have landed while the
+    // derive ran), the session ends before its files move, and the paths and
+    // the file on disk change together.
+    let (ended_session, was_primary, applied) = {
+        let _paths = state.workspace_lock.lock().unwrap();
+        let registry = Registry::load(&root);
+        let deletion = registry.without(&id)?;
+        guard_sync_idle(&state)?;
+
+        // The open workspace is left open unless this delete disturbs it: it is
+        // the one going away, or the one whose directory is about to become the
+        // root. Either way its store has to close before the files move.
+        let active = state.active_workspace.lock().unwrap().clone();
+        let ends_session = active == id || deletion.promoted.as_deref() == Some(active.as_str());
+        if ends_session {
+            state.session.lock().unwrap().clear();
+        }
+
+        // Staged, so that whichever step a failure lands on, what is left is
+        // either the old layout or a record that can be finished without the
+        // password (`workspace::apply_deletion`). Nothing is removed until the
+        // registry that no longer names this workspace is on disk — the
+        // opposite order to a create, which records the registry last for the
+        // same reason: a file set nothing names is one the user has no way to
+        // reach, and no way to prove a password against either.
+        let applied = workspace::apply_deletion(&root, &id, &deletion);
+        if applied.is_ok() {
+            *state.active_workspace.lock().unwrap() = deletion.registry.active.clone();
+        }
+        (ends_session, deletion.promoted.is_some(), applied)
+    };
+
+    // Off the lock, because a keychain delete is a blocking call into the OS.
+    // The enrollment belonged to the primary's key and that vault is gone, so
+    // the stored bytes open nothing; the marker file went with the primary's
+    // other files above. Best effort, like every other unenroll on a path the
+    // user cannot retry: an item we could not reach is overwritten by the next
+    // enrollment.
+    if was_primary && applied.is_ok() {
+        let _ = blocking(|| crate::secure_store::Platform.delete()).await;
+    }
+
+    // Said exactly as `workspace_select` says it, and in the same order: the
+    // session is over, the sync status the frontend holds belongs to a
+    // workspace it is no longer looking at, and the lock is announced last so
+    // the re-probe it triggers finds the new active workspace already in place.
+    // Said for a failed delete too: the session was closed before the files
+    // moved, so a vault the user was in is locked whether or not the delete
+    // went through, and the frontend has to hear it either way.
+    if ended_session {
+        crate::session::sealed(&app);
+        super::sync::switched(&app);
+        crate::events::vault_locked(&app);
+    }
+    applied
+}
+
+// Prove `password` opens the vault in `dir`.
+//
+// The same proof an unlock makes, on a path instead of on the app's: read that
+// workspace's own descriptor, derive, and let SQLCipher answer. It has to work
+// on a locked workspace — whose key is nowhere in memory — so there is nothing
+// to compare against the session the way `change_master_password` does.
+//
+// Argon2id: run it off the main thread.
+fn verify_password_in(dir: &Path, password: &str) -> Result<()> {
+    let sidecar = dir.join(storage::KDF_SIDECAR_FILE);
+    let key = if sidecar.exists() {
+        let params = KdfParams::from_json(&fs::read_to_string(sidecar)?)?;
+        VaultKey::Argon2 {
+            master: crate::crypto::derive(password.as_bytes(), &params)?,
+        }
+    } else {
+        // A vault written before the sidecar existed, as `session::derive_key`
+        // reads one.
+        VaultKey::legacy_from_password(password)
+    };
+
+    // The same split `session::open_with_key` draws: only the store's own key
+    // check is a wrong password. A failing disk must not be reported as one.
+    SqliteStore::open(&dir.join(storage::DB_FILE), &*key.sqlcipher_key()).map_err(|e| match e {
+        StoreError::WrongKey => Error::InvalidPassword,
+        StoreError::SchemaNewer => Error::VaultTooNew,
+        e => Error::Other(format!("could not open the vault: {e}")),
+    })?;
+    Ok(())
+}
+
 // Argon2id + creating the encrypted DB, off the command thread. The directory
 // comes first: `create_vault` writes the KDF sidecar before SQLCipher opens
 // anything, and the sidecar must land in the new workspace, not beside it.
@@ -918,5 +1052,30 @@ mod tests {
         let root = tmp_root();
         assert!(!name_the_open_vault(&open_with(store()), &root, "b2c3", "Home", 20).unwrap());
         assert!(!name_the_open_vault(&AppState::default(), &root, PRIMARY_ID, "Home", 20).unwrap());
+    }
+
+    // The proof a delete asks for, on files rather than on the session — which
+    // is what lets it be asked of a locked workspace.
+    #[test]
+    fn a_password_is_proved_against_the_workspaces_own_files() {
+        let root = tmp_root();
+        let dir = workspace::dir_of(&root, "a1b2");
+        crate::store::create_private_dir(&dir).unwrap();
+        let params = crate::crypto::KdfParams::argon2id(b"salt-0123456789012345", 256, 1, 1);
+        storage::atomic_write_file(
+            &dir.join(storage::KDF_SIDECAR_FILE),
+            &params.to_json().unwrap(),
+        )
+        .unwrap();
+        let key = VaultKey::Argon2 {
+            master: crate::crypto::derive(b"right-password", &params).unwrap(),
+        };
+        drop(SqliteStore::open(&dir.join(storage::DB_FILE), &*key.sqlcipher_key()).unwrap());
+
+        assert!(verify_password_in(&dir, "right-password").is_ok());
+        assert!(matches!(
+            verify_password_in(&dir, "wrong-password"),
+            Err(Error::InvalidPassword)
+        ));
     }
 }

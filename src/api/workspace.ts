@@ -31,6 +31,23 @@ export const workspaceRename = (id: string, name: string): Promise<void> =>
   call('workspace_rename', { id, name })
 
 /**
+ * Remove a workspace's vault from this device. `password` is that workspace's
+ * own master password — a locked workspace's key is nowhere in memory, so the
+ * backend derives from its descriptor and lets the database answer; a wrong one
+ * rejects as `invalidPassword` and nothing is removed.
+ *
+ * Local only: whatever the vault has on Google Drive is left there, so the
+ * account still holds it and it can be restored as a workspace again.
+ *
+ * Refused as `lastWorkspace` when it is the only workspace left. Deleting the
+ * active one ends its session, so `vault:locked` arrives and the app comes back
+ * on the survivor's lock screen — there is nothing to do with this promise but
+ * report what went wrong.
+ */
+export const workspaceDelete = (id: string, password: string): Promise<void> =>
+  call('workspace_delete', { id, password })
+
+/**
  * Connect a Google account for a workspace that does not exist yet. The
  * onboarding connect with its "no vault here" precondition dropped, so it
  * answers on exactly the same events: `setup:drive:pending`, then one of

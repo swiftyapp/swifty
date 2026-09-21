@@ -131,9 +131,14 @@ pub fn run() {
             // vault's host list in the clear, so it goes on the first launch
             // that can see it, whether or not this one looks an icon up.
             storage::remove_legacy_icons_dir(app.handle());
+            // A workspace delete a crash caught between its file moves and the
+            // registry write: put back, or cleared away, before anything reads
+            // either — the registry below is the first thing that does.
+            let root = storage::root_dir(app.handle())?;
+            workspace::recover_interrupted_delete(&root);
             // Which workspace was open last. Read before the window exists, so
             // the lock screen the user lands on is that workspace's.
-            let registry = workspace::Registry::load(&storage::root_dir(app.handle())?);
+            let registry = workspace::Registry::load(&root);
             *app.state::<AppState>().active_workspace.lock().unwrap() = registry.active;
 
             window::create(app.handle())?;
@@ -215,6 +220,7 @@ pub fn run() {
             commands::workspace::workspace_restore_from_drive,
             commands::workspace::workspace_restore_from_account,
             commands::workspace::workspace_rename,
+            commands::workspace::workspace_delete,
             // E2E-only vault reset. `generate_handler!` honours per-command
             // attributes, so in a release build the match arm — and with it the
             // only reference to the (also cfg'd-out) module — simply is not

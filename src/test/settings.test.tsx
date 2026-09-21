@@ -775,6 +775,105 @@ describe('Settings › workspaces › vaults in the account', () => {
   })
 })
 
+// Local only: the vault leaves this device and whatever it has on Drive stays,
+// so the confirmation asks for two proofs — the workspace's own master password
+// and its label typed out — before anything is removed.
+describe('Settings › workspaces › delete', () => {
+  const two = () =>
+    seedApp({
+      workspaces: [
+        { id: 'default', name: null },
+        { id: 'w2', name: 'Work' }
+      ],
+      activeWorkspace: 'default'
+    })
+
+  const openDelete = async (id: string) => {
+    two()
+    await open()
+    await go('workspaces')
+    await userEvent.click(screen.getByTestId(`workspace-delete-${id}`))
+    return screen.getByTestId('workspace-delete-dialog')
+  }
+
+  it('opens the confirmation on the workspace that was chosen', async () => {
+    await openDelete('w2')
+
+    expect(screen.getByTestId('workspace-delete-dialog')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Delete Work?' })).toBeInTheDocument()
+    expect(
+      screen.getByText(/A copy on Google Drive is left where it is/)
+    ).toBeInTheDocument()
+  })
+
+  it('holds Delete until the label is typed back', async () => {
+    await openDelete('w2')
+
+    const submit = screen.getByTestId('workspace-delete-submit')
+    expect(submit).toBeDisabled()
+
+    await userEvent.type(screen.getByTestId('workspace-delete-password'), 'work-pass')
+    expect(submit).toBeDisabled()
+
+    await userEvent.type(screen.getByTestId('workspace-delete-confirm'), 'Wor')
+    expect(submit).toBeDisabled()
+
+    await userEvent.type(screen.getByTestId('workspace-delete-confirm'), 'k')
+    expect(submit).toBeEnabled()
+  })
+
+  it('deletes with the id and that workspace’s password', async () => {
+    mockCommand('workspace_delete', () => undefined)
+    await openDelete('w2')
+
+    await userEvent.type(screen.getByTestId('workspace-delete-password'), 'work-pass')
+    await userEvent.type(screen.getByTestId('workspace-delete-confirm'), 'Work')
+    await act(async () => {
+      await userEvent.click(screen.getByTestId('workspace-delete-submit'))
+    })
+
+    expect(calls('workspace_delete')).toEqual([{ id: 'w2', password: 'work-pass' }])
+    // The probe is what carries the list, so a delete ends by re-reading it.
+    expect(calls('app_status').length).toBeGreaterThan(0)
+    await waitFor(() =>
+      expect(screen.queryByTestId('workspace-delete-dialog')).not.toBeInTheDocument()
+    )
+  })
+
+  // The open workspace may go too: the backend ends its session and announces
+  // the lock, which is what lands on the survivor's lock screen.
+  it('offers the delete on the current workspace as well', async () => {
+    await openDelete('default')
+    expect(screen.getByRole('heading', { name: 'Delete Personal?' })).toBeInTheDocument()
+  })
+
+  it('blames the password only when the backend does', async () => {
+    mockCommandOnce('workspace_delete', () =>
+      Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })
+    )
+    await openDelete('w2')
+
+    await userEvent.type(screen.getByTestId('workspace-delete-password'), 'wrong')
+    await userEvent.type(screen.getByTestId('workspace-delete-confirm'), 'Work')
+    await userEvent.click(screen.getByTestId('workspace-delete-submit'))
+
+    expect(await screen.findByTestId('workspace-delete-error')).toHaveTextContent(
+      'That is not this workspace’s master password'
+    )
+    expect(screen.getByTestId('workspace-delete-dialog')).toBeInTheDocument()
+  })
+
+  // A device always has a vault to open, and the control says so rather than
+  // letting the user find out from a rejection.
+  it('withdraws the delete when there is only one workspace', async () => {
+    await open()
+    await go('workspaces')
+
+    expect(screen.getByTestId('workspace-delete-default')).toBeDisabled()
+    expect(screen.getByTestId('workspace-delete-last')).toBeInTheDocument()
+  })
+})
+
 describe('Settings › workspaces › restore from Drive', () => {
   // Consent, then the probe's answer — which arrives as an event, never through
   // the connect's promise.
