@@ -125,16 +125,15 @@ fn unwrap(root: &Path, id: &str, app_key: &[u8]) -> Result<Option<Zeroizing<Vec<
     if !path.exists() {
         return Ok(None);
     }
-    // One that cannot be read or decoded is as stale as one that fails its
-    // tag: the probe offers a biometric unlock on the strength of the file
-    // being there, so a file that will never open must not stay there.
-    let opened = fs::read_to_string(&path)
-        .map_err(Error::from)
-        .and_then(|text| {
-            STANDARD
-                .decode(text.trim())
-                .map_err(|e| Error::Crypto(e.to_string()))
-        })
+    // A read that fails says nothing about the file — a disk that is slow or
+    // briefly unavailable is not a stale sidecar — so it is reported and the
+    // file left alone. One that reads but will not decode, or fails its tag,
+    // will never open: the probe offers a biometric unlock on the strength of
+    // the file being there, so that one must not stay there.
+    let text = fs::read_to_string(&path)?;
+    let opened = STANDARD
+        .decode(text.trim())
+        .map_err(|e| Error::Crypto(e.to_string()))
         .and_then(|sealed| crypto::unseal_aead(&*wrapping_key(app_key), id.as_bytes(), &sealed));
     match opened {
         Ok(material) => Ok(Some(Zeroizing::new(material))),
@@ -168,19 +167,27 @@ pub fn open_all(app: &AppHandle, app_key: &[u8]) {
     let Ok(root) = storage::root_dir(app) else {
         return;
     };
-    let session = state.session.lock().unwrap();
-    if !session.is_live() {
-        return;
-    }
-    let mut ring = state.keyring.lock().unwrap();
-    ring.insert(PRIMARY_ID, app_key);
+    // What the ring already holds, read under the guards and then released:
+    // the filesystem work below — a sidecar per workspace — must not hold up
+    // every command that needs the session, a lock included.
+    let held = {
+        let session = state.session.lock().unwrap();
+        if !session.is_live() {
+            return;
+        }
+        state.keyring.lock().unwrap().others()
+    };
+
+    let mut opened = Vec::new();
     for workspace in Registry::load(&root).workspaces {
         if workspace.id == PRIMARY_ID {
             continue;
         }
-        match ring.get(&workspace.id) {
-            Some(material) => {
-                if let Err(e) = wrap(&root, &workspace.id, app_key, &material) {
+        match held.iter().find(|(id, _)| *id == workspace.id) {
+            // A sidecar is a copy of what the ring holds, sealed under a key
+            // the ring has accepted, so writing one needs no guard.
+            Some((_, material)) => {
+                if let Err(e) = wrap(&root, &workspace.id, app_key, material) {
                     log::warn!(
                         "could not seal workspace {}'s key under the app key: {e}",
                         workspace.id
@@ -189,10 +196,23 @@ pub fn open_all(app: &AppHandle, app_key: &[u8]) {
             }
             None => {
                 if let Ok(Some(material)) = unwrap(&root, &workspace.id, app_key) {
-                    ring.insert(&workspace.id, &material);
+                    opened.push((workspace.id, material));
                 }
             }
         }
+    }
+
+    // Into the ring under the guards again, and only if the session is still
+    // live: a lock that landed during the reads above cleared the ring, and
+    // nothing goes back behind it.
+    let session = state.session.lock().unwrap();
+    if !session.is_live() {
+        return;
+    }
+    let mut ring = state.keyring.lock().unwrap();
+    ring.insert(PRIMARY_ID, app_key);
+    for (id, material) in opened {
+        ring.insert(&id, &material);
     }
 }
 
