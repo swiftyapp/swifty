@@ -632,17 +632,29 @@ fn rekey_one(
         master: crypto::derive(new.as_bytes(), &params)?,
     };
     let material = Zeroizing::new(new_key.biometric_material().to_vec());
-    // Both taken before the keys are moved into the saga: the token file is
-    // sealed under the old key and has to be re-sealed under the new one.
-    let (old_cryptor, new_cryptor) = (old_key.cryptor(), new_key.cryptor());
+    // The Drive token file is sealed under the old key and has to come out
+    // sealed under the new one. Read *before* the change commits: a file that
+    // is there and will not open under the key that opens the vault would
+    // otherwise be found out only once the vault was on the new password, with
+    // the connection lost and the change reported complete. Refused here,
+    // nothing has been touched — this workspace stays on the password it had
+    // and is reported as unchanged, which is true.
+    let tokens = crate::sync::read_tokens_in(dir, &old_key.cryptor())?;
+    let new_cryptor = new_key.cryptor();
 
     auth::rekey_workspace(dir, old_key, new_key, &params)?;
 
-    // Best effort, after the change is committed, for the same reason it is on
+    // The write is best effort, after the commit, for the same reason it is on
     // the open workspace: the change is on disk and reporting a failure here
-    // would undo nothing. The worst case is an account the user reconnects.
-    if let Err(e) = crate::sync::reseal_tokens_in(dir, &old_cryptor, &new_cryptor) {
-        log::warn!("could not re-seal this workspace's Drive token under the new password: {e}");
+    // would undo nothing, and reporting the workspace as unchanged would be
+    // false. What is left to fail is one small write into a directory the saga
+    // has just rewritten a whole database in.
+    if let Some(tokens) = tokens {
+        if let Err(e) = crate::sync::persist_tokens_in(dir, &new_cryptor, &tokens) {
+            log::warn!(
+                "could not re-seal this workspace's Drive token under the new password: {e}"
+            );
+        }
     }
     Ok(material)
 }
@@ -689,5 +701,63 @@ mod tests {
         ] {
             assert!(!unenroll_on(&err), "{err} must not clear the marker");
         }
+    }
+
+    // --- the change a workspace beside the open one gets ------------------------
+
+    use crate::sync::Tokens;
+
+    fn workspace_under(old: &VaultKey) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join(storage::DB_FILE);
+        drop(SqliteStore::open(&db, &*old.sqlcipher_key()).unwrap());
+        dir
+    }
+
+    fn opens_under(dir: &Path, key: &VaultKey) -> bool {
+        SqliteStore::open(&dir.join(storage::DB_FILE), &*key.sqlcipher_key()).is_ok()
+    }
+
+    #[test]
+    fn a_workspaces_drive_token_comes_out_under_its_new_password() {
+        let old = VaultKey::legacy_from_password("old-pw");
+        let dir = workspace_under(&old);
+        let tokens = Tokens {
+            access_token: None,
+            refresh_token: Some("refresh".into()),
+            expires_at: None,
+        };
+        crate::sync::persist_tokens_in(dir.path(), &old.cryptor(), &tokens).unwrap();
+
+        let held = Zeroizing::new(old.biometric_material().to_vec());
+        let material = rekey_one(dir.path(), Some(held), "old-pw", "new-pw").unwrap();
+
+        let new = VaultKey::from_material(material, true);
+        assert!(opens_under(dir.path(), &new));
+        let resealed = crate::sync::read_tokens_in(dir.path(), &new.cryptor())
+            .unwrap()
+            .expect("the token file is still there");
+        assert_eq!(resealed.refresh_token.as_deref(), Some("refresh"));
+    }
+
+    // A token file that will not open under the key that opens the vault is
+    // found before anything is changed, so the workspace keeps its password —
+    // and is reported as unchanged — rather than coming out on the new one
+    // with a Drive connection nothing can read.
+    #[test]
+    fn a_workspace_whose_drive_token_will_not_read_keeps_its_password() {
+        let old = VaultKey::legacy_from_password("old-pw");
+        let dir = workspace_under(&old);
+        storage::write_gdrive_in(dir.path(), "not a sealed token file").unwrap();
+
+        let held = Zeroizing::new(old.biometric_material().to_vec());
+        assert!(rekey_one(dir.path(), Some(held), "old-pw", "new-pw").is_err());
+
+        assert!(opens_under(dir.path(), &old), "nothing was changed");
+        assert!(!dir.path().join(storage::KDF_SIDECAR_FILE).exists());
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(storage::GDRIVE_FILE)).unwrap(),
+            "not a sealed token file"
+        );
     }
 }

@@ -458,23 +458,6 @@ pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()
     TokenFile::of(app)?.reseal(old, new)
 }
 
-/// [`reseal_tokens`] on a named workspace directory rather than the active
-/// workspace's — a master-password change re-keys every workspace that shares
-/// the password, and each one's token file is sealed under its own vault key.
-///
-/// No connection generation to move, unlike [`TokenFile::reseal`]: the
-/// generation guards write-backs from a refresh running against the *open*
-/// workspace, and a workspace that is not the open one has no run against it
-/// (a change holds the setup step, which every switch takes first). A file that
-/// is there and will not read is an error rather than a no-op, as it is for
-/// every other caller that works on a directory ([`read_tokens_in`]).
-pub fn reseal_tokens_in(dir: &std::path::Path, old: &Cryptor, new: &Cryptor) -> Result<()> {
-    let Some(tokens) = read_tokens_in(dir, old)? else {
-        return Ok(());
-    };
-    write_tokens_in(dir, new, &tokens)
-}
-
 // --- OAuth flow ---
 
 /// One consent request in flight: the PKCE verifier the code will be redeemed

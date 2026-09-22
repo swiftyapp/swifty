@@ -84,7 +84,8 @@ pub(crate) fn current_account(app: &AppHandle, cryptor: &Cryptor) -> Option<(Tok
 
 /// [`persist_tokens`] into the workspace directory `dir` rather than the active
 /// workspace's — for a vault added beside the open one while its paths stay put
-/// (`commands::autojoin`).
+/// (`commands::autojoin`), and for one re-keyed beside it by a master-password
+/// change, whose tokens come out sealed under its new key.
 pub(crate) fn persist_tokens_in(
     dir: &std::path::Path,
     cryptor: &Cryptor,
@@ -212,13 +213,6 @@ pub fn disconnect(app: &AppHandle) -> Result<()> {
 /// missing token file is a no-op, not an error.
 pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()> {
     auth::reseal_tokens(app, old, new)
-}
-
-/// [`reseal_tokens`] on the workspace directory `dir` rather than the active
-/// workspace's — for the workspaces a master-password change re-keys beside the
-/// open one.
-pub(crate) fn reseal_tokens_in(dir: &std::path::Path, old: &Cryptor, new: &Cryptor) -> Result<()> {
-    auth::reseal_tokens_in(dir, old, new)
 }
 
 /// One full sync against Drive. Blocking: call it on a dedicated thread.
