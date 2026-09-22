@@ -190,10 +190,7 @@ fn adopt_primary_with(app: &AppHandle, password: Zeroizing<String>) {
             return;
         };
         match super::workspace::verify_password_in(&root, &password) {
-            Ok(key) => {
-                appkey::open_all(&app, key.biometric_material());
-                appkey::rewrap_all(&app);
-            }
+            Ok(key) => appkey::open_all(&app, key.biometric_material()),
             Err(Error::InvalidPassword) => {}
             Err(e) => log::warn!("could not try the password against the primary: {e}"),
         }
@@ -270,7 +267,7 @@ pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Res
     let key = if active == PRIMARY_ID {
         app_key
     } else {
-        appkey::unwrap_key(&root, &active, &app_material).ok_or_else(|| {
+        appkey::unwrap_key(&app, &active, &app_material).ok_or_else(|| {
             Error::Other("biometric unlock is not enabled for this workspace".into())
         })?
     };

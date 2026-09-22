@@ -166,6 +166,30 @@ fn unwrap(root: &Path, id: &str, app_key: &[u8]) -> Result<Option<Zeroizing<Vec<
 // ran, an account vault joined after the user walked away — finds no live
 // session and stands down, rather than putting keys behind the lock screen
 // that a switch would then open the vault with.
+//
+// And each of them runs whole under one more lock, `AppState::sidecars`: the
+// check of which app key the ring holds, the sidecar reads and writes made on
+// the strength of it, and the write back into the ring. The check alone would
+// not do. A slower proof of an old app key could pass it, and a password
+// change then replace the key and reseal every sidecar while the proof was
+// still writing sidecars under the old one — or reading a freshly resealed one
+// with the old key, failing its tag, and removing it as stale. Under the lock,
+// either the change runs first and the proof stands down at its check, or the
+// proof runs to its end and the change reseals what it wrote. The lock is taken
+// before the session lock and never inside it, so `session::lock` never waits
+// on filesystem work; and nothing here holds it across an Argon2id run — the
+// proof itself happens before any of this is called.
+
+fn sidecars(state: &AppState) -> std::sync::MutexGuard<'_, ()> {
+    state.sidecars.lock().unwrap()
+}
+
+// A sidecar written under an app key the ring holds, or a note of why not.
+fn seal(root: &Path, id: &str, app_key: &[u8], material: &[u8]) {
+    if let Err(e) = wrap(root, id, app_key, material) {
+        log::warn!("could not seal workspace {id}'s key under the app key: {e}");
+    }
+}
 
 /// The primary has been opened: its key is the app key, and every workspace
 /// with a sidecar it opens joins the ring with it. Best effort per workspace —
@@ -175,13 +199,16 @@ fn unwrap(root: &Path, id: &str, app_key: &[u8]) -> Result<Option<Zeroizing<Vec<
 /// primary was, with no app key to seal it under at the time — is sealed now,
 /// which is the moment its password and the app key are first both known.
 pub fn open_all(app: &AppHandle, app_key: &[u8]) {
-    let state = app.state::<AppState>();
-    let Ok(root) = storage::root_dir(app) else {
-        return;
-    };
-    // What the ring already holds, read under the guards and then released:
-    // the filesystem work below — a sidecar per workspace — must not hold up
-    // every command that needs the session, a lock included.
+    if let Ok(root) = storage::root_dir(app) {
+        open_all_in(&app.state::<AppState>(), &root, app_key);
+    }
+}
+
+fn open_all_in(state: &AppState, root: &Path, app_key: &[u8]) {
+    let _sidecars = sidecars(state);
+    // What the ring already holds, read under the session guards and then
+    // released: the filesystem work below — a sidecar per workspace — must not
+    // hold up every command that needs the session, a lock included.
     let held = {
         let session = state.session.lock().unwrap();
         if !session.is_live() {
@@ -200,49 +227,38 @@ pub fn open_all(app: &AppHandle, app_key: &[u8]) {
         }
         ring.others()
     };
+    tests::pause();
 
     let mut opened = Vec::new();
-    for workspace in Registry::load(&root).workspaces {
+    for workspace in Registry::load(root).workspaces {
         if workspace.id == PRIMARY_ID {
             continue;
         }
         match held.iter().find(|(id, _)| *id == workspace.id) {
-            // A sidecar is a copy of what the ring holds, sealed under a key
-            // the ring has accepted, so writing one needs no guard.
-            Some((_, material)) => {
-                if let Err(e) = wrap(&root, &workspace.id, app_key, material) {
-                    log::warn!(
-                        "could not seal workspace {}'s key under the app key: {e}",
-                        workspace.id
-                    );
-                }
-            }
+            Some((_, material)) => seal(root, &workspace.id, app_key, material),
             None => {
-                if let Ok(Some(material)) = unwrap(&root, &workspace.id, app_key) {
+                if let Ok(Some(material)) = unwrap(root, &workspace.id, app_key) {
                     opened.push((workspace.id, material));
                 }
             }
         }
     }
 
-    // Into the ring under the guards again, and only if the session is still
-    // live and the app key is still this one: a lock that landed during the
-    // reads above cleared the ring, and a password change replaced the key,
-    // and neither is undone by what was read before it.
+    // Into the ring under the session guards again, and only if the session is
+    // still live: a lock that landed during the reads above cleared the ring,
+    // and what was read before it does not undo that. The app key is still the
+    // one checked above — the only writes that replace it wait on the sidecar
+    // lock this holds — so the check is repeated only as the last word against
+    // a writer added later.
     let session = state.session.lock().unwrap();
     if !session.is_live() {
         return;
     }
     let mut ring = state.keyring.lock().unwrap();
     if !ring.accepts_app_key(app_key) {
-        // A password change replaced the app key while the sidecars above were
-        // being written, so some of them may now be sealed under the old one —
-        // and a sidecar that will not open is advertised by the probe until
-        // it fails. The ring holds the new key and every workspace's material,
-        // so all of them are resealed under it; nothing read above goes in.
-        drop(ring);
-        drop(session);
-        rewrap_all(app);
+        log::error!(
+            "the app key changed under the sidecar lock; the sidecars just written are stale"
+        );
         return;
     }
     ring.insert(PRIMARY_ID, app_key);
@@ -256,15 +272,25 @@ pub fn open_all(app: &AppHandle, app_key: &[u8]) {
 /// it. The one write that replaces an app key on purpose — every other route
 /// into the ring refuses to (`Keyring::accepts_app_key`).
 pub fn replace_app_key(app: &AppHandle, app_key: &[u8]) {
-    let state = app.state::<AppState>();
-    {
+    if let Ok(root) = storage::root_dir(app) {
+        replace_app_key_in(&app.state::<AppState>(), &root, app_key);
+    }
+}
+
+fn replace_app_key_in(state: &AppState, root: &Path, app_key: &[u8]) {
+    let _sidecars = sidecars(state);
+    let others = {
         let session = state.session.lock().unwrap();
         if !session.is_live() {
             return;
         }
-        state.keyring.lock().unwrap().insert(PRIMARY_ID, app_key);
+        let mut ring = state.keyring.lock().unwrap();
+        ring.insert(PRIMARY_ID, app_key);
+        ring.others()
+    };
+    for (id, material) in others {
+        seal(root, &id, app_key, &material);
     }
-    rewrap_all(app);
 }
 
 /// A workspace other than the primary has been opened with its own key: it
@@ -272,70 +298,110 @@ pub fn replace_app_key(app: &AppHandle, app_key: &[u8]) {
 /// the next app unlock opens it too. Without the app key the sidecar waits for
 /// an unlock that has it (see `commands::auth::unlock`).
 pub fn adopt(app: &AppHandle, id: &str, material: &[u8]) {
-    if id == PRIMARY_ID {
-        open_all(app, material);
-        return;
-    }
-    let state = app.state::<AppState>();
-    let session = state.session.lock().unwrap();
-    if !session.is_live() {
-        return;
-    }
-    let mut ring = state.keyring.lock().unwrap();
-    ring.insert(id, material);
-    let app_key = ring.app_key();
-    drop(ring);
-    drop(session);
-    // The sidecar is a copy of what the ring now holds, so it needs no lock:
-    // it is only ever read under an app key the ring has already accepted.
-    let Some(app_key) = app_key else {
-        return;
-    };
     if let Ok(root) = storage::root_dir(app) {
-        if let Err(e) = wrap(&root, id, &app_key, material) {
-            log::warn!("could not seal workspace {id}'s key under the app key: {e}");
-        }
+        adopt_in(&app.state::<AppState>(), &root, id, material);
     }
 }
 
-/// The app key changed — a master-password change on the primary, or another
-/// workspace promoted into its place — and every sidecar sealed under the old
-/// one is stale. Rewritten for every workspace whose key is in the ring; the
-/// rest are removed by the next `open_all` when they fail to open.
-pub fn rewrap_all(app: &AppHandle) {
-    let state = app.state::<AppState>();
-    let ring = state.keyring.lock().unwrap();
-    let Some(app_key) = ring.app_key() else {
+fn adopt_in(state: &AppState, root: &Path, id: &str, material: &[u8]) {
+    if id == PRIMARY_ID {
+        open_all_in(state, root, material);
         return;
+    }
+    let _sidecars = sidecars(state);
+    let app_key = {
+        let session = state.session.lock().unwrap();
+        if !session.is_live() {
+            return;
+        }
+        let mut ring = state.keyring.lock().unwrap();
+        ring.insert(id, material);
+        ring.app_key()
     };
-    let others = ring.others();
-    drop(ring);
+    if let Some(app_key) = app_key {
+        seal(root, id, &app_key, material);
+    }
+}
+
+/// Workspace `id` was deleted: its key leaves the ring. When another workspace
+/// was promoted into the primary's place, its key is the app key now: the
+/// sealed copy of it that came into the root with its other files goes (the
+/// primary keeps none), and everything the ring still holds is resealed under
+/// it. A sidecar the ring does not hold the key for is left as it is, and goes
+/// when the next `open_all` fails to open it.
+pub fn forget(app: &AppHandle, id: &str, promoted: Option<&str>) {
     let Ok(root) = storage::root_dir(app) else {
         return;
     };
+    let state = app.state::<AppState>();
+    let _sidecars = sidecars(&state);
+    let mut ring = state.keyring.lock().unwrap();
+    ring.remove(id);
+    let Some(promoted) = promoted else {
+        return;
+    };
+    if let Some(material) = ring.remove(promoted) {
+        ring.insert(PRIMARY_ID, &material);
+    }
+    let app_key = ring.app_key();
+    let others = ring.others();
+    drop(ring);
+    let _ = storage::remove_if_present(&root.join(storage::WRAPPED_KEY_FILE));
+    let Some(app_key) = app_key else {
+        return;
+    };
     for (id, material) in others {
-        if let Err(e) = wrap(&root, &id, &app_key, &material) {
-            log::warn!("could not reseal workspace {id}'s key under the new app key: {e}");
-        }
+        seal(&root, &id, &app_key, &material);
     }
 }
 
 /// Open the primary's sealed copy of workspace `id`'s key with `app_key`, as a
 /// [`VaultKey`] ready to open that workspace's database. `None` when it has no
 /// sidecar, or one the app key does not open.
-pub fn unwrap_key(root: &Path, id: &str, app_key: &[u8]) -> Option<VaultKey> {
-    let material = unwrap(root, id, app_key).ok()??;
+pub fn unwrap_key(app: &AppHandle, id: &str, app_key: &[u8]) -> Option<VaultKey> {
+    let root = storage::root_dir(app).ok()?;
+    // Under the sidecar lock like every other read: a sidecar being resealed
+    // by a password change must not be read half-way, nor removed as stale
+    // for failing under a key that is a moment out of date.
+    let state = app.state::<AppState>();
+    let _sidecars = sidecars(&state);
+    let material = unwrap(&root, id, app_key).ok()??;
     Some(VaultKey::from_material(
         material,
-        workspace::dir_of(root, id)
+        workspace::dir_of(&root, id)
             .join(storage::KDF_SIDECAR_FILE)
             .exists(),
     ))
 }
 
+// A point a test can hold `open_all` at, between its check of the ring and the
+// sidecars it writes on the strength of it — the window the sidecar lock
+// closes. Nothing outside tests.
+#[cfg(not(test))]
+mod tests {
+    pub fn pause() {}
+}
+
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+    use std::thread::{self, JoinHandle};
+    use std::time::Duration;
+
     use super::*;
+    use crate::store::SqliteStore;
+    use crate::workspace::Workspace;
+
+    type Hook = Box<dyn Fn() + Send>;
+    static PAUSE: Mutex<Option<Hook>> = Mutex::new(None);
+
+    /// What `open_all` runs between its check of the ring and its sidecar
+    /// writes: nothing, unless a test has hung something there.
+    pub fn pause() {
+        if let Some(hook) = PAUSE.lock().unwrap().as_ref() {
+            hook();
+        }
+    }
 
     fn tmp_root() -> std::path::PathBuf {
         static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -421,6 +487,121 @@ mod tests {
 
         assert!(ring.accepts_app_key(APP_KEY));
         assert!(!ring.accepts_app_key(&[9u8; 32]));
+    }
+
+    // --- the ring under a live session --------------------------------------------
+
+    const OLD_KEY: &[u8] = &[1u8; 32];
+    const NEW_KEY: &[u8] = &[2u8; 32];
+    const X_KEY: &[u8] = &[3u8; 32];
+    const Y_KEY: &[u8] = &[4u8; 32];
+
+    // A root with the primary and two more workspaces, `x` and `y`, and an app
+    // state whose session is live on the primary.
+    fn live_state(root: &Path) -> Arc<AppState> {
+        let registry = Registry {
+            active: PRIMARY_ID.to_string(),
+            workspaces: ["default", "x", "y"]
+                .into_iter()
+                .map(|id| Workspace {
+                    id: id.to_string(),
+                    name: None,
+                    vault_id: None,
+                })
+                .collect(),
+        };
+        registry.save(root).unwrap();
+        for id in ["x", "y"] {
+            fs::create_dir_all(workspace::dir_of(root, id)).unwrap();
+        }
+        let state = Arc::new(AppState::default());
+        let key = VaultKey::legacy_from_password("primary");
+        let store = SqliteStore::open(&root.join("vault.db"), &*key.sqlcipher_key()).unwrap();
+        state.session.lock().unwrap().set(key, store, false);
+        state
+    }
+
+    fn sealed_under(root: &Path, id: &str, app_key: &[u8]) -> Vec<u8> {
+        unwrap(root, id, app_key).unwrap().unwrap().to_vec()
+    }
+
+    #[test]
+    fn a_primary_unlock_seals_what_the_ring_holds_and_opens_what_it_does_not() {
+        let root = tmp_root();
+        let state = live_state(&root);
+        state.keyring.lock().unwrap().insert("x", X_KEY);
+        wrap(&root, "y", OLD_KEY, Y_KEY).unwrap();
+
+        open_all_in(&state, &root, OLD_KEY);
+
+        let ring = state.keyring.lock().unwrap();
+        assert_eq!(&**ring.app_key().unwrap(), OLD_KEY);
+        assert_eq!(&**ring.get("y").unwrap(), Y_KEY, "opened from its sidecar");
+        drop(ring);
+        assert_eq!(sealed_under(&root, "x", OLD_KEY), X_KEY, "sealed now");
+    }
+
+    #[test]
+    fn a_proof_of_an_app_key_the_ring_has_replaced_writes_nothing() {
+        let root = tmp_root();
+        let state = live_state(&root);
+        state.keyring.lock().unwrap().insert(PRIMARY_ID, NEW_KEY);
+        state.keyring.lock().unwrap().insert("x", X_KEY);
+
+        open_all_in(&state, &root, OLD_KEY);
+
+        assert!(!is_wrapped(&root, "x"), "no sidecar under the retired key");
+        assert_eq!(&**state.keyring.lock().unwrap().app_key().unwrap(), NEW_KEY);
+    }
+
+    // The window the sidecar lock closes. A proof of the old app key has passed
+    // its check of the ring and is about to write sidecars by it; meanwhile a
+    // password change replaces the app key, rekeys another workspace, and a
+    // lock lands. Without the lock, the proof would seal `x` under the retired
+    // key over the change's fresh sidecar, read `y`'s fresh sidecar with the
+    // retired key and remove it as stale, and the lock would leave nothing to
+    // put either right — so the next app unlock would open neither. Under it,
+    // the change waits for the proof to finish and reseals everything it wrote.
+    #[test]
+    fn a_password_change_waits_for_a_proof_of_the_old_app_key_to_finish() {
+        let root = tmp_root();
+        let state = live_state(&root);
+        state.keyring.lock().unwrap().insert("x", X_KEY);
+        wrap(&root, "y", OLD_KEY, Y_KEY).unwrap();
+
+        let change: Arc<Mutex<Option<JoinHandle<()>>>> = Arc::default();
+        {
+            let (state, root, change) = (state.clone(), root.clone(), change.clone());
+            *PAUSE.lock().unwrap() = Some(Box::new(move || {
+                let worker = {
+                    let (state, root) = (state.clone(), root.clone());
+                    thread::spawn(move || {
+                        replace_app_key_in(&state, &root, NEW_KEY);
+                        adopt_in(&state, &root, "y", Y_KEY);
+                        // A lock: the session and the ring end (`session::lock`).
+                        state.session.lock().unwrap().clear();
+                        state.keyring.lock().unwrap().clear();
+                    })
+                };
+                thread::sleep(Duration::from_millis(200));
+                assert!(
+                    state.keyring.lock().unwrap().accepts_app_key(OLD_KEY),
+                    "the change is waiting on the proof"
+                );
+                *change.lock().unwrap() = Some(worker);
+            }));
+        }
+
+        open_all_in(&state, &root, OLD_KEY);
+        *PAUSE.lock().unwrap() = None;
+        change.lock().unwrap().take().unwrap().join().unwrap();
+
+        assert_eq!(sealed_under(&root, "x", NEW_KEY), X_KEY);
+        assert_eq!(sealed_under(&root, "y", NEW_KEY), Y_KEY);
+        assert!(
+            state.keyring.lock().unwrap().is_empty(),
+            "the lock had the last word"
+        );
     }
 
     #[test]

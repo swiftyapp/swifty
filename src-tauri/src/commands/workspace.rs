@@ -42,7 +42,7 @@ use crate::state::AppState;
 use crate::storage;
 use crate::store::{identity, SqliteStore, StoreError};
 use crate::sync::{self, restore};
-use crate::workspace::{self, Registry, Workspace, PRIMARY_ID};
+use crate::workspace::{self, Registry, Workspace};
 
 use super::blocking;
 use super::setup::{self, begin_step, create_off_thread};
@@ -925,21 +925,10 @@ pub async fn workspace_delete(
         let applied = workspace::apply_deletion(&root, &id, &deletion);
         if applied.is_ok() {
             *state.active_workspace.lock().unwrap() = deletion.registry.active.clone();
-            // The ring: the deleted workspace's key goes. A promotion makes the
-            // promoted vault's key the app key, under which everything the
-            // ring still holds is resealed; the promoted vault's own sealed
-            // copy came into the root with its other files, and the primary
-            // keeps none.
-            let mut ring = state.keyring.lock().unwrap();
-            ring.remove(&id);
-            if let Some(promoted) = &deletion.promoted {
-                if let Some(material) = ring.remove(promoted) {
-                    ring.insert(PRIMARY_ID, &material);
-                }
-                drop(ring);
-                let _ = storage::remove_if_present(&root.join(storage::WRAPPED_KEY_FILE));
-                appkey::rewrap_all(&app);
-            }
+            // The ring: the deleted workspace's key goes, and a promotion
+            // makes the promoted vault's key the app key, with every sidecar
+            // resealed under it.
+            appkey::forget(&app, &id, deletion.promoted.as_deref());
         }
         (ends_session, deletion.promoted.is_some(), applied)
     };
