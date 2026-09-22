@@ -36,10 +36,17 @@ describe("secure notes", () => {
     await waitFor("entry-item");
   });
 
-  it("renders the note body in the detail pane", async () => {
+  it("keeps the body sealed until the seal is clicked", async () => {
     await waitFor("entry-value-note");
-    await expect($('[data-testid="entry-value-note"]')).toHaveText(NOTE);
+    await expect($('[data-testid="entry-value-note"]')).not.toHaveText(NOTE);
     await expect($('[data-testid="entry-item-title"]')).toHaveText(TITLE);
+
+    await $('[data-testid="unseal-note"]').click();
+    await expect($('[data-testid="entry-value-note"]')).toHaveText(NOTE);
+
+    // The eye seals it back up.
+    await $('[data-testid="reveal-note"]').click();
+    await expect($('[data-testid="entry-value-note"]')).not.toHaveText(NOTE);
   });
 
   it("round-trips an edit of the body", async () => {
@@ -61,6 +68,7 @@ describe("secure notes", () => {
     });
 
     await reopenFirstEntry();
+    await $('[data-testid="unseal-note"]').click();
     await expect($('[data-testid="entry-value-note"]')).toHaveText(
       EDITED_NOTE,
     );
