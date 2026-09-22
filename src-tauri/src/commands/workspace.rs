@@ -125,11 +125,21 @@ pub async fn workspace_select(
         }
     };
     let sync_configured = storage::sync_configured(&app);
-    state
-        .session
-        .lock()
-        .unwrap()
-        .set(key, store, sync_configured);
+    // The ring is what authorised this open, so it is asked once more before
+    // the vault is handed to the session — under the session lock, as a lock
+    // reads and clears it (`session::lock`). A lock that landed while the open
+    // was in flight cleared the ring, so a ring that no longer holds this key
+    // is a lock that won: the store closes and the vault stays as the lock
+    // left it, exactly as a lease `Session::adopt` refuses does for a create.
+    // The lock has already said `vault:locked`; there is nothing to add.
+    {
+        let mut session = state.session.lock().unwrap();
+        if !state.keyring.lock().unwrap().has(&id) {
+            log::info!("vault locked during the switch; workspace {id} stays locked");
+            return Ok(None);
+        }
+        session.set(key, store, sync_configured);
+    }
     // As after any unlock: the session arms its own idle clock, and a vault
     // named before names lived inside it takes the registry's label.
     crate::autolock::touch(&app);
@@ -347,6 +357,11 @@ pub async fn workspace_create(
 /// with the primary's own descriptor and compare. `PrimaryWorkspaceOnly` when
 /// the primary has not been opened this session and there is nothing to
 /// compare against, which the frontend has already said no to.
+///
+/// Under the primary's own failed-attempt backoff, exactly as an unlock of it
+/// and a delete of it run: this proves the primary's password on demand from
+/// an open webview, and without the backoff it would be a way to guess that
+/// password at full Argon2id speed while the lock screen beside it escalates.
 async fn verify_master_password(
     root: &Path,
     state: &AppState,
@@ -355,12 +370,27 @@ async fn verify_master_password(
     let Some(app_key) = state.keyring.lock().unwrap().app_key() else {
         return Err(Error::PrimaryWorkspaceOnly);
     };
+    let lockout = LockoutState::load_in(root)?;
+    let now = auth::now_ms();
+    if let Some(refusal) = auth::locked_out(lockout, now) {
+        return Err(refusal);
+    }
+
     let dir = root.to_path_buf();
     let derived = blocking(move || derive_in(&dir, &password)).await?;
     if derived.biometric_material().ct_eq(&app_key).into() {
+        if lockout != LockoutState::default() {
+            if let Err(e) = LockoutState::default().save_in(root) {
+                log::warn!("failed to reset lockout sidecar: {e}");
+            }
+        }
         Ok(())
     } else {
-        Err(Error::InvalidPassword)
+        let (updated, refusal) = auth::penalize(lockout, now);
+        if let Err(e) = updated.save_in(root) {
+            log::warn!("failed to persist lockout sidecar: {e}");
+        }
+        Err(refusal)
     }
 }
 

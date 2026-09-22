@@ -125,10 +125,18 @@ fn unwrap(root: &Path, id: &str, app_key: &[u8]) -> Result<Option<Zeroizing<Vec<
     if !path.exists() {
         return Ok(None);
     }
-    let sealed = STANDARD
-        .decode(fs::read_to_string(&path)?.trim())
-        .map_err(|e| Error::Crypto(e.to_string()))?;
-    match crypto::unseal_aead(&*wrapping_key(app_key), id.as_bytes(), &sealed) {
+    // One that cannot be read or decoded is as stale as one that fails its
+    // tag: the probe offers a biometric unlock on the strength of the file
+    // being there, so a file that will never open must not stay there.
+    let opened = fs::read_to_string(&path)
+        .map_err(Error::from)
+        .and_then(|text| {
+            STANDARD
+                .decode(text.trim())
+                .map_err(|e| Error::Crypto(e.to_string()))
+        })
+        .and_then(|sealed| crypto::unseal_aead(&*wrapping_key(app_key), id.as_bytes(), &sealed));
+    match opened {
         Ok(material) => Ok(Some(Zeroizing::new(material))),
         Err(e) => {
             log::warn!("workspace {id}'s sealed key does not open under the app key; removing it");
@@ -139,6 +147,14 @@ fn unwrap(root: &Path, id: &str, app_key: &[u8]) -> Result<Option<Zeroizing<Vec<
 }
 
 // --- filling the ring ------------------------------------------------------------
+//
+// Every write below is made under the session lock, and only for a session
+// that is live. A lock takes the session first and clears the ring under it
+// (`session::lock`), so a write that lands after a lock — a detached password
+// proof finishing late, a password change whose session was locked while it
+// ran, an account vault joined after the user walked away — finds no live
+// session and stands down, rather than putting keys behind the lock screen
+// that a switch would then open the vault with.
 
 /// The primary has been opened: its key is the app key, and every workspace
 /// with a sidecar it opens joins the ring with it. Best effort per workspace —
@@ -152,6 +168,10 @@ pub fn open_all(app: &AppHandle, app_key: &[u8]) {
     let Ok(root) = storage::root_dir(app) else {
         return;
     };
+    let session = state.session.lock().unwrap();
+    if !session.is_live() {
+        return;
+    }
     let mut ring = state.keyring.lock().unwrap();
     ring.insert(PRIMARY_ID, app_key);
     for workspace in Registry::load(&root).workspaces {
@@ -186,12 +206,20 @@ pub fn adopt(app: &AppHandle, id: &str, material: &[u8]) {
         return;
     }
     let state = app.state::<AppState>();
+    let session = state.session.lock().unwrap();
+    if !session.is_live() {
+        return;
+    }
     let mut ring = state.keyring.lock().unwrap();
     ring.insert(id, material);
-    let Some(app_key) = ring.app_key() else {
+    let app_key = ring.app_key();
+    drop(ring);
+    drop(session);
+    // The sidecar is a copy of what the ring now holds, so it needs no lock:
+    // it is only ever read under an app key the ring has already accepted.
+    let Some(app_key) = app_key else {
         return;
     };
-    drop(ring);
     if let Ok(root) = storage::root_dir(app) {
         if let Err(e) = wrap(&root, id, &app_key, material) {
             log::warn!("could not seal workspace {id}'s key under the app key: {e}");
@@ -278,6 +306,19 @@ mod tests {
         wrap(&root, "a1b2", APP_KEY, b"vault-key").unwrap();
 
         assert!(unwrap(&root, "a1b2", &[9u8; 32]).is_err());
+        assert!(!is_wrapped(&root, "a1b2"));
+    }
+
+    // A file that is not even a sealed key — truncated, overwritten, not
+    // base64 — is advertised by the probe for as long as it exists, so it goes
+    // the same way a stale one does.
+    #[test]
+    fn a_malformed_sidecar_is_removed_too() {
+        let root = tmp_root();
+        fs::create_dir_all(workspace::dir_of(&root, "a1b2")).unwrap();
+        fs::write(sidecar(&root, "a1b2"), "not a sealed key").unwrap();
+
+        assert!(unwrap(&root, "a1b2", APP_KEY).is_err());
         assert!(!is_wrapped(&root, "a1b2"));
     }
 
