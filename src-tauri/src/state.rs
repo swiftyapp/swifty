@@ -182,6 +182,13 @@ pub struct AppState {
     /// Outside `session` because it outlives one — a switch ends the session
     /// and keeps the ring — and ends with every lock instead.
     pub keyring: Mutex<crate::appkey::Keyring>,
+    /// Held across every step that decides the ring's app key and then reads or
+    /// writes the sealed-key sidecars by it (`crate::appkey`): a proof of one
+    /// app key and a password change that replaces it run whole, one after the
+    /// other, rather than the slower one writing sidecars under a key the
+    /// faster one has already retired. Taken before `session`, never inside it,
+    /// so a lock never waits on filesystem work.
+    pub sidecars: Mutex<()>,
     /// Which workspace every vault path resolves to right now.
     ///
     /// Held in memory rather than read from the registry on each path lookup:
@@ -287,6 +294,7 @@ impl Default for AppState {
         Self {
             session: Mutex::default(),
             keyring: Mutex::default(),
+            sidecars: Mutex::default(),
             active_workspace: Mutex::new(crate::workspace::PRIMARY_ID.to_string()),
             workspace_lock: Mutex::default(),
             syncing: Arc::default(),

@@ -345,7 +345,12 @@ carries them as part of the opaque payload and never sees them.
    lock screen, and that unlock writes one. The same passphrase for every
    workspace is the rule (a create proves it against the app key), which is
    what lets a non-primary unlock prove the passphrase against the primary in
-   the background and fill the ring from there. A passphrase *change*
+   the background and fill the ring from there. Every step that settles which
+   key the app key is and then reads or writes sidecars by it — a proof filling
+   the ring, a passphrase change replacing the key, a delete promoting a
+   workspace — runs whole under one lock (`AppState::sidecars`), so a slower
+   proof of a retired key cannot reseal a sidecar under it, or remove a fresh
+   one as stale, behind a change that has already landed. A passphrase *change*
    (`change_master_password`) keeps that rule true: after the open workspace is
    re-keyed, every other workspace that shares the passphrase is re-keyed too —
    each under a fresh salt of its own, through the same snapshot-guarded saga on
