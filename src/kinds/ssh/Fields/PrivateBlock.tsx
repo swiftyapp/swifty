@@ -3,14 +3,11 @@ import { useTranslation } from 'react-i18next'
 import CopyButton from '@/components/elements/CopyButton'
 import IconButton from '@/components/elements/IconButton'
 import Panel from '@/components/elements/Panel'
+import Seal from '@/components/elements/Seal'
 import { useField } from '@/components/elements/fields'
 import { LABEL, META } from '@/components/elements/tokens'
-import { EyeGlyph, EyeOffGlyph, LockGlyph } from '@/components/Main/icons'
+import { EyeGlyph, EyeOffGlyph } from '@/components/Main/icons'
 import { privateKeyFormat } from '../keyInfo'
-
-// What stands in for the body while it is sealed. Fixed, like BLOCK_DOTS: the
-// seal says nothing about how long the key is.
-const SEAL = Array.from({ length: 4 }, () => '•'.repeat(64))
 
 /**
  * The private key as a sealed block — the read view's. Its armor (the BEGIN and
@@ -65,28 +62,9 @@ export default function PrivateBlock() {
         {shown ? (
           body.map((line, index) => <div key={index}>{line}</div>)
         ) : (
-          <div aria-hidden className="select-none blur-[5px]">
-            {SEAL.map((line, index) => (
-              <div key={index}>{line}</div>
-            ))}
-          </div>
+          <Seal onReveal={() => setShown(true)} testid="unseal-privateKey" />
         )}
         {foot && <div>{foot}</div>}
-
-        {!shown && (
-          <button
-            type="button"
-            onClick={() => setShown(true)}
-            aria-label={t('Reveal')}
-            data-testid="unseal-privateKey"
-            className="absolute inset-0 grid cursor-pointer place-items-center"
-          >
-            <span className="flex h-[30px] items-center gap-2 rounded-sm border border-line2 bg-detail px-3 font-sans text-base font-medium text-text shadow-[0_6px_18px_rgba(0,0,0,0.12)]">
-              <LockGlyph size={13} />
-              {t('Sealed · click to reveal')}
-            </span>
-          </button>
-        )}
       </div>
     </Panel>
   )
