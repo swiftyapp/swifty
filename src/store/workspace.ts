@@ -8,7 +8,6 @@ import {
 } from '@/api/workspace'
 import { PRIMARY_WORKSPACE } from '@/lib/workspace'
 import {
-  useApp,
   clearSession,
   enterMain,
   refreshApp,
@@ -34,23 +33,32 @@ export const selectWorkspaces = (state: AppState): Workspace[] =>
 export const selectActiveWorkspace = (state: AppState): string =>
   state.status?.activeWorkspace ?? PRIMARY_WORKSPACE
 
-/** Sync and biometric unlock are offered here and nowhere else. */
-export const useIsPrimaryWorkspace = () => useApp(selectActiveWorkspace) === PRIMARY_WORKSPACE
-
-// Move to another workspace. Only one is ever unlocked, so this *is* a lock —
-// and the backend emits `vault:locked` for it like any other, so there is
-// nothing to do here afterwards: the one handler re-probes and lands on that
-// workspace's lock screen with the picker still offering the way back.
+// Move to another workspace. The app is unlocked as a whole, so the backend
+// usually opens the next database itself and answers like an unlock: the same
+// landing as a create — the previous workspace's data goes first, then the
+// probe brings the new active workspace on screen. Only a workspace that has
+// never been opened with its password on this device answers with nothing:
+// that switch is a lock, announced as `vault:locked` like any other, and the
+// one handler re-probes and lands on that workspace's lock screen with the
+// picker still offering the way back.
 //
-// The gate is dropped first: it belongs to the workspace being left, and the
-// lock screen would otherwise wear it for the new one until the re-probe lands
-// (see `forgetBiometricGate`). A switch that fails re-probes to put it back.
-export const switchWorkspace = (id: string) => {
+// The gate is dropped first: whether biometrics open a workspace is a fact
+// about that workspace, and the lock screen would otherwise wear the previous
+// one's answer until the re-probe lands (see `forgetBiometricGate`). A switch
+// that fails re-probes to put it back.
+export const switchWorkspace = async (id: string) => {
   forgetBiometricGate()
-  return workspaceSelect(id).catch((error: unknown) => {
+  let result
+  try {
+    result = await workspaceSelect(id)
+  } catch (error) {
     void refreshApp()
     throw error
-  })
+  }
+  if (!result) return
+  clearSession()
+  await enterMain(result)
+  await refreshApp()
 }
 
 // Remove a workspace's vault from this device, and with `everywhere` from the

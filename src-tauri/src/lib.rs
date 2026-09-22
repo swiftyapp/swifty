@@ -1,4 +1,5 @@
 mod app;
+mod appkey;
 // The master-password domain: the failed-unlock backoff and the rekey saga.
 mod auth;
 mod autolock;

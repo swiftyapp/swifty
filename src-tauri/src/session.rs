@@ -212,11 +212,25 @@ impl Session {
 pub fn lock(app: &AppHandle) -> bool {
     let state = app.state::<AppState>();
     let mut session = state.session.lock().unwrap();
-    if !session.is_live() {
+    let live = session.is_live();
+    if live {
+        session.clear();
+    }
+    // The app-level unlock ends with every lock, whichever workspace was open
+    // — and whether or not one was: a ring kept across a switch to a workspace
+    // it did not hold (`workspace_select`) is a vault open at this level with
+    // no session behind it, and a lock has to end that too.
+    //
+    // Cleared under the session guard, not after it. Everything that puts a
+    // key into the ring, or opens a vault from one, takes the session lock
+    // first and reads the ring under it (`appkey`, `workspace_select`) — so
+    // this either runs wholly before such a step, which then finds the ring
+    // empty and stands down, or wholly after it, which it then ends.
+    let held = state.keyring.lock().unwrap().clear();
+    drop(session);
+    if !live && !held {
         return false;
     }
-    session.clear();
-    drop(session);
     sealed(app);
     events::vault_locked(app);
     true

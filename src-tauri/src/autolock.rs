@@ -97,8 +97,16 @@ pub fn set_timeout(app: &AppHandle, secs: u64) {
 /// `is_live`, not `is_unlocked`: a vault whose key is out with a password
 /// change or a workspace create is still a vault to lock, and the operation
 /// finds out when it tries to hand the key back (`Session::adopt`).
+///
+/// A ring with keys in it counts too. A switch to a workspace the ring does
+/// not hold ends the session and keeps the ring (`workspace_select`), so the
+/// lock screen it lands on has the app open behind it — for exactly as long
+/// as an open vault would be.
 pub fn touch(app: &AppHandle) {
-    if !app.state::<AppState>().session.lock().unwrap().is_live() {
+    let state = app.state::<AppState>();
+    let live = state.session.lock().unwrap().is_live();
+    let held = !state.keyring.lock().unwrap().is_empty();
+    if !live && !held {
         return;
     }
     let state = app.state::<AutoLock>();

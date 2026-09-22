@@ -4398,6 +4398,7 @@ dependencies = [
  "serde_json",
  "sha2 0.11.0",
  "ssh-key",
+ "subtle",
  "sys-locale",
  "tauri",
  "tauri-build",

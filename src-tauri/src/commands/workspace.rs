@@ -1,10 +1,16 @@
 //! Creating, restoring, switching, renaming and deleting workspaces.
 //!
-//! Only one workspace is ever unlocked, so every command here starts by
-//! clearing the session: switching *is* locking what is open and pointing the
-//! paths somewhere else. A switch therefore announces itself as the lock it is
-//! (`vault:locked`), which is what re-probes `app_status` on the frontend;
-//! creating one ends unlocked and has nothing to announce.
+//! Only one workspace's database is ever open, so every command here starts by
+//! clearing the session: switching *is* closing what is open and pointing the
+//! paths somewhere else. The app, though, is open at its own level
+//! (`crate::appkey`): one unlock holds every workspace's key, so a switch to a
+//! workspace the ring holds opens the next database itself and hands back an
+//! unlock's result. Only a switch to one it does not hold — a workspace that
+//! has never been opened with its password on this device — ends as every
+//! switch used to, announcing itself as the lock it is (`vault:locked`), which
+//! is what re-probes `app_status` on the frontend and lands on that
+//! workspace's lock screen. Creating one ends unlocked and has nothing to
+//! announce.
 //!
 //! A workspace can also arrive from Drive rather than be made here. That flow
 //! borrows onboarding's keyless connect (`commands::setup`) wholesale — the
@@ -21,9 +27,11 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::Ordering;
 
+use subtle::ConstantTimeEq;
 use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
+use crate::appkey;
 use crate::auth::{self, LockoutState};
 use crate::crypto::{KdfParams, VaultKey};
 use crate::error::{Error, Result};
@@ -39,53 +47,124 @@ use crate::workspace::{self, Registry, Workspace};
 use super::blocking;
 use super::setup::{self, begin_step, create_off_thread};
 
-/// Lock whatever is open and make `id` the workspace the app addresses.
+/// Close whatever is open and make `id` the workspace the app addresses.
 ///
-/// The next unlock opens its database, and a relaunch comes back to it: the
-/// choice is recorded in the registry, not just in memory.
+/// With the target's key in the ring — the app-level unlock — its database is
+/// opened here and the result is an unlock's, for the frontend to enter with.
+/// Without one, the switch ends on that workspace's lock screen as it always
+/// did, and `None` says so; the `vault:locked` it emits is what lands there.
+///
+/// A relaunch comes back to the workspace chosen: the choice is recorded in
+/// the registry, not just in memory.
 #[tauri::command]
-pub fn workspace_select(id: String, app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+pub async fn workspace_select(
+    id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Option<UnlockResult>> {
     // The step a create holds while its Argon2 runs, and a master-password
     // change while it rewrites the sidecar: both write through the paths, so
-    // neither may see them move underneath.
+    // neither may see them move underneath. Held to the end, so no second
+    // switch lands while the open below is in flight.
     let _step = begin_step(&state)?;
     let root = storage::root_dir(&app)?;
 
-    // Read under the lock too: every writer of the registry holds it, so what is
-    // saved below is a change to the current file, never to a stale copy.
-    let _paths = state.workspace_lock.lock().unwrap();
-    let mut registry = Registry::load(&root);
-    if !registry.contains(&id) {
-        return Err(Error::NotFound);
-    }
-    guard_sync_idle(&state)?;
+    let material = {
+        // Read under the lock too: every writer of the registry holds it, so
+        // what is saved below is a change to the current file, never to a
+        // stale copy.
+        let _paths = state.workspace_lock.lock().unwrap();
+        let mut registry = Registry::load(&root);
+        if !registry.contains(&id) {
+            return Err(Error::NotFound);
+        }
+        guard_sync_idle(&state)?;
 
-    // Persist first: a save that fails leaves the session open and the paths
-    // where they were, so a rejected switch changes nothing. Nothing to record
-    // when the choice did not change, which on a single-workspace install is
-    // the only case there is — so selecting the primary never conjures a
-    // registry file for a user who has no second vault.
-    if registry.active != id {
-        registry.active = id.clone();
-        registry.save(&root)?;
-    }
+        // Persist first: a save that fails leaves the session open and the
+        // paths where they were, so a rejected switch changes nothing. Nothing
+        // to record when the choice did not change, which on a single-workspace
+        // install is the only case there is — so selecting the primary never
+        // conjures a registry file for a user who has no second vault.
+        if registry.active != id {
+            registry.active = id.clone();
+            registry.save(&root)?;
+        }
 
-    // Together, and in this order: a session outliving the switch would hold
-    // one workspace's key against another's database.
-    state.session.lock().unwrap().clear();
-    *state.active_workspace.lock().unwrap() = id;
+        // Together, and in this order: a session outliving the switch would
+        // hold one workspace's key against another's database. The ring is
+        // untouched — the open workspace's key stays in it, which is what
+        // lets a switch back open it without a prompt.
+        let material = state.keyring.lock().unwrap().get(&id);
+        state.session.lock().unwrap().clear();
+        *state.active_workspace.lock().unwrap() = id.clone();
+        material
+    };
     // Ended like any other session: clipboard cleared, idle timer dropped.
     crate::session::sealed(&app);
     // Sync is per workspace, and what the frontend is holding belongs to the one
-    // that just locked. Said now rather than left to the re-probe below, so no
-    // frame shows another vault's "last synced" or another vault's error.
+    // that just closed. Said now rather than left to the re-probe or the entry
+    // below, so no frame shows another vault's "last synced" or another
+    // vault's error.
     super::sync::switched(&app);
-    // Announced like any other lock, so the frontend takes the one path it
-    // takes for all of them. After the repoint rather than inside the clear
-    // (`session::lock`): the reaction re-probes `app_status`, which must find
-    // the new workspace already active.
-    crate::events::vault_locked(&app);
-    Ok(())
+
+    let Some(material) = material else {
+        return Ok(land_on_lock_screen(&app));
+    };
+    let key = VaultKey::from_material(material, storage::kdf_sidecar_path(&app)?.exists());
+    let (key, store, entries) = match super::auth::open_off_thread(&app, key).await {
+        Ok(opened) => opened,
+        Err(e) => {
+            // The key the ring held does not open this vault — its password
+            // was changed somewhere the ring never heard of. It is dropped,
+            // and the switch ends where it always used to: on the lock screen,
+            // where the password that does open it also puts it back in the
+            // ring (`auth::unlock`).
+            log::warn!("workspace {id} did not open with the key held for it: {e}");
+            state.keyring.lock().unwrap().remove(&id);
+            return Ok(land_on_lock_screen(&app));
+        }
+    };
+    let sync_configured = storage::sync_configured(&app);
+    // The ring is what authorised this open, so it is asked once more before
+    // the vault is handed to the session — under the session lock, as a lock
+    // reads and clears it (`session::lock`). A lock that landed while the open
+    // was in flight cleared the ring, so a ring that no longer holds this key
+    // is a lock that won: the store closes and the vault stays as the lock
+    // left it, exactly as a lease `Session::adopt` refuses does for a create.
+    // The lock has already said `vault:locked`; there is nothing to add.
+    {
+        let mut session = state.session.lock().unwrap();
+        if !state.keyring.lock().unwrap().has(&id) {
+            log::info!("vault locked during the switch; workspace {id} stays locked");
+            return Ok(None);
+        }
+        session.set(key, store, sync_configured);
+    }
+    // As after any unlock: the session arms its own idle clock, and a vault
+    // named before names lived inside it takes the registry's label.
+    crate::autolock::touch(&app);
+    super::auth::seed_vault_name(&app, &state);
+    Ok(Some(UnlockResult {
+        entries,
+        sync_configured,
+    }))
+}
+
+/// The switch that has no key to open its target with: announced like any
+/// other lock, so the frontend takes the one path it takes for all of them.
+/// After the repoint rather than inside the clear (`session::lock`): the
+/// reaction re-probes `app_status`, which must find the new workspace already
+/// active.
+///
+/// The ring stays. The app is still open at its own level — the picker on the
+/// lock screen can come straight back to a workspace the ring holds, and a
+/// password typed for this one is enough to seal its key under the app key
+/// (`auth::unlock`). It goes back on the idle clock for it, since the session
+/// that kept it there has ended.
+fn land_on_lock_screen(app: &AppHandle) -> Option<UnlockResult> {
+    crate::autolock::touch(app);
+    crate::events::vault_locked(app);
+    None
 }
 
 /// Refuse to move the paths while a sync flow is using them. The caller holds
@@ -147,7 +226,13 @@ fn restore(state: &AppState, active: String, previous: Lease) {
     state.session.lock().unwrap().restore(previous);
 }
 
-/// Create a workspace with its own master password and leave it unlocked.
+/// Create a workspace under the device's master password and leave it unlocked.
+///
+/// One master password for the device: `password` has to be the primary's, so
+/// that the vault opens on another device under the same password
+/// (`commands::autojoin`) and so that a password change can carry every
+/// workspace along. Proved against the app key the ring holds, which costs the
+/// Argon2id run and nothing else; a wrong one is `InvalidPassword`.
 ///
 /// The new vault is empty, so the result needs no listing — it is what the
 /// caller of a first unlock expects, with nothing in it yet.
@@ -180,6 +265,7 @@ pub async fn workspace_create(
     let _step = begin_step(&state)?;
 
     let root = storage::root_dir(&app)?;
+    verify_master_password(&root, &state, password.clone()).await?;
     let id = crate::crypto::random_hex_id();
 
     // The open session comes out on a lease and the paths move as one step
@@ -243,6 +329,7 @@ pub async fn workspace_create(
     // locked: the workspace exists and is recorded, and the next unlock opens
     // it, but it does not open itself behind a lock the user asked for.
     let syncing = inherited.is_some();
+    let material = Zeroizing::new(key.biometric_material().to_vec());
     let (_, _, _, claim) = previous.split();
     if !state
         .session
@@ -256,10 +343,55 @@ pub async fn workspace_create(
     // put it on the idle clock from here rather than from whenever the webview
     // next reports activity.
     crate::autolock::touch(&app);
+    // And open at the app level: sealed under the app key, which the check
+    // above proved is in the ring.
+    appkey::adopt(&app, &id, &material);
     Ok(UnlockResult {
         entries: vec![],
         sync_configured: syncing,
     })
+}
+
+/// Prove `password` is the master password — the one the primary's key derives
+/// from, held in the ring as the app key — without opening anything: derive
+/// with the primary's own descriptor and compare. `PrimaryWorkspaceOnly` when
+/// the primary has not been opened this session and there is nothing to
+/// compare against, which the frontend has already said no to.
+///
+/// Under the primary's own failed-attempt backoff, exactly as an unlock of it
+/// and a delete of it run: this proves the primary's password on demand from
+/// an open webview, and without the backoff it would be a way to guess that
+/// password at full Argon2id speed while the lock screen beside it escalates.
+async fn verify_master_password(
+    root: &Path,
+    state: &AppState,
+    password: Zeroizing<String>,
+) -> Result<()> {
+    let Some(app_key) = state.keyring.lock().unwrap().app_key() else {
+        return Err(Error::PrimaryWorkspaceOnly);
+    };
+    let lockout = LockoutState::load_in(root)?;
+    let now = auth::now_ms();
+    if let Some(refusal) = auth::locked_out(lockout, now) {
+        return Err(refusal);
+    }
+
+    let dir = root.to_path_buf();
+    let derived = blocking(move || derive_in(&dir, &password)).await?;
+    if derived.biometric_material().ct_eq(&app_key).into() {
+        if lockout != LockoutState::default() {
+            if let Err(e) = LockoutState::default().save_in(root) {
+                log::warn!("failed to reset lockout sidecar: {e}");
+            }
+        }
+        Ok(())
+    } else {
+        let (updated, refusal) = auth::penalize(lockout, now);
+        if let Err(e) = updated.save_in(root) {
+            log::warn!("failed to persist lockout sidecar: {e}");
+        }
+        Err(refusal)
+    }
 }
 
 /// The open workspace's Google account, with the connection generation it was
@@ -536,13 +668,16 @@ async fn restore_workspace(
     // The restored vault continues the session the previous one was taken from,
     // and it arrives connected. A lock that landed while the lease was out still
     // wins — the workspace exists and is recorded, and the next unlock opens it.
+    let material = Zeroizing::new(key.biometric_material().to_vec());
     let (_, _, _, claim) = previous.split();
     if !state.session.lock().unwrap().adopt(claim, key, store, true) {
         return Err(Error::Locked);
     }
     // As in `workspace_create`: the restored vault is open, so its idle clock
-    // starts here.
+    // starts here — and it is open at the app level, sealed under the app key
+    // when the ring holds one.
     crate::autolock::touch(app);
+    appkey::adopt(app, &id, &material);
     super::autojoin::with_password(app, join);
     Ok(UnlockResult {
         entries,
@@ -672,7 +807,11 @@ fn name_the_open_vault(
 /// Deleting the primary is the case that moves files: the root is its
 /// directory, so the first surviving workspace is promoted into it and takes
 /// `PRIMARY_ID` (see [`Registry::without`]). The biometric enrollment goes with
-/// it — the one keychain item held the deleted vault's key.
+/// it — the one keychain item held the app key, which was the deleted vault's
+/// — and so does every other workspace's copy of its key sealed under that
+/// app key: the promoted vault's key is the app key now, and the ring reseals
+/// what it holds under it (`crate::appkey`); the rest are stale, and the next
+/// unlock of each writes a fresh one.
 ///
 /// Ends like a switch whenever the workspace the paths point at is the one
 /// going away or the one being promoted: same guards, same `vault:locked`, so
@@ -786,15 +925,19 @@ pub async fn workspace_delete(
         let applied = workspace::apply_deletion(&root, &id, &deletion);
         if applied.is_ok() {
             *state.active_workspace.lock().unwrap() = deletion.registry.active.clone();
+            // The ring: the deleted workspace's key goes, and a promotion
+            // makes the promoted vault's key the app key, with every sidecar
+            // resealed under it.
+            appkey::forget(&app, &id, deletion.promoted.as_deref());
         }
         (ends_session, deletion.promoted.is_some(), applied)
     };
 
     // Off the lock, because a keychain delete is a blocking call into the OS.
-    // The enrollment belonged to the primary's key and that vault is gone, so
-    // the stored bytes open nothing; the marker file went with the primary's
-    // other files above. Best effort, like every other unenroll on a path the
-    // user cannot retry: an item we could not reach is overwritten by the next
+    // The enrollment held the app key, which was the deleted primary's, so the
+    // stored bytes open nothing; the marker file went with the primary's other
+    // files above. Best effort, like every other unenroll on a path the user
+    // cannot retry: an item we could not reach is overwritten by the next
     // enrollment.
     if was_primary && applied.is_ok() {
         let _ = blocking(|| crate::secure_store::Platform.delete()).await;
@@ -857,18 +1000,8 @@ async fn delete_remote_pack(
 // to compare against the session the way `change_master_password` does.
 //
 // Argon2id: run it off the main thread.
-fn verify_password_in(dir: &Path, password: &str) -> Result<VaultKey> {
-    let sidecar = dir.join(storage::KDF_SIDECAR_FILE);
-    let key = if sidecar.exists() {
-        let params = KdfParams::from_json(&fs::read_to_string(sidecar)?)?;
-        VaultKey::Argon2 {
-            master: crate::crypto::derive(password.as_bytes(), &params)?,
-        }
-    } else {
-        // A vault written before the sidecar existed, as `session::derive_key`
-        // reads one.
-        VaultKey::legacy_from_password(password)
-    };
+pub(crate) fn verify_password_in(dir: &Path, password: &str) -> Result<VaultKey> {
+    let key = derive_in(dir, password)?;
 
     // The same split `session::open_with_key` draws: only the store's own key
     // check is a wrong password. A failing disk must not be reported as one.
@@ -878,6 +1011,23 @@ fn verify_password_in(dir: &Path, password: &str) -> Result<VaultKey> {
         e => Error::Other(format!("could not open the vault: {e}")),
     })?;
     Ok(key)
+}
+
+// The key `password` derives to for the vault in `dir`, as `session::derive_key`
+// derives one for the active workspace: Argon2id under the descriptor beside
+// the database, or the legacy scheme for a vault written before the sidecar
+// existed. Nothing is opened; whether it is the right key is the caller's
+// question.
+fn derive_in(dir: &Path, password: &str) -> Result<VaultKey> {
+    let sidecar = dir.join(storage::KDF_SIDECAR_FILE);
+    if sidecar.exists() {
+        let params = KdfParams::from_json(&fs::read_to_string(sidecar)?)?;
+        Ok(VaultKey::Argon2 {
+            master: crate::crypto::derive(password.as_bytes(), &params)?,
+        })
+    } else {
+        Ok(VaultKey::legacy_from_password(password))
+    }
 }
 
 // Argon2id + creating the encrypted DB, off the command thread. The directory

@@ -33,7 +33,7 @@ const SALT_LEN: usize = 64;
 const IV_LEN: usize = 16;
 const TAG_LEN: usize = 16;
 const ITERATIONS: u32 = 100_000;
-const KEY_LEN: usize = 32;
+pub(crate) const KEY_LEN: usize = 32;
 
 /// Sixteen random bytes — the width of every id the app mints for itself
 /// (entries, workspaces, share files, export rows). One source so they all
