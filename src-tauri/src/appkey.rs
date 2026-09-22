@@ -25,6 +25,7 @@ use std::fs;
 use std::path::Path;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
+use subtle::ConstantTimeEq;
 use tauri::{AppHandle, Manager};
 use zeroize::Zeroizing;
 
@@ -74,6 +75,17 @@ impl Keyring {
     /// The app key: the primary's material, if the primary has been opened.
     pub fn app_key(&self) -> Option<Zeroizing<Vec<u8>>> {
         self.get(PRIMARY_ID)
+    }
+
+    /// Whether `app_key` is the app key the ring already holds — or the ring
+    /// holds none yet. A ring that holds a *different* one is the newer fact:
+    /// a password change replaced the primary's key while some slower proof
+    /// of the old one was still running, and that proof must not win.
+    pub fn accepts_app_key(&self, app_key: &[u8]) -> bool {
+        match self.keys.get(PRIMARY_ID) {
+            Some(current) => bool::from(current.ct_eq(app_key)),
+            None => true,
+        }
     }
 
     /// Every workspace but the primary, with its material.
@@ -175,7 +187,18 @@ pub fn open_all(app: &AppHandle, app_key: &[u8]) {
         if !session.is_live() {
             return;
         }
-        state.keyring.lock().unwrap().others()
+        let ring = state.keyring.lock().unwrap();
+        // Never over a different app key. This is the key some proof of the
+        // primary's password produced — an unlock, the biometric item, the
+        // detached try `auth::unlock` makes with another workspace's password
+        // — and a password change that landed meanwhile has since replaced
+        // it (`replace_app_key`). Sealing the sidecars under the old one would
+        // leave every workspace closed to the next app unlock.
+        if !ring.accepts_app_key(app_key) {
+            log::info!("the app key changed while it was being proved; the older key stands down");
+            return;
+        }
+        ring.others()
     };
 
     let mut opened = Vec::new();
@@ -203,17 +226,37 @@ pub fn open_all(app: &AppHandle, app_key: &[u8]) {
     }
 
     // Into the ring under the guards again, and only if the session is still
-    // live: a lock that landed during the reads above cleared the ring, and
-    // nothing goes back behind it.
+    // live and the app key is still this one: a lock that landed during the
+    // reads above cleared the ring, and a password change replaced the key,
+    // and neither is undone by what was read before it.
     let session = state.session.lock().unwrap();
     if !session.is_live() {
         return;
     }
     let mut ring = state.keyring.lock().unwrap();
+    if !ring.accepts_app_key(app_key) {
+        return;
+    }
     ring.insert(PRIMARY_ID, app_key);
     for (id, material) in opened {
         ring.insert(&id, &material);
     }
+}
+
+/// The primary's key was changed by a master-password change: the ring takes
+/// the new app key over whatever it held, and every sidecar is resealed under
+/// it. The one write that replaces an app key on purpose — every other route
+/// into the ring refuses to (`Keyring::accepts_app_key`).
+pub fn replace_app_key(app: &AppHandle, app_key: &[u8]) {
+    let state = app.state::<AppState>();
+    {
+        let session = state.session.lock().unwrap();
+        if !session.is_live() {
+            return;
+        }
+        state.keyring.lock().unwrap().insert(PRIMARY_ID, app_key);
+    }
+    rewrap_all(app);
 }
 
 /// A workspace other than the primary has been opened with its own key: it
@@ -358,6 +401,18 @@ mod tests {
     fn the_primary_is_never_wrapped() {
         let root = tmp_root();
         assert!(!is_wrapped(&root, PRIMARY_ID));
+    }
+
+    // A proof of the old primary password finishing after a password change
+    // must not put the old key back: the ring's key is the newer fact.
+    #[test]
+    fn the_ring_refuses_a_different_app_key_once_it_holds_one() {
+        let mut ring = Keyring::default();
+        assert!(ring.accepts_app_key(APP_KEY));
+        ring.insert(PRIMARY_ID, APP_KEY);
+
+        assert!(ring.accepts_app_key(APP_KEY));
+        assert!(!ring.accepts_app_key(&[9u8; 32]));
     }
 
     #[test]

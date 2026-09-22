@@ -459,12 +459,14 @@ pub async fn change_master_password(
 
     // The ring held the old key: it takes the new one, and — for the primary,
     // whose key is what every other workspace is sealed under — every sidecar
-    // is resealed under it. Whether or not the session was adopted: the change
-    // is on disk, and a ring left holding the old key would fail the next
-    // switch to this workspace.
-    appkey::adopt(&app, &active, &new_material);
+    // is resealed under it. The primary's is the one replacement of an app key
+    // made on purpose; every other route into the ring refuses to overwrite
+    // one, so a slower proof of the old password cannot undo this. A lock that
+    // won while the saga ran has cleared the ring, and neither writes to it.
     if primary {
-        appkey::rewrap_all(&app);
+        appkey::replace_app_key(&app, &new_material);
+    } else {
+        appkey::adopt(&app, &active, &new_material);
     }
 
     // Re-encrypt the Drive token file under the new key if present (sync parity).
