@@ -31,6 +31,11 @@ export default function BiometricRow() {
   const biometric = useApp(state => state.status?.biometric)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // One enrollment opens every workspace, and it stores the primary's key — so
+  // a workspace opened on its own password, with the primary still closed this
+  // session, has nothing to enrol with yet. The probe says so (`canEnroll`),
+  // and the switch waits rather than offering a press that would be refused.
+  const enrollable = !!biometric?.available || !!biometric?.canEnroll
 
   const toggle = () => {
     setBusy(true)
@@ -52,7 +57,7 @@ export default function BiometricRow() {
           <Toggle
             name="biometric"
             checked={!!biometric?.available}
-            disabled={busy}
+            disabled={busy || !enrollable}
             onChange={toggle}
             aria-label={t('Unlock with Touch ID or Windows Hello')}
             testid="settings-biometric-toggle"

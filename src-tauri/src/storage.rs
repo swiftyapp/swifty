@@ -34,6 +34,11 @@ pub const GDRIVE_FILE: &str = "auth/gdrive.swftx";
 // Its contents name the gate the key was enrolled behind (`secure_store::GateMode`)
 // — not a secret: it says *how* the key is gated, never anything about the key.
 pub const BIOMETRIC_FILE: &str = "biometric.enabled";
+// A non-primary workspace's own vault key, sealed under the primary's (the app
+// key) so that one unlock opens every workspace on the device — see
+// `crate::appkey`. Ciphertext, but held to `0600` all the same; the primary
+// has none, since its key *is* the app key.
+pub const WRAPPED_KEY_FILE: &str = "vault.key.sealed";
 // Working space for the sync engine, inside the workspace's own directory (see
 // `sync_scratch_dir`).
 const SYNC_SCRATCH_DIR: &str = "sync-scratch";
@@ -54,18 +59,20 @@ const SYNC_SCRATCH_DIR: &str = "sync-scratch";
 // whatever `-wal`/`-shm` siblings it has (see `db_files`), a sidecar is the one
 // file.
 const VAULT_DB_FILES: [&str; 2] = [DB_FILE, DB_REKEY_BACKUP_FILE];
-const VAULT_SIDECAR_FILES: [&str; 4] = [
+const VAULT_SIDECAR_FILES: [&str; 5] = [
     KDF_SIDECAR_FILE,
     KDF_SIDECAR_REKEY_BACKUP_FILE,
     LOCKOUT_SIDECAR_FILE,
     GDRIVE_FILE,
+    WRAPPED_KEY_FILE,
 ];
 
 // What a workspace keeps beside its vault and never takes with it. The
 // biometric marker names the one keychain item this install has, and deleting
-// the vault it was enrolled for deletes that item (`workspace_delete`) — a
-// marker that travelled would claim an enrollment that no longer exists. The
-// scratch directory is a sync run's working space, made again on demand.
+// the primary — whose key that item holds — deletes the item with it
+// (`workspace_delete`): a marker that travelled would claim an enrollment that
+// no longer exists. The scratch directory is a sync run's working space, made
+// again on demand.
 //
 // Both still belong to the workspace that holds them, so a delete moves them
 // out of the way rather than removing them: what it moves it can put back.
@@ -575,14 +582,18 @@ pub(crate) fn remove_if_present(path: &Path) -> Result<()> {
 // The recorded gate marker, or `None` when biometric unlock is not enabled.
 // Enrollment decides the gate once; every later retrieval reads it back from
 // here rather than re-probing what the platform would do today.
+//
+// In the root, whichever workspace is active: the enrolled key is the app key
+// (the primary's), and it opens every workspace (`crate::appkey`), so the
+// enrollment belongs to the install rather than to one workspace.
 pub fn biometric_marker(app: &AppHandle) -> Option<String> {
-    let path = workspace_dir(app).ok()?.join(BIOMETRIC_FILE);
+    let path = root_dir(app).ok()?.join(BIOMETRIC_FILE);
     fs::read_to_string(path).ok()
 }
 
 // Whether the user opted into biometric unlock (marker file present).
 pub fn biometric_enrolled(app: &AppHandle) -> bool {
-    workspace_dir(app)
+    root_dir(app)
         .map(|d| d.join(BIOMETRIC_FILE).exists())
         .unwrap_or(false)
 }
@@ -591,7 +602,7 @@ pub fn biometric_enrolled(app: &AppHandle) -> bool {
 // Atomic like the sidecars: a torn marker would read as the legacy gate
 // (`GateMode::from_marker`) and send the next unlock through the wrong one.
 pub fn set_biometric_marker(app: &AppHandle, marker: Option<&str>) -> Result<()> {
-    let path = workspace_dir(app)?.join(BIOMETRIC_FILE);
+    let path = root_dir(app)?.join(BIOMETRIC_FILE);
     match marker {
         Some(marker) => atomic_write_file(&path, marker),
         None if path.exists() => {
@@ -616,7 +627,7 @@ mod tests {
         atomic_replace_with, atomic_write_file, move_vault_files, move_workspace_files,
         read_backup, read_regular_file_capped, remove_if_present, Error, BIOMETRIC_FILE, DB_FILE,
         DB_REKEY_BACKUP_FILE, GDRIVE_FILE, KDF_SIDECAR_FILE, KDF_SIDECAR_REKEY_BACKUP_FILE,
-        LOCKOUT_SIDECAR_FILE, SYNC_SCRATCH_DIR,
+        LOCKOUT_SIDECAR_FILE, SYNC_SCRATCH_DIR, WRAPPED_KEY_FILE,
     };
     use std::fs;
     use std::io::{self, Write};
@@ -749,7 +760,7 @@ mod tests {
     }
 
     // Every file of the set, laid out as a workspace holds them.
-    fn seed_vault(dir: &Path) -> [&'static str; 6] {
+    fn seed_vault(dir: &Path) -> [&'static str; 7] {
         let files = [
             DB_FILE,
             DB_REKEY_BACKUP_FILE,
@@ -757,6 +768,7 @@ mod tests {
             KDF_SIDECAR_REKEY_BACKUP_FILE,
             LOCKOUT_SIDECAR_FILE,
             GDRIVE_FILE,
+            WRAPPED_KEY_FILE,
         ];
         fs::create_dir_all(dir.join("auth")).unwrap();
         for file in files {
@@ -768,7 +780,8 @@ mod tests {
 
     // The set is this module's answer to "what a vault is", and a move has to
     // take all of it: the database with its WAL, the pair an interrupted
-    // password change left behind, the backoff state and the sealed account.
+    // password change left behind, the backoff state, the sealed account and
+    // the key sealed under the app key.
     #[test]
     fn a_moved_vault_takes_every_file_it_is_made_of() {
         let from = tmp_sidecar().parent().unwrap().to_path_buf();

@@ -393,6 +393,9 @@ fn adopt(
                 }
             }
             let sync_configured = tokens.is_some();
+            // Copied before the key goes into the session: this is the app
+            // key, and the ring is what every later workspace is sealed under.
+            let material = Zeroizing::new(key.biometric_material().to_vec());
             state
                 .session
                 .lock()
@@ -402,6 +405,7 @@ fn adopt(
             // it goes on the idle clock here rather than waiting for the
             // frontend's first activity ping.
             crate::autolock::touch(app);
+            crate::appkey::adopt(app, &crate::workspace::active_id(app), &material);
             take_pending(state);
             Ok(UnlockResult {
                 entries,

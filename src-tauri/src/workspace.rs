@@ -505,19 +505,6 @@ pub fn is_primary(app: &AppHandle) -> bool {
     active_id(app) == PRIMARY_ID
 }
 
-/// Refuse a feature that is still single-vault.
-///
-/// Biometric unlock alone, now that sync is per-workspace: the enrolled key is
-/// one keychain item under a fixed service and account name, so a second
-/// workspace enrolling would overwrite the primary's rather than get its own.
-pub fn guard_primary(app: &AppHandle) -> Result<()> {
-    if is_primary(app) {
-        Ok(())
-    } else {
-        Err(Error::PrimaryWorkspaceOnly)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

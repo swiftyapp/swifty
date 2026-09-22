@@ -2,16 +2,16 @@ import { useState, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createWorkspace } from '@/store'
 import { messageOf } from '@/api/errors'
-import { masterPasswordError } from '@/services/strength'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Masterpass from '@/components/elements/Masterpass'
 import Button from '@/components/elements/Button'
 import { inputClass } from '@/components/elements/formStyles'
 
-// Creating a second (or third) encrypted database. Both password fields belong
-// together for the same reason the first run's do — the second is a check on
-// the first — so this is the setup screen's form, condensed into a settings
-// group and holding to the same bar via `masterPasswordError`.
+// Creating a second (or third) encrypted database. There is one master
+// password for the device, so the form asks for it rather than for a new one:
+// the backend proves it against the primary before creating anything, which
+// is what keeps every workspace under the same password — and what lets the
+// whole app open with one unlock. A wrong one is the unlock's own error.
 //
 // Creating opens the new workspace immediately: `workspace_create` hands back
 // an unlocked session, so the settings modal is left behind by the flow change
@@ -20,9 +20,7 @@ export default function NewWorkspace() {
   const { t } = useTranslation()
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
-  const [confirmation, setConfirmation] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [mismatch, setMismatch] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const changePassword = (event: ChangeEvent<HTMLInputElement>) => {
@@ -30,43 +28,19 @@ export default function NewWorkspace() {
     setPassword(event.currentTarget.value)
   }
 
-  const changeConfirmation = (event: ChangeEvent<HTMLInputElement>) => {
-    setMismatch(null)
-    setConfirmation(event.currentTarget.value)
-  }
-
-  // Enter on the password field reports what is wrong with it; it does not
-  // submit. The check awaits the zxcvbn chunk on first use.
-  const reportStrength = () => {
-    void masterPasswordError(password, t)
-      .then(setError)
-      .catch(() => setError(t('Something went wrong')))
-  }
-
-  // Busy goes up before the strength check, not after: the check awaits a chunk
-  // fetch, and that window must not let a second press through. The fields are
-  // read once here and disabled while busy, so what is created is exactly what
-  // is on screen — an edit during the wait cannot leave the form showing a
-  // password other than the one the workspace got.
+  // The fields are read once here and disabled while busy, so what is created
+  // is exactly what is on screen.
   const submit = async () => {
     if (busy) return
     const label = name.trim()
-    if (!label) return setMismatch(t('Fill in the name'))
+    if (!label) return setError(t('Fill in the name'))
+    if (!password) return setError(t('Fill in your master password'))
     setBusy(true)
     try {
-      const weak = await masterPasswordError(password, t)
-      if (weak) {
-        setBusy(false)
-        return setError(weak)
-      }
-      if (password !== confirmation) {
-        setBusy(false)
-        return setMismatch(t('Passwords do not match'))
-      }
       await createWorkspace(label, password)
     } catch (err: unknown) {
       setBusy(false)
-      setMismatch(messageOf(err) || t('Something went wrong'))
+      setError(messageOf(err) || t('Something went wrong'))
     }
   }
 
@@ -74,7 +48,7 @@ export default function NewWorkspace() {
     <SettingsRow
       label={t('Add a workspace')}
       description={t(
-        'Each workspace is a separate encrypted database with its own master password. On a device that syncs, it syncs to the same Google account as a vault of its own. Biometric unlock stays with your primary workspace for now.'
+        'Each workspace is a separate encrypted database. Unlocking the app opens all of them, and on a device that syncs each one syncs to the same Google account as a vault of its own. Confirm your master password to add one.'
       )}
       testid="workspace-new-row"
     >
@@ -94,17 +68,8 @@ export default function NewWorkspace() {
           autoFocus={false}
           disabled={busy}
           error={error}
-          onEnter={reportStrength}
-          onChange={changePassword}
-        />
-        <Masterpass
-          placeholder={t('Type it once more')}
-          testid="workspace-new-confirm"
-          autoFocus={false}
-          disabled={busy}
-          error={mismatch}
           onEnter={() => void submit()}
-          onChange={changeConfirmation}
+          onChange={changePassword}
         />
         <div>
           <Button size="md" testid="workspace-create" loading={busy} onClick={() => void submit()}>

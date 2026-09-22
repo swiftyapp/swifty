@@ -14,7 +14,8 @@ use crate::secure_store::{self, GateMode, KeyStore};
 use crate::session::{derive_key, open_with_key, unlock_with_password};
 use crate::state::AppState;
 use crate::store::SqliteStore;
-use crate::{biometrics, crypto, events, storage};
+use crate::workspace::PRIMARY_ID;
+use crate::{appkey, biometrics, crypto, events, storage};
 use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
@@ -55,11 +56,16 @@ pub async fn unlock(
         return Err(refusal);
     }
 
-    // A second copy of the password, for the one thing that may outlive the
-    // unlock: trying it against the account's other vaults
-    // (`commands::autojoin`). Only for a vault that syncs — a local vault has
-    // no account to look in — and only once the unlock has succeeded.
+    // Two more copies of the password, for the things that may outlive the
+    // unlock, each only once it has succeeded. One tries it against the
+    // account's other vaults (`commands::autojoin`) — only for a vault that
+    // syncs, since a local vault has no account to look in. The other, for a
+    // workspace that is not the primary, tries it against the primary: the
+    // device has one master password, so this is usually it, and proving that
+    // is what opens the app at its own level (`adopt_primary_with`).
     let join = storage::sync_configured(&app).then(|| password.clone());
+    let active = crate::workspace::active_id(&app);
+    let master = (active != PRIMARY_ID).then(|| password.clone());
 
     match unlock_off_thread(&app, password).await {
         Ok((key, store, entries)) => {
@@ -69,6 +75,7 @@ pub async fn unlock(
                 }
             }
             let sync_configured = storage::sync_configured(&app);
+            let material = Zeroizing::new(key.biometric_material().to_vec());
             state
                 .session
                 .lock()
@@ -80,6 +87,17 @@ pub async fn unlock(
             // the vault open for good.
             crate::autolock::touch(&app);
             seed_vault_name(&app, &state);
+            // The app-level unlock: the primary's key opens every workspace
+            // sealed under it; another workspace's key joins the ring, and is
+            // sealed under the app key once that is known — now, if the ring
+            // already holds it, or once the same password has opened the
+            // primary too.
+            appkey::adopt(&app, &active, &material);
+            if let Some(password) = master {
+                if !state.keyring.lock().unwrap().has(PRIMARY_ID) {
+                    adopt_primary_with(&app, password);
+                }
+            }
             if let Some(password) = join {
                 super::autojoin::with_password(&app, password);
             }
@@ -112,7 +130,7 @@ pub async fn unlock(
 //
 // Best effort, and the registry is read before the session lock is taken, since
 // that is the order every other reader of the two takes them in.
-fn seed_vault_name(app: &AppHandle, state: &AppState) {
+pub(crate) fn seed_vault_name(app: &AppHandle, state: &AppState) {
     let Some(name) = crate::workspace::active_name(app) else {
         return;
     };
@@ -141,8 +159,9 @@ async fn unlock_off_thread(
     blocking(move || unlock_with_password(&app, &password)).await
 }
 
-// Open the store for an already-resolved key (biometric path) off the UI thread.
-async fn open_off_thread(
+// Open the store for an already-resolved key (the biometric path, and a
+// switch to a workspace the ring holds) off the UI thread.
+pub(crate) async fn open_off_thread(
     app: &AppHandle,
     key: VaultKey,
 ) -> Result<(VaultKey, SqliteStore, Vec<EntryMetaDto>)> {
@@ -152,6 +171,33 @@ async fn open_off_thread(
         Ok((key, store, entries))
     })
     .await
+}
+
+// A workspace other than the primary was just opened with `password`. If the
+// same password opens the primary — one master password for the device is the
+// rule, and this is where a workspace restored under it before the rule existed
+// catches up — the primary's key is the app key, and the ring fills from it:
+// every workspace sealed under it, and the one just opened sealed under it
+// now. A password that does not open the primary is a workspace of its own,
+// and its sidecar waits for an unlock that has the app key.
+//
+// Detached: an Argon2id run and a SQLCipher open, on the primary's own files
+// rather than the active paths, and nothing the unlock has to wait for.
+fn adopt_primary_with(app: &AppHandle, password: Zeroizing<String>) {
+    let app = app.clone();
+    super::detached(move || {
+        let Ok(root) = storage::root_dir(&app) else {
+            return;
+        };
+        match super::workspace::verify_password_in(&root, &password) {
+            Ok(key) => {
+                appkey::open_all(&app, key.biometric_material());
+                appkey::rewrap_all(&app);
+            }
+            Err(Error::InvalidPassword) => {}
+            Err(e) => log::warn!("could not try the password against the primary: {e}"),
+        }
+    });
 }
 
 // Clear the in-memory key and close the store, and emit `vault:locked` with it
@@ -181,6 +227,11 @@ pub fn touch_activity(app: AppHandle) -> Result<()> {
 // store. Retrieving the key triggers the biometric prompt; the sidecar decides
 // how to interpret the stored bytes (Argon2id master vs legacy secret). The
 // store then opens off the UI thread. No migration on unlock.
+//
+// The stored key is the app key — the primary's. It opens the primary
+// directly, and any other workspace through the copy of that workspace's key
+// sealed under it (`crate::appkey`); a workspace with no such copy is not
+// offered this unlock (`commands::app::snapshot`).
 #[tauri::command]
 pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<UnlockResult> {
     // Same two reasons as in `unlock`: no unlock while a change is re-keying,
@@ -210,10 +261,18 @@ pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Res
         }
     };
     // A sidecar means the stored bytes are an Argon2id master; without one they
-    // are the legacy secret string (a pre-sidecar dev vault).
-    let key = match storage::read_kdf_sidecar(&app)? {
-        Some(_) => VaultKey::Argon2 { master: material },
-        None => VaultKey::Legacy { secret: material },
+    // are the legacy secret string (a pre-sidecar dev vault). The primary's
+    // sidecar, since the stored bytes are the primary's key.
+    let root = storage::root_dir(&app)?;
+    let app_key = VaultKey::from_material(material, root.join(storage::KDF_SIDECAR_FILE).exists());
+    let app_material = Zeroizing::new(app_key.biometric_material().to_vec());
+    let active = crate::workspace::active_id(&app);
+    let key = if active == PRIMARY_ID {
+        app_key
+    } else {
+        appkey::unwrap_key(&root, &active, &app_material).ok_or_else(|| {
+            Error::Other("biometric unlock is not enabled for this workspace".into())
+        })?
     };
     let (key, store, entries) = open_off_thread(&app, key).await?;
     let sync_configured = storage::sync_configured(&app);
@@ -226,6 +285,8 @@ pub async fn unlock_biometric(app: AppHandle, state: State<'_, AppState>) -> Res
     // before names lived inside it takes the registry's label.
     crate::autolock::touch(&app);
     seed_vault_name(&app, &state);
+    // The app key opens the app: every workspace sealed under it joins the ring.
+    appkey::open_all(&app, &app_material);
     Ok(UnlockResult {
         entries,
         sync_configured,
@@ -246,19 +307,20 @@ fn unenroll_on(err: &Error) -> bool {
     matches!(err, Error::NotFound)
 }
 
-// Opt in: store the current session's key material in the OS secure store,
-// biometry-gated. Requires an unlocked vault. Returns the gate that enrollment
-// settled on — recorded here and honoured verbatim by every later retrieval.
+// Opt in: store the app key in the OS secure store, biometry-gated. From any
+// workspace, since the one key opens them all — it just has to be known, which
+// it is once the primary has been opened this session. Returns the gate that
+// enrollment settled on — recorded here and honoured verbatim by every later
+// retrieval.
 #[tauri::command]
 pub async fn enable_biometric(app: AppHandle, state: State<'_, AppState>) -> Result<String> {
-    crate::workspace::guard_primary(&app)?;
     if !secure_store::is_supported() || !biometrics::is_available() {
         return Err(Error::Other("biometrics not available".into()));
     }
     // Copied out from under the guard, because the write below is a blocking
     // call into the OS keychain (and a gated one on macOS) — precisely what the
     // session lock may not be held across. `Zeroizing` so the copy is scrubbed.
-    let material = biometric_material(&state)?;
+    let material = app_key_material(&app, &state)?;
     let mode = blocking(move || secure_store::Platform.store(&material)).await?;
     storage::set_biometric_marker(&app, Some(mode.as_marker()))?;
     Ok(mode.as_marker().to_string())
@@ -272,10 +334,20 @@ pub async fn disable_biometric(app: AppHandle) -> Result<()> {
     Ok(())
 }
 
-// The session key's opaque bytes, as a scrubbed copy the blocking pool can own.
-fn biometric_material(state: &State<'_, AppState>) -> Result<Zeroizing<Vec<u8>>> {
-    let session = state.session.lock().unwrap();
-    Ok(Zeroizing::new(session.key()?.biometric_material().to_vec()))
+// The app key's opaque bytes, as a scrubbed copy the blocking pool can own:
+// from the ring once the primary has been opened this session, or from the
+// session itself when the primary is what is open. A workspace opened on its
+// own password, with the primary still closed, has no app key to store — the
+// launch probe says so first (`can_enroll`), so this is the backstop.
+fn app_key_material(app: &AppHandle, state: &State<'_, AppState>) -> Result<Zeroizing<Vec<u8>>> {
+    if let Some(material) = state.keyring.lock().unwrap().app_key() {
+        return Ok(material);
+    }
+    if crate::workspace::is_primary(app) {
+        let session = state.session.lock().unwrap();
+        return Ok(Zeroizing::new(session.key()?.biometric_material().to_vec()));
+    }
+    Err(Error::PrimaryWorkspaceOnly)
 }
 
 // Re-derive a fresh Argon2id key (new salt), re-seal every payload under the new
@@ -359,10 +431,15 @@ pub async fn change_master_password(
         }
     };
 
-    // Both taken before the key is handed to the session, so what follows needs
-    // no second lock to read them back.
-    let stale_enrollment = storage::biometric_enrolled(&app)
-        .then(|| Zeroizing::new(new_key.biometric_material().to_vec()));
+    // All taken before the key is handed to the session, so what follows needs
+    // no second lock to read them back. The biometric enrollment holds the app
+    // key, so only a change on the primary makes it stale; a change elsewhere
+    // leaves the stored bytes exactly as good as they were.
+    let active = crate::workspace::active_id(&app);
+    let primary = active == PRIMARY_ID;
+    let new_material = Zeroizing::new(new_key.biometric_material().to_vec());
+    let stale_enrollment =
+        (primary && storage::biometric_enrolled(&app)).then(|| new_material.clone());
     let new_cryptor = new_key.cryptor();
 
     // Adopt the new key + store as the continuation of the session the lease
@@ -378,6 +455,16 @@ pub async fn change_master_password(
         log::info!(
             "vault locked during the password change; the new key waits for the next unlock"
         );
+    }
+
+    // The ring held the old key: it takes the new one, and — for the primary,
+    // whose key is what every other workspace is sealed under — every sidecar
+    // is resealed under it. Whether or not the session was adopted: the change
+    // is on disk, and a ring left holding the old key would fail the next
+    // switch to this workspace.
+    appkey::adopt(&app, &active, &new_material);
+    if primary {
+        appkey::rewrap_all(&app);
     }
 
     // Re-encrypt the Drive token file under the new key if present (sync parity).

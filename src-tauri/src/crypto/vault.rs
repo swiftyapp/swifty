@@ -75,13 +75,25 @@ impl VaultKey {
         }
     }
 
-    /// The opaque bytes to persist in the OS secure store for biometric unlock:
+    /// The opaque bytes to persist in the OS secure store for biometric unlock,
+    /// or to seal under the app key for another workspace (`crate::appkey`):
     /// the Argon2id master, or the legacy secret. Interpreted back by sidecar
-    /// presence at unlock (see `unlock_biometric`).
+    /// presence when they are used again ([`VaultKey::from_material`]).
     pub fn biometric_material(&self) -> &[u8] {
         match self {
             Self::Argon2 { master } => master,
             Self::Legacy { secret } => secret,
+        }
+    }
+
+    /// The inverse of [`VaultKey::biometric_material`]: stored bytes read back
+    /// as the key of a vault with a KDF sidecar (an Argon2id master) or without
+    /// one (the legacy secret).
+    pub fn from_material(material: Zeroizing<Vec<u8>>, has_sidecar: bool) -> Self {
+        if has_sidecar {
+            Self::Argon2 { master: material }
+        } else {
+            Self::Legacy { secret: material }
         }
     }
 }

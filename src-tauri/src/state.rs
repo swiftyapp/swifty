@@ -177,6 +177,11 @@ pub struct SyncStatus {
 
 pub struct AppState {
     pub session: Mutex<Session>,
+    /// The app-level unlock: every workspace's key once the app is open, so a
+    /// switch opens the next database without a prompt (see `crate::appkey`).
+    /// Outside `session` because it outlives one — a switch ends the session
+    /// and keeps the ring — and ends with every lock instead.
+    pub keyring: Mutex<crate::appkey::Keyring>,
     /// Which workspace every vault path resolves to right now.
     ///
     /// Held in memory rather than read from the registry on each path lookup:
@@ -281,6 +286,7 @@ impl Default for AppState {
     fn default() -> Self {
         Self {
             session: Mutex::default(),
+            keyring: Mutex::default(),
             active_workspace: Mutex::new(crate::workspace::PRIMARY_ID.to_string()),
             workspace_lock: Mutex::default(),
             syncing: Arc::default(),

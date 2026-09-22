@@ -32,6 +32,7 @@ use zeroize::Zeroizing;
 /// many vaults leaves the rest for Settings › Workspaces and the next unlock.
 const JOIN_BUDGET: Duration = Duration::from_secs(60);
 
+use crate::crypto::VaultKey;
 use crate::error::{Error, Result};
 use crate::session::store_err;
 use crate::state::AppState;
@@ -250,8 +251,8 @@ fn join_one(
     guard_other_vault(state, root, &vault_id)?;
     let id = crate::crypto::random_hex_id();
     let dir = workspace::dir_of(root, &id);
-    let name = match install(&dir, &bytes, password, &vault_id, tokens) {
-        Ok(name) => name,
+    let (name, key) = match install(&dir, &bytes, password, &vault_id, tokens) {
+        Ok(installed) => installed,
         Err(e) => {
             // Nothing half-made: the directory goes, token file and all.
             discard(root, &id);
@@ -272,6 +273,10 @@ fn join_one(
         discard(root, &id);
         return Err(e);
     }
+    // Open at the app level from the start: the password that opened it is the
+    // master password, so it joins the ring and — the app key being known —
+    // is sealed under it for every unlock after this one.
+    crate::appkey::adopt(app, &id, key.biometric_material());
     Ok(name)
 }
 
@@ -282,14 +287,15 @@ fn join_one(
 ///
 /// The name comes back with it: the vault carries its own (see
 /// [`crate::store::identity`]), so a vault the user named on another device
-/// arrives here under that name rather than under a short id nobody chose.
+/// arrives here under that name rather than under a short id nobody chose. So
+/// does the key, for the ring (`crate::appkey`); the store itself is closed.
 fn install(
     dir: &Path,
     bytes: &[u8],
     password: &str,
     vault_id: &str,
     tokens: &Tokens,
-) -> Result<String> {
+) -> Result<(String, VaultKey)> {
     crate::store::create_private_dir(dir)?;
     let (key, store) = restore::restore_at(
         &dir.join(storage::DB_FILE),
@@ -307,7 +313,7 @@ fn install(
     sync::persist_tokens_in(dir, &key.cryptor(), tokens)?;
     // Closed before the registry names it: the next unlock of it opens fresh.
     drop(store);
-    Ok(name)
+    Ok((name, key))
 }
 
 /// What an added workspace is called when its pack carries no name of its own.
@@ -376,28 +382,30 @@ mod tests {
     #[test]
     fn an_installed_vault_takes_the_name_its_pack_carries() {
         let dir = tmp_dir().join("workspace");
-        let name = install(
+        let (name, _key) = install(
             &dir,
             &packed(Some("Work")),
             PASSWORD,
             "9f3c1a2b",
             &Tokens::default(),
-        );
-        assert_eq!(name.unwrap(), "Work");
+        )
+        .unwrap();
+        assert_eq!(name, "Work");
     }
 
     // A pack written before names travelled carries none, and falls back.
     #[test]
     fn an_unnamed_pack_still_gets_the_short_id_label() {
         let dir = tmp_dir().join("workspace");
-        let name = install(
+        let (name, _key) = install(
             &dir,
             &packed(None),
             PASSWORD,
             "9f3c1a2b",
             &Tokens::default(),
-        );
-        assert_eq!(name.unwrap(), "Vault 9f3c1a");
+        )
+        .unwrap();
+        assert_eq!(name, "Vault 9f3c1a");
     }
 
     // The open vault counts as held even before a sync has recorded it: a pack

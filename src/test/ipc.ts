@@ -114,7 +114,9 @@ const DEFAULTS: Record<string, Handler> = {
   workspace_restore_from_drive: () => ({ entries: [], syncConfigured: true }),
   // The same landing from the open workspace's own account: no sign-in first.
   workspace_restore_from_account: () => ({ entries: [], syncConfigured: true }),
-  // Switching is locking what is open, and Rust announces it as one.
+  // A switch to a workspace Rust holds no key for: it ends as the lock it is,
+  // announced like any other. (One it does hold answers like an unlock — a
+  // spec that wants that path mocks the command with a session.)
   workspace_select: () => emitEventSoon(EVENTS.vaultLocked, undefined),
   workspace_rename: () => undefined,
 

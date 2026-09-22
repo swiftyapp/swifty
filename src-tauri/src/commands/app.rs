@@ -96,11 +96,20 @@ pub fn snapshot(app: &AppHandle) -> Result<AppStatus> {
 
     let settings = settings::current(app);
 
-    let registry = workspace::Registry::load(&storage::root_dir(app)?);
+    let root = storage::root_dir(app)?;
+    let registry = workspace::Registry::load(&root);
     // The in-memory id, not the registry's: it is what every path above was
     // resolved through, so it is what `initialized` and the rest are about.
     let active_workspace = workspace::active_id(app);
     let primary = active_workspace == workspace::PRIMARY_ID;
+    // The enrolled key is the app key (the primary's). It opens the primary
+    // outright, and any other workspace whose own key is sealed under it on
+    // this device (`crate::appkey`) — one that is not has to be opened with
+    // its password once first.
+    let openable = primary || crate::appkey::is_wrapped(&root, &active_workspace);
+    // Enrolling stores the app key, so it has to be in hand: it is whenever the
+    // primary is open or has been opened this session.
+    let app_key_known = primary || state.keyring.lock().unwrap().app_key().is_some();
 
     Ok(AppStatus {
         initialized: storage::db_exists(app),
@@ -110,10 +119,8 @@ pub fn snapshot(app: &AppHandle) -> Result<AppStatus> {
         sync,
         scan_supported: scan::is_supported(),
         biometric: Biometric {
-            available: hardware && storage::biometric_enrolled(app),
-            // One keychain item for the whole install, so enrolling is the
-            // primary workspace's to offer (see `workspace::guard_primary`).
-            can_enroll: hardware && primary,
+            available: hardware && storage::biometric_enrolled(app) && openable,
+            can_enroll: hardware && app_key_known,
             kind: gate.kind,
             mode: marker.map(|m| GateMode::from_marker(&m).as_marker().to_string()),
         },

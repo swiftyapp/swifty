@@ -328,6 +328,24 @@ carries them as part of the opaque payload and never sees them.
      logged-in user.
    - **Linux and others:** unsupported; the app reports biometrics unavailable
      rather than store an ungated key.
+5. **One unlock for every workspace (`appkey.rs`).** The primary workspace's
+   key is the *app key*. Every other workspace keeps a copy of its own key
+   sealed under it — AES-256-GCM under an HKDF subkey of the app key, bound to
+   the workspace id as associated data — in a `0600` sidecar beside its
+   database (`vault.key.sealed`). Opening the primary, by passphrase or by the
+   biometric item above (which stores the app key and nothing else), unwraps
+   every sidecar into an in-memory ring, so a workspace switch opens the next
+   database without a prompt and without an Argon2id run. The ring lives as
+   long as a session would: it ends with every lock, the auto-lock included,
+   and the sidecars are worth nothing without the app key. They are also local
+   to the device on purpose — the pack a workspace syncs stays under its own
+   passphrase-derived key, so another device restores it with the passphrase
+   exactly as before. A workspace that has never been opened with its
+   passphrase on a device has no sidecar there; its first switch lands on its
+   lock screen, and that unlock writes one. The same passphrase for every
+   workspace is the rule (a create proves it against the app key), which is
+   what lets a non-primary unlock prove the passphrase against the primary in
+   the background and fill the ring from there.
 
 ## Fresh start and explicit import
 

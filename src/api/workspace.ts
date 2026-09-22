@@ -2,28 +2,37 @@ import { call } from './client'
 import type { UnlockResult } from './types'
 
 /**
- * Additional encrypted databases. Each has its own master password and its own
- * file; only one is ever unlocked, so moving between them goes through the lock
- * screen. Each carries its own Drive connection and syncs its own pack, so sync
- * is offered everywhere; biometric unlock still belongs to the primary, and the
- * backend rejects it elsewhere rather than letting a second vault quietly take
- * over the one enrolled key.
+ * Additional encrypted databases. Each has its own file and its own key, but
+ * the app is unlocked as a whole: one master password (or one biometric
+ * prompt) opens the primary, and every other workspace's key is kept sealed
+ * under the primary's on this device, so moving between them never asks
+ * again. A workspace that has never been opened with its password here is the
+ * one exception — its first switch lands on its lock screen, and that unlock is
+ * what seals its key for the ones after. Each carries its own Drive connection
+ * and syncs its own pack.
  */
 
 /**
- * Create a workspace under `password` and open it. It comes back already active
- * and unlocked, so the result is an unlock's, not a setup's: the caller has a
- * session to enter main with and a previous workspace's data to drop first.
+ * Create a workspace and open it. `password` is the device's master password —
+ * the primary's — which the backend proves before creating anything, so every
+ * workspace stays under the one password; a wrong one rejects as
+ * `invalidPassword`. It comes back already active and unlocked, so the result
+ * is an unlock's, not a setup's: the caller has a session to enter main with
+ * and a previous workspace's data to drop first.
  */
 export const workspaceCreate = (name: string, password: string): Promise<UnlockResult> =>
   call('workspace_create', { name, password })
 
 /**
- * Lock whatever is open and make `id` the active workspace. Persisted, so a
- * relaunch lands on it. Nothing is unlocked afterwards — the caller's next stop
- * is that workspace's lock screen.
+ * Close whatever is open and make `id` the active workspace. Persisted, so a
+ * relaunch lands on it.
+ *
+ * Resolves with an unlock's result when the backend holds that workspace's key
+ * and opened it — the caller enters main with it, exactly as after a create.
+ * Resolves `null` when it does not: the switch then ends on that workspace's
+ * lock screen, announced by the `vault:locked` the backend emits for it.
  */
-export const workspaceSelect = (id: string): Promise<void> =>
+export const workspaceSelect = (id: string): Promise<UnlockResult | null> =>
   call('workspace_select', { id })
 
 /** Rename a workspace. Metadata only: the vault behind it is untouched. */

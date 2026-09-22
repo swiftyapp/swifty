@@ -29,15 +29,36 @@ beforeEach(() => {
 })
 
 describe('switchWorkspace', () => {
-  it('marks the other active and lands on its lock screen', async () => {
+  // The app is unlocked as a whole: Rust holds the other workspace's key and
+  // opens it, answering like an unlock — the same landing as a create.
+  it('opens the other workspace and drops the rows of the one left behind', async () => {
+    flowMain()
+    setEntries([meta('a')])
+    mockCommand('workspace_select', () => ({ entries: [meta('b')], syncConfigured: false }))
+    mockCommand('app_status', () => ({
+      ...appStatusDefault(),
+      workspaces: TWO,
+      activeWorkspace: 'w2'
+    }))
+
+    await switchWorkspace('w2')
+
+    expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
+    expect(calls('lock')).toHaveLength(0)
+    expect(useApp.getState().flow).toBe('main')
+    expect(useVault.getState().items.map(item => item.id)).toEqual(['b'])
+    await vi.waitFor(() => expect(useApp.getState().status?.activeWorkspace).toBe('w2'))
+  })
+
+  // A workspace never opened with its password on this device: Rust has no key
+  // for it, so the switch *is* a lock — announced like any other, and the one
+  // `vault:locked` handler lands its lock screen.
+  it('lands on the lock screen of a workspace the app holds no key for', async () => {
     flowMain()
 
     await switchWorkspace('w2')
 
     expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
-    // Only one workspace is unlocked at a time, so the switch *is* the lock:
-    // Rust clears the session inside `workspace_select` and announces it like
-    // any other, and the one `vault:locked` handler lands the screen.
     expect(calls('lock')).toHaveLength(0)
     await vi.waitFor(() => expect(useApp.getState().flow).toBe('auth'))
   })
