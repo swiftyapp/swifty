@@ -317,7 +317,7 @@ pub fn open_snapshot_source(app: &AppHandle, key: &[u8]) -> Result<SqliteStore> 
 // An env row's `file_name` and `var_count` follow the `card_brand` shape: the
 // count is `Some` for every stamped env entry, so a NULL count is the marker,
 // and a file that simply has no name stays NULL there without re-running.
-fn backfill_derived_columns(store: &SqliteStore, key: &VaultKey) {
+pub(crate) fn backfill_derived_columns(store: &SqliteStore, key: &VaultKey) {
     let Ok(metas) = store.list() else { return };
     let cipher = key.payload_cipher();
     for meta in metas {

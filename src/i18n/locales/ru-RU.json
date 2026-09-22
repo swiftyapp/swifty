@@ -230,6 +230,8 @@
   "Export": "Экспорт",
   "Saved to": "Сохранено в",
   "Change master password": "Смена мастер-пароля",
+  "Every workspace on this device that shares this password changes with it": "Каждое рабочее пространство на этом устройстве с тем же паролем изменится вместе с ним",
+  "Password changed. Some workspaces on this device kept their own password.": "Пароль изменён. Некоторые рабочие пространства на этом устройстве сохранили свой пароль.",
   "Change…": "Изменить…",
   "Biometrics": "Биометрия",
   "Session": "Сеанс",

@@ -32,9 +32,16 @@ export default function MasterPasswordRow() {
     setError(null)
     setSuccess(null)
     changeMasterPassword(current, next)
-      .then(() => {
+      .then(unchanged => {
         setValues({})
-        setSuccess(t('Successfully changed password'))
+        // The change reaches every workspace that shares the password, so the
+        // ones it did not reach are the news: a workspace with a password of
+        // its own keeps it, and so does one whose own re-key failed.
+        setSuccess(
+          unchanged?.length
+            ? t('Password changed. Some workspaces on this device kept their own password.')
+            : t('Successfully changed password')
+        )
       })
       .catch((err: unknown) => setError(describeError(err)))
       .finally(() => setProcessing(false))
@@ -43,6 +50,9 @@ export default function MasterPasswordRow() {
   return (
     <ExpandableRow
       label={t('Change master password')}
+      description={t(
+        'Every workspace on this device that shares this password changes with it'
+      )}
       action={t('Change…')}
       testid="settings-master-password-row"
     >

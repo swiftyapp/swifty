@@ -230,6 +230,8 @@
   "Export": "Eksportuj",
   "Saved to": "Zapisano w",
   "Change master password": "Zmień hasło główne",
+  "Every workspace on this device that shares this password changes with it": "Każda przestrzeń robocza na tym urządzeniu, która używa tego hasła, zmieni się razem z nim",
+  "Password changed. Some workspaces on this device kept their own password.": "Hasło zmienione. Niektóre przestrzenie robocze na tym urządzeniu zachowały własne hasło.",
   "Change…": "Zmień…",
   "Biometrics": "Biometria",
   "Session": "Sesja",

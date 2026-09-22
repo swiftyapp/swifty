@@ -322,7 +322,8 @@ describe('Settings › sync', () => {
 
 describe('Settings › security', () => {
   it('changes the master password', async () => {
-    mockCommand('change_master_password', () => undefined)
+    // Nothing came back: the change reached every workspace on the device.
+    mockCommand('change_master_password', () => [])
     await open()
     await go('security')
     await userEvent.click(screen.getByText('Change…'))
@@ -336,7 +337,31 @@ describe('Settings › security', () => {
     await userEvent.click(screen.getByTestId('change-password-submit'))
 
     expect(calls('change_master_password')).toContainEqual({ current: 'old', new: 'newpass' })
-    expect(await screen.findByTestId('change-password-success')).toBeInTheDocument()
+    expect(await screen.findByText('Successfully changed password')).toBeInTheDocument()
+  })
+
+  // A workspace on a password of its own is left on it, and so is one whose own
+  // re-key failed. The change itself succeeded, so it is still the success line
+  // that is shown — it just says the new password does not open everything.
+  it('says so when the change did not reach every workspace', async () => {
+    mockCommand('change_master_password', () => ['a1b2c3d4'])
+    await open()
+    await go('security')
+    await userEvent.click(screen.getByText('Change…'))
+
+    await userEvent.type(document.querySelector('input[name="current_password"]')!, 'old')
+    await userEvent.type(document.querySelector('input[name="new_password"]')!, 'newpass')
+    await userEvent.type(
+      document.querySelector('input[name="new_password_repeat"]')!,
+      'newpass'
+    )
+    await userEvent.click(screen.getByTestId('change-password-submit'))
+
+    expect(
+      await screen.findByText(
+        'Password changed. Some workspaces on this device kept their own password.'
+      )
+    ).toBeInTheDocument()
   })
 
   it('reports a rejected master password change', async () => {

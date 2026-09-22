@@ -15,10 +15,10 @@ use tauri::AppHandle;
 
 use crate::crypto::{KdfParams, PayloadCipher, VaultKey};
 use crate::error::{Error, Result};
-use crate::session::{open_with_key, record_kdf_meta, store_err};
+use crate::session::{backfill_derived_columns, record_kdf_meta, store_err};
 use crate::state::AppState;
 use crate::storage;
-use crate::store::{Record, SqliteStore, VaultStore};
+use crate::store::{Record, SqliteStore, StoreError, VaultStore};
 
 // --- Failed-unlock backoff (T-AUTH-3) ---------------------------------------
 //
@@ -223,7 +223,6 @@ impl RekeyPaths {
 /// the same step, so recovery can never run against a change still in flight.
 #[allow(clippy::result_large_err)]
 pub fn rekey(
-    app: &AppHandle,
     store: SqliteStore,
     old_key: VaultKey,
     new_key: VaultKey,
@@ -255,7 +254,7 @@ pub fn rekey(
         drop(store);
         return Err(Rollback {
             error,
-            restored: roll_back(app, old_key, paths),
+            restored: roll_back(old_key, paths),
         });
     }
 
@@ -271,10 +270,38 @@ pub fn rekey(
                     "the password change could not be finalized and was undone; \
                      the previous password still applies ({e})"
                 )),
-                restored: roll_back(app, old_key, paths),
+                restored: roll_back(old_key, paths),
             })
         }
     }
+}
+
+/// The same change on a workspace that is not the open one: its own directory,
+/// its own store, and no session on the other side of it.
+///
+/// Everything [`rekey`] guarantees holds here too — the change is atomic for
+/// this workspace, and a failure leaves it on the password it had — but there
+/// is nothing to hand back, so a rollback that reopened the vault only closes
+/// it again. A key that does not open the database is reported as
+/// [`Error::InvalidPassword`], which is what tells a caller working through
+/// every workspace that this one is on a password of its own.
+///
+/// Blocking from end to end, like the saga it runs: callers put it on the
+/// blocking pool.
+pub fn rekey_workspace(
+    dir: &Path,
+    old_key: VaultKey,
+    new_key: VaultKey,
+    params: &KdfParams,
+) -> Result<()> {
+    let paths = RekeyPaths::in_dir(dir);
+    let store = SqliteStore::open(&paths.db, &*old_key.sqlcipher_key()).map_err(|e| match e {
+        StoreError::WrongKey => Error::InvalidPassword,
+        StoreError::SchemaNewer => Error::VaultTooNew,
+        e => Error::Other(format!("could not open the vault: {e}")),
+    })?;
+    rekey(store, old_key, new_key, params, &paths).map_err(|rollback| rollback.error)?;
+    Ok(())
 }
 
 // Put the pre-change pair back and reopen it under the old key. The connection
@@ -282,15 +309,9 @@ pub fn rekey(
 // be restored, or was restored but its marker could not be retired: either way
 // there is no state a writable session could safely sit on top of, and the
 // next unlock's recovery gets another go at the same snapshot.
-fn roll_back(
-    app: &AppHandle,
-    old_key: VaultKey,
-    paths: &RekeyPaths,
-) -> Option<(VaultKey, SqliteStore)> {
+fn roll_back(old_key: VaultKey, paths: &RekeyPaths) -> Option<(VaultKey, SqliteStore)> {
     match restore_rekey_backup(paths) {
-        Ok(true) => open_with_key(app, &old_key)
-            .ok()
-            .map(|(store, _)| (old_key, store)),
+        Ok(true) => reopen(paths, &old_key).map(|store| (old_key, store)),
         Ok(false) => {
             log::error!("the rekey snapshot vanished before the rollback; locking the vault");
             None
@@ -302,6 +323,17 @@ fn roll_back(
             None
         }
     }
+}
+
+// Reopen the restored database from the paths the saga was given rather than
+// from the app handle's: the vault being changed is not always the open one —
+// a password change now re-keys every workspace that shares the password — and
+// the two must not be resolved separately. Same shape as
+// `session::open_with_key`, minus the metadata list a rollback has no use for.
+fn reopen(paths: &RekeyPaths, key: &VaultKey) -> Option<SqliteStore> {
+    let store = SqliteStore::open(&paths.db, &*key.sqlcipher_key()).ok()?;
+    backfill_derived_columns(&store, key);
+    Some(store)
 }
 
 // Build the recovery point and publish it in the one order a crash cannot
@@ -387,7 +419,23 @@ fn remove_marker(marker: &Path) -> Result<()> {
 /// One `metadata` call when there is nothing to do, which is every unlock but
 /// the vanishingly rare one.
 pub fn recover_interrupted_rekey(app: &AppHandle, state: &AppState) -> Result<()> {
-    if restore_rekey_backup(&RekeyPaths::resolve(app, state)?)? {
+    recover(&RekeyPaths::resolve(app, state)?)
+}
+
+/// [`recover_interrupted_rekey`] on a named workspace directory rather than the
+/// active workspace's. A password change re-keys every workspace that shares the
+/// password, so any of them can be the one a crash caught — and a workspace that
+/// is opened from the ring rather than from a password (`workspace_select`)
+/// never passes through an unlock that would have rolled it back.
+///
+/// Its callers take the same setup step an unlock does, for the same reason: a
+/// change still in flight must never be read as an interrupted one.
+pub fn recover_interrupted_rekey_in(dir: &Path) -> Result<()> {
+    recover(&RekeyPaths::in_dir(dir))
+}
+
+fn recover(paths: &RekeyPaths) -> Result<()> {
+    if restore_rekey_backup(paths)? {
         log::warn!(
             "rolled back an interrupted master-password change; the previous password applies"
         );
@@ -916,5 +964,79 @@ mod recovery_tests {
         assert!(!restore_rekey_backup(&p).unwrap());
         assert_eq!(title_under(&p.db, &old), "before");
         assert_eq!(fs::read_to_string(&p.sidecar).unwrap(), "old-params");
+    }
+
+    // Recovery on a directory rather than on the app's paths: what a switch to a
+    // workspace the ring holds runs before it opens it, since a change that
+    // crashed on a workspace nobody was looking at is never met by an unlock.
+    #[test]
+    fn a_named_directorys_interrupted_change_is_rolled_back_too() {
+        let (dir, p) = paths();
+        fs::write(&p.db, "new-keyed").unwrap();
+        fs::write(&p.db_backup, "old-keyed").unwrap();
+        fs::write(&p.sidecar, "new-params").unwrap();
+        fs::write(&p.sidecar_backup, "old-params").unwrap();
+
+        recover_interrupted_rekey_in(dir.path()).unwrap();
+
+        assert_eq!(fs::read_to_string(&p.db).unwrap(), "old-keyed");
+        assert_eq!(fs::read_to_string(&p.sidecar).unwrap(), "old-params");
+        assert!(!p.db_backup.exists() && !p.sidecar_backup.exists());
+    }
+
+    // --- the change a workspace beside the open one gets ------------------------
+
+    #[test]
+    fn a_workspace_directory_changes_password_on_its_own_files() {
+        let (dir, p) = paths();
+        let old = VaultKey::legacy_from_password("old-pw");
+        fs::write(&p.sidecar, "old-params").unwrap();
+        drop(store_with_one_entry(&p.db, &old));
+
+        // A salt of this workspace's own, and the key the new password derives
+        // to under it — exactly what `commands::auth::rekey_one` builds.
+        let params = KdfParams::default_argon2id();
+        let new = VaultKey::Argon2 {
+            master: crate::crypto::derive(b"new-pw", &params).unwrap(),
+        };
+
+        rekey_workspace(dir.path(), old, new, &params).unwrap();
+
+        let new = VaultKey::Argon2 {
+            master: crate::crypto::derive(b"new-pw", &params).unwrap(),
+        };
+        assert_eq!(title_under(&p.db, &new), "before");
+        assert_eq!(
+            fs::read_to_string(&p.sidecar).unwrap(),
+            params.to_json().unwrap(),
+            "the descriptor has to name the key the database now uses"
+        );
+        // The invariant every exit of the saga keeps: no marker on disk behind a
+        // change that committed.
+        assert!(!p.db_backup.exists() && !p.sidecar_backup.exists() && !p.staging.exists());
+    }
+
+    // The workspace is on a password of its own. Nothing is touched, and the
+    // refusal is the one the caller reads as "leave this one alone" rather than
+    // as a failure to report.
+    #[test]
+    fn a_key_that_does_not_open_the_workspace_changes_nothing() {
+        let (dir, p) = paths();
+        let old = VaultKey::legacy_from_password("old-pw");
+        fs::write(&p.sidecar, "old-params").unwrap();
+        drop(store_with_one_entry(&p.db, &old));
+
+        let params = KdfParams::default_argon2id();
+        let refusal = rekey_workspace(
+            dir.path(),
+            VaultKey::legacy_from_password("someone-elses-pw"),
+            VaultKey::legacy_from_password("new-pw"),
+            &params,
+        );
+
+        assert!(matches!(refusal, Err(Error::InvalidPassword)));
+        assert_eq!(title_under(&p.db, &old), "before");
+        assert_eq!(fs::read_to_string(&p.sidecar).unwrap(), "old-params");
+        assert!(!p.db_backup.exists());
     }
 }

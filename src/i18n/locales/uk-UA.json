@@ -230,6 +230,8 @@
   "Export": "Експортувати",
   "Saved to": "Збережено в",
   "Change master password": "Змінити головний пароль",
+  "Every workspace on this device that shares this password changes with it": "Кожен робочий простір на цьому пристрої з таким самим паролем зміниться разом із ним",
+  "Password changed. Some workspaces on this device kept their own password.": "Пароль змінено. Деякі робочі простори на цьому пристрої зберегли власний пароль.",
   "Change…": "Змінити…",
   "Biometrics": "Біометрія",
   "Session": "Сеанс",

@@ -84,7 +84,8 @@ pub(crate) fn current_account(app: &AppHandle, cryptor: &Cryptor) -> Option<(Tok
 
 /// [`persist_tokens`] into the workspace directory `dir` rather than the active
 /// workspace's — for a vault added beside the open one while its paths stay put
-/// (`commands::autojoin`).
+/// (`commands::autojoin`), and for one re-keyed beside it by a master-password
+/// change, whose tokens come out sealed under its new key.
 pub(crate) fn persist_tokens_in(
     dir: &std::path::Path,
     cryptor: &Cryptor,
