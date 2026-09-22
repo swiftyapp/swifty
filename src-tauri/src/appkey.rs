@@ -235,6 +235,14 @@ pub fn open_all(app: &AppHandle, app_key: &[u8]) {
     }
     let mut ring = state.keyring.lock().unwrap();
     if !ring.accepts_app_key(app_key) {
+        // A password change replaced the app key while the sidecars above were
+        // being written, so some of them may now be sealed under the old one —
+        // and a sidecar that will not open is advertised by the probe until
+        // it fails. The ring holds the new key and every workspace's material,
+        // so all of them are resealed under it; nothing read above goes in.
+        drop(ring);
+        drop(session);
+        rewrap_all(app);
         return;
     }
     ring.insert(PRIMARY_ID, app_key);
