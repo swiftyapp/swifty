@@ -25,5 +25,12 @@ export const enableBiometric = (): Promise<BiometricMode> => call('enable_biomet
 
 export const disableBiometric = (): Promise<void> => call('disable_biometric')
 
-export const changeMasterPassword = (current: string, next: string): Promise<void> =>
+/**
+ * Change the master password of this device. Every workspace that shares the
+ * password is re-keyed with it — one master password per device is the rule —
+ * so this resolves with the ids of the workspaces that kept their old one: a
+ * workspace on a password of its own is left alone, and one whose own re-key
+ * failed stays on the password it had.
+ */
+export const changeMasterPassword = (current: string, next: string): Promise<string[]> =>
   call('change_master_password', { current, new: next })

@@ -230,6 +230,8 @@
   "Export": "Exportera",
   "Saved to": "Sparad som",
   "Change master password": "Byt huvudlösenord",
+  "Every workspace on this device that shares this password changes with it": "Varje arbetsyta på den här enheten som delar lösenordet ändras med det",
+  "Password changed. Some workspaces on this device kept their own password.": "Lösenordet har ändrats. Vissa arbetsytor på den här enheten behöll sitt eget lösenord.",
   "Change…": "Byt…",
   "Biometrics": "Biometri",
   "Session": "Session",

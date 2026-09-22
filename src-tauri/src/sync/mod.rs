@@ -214,6 +214,13 @@ pub fn reseal_tokens(app: &AppHandle, old: &Cryptor, new: &Cryptor) -> Result<()
     auth::reseal_tokens(app, old, new)
 }
 
+/// [`reseal_tokens`] on the workspace directory `dir` rather than the active
+/// workspace's — for the workspaces a master-password change re-keys beside the
+/// open one.
+pub(crate) fn reseal_tokens_in(dir: &std::path::Path, old: &Cryptor, new: &Cryptor) -> Result<()> {
+    auth::reseal_tokens_in(dir, old, new)
+}
+
 /// One full sync against Drive. Blocking: call it on a dedicated thread.
 pub fn run(app: &AppHandle, cryptor: Cryptor) -> Result<SyncOutcome> {
     if !is_configured(app, &cryptor) {

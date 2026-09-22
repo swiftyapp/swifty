@@ -16,6 +16,7 @@ use crate::state::AppState;
 use crate::store::SqliteStore;
 use crate::workspace::PRIMARY_ID;
 use crate::{appkey, biometrics, crypto, events, storage};
+use std::path::Path;
 use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
@@ -355,6 +356,13 @@ fn app_key_material(app: &AppHandle, state: &State<'_, AppState>) -> Result<Zero
 // unlocked session. The saga itself is [`crate::auth::rekey`]; this is the part
 // that has to touch the session.
 //
+// And then the same for every *other* workspace on this device that shares the
+// password ([`rekey_beside`]): the device has one master password, so a change
+// that stopped at the open workspace would leave the others restorable on
+// another device only under the password the user has just replaced. The ids of
+// the ones that kept their old password come back, so the frontend can say that
+// the change did not reach all of them.
+//
 // Nothing expensive happens under the session lock. Both Argon2id derives run
 // before it is taken, and the saga runs on the blocking pool with the store
 // *out* of the session — so for its duration every other command reads the
@@ -367,15 +375,25 @@ pub async fn change_master_password(
     new: Zeroizing<String>,
     app: AppHandle,
     state: State<'_, AppState>,
-) -> Result<()> {
+) -> Result<Vec<String>> {
     // This rewrites the KDF sidecar and the database through the workspace
     // paths, so it holds the same step a workspace switch has to take first —
     // and that every unlock takes, so no unlock can run recovery against the
-    // snapshot this change is about to publish.
+    // snapshot this change is about to publish. Held for the workspaces beside
+    // the open one too: they are re-keyed through their own paths, and a switch
+    // landing between two of them would move the open workspace out from under
+    // the session this one is still holding.
     let _step = super::setup::begin_step(&state)?;
     // Resolved before anything is taken out of the session, so a path that
     // cannot be resolved leaves the vault open and unchanged.
     let paths = auth::RekeyPaths::resolve(&app, &state)?;
+    let root = storage::root_dir(&app)?;
+
+    // The passwords themselves are needed again once the open workspace is
+    // done: every other workspace derives `current` against its own descriptor
+    // and `new` under a salt of its own, so neither key derived here is any use
+    // to it.
+    let (current_beside, new_beside) = (current.clone(), new.clone());
 
     // Deriving needs only the app handle and the passwords, so it happens off
     // the session entirely — and off the main thread, since Argon2id is the
@@ -399,13 +417,8 @@ pub async fn change_master_password(
     // after the change; the key itself is about to be moved into the saga.
     let old_cryptor = old_key.cryptor();
 
-    let handle = app.clone();
-    let rekeyed = blocking(move || {
-        Ok(auth::rekey(
-            &handle, store, old_key, new_key, &params, &paths,
-        ))
-    })
-    .await?;
+    let rekeyed =
+        blocking(move || Ok(auth::rekey(store, old_key, new_key, &params, &paths))).await?;
 
     let (new_key, store) = match rekeyed {
         Ok(changed) => changed,
@@ -431,15 +444,11 @@ pub async fn change_master_password(
         }
     };
 
-    // All taken before the key is handed to the session, so what follows needs
-    // no second lock to read them back. The biometric enrollment holds the app
-    // key, so only a change on the primary makes it stale; a change elsewhere
-    // leaves the stored bytes exactly as good as they were.
+    // Both taken before the key is handed to the session, so what follows needs
+    // no second lock to read them back.
     let active = crate::workspace::active_id(&app);
     let primary = active == PRIMARY_ID;
     let new_material = Zeroizing::new(new_key.biometric_material().to_vec());
-    let stale_enrollment =
-        (primary && storage::biometric_enrolled(&app)).then(|| new_material.clone());
     let new_cryptor = new_key.cryptor();
 
     // Adopt the new key + store as the continuation of the session the lease
@@ -478,22 +487,167 @@ pub async fn change_master_password(
         log::warn!("could not re-seal the Drive token under the new key: {e}");
     }
 
-    // The biometric-stored key is now stale; re-store the new material or clear
-    // it. Re-storing is a fresh enrollment, so the gate is decided again and the
-    // marker refreshed — a build that has since gained (or lost) its entitlement
-    // moves the key to the matching mode instead of leaving a mislabelled item.
-    if let Some(material) = stale_enrollment {
-        match blocking(move || secure_store::Platform.store(&material)).await {
-            Ok(mode) => {
-                let _ = storage::set_biometric_marker(&app, Some(mode.as_marker()));
+    // The enrollment holds the app key, so only a change of the primary's key
+    // makes it stale; a change elsewhere leaves the stored bytes exactly as good
+    // as they were. Done here rather than after the workspaces below, which can
+    // take an Argon2id run apiece: the item is stale from the moment the
+    // primary's database is re-keyed, and the shorter that window the better.
+    if primary {
+        restore_enrollment(&app, new_material).await;
+    }
+
+    Ok(rekey_beside(&app, &state, &root, &active, current_beside, new_beside).await)
+}
+
+// The biometric-stored key is the app key, and a change of the primary's key
+// has just retired it: re-store the new material, or clear the enrollment if it
+// cannot be written. Re-storing is a fresh enrollment, so the gate is decided
+// again and the marker refreshed — a build that has since gained (or lost) its
+// entitlement moves the key to the matching mode instead of leaving a
+// mislabelled item. A device that never enrolled has nothing to re-store.
+async fn restore_enrollment(app: &AppHandle, material: Zeroizing<Vec<u8>>) {
+    if !storage::biometric_enrolled(app) {
+        return;
+    }
+    match blocking(move || secure_store::Platform.store(&material)).await {
+        Ok(mode) => {
+            let _ = storage::set_biometric_marker(app, Some(mode.as_marker()));
+        }
+        Err(_) => {
+            let _ = blocking(|| secure_store::Platform.delete()).await;
+            let _ = storage::set_biometric_marker(app, None);
+        }
+    }
+}
+
+// Every workspace on this device but the open one, put on the new password.
+//
+// One master password per device is the rule the rest of the app already keeps
+// — a create proves the typed password against the app key, and an unlock
+// elsewhere tries it against the primary — so a change of that password has to
+// reach every workspace that shares it. A workspace that does *not* share it is
+// left exactly as it was: the password the user typed is not its password, and
+// this command is not a way to take one over.
+//
+// One workspace at a time, each on the blocking pool: an Argon2id derive and a
+// whole-vault re-seal apiece, and nothing here goes faster in parallel on a
+// machine whose cores Argon2id is already meant to saturate.
+//
+// Each workspace's saga is atomic on its own directory, so one that fails stays
+// on the old password while the ones already done keep the new one. The ids of
+// both kinds come back: a workspace on a password of its own is left alone on
+// purpose and one that failed is left alone by accident, but the user needs the
+// same thing from both — to know the new password does not open everything on
+// this device.
+//
+// The primary goes last. Its key is the app key every other workspace's sealed
+// copy is wrapped under, so replacing it once the rest are in the ring under
+// their new keys reseals every sidecar in a single pass
+// (`appkey::replace_app_key`) rather than once per workspace.
+async fn rekey_beside(
+    app: &AppHandle,
+    state: &AppState,
+    root: &Path,
+    active: &str,
+    current: Zeroizing<String>,
+    new: Zeroizing<String>,
+) -> Vec<String> {
+    let mut ids: Vec<String> = crate::workspace::Registry::load(root)
+        .workspaces
+        .into_iter()
+        .map(|workspace| workspace.id)
+        .filter(|id| id != active)
+        .collect();
+    ids.sort_by_key(|id| id == PRIMARY_ID);
+
+    let mut unchanged = Vec::new();
+    for id in ids {
+        let dir = crate::workspace::dir_of(root, &id);
+        // The ring's copy of this workspace's key, read under its own guard and
+        // released before any of the work below: a whole vault's worth of it is
+        // no thing to hold a mutex across. A lock that lands afterwards makes
+        // the copy stale, and the writes back into the ring stand down on their
+        // own (`appkey`); the change on disk is the user's either way.
+        let held = state.keyring.lock().unwrap().get(&id);
+        let (current, new) = (current.clone(), new.clone());
+        match blocking(move || rekey_one(&dir, held, &current, &new)).await {
+            Ok(material) => {
+                if id == PRIMARY_ID {
+                    appkey::replace_app_key(app, &material);
+                    restore_enrollment(app, material).await;
+                } else {
+                    appkey::adopt(app, &id, &material);
+                }
             }
-            Err(_) => {
-                let _ = blocking(|| secure_store::Platform.delete()).await;
-                let _ = storage::set_biometric_marker(&app, None);
+            Err(Error::InvalidPassword) => {
+                log::info!("workspace {id} has a password of its own and keeps it");
+                unchanged.push(id);
+            }
+            Err(e) => {
+                log::warn!("workspace {id} kept its old password: {e}");
+                unchanged.push(id);
             }
         }
     }
-    Ok(())
+    unchanged
+}
+
+// One workspace's whole password change, on its own files: roll back a change a
+// crash left half-applied, find the key that opens it, re-key it under a salt of
+// its own, and re-seal its Drive token. The material it now opens under comes
+// back, for the ring.
+//
+// `held` is the ring's copy of its key, for a workspace the app already has
+// open: it needs no derive at all, which is the point of the app being unlocked
+// as a whole. Without one the typed password is proved against that workspace's
+// own descriptor, and a password that does not open it is `InvalidPassword` —
+// a workspace of its own rather than a failure.
+//
+// That proof stands outside the failed-attempt backoff, unlike every other one
+// the app makes: the password was typed by someone who had already proved it
+// against the open vault, so it is not a guess — and recording it as one would
+// escalate a workspace's own lockout a little further with every password
+// change the user makes.
+//
+// Blocking from end to end (a derive, a whole-vault re-seal, two file copies),
+// so it only ever runs on the blocking pool.
+fn rekey_one(
+    dir: &Path,
+    held: Option<Zeroizing<Vec<u8>>>,
+    current: &str,
+    new: &str,
+) -> Result<Zeroizing<Vec<u8>>> {
+    // Before the descriptor is read or the database opened, exactly as an
+    // unlock does it: a crash during an earlier change can leave the two
+    // disagreeing, and the rollback has to land before either is consulted.
+    auth::recover_interrupted_rekey_in(dir)?;
+
+    let old_key = match held {
+        Some(material) => {
+            VaultKey::from_material(material, dir.join(storage::KDF_SIDECAR_FILE).exists())
+        }
+        None => super::workspace::verify_password_in(dir, current)?,
+    };
+    // Its own params, so every workspace keeps its own salt: the one thing a
+    // shared password must not turn into a shared derivation.
+    let params = KdfParams::default_argon2id();
+    let new_key = VaultKey::Argon2 {
+        master: crypto::derive(new.as_bytes(), &params)?,
+    };
+    let material = Zeroizing::new(new_key.biometric_material().to_vec());
+    // Both taken before the keys are moved into the saga: the token file is
+    // sealed under the old key and has to be re-sealed under the new one.
+    let (old_cryptor, new_cryptor) = (old_key.cryptor(), new_key.cryptor());
+
+    auth::rekey_workspace(dir, old_key, new_key, &params)?;
+
+    // Best effort, after the change is committed, for the same reason it is on
+    // the open workspace: the change is on disk and reporting a failure here
+    // would undo nothing. The worst case is an account the user reconnects.
+    if let Err(e) = crate::sync::reseal_tokens_in(dir, &old_cryptor, &new_cryptor) {
+        log::warn!("could not re-seal this workspace's Drive token under the new password: {e}");
+    }
+    Ok(material)
 }
 
 // Both Argon2id derives, on the blocking pool and before the session lock is

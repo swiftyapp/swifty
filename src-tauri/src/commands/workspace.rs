@@ -110,6 +110,18 @@ pub async fn workspace_select(
     let Some(material) = material else {
         return Ok(land_on_lock_screen(&app));
     };
+    // The rollback every unlock runs first, for the one open that never passes
+    // through an unlock: a password change re-keys every workspace that shares
+    // the password, so a crash during one can leave *this* workspace's database
+    // and descriptor disagreeing, and the ring's key opens neither of them
+    // until the pre-change pair is back. Before the descriptor below is read,
+    // since recovery decides whether there is one. Under the step held above,
+    // as `auth::unlock` runs it under its own, so a change still in flight is
+    // never read as an interrupted one.
+    if let Err(e) = auth::recover_interrupted_rekey_in(&workspace::dir_of(&root, &id)) {
+        log::warn!("could not roll back an interrupted password change for workspace {id}: {e}");
+        return Ok(land_on_lock_screen(&app));
+    }
     let key = VaultKey::from_material(material, storage::kdf_sidecar_path(&app)?.exists());
     let (key, store, entries) = match super::auth::open_off_thread(&app, key).await {
         Ok(opened) => opened,

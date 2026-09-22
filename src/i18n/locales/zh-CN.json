@@ -230,6 +230,8 @@
   "Export": "导出",
   "Saved to": "已保存到",
   "Change master password": "修改主密码",
+  "Every workspace on this device that shares this password changes with it": "本设备上使用此密码的每个工作区都会一并更改",
+  "Password changed. Some workspaces on this device kept their own password.": "密码已修改。本设备上的部分工作区保留了各自的密码。",
   "Change…": "修改…",
   "Biometrics": "生物识别",
   "Session": "会话",

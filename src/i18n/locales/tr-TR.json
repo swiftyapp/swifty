@@ -230,6 +230,8 @@
   "Export": "Dışa aktar",
   "Saved to": "Şuraya kaydedildi:",
   "Change master password": "Ana şifreyi değiştir",
+  "Every workspace on this device that shares this password changes with it": "Bu cihazda aynı şifreyi kullanan her çalışma alanı da birlikte değişir",
+  "Password changed. Some workspaces on this device kept their own password.": "Şifre değiştirildi. Bu cihazdaki bazı çalışma alanları kendi şifresini korudu.",
   "Change…": "Değiştir…",
   "Biometrics": "Biyometri",
   "Session": "Oturum",

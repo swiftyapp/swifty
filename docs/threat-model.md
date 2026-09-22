@@ -345,7 +345,17 @@ carries them as part of the opaque payload and never sees them.
    lock screen, and that unlock writes one. The same passphrase for every
    workspace is the rule (a create proves it against the app key), which is
    what lets a non-primary unlock prove the passphrase against the primary in
-   the background and fill the ring from there.
+   the background and fill the ring from there. A passphrase *change*
+   (`change_master_password`) keeps that rule true: after the open workspace is
+   re-keyed, every other workspace that shares the passphrase is re-keyed too —
+   each under a fresh salt of its own, through the same snapshot-guarded saga on
+   its own files, and with its Drive token re-sealed under its new key — so a
+   workspace created before the change no longer restores on another device only
+   under the passphrase the user has just replaced. A workspace on a passphrase
+   of its own is left untouched (its own passphrase is not the one that was
+   proved), and one whose re-key fails stays on the passphrase it had; both are
+   reported back so the UI can say the new passphrase does not open everything
+   on the device.
 
 ## Fresh start and explicit import
 

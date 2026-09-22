@@ -236,6 +236,8 @@
   "Export": "Export",
   "Saved to": "Saved to",
   "Change master password": "Change master password",
+  "Every workspace on this device that shares this password changes with it": "Every workspace on this device that shares this password changes with it",
+  "Password changed. Some workspaces on this device kept their own password.": "Password changed. Some workspaces on this device kept their own password.",
   "Change…": "Change…",
   "Biometrics": "Biometrics",
   "Session": "Session",
