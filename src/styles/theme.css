@@ -349,6 +349,15 @@
   --color-accent-fg: var(--c-accent-fg);
   --color-accent-soft: var(--c-accent-soft);
   --color-accent-line: var(--c-accent-line);
+  /*
+   * The filled accent under the pointer: a solid, never a translucent blend
+   * of the accent into the surface, which would pull the fill towards the
+   * ground and the text on it under AA. Darker than the accent on the light
+   * theme (white text gains), lighter on the dark (ink text gains); ink alone
+   * lifts a touch on light, since there is no darker than black.
+   */
+  --color-accent-hover: var(--c-accent-hover);
+  --color-bad-hover: var(--c-bad-hover);
   --color-good: var(--c-good);
   --color-warn: var(--c-warn);
   --color-bad: var(--c-bad);
@@ -637,6 +646,7 @@
   --c-accent-fg: #ffffff;
   --c-accent-soft: rgba(20, 22, 26, 0.08);
   --c-accent-line: rgba(20, 22, 26, 0.5);
+  --c-accent-hover: #2c2d31;
   --c-lens: #ffffff;
   --lens-shadow:
     0 1px 2px rgba(20, 22, 26, 0.1),
@@ -644,6 +654,8 @@
   --c-good: #1e9c6e;
   --c-warn: #b7761a;
   --c-bad: #c9453a;
+  /* The danger button under the pointer: darker, so its white text gains. */
+  --c-bad-hover: #b33e34;
   /* The macOS Touch ID fingerprint rose (biometric affordances). */
   --c-touchid: #ee5d6f;
   /* The brand asterisk's ink (mascot body + rail mark) and the paper its eyes
@@ -775,6 +787,7 @@
   --c-accent-fg: #15161a;
   --c-accent-soft: rgba(255, 255, 255, 0.1);
   --c-accent-line: rgba(255, 255, 255, 0.55);
+  --c-accent-hover: #ffffff;
   /* A step up from the rail rather than white: a white key on a near-black
    * rail would glare, and the glyph on it is already the full ink. */
   --c-lens: rgba(255, 255, 255, 0.1);
@@ -784,6 +797,8 @@
   --c-good: #4cc08f;
   --c-warn: #e0a94e;
   --c-bad: #e4685d;
+  /* Darker here too: the danger fill keeps white text on both themes. */
+  --c-bad-hover: #d65c51;
   --c-touchid: #ee5d6f;
   --c-brand: #d6d8dc;
   --c-brand-eye: #15161a;
@@ -880,6 +895,7 @@
   --c-accent: #0f6f86;
   --c-accent-soft: rgba(15, 111, 134, 0.1);
   --c-accent-line: rgba(15, 111, 134, 0.45);
+  --c-accent-hover: #0d5f73;
   --c-sel: rgba(15, 111, 134, 0.09);
 }
 :root[data-theme='dark'][data-accent='petrol'],
@@ -887,6 +903,7 @@
   --c-accent: #34b7cb;
   --c-accent-soft: rgba(52, 183, 203, 0.16);
   --c-accent-line: rgba(52, 183, 203, 0.55);
+  --c-accent-hover: #50c1d2;
   --c-sel: rgba(255, 255, 255, 0.06);
 }
 
@@ -894,6 +911,7 @@
   --c-accent: #3b5bdb;
   --c-accent-soft: rgba(59, 91, 219, 0.1);
   --c-accent-line: rgba(59, 91, 219, 0.45);
+  --c-accent-hover: #334ebc;
   --c-sel: rgba(59, 91, 219, 0.09);
 }
 :root[data-theme='dark'][data-accent='cobalt'],
@@ -901,6 +919,7 @@
   --c-accent: #6f88ee;
   --c-accent-soft: rgba(111, 136, 238, 0.16);
   --c-accent-line: rgba(111, 136, 238, 0.55);
+  --c-accent-hover: #8399f0;
   --c-sel: rgba(255, 255, 255, 0.06);
 }
 
@@ -908,6 +927,7 @@
   --c-accent: #4a7a2a;
   --c-accent-soft: rgba(74, 122, 42, 0.1);
   --c-accent-line: rgba(74, 122, 42, 0.45);
+  --c-accent-hover: #406924;
   --c-sel: rgba(74, 122, 42, 0.09);
 }
 :root[data-theme='dark'][data-accent='moss'],
@@ -915,6 +935,7 @@
   --c-accent: #8fc266;
   --c-accent-soft: rgba(143, 194, 102, 0.16);
   --c-accent-line: rgba(143, 194, 102, 0.55);
+  --c-accent-hover: #9fcb7b;
   --c-sel: rgba(255, 255, 255, 0.06);
 }
 
@@ -924,6 +945,7 @@
   --c-accent: #b45309;
   --c-accent-soft: rgba(180, 83, 9, 0.1);
   --c-accent-line: rgba(180, 83, 9, 0.45);
+  --c-accent-hover: #9b4708;
   --c-sel: rgba(180, 83, 9, 0.09);
 }
 :root[data-theme='dark'][data-accent='copper'],
@@ -931,6 +953,7 @@
   --c-accent: #f79a3e;
   --c-accent-soft: rgba(247, 154, 62, 0.16);
   --c-accent-line: rgba(247, 154, 62, 0.55);
+  --c-accent-hover: #f8a859;
   --c-sel: rgba(255, 255, 255, 0.06);
 }
 
@@ -940,6 +963,7 @@
   --c-accent: #b3202c;
   --c-accent-soft: rgba(179, 32, 44, 0.1);
   --c-accent-line: rgba(179, 32, 44, 0.45);
+  --c-accent-hover: #9a1c26;
   --c-sel: rgba(179, 32, 44, 0.09);
 }
 :root[data-theme='dark'][data-accent='ruby'],
@@ -947,6 +971,7 @@
   --c-accent: #e8555a;
   --c-accent-soft: rgba(232, 85, 90, 0.16);
   --c-accent-line: rgba(232, 85, 90, 0.55);
+  --c-accent-hover: #eb6d71;
   --c-sel: rgba(255, 255, 255, 0.06);
 }
 
@@ -960,6 +985,7 @@
   --c-accent: #15161a;
   --c-accent-soft: rgba(20, 22, 26, 0.08);
   --c-accent-line: rgba(20, 22, 26, 0.5);
+  --c-accent-hover: #2c2d31;
   --c-sel: rgba(20, 22, 26, 0.07);
 }
 :root[data-theme='dark'][data-accent='ink'],
@@ -967,5 +993,6 @@
   --c-accent: #f2f3f4;
   --c-accent-soft: rgba(255, 255, 255, 0.1);
   --c-accent-line: rgba(255, 255, 255, 0.55);
+  --c-accent-hover: #ffffff;
   --c-sel: rgba(255, 255, 255, 0.06);
 }

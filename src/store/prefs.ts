@@ -102,27 +102,45 @@ export const hydratePrefs = (settings: Settings): void => {
  * answers without the key — leaves the choice standing for the session instead
  * of snapping it back to the default on every click. Same outcome as the
  * failed write above, for the same reason.
+ *
+ * Except for what is still being written. Two writes to different keys
+ * overlap all the time (an accent, then a theme), and each answer is the whole
+ * file as the backend held it when *that* patch was merged — so the theme's
+ * answer, landing first, may still carry the old accent. Every key with an
+ * unanswered write keeps its optimistic value over any answer; its own answer,
+ * or a failure, is what releases it.
  */
 // Which write is the newest. Answers can land out of order — a slider drag
 // issues several in a row — and each one carries the whole file, so only the
 // answer to the latest write may replace the store: an older one would put back
 // a value the user has already moved past.
 let latestWrite = 0
-// How many writes are still waiting for their answer.
-let inFlight = 0
+// Per key, the newest write still waiting for its answer and the value it
+// carries: the overlay every answer is read through.
+const inFlight = new Map<keyof Settings, { write: number; value: Settings[keyof Settings] }>()
+
+const pendingOverlay = (except: number): Partial<Settings> =>
+  Object.fromEntries(
+    [...inFlight].filter(([, w]) => w.write !== except).map(([key, w]) => [key, w.value])
+  )
 
 export const setPref = <K extends keyof Settings>(key: K, value: Settings[K]): void => {
   const write = ++latestWrite
-  inFlight++
+  inFlight.set(key, { write, value })
   usePrefs.setState({ [key]: value } as Pick<Settings, K>)
   setSettings({ [key]: value } as Partial<Settings>)
     .then(merged => {
       if (write === latestWrite)
-        usePrefs.setState(sanitize({ ...usePrefs.getState(), ...merged }), true)
+        usePrefs.setState(
+          sanitize({ ...usePrefs.getState(), ...merged, ...pendingOverlay(write) }),
+          true
+        )
     })
     .catch(() => {})
     .finally(() => {
-      inFlight--
+      // Only this write's own entry: a newer write to the same key has
+      // replaced it and is still owed an answer.
+      if (inFlight.get(key)?.write === write) inFlight.delete(key)
     })
 }
 
@@ -142,7 +160,7 @@ export const prefsMark = (): number => latestWrite
  * anyway, so nothing is lost by letting the probe's copy go.
  */
 export const hydrateFromProbe = (settings: Settings, mark: number): void => {
-  if (mark === latestWrite && inFlight === 0) hydratePrefs(settings)
+  if (mark === latestWrite && inFlight.size === 0) hydratePrefs(settings)
 }
 
 // The palette command is a flip, so it resolves "system" first and then lands

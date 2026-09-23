@@ -44,7 +44,7 @@ export default function RailButton({
         className={cx(
           'relative grid h-9 w-9 cursor-pointer place-items-center rounded-lg transition-[color,background-color,box-shadow]',
           action
-            ? 'bg-accent text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] hover:bg-accent/85'
+            ? 'bg-accent text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] hover:bg-accent-hover'
             : selected
               ? 'bg-lens text-text shadow-lens [&_svg]:stroke-2'
               : 'text-text2 hover:bg-hover hover:text-text',

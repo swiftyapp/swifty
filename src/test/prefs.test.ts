@@ -54,6 +54,37 @@ describe('prefs', () => {
     expect(document.documentElement.getAttribute('data-accent')).toBe('ruby')
   })
 
+  // Two keys written back to back, the second answered first with the file as
+  // it stood before the first was merged: the first key's choice must survive
+  // that answer, and the first answer arriving late must not undo the second.
+  it('keeps an unanswered write over another key’s answer', async () => {
+    const accentWrite = deferred<Settings>()
+    const themeWrite = deferred<Settings>()
+    mockCommandOnce('set_settings', () => accentWrite.promise)
+    mockCommandOnce('set_settings', () => themeWrite.promise)
+
+    setPref('accent', 'ruby')
+    setPref('theme', 'dark')
+
+    // The theme's answer lands first, and the backend merged it before the
+    // accent's patch reached it.
+    themeWrite.resolve({ ...DEFAULT_PREFS, theme: 'dark' })
+    await settled()
+    expect(usePrefs.getState().accent).toBe('ruby')
+    expect(usePrefs.getState().theme).toBe('dark')
+
+    // The accent's answer, older, arrives with the file as it was after its
+    // own merge — before the theme's. It is not allowed to put light back.
+    accentWrite.resolve({ ...DEFAULT_PREFS, accent: 'ruby' })
+    await settled()
+    expect(usePrefs.getState().accent).toBe('ruby')
+    expect(usePrefs.getState().theme).toBe('dark')
+
+    // Nothing is pending any more, so the next probe is trusted.
+    hydrateFromProbe({ ...DEFAULT_PREFS, accent: 'moss', theme: 'dark' }, prefsMark())
+    expect(usePrefs.getState().accent).toBe('moss')
+  })
+
   // A probe (`app_status`) carries the settings too, and one that raced a write
   // — read the file before the write, landed after it — must not put the old
   // value back. The mark taken when the probe went out is what tells.
