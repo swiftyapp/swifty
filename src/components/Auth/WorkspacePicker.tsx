@@ -50,7 +50,10 @@ export default function WorkspacePicker() {
         data-testid="workspace-chip"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={t('Switch vault')}
+        // The accessible name is the vault's own (the monogram is decorative),
+        // so what is about to open is what is read out; the hint that it can
+        // be changed is the title, not a label over the name.
+        title={t('Switch vault')}
         onClick={() => setOpen(value => !value)}
         className={cx(
           'flex h-8 cursor-pointer items-center gap-2 rounded-full pl-1 pr-2.5 text-base font-medium text-text transition-colors',
@@ -80,6 +83,7 @@ export default function WorkspacePicker() {
                 <DropdownItem
                   key={workspace.id}
                   testid={`workspace-option-${workspace.id}`}
+                  checked={selected}
                   onClick={() => pick(workspace.id)}
                   className="py-1.5"
                 >

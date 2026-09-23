@@ -33,19 +33,28 @@ describe('WorkspacePicker', () => {
     render(<WorkspacePicker />)
 
     expect(screen.getByTestId('workspace-picker')).toBeInTheDocument()
-    // The primary has no name of its own until it is given one.
-    expect(screen.getByTestId('workspace-chip')).toHaveTextContent('Personal')
+    // The primary has no name of its own until it is given one. The chip is
+    // named by the vault it shows, so assistive technology hears which one is
+    // about to open rather than a generic label.
+    expect(screen.getByTestId('workspace-chip')).toHaveAccessibleName('Personal')
     expect(screen.queryByTestId('workspace-option-w2')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('workspace-chip'))
 
-    expect(screen.getByTestId('workspace-option-default')).toHaveTextContent('Personal')
-    expect(screen.getByTestId('workspace-option-w2')).toHaveTextContent('Work')
+    // One of several: each row says whether it is the current one.
+    expect(screen.getByRole('menuitemradio', { name: /Personal/, checked: true })).toBe(
+      screen.getByTestId('workspace-option-default')
+    )
+    expect(screen.getByRole('menuitemradio', { name: /Work/, checked: false })).toBe(
+      screen.getByTestId('workspace-option-w2')
+    )
 
     await userEvent.click(screen.getByTestId('workspace-option-w2'))
 
     expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
     expect(screen.queryByTestId('workspace-option-w2')).not.toBeInTheDocument()
+    // The picked row is gone with the menu; the keyboard lands back on the chip.
+    expect(screen.getByTestId('workspace-chip')).toHaveFocus()
   })
 
   // Where each vault lives is read off what is knowable while it is locked:
