@@ -384,6 +384,7 @@ mod tests {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
     use std::sync::{Arc, Mutex};
     use std::thread::{self, JoinHandle};
     use std::time::Duration;
@@ -392,15 +393,25 @@ mod tests {
     use crate::store::SqliteStore;
     use crate::workspace::Workspace;
 
-    type Hook = Box<dyn Fn() + Send>;
-    static PAUSE: Mutex<Option<Hook>> = Mutex::new(None);
+    type Hook = Box<dyn Fn()>;
+    thread_local! {
+        // Per thread, not per process: tests run in parallel, and a hook one
+        // test hung in a shared slot fired inside any other test's
+        // `open_all_in` that overlapped it — asserting that test's ring, and
+        // poisoning the slot for the one that owned it. `open_all_in` calls
+        // `pause` on its caller's thread, so the hook only ever meets the open
+        // its own test started.
+        static PAUSE: RefCell<Option<Hook>> = const { RefCell::new(None) };
+    }
 
     /// What `open_all` runs between its check of the ring and its sidecar
-    /// writes: nothing, unless a test has hung something there.
+    /// writes: nothing, unless this thread's test has hung something there.
     pub fn pause() {
-        if let Some(hook) = PAUSE.lock().unwrap().as_ref() {
-            hook();
-        }
+        PAUSE.with_borrow(|hook| {
+            if let Some(hook) = hook {
+                hook();
+            }
+        });
     }
 
     fn tmp_root() -> std::path::PathBuf {
@@ -573,7 +584,7 @@ mod tests {
         let change: Arc<Mutex<Option<JoinHandle<()>>>> = Arc::default();
         {
             let (state, root, change) = (state.clone(), root.clone(), change.clone());
-            *PAUSE.lock().unwrap() = Some(Box::new(move || {
+            PAUSE.set(Some(Box::new(move || {
                 let worker = {
                     let (state, root) = (state.clone(), root.clone());
                     thread::spawn(move || {
@@ -590,11 +601,11 @@ mod tests {
                     "the change is waiting on the proof"
                 );
                 *change.lock().unwrap() = Some(worker);
-            }));
+            })));
         }
 
         open_all_in(&state, &root, OLD_KEY);
-        *PAUSE.lock().unwrap() = None;
+        PAUSE.set(None);
         change.lock().unwrap().take().unwrap().join().unwrap();
 
         assert_eq!(sealed_under(&root, "x", NEW_KEY), X_KEY);
