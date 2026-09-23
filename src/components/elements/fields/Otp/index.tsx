@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
-import { copy } from '@/services/copy'
 import { useOtp } from '@/hooks/useOtp'
 import Panel from '../../Panel'
 import { verbatimInput } from '../../inputProps'
@@ -34,8 +33,8 @@ export default function OtpField({
 
   // Reading, the panel is worth its column only once a code has arrived.
   // Passing the raw value through when it failed to parse bought nothing but a
-  // dead dial and a "Copy code" button that copied '' — the backend rejects
-  // exactly what `otpSecret` rejects.
+  // dead dial that copied '' — the backend rejects exactly what `otpSecret`
+  // rejects.
   if (!editing && !code) return null
 
   return (
@@ -64,20 +63,11 @@ export default function OtpField({
         />
       )}
 
-      {parsed && <Dial code={code} time={time} period={period} />}
+      {/* Reading, the dial itself is the copy control — see `Dial`. */}
+      {parsed && <Dial code={code} time={time} period={period} copyable={!editing} />}
 
       {editing && value !== '' && !parsed && (
         <div className="mt-3 text-base text-bad">{t('Not a one-time-password secret')}</div>
-      )}
-
-      {!editing && (
-        <button
-          type="button"
-          onClick={() => copy(code)}
-          className="mt-3 grid h-7 w-full cursor-pointer place-items-center rounded-sm border border-line2 text-base text-text2 transition-colors hover:border-accent-line hover:text-text"
-        >
-          {t('Copy code')}
-        </button>
       )}
     </Panel>
   )
