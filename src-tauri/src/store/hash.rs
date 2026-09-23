@@ -75,7 +75,23 @@ pub fn record_hash(r: &Record) -> [u8; 32] {
     // backfill holds the same payload under NULLs, and the merge must see that.
     opt_field(&mut h, r.file_name.as_deref());
     opt_i64(&mut h, r.var_count);
+    opt_field(&mut h, r.username.as_deref());
     h.finalize().into()
+}
+
+/// How many of a record's derived columns have been stamped. The merge prefers
+/// the higher rank on a timestamp tie, so a row backfilled on one device is not
+/// undone by a peer's copy of the same row that predates the column — the two
+/// have equal `updated_at` (backfills do not stamp it), and the hash tie-break
+/// alone can pick the NULL side, permanently.
+///
+/// Only the NULL-marker columns count. Every write stamps them for its kind, so
+/// two genuine edits always tie here and fall through to the hash; the rank
+/// only ever separates a stamped row from one that predates the column.
+/// `has_passkey` is left out because `false` is also what a stamped login with
+/// no passkey holds — counting it would bias real edit conflicts.
+pub fn derived_rank(r: &Record) -> u8 {
+    r.card_brand.is_some() as u8 + r.var_count.is_some() as u8 + r.username.is_some() as u8
 }
 
 /// SHA-256 over an entire entry set — tombstones included — as

@@ -38,6 +38,7 @@ pub fn build_record(entry: &Entry, payload: Vec<u8>) -> Result<Record> {
         has_passkey: derived_has_passkey(entry),
         file_name: derived_file_name(entry),
         var_count: derived_var_count(entry),
+        username: derived_username(entry),
     })
 }
 
@@ -111,6 +112,19 @@ fn is_assignment(line: &str) -> bool {
         .map(|(i, _)| i)
         .unwrap_or(rest.len());
     rest[end..].trim_start().starts_with('=')
+}
+
+/// The stored username of a login: `Some` for every login (so a stamped row is
+/// distinguishable from a pre-column NULL), `None` for every other kind.
+pub fn derived_username(entry: &Entry) -> Option<String> {
+    (entry.kind == "login").then(|| {
+        entry
+            .username
+            .as_deref()
+            .unwrap_or_default()
+            .trim()
+            .to_string()
+    })
 }
 
 /// Whether the entry holds any passkey — the plaintext flag a listing reads

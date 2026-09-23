@@ -70,6 +70,7 @@ fn rec(id: &str, payload: &[u8]) -> Record {
         has_passkey: false,
         file_name: None,
         var_count: None,
+        username: None,
     }
 }
 
@@ -187,6 +188,7 @@ fn purge_empties_the_row_and_drops_it_from_the_trash() {
     let store = seeded(&[Record {
         deleted_at: Some(1000),
         title: "Secret Thing".into(),
+        username: Some("alice".into()),
         ..stamped("1", b"sealed-payload", 1000)
     }]);
 
@@ -199,6 +201,7 @@ fn purge_empties_the_row_and_drops_it_from_the_trash() {
     assert!(purged.deleted_at.is_some());
     assert!(purged.payload.is_empty());
     assert_eq!(purged.title, "");
+    assert_eq!(purged.username, None);
     assert!(purged.updated_at > 1000);
 }
 
@@ -417,6 +420,18 @@ fn build_record_stamps_an_env_files_name_and_variable_count() {
     // Every other kind leaves both NULL, so the columns say nothing about it.
     let login = migrate::build_record(&sample_entry(), b"s".to_vec()).unwrap();
     assert_eq!((login.file_name, login.var_count), (None, None));
+}
+
+#[test]
+fn build_record_stamps_a_logins_username() {
+    let login = migrate::build_record(&sample_entry(), b"s".to_vec()).unwrap();
+    assert_eq!(login.username.as_deref(), Some("alice"));
+
+    let bare = migrate::build_record(&passkey_entry(), b"s".to_vec()).unwrap();
+    assert_eq!(bare.username.as_deref(), Some(""));
+
+    let env = migrate::build_record(&env_entry(None, "A=1\n"), b"s".to_vec()).unwrap();
+    assert_eq!(env.username, None);
 }
 
 // What counts as a variable line, and what does not: comments, blank lines,
@@ -1213,6 +1228,63 @@ fn merge_tie_picks_the_same_winner_on_both_sides() {
     let payload = row(&a, "1").payload;
     assert_eq!(payload, row(&b, "1").payload);
     assert!(payload == b"aaa" || payload == b"bbb");
+}
+
+// A backfill stamps a derived column without moving `updated_at`, so the
+// stamped row and a peer's pre-column copy tie on time. The stamped side must
+// win — in both directions — or the hash can pick the NULL side every time.
+#[test]
+fn merge_tie_prefers_the_row_whose_derived_columns_are_stamped() {
+    // A payload whose NULL copy beats the stamped one on hash alone.
+    let (unstamped, backfilled) = (0u8..)
+        .map(|n| {
+            let unstamped = stamped("1", &[n], 5000);
+            let backfilled = Record {
+                username: Some("alice".into()),
+                ..unstamped.clone()
+            };
+            (unstamped, backfilled)
+        })
+        .find(|(u, b)| record_hash(u) > record_hash(b))
+        .unwrap();
+
+    let a = seeded(std::slice::from_ref(&backfilled));
+    assert_eq!(
+        a.merge_records(std::slice::from_ref(&unstamped)).unwrap(),
+        0
+    );
+    assert_eq!(row(&a, "1").username.as_deref(), Some("alice"));
+
+    let b = seeded(std::slice::from_ref(&unstamped));
+    assert_eq!(
+        b.merge_records(std::slice::from_ref(&backfilled)).unwrap(),
+        1
+    );
+    assert_eq!(row(&b, "1").username.as_deref(), Some("alice"));
+}
+
+// Two real edits of one login in the same millisecond — one drops its last
+// passkey — both carry a stamped username, so the rank ties and the hash
+// decides, exactly as before. Keeping a passkey must not be a systematic win.
+#[test]
+fn merge_tie_between_two_stamped_edits_is_still_decided_by_hash() {
+    let edit = |payload: &[u8], has_passkey: bool| Record {
+        username: Some("alice".into()),
+        has_passkey,
+        ..stamped("1", payload, 5000)
+    };
+    // A pair where the passkey-keeping side loses on hash.
+    let (keeps, drops) = (0u8..)
+        .map(|n| (edit(&[n], true), edit(&[n, n], false)))
+        .find(|(keeps, drops)| record_hash(drops) > record_hash(keeps))
+        .unwrap();
+
+    let store = seeded(std::slice::from_ref(&keeps));
+    assert_eq!(
+        store.merge_records(std::slice::from_ref(&drops)).unwrap(),
+        1
+    );
+    assert!(!row(&store, "1").has_passkey);
 }
 
 #[test]

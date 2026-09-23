@@ -24,11 +24,10 @@ interface FilterOptions {
   query: string
 }
 
-// Fields a query is matched against. Only non-secret list metadata is available
-// here (secret fields like username/notes live in the encrypted payload); the
-// site host stands in for the website. url_host covers most "which account"
-// searches, and tags make the search field the way to pull up a tagged set.
-const SEARCH_KEYS = ['title', 'urlHost', 'tags']
+// Fields a query is matched against. Only list metadata is available here
+// (secret fields like passwords/notes live in the encrypted payload); the site
+// host stands in for the website.
+const SEARCH_KEYS = ['title', 'urlHost', 'username', 'tags']
 
 // The rows the kind and tag filters leave. Unordered: the list's own sort
 // (recency or A–Z) is applied downstream, so ordering here would only be thrown

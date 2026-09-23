@@ -172,6 +172,9 @@ export interface EntryMeta {
   // columns existed, and — for the name alone — on a pasted file.
   fileName?: string
   varCount?: number
+  // A login's username, derived at save time like cardBrand. Absent on other
+  // kinds and on rows not yet stamped.
+  username?: string
   createdAt?: string
   updatedAt?: string
   // Present only on the tombstones listDeleted returns.

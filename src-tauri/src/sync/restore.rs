@@ -192,6 +192,7 @@ mod tests {
             has_passkey: false,
             file_name: None,
             var_count: None,
+            username: None,
         }
     }
 

@@ -83,6 +83,9 @@ pub struct Record {
     /// alone — on a pasted file that never had one.
     pub file_name: Option<String>,
     pub var_count: Option<i64>,
+    /// A login's username, derived from the payload at save time. `Some` for
+    /// every stamped login (`""` when it has none), `None` otherwise.
+    pub username: Option<String>,
 }
 
 /// A row's metadata without its payload (what listings need).
@@ -101,6 +104,7 @@ pub struct EntryMeta {
     pub has_passkey: bool,
     pub file_name: Option<String>,
     pub var_count: Option<i64>,
+    pub username: Option<String>,
 }
 
 /// The swappable storage contract. Any backend behind this interface is a drop-in.

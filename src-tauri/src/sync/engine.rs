@@ -523,6 +523,7 @@ mod tests {
             has_passkey: false,
             file_name: None,
             var_count: None,
+            username: None,
         }
     }
 
@@ -786,6 +787,45 @@ mod tests {
             }
         );
         assert_eq!(remote.uploads(), 1);
+    }
+
+    // A backfilled username has the same `updated_at` as the peer's pre-column
+    // copy, so the two tie on time. The remote's NULL copy must not win that
+    // tie: the first run publishes the stamped row, and the next has nothing to
+    // say.
+    #[test]
+    fn a_backfilled_username_survives_a_pull_of_an_older_snapshot() {
+        // A payload whose NULL copy would beat the stamped one on hash alone —
+        // the case a hash-only tie-break loses.
+        let (unstamped, backfilled) = (0u8..)
+            .map(|n| {
+                let unstamped = record("1", 200, &[b"login-", &[n][..]].concat());
+                let backfilled = Record {
+                    username: Some("alice".into()),
+                    ..unstamped.clone()
+                };
+                (unstamped, backfilled)
+            })
+            .find(|(u, b)| crate::store::record_hash(u) > crate::store::record_hash(b))
+            .unwrap();
+
+        let a = Device::seeded(&[backfilled]);
+        let remote = FakeRemote::with(Device::seeded(&[unstamped]).pack_bytes());
+
+        let first = sync(&remote, &a, NOW).unwrap();
+        assert!(first.pushed);
+        assert_eq!(
+            remote_records(&remote)[0].username.as_deref(),
+            Some("alice")
+        );
+
+        let second = sync(&remote, &a, NOW).unwrap();
+        assert!(!second.pushed);
+        assert_eq!(remote.uploads(), 1);
+        assert_eq!(
+            a.store.export_for_sync().unwrap()[0].username.as_deref(),
+            Some("alice")
+        );
     }
 
     // F1. Another device pushed a state derived from a stale pull, clobbering
