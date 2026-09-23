@@ -1263,6 +1263,30 @@ fn merge_tie_prefers_the_row_whose_derived_columns_are_stamped() {
     assert_eq!(row(&b, "1").username.as_deref(), Some("alice"));
 }
 
+// Two real edits of one login in the same millisecond — one drops its last
+// passkey — both carry a stamped username, so the rank ties and the hash
+// decides, exactly as before. Keeping a passkey must not be a systematic win.
+#[test]
+fn merge_tie_between_two_stamped_edits_is_still_decided_by_hash() {
+    let edit = |payload: &[u8], has_passkey: bool| Record {
+        username: Some("alice".into()),
+        has_passkey,
+        ..stamped("1", payload, 5000)
+    };
+    // A pair where the passkey-keeping side loses on hash.
+    let (keeps, drops) = (0u8..)
+        .map(|n| (edit(&[n], true), edit(&[n, n], false)))
+        .find(|(keeps, drops)| record_hash(drops) > record_hash(keeps))
+        .unwrap();
+
+    let store = seeded(std::slice::from_ref(&keeps));
+    assert_eq!(
+        store.merge_records(std::slice::from_ref(&drops)).unwrap(),
+        1
+    );
+    assert!(!row(&store, "1").has_passkey);
+}
+
 #[test]
 fn merge_is_idempotent() {
     let source = seeded(&[stamped("1", b"x", 1000), stamped("2", b"y", 2000)]);
