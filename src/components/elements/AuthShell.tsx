@@ -1,17 +1,18 @@
 import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
-import { useAuthMeta } from '@/hooks/useAuthMeta'
 import Back from '@/assets/images/back.svg?react'
+import VaultFooter from './VaultFooter'
 import { LABEL } from './tokens'
 
 interface Props {
   children: ReactNode
   onBack?: () => void
   /**
-   * Draw the footer strip (version + where the vault lives, from useAuthMeta).
-   * The lock screen's: it says which vault is about to open. The first run has
-   * no vault yet, so it draws none — and nothing else sits under its content.
+   * Draw the footer strip (where the vault lives + the version; see
+   * VaultFooter). The lock screen's: it says which vault is about to open. The
+   * first run has no vault yet, so it draws none — and nothing else sits under
+   * its content.
    */
   footer?: boolean
   /**
@@ -29,7 +30,6 @@ interface Props {
 // strip is opt-in. Reused by the lock, setup and restore screens.
 export default function AuthShell({ children, onBack, footer, ref }: Props) {
   const { t } = useTranslation()
-  const meta = useAuthMeta()
   return (
     // Compact narrows the gutters, pads past the notch by a nav bar's height
     // (so the centered column never lays over "Back") and past the home
@@ -82,10 +82,9 @@ export default function AuthShell({ children, onBack, footer, ref }: Props) {
 
       <div className="relative my-auto w-[560px] max-w-full">{children}</div>
 
-      {footer && meta && (
-        // A tier below text-xs on purpose: footer chrome, not content.
-        <div className="absolute inset-x-0 bottom-0 flex h-13 items-center justify-center text-2xs uppercase tracking-label text-text2">
-          {meta}
+      {footer && (
+        <div className="absolute inset-x-0 bottom-0 flex h-13 items-center justify-center">
+          <VaultFooter />
         </div>
       )}
     </div>

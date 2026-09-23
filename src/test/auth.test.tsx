@@ -13,11 +13,23 @@ describe('Auth', () => {
     expect(screen.getByPlaceholderText('Master Password')).toBeInTheDocument()
   })
 
+  // The footer is chrome: the bare version, and where the vault lives as a
+  // glyph whose sentence is its accessible name (and its tooltip).
   it('footers the version and where the vault lives', async () => {
     render(<Auth biometric={false} />)
-    expect(
-      await screen.findByText('Rowel 1.0.0 · Vault on this device')
-    ).toBeInTheDocument()
+    expect(await screen.findByTestId('app-version')).toHaveTextContent('1.0.0')
+    expect(screen.queryByText(/Rowel/)).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Stored on this device')).toHaveAttribute('data-state', 'off')
+  })
+
+  it('shows Drive in the footer once the vault syncs', async () => {
+    useApp.setState(state => ({
+      sync: { ...state.sync, configured: true, lastSyncedAt: new Date().toISOString() }
+    }))
+    render(<Auth biometric={false} />)
+    const indicator = await screen.findByTestId('sync-indicator')
+    expect(indicator).toHaveAttribute('data-state', 'on')
+    expect(indicator).toHaveAccessibleName('Synced with Google Drive. Last synced just now')
   })
 
   it('has no unlock button — Enter is the only way to submit', () => {
