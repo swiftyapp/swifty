@@ -1,5 +1,4 @@
 import { useApp } from '@/store'
-import { t } from '@/i18n'
 
 export interface VaultMeta {
   version: string
@@ -7,9 +6,6 @@ export interface VaultMeta {
 }
 
 // Where the vault lives, in one phrase.
-export const vaultHome = (configured: boolean): string =>
-  configured ? t('Syncs with Google Drive') : t('Vault on this device')
-
 // The raw parts, for the footers that lay them out themselves (Settings, the
 // lock screen). Read from the store rather than fetched: null until the launch
 // probe lands, and re-read whenever either half changes — the version with the

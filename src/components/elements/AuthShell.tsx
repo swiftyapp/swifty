@@ -2,7 +2,7 @@ import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
 import Back from '@/assets/images/back.svg?react'
-import AuthFooter from './AuthFooter'
+import VaultFooter from './VaultFooter'
 import { LABEL } from './tokens'
 
 interface Props {
@@ -10,7 +10,7 @@ interface Props {
   onBack?: () => void
   /**
    * Draw the footer strip (where the vault lives + the version; see
-   * AuthFooter). The lock screen's: it says which vault is about to open. The
+   * VaultFooter). The lock screen's: it says which vault is about to open. The
    * first run has no vault yet, so it draws none — and nothing else sits under
    * its content.
    */
@@ -84,7 +84,7 @@ export default function AuthShell({ children, onBack, footer, ref }: Props) {
 
       {footer && (
         <div className="absolute inset-x-0 bottom-0 flex h-13 items-center justify-center">
-          <AuthFooter />
+          <VaultFooter />
         </div>
       )}
     </div>

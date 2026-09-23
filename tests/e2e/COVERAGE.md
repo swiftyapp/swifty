@@ -56,7 +56,7 @@ runs one app process against one data dir, so nothing may depend on file order.
 | Command palette | PR 4 | `command-palette`, `command-palette-input`, `palette-item`. Commands only — a query matching a vault entry must leave `palette-item` empty; entries are `search-and-scopes.spec.ts`'s job. |
 | Password generator | PR 4 | `generator-mode-random` / `-memorable`, `generator-amount`, `generator-regenerate`, `generator-output`, `generator-use-button` |
 | Change master password | PR 4 | `change-password-submit`, `change-password-error`, `change-password-success` |
-| Settings shell: nav + section titles | PR 4 | `settings-modal`, `settings-nav-<sync\|security\|audit\|import\|language>` (`aria-current="page"` on the active item), `settings-version` / `settings-update-status` in the pinned footer, `modal-close` |
+| Settings shell: nav + section titles | PR 4 | `settings-modal`, `settings-nav-<sync\|security\|audit\|import\|language>` (`aria-current="page"` on the active item), `app-version` in the pinned footer, `modal-close` |
 | Session preferences | PR 4 | `settings-autolock-<secs>` and `settings-clipboard-<ms>` segments, asserted through `autolockSecs` / `clipboardTimeoutMs` in the persisted settings (`readSettings()`). |
 | Generator defaults | PR 4 | `settings-generator-symbols`, asserted through the persisted `generator` record. `settings-generator-length` and `-numbers` exist but nothing asserts them yet. |
 | Breach monitoring switch | PR 4 | `settings-breach-toggle`; weak/reused are informational rows with no control, so the section holds exactly one `role="switch"` |

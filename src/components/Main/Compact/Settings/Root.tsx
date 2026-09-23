@@ -3,7 +3,7 @@ import { lockVault, type Section } from '@/store'
 import { CARD } from '@/components/elements/tokens'
 import { cx } from '@/utils/cx'
 import { SECTIONS } from '../../Sidebar/Settings/sections'
-import Footer from '../../Sidebar/Settings/Footer'
+import VaultFooter from '@/components/elements/VaultFooter'
 import SyncIndicator from '../../Header/SyncIndicator'
 import { LockGlyph } from '../../icons'
 import { ROOT_HEADER, TAB_BAR_CLEARANCE, TOUCH } from '../chrome'
@@ -63,7 +63,8 @@ export default function Root({ onSelect }: { onSelect: (section: Section) => voi
           />
         </div>
 
-        <Footer />
+        {/* The title row's chip already says where the vault lives. */}
+        <VaultFooter sync={false} className="mt-4 px-1" />
       </div>
     </div>
   )
