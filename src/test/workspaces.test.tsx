@@ -135,6 +135,35 @@ describe('WorkspacePicker', () => {
     expect(screen.getByTestId('workspace-chip')).toHaveAccessibleName('Work')
   })
 
+  // An unlock being verified or held on its success beat is opening *this*
+  // vault; a switch now would have it enter with the old rows afterwards.
+  it('opens nothing and takes no chord while an unlock is in flight', async () => {
+    seed([PRIMARY, WORK])
+    render(<WorkspacePicker busy />)
+
+    await userEvent.click(screen.getByTestId('workspace-chip'))
+    await userEvent.keyboard('{Meta>}2{/Meta}')
+
+    expect(screen.queryByTestId('workspace-option-w2')).not.toBeInTheDocument()
+    expect(calls('workspace_select')).toHaveLength(0)
+  })
+
+  // A second pick while the first is landing is dropped, not raced: its
+  // ending would clear the flag while the first was still in flight.
+  it('runs one switch at a time', async () => {
+    seed([PRIMARY, WORK, { id: 'w3', name: 'Third' }])
+    const answer = deferred<null>()
+    mockCommand('workspace_select', () => answer.promise)
+    render(<WorkspacePicker />)
+
+    await userEvent.keyboard('{Meta>}2{/Meta}')
+    await userEvent.keyboard('{Meta>}3{/Meta}')
+
+    expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
+    answer.resolve(null)
+    await waitFor(() => expect(useApp.getState().switching).toBe(false))
+  })
+
   it('offers no gate when the probe after a switch cannot be had', async () => {
     seedApp({
       workspaces: [PRIMARY, WORK],

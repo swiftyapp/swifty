@@ -457,17 +457,30 @@ fn named(name: &str) -> impl FnOnce(&mut Workspace) -> bool + '_ {
 /// By id rather than "the active one": a lock records the workspace it
 /// sealed, which a switch landing a moment later must not redirect.
 ///
+/// Never the write that brings the registry into being: a single-workspace
+/// install has no file and no picker to show a count in, and keeps costing
+/// nothing on disk. Its count arrives with the next open or lock once a
+/// second workspace has made the file.
+///
 /// Takes `workspace_lock`, so never call it holding the session lock: every
 /// reader of the two takes the registry's first.
 pub fn record_item_count(app: &AppHandle, id: &str, count: u32) {
     let state = app.state::<AppState>();
     let recorded = storage::root_dir(app).and_then(|root| {
         let _paths = state.workspace_lock.lock().unwrap();
-        update_active_locked(&root, id, counted(count))
+        count_in(&root, id, count)
     });
     if let Err(e) = recorded {
         log::warn!("could not record workspace {id}'s item count: {e}");
     }
+}
+
+// [`record_item_count`]'s write, under the caller's `workspace_lock`.
+fn count_in(root: &Path, id: &str, count: u32) -> Result<()> {
+    if !root.join(REGISTRY_FILE).exists() {
+        return Ok(());
+    }
+    update_active_locked(root, id, counted(count))
 }
 
 /// [`record_item_count`] for a caller that already holds `workspace_lock` and
@@ -625,6 +638,19 @@ mod tests {
         assert!(!json.contains("vaultId"), "{json}");
         assert!(!json.contains("itemCount"), "{json}");
         assert_eq!(loaded.workspaces[0].item_count, None);
+    }
+
+    // An install that never made a second workspace has no registry file, and
+    // an unlock recording its size must not be what creates one.
+    #[test]
+    fn an_item_count_never_creates_the_registry() {
+        let root = tmp_root();
+        count_in(&root, PRIMARY_ID, 12).unwrap();
+        assert!(!root.join(REGISTRY_FILE).exists());
+
+        Registry::default().save(&root).unwrap();
+        count_in(&root, PRIMARY_ID, 12).unwrap();
+        assert_eq!(Registry::load(&root).workspaces[0].item_count, Some(12));
     }
 
     // A count is recorded against the workspace named, whichever is active,

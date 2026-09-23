@@ -4,10 +4,20 @@ import Chip from './Chip'
 import Menu from './Menu'
 import { useWorkspaceShortcuts } from './useWorkspaceShortcuts'
 
+interface Props {
+  /**
+   * An unlock is being verified or held on its success beat. The chip stays
+   * as it is but opens nothing, and the chords stand down: the backend is
+   * opening *this* vault, and a switch landing now would have that unlock
+   * enter with its rows after the backend had moved to another one.
+   */
+  busy?: boolean
+}
+
 // Which vault the lock screen is about to open, and the way to another: a chip
 // naming the current one over a menu of them all. Drawn only when there is a
 // choice to make.
-export default function WorkspacePicker() {
+export default function WorkspacePicker({ busy = false }: Props) {
   const list = useApp(selectWorkspaces)
   const active = useApp(selectActiveWorkspace)
   const [open, setOpen] = useState(false)
@@ -27,14 +37,21 @@ export default function WorkspacePicker() {
 
   // A chord leaves the caret where it was — mid-passphrase, typically — unless
   // the menu it would otherwise be stranded in was open.
-  useWorkspaceShortcuts(list.length < 2 ? [] : list, id => (open ? pick(id) : select(id)))
+  useWorkspaceShortcuts(list.length < 2 || busy ? [] : list, id =>
+    open ? pick(id) : select(id)
+  )
 
   if (list.length < 2) return null
   const current = list.find(workspace => workspace.id === active) ?? list[0]
 
   return (
     <div data-testid="workspace-picker" className="relative mb-5 flex justify-center">
-      <Chip ref={chip} workspace={current} open={open} onClick={() => setOpen(value => !value)} />
+      <Chip
+        ref={chip}
+        workspace={current}
+        open={open}
+        onClick={() => setOpen(value => !value && !busy)}
+      />
       {open && (
         <Menu list={list} active={active} onPick={pick} onClose={() => setOpen(false)} />
       )}

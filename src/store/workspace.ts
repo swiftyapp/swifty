@@ -13,6 +13,7 @@ import {
   refreshApp,
   forgetBiometricGate,
   setSwitching,
+  useApp,
   setupDriveRestoring,
   setupDriveRestoreFailed,
   type AppState
@@ -50,7 +51,12 @@ export const selectActiveWorkspace = (state: AppState): string =>
 // workspace's, and an unlock now would reach the next one. However it ends
 // (opened, locked, refused), the switch probes once itself, so the flag never
 // outlives it; a probe that fails leaves the safe default, no gate offered.
+//
+// One at a time. A second pick while the first is in flight is dropped rather
+// than raced: the backend refuses it anyway, and its ending would clear the
+// flag — and take attempts again — while the first was still landing.
 export const switchWorkspace = async (id: string) => {
+  if (useApp.getState().switching) return
   setSwitching(true)
   try {
     const result = await workspaceSelect(id)
