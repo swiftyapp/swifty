@@ -975,9 +975,9 @@ describe('Settings › workspaces › delete', () => {
       })
     )
 
-    expect(
-      screen.getByText('This vault was deleted from Google Drive on another device.')
-    ).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-deleted-remotely')).toHaveTextContent(
+      'This vault was deleted from Google Drive on another device.'
+    )
     await userEvent.click(screen.getByTestId('workspace-delete-stranded'))
 
     expect(screen.getByRole('heading', { name: 'Delete Personal?' })).toBeInTheDocument()

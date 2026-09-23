@@ -97,10 +97,10 @@ describe('welcome', () => {
   // run draws no footer on any of its screens — the lock screen keeps it.
   it('draws no footer strip during the first run', async () => {
     render(<Start />)
-    expect(screen.queryByText(/Vault on this device/)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('app-version')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('start-setup-button'))
-    expect(screen.queryByText(/Vault on this device/)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('app-version')).not.toBeInTheDocument()
     expect(screen.getByTestId('go-back-button')).toBeInTheDocument()
   })
 

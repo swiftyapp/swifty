@@ -17,7 +17,7 @@ describe('Auth', () => {
   // glyph whose sentence is its accessible name (and its tooltip).
   it('footers the version and where the vault lives', async () => {
     render(<Auth biometric={false} />)
-    expect(await screen.findByTestId('auth-version')).toHaveTextContent('1.0.0')
+    expect(await screen.findByTestId('app-version')).toHaveTextContent('1.0.0')
     expect(screen.queryByText(/Rowel/)).not.toBeInTheDocument()
     expect(screen.getByLabelText('Stored on this device')).toHaveAttribute('data-state', 'off')
   })

@@ -60,9 +60,8 @@ describe("settings", () => {
     }
   });
 
-  it("names the build in the pinned footer", async () => {
-    await expect($('[data-testid="settings-version"]')).toHaveText(/^Rowel /);
-    await expect($('[data-testid="settings-update-status"]')).toBeDisplayed();
+  it("shows the bare version in the pinned footer", async () => {
+    await expect($('[data-testid="app-version"]')).toHaveText(/^\d+\.\d+\.\d+/);
   });
 
   it("offers Google Drive as not connected", async () => {
