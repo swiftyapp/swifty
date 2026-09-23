@@ -49,7 +49,7 @@ export default function Dots({
             key={i}
             className={cx(
               'animate-fade flex flex-none items-center justify-center rounded-xs',
-              i >= start && i < end && 'bg-accent-soft'
+              i >= start && i < end && 'bg-lockfield-soft'
             )}
             style={{ width: CELL }}
           >
@@ -68,7 +68,7 @@ export default function Dots({
         ))}
         {caret && (
           <span
-            className="absolute top-1/2 h-6 w-px -translate-x-1/2 -translate-y-1/2 bg-accent animate-[caret_1.1s_steps(1,end)_infinite]"
+            className="absolute top-1/2 h-6 w-px -translate-x-1/2 -translate-y-1/2 bg-lockfield animate-[caret_1.1s_steps(1,end)_infinite]"
             style={{ left: start * CELL }}
           />
         )}

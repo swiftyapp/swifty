@@ -354,6 +354,15 @@
   --color-bad: var(--c-bad);
   --color-touchid: var(--c-touchid);
   --color-brand: var(--c-brand);
+  /*
+   * The lens: the one raised key in a run of flat tiles, marking where you
+   * are (the rail's selected view, the phone tab bar's lit tab). A surface,
+   * not a colour — white on the light chrome, a lifted grey on the dark —
+   * with its own shadow, so the selected tile is *the* tile that stands
+   * proud rather than the one washed in accent.
+   */
+  --color-lens: var(--c-lens);
+  --shadow-lens: var(--lens-shadow);
 
   /*
    * Surfaces and shadows that are more than a flat colour (see the design vars
@@ -370,6 +379,16 @@
   --shadow-menu: var(--menu-shadow);
   --shadow-lockfield: var(--lockfield-shadow);
   --shadow-lockfield-deep: var(--lockfield-shadow-deep);
+  /*
+   * The lock field's own state ink (see elements/Masterpass): a fixed blue
+   * that does not follow the user's accent. The field is the one bespoke
+   * control in the app, with its own cut, halo, caret and orbit, and those
+   * states are its character rather than the chrome's. `lockfield` is the
+   * caret, `-soft` the halo and the selection wash, `-line` the border.
+   */
+  --color-lockfield: var(--c-lockfield);
+  --color-lockfield-soft: var(--c-lockfield-soft);
+  --color-lockfield-line: var(--c-lockfield-line);
   /* The 1px rule under a list row, drawn as a shadow so it costs no layout. */
   --inset-shadow-hairline: inset 0 -1px 0 var(--c-line);
 
@@ -502,7 +521,7 @@
     height: 400px;
     background: conic-gradient(
       transparent 0turn 0.62turn,
-      color-mix(in srgb, var(--c-accent-line) 55%, transparent) 0.9turn,
+      color-mix(in srgb, var(--c-lockfield-line) 55%, transparent) 0.9turn,
       transparent 0.99turn
     );
     animation: orbit-spin 2.2s linear infinite;
@@ -596,17 +615,32 @@
   --c-line: rgba(20, 22, 26, 0.075);
   --c-line2: rgba(20, 22, 26, 0.19);
   --c-hover: rgba(20, 22, 26, 0.045);
-  --c-sel: rgba(59, 91, 219, 0.09);
+  --c-sel: rgba(20, 22, 26, 0.07);
   --c-text: #15161a;
   --c-text2: #585c64;
   /* The glyph tier. ~3.6:1 on --c-detail and ~2.9:1 on --c-app: enough for a
      bare icon (WCAG AA 3:1 for graphics), not for text (4.5:1). Labels, stamps
      and placeholders take text2 — see elements/tokens. */
   --c-text3: #84878e;
-  --c-accent: #3b5bdb;
+  /*
+   * The accent is the user's to choose (Settings › Appearance; the blocks
+   * under `[data-accent]` at the end of this file). These are the default,
+   * ink: the brand's own colour — the asterisk, the card face, the tooltip —
+   * which flips cleanly with the theme, black on the light ground and white
+   * on the dark. Whatever the choice, the accent is used sparingly — the
+   * verbs (Add, the primary button), the selection and focus — while
+   * navigation and the "you are here" lens stay neutral (see `--c-lens`).
+   * `accent-fg` is the text on a filled accent: white on the light theme,
+   * ink on the dark, where every accent is lifted light enough to carry it.
+   */
+  --c-accent: #15161a;
   --c-accent-fg: #ffffff;
-  --c-accent-soft: rgba(59, 91, 219, 0.1);
-  --c-accent-line: rgba(59, 91, 219, 0.45);
+  --c-accent-soft: rgba(20, 22, 26, 0.08);
+  --c-accent-line: rgba(20, 22, 26, 0.5);
+  --c-lens: #ffffff;
+  --lens-shadow:
+    0 1px 2px rgba(20, 22, 26, 0.1),
+    0 0 0 1px rgba(20, 22, 26, 0.05);
   --c-good: #1e9c6e;
   --c-warn: #b7761a;
   --c-bad: #c9453a;
@@ -682,6 +716,10 @@
   --lockfield-shadow-deep:
     inset 0 2px 5px rgba(20, 22, 26, 0.13),
     0 1px 0 rgba(255, 255, 255, 0.75);
+  /* The field's state ink: the prototype's blue, kept whatever the accent. */
+  --c-lockfield: #3b5bdb;
+  --c-lockfield-soft: rgba(59, 91, 219, 0.1);
+  --c-lockfield-line: rgba(59, 91, 219, 0.45);
   /*
    * The faces (see elements/Face): the stock an object in the vault is cut
    * from. `paper` is the ID document's, and it is not overridden on the dark
@@ -733,10 +771,16 @@
   --c-text: #ebeced;
   --c-text2: #9ea1a6;
   --c-text3: #71747a;
-  --c-accent: #5b78e8;
-  --c-accent-fg: #ffffff;
-  --c-accent-soft: rgba(91, 120, 232, 0.16);
-  --c-accent-line: rgba(91, 120, 232, 0.55);
+  --c-accent: #f2f3f4;
+  --c-accent-fg: #15161a;
+  --c-accent-soft: rgba(255, 255, 255, 0.1);
+  --c-accent-line: rgba(255, 255, 255, 0.55);
+  /* A step up from the rail rather than white: a white key on a near-black
+   * rail would glare, and the glyph on it is already the full ink. */
+  --c-lens: rgba(255, 255, 255, 0.1);
+  --lens-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
   --c-good: #4cc08f;
   --c-warn: #e0a94e;
   --c-bad: #e4685d;
@@ -792,6 +836,9 @@
   --lockfield-shadow-deep:
     inset 0 2px 5px rgba(0, 0, 0, 0.65),
     0 1px 0 rgba(255, 255, 255, 0.05);
+  --c-lockfield: #5b78e8;
+  --c-lockfield-soft: rgba(91, 120, 232, 0.16);
+  --c-lockfield-line: rgba(91, 120, 232, 0.55);
   /* The slate in the dark: a step up from the detail pane (#1b1c1e), no more. */
   --slate-bg: linear-gradient(160deg, #27282c, #1e1f22 58%, #232428);
   --slate-sheen: radial-gradient(
@@ -809,4 +856,116 @@
   --slate-rule: rgba(255, 255, 255, 0.14);
   --slate-tail: rgba(255, 255, 255, 0.04);
   --slate-hover: rgba(255, 255, 255, 0.07);
+}
+
+/*
+ * The accent choices (Settings › Appearance). `boot.ts` / `store/prefs` set
+ * `data-accent` on the root from the stored preference; the swatch that
+ * offers a choice carries the same attribute itself, so it previews the colour
+ * through the very same tokens. Ink is the default and lives on `:root`
+ * above, so it needs no block here.
+ *
+ * Each is one hue in two lifts: a deep one for the light theme, where white
+ * sits on it, and a bright one for the dark theme, where ink does — both
+ * clearing WCAG AA (4.5:1) for text on the fill and as text on the ground.
+ * The washes carry more alpha on the dark palette, as the kind tints do. The
+ * selection wash (`--c-sel`) takes the hue on the light theme only; on the
+ * dark one it stays the neutral lift the rows have always had.
+ *
+ * The dark selectors are written on the root *and* on a descendant so the
+ * swatches keep previewing their own colour under the dark theme — a root
+ * rule alone would be beaten there by the root's own dark ink.
+ */
+[data-accent='petrol'] {
+  --c-accent: #0f6f86;
+  --c-accent-soft: rgba(15, 111, 134, 0.1);
+  --c-accent-line: rgba(15, 111, 134, 0.45);
+  --c-sel: rgba(15, 111, 134, 0.09);
+}
+:root[data-theme='dark'][data-accent='petrol'],
+:root[data-theme='dark'] [data-accent='petrol'] {
+  --c-accent: #34b7cb;
+  --c-accent-soft: rgba(52, 183, 203, 0.16);
+  --c-accent-line: rgba(52, 183, 203, 0.55);
+  --c-sel: rgba(255, 255, 255, 0.06);
+}
+
+[data-accent='cobalt'] {
+  --c-accent: #3b5bdb;
+  --c-accent-soft: rgba(59, 91, 219, 0.1);
+  --c-accent-line: rgba(59, 91, 219, 0.45);
+  --c-sel: rgba(59, 91, 219, 0.09);
+}
+:root[data-theme='dark'][data-accent='cobalt'],
+:root[data-theme='dark'] [data-accent='cobalt'] {
+  --c-accent: #6f88ee;
+  --c-accent-soft: rgba(111, 136, 238, 0.16);
+  --c-accent-line: rgba(111, 136, 238, 0.55);
+  --c-sel: rgba(255, 255, 255, 0.06);
+}
+
+[data-accent='moss'] {
+  --c-accent: #4a7a2a;
+  --c-accent-soft: rgba(74, 122, 42, 0.1);
+  --c-accent-line: rgba(74, 122, 42, 0.45);
+  --c-sel: rgba(74, 122, 42, 0.09);
+}
+:root[data-theme='dark'][data-accent='moss'],
+:root[data-theme='dark'] [data-accent='moss'] {
+  --c-accent: #8fc266;
+  --c-accent-soft: rgba(143, 194, 102, 0.16);
+  --c-accent-line: rgba(143, 194, 102, 0.55);
+  --c-sel: rgba(255, 255, 255, 0.06);
+}
+
+/* A burnt orange, held between ruby (355°) and the amber verdicts (35°+) so
+ * it is neither the red beside it nor the warning ink. */
+[data-accent='copper'] {
+  --c-accent: #b45309;
+  --c-accent-soft: rgba(180, 83, 9, 0.1);
+  --c-accent-line: rgba(180, 83, 9, 0.45);
+  --c-sel: rgba(180, 83, 9, 0.09);
+}
+:root[data-theme='dark'][data-accent='copper'],
+:root[data-theme='dark'] [data-accent='copper'] {
+  --c-accent: #f79a3e;
+  --c-accent-soft: rgba(247, 154, 62, 0.16);
+  --c-accent-line: rgba(247, 154, 62, 0.55);
+  --c-sel: rgba(255, 255, 255, 0.06);
+}
+
+/* A crimson, set cooler than the `bad` verdict and the login coral so a
+ * primary button never reads as a warning. */
+[data-accent='ruby'] {
+  --c-accent: #b3202c;
+  --c-accent-soft: rgba(179, 32, 44, 0.1);
+  --c-accent-line: rgba(179, 32, 44, 0.45);
+  --c-sel: rgba(179, 32, 44, 0.09);
+}
+:root[data-theme='dark'][data-accent='ruby'],
+:root[data-theme='dark'] [data-accent='ruby'] {
+  --c-accent: #e8555a;
+  --c-accent-soft: rgba(232, 85, 90, 0.16);
+  --c-accent-line: rgba(232, 85, 90, 0.55);
+  --c-sel: rgba(255, 255, 255, 0.06);
+}
+
+/*
+ * Ink, spelled out even though it is what `:root` already holds: the swatch
+ * that offers it sits *inside* a root that may be wearing another accent, and
+ * without a block of its own it would inherit that one and preview the wrong
+ * colour. Same values as the defaults above, in both themes.
+ */
+[data-accent='ink'] {
+  --c-accent: #15161a;
+  --c-accent-soft: rgba(20, 22, 26, 0.08);
+  --c-accent-line: rgba(20, 22, 26, 0.5);
+  --c-sel: rgba(20, 22, 26, 0.07);
+}
+:root[data-theme='dark'][data-accent='ink'],
+:root[data-theme='dark'] [data-accent='ink'] {
+  --c-accent: #f2f3f4;
+  --c-accent-soft: rgba(255, 255, 255, 0.1);
+  --c-accent-line: rgba(255, 255, 255, 0.55);
+  --c-sel: rgba(255, 255, 255, 0.06);
 }

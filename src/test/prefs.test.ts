@@ -31,11 +31,37 @@ describe('prefs', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
+  // A backend from before the preference existed merges the patch into a struct
+  // with no field for it and answers without the key. The choice has to stand
+  // for the session anyway, or every click snaps straight back to the default.
+  it('keeps a choice an older backend does not echo back', async () => {
+    const older: Partial<Settings> = { ...DEFAULT_PREFS }
+    delete older.accent
+    mockCommand('set_settings', () => older)
+
+    setPref('accent', 'ruby')
+    await settled()
+
+    expect(usePrefs.getState().accent).toBe('ruby')
+    expect(document.documentElement.getAttribute('data-accent')).toBe('ruby')
+  })
+
+  // The accent rides on the root the way the theme does, so theme.css can key
+  // its tokens off both.
+  it('paints the root with the stored accent', () => {
+    hydratePrefs({ ...DEFAULT_PREFS, accent: 'copper' })
+    expect(document.documentElement.getAttribute('data-accent')).toBe('copper')
+
+    setPref('accent', 'ink')
+    expect(document.documentElement.getAttribute('data-accent')).toBe('ink')
+  })
+
   // The file is user-writable, so what comes off it is checked field by field.
   it('puts a junk value back to its default on the way in', () => {
     hydratePrefs({
       ...DEFAULT_PREFS,
       theme: 'purple' as never,
+      accent: 'neon' as never,
       autolockSecs: -5,
       dateFormat: 'YYYY/MM/DD' as never,
       generator: { ...DEFAULT_PREFS.generator, length: 'nope' as never }
@@ -43,6 +69,7 @@ describe('prefs', () => {
 
     const state = usePrefs.getState()
     expect(state.theme).toBe('light')
+    expect(state.accent).toBe('ink')
     expect(state.autolockSecs).toBe(60)
     expect(state.dateFormat).toBe('MM/DD/YYYY')
     expect(state.generator.length).toBe(20)

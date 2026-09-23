@@ -3,16 +3,20 @@ import Brand from './Brand'
 import Add from './Add'
 import ViewButton from './ViewButton'
 import Tags from './Tags'
-import Generator from './Generator'
+import Lock from './Lock'
 import Settings from './Settings'
 import { ArchiveRailGlyph, GridRailGlyph, StarRailGlyph } from '../icons'
 
-// The 56px icon rail: brand mark · new-secret · all-items · favorites · archive ·
-// tags · spacer · generator · settings. Rail tiles are 36px with 20px glyphs —
-// one step up from the in-pane tiers so the rail reads as primary navigation.
+// The 56px icon rail, in three groups: brand mark · new-secret (the one verb)
+// at the head; all-items · favorites · archive · tags (the places) in the
+// middle; lock · settings (the vault itself) at the foot. Rail tiles are 36px
+// with 20px glyphs — one step up from the in-pane tiers so the rail reads as
+// primary navigation.
 // Tags is a view like the three above it, not a filter over them: its menu
 // lists the vault's tags, and a picked tag gathers its items from across the
 // vault under the Tags tile.
+// The generator is a tool, not a place, so it has no tile: it opens from ⌘G,
+// the command palette and the Add picker (see `AddSecret/GenerateAction`).
 // The Vault Health tile is parked, not removed: `VaultHealth.tsx` and the
 // `health` view stay, reachable from Settings › Audit.
 export default function Sidebar() {
@@ -34,7 +38,7 @@ export default function Sidebar() {
       </ViewButton>
       <Tags />
       <div className="flex-1" />
-      <Generator />
+      <Lock />
       <Settings />
     </nav>
   )

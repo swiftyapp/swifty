@@ -1,12 +1,31 @@
-// Resolving a theme preference onto <html data-theme>, which drives the token
-// swap in theme.css. The preference itself lives in the prefs store
-// (`store/prefs`), which applies it here whenever it changes.
+import type { TKey } from '@/i18n'
 
 export type Theme = 'light' | 'dark'
 export type ThemePreference = Theme | 'system'
 
-// jsdom ships no matchMedia, and a locked-down webview can throw; either way
-// "system" degrades to light rather than crashing the render.
+/**
+ * The accent choices, in the order the swatches offer them. Ink is the
+ * default. Each id is a `[data-accent]` block in theme.css; the label is a
+ * catalogue key. The palette is deliberately short and deliberately spread
+ * around the wheel — one neutral, one cool, one blue, one green, one warm,
+ * one red — so a choice is a choice and not a shade.
+ */
+export type Accent = 'ink' | 'petrol' | 'cobalt' | 'moss' | 'copper' | 'ruby'
+
+export const ACCENTS: { id: Accent; label: TKey }[] = [
+  { id: 'ink', label: 'Ink' },
+  { id: 'petrol', label: 'Petrol' },
+  { id: 'cobalt', label: 'Cobalt' },
+  { id: 'moss', label: 'Moss' },
+  { id: 'copper', label: 'Copper' },
+  { id: 'ruby', label: 'Ruby' }
+]
+
+export const DEFAULT_ACCENT: Accent = 'ink'
+
+export const isAccent = (value: unknown): value is Accent =>
+  ACCENTS.some(accent => accent.id === value)
+
 export const prefersDark = (): boolean => {
   try {
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
@@ -18,7 +37,11 @@ export const prefersDark = (): boolean => {
 export const resolveTheme = (next: ThemePreference): Theme =>
   next === 'system' ? (prefersDark() ? 'dark' : 'light') : next
 
-// Reflect the theme onto the document root so the CSS token overrides apply.
 export const applyTheme = (next: ThemePreference): void => {
   document.documentElement.setAttribute('data-theme', resolveTheme(next))
+}
+
+/** The accent, like the theme, is a root attribute theme.css keys off. */
+export const applyAccent = (next: Accent): void => {
+  document.documentElement.setAttribute('data-accent', next)
 }

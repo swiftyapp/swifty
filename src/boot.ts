@@ -4,7 +4,7 @@ import App from '@/App'
 import { appReady, appStatus, type AppStatus } from '@/api/app'
 import { flowSetup, hydratePrefs, setApp, setUpdateReady, usePrefs } from '@/store'
 import { runStartupUpdateCheck } from '@/api/autoUpdate'
-import { applyTheme } from '@/theme'
+import { applyAccent, applyTheme } from '@/theme'
 import { changeLocale, DEFAULT_LOCALE, getLocale, initI18n } from '@/i18n'
 import { startSplash } from '@/lib/splash'
 
@@ -41,11 +41,12 @@ const injectedBoot = (): RowelBoot | null => {
   return { locale, settings }
 }
 
-/** Take a probe's answer into the stores, theme included. */
+/** Take a probe's answer into the stores, theme and accent included. */
 const adopt = (status: AppStatus) => {
   setApp(status)
   hydratePrefs(status.settings)
   applyTheme(usePrefs.getState().theme)
+  applyAccent(usePrefs.getState().accent)
 }
 
 /**
@@ -72,6 +73,7 @@ export const boot = async (): Promise<void> => {
     // in the stored theme rather than in the default it would start from.
     hydratePrefs(injected.settings)
     applyTheme(usePrefs.getState().theme)
+    applyAccent(usePrefs.getState().accent)
   }
   const locale = injected?.locale ?? DEFAULT_LOCALE
 

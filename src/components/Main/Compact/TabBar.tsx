@@ -38,7 +38,8 @@ const SLOT: Record<'items' | 'favorites' | 'generator' | 'settings', number> = {
  * either — the bar has no slot left for it — so its tile and menu live in the
  * list header, and like the Archive it lights no tab.
  *
- * The selected tab is marked by one lens — an accent-soft pill — that slides
+ * The selected tab is marked by one lens — the raised `bg-lens` key the
+ * desktop rail's selected tile also wears, a pill here — that slides
  * from the old tab to the new one and settles with a little overshoot, the way
  * the system tab bar's does, rather than one wash blinking off and another on.
  *
@@ -102,7 +103,7 @@ export default function TabBar() {
             data-testid="tab-lens"
             style={{ transform: `translateX(${at * 100}%)` }}
             className={cx(
-              'absolute inset-y-1 left-1.5 w-[calc((100%-12px)/5)] rounded-full bg-accent-soft transition-[transform,opacity] duration-300 ease-spring',
+              'absolute inset-y-1 left-1.5 w-[calc((100%-12px)/5)] rounded-full bg-lens shadow-lens transition-[transform,opacity] duration-300 ease-spring',
               slot === null && 'opacity-0'
             )}
           />

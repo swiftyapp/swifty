@@ -1,7 +1,15 @@
 import { create } from 'zustand'
 import { DATE_FORMATS, setSettings, type DateFormat, type Settings } from '@/api/app'
 import i18n from '@/i18n'
-import { applyTheme, resolveTheme, type Theme, type ThemePreference } from '@/theme'
+import {
+  applyAccent,
+  applyTheme,
+  isAccent,
+  resolveTheme,
+  DEFAULT_ACCENT,
+  type Theme,
+  type ThemePreference
+} from '@/theme'
 
 /**
  * User preferences: everything that outlives a session and a lock.
@@ -21,6 +29,7 @@ export { DATE_FORMATS } from '@/api/app'
 // hydration lands — reads like a fresh install rather than like `undefined`.
 export const DEFAULT_PREFS: Settings = {
   theme: 'light',
+  accent: DEFAULT_ACCENT,
   sort: 'recent',
   breachCheck: false,
   autolockSecs: 60,
@@ -53,6 +62,7 @@ const sanitize = (raw: Partial<Settings>): Settings => {
   const generator = { ...DEFAULT_PREFS.generator, ...(raw.generator ?? {}) }
   return {
     theme: isTheme(raw.theme) ? raw.theme : DEFAULT_PREFS.theme,
+    accent: isAccent(raw.accent) ? raw.accent : DEFAULT_PREFS.accent,
     sort: raw.sort === 'alpha' ? 'alpha' : 'recent',
     breachCheck: raw.breachCheck === true,
     autolockSecs: isPositive(raw.autolockSecs) ? raw.autolockSecs : DEFAULT_PREFS.autolockSecs,
@@ -85,6 +95,13 @@ export const hydratePrefs = (settings: Settings): void => {
  * merged, which is authoritative. A failed write leaves the optimistic value in
  * place: the preference still applies for this session, it just won't survive
  * a restart.
+ *
+ * Authoritative for the keys it carries: the answer is laid over the store
+ * rather than swapped in for it, so a backend built before a preference
+ * existed — which merges the patch into a struct that has no field for it and
+ * answers without the key — leaves the choice standing for the session instead
+ * of snapping it back to the default on every click. Same outcome as the
+ * failed write above, for the same reason.
  */
 // Which write is the newest. Answers can land out of order — a slider drag
 // issues several in a row — and each one carries the whole file, so only the
@@ -97,7 +114,8 @@ export const setPref = <K extends keyof Settings>(key: K, value: Settings[K]): v
   usePrefs.setState({ [key]: value } as Pick<Settings, K>)
   setSettings({ [key]: value } as Partial<Settings>)
     .then(merged => {
-      if (write === latestWrite) usePrefs.setState(sanitize(merged), true)
+      if (write === latestWrite)
+        usePrefs.setState(sanitize({ ...usePrefs.getState(), ...merged }), true)
     })
     .catch(() => {})
 }
@@ -113,6 +131,7 @@ export const toggleTheme = () => {
 // document root's `data-theme`, which theme.css keys its tokens off.
 usePrefs.subscribe((state, previous) => {
   if (state.theme !== previous.theme) applyTheme(state.theme)
+  if (state.accent !== previous.accent) applyAccent(state.accent)
 })
 
 // "System" has to keep following the OS, not just read it once at startup. No
