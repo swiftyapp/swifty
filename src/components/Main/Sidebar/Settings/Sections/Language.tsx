@@ -6,6 +6,7 @@ import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Segmented from '@/components/elements/Segmented'
 import RadioList from '@/components/elements/RadioList'
+import AccentSwatches from '@/components/elements/AccentSwatches'
 import { LABEL } from '@/components/elements/tokens'
 
 const THEMES: { value: ThemePreference; label: TKey }[] = [
@@ -17,11 +18,13 @@ const THEMES: { value: ThemePreference; label: TKey }[] = [
 export default function Language() {
   const { t, i18n } = useTranslation()
   const theme = usePrefs(state => state.theme)
+  const accent = usePrefs(state => state.accent)
   const format = usePrefs(state => state.dateFormat)
 
   // Each row label doubles as its radiogroup's accessible name.
   const formatLabel = t('Date format')
   const themeLabel = t('Theme')
+  const accentLabel = t('Accent')
 
   return (
     <>
@@ -65,6 +68,17 @@ export default function Language() {
               value={theme}
               onChange={next => setPref('theme', next)}
               testidPrefix="settings-theme"
+            />
+          }
+        />
+        <SettingsRow
+          label={accentLabel}
+          control={
+            <AccentSwatches
+              name={accentLabel}
+              value={accent}
+              onChange={next => setPref('accent', next)}
+              testidPrefix="settings-accent"
             />
           }
         />

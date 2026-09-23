@@ -3,8 +3,8 @@ import { cx } from '@/utils/cx'
 
 // One destination in the tab bar: 56px tall inside the 64px pill, so the tap
 // target clears 44px even with the 10px label under the glyph. Selected lights
-// the ink; the accent-soft pill under it is the bar's one sliding lens, not
-// the tab's own — see TabBar. `relative` puts the tab above that lens.
+// the ink; the raised pill under it is the bar's one sliding lens, not the
+// tab's own — see TabBar. `relative` puts the tab above that lens.
 //
 // Resting ink is the secondary tier (text2), not the tertiary the rail's tiles
 // use: on the glass it measures ~6.4:1 light / ~6.1:1 dark, clearing WCAG AA's

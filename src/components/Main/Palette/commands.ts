@@ -1,8 +1,16 @@
-import { usePrefs, lockVault, openAddPicker, openSettings, startEntry, toggleTheme } from '@/store'
+import {
+  usePrefs,
+  lockVault,
+  openAddPicker,
+  openGenerator,
+  openSettings,
+  startEntry,
+  toggleTheme
+} from '@/store'
 import { KINDS, addLabel } from '@/kinds'
 import { t } from '@/i18n'
 import { chord } from '@/lib/platform'
-import { GearGlyph, LockGlyph, MoonGlyph, PlusGlyph, SunGlyph } from '../icons'
+import { DicesGlyph, GearGlyph, LockGlyph, MoonGlyph, PlusGlyph, SunGlyph } from '../icons'
 
 type Glyph = typeof LockGlyph
 
@@ -38,6 +46,14 @@ export const useCommands = (): Command[] => {
       shortcut: chord('N'),
       glyph: PlusGlyph,
       run: openAddPicker
+    },
+    {
+      id: 'generate-password',
+      label: t('Generate a password'),
+      shortcut: chord('G'),
+      glyph: DicesGlyph,
+      // The standalone form: nothing to apply the value to, so it copies.
+      run: () => openGenerator()
     },
     {
       id: 'lock-vault',

@@ -9,7 +9,7 @@ import { PlusRailGlyph } from '../icons'
 // they then dismissed the picker.
 export default function Add({ className }: { className?: string }) {
   const { t } = useTranslation()
-  // The rail's only action tile: a filled accent wash rather than the
+  // The rail's only action tile: a solid accent fill rather than the
   // navigation inks, so it reads as "do" and not "go".
   return (
     <RailButton

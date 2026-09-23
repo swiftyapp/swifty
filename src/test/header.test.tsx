@@ -21,8 +21,13 @@ describe('Header', () => {
     render(<Header />)
     expect(chip()).toHaveAttribute('data-tone', 'local')
     expect(chip()).toHaveAccessibleName(/this device only/i)
-    // Lock stays: it is the one control the chrome always owns.
-    expect(screen.getByTestId('lock-vault-button')).toBeInTheDocument()
+  })
+
+  // The bar is a status line: the chip is its only control. Lock moved to the
+  // foot of the rail (see rail.test).
+  it('holds nothing but the sync chip', () => {
+    render(<Header />)
+    expect(screen.getAllByRole('button')).toEqual([chip()])
   })
 
   it('stays unbadged on a fresh connection, before any run has landed', () => {
@@ -57,15 +62,6 @@ describe('Header', () => {
     synced({ inProgress: true })
     render(<Header />)
     expect(chip()).toHaveAttribute('data-tone', 'loading')
-  })
-
-  // The lock traded IconButton's `title` for the app's Tooltip, and the panel
-  // is aria-hidden -- so without `label` the button would be left nameless.
-  it('keeps the lock button named after dropping the native tooltip', () => {
-    render(<Header />)
-    const lock = screen.getByTestId('lock-vault-button')
-    expect(lock).toHaveAccessibleName('Lock vault')
-    expect(lock).not.toHaveAttribute('title')
   })
 
   it('opens Settings › Sync & devices from the sync chip', async () => {

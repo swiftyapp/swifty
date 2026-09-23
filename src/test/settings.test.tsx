@@ -622,6 +622,20 @@ describe('Settings › language & region', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
+  it('picks an accent from the swatches and paints the root with it', async () => {
+    await open()
+    await go('language')
+
+    expect(screen.getByRole('radiogroup', { name: 'Accent' })).toBeInTheDocument()
+    expect(screen.getByTestId('settings-accent-ink')).toHaveAttribute('aria-checked', 'true')
+
+    await userEvent.click(screen.getByTestId('settings-accent-petrol'))
+
+    expect(usePrefs.getState().accent).toBe('petrol')
+    expect(document.documentElement.getAttribute('data-accent')).toBe('petrol')
+    expect(screen.getByTestId('settings-accent-petrol')).toHaveAttribute('aria-checked', 'true')
+  })
+
   it('offers System as a theme', async () => {
     await open()
     await go('language')

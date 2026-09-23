@@ -79,8 +79,10 @@ export default function EmptyState({
     >
       <div
         className={cx(
+          // Neutral by default: the mark is an emblem, not a call to action,
+          // and the primary button under it already carries the accent.
           'grid h-16 w-16 place-items-center rounded-lg',
-          markClassName ?? 'bg-accent-soft text-accent'
+          markClassName ?? 'bg-tile text-text'
         )}
       >
         {mark}

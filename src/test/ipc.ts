@@ -42,6 +42,7 @@ const DEFAULT_SETTINGS: Settings = {
   dateFormat: 'MM/DD/YYYY',
   sort: 'recent',
   theme: 'light',
+  accent: 'ink',
   locale: null,
   breachCheck: false,
   generator: {

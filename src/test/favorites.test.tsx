@@ -60,7 +60,7 @@ describe('the Favorites view', () => {
       'view-favorites',
       'view-archive',
       'tags-button',
-      'generator-button',
+      'lock-vault-button',
       'settings-button'
     ])
   })
