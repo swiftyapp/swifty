@@ -75,6 +75,7 @@ pub fn record_hash(r: &Record) -> [u8; 32] {
     // backfill holds the same payload under NULLs, and the merge must see that.
     opt_field(&mut h, r.file_name.as_deref());
     opt_i64(&mut h, r.var_count);
+    opt_field(&mut h, r.username.as_deref());
     h.finalize().into()
 }
 

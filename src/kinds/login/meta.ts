@@ -31,5 +31,5 @@ export const isValid = (draft: EntryDraft): boolean =>
 export const primarySecret = (entry: Entry): string =>
   entry.type === 'login' ? entry.password : ''
 
-// The site's own host stands in for the account — the username is a secret.
-export const listSubtitle = (entry: EntryMeta): string => entry.urlHost
+// The host stands in for a row not yet stamped with its username.
+export const listSubtitle = (entry: EntryMeta): string => entry.username || entry.urlHost

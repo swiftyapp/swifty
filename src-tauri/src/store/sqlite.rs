@@ -83,12 +83,14 @@ fn migration_list() -> Vec<M<'static>> {
            fetched_at INTEGER NOT NULL
          );",
         ),
+        // A login's username. NULL = not yet derived (backfilled on unlock).
+        M::up("ALTER TABLE entries ADD COLUMN username TEXT;"),
     ]
 }
 
 // New columns are appended last so pre-existing column indexes stay put.
-const COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, payload, card_brand, favorite, has_passkey, file_name, var_count";
-const META_COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, card_brand, favorite, has_passkey, file_name, var_count";
+const COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, payload, card_brand, favorite, has_passkey, file_name, var_count, username";
+const META_COLS: &str = "id, kind, title, tags, url_host, created_at, updated_at, deleted_at, card_brand, favorite, has_passkey, file_name, var_count, username";
 
 const META_UPSERT: &str = "INSERT INTO meta (key, value) VALUES (?1, ?2)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value";
@@ -259,6 +261,15 @@ impl SqliteStore {
         Ok(())
     }
 
+    /// Stamp a login row's derived username without touching `updated_at`.
+    pub fn set_username(&self, id: &str, username: &str) -> Result<()> {
+        self.lock().execute(
+            "UPDATE entries SET username = ?1 WHERE id = ?2",
+            params![username, id],
+        )?;
+        Ok(())
+    }
+
     /// Merge foreign records into the vault, last-writer-wins per id, in one
     /// transaction. Returns how many rows were written.
     ///
@@ -410,13 +421,16 @@ impl SqliteStore {
     }
 
     /// Test seam: put the DB back the way the build before the favicon cache
-    /// left it — no `favicons` table, stamped at the version that preceded it
-    /// — so a test can watch the migration land on an existing vault.
+    /// left it — no `favicons` table, no columns added since, stamped at the
+    /// version that preceded it — so a test can watch the migrations land on an
+    /// existing vault. Keep in step with `migration_list`.
     #[cfg(test)]
     pub(crate) fn drop_favicons_for_test(&self) -> Result<()> {
-        let previous = schema_version() - 1;
+        let previous = schema_version() - 2;
         self.lock().execute_batch(&format!(
-            "DROP TABLE favicons; PRAGMA user_version = {previous};"
+            "ALTER TABLE entries DROP COLUMN username;
+             DROP TABLE favicons;
+             PRAGMA user_version = {previous};"
         ))?;
         Ok(())
     }
@@ -543,13 +557,14 @@ impl VaultStore for SqliteStore {
         // written, so a save that drops the last passkey has to clear it.
         conn.execute(
             &format!(
-                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)
+                "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)
                  ON CONFLICT(id) DO UPDATE SET
                    kind=excluded.kind, title=excluded.title, tags=excluded.tags,
                    url_host=excluded.url_host, updated_at=excluded.updated_at,
                    deleted_at=excluded.deleted_at, payload=excluded.payload,
                    card_brand=excluded.card_brand, has_passkey=excluded.has_passkey,
-                   file_name=excluded.file_name, var_count=excluded.var_count"
+                   file_name=excluded.file_name, var_count=excluded.var_count,
+                   username=excluded.username"
             ),
             params![
                 rec.id,
@@ -570,6 +585,7 @@ impl VaultStore for SqliteStore {
                 rec.has_passkey,
                 rec.file_name,
                 rec.var_count,
+                rec.username,
             ],
         )?;
         Ok(())
@@ -616,7 +632,7 @@ impl VaultStore for SqliteStore {
             "UPDATE entries
              SET payload = x'', title = '', tags = '[]', url_host = '',
                  card_brand = NULL, favorite = 0, has_passkey = 0,
-                 file_name = NULL, var_count = NULL,
+                 file_name = NULL, var_count = NULL, username = NULL,
                  updated_at = ?1
              WHERE id = ?2 AND deleted_at IS NOT NULL",
             params![now, id],
@@ -674,14 +690,15 @@ impl VaultStore for SqliteStore {
 // sync-in paths (import, merge_records) need.
 fn verbatim_upsert() -> String {
     format!(
-        "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)
+        "INSERT INTO entries ({COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)
          ON CONFLICT(id) DO UPDATE SET
            kind=excluded.kind, title=excluded.title, tags=excluded.tags,
            url_host=excluded.url_host, created_at=excluded.created_at,
            updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
            payload=excluded.payload, card_brand=excluded.card_brand,
            favorite=excluded.favorite, has_passkey=excluded.has_passkey,
-           file_name=excluded.file_name, var_count=excluded.var_count"
+           file_name=excluded.file_name, var_count=excluded.var_count,
+           username=excluded.username"
     )
 }
 
@@ -708,6 +725,7 @@ fn exec_record(stmt: &mut Statement, r: &Record) -> rusqlite::Result<usize> {
         r.has_passkey,
         r.file_name,
         r.var_count,
+        r.username,
     ])
 }
 
@@ -727,6 +745,7 @@ fn row_to_record(row: &Row) -> rusqlite::Result<Record> {
         has_passkey: row.get(11)?,
         file_name: row.get(12)?,
         var_count: row.get(13)?,
+        username: row.get(14)?,
     })
 }
 
@@ -745,6 +764,7 @@ fn row_to_meta(row: &Row) -> rusqlite::Result<EntryMeta> {
         has_passkey: row.get(10)?,
         file_name: row.get(11)?,
         var_count: row.get(12)?,
+        username: row.get(13)?,
     })
 }
 

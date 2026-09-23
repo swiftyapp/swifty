@@ -349,6 +349,8 @@ pub struct EntryMetaDto {
     pub file_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub var_count: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
     // Set only on the tombstones the Trash lists; absent for live entries.
@@ -374,6 +376,7 @@ impl From<&crate::store::EntryMeta> for EntryMetaDto {
             has_passkey: m.has_passkey,
             file_name: m.file_name.clone(),
             var_count: m.var_count,
+            username: m.username.clone().filter(|u| !u.is_empty()),
             created_at: iso(m.created_at),
             updated_at: iso(m.updated_at),
             deleted_at: m.deleted_at.and_then(iso),
@@ -778,6 +781,7 @@ mod tests {
             has_passkey,
             file_name: None,
             var_count: None,
+            username: None,
         }
     }
 
@@ -812,5 +816,28 @@ mod tests {
         let bare = serde_json::to_value(EntryMetaDto::from(&meta(false))).unwrap();
         assert!(bare.get("fileName").is_none());
         assert!(bare.get("varCount").is_none());
+    }
+
+    #[test]
+    fn meta_dto_carries_the_username_only_when_stamped_and_present() {
+        let stamped = crate::store::EntryMeta {
+            username: Some("alex@example.com".into()),
+            ..meta(false)
+        };
+        let out = serde_json::to_value(EntryMetaDto::from(&stamped)).unwrap();
+        assert_eq!(out["username"], "alex@example.com");
+        assert!(out.get("password").is_none());
+
+        let empty = crate::store::EntryMeta {
+            username: Some("".into()),
+            ..meta(false)
+        };
+        assert!(serde_json::to_value(EntryMetaDto::from(&empty))
+            .unwrap()
+            .get("username")
+            .is_none());
+
+        let bare = serde_json::to_value(EntryMetaDto::from(&meta(false))).unwrap();
+        assert!(bare.get("username").is_none());
     }
 }

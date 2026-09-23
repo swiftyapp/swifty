@@ -70,6 +70,7 @@ fn rec(id: &str, payload: &[u8]) -> Record {
         has_passkey: false,
         file_name: None,
         var_count: None,
+        username: None,
     }
 }
 
@@ -187,6 +188,7 @@ fn purge_empties_the_row_and_drops_it_from_the_trash() {
     let store = seeded(&[Record {
         deleted_at: Some(1000),
         title: "Secret Thing".into(),
+        username: Some("alice".into()),
         ..stamped("1", b"sealed-payload", 1000)
     }]);
 
@@ -199,6 +201,7 @@ fn purge_empties_the_row_and_drops_it_from_the_trash() {
     assert!(purged.deleted_at.is_some());
     assert!(purged.payload.is_empty());
     assert_eq!(purged.title, "");
+    assert_eq!(purged.username, None);
     assert!(purged.updated_at > 1000);
 }
 
@@ -417,6 +420,18 @@ fn build_record_stamps_an_env_files_name_and_variable_count() {
     // Every other kind leaves both NULL, so the columns say nothing about it.
     let login = migrate::build_record(&sample_entry(), b"s".to_vec()).unwrap();
     assert_eq!((login.file_name, login.var_count), (None, None));
+}
+
+#[test]
+fn build_record_stamps_a_logins_username() {
+    let login = migrate::build_record(&sample_entry(), b"s".to_vec()).unwrap();
+    assert_eq!(login.username.as_deref(), Some("alice"));
+
+    let bare = migrate::build_record(&passkey_entry(), b"s".to_vec()).unwrap();
+    assert_eq!(bare.username.as_deref(), Some(""));
+
+    let env = migrate::build_record(&env_entry(None, "A=1\n"), b"s".to_vec()).unwrap();
+    assert_eq!(env.username, None);
 }
 
 // What counts as a variable line, and what does not: comments, blank lines,
