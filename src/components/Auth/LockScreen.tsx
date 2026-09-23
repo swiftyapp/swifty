@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import AuthShell from '@/components/elements/AuthShell'
 import Eyebrow from '@/components/elements/Eyebrow'
-import Mascot from '@/components/elements/Mascot'
 import Masterpass from '@/components/elements/Masterpass'
 import type { BiometryType } from '@/api/types'
 import BiometricTile from './BiometricTile'
+import Brand from './Brand'
 import { useUnlock } from './useUnlock'
 import WorkspacePicker from './WorkspacePicker'
 
@@ -37,9 +37,7 @@ export default function LockScreen({ biometric, biometry = 'touch' }: Props) {
 
   return (
     <AuthShell footer>
-      <div className="mb-7 flex justify-center">
-        <Mascot state={mascot.state} gaze={mascot.gaze} />
-      </div>
+      <Brand state={mascot.state} gaze={mascot.gaze} />
       <WorkspacePicker />
       <Eyebrow tone={eyebrow.tone} busy={eyebrow.busy} testid={eyebrow.testid}>
         {eyebrow.text}

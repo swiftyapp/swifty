@@ -12,8 +12,9 @@ export function Dropdown({ onBlur, className, children }: DropdownProps) {
   const ref = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLElement | null>(null)
 
+  // Every kind of item: plain, and the radio kind a single-select menu uses.
   const items = () =>
-    Array.from(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
+    Array.from(ref.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])
 
   // Roving focus: unlike a radio group the arrows only *move*, they never
   // activate, so the menu holds no selection of its own.
@@ -81,6 +82,16 @@ interface ItemProps {
   danger?: boolean
   testid?: string
   onClick?: () => void
+  // Spacing overrides for a row that is not a plain label (a tile with two
+  // lines of text wants less vertical padding than the 40px default).
+  className?: string
+  /**
+   * Set on every item of a menu that picks one of several (a sort order, a
+   * vault): the item becomes a `menuitemradio` and says whether it is the one,
+   * so the selection a check glyph shows is also told to assistive technology.
+   * Left undefined, the item is a plain action.
+   */
+  checked?: boolean
   children: ReactNode
 }
 
@@ -89,12 +100,15 @@ export function DropdownItem({
   danger,
   testid,
   onClick,
+  className,
+  checked,
   children
 }: ItemProps) {
   return (
     <button
       type="button"
-      role="menuitem"
+      role={checked === undefined ? 'menuitem' : 'menuitemradio'}
+      aria-checked={checked}
       data-testid={testid}
       onClick={onClick}
       className={cx(
@@ -102,7 +116,8 @@ export function DropdownItem({
         // the hover treatment instead of inventing a ring of its own.
         'flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-left text-base transition-colors hover:bg-hover focus-visible:bg-hover',
         danger ? 'text-bad' : 'text-text2 hover:text-text focus-visible:text-text',
-        separated && 'mt-1 border-t border-line pt-2.5'
+        separated && 'mt-1 border-t border-line pt-2.5',
+        className
       )}
     >
       {children}

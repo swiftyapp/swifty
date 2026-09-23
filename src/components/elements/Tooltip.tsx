@@ -14,9 +14,20 @@ interface Props {
    * where it is simply clipped -- there is no page to scroll into.
    */
   align?: 'center' | 'end'
+  /**
+   * Which side of the trigger the panel opens on. `bottom` is the default;
+   * `top` is for a trigger in bottom chrome (the lock screen's footer), where
+   * a panel below it would run off the window.
+   */
+  side?: 'top' | 'bottom'
 }
 
-export default function Tooltip({ content, children, align = 'center' }: Props) {
+export default function Tooltip({
+  content,
+  children,
+  align = 'center',
+  side = 'bottom'
+}: Props) {
   return (
     <div className="group/tt relative">
       {/* The panel stays mounted, so `animate-pop` is scoped to the shown state
@@ -33,7 +44,8 @@ export default function Tooltip({ content, children, align = 'center' }: Props) 
         role="tooltip"
         aria-hidden="true"
         className={cx(
-          'pointer-events-none absolute top-full z-50 mt-2 w-max whitespace-nowrap rounded-sm bg-text px-2.5 py-1 text-base text-detail opacity-0 shadow-float transition-opacity delay-0 group-hover/tt:animate-pop group-hover/tt:opacity-100 group-hover/tt:delay-300 group-hover/tt:[animation-delay:300ms] group-focus-within/tt:animate-pop group-focus-within/tt:opacity-100 group-focus-within/tt:delay-300 group-focus-within/tt:[animation-delay:300ms]',
+          'pointer-events-none absolute z-50 w-max whitespace-nowrap rounded-sm bg-text px-2.5 py-1 text-base text-detail opacity-0 shadow-float transition-opacity delay-0 group-hover/tt:animate-pop group-hover/tt:opacity-100 group-hover/tt:delay-300 group-hover/tt:[animation-delay:300ms] group-focus-within/tt:animate-pop group-focus-within/tt:opacity-100 group-focus-within/tt:delay-300 group-focus-within/tt:[animation-delay:300ms]',
+          side === 'top' ? 'bottom-full mb-2' : 'top-full mt-2',
           align === 'end' ? 'right-0' : 'inset-x-0 mx-auto'
         )}
       >
