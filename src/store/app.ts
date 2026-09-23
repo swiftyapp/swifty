@@ -8,7 +8,7 @@ import { checkForUpdate } from '@/api/autoUpdate'
 import { resetFavicons } from '@/hooks/useFavicon'
 import { setEntries, resetVault, runAudit } from './vault'
 import { openSettings, resetUi } from './ui'
-import { hydratePrefs } from './prefs'
+import { hydratePrefs, hydrateFromProbe, prefsMark } from './prefs'
 
 /**
  * State that lives as long as the app does, across locks: which flow is on
@@ -149,10 +149,15 @@ export const useApp = create<AppState>()(() => initialApp)
  * a probe that answers late — the shell's own re-ask after the boot probe
  * failed — is then the first word on the stored theme and accent, and the
  * prefs store's subscriber paints the document from whatever changed.
+ *
+ * With a `mark` (see `prefsMark`, taken when the probe went out) the settings
+ * are taken only if no preference write has overtaken the probe since; the
+ * boot path passes none, since nothing can have been written before it.
  */
-export const setApp = (status: AppStatus) => {
+export const setApp = (status: AppStatus, mark?: number) => {
   useApp.setState(state => ({ status, sync: newer(state.sync, status.sync) }))
-  hydratePrefs(status.settings)
+  if (mark === undefined) hydratePrefs(status.settings)
+  else hydrateFromProbe(status.settings, mark)
 }
 
 /**
@@ -178,13 +183,17 @@ export const useScanSupported = () => useApp(state => state.status?.scanSupporte
  * enrollment. Resolves with what it stored — or null, keeping the last known
  * answer, if the call failed — and never rejects, so no caller has to guard it.
  */
-export const refreshApp = (): Promise<AppStatus | null> =>
-  appStatus()
+export const refreshApp = (): Promise<AppStatus | null> => {
+  // Stamped before the request leaves, so a write issued while it is out — or
+  // still unanswered — outranks the settings it brings back.
+  const mark = prefsMark()
+  return appStatus()
     .then(status => {
-      setApp(status)
+      setApp(status, mark)
       return status
     })
     .catch(() => null)
+}
 
 // --- flow -----------------------------------------------------------------------
 

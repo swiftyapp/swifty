@@ -108,9 +108,12 @@ export const hydratePrefs = (settings: Settings): void => {
 // answer to the latest write may replace the store: an older one would put back
 // a value the user has already moved past.
 let latestWrite = 0
+// How many writes are still waiting for their answer.
+let inFlight = 0
 
 export const setPref = <K extends keyof Settings>(key: K, value: Settings[K]): void => {
   const write = ++latestWrite
+  inFlight++
   usePrefs.setState({ [key]: value } as Pick<Settings, K>)
   setSettings({ [key]: value } as Partial<Settings>)
     .then(merged => {
@@ -118,6 +121,28 @@ export const setPref = <K extends keyof Settings>(key: K, value: Settings[K]): v
         usePrefs.setState(sanitize({ ...usePrefs.getState(), ...merged }), true)
     })
     .catch(() => {})
+    .finally(() => {
+      inFlight--
+    })
+}
+
+/**
+ * A stamp of the write history, taken before a probe is sent, so its answer
+ * can tell whether it is still the newest word (`hydrateFromProbe`).
+ */
+export const prefsMark = (): number => latestWrite
+
+/**
+ * Take a probe's settings only when they cannot be older than what the store
+ * holds: no write was issued after the probe went out, and none is still
+ * waiting for its answer. A probe that raced a write — `app_status` read the
+ * file before `set_settings` rewrote it, then landed after — would otherwise
+ * put the old value back over a change the backend has already kept. When a
+ * write is pending its answer is the newer fact and carries the whole file
+ * anyway, so nothing is lost by letting the probe's copy go.
+ */
+export const hydrateFromProbe = (settings: Settings, mark: number): void => {
+  if (mark === latestWrite && inFlight === 0) hydratePrefs(settings)
 }
 
 // The palette command is a flip, so it resolves "system" first and then lands

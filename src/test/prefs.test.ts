@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import i18n from '@/i18n'
 import type { Settings } from '@/api/app'
-import { DEFAULT_PREFS, hydratePrefs, setPref, toggleTheme, usePrefs } from '@/store/prefs'
+import {
+  DEFAULT_PREFS,
+  hydrateFromProbe,
+  hydratePrefs,
+  prefsMark,
+  setPref,
+  toggleTheme,
+  usePrefs
+} from '@/store/prefs'
 import { appStatusDefault, calls, clearCalls, mockCommand, mockCommandOnce } from './ipc'
 import { deferred } from './utils'
 
@@ -44,6 +52,45 @@ describe('prefs', () => {
 
     expect(usePrefs.getState().accent).toBe('ruby')
     expect(document.documentElement.getAttribute('data-accent')).toBe('ruby')
+  })
+
+  // A probe (`app_status`) carries the settings too, and one that raced a write
+  // — read the file before the write, landed after it — must not put the old
+  // value back. The mark taken when the probe went out is what tells.
+  describe('a probe that carries settings', () => {
+    it('is taken when nothing was written meanwhile', () => {
+      hydrateFromProbe({ ...DEFAULT_PREFS, accent: 'moss' }, prefsMark())
+      expect(usePrefs.getState().accent).toBe('moss')
+    })
+
+    it('is ignored when a write overtook it', async () => {
+      const mark = prefsMark()
+      setPref('accent', 'ruby')
+      await settled()
+
+      hydrateFromProbe({ ...DEFAULT_PREFS }, mark)
+      expect(usePrefs.getState().accent).toBe('ruby')
+    })
+
+    it('is ignored while a write is still unanswered, whose answer then lands', async () => {
+      const write = deferred<Settings>()
+      mockCommandOnce('set_settings', () => write.promise)
+      setPref('accent', 'ruby')
+
+      // Went out after the write, so the mark is current — but the write's
+      // answer is still the newer fact, and a probe served before the merge
+      // would carry the old value.
+      hydrateFromProbe({ ...DEFAULT_PREFS }, prefsMark())
+      expect(usePrefs.getState().accent).toBe('ruby')
+
+      write.resolve({ ...DEFAULT_PREFS, accent: 'ruby' })
+      await settled()
+      expect(usePrefs.getState().accent).toBe('ruby')
+
+      // Settled: the next probe is trusted again.
+      hydrateFromProbe({ ...DEFAULT_PREFS, accent: 'moss' }, prefsMark())
+      expect(usePrefs.getState().accent).toBe('moss')
+    })
   })
 
   // The accent rides on the root the way the theme does, so theme.css can key
