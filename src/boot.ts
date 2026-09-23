@@ -41,10 +41,14 @@ const injectedBoot = (): RowelBoot | null => {
   return { locale, settings }
 }
 
-/** Take a probe's answer into the stores, theme and accent included. */
+/**
+ * Take a probe's answer into the stores (`setApp` hydrates the preferences),
+ * then paint the document even where nothing changed: on a fresh page the root
+ * carries no theme or accent yet, so a stored value equal to the store's
+ * default would otherwise never reach it.
+ */
 const adopt = (status: AppStatus) => {
   setApp(status)
-  hydratePrefs(status.settings)
   applyTheme(usePrefs.getState().theme)
   applyAccent(usePrefs.getState().accent)
 }

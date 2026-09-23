@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import App from '@/App'
-import { useApp } from '@/store'
+import { useApp, usePrefs } from '@/store'
 import { unlistens } from './events'
 import { appStatusDefault, calls, mockCommand } from './ipc'
 import { seedApp } from './utils'
@@ -32,6 +32,24 @@ describe('App', () => {
 
     await waitFor(() => expect(useApp.getState().flow).toBe('setup'))
     expect(useApp.getState().status?.initialized).toBe(false)
+  })
+
+  // That late answer is also the first word on the stored preferences when
+  // the boot probe failed: the theme and accent it carries have to reach the
+  // document, not just the status slot.
+  it('restores the saved theme and accent when its own probe is the one that answers', async () => {
+    useApp.setState({ status: null })
+    const status = appStatusDefault()
+    mockCommand('app_status', () => ({
+      ...status,
+      settings: { ...status.settings, theme: 'dark', accent: 'ruby' }
+    }))
+    render(<App />)
+
+    await waitFor(() => expect(usePrefs.getState().accent).toBe('ruby'))
+    expect(usePrefs.getState().theme).toBe('dark')
+    expect(document.documentElement.getAttribute('data-accent')).toBe('ruby')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
   })
 
   // `subscribeToEvents` hands back a cleanup that has to reach every one of the
