@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useApp, selectWorkspaces, selectActiveWorkspace, switchWorkspace } from '@/store'
 import type { Workspace } from '@/api/types'
@@ -19,6 +19,7 @@ export default function WorkspacePicker() {
   const active = useApp(selectActiveWorkspace)
   const configured = useApp(state => state.sync.configured)
   const [open, setOpen] = useState(false)
+  const chip = useRef<HTMLButtonElement>(null)
 
   if (list.length < 2) return null
   const current = list.find(workspace => workspace.id === active) ?? list[0]
@@ -32,6 +33,10 @@ export default function WorkspacePicker() {
 
   const pick = (id: string) => {
     setOpen(false)
+    // The row that was picked unmounts with the menu, so focus would fall to
+    // the body; it goes back to the chip, as it does on Escape. A switch that
+    // relocks the screen redraws the chip in place, so the focus holds there.
+    chip.current?.focus()
     // Nothing is unlocked here, so the one refusal the backend has (a sync in
     // flight) cannot apply; a failure is only worth a log.
     if (id !== active) switchWorkspace(id).catch(() => {})
@@ -40,6 +45,7 @@ export default function WorkspacePicker() {
   return (
     <div data-testid="workspace-picker" className="relative mb-5 flex justify-center">
       <button
+        ref={chip}
         type="button"
         data-testid="workspace-chip"
         aria-haspopup="menu"

@@ -118,5 +118,8 @@ describe('WorkspacePicker', () => {
 
     expect(calls('workspace_select')).toHaveLength(0)
     expect(screen.queryByTestId('workspace-option-default')).not.toBeInTheDocument()
+    // The row that was picked is gone with the menu; the keyboard is back on
+    // the chip rather than dropped on the body.
+    expect(screen.getByTestId('workspace-chip')).toHaveFocus()
   })
 })
