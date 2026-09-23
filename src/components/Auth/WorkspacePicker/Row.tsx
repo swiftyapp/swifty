@@ -5,6 +5,9 @@ import { chord } from '@/lib/platform'
 
 interface Props {
   id: string
+  // The row's element id, which the search field's `aria-activedescendant`
+  // names while this row is the lit one.
+  domId: string
   label: string
   // Its size and where it lives, already translated ("284 items · Google Drive").
   about: string
@@ -18,9 +21,20 @@ interface Props {
 
 // One vault: its tile, its name over its size and where it lives, and at the
 // end either the check of the one open or the chord that opens it (⌘1–⌘9).
-export default function Row({ id, label, about, position, selected, lit, onLight, onPick }: Props) {
+export default function Row({
+  id,
+  domId,
+  label,
+  about,
+  position,
+  selected,
+  lit,
+  onLight,
+  onPick
+}: Props) {
   return (
     <DropdownItem
+      id={domId}
       testid={`workspace-option-${id}`}
       checked={selected}
       active={lit}

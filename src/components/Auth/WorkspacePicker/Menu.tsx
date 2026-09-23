@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useApp } from '@/store'
 import type { Workspace } from '@/api/types'
@@ -25,6 +25,11 @@ export default function Menu({ list, active, onPick, onClose }: Props) {
   const { t } = useTranslation()
   const configured = useApp(state => state.sync.configured)
   const [query, setQuery] = useState('')
+  // Element ids for the menu and each row, so the search field can point at
+  // the lit one; per row by workspace id, so an id holds while the list filters.
+  const base = useId()
+  const menuId = `${base}-menu`
+  const rowId = (workspace: Workspace) => `${base}-${workspace.id}`
 
   const needle = query.trim().toLowerCase()
   const rows = list
@@ -34,6 +39,14 @@ export default function Menu({ list, active, onPick, onClose }: Props) {
   const [lit, setLit] = useState(() =>
     Math.max(0, rows.findIndex(row => row.workspace.id === active))
   )
+
+  // The lit row stays in view as the arrows walk a list longer than the
+  // menu's 300px. `nearest`, so a row already showing — any the pointer is
+  // on — does not move.
+  const litId = rows[lit] && rowId(rows[lit].workspace)
+  useEffect(() => {
+    if (litId) document.getElementById(litId)?.scrollIntoView?.({ block: 'nearest' })
+  }, [litId])
 
   // How big each vault is and where it lives, read off what is knowable while
   // it is locked: the count its last open here left, and the open one's live
@@ -78,12 +91,19 @@ export default function Menu({ list, active, onPick, onClose }: Props) {
     // 320px, short of a phone's screen edges on the narrowest of them.
     <div className="absolute top-full z-20 mt-2 w-[320px] max-w-[calc(100vw-24px)]">
       <Dropdown
+        id={menuId}
         onBlur={onClose}
         className="inset-x-0"
         listClassName="max-h-[300px]"
         header={
           list.length >= SEARCH_FROM && (
-            <Search value={query} onChange={find} onKeyDown={onSearchKey} />
+            <Search
+              value={query}
+              onChange={find}
+              onKeyDown={onSearchKey}
+              controls={menuId}
+              active={litId}
+            />
           )
         }
       >
@@ -91,6 +111,7 @@ export default function Menu({ list, active, onPick, onClose }: Props) {
           <Row
             key={row.workspace.id}
             id={row.workspace.id}
+            domId={rowId(row.workspace)}
             label={row.label}
             about={about(row.workspace)}
             position={row.index}

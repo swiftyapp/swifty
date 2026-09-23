@@ -274,6 +274,26 @@ describe('WorkspacePicker', () => {
       expect(screen.getByTestId('workspace-chip')).toHaveFocus()
     })
 
+    // The caret never leaves the field, so the field is what says which row
+    // the arrows have lit — the one Enter would open.
+    it('names the lit row to assistive technology as the arrows move', async () => {
+      seed(MANY)
+      render(<WorkspacePicker />)
+
+      await userEvent.click(screen.getByTestId('workspace-chip'))
+      const search = screen.getByRole('combobox', { name: 'Find a vault' })
+      const lit = () => document.getElementById(search.getAttribute('aria-activedescendant') ?? '')
+
+      expect(search).toHaveAttribute('aria-controls', screen.getByRole('menu').id)
+      expect(lit()).toBe(screen.getByTestId('workspace-option-default'))
+
+      await userEvent.keyboard('{ArrowDown}')
+      expect(lit()).toBe(screen.getByTestId('workspace-option-w2'))
+
+      await userEvent.keyboard('zzz')
+      expect(search).not.toHaveAttribute('aria-activedescendant')
+    })
+
     it('says so when nothing matches', async () => {
       seed(MANY)
       render(<WorkspacePicker />)

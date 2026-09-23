@@ -91,31 +91,40 @@ impl Registry {
     /// vault they already have: the default still names the primary, whose
     /// database is exactly where it has always been.
     pub fn load(root: &Path) -> Registry {
+        match Registry::read(root) {
+            Ok(Some(registry)) => registry,
+            Ok(None) => Registry::default(),
+            Err(e) => {
+                log::warn!("{e}; assuming one workspace");
+                Registry::default()
+            }
+        }
+    }
+
+    /// The registry as it is on disk, for a writer: `None` when there is no
+    /// file, and an error — never the default — when there is one that cannot
+    /// be read or parsed.
+    ///
+    /// [`Registry::load`]'s fallback is right for a reader and wrong for a
+    /// writer: a change saved over the default it stands in with replaces the
+    /// file with a one-workspace registry, and every other workspace drops off
+    /// the list for good. A file this cannot read is left as it is.
+    pub fn read(root: &Path) -> Result<Option<Registry>> {
         let path = root.join(REGISTRY_FILE);
         if !path.exists() {
-            return Registry::default();
+            return Ok(None);
         }
-
-        let parsed = std::fs::read_to_string(&path)
+        let mut registry = std::fs::read_to_string(&path)
             .map_err(|e| e.to_string())
-            .and_then(|json| serde_json::from_str::<Registry>(&json).map_err(|e| e.to_string()));
-        let mut registry = match parsed {
-            Ok(registry) => registry,
-            Err(e) => {
-                log::warn!(
-                    "cannot read {}: {e}; assuming one workspace",
-                    path.display()
-                );
-                return Registry::default();
-            }
-        };
+            .and_then(|json| serde_json::from_str::<Registry>(&json).map_err(|e| e.to_string()))
+            .map_err(|e| Error::Other(format!("cannot read {}: {e}", path.display())))?;
 
         // An `active` naming a workspace that is not in the list would resolve
         // to a directory nothing created. The primary always opens.
         if !registry.workspaces.iter().any(|w| w.id == registry.active) {
             registry.active = PRIMARY_ID.to_string();
         }
-        registry
+        Ok(Some(registry))
     }
 
     pub fn save(&self, root: &Path) -> Result<()> {
@@ -477,7 +486,7 @@ pub fn record_item_count(app: &AppHandle, id: &str, count: u32) {
 
 // [`record_item_count`]'s write, under the caller's `workspace_lock`.
 fn count_in(root: &Path, id: &str, count: u32) -> Result<()> {
-    if !root.join(REGISTRY_FILE).exists() {
+    if Registry::read(root)?.is_none() {
         return Ok(());
     }
     update_active_locked(root, id, counted(count))
@@ -534,7 +543,9 @@ fn update_active_locked(
     active: &str,
     change: impl FnOnce(&mut Workspace) -> bool,
 ) -> Result<()> {
-    let mut registry = Registry::load(root);
+    // Strict: a file that is there and unreadable is refused, not saved over
+    // (see `Registry::read`). No file is the single-workspace default.
+    let mut registry = Registry::read(root)?.unwrap_or_default();
     let Some(workspace) = registry.workspaces.iter_mut().find(|w| w.id == active) else {
         return Err(Error::NotFound);
     };
@@ -638,6 +649,25 @@ mod tests {
         assert!(!json.contains("vaultId"), "{json}");
         assert!(!json.contains("itemCount"), "{json}");
         assert_eq!(loaded.workspaces[0].item_count, None);
+    }
+
+    // A registry this cannot parse is refused, not replaced: saving the
+    // default over it would drop every other workspace from the list for good.
+    // The same guard covers the vault-id and name mirrors, which write through
+    // the same path.
+    #[test]
+    fn a_count_leaves_a_registry_it_cannot_read_as_it_is() {
+        let root = tmp_root();
+        let malformed = r#"{"active":"a1b2","workspaces":[{"id":"#;
+        fs::write(root.join(REGISTRY_FILE), malformed).unwrap();
+
+        assert!(count_in(&root, PRIMARY_ID, 12).is_err());
+        assert!(update_active_locked(&root, PRIMARY_ID, named("Home")).is_err());
+
+        assert_eq!(
+            fs::read_to_string(root.join(REGISTRY_FILE)).unwrap(),
+            malformed
+        );
     }
 
     // An install that never made a second workspace has no registry file, and

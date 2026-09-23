@@ -3,6 +3,9 @@ import { cx } from '@/utils/cx'
 
 interface DropdownProps {
   onBlur: () => void
+  // For a control outside the items that points into them (a search field's
+  // `aria-controls`).
+  id?: string
   // Placement against the nearest positioned ancestor (e.g. 'right-0 top-8').
   className?: string
   /**
@@ -15,7 +18,14 @@ interface DropdownProps {
   children: ReactNode
 }
 
-export function Dropdown({ onBlur, className, header, listClassName, children }: DropdownProps) {
+export function Dropdown({
+  onBlur,
+  id,
+  className,
+  header,
+  listClassName,
+  children
+}: DropdownProps) {
   const ref = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLElement | null>(null)
 
@@ -71,6 +81,7 @@ export function Dropdown({ onBlur, className, header, listClassName, children }:
     <>
       <div
         ref={ref}
+        id={id}
         role="menu"
         onKeyDown={onKeyDown}
         className={cx(
@@ -93,6 +104,8 @@ export function Dropdown({ onBlur, className, header, listClassName, children }:
 }
 
 interface ItemProps {
+  // Stable, for a field that names the lit item by `aria-activedescendant`.
+  id?: string
   // A rule across the whole menu above this item, setting it apart.
   separated?: boolean
   // Destructive entry (delete, disconnect, ...): inked in the `bad` token.
@@ -122,6 +135,7 @@ interface ItemProps {
 }
 
 export function DropdownItem({
+  id,
   separated,
   danger,
   testid,
@@ -150,6 +164,7 @@ export function DropdownItem({
       {separated && <div role="separator" className="-mx-1.5 my-[5px] h-px flex-none bg-line" />}
       <button
         type="button"
+        id={id}
         role={radio ? 'menuitemradio' : 'menuitem'}
         aria-checked={checked}
         data-testid={testid}
