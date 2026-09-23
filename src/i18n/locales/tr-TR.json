@@ -574,5 +574,9 @@
   "This file is too large": "Bu dosya çok büyük",
   "This file is not text": "Bu dosya bir metin dosyası değil",
   "The vault changed while this was running. Try again.": "İşlem sırasında kasa değişti. Yeniden deneyin.",
-  "Backups restore a fresh install and are not imported into an existing vault.": "Yedekler yeni bir kurulumu geri yükler; mevcut bir kasaya aktarılmaz."
+  "Backups restore a fresh install and are not imported into an existing vault.": "Yedekler yeni bir kurulumu geri yükler; mevcut bir kasaya aktarılmaz.",
+  "Find a vault": "Kasa bul",
+  "No vault matches “{{query}}”": "“{{query}}” ile eşleşen kasa yok",
+  "{{count}} items_one": "{{count}} kayıt",
+  "{{count}} items_other": "{{count}} kayıt"
 }

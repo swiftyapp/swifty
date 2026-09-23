@@ -211,8 +211,17 @@ impl Session {
 /// a vault already locked has nothing to announce.
 pub fn lock(app: &AppHandle) -> bool {
     let state = app.state::<AppState>();
+    let workspace = crate::workspace::active_id(app);
     let mut session = state.session.lock().unwrap();
     let live = session.is_live();
+    // The size the vault is left at, for the lock screen to show while it is
+    // sealed — read while the store is still open, recorded once the session
+    // guard is let go (the registry's lock is taken before it, never inside).
+    // A store out on a lease has nothing to count, and keeps its last one.
+    let count = session
+        .store()
+        .ok()
+        .and_then(|store| store.count_live().ok());
     if live {
         session.clear();
     }
@@ -228,6 +237,9 @@ pub fn lock(app: &AppHandle) -> bool {
     // empty and stands down, or wholly after it, which it then ends.
     let held = state.keyring.lock().unwrap().clear();
     drop(session);
+    if let Some(count) = count {
+        crate::workspace::record_item_count(app, &workspace, count);
+    }
     if !live && !held {
         return false;
     }
@@ -282,6 +294,10 @@ pub fn open_with_key(app: &AppHandle, key: &VaultKey) -> Result<(SqliteStore, Ve
         })?;
     backfill_derived_columns(&store, key);
     let metas = list_metas(&store)?;
+    // Every open lands here — password, biometrics, a switch the ring allows —
+    // so the lock screen knows the size of any vault opened on this device.
+    // No lock held: this runs on the opening thread, ahead of the session.
+    crate::workspace::record_item_count(app, &crate::workspace::active_id(app), metas.len() as u32);
     Ok((store, metas))
 }
 

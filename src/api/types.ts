@@ -199,6 +199,12 @@ export interface Workspace {
    * pack that is already a workspace here.
    */
   vaultId?: string
+  /**
+   * How many live entries the vault held when it was last open on this
+   * device — the one thing about its contents readable while it is locked.
+   * Absent for a vault not opened here since the count was first kept.
+   */
+  itemCount?: number
 }
 
 // Which biometry this device gates with, straight from the OS (Apple reads

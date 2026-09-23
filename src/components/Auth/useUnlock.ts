@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next'
 import type { UnlockResult } from '@/api/types'
 import { unlock, unlockBiometric } from '@/api/auth'
 import { errorKind, isTooManyAttempts } from '@/api/errors'
-import { enterMain, useApp } from '@/store'
+import { enterMain, useApp, selectActiveWorkspace } from '@/store'
 import type { MascotState } from '@/components/elements/Mascot'
 import { unsealError } from '@/components/Start/shared/errors'
 import { untilFocused } from '@/utils/untilFocused'
@@ -58,6 +58,12 @@ export interface Unlock {
     success: boolean
     pending: boolean
     disabled: boolean
+    /**
+     * The workspace the passphrase is for. The card is keyed on it, so a
+     * switch hands the next vault an empty field rather than the passphrase
+     * already typed for the last one.
+     */
+    vault: string
   }
   submit: (value: string) => void
   biometric: () => void
@@ -81,6 +87,19 @@ export function useUnlock(): Unlock {
   // by the time this is set, so it must reach `enterMain` whatever happens to
   // this hook — see the unmount cleanup below.
   const pending = useRef<UnlockResult | null>(null)
+  const vault = useApp(selectActiveWorkspace)
+  const switching = useApp(state => state.switching)
+
+  // A new vault on screen starts from nothing typed and nothing wrong: what
+  // the mascot read along with, and the error, were about the last one. Reset
+  // in render rather than in an effect, so the frame the vault changes in
+  // already draws it clean.
+  const [shown, setShown] = useState(vault)
+  if (shown !== vault) {
+    setShown(vault)
+    setCount(0)
+    if (retryAfter <= 0) setError(null)
+  }
 
   // Countdown ticks once a second while locked out; re-enables the input at 0.
   useEffect(() => {
@@ -129,7 +148,9 @@ export function useUnlock(): Unlock {
   }
 
   const handleEnter = (value: string) => {
-    if (retryAfter > 0 || phase !== 'idle') return
+    // Mid-switch the backend is already pointed at a vault the screen does not
+    // show yet; the attempt would go there.
+    if (retryAfter > 0 || phase !== 'idle' || switching) return
     // Key derivation is deliberately slow; acknowledge the Enter immediately
     // (and drop any stale error — this attempt owns the eyebrow now).
     setError(null)
@@ -150,7 +171,7 @@ export function useUnlock(): Unlock {
   const handleTouchId = () => {
     // Biometric unlock is never subject to the password backoff (the OS gate
     // already rate-limits it), so it stays available even while locked out.
-    if (phase !== 'idle') return
+    if (phase !== 'idle' || switching) return
     setError(null)
     setPhase('verifying')
     unlockBiometric()
@@ -203,7 +224,8 @@ export function useUnlock(): Unlock {
       invalid: !!error,
       success: phase === 'success',
       pending: phase === 'verifying',
-      disabled: retryAfter > 0
+      disabled: retryAfter > 0,
+      vault
     },
     submit: handleEnter,
     biometric: handleTouchId,

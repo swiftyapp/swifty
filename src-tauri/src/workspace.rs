@@ -48,6 +48,17 @@ pub struct Workspace {
     /// secret: the same id is the pack's file name in the user's own Drive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vault_id: Option<String>,
+    /// How many live entries the vault held when it was last open here — the
+    /// lock screen's picker says it beside each workspace. `None` for a vault
+    /// not opened on this device since the count was first kept.
+    ///
+    /// Recorded outside the vault knowingly: it is the one thing about a
+    /// vault's contents this file says, readable without the password by
+    /// anyone with the disk. It never leaves the device — a Drive pack keeps
+    /// even the count sealed (see `sync::pack`). As of the last open or lock
+    /// here, so entries another device added show up after this one next syncs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_count: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -66,6 +77,7 @@ impl Default for Registry {
                 id: PRIMARY_ID.to_string(),
                 name: None,
                 vault_id: None,
+                item_count: None,
             }],
         }
     }
@@ -79,31 +91,40 @@ impl Registry {
     /// vault they already have: the default still names the primary, whose
     /// database is exactly where it has always been.
     pub fn load(root: &Path) -> Registry {
+        match Registry::read(root) {
+            Ok(Some(registry)) => registry,
+            Ok(None) => Registry::default(),
+            Err(e) => {
+                log::warn!("{e}; assuming one workspace");
+                Registry::default()
+            }
+        }
+    }
+
+    /// The registry as it is on disk, for a writer: `None` when there is no
+    /// file, and an error — never the default — when there is one that cannot
+    /// be read or parsed.
+    ///
+    /// [`Registry::load`]'s fallback is right for a reader and wrong for a
+    /// writer: a change saved over the default it stands in with replaces the
+    /// file with a one-workspace registry, and every other workspace drops off
+    /// the list for good. A file this cannot read is left as it is.
+    pub fn read(root: &Path) -> Result<Option<Registry>> {
         let path = root.join(REGISTRY_FILE);
         if !path.exists() {
-            return Registry::default();
+            return Ok(None);
         }
-
-        let parsed = std::fs::read_to_string(&path)
+        let mut registry = std::fs::read_to_string(&path)
             .map_err(|e| e.to_string())
-            .and_then(|json| serde_json::from_str::<Registry>(&json).map_err(|e| e.to_string()));
-        let mut registry = match parsed {
-            Ok(registry) => registry,
-            Err(e) => {
-                log::warn!(
-                    "cannot read {}: {e}; assuming one workspace",
-                    path.display()
-                );
-                return Registry::default();
-            }
-        };
+            .and_then(|json| serde_json::from_str::<Registry>(&json).map_err(|e| e.to_string()))
+            .map_err(|e| Error::Other(format!("cannot read {}: {e}", path.display())))?;
 
         // An `active` naming a workspace that is not in the list would resolve
         // to a directory nothing created. The primary always opens.
         if !registry.workspaces.iter().any(|w| w.id == registry.active) {
             registry.active = PRIMARY_ID.to_string();
         }
-        registry
+        Ok(Some(registry))
     }
 
     pub fn save(&self, root: &Path) -> Result<()> {
@@ -437,6 +458,59 @@ fn named(name: &str) -> impl FnOnce(&mut Workspace) -> bool + '_ {
     }
 }
 
+/// Remember how many live entries workspace `id`'s vault holds, for the lock
+/// screen to show while it is locked (see [`Workspace::item_count`]). Best
+/// effort — a count that cannot be saved is only a stale number on the lock
+/// screen — and a no-op when it has not changed.
+///
+/// By id rather than "the active one": a lock records the workspace it
+/// sealed, which a switch landing a moment later must not redirect.
+///
+/// Never the write that brings the registry into being: a single-workspace
+/// install has no file and no picker to show a count in, and keeps costing
+/// nothing on disk. Its count arrives with the next open or lock once a
+/// second workspace has made the file.
+///
+/// Takes `workspace_lock`, so never call it holding the session lock: every
+/// reader of the two takes the registry's first.
+pub fn record_item_count(app: &AppHandle, id: &str, count: u32) {
+    let state = app.state::<AppState>();
+    let recorded = storage::root_dir(app).and_then(|root| {
+        let _paths = state.workspace_lock.lock().unwrap();
+        count_in(&root, id, count)
+    });
+    if let Err(e) = recorded {
+        log::warn!("could not record workspace {id}'s item count: {e}");
+    }
+}
+
+// [`record_item_count`]'s write, under the caller's `workspace_lock`.
+fn count_in(root: &Path, id: &str, count: u32) -> Result<()> {
+    if Registry::read(root)?.is_none() {
+        return Ok(());
+    }
+    update_active_locked(root, id, counted(count))
+}
+
+/// [`record_item_count`] for a caller that already holds `workspace_lock` and
+/// the registry it is about to save (`workspace_select`, leaving one
+/// workspace for another).
+pub(crate) fn count_into(registry: &mut Registry, id: &str, count: u32) {
+    if let Some(workspace) = registry.workspaces.iter_mut().find(|w| w.id == id) {
+        counted(count)(workspace);
+    }
+}
+
+fn counted(count: u32) -> impl FnOnce(&mut Workspace) -> bool {
+    move |workspace| {
+        if workspace.item_count == Some(count) {
+            return false;
+        }
+        workspace.item_count = Some(count);
+        true
+    }
+}
+
 /// The active workspace's registry label, if it has one.
 pub fn active_name(app: &AppHandle) -> Option<String> {
     let root = storage::root_dir(app).ok()?;
@@ -469,7 +543,9 @@ fn update_active_locked(
     active: &str,
     change: impl FnOnce(&mut Workspace) -> bool,
 ) -> Result<()> {
-    let mut registry = Registry::load(root);
+    // Strict: a file that is there and unreadable is refused, not saved over
+    // (see `Registry::read`). No file is the single-workspace default.
+    let mut registry = Registry::read(root)?.unwrap_or_default();
     let Some(workspace) = registry.workspaces.iter_mut().find(|w| w.id == active) else {
         return Err(Error::NotFound);
     };
@@ -541,11 +617,13 @@ mod tests {
                     id: PRIMARY_ID.into(),
                     name: None,
                     vault_id: None,
+                    item_count: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
+                    item_count: None,
                 },
             ],
         };
@@ -569,6 +647,72 @@ mod tests {
         loaded.save(&root).unwrap();
         let json = fs::read_to_string(root.join(REGISTRY_FILE)).unwrap();
         assert!(!json.contains("vaultId"), "{json}");
+        assert!(!json.contains("itemCount"), "{json}");
+        assert_eq!(loaded.workspaces[0].item_count, None);
+    }
+
+    // A registry this cannot parse is refused, not replaced: saving the
+    // default over it would drop every other workspace from the list for good.
+    // The same guard covers the vault-id and name mirrors, which write through
+    // the same path.
+    #[test]
+    fn a_count_leaves_a_registry_it_cannot_read_as_it_is() {
+        let root = tmp_root();
+        let malformed = r#"{"active":"a1b2","workspaces":[{"id":"#;
+        fs::write(root.join(REGISTRY_FILE), malformed).unwrap();
+
+        assert!(count_in(&root, PRIMARY_ID, 12).is_err());
+        assert!(update_active_locked(&root, PRIMARY_ID, named("Home")).is_err());
+
+        assert_eq!(
+            fs::read_to_string(root.join(REGISTRY_FILE)).unwrap(),
+            malformed
+        );
+    }
+
+    // An install that never made a second workspace has no registry file, and
+    // an unlock recording its size must not be what creates one.
+    #[test]
+    fn an_item_count_never_creates_the_registry() {
+        let root = tmp_root();
+        count_in(&root, PRIMARY_ID, 12).unwrap();
+        assert!(!root.join(REGISTRY_FILE).exists());
+
+        Registry::default().save(&root).unwrap();
+        count_in(&root, PRIMARY_ID, 12).unwrap();
+        assert_eq!(Registry::load(&root).workspaces[0].item_count, Some(12));
+    }
+
+    // A count is recorded against the workspace named, whichever is active,
+    // and survives a save.
+    #[test]
+    fn an_item_count_is_kept_per_workspace() {
+        let root = tmp_root();
+        let mut registry = Registry {
+            active: "a1b2".into(),
+            workspaces: vec![
+                Workspace {
+                    id: PRIMARY_ID.into(),
+                    name: None,
+                    vault_id: None,
+                    item_count: None,
+                },
+                Workspace {
+                    id: "a1b2".into(),
+                    name: Some("Work".into()),
+                    vault_id: None,
+                    item_count: Some(3),
+                },
+            ],
+        };
+        count_into(&mut registry, PRIMARY_ID, 284);
+        registry.save(&root).unwrap();
+
+        let loaded = Registry::load(&root);
+        assert_eq!(loaded.workspaces[0].item_count, Some(284));
+        assert_eq!(loaded.workspaces[1].item_count, Some(3));
+        let json = fs::read_to_string(root.join(REGISTRY_FILE)).unwrap();
+        assert!(json.contains(r#""itemCount":284"#), "{json}");
     }
 
     // The question a restore asks: is this pack already a workspace here — any
@@ -582,11 +726,13 @@ mod tests {
                     id: PRIMARY_ID.into(),
                     name: None,
                     vault_id: Some("cafe".into()),
+                    item_count: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: None,
+                    item_count: None,
                 },
             ],
         };
@@ -610,6 +756,7 @@ mod tests {
                 id: PRIMARY_ID.into(),
                 name: None,
                 vault_id: None,
+                item_count: None,
             }],
         }
         .save(&root)
@@ -637,16 +784,19 @@ mod tests {
                     id: PRIMARY_ID.into(),
                     name: None,
                     vault_id: Some("beef".into()),
+                    item_count: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
+                    item_count: None,
                 },
                 Workspace {
                     id: "c3d4".into(),
                     name: Some("Side".into()),
                     vault_id: None,
+                    item_count: None,
                 },
             ],
         }
@@ -685,6 +835,7 @@ mod tests {
                 id: PRIMARY_ID.into(),
                 name: Some("Work".into()),
                 vault_id: Some("cafe".into()),
+                item_count: None,
             }
         );
         // The one that was not promoted is untouched, and still second.
@@ -785,11 +936,13 @@ mod tests {
                     id: PRIMARY_ID.into(),
                     name: None,
                     vault_id: None,
+                    item_count: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
+                    item_count: None,
                 },
             ],
         };

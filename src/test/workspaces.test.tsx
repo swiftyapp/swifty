@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import App from '@/App'
 import WorkspacePicker from '@/components/Auth/WorkspacePicker'
 import type { Workspace } from '@/api/types'
 import { useApp } from '@/store'
 import { appStatusDefault, calls, mockCommand } from './ipc'
-import { resetStores, seedApp } from './utils'
+import { deferred, resetStores, seedApp } from './utils'
+import { setLayout } from './layout'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -15,9 +17,13 @@ beforeEach(() => {
 const PRIMARY: Workspace = { id: 'default', name: null }
 const WORK: Workspace = { id: 'w2', name: 'Work' }
 
-// What the boot probe said about workspaces, as boot.ts would have stored it.
-const seed = (workspaces: Workspace[], activeWorkspace = 'default') =>
+// What the boot probe said about workspaces, as boot.ts would have stored it —
+// and what the probe every switch ends in says again, so the picker is still
+// there once it lands.
+const seed = (workspaces: Workspace[], activeWorkspace = 'default') => {
   seedApp({ workspaces, activeWorkspace })
+  mockCommand('app_status', () => ({ ...appStatusDefault(), workspaces, activeWorkspace }))
+}
 
 describe('WorkspacePicker', () => {
   it('draws nothing on a single-workspace install', () => {
@@ -69,6 +75,19 @@ describe('WorkspacePicker', () => {
     expect(screen.getByTestId('workspace-option-w2')).toHaveTextContent('Google Drive')
   })
 
+  // The size its last open here recorded, ahead of where it lives; a vault
+  // never opened on this device has no count to give.
+  it('says how many items each workspace held when last open', async () => {
+    seed([{ ...PRIMARY, itemCount: 284 }, { ...WORK, itemCount: 1 }, { id: 'w3', name: 'New' }])
+    render(<WorkspacePicker />)
+
+    await userEvent.click(screen.getByTestId('workspace-chip'))
+
+    expect(screen.getByTestId('workspace-option-default')).toHaveTextContent('284 items · This device')
+    expect(screen.getByTestId('workspace-option-w2')).toHaveTextContent('1 item · This device')
+    expect(screen.getByTestId('workspace-option-w3')).not.toHaveTextContent('item')
+  })
+
   it('closes the menu on Escape and hands focus back to the chip', async () => {
     seed([PRIMARY, WORK])
     render(<WorkspacePicker />)
@@ -82,20 +101,82 @@ describe('WorkspacePicker', () => {
     expect(screen.getByTestId('workspace-chip')).toHaveFocus()
   })
 
-  // Enrollment is per workspace. The lock screen draws the last known gate
-  // until the re-probe lands, so the one being left must not be offered for
-  // the one being entered.
-  it('forgets the biometric gate the moment a switch is asked for', async () => {
+  // Enrollment is per workspace, so the gate on screen mid-switch is the one
+  // being left. It stays drawn — taking it down and putting it back blinked
+  // the passphrase card — and the switch is flagged so the lock screen takes
+  // no attempt against it, until the probe brings the next one's answer.
+  it('keeps the gate on screen through a switch, flagged until the probe lands', async () => {
     seedApp({
       workspaces: [PRIMARY, WORK],
       activeWorkspace: 'default',
       biometric: { available: true, canEnroll: true, type: 'touch', mode: 'prompt' }
     })
+    const answer = deferred<null>()
+    mockCommand('workspace_select', () => answer.promise)
+    mockCommand('app_status', () => ({
+      ...appStatusDefault(),
+      workspaces: [PRIMARY, WORK],
+      activeWorkspace: 'w2'
+    }))
     render(<WorkspacePicker />)
 
     await userEvent.click(screen.getByTestId('workspace-chip'))
     await userEvent.click(screen.getByTestId('workspace-option-w2'))
 
+    expect(useApp.getState().switching).toBe(true)
+    expect(useApp.getState().status?.biometric.available).toBe(true)
+    // The chip still names the vault the gate belongs to.
+    expect(screen.getByTestId('workspace-chip')).toHaveAccessibleName('Personal')
+
+    answer.resolve(null)
+
+    await waitFor(() => expect(useApp.getState().switching).toBe(false))
+    expect(useApp.getState().status?.activeWorkspace).toBe('w2')
+    expect(screen.getByTestId('workspace-chip')).toHaveAccessibleName('Work')
+  })
+
+  // An unlock being verified or held on its success beat is opening *this*
+  // vault; a switch now would have it enter with the old rows afterwards.
+  it('opens nothing and takes no chord while an unlock is in flight', async () => {
+    seed([PRIMARY, WORK])
+    render(<WorkspacePicker busy />)
+
+    await userEvent.click(screen.getByTestId('workspace-chip'))
+    await userEvent.keyboard('{Meta>}2{/Meta}')
+
+    expect(screen.queryByTestId('workspace-option-w2')).not.toBeInTheDocument()
+    expect(calls('workspace_select')).toHaveLength(0)
+  })
+
+  // A second pick while the first is landing is dropped, not raced: its
+  // ending would clear the flag while the first was still in flight.
+  it('runs one switch at a time', async () => {
+    seed([PRIMARY, WORK, { id: 'w3', name: 'Third' }])
+    const answer = deferred<null>()
+    mockCommand('workspace_select', () => answer.promise)
+    render(<WorkspacePicker />)
+
+    await userEvent.keyboard('{Meta>}2{/Meta}')
+    await userEvent.keyboard('{Meta>}3{/Meta}')
+
+    expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
+    answer.resolve(null)
+    await waitFor(() => expect(useApp.getState().switching).toBe(false))
+  })
+
+  it('offers no gate when the probe after a switch cannot be had', async () => {
+    seedApp({
+      workspaces: [PRIMARY, WORK],
+      activeWorkspace: 'default',
+      biometric: { available: true, canEnroll: true, type: 'touch', mode: 'prompt' }
+    })
+    mockCommand('app_status', () => Promise.reject({ kind: 'other', message: 'down' }))
+    render(<WorkspacePicker />)
+
+    await userEvent.click(screen.getByTestId('workspace-chip'))
+    await userEvent.click(screen.getByTestId('workspace-option-w2'))
+
+    await waitFor(() => expect(useApp.getState().switching).toBe(false))
     expect(useApp.getState().status?.biometric.available).toBe(false)
   })
 
@@ -117,6 +198,119 @@ describe('WorkspacePicker', () => {
     await waitFor(() => expect(useApp.getState().status?.biometric.available).toBe(true))
   })
 
+  it('opens the menu on the workspace already open', async () => {
+    seed([PRIMARY, WORK], 'w2')
+    render(<WorkspacePicker />)
+
+    await userEvent.click(screen.getByTestId('workspace-chip'))
+
+    expect(screen.getByTestId('workspace-option-w2')).toHaveFocus()
+  })
+
+  // The chord a row prints is the chord that opens it, menu or no menu.
+  it('switches with ⌘ and the workspace’s place on the list', async () => {
+    seed([PRIMARY, WORK])
+    render(<WorkspacePicker />)
+
+    expect(screen.queryByTestId('workspace-option-w2')).not.toBeInTheDocument()
+    await userEvent.keyboard('{Meta>}2{/Meta}')
+
+    expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
+  })
+
+  it('prints each other workspace’s chord and checks the open one', async () => {
+    seed([PRIMARY, WORK])
+    render(<WorkspacePicker />)
+
+    await userEvent.click(screen.getByTestId('workspace-chip'))
+
+    expect(screen.getByTestId('workspace-option-w2')).toHaveTextContent('⌘2')
+    expect(screen.getByTestId('workspace-option-default')).not.toHaveTextContent('⌘1')
+  })
+
+  it('offers no search while the list is short', async () => {
+    seed([PRIMARY, WORK])
+    render(<WorkspacePicker />)
+
+    await userEvent.click(screen.getByTestId('workspace-chip'))
+
+    expect(screen.queryByTestId('workspace-search')).not.toBeInTheDocument()
+  })
+
+  describe('with enough workspaces to search', () => {
+    const MANY: Workspace[] = [
+      PRIMARY,
+      WORK,
+      { id: 'w3', name: 'Northwind' },
+      { id: 'w4', name: 'Family' },
+      { id: 'w5', name: 'Finance' },
+      { id: 'w6', name: 'Clients' }
+    ]
+
+    it('opens on the search field and filters the rows by name', async () => {
+      seed(MANY)
+      render(<WorkspacePicker />)
+
+      await userEvent.click(screen.getByTestId('workspace-chip'))
+      expect(screen.getByTestId('workspace-search')).toHaveFocus()
+
+      await userEvent.keyboard('in')
+
+      expect(screen.getAllByRole('option').map(row => row.dataset.testid)).toEqual([
+        'workspace-option-w3',
+        'workspace-option-w5'
+      ])
+    })
+
+    // The caret stays in the field: the arrows walk the rows, Enter picks.
+    it('picks the row the arrows land on with Enter', async () => {
+      seed(MANY)
+      render(<WorkspacePicker />)
+
+      await userEvent.click(screen.getByTestId('workspace-chip'))
+      await userEvent.keyboard('in{ArrowDown}{Enter}')
+
+      expect(calls('workspace_select')).toEqual([{ id: 'w5' }])
+      expect(screen.getByTestId('workspace-chip')).toHaveFocus()
+    })
+
+    // The caret never leaves the field, so the field is what says which row
+    // the arrows have lit — the one Enter would open.
+    it('names the lit row to assistive technology as the arrows move', async () => {
+      seed(MANY)
+      render(<WorkspacePicker />)
+
+      await userEvent.click(screen.getByTestId('workspace-chip'))
+      const search = screen.getByRole('combobox', { name: 'Find a vault' })
+      const lit = () => document.getElementById(search.getAttribute('aria-activedescendant') ?? '')
+
+      // A combobox's popup is a listbox, its rows options: the lit one is
+      // selected, the open vault checked.
+      expect(search).toHaveAttribute('aria-controls', screen.getByRole('listbox').id)
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+      expect(lit()).toBe(screen.getByRole('option', { name: /Personal/, selected: true }))
+      expect(lit()).toHaveAttribute('aria-checked', 'true')
+
+      await userEvent.keyboard('{ArrowDown}')
+      expect(lit()).toBe(screen.getByRole('option', { name: /Work/, selected: true }))
+      expect(screen.getByTestId('workspace-option-default')).toHaveAttribute('aria-selected', 'false')
+
+      await userEvent.keyboard('zzz')
+      expect(search).not.toHaveAttribute('aria-activedescendant')
+    })
+
+    it('says so when nothing matches', async () => {
+      seed(MANY)
+      render(<WorkspacePicker />)
+
+      await userEvent.click(screen.getByTestId('workspace-chip'))
+      await userEvent.keyboard('zzz')
+
+      expect(screen.queryAllByRole('option')).toHaveLength(0)
+      expect(screen.getByTestId('workspace-search-empty')).toHaveTextContent('zzz')
+    })
+  })
+
   it('does nothing when the workspace already open is picked', async () => {
     seed([PRIMARY, WORK])
     render(<WorkspacePicker />)
@@ -130,5 +324,50 @@ describe('WorkspacePicker', () => {
     // The row that was picked is gone with the menu; the keyboard is back on
     // the chip rather than dropped on the body.
     expect(screen.getByTestId('workspace-chip')).toHaveFocus()
+  })
+})
+
+// The phone's lock screen mounts the same picker, and through `App` so the
+// switch runs exactly as it does on a device.
+describe('WorkspacePicker on the phone lock screen', () => {
+  const GATE = { available: true, canEnroll: true, type: 'face', mode: 'prompt' } as const
+
+  beforeEach(() => setLayout('compact'))
+
+  it('lists each workspace with its size and where it lives', async () => {
+    seed([{ ...PRIMARY, itemCount: 284 }, { ...WORK, itemCount: 12 }])
+    render(<App />)
+
+    await userEvent.click(await screen.findByTestId('workspace-chip'))
+
+    expect(screen.getByTestId('workspace-option-default')).toHaveTextContent('284 items · This device')
+    expect(screen.getByTestId('workspace-option-w2')).toHaveTextContent('12 items · This device')
+  })
+
+  // The tile is the phone's whole lead: taking the gate down for the round
+  // trip swapped it for the passphrase card and back.
+  it('keeps the biometric tile on screen through a switch', async () => {
+    seedApp({ workspaces: [PRIMARY, WORK], activeWorkspace: 'default', biometric: GATE })
+    const answer = deferred<null>()
+    mockCommand('workspace_select', () => answer.promise)
+    mockCommand('app_status', () => ({
+      ...appStatusDefault(),
+      workspaces: [PRIMARY, WORK],
+      activeWorkspace: 'w2',
+      biometric: GATE
+    }))
+    render(<App />)
+
+    await userEvent.click(await screen.findByTestId('workspace-chip'))
+    await userEvent.click(screen.getByTestId('workspace-option-w2'))
+
+    expect(useApp.getState().switching).toBe(true)
+    expect(screen.getByTestId('biometric-tile')).toBeInTheDocument()
+    expect(screen.queryByTestId('unlock-password-input')).not.toBeInTheDocument()
+
+    answer.resolve(null)
+
+    await waitFor(() => expect(screen.getByTestId('workspace-chip')).toHaveAccessibleName('Work'))
+    expect(screen.getByTestId('biometric-tile')).toBeInTheDocument()
   })
 })

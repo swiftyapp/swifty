@@ -3,18 +3,42 @@ import { cx } from '@/utils/cx'
 
 interface DropdownProps {
   onBlur: () => void
+  /**
+   * The items' id, given when a search field in the header drives them. The
+   * body is then a `listbox` the field controls (a combobox's popup has to
+   * be one) and the items are its options, rather than a `menu` of items the
+   * arrows focus in turn.
+   */
+  listbox?: string
   // Placement against the nearest positioned ancestor (e.g. 'right-0 top-8').
   className?: string
+  /**
+   * Full-bleed above the items, outside their padding: a search field. A menu
+   * that has one opens on it rather than on an item.
+   */
+  header?: ReactNode
+  // The items' own scrolling body — a max height, for a list that can run long.
+  listClassName?: string
   children: ReactNode
 }
 
-export function Dropdown({ onBlur, className, children }: DropdownProps) {
+export function Dropdown({
+  onBlur,
+  listbox,
+  className,
+  header,
+  listClassName,
+  children
+}: DropdownProps) {
   const ref = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLElement | null>(null)
 
-  // Every kind of item: plain, and the radio kind a single-select menu uses.
+  // Every kind of item: plain, the radio kind a single-select menu uses, and
+  // the options of a listbox a search field drives.
   const items = () =>
-    Array.from(ref.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])
+    Array.from(
+      ref.current?.querySelectorAll<HTMLElement>('[role^="menuitem"], [role="option"]') ?? []
+    )
 
   // Roving focus: unlike a radio group the arrows only *move*, they never
   // activate, so the menu holds no selection of its own.
@@ -25,11 +49,17 @@ export function Dropdown({ onBlur, className, children }: DropdownProps) {
     all[(from + step + all.length) % all.length].focus()
   }
 
-  // The menu takes focus on open so the keyboard lands inside it, and hands
-  // focus back to whatever opened it on Escape.
+  // The menu takes focus on open so the keyboard lands inside it — on its
+  // search field if it has one, else on the item already chosen, else the
+  // first — and hands focus back to whatever opened it on Escape.
   useEffect(() => {
     trigger.current = document.activeElement as HTMLElement | null
-    items()[0]?.focus()
+    const all = items()
+    const start =
+      ref.current?.querySelector('input') ??
+      all.find(item => item.getAttribute('aria-checked') === 'true') ??
+      all[0]
+    start?.focus()
   }, [])
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -58,14 +88,21 @@ export function Dropdown({ onBlur, className, children }: DropdownProps) {
     <>
       <div
         ref={ref}
-        role="menu"
+        role={listbox ? undefined : 'menu'}
         onKeyDown={onKeyDown}
         className={cx(
-          'animate-pop absolute z-20 min-w-[180px] overflow-hidden rounded-xl border border-line2 bg-detail py-1 text-text shadow-float',
+          'animate-drop absolute z-20 flex min-w-[180px] origin-top flex-col overflow-hidden rounded-xl bg-menu text-text shadow-menu backdrop-blur-[20px]',
           className
         )}
       >
-        {children}
+        {header}
+        <div
+          id={listbox}
+          role={listbox && 'listbox'}
+          className={cx('flex flex-col gap-px overflow-y-auto p-1.5', listClassName)}
+        >
+          {children}
+        </div>
       </div>
       <div
         data-testid="dropdown-scrim"
@@ -77,50 +114,90 @@ export function Dropdown({ onBlur, className, children }: DropdownProps) {
 }
 
 interface ItemProps {
+  // Stable, for a field that names the lit item by `aria-activedescendant`.
+  id?: string
+  /**
+   * An option of the listbox a search field drives (see `Dropdown.listbox`):
+   * `aria-selected` says which one the field has lit — `active` — and a
+   * `checked` item says it is the chosen one by `aria-checked`.
+   */
+  option?: boolean
+  // A rule across the whole menu above this item, setting it apart.
   separated?: boolean
   // Destructive entry (delete, disconnect, ...): inked in the `bad` token.
   danger?: boolean
   testid?: string
   onClick?: () => void
   // Spacing overrides for a row that is not a plain label (a tile with two
-  // lines of text wants less vertical padding than the 40px default).
+  // lines of text is taller than the 34px default).
   className?: string
   /**
    * Set on every item of a menu that picks one of several (a sort order, a
    * vault): the item becomes a `menuitemradio` and says whether it is the one,
    * so the selection a check glyph shows is also told to assistive technology.
+   * Its highlight is the selection tint rather than the neutral hover.
    * Left undefined, the item is a plain action.
    */
   checked?: boolean
+  /**
+   * Given, the caller owns the highlight and the pointer and focus stop
+   * drawing it: a menu whose keyboard stays in a search field moves it by
+   * index, and one highlight has to follow both hands (see WorkspacePicker).
+   */
+  active?: boolean
+  onMouseEnter?: () => void
+  onFocus?: () => void
   children: ReactNode
 }
 
 export function DropdownItem({
+  id,
+  option,
   separated,
   danger,
   testid,
   onClick,
   className,
   checked,
+  active,
+  onMouseEnter,
+  onFocus,
   children
 }: ItemProps) {
+  const radio = checked !== undefined
+  // Keyboard focus borrows the hover treatment instead of the global outline,
+  // which would ring a rounded row inset in a rounded panel. The row's corner
+  // (`rounded-sm`, 8px) is the panel's 14px less its 6px padding, so the
+  // highlight sits concentric in it.
+  const highlight =
+    active !== undefined
+      ? active && (radio ? 'bg-sel' : 'bg-hover')
+      : radio
+        ? 'hover:bg-sel focus-visible:bg-sel'
+        : 'hover:bg-hover focus-visible:bg-hover'
+
   return (
-    <button
-      type="button"
-      role={checked === undefined ? 'menuitem' : 'menuitemradio'}
-      aria-checked={checked}
-      data-testid={testid}
-      onClick={onClick}
-      className={cx(
-        // The panel clips the global focus outline, so keyboard focus borrows
-        // the hover treatment instead of inventing a ring of its own.
-        'flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-left text-base transition-colors hover:bg-hover focus-visible:bg-hover',
-        danger ? 'text-bad' : 'text-text2 hover:text-text focus-visible:text-text',
-        separated && 'mt-1 border-t border-line pt-2.5',
-        className
-      )}
-    >
-      {children}
-    </button>
+    <>
+      {separated && <div role="separator" className="-mx-1.5 my-[5px] h-px flex-none bg-line" />}
+      <button
+        type="button"
+        id={id}
+        role={option ? 'option' : radio ? 'menuitemradio' : 'menuitem'}
+        aria-selected={option ? !!active : undefined}
+        aria-checked={checked}
+        data-testid={testid}
+        onClick={onClick}
+        onMouseEnter={onMouseEnter}
+        onFocus={onFocus}
+        className={cx(
+          'flex min-h-[34px] w-full flex-none cursor-pointer items-center gap-2.75 rounded-sm px-2 py-1.5 text-left text-base focus-visible:outline-none',
+          danger ? 'text-bad' : 'text-text2',
+          highlight,
+          className
+        )}
+      >
+        {children}
+      </button>
+    </>
   )
 }

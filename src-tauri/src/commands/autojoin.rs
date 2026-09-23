@@ -268,6 +268,7 @@ fn join_one(
         id: id.clone(),
         name: Some(name.clone()),
         vault_id: Some(vault_id.clone()),
+        item_count: None,
     };
     if let Err(e) = account.commit(state, root, &vault_id, workspace) {
         discard(root, &id);
@@ -419,11 +420,13 @@ mod tests {
                     id: PRIMARY_ID.into(),
                     name: None,
                     vault_id: None,
+                    item_count: None,
                 },
                 Workspace {
                     id: "b2c3".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
+                    item_count: None,
                 },
             ],
         };

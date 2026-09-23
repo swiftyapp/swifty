@@ -41,6 +41,18 @@
     transform: none;
   }
 }
+/* A menu hanging off its trigger: drops in from just above, growing from its
+ * top edge (Rowel lock prototype's `rw-pop`). */
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 @keyframes sheet {
   from {
     opacity: 0;
@@ -352,8 +364,10 @@
   --color-scrim: var(--scrim);
   --color-chrome: var(--chrome);
   --color-glass: var(--glass);
+  --color-menu: var(--menu);
   --background-image-card: var(--card);
   --shadow-float: var(--shadow);
+  --shadow-menu: var(--menu-shadow);
   --shadow-lockfield: var(--lockfield-shadow);
   --shadow-lockfield-deep: var(--lockfield-shadow-deep);
   /* The 1px rule under a list row, drawn as a shadow so it costs no layout. */
@@ -404,7 +418,8 @@
  *             should be seen moving (the lock field, a progress bar) —
  *             one easing (ease-swift) — plus ease-spring, which overshoots,
  *             for the one thing that slides to a new place (the tab bar's
- *             lens) — four shapes (fade/pop/sheet/rise)
+ *             lens) — five shapes (fade/pop/drop/sheet/rise); drop, a
+ *             menu's, runs 180ms as its prototype does
  */
 @theme {
   --text-*: initial;
@@ -450,6 +465,7 @@
 
   --animate-fade: fade 160ms var(--ease-swift) both;
   --animate-pop: pop 160ms var(--ease-swift) both;
+  --animate-drop: drop 180ms var(--ease-swift) both;
   --animate-sheet: sheet 160ms var(--ease-swift) both;
   --animate-step-forward: step-forward 240ms var(--ease-swift) both;
   --animate-step-back: step-back 240ms var(--ease-swift) both;
@@ -516,6 +532,31 @@
 }
 
 /*
+ * An identity tile set flat, like a label chip rather than a key: a pale tint
+ * of the tile's `--hue`, edged by a 1px hairline of the same hue (what keeps
+ * it from reading as a bare swatch), and the letter in the hue's deep ink.
+ *
+ * The tint drifts corner to corner into a neighbouring hue at the same
+ * lightness. A light-to-dark fall from the top is what reads as a lit, raised
+ * button; a diagonal shift of hue reads as colour in the surface. No gloss or
+ * shadow either, so nothing about it says press me. See elements/Monogram.
+ */
+@utility monogram {
+  color: oklch(var(--monogram-ink-l) var(--monogram-ink-c) var(--hue));
+  background: linear-gradient(
+    135deg,
+    oklch(var(--monogram-l) var(--monogram-c) var(--hue)),
+    oklch(
+      calc(var(--monogram-l) - var(--monogram-drift-l))
+        calc(var(--monogram-c) + 0.015)
+        calc(var(--hue) + var(--monogram-drift-h))
+    )
+  );
+  box-shadow: inset 0 0 0 1px
+    oklch(var(--monogram-edge-l) var(--monogram-edge-c) var(--hue) / var(--monogram-edge-a));
+}
+
+/*
  * Busy text: the muted ink with a brighter band sweeping through the glyphs.
  * Gradient is clipped to the text, so it re-themes via the ink tokens.
  */
@@ -577,16 +618,20 @@
   --c-brand-eye: #ffffff;
 
   /*
-   * The monogram tiles (see elements/Monogram): a per-thing hue on a wash.
-   * Lightness and chroma are the theme's — a soft tint with a deep ink here,
-   * the pair inverted on the dark palette — and the hue is the instance's own,
-   * composed at the element (`oklch(var(--monogram-l) var(--monogram-c) <hue>)`)
-   * because a var() inside a custom property resolves where it is declared.
+   * The monogram chip (see the `monogram` utility): its tint, its letter's
+   * ink and its hairline edge. The hue is the instance's own (`--hue`, set on
+   * the element).
    */
-  --monogram-l: 0.92;
-  --monogram-c: 0.05;
-  --monogram-ink-l: 0.42;
-  --monogram-ink-c: 0.11;
+  --monogram-l: 0.94;
+  --monogram-c: 0.04;
+  --monogram-ink-l: 0.44;
+  --monogram-ink-c: 0.12;
+  --monogram-edge-l: 0.6;
+  --monogram-edge-c: 0.1;
+  --monogram-edge-a: 0.3;
+  /* How far the tint drifts across the tile: in hue, and barely in lightness. */
+  --monogram-drift-h: 28;
+  --monogram-drift-l: 0.015;
 
   /* Kind identity: coral logins, indigo cards, amber notes, teal identities,
    * violet SSH keys, leaf-green env files (yellow-leaning, so it never reads
@@ -614,6 +659,13 @@
   --glass: rgba(255, 255, 255, 0.8);
   --topglow: rgba(255, 255, 255, 0.7);
   --shadow: 0 24px 60px rgba(24, 26, 30, 0.16), 0 1px 3px rgba(24, 26, 30, 0.1);
+  /* A dropdown menu (see elements/Dropdown): a near-opaque sheet over a
+   * backdrop blur, edged by a half-pixel hairline in the shadow rather than a
+   * border, and lifted less than a dialog — it hangs off a control. */
+  --menu: rgba(255, 255, 255, 0.96);
+  --menu-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 12px 40px rgba(20, 22, 30, 0.16),
+    0 2px 6px rgba(20, 22, 30, 0.06);
   --scrim: rgba(40, 43, 48, 0.3);
   --thumb: rgba(20, 22, 26, 0.22);
   /*
@@ -692,10 +744,16 @@
   --c-brand: #d6d8dc;
   --c-brand-eye: #15161a;
 
-  --monogram-l: 0.31;
+  /* The pair inverted: a deep tint with a light ink, edged a touch brighter. */
+  --monogram-l: 0.3;
   --monogram-c: 0.05;
-  --monogram-ink-l: 0.87;
-  --monogram-ink-c: 0.08;
+  --monogram-ink-l: 0.86;
+  --monogram-ink-c: 0.09;
+  --monogram-edge-l: 0.7;
+  --monogram-edge-c: 0.09;
+  --monogram-edge-a: 0.22;
+  --monogram-drift-h: 28;
+  --monogram-drift-l: -0.02;
 
   /* Each solid lifts a step on the dark ground; the washes carry more alpha. */
   --c-kind-login: #e4685d;
@@ -722,6 +780,10 @@
   --glass: rgba(40, 42, 46, 0.72);
   --topglow: rgba(255, 255, 255, 0.06);
   --shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  --menu: rgba(27, 28, 30, 0.96);
+  --menu-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.12), 0 12px 40px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.3);
   --scrim: rgba(8, 9, 10, 0.7);
   --thumb: rgba(255, 255, 255, 0.14);
   --lockfield-shadow:

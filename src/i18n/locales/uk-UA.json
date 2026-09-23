@@ -590,5 +590,11 @@
   "This file is too large": "Цей файл завеликий",
   "This file is not text": "Цей файл не текстовий",
   "The vault changed while this was running. Try again.": "Сховище змінилося під час операції. Спробуйте ще раз.",
-  "Backups restore a fresh install and are not imported into an existing vault.": "Резервна копія відновлює чисту інсталяцію й не імпортується в наявне сховище."
+  "Backups restore a fresh install and are not imported into an existing vault.": "Резервна копія відновлює чисту інсталяцію й не імпортується в наявне сховище.",
+  "Find a vault": "Знайти сховище",
+  "No vault matches “{{query}}”": "Немає сховищ за запитом «{{query}}»",
+  "{{count}} items_one": "{{count}} запис",
+  "{{count}} items_few": "{{count}} записи",
+  "{{count}} items_many": "{{count}} записів",
+  "{{count}} items_other": "{{count}} запису"
 }

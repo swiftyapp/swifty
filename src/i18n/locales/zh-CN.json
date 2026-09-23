@@ -566,5 +566,8 @@
   "This file is too large": "该文件过大",
   "This file is not text": "该文件不是文本文件",
   "The vault changed while this was running. Try again.": "操作期间保险库已更改。请重试。",
-  "Backups restore a fresh install and are not imported into an existing vault.": "备份用于恢复全新安装，不会导入到现有保险库。"
+  "Backups restore a fresh install and are not imported into an existing vault.": "备份用于恢复全新安装，不会导入到现有保险库。",
+  "Find a vault": "查找保险库",
+  "No vault matches “{{query}}”": "没有与“{{query}}”匹配的保险库",
+  "{{count}} items_other": "{{count}} 个条目"
 }

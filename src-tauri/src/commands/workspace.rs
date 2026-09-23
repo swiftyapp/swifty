@@ -86,6 +86,22 @@ pub async fn workspace_select(
         // install is the only case there is — so selecting the primary never
         // conjures a registry file for a user who has no second vault.
         if registry.active != id {
+            // The workspace being left keeps its size on the lock screen, as a
+            // lock would have recorded it: this switch clears the session
+            // itself rather than going through one. Saved with the choice, in
+            // the one write. Nothing to count from the lock screen, where the
+            // lock already did.
+            let leaving = state
+                .session
+                .lock()
+                .unwrap()
+                .store()
+                .ok()
+                .map(|s| s.count_live());
+            if let Some(Ok(count)) = leaving {
+                let left = registry.active.clone();
+                workspace::count_into(&mut registry, &left, count);
+            }
             registry.active = id.clone();
             registry.save(&root)?;
         }
@@ -324,6 +340,7 @@ pub async fn workspace_create(
             // what turns a restore of that pack away. A local vault has no id
             // and no pack, so there is nothing to record.
             vault_id: vault_id.clone(),
+            item_count: None,
         });
         registry.active = id.clone();
         Ok(())
@@ -655,6 +672,7 @@ async fn restore_workspace(
             // turns away a second restore of the same pack is made with the
             // first, not left to the sync that follows.
             vault_id: Some(vault_id.clone()),
+            item_count: None,
         });
         registry.active = id.clone();
         Ok(())
@@ -1262,11 +1280,13 @@ mod tests {
                     id: PRIMARY_ID.into(),
                     name: None,
                     vault_id: None,
+                    item_count: None,
                 },
                 Workspace {
                     id: "b2c3".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
+                    item_count: None,
                 },
             ],
         }

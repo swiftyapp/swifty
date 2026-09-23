@@ -84,14 +84,19 @@ interface IconProps {
   // Solid rather than outline, for the glyphs that carry an on/off state (the
   // favorite star). Outline is lucide's default, so this is opt-in everywhere.
   filled?: boolean
+  // A stroke in screen pixels whatever the size, for a glyph drawn off the
+  // three sizes that has to hold a prototype's hairline (the lock chip's 10px
+  // chevron at 1.5px). Left out, the stroke scales with the glyph.
+  stroke?: number
 }
 
 const glyph =
   (Icon: LucideIcon, defaultSize: 14 | 16 | 20) =>
-  ({ size = defaultSize, className, filled }: IconProps) => (
+  ({ size = defaultSize, className, filled, stroke }: IconProps) => (
     <Icon
       size={size}
-      strokeWidth={1.75}
+      strokeWidth={stroke ?? 1.75}
+      absoluteStrokeWidth={stroke !== undefined}
       className={className}
       fill={filled ? 'currentColor' : 'none'}
     />

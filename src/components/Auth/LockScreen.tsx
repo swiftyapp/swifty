@@ -38,7 +38,7 @@ export default function LockScreen({ biometric, biometry = 'touch' }: Props) {
   return (
     <AuthShell footer>
       <Brand state={mascot.state} gaze={mascot.gaze} />
-      <WorkspacePicker />
+      <WorkspacePicker busy={field.pending || field.success} />
       <Eyebrow tone={eyebrow.tone} busy={eyebrow.busy} testid={eyebrow.testid}>
         {eyebrow.text}
       </Eyebrow>
@@ -48,6 +48,7 @@ export default function LockScreen({ biometric, biometry = 'touch' }: Props) {
           {/* The card keeps its own biometric segment, so revealing the
               passphrase never takes the faster way out away. */}
           <Masterpass
+            key={field.vault}
             biometric={biometric}
             biometry={biometry}
             testid="unlock-password-input"
