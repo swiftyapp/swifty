@@ -81,6 +81,9 @@ interface ItemProps {
   danger?: boolean
   testid?: string
   onClick?: () => void
+  // Spacing overrides for a row that is not a plain label (a tile with two
+  // lines of text wants less vertical padding than the 40px default).
+  className?: string
   children: ReactNode
 }
 
@@ -89,6 +92,7 @@ export function DropdownItem({
   danger,
   testid,
   onClick,
+  className,
   children
 }: ItemProps) {
   return (
@@ -102,7 +106,8 @@ export function DropdownItem({
         // the hover treatment instead of inventing a ring of its own.
         'flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-left text-base transition-colors hover:bg-hover focus-visible:bg-hover',
         danger ? 'text-bad' : 'text-text2 hover:text-text focus-visible:text-text',
-        separated && 'mt-1 border-t border-line pt-2.5'
+        separated && 'mt-1 border-t border-line pt-2.5',
+        className
       )}
     >
       {children}

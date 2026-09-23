@@ -27,18 +27,50 @@ describe('WorkspacePicker', () => {
     expect(screen.queryByTestId('workspace-picker')).not.toBeInTheDocument()
   })
 
-  it('lists every workspace once there are two and switches to the one picked', async () => {
+  // Only the vault about to open is on the screen; the rest wait in the menu.
+  it('wears the open workspace as a chip and lists every one in its menu', async () => {
     seed([PRIMARY, WORK])
     render(<WorkspacePicker />)
 
     expect(screen.getByTestId('workspace-picker')).toBeInTheDocument()
     // The primary has no name of its own until it is given one.
+    expect(screen.getByTestId('workspace-chip')).toHaveTextContent('Personal')
+    expect(screen.queryByTestId('workspace-option-w2')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('workspace-chip'))
+
     expect(screen.getByTestId('workspace-option-default')).toHaveTextContent('Personal')
     expect(screen.getByTestId('workspace-option-w2')).toHaveTextContent('Work')
 
     await userEvent.click(screen.getByTestId('workspace-option-w2'))
 
     expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
+    expect(screen.queryByTestId('workspace-option-w2')).not.toBeInTheDocument()
+  })
+
+  // Where each vault lives is read off what is knowable while it is locked:
+  // the open one's live connection, any other's the vault id a sync recorded.
+  it('says where each workspace lives', async () => {
+    seed([PRIMARY, { ...WORK, vaultId: 'v-work' }])
+    render(<WorkspacePicker />)
+
+    await userEvent.click(screen.getByTestId('workspace-chip'))
+
+    expect(screen.getByTestId('workspace-option-default')).toHaveTextContent('This device')
+    expect(screen.getByTestId('workspace-option-w2')).toHaveTextContent('Google Drive')
+  })
+
+  it('closes the menu on Escape and hands focus back to the chip', async () => {
+    seed([PRIMARY, WORK])
+    render(<WorkspacePicker />)
+
+    await userEvent.click(screen.getByTestId('workspace-chip'))
+    expect(screen.getByTestId('workspace-chip')).toHaveAttribute('aria-expanded', 'true')
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.queryByTestId('workspace-option-w2')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-chip')).toHaveFocus()
   })
 
   // Enrollment is per workspace. The lock screen draws the last known gate
@@ -52,6 +84,7 @@ describe('WorkspacePicker', () => {
     })
     render(<WorkspacePicker />)
 
+    await userEvent.click(screen.getByTestId('workspace-chip'))
     await userEvent.click(screen.getByTestId('workspace-option-w2'))
 
     expect(useApp.getState().status?.biometric.available).toBe(false)
@@ -69,6 +102,7 @@ describe('WorkspacePicker', () => {
     mockCommand('workspace_select', () => Promise.reject({ kind: 'other', message: 'busy' }))
     render(<WorkspacePicker />)
 
+    await userEvent.click(screen.getByTestId('workspace-chip'))
     await userEvent.click(screen.getByTestId('workspace-option-w2'))
 
     await waitFor(() => expect(useApp.getState().status?.biometric.available).toBe(true))
@@ -79,8 +113,10 @@ describe('WorkspacePicker', () => {
     render(<WorkspacePicker />)
 
     // Switching to it would lock and re-open the very screen it is on.
+    await userEvent.click(screen.getByTestId('workspace-chip'))
     await userEvent.click(screen.getByTestId('workspace-option-default'))
 
     expect(calls('workspace_select')).toHaveLength(0)
+    expect(screen.queryByTestId('workspace-option-default')).not.toBeInTheDocument()
   })
 })
