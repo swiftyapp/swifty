@@ -1248,12 +1248,18 @@ fn merge_tie_prefers_the_row_whose_derived_columns_are_stamped() {
         .find(|(u, b)| record_hash(u) > record_hash(b))
         .unwrap();
 
-    let a = seeded(&[backfilled.clone()]);
-    assert_eq!(a.merge_records(&[unstamped.clone()]).unwrap(), 0);
+    let a = seeded(std::slice::from_ref(&backfilled));
+    assert_eq!(
+        a.merge_records(std::slice::from_ref(&unstamped)).unwrap(),
+        0
+    );
     assert_eq!(row(&a, "1").username.as_deref(), Some("alice"));
 
-    let b = seeded(&[unstamped]);
-    assert_eq!(b.merge_records(&[backfilled]).unwrap(), 1);
+    let b = seeded(std::slice::from_ref(&unstamped));
+    assert_eq!(
+        b.merge_records(std::slice::from_ref(&backfilled)).unwrap(),
+        1
+    );
     assert_eq!(row(&b, "1").username.as_deref(), Some("alice"));
 }
 
