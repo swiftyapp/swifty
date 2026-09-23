@@ -79,6 +79,18 @@ pub fn record_hash(r: &Record) -> [u8; 32] {
     h.finalize().into()
 }
 
+/// How many of a record's derived columns have been stamped. The merge prefers
+/// the higher rank on a timestamp tie, so a row backfilled on one device is not
+/// undone by a peer's copy of the same row that predates the column — the two
+/// have equal `updated_at` (backfills do not stamp it), and the hash tie-break
+/// alone can pick the NULL side, permanently.
+pub fn derived_rank(r: &Record) -> u8 {
+    r.card_brand.is_some() as u8
+        + r.has_passkey as u8
+        + r.var_count.is_some() as u8
+        + r.username.is_some() as u8
+}
+
 /// SHA-256 over an entire entry set — tombstones included — as
 /// (length-prefixed id, [`record_hash`]) pairs in ascending id byte order.
 ///

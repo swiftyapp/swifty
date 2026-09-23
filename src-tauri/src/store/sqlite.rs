@@ -9,7 +9,7 @@ use rusqlite::{params, Connection, OptionalExtension, Row, Statement};
 use rusqlite_migration::{Migrations, M};
 use zeroize::Zeroizing;
 
-use super::hash::{record_hash, state_digest};
+use super::hash::{derived_rank, record_hash, state_digest};
 use super::{now_ms, EntryMeta, Record, Result, StoreError, VaultStore};
 
 // Ordered schema migrations, versioned via SQLite's `user_version` pragma. This
@@ -274,8 +274,10 @@ impl SqliteStore {
     /// transaction. Returns how many rows were written.
     ///
     /// A record wins when its `updated_at` is strictly newer, or — on an exact
-    /// timestamp tie — when its [`record_hash`] sorts higher bytewise. That
-    /// tie-break is the whole reason this is not a plain "newer or keep local":
+    /// timestamp tie — when more of its derived columns are stamped (see
+    /// [`derived_rank`]), or failing that when its [`record_hash`] sorts higher
+    /// bytewise. That tie-break is the whole reason this is not a plain "newer
+    /// or keep local":
     /// "keep local" is not commutative, so on a tie two devices each keep their
     /// own row, every sync sees a difference, and they ping-pong pushes forever
     /// without ever converging. Ordering by content hash makes the merge a true
@@ -318,11 +320,7 @@ impl SqliteStore {
                     // a purge cannot be undone, and it always propagates.
                     Some(local) if is_purged(local) => false,
                     Some(_) if is_purged(incoming) => true,
-                    Some(local) => {
-                        incoming.updated_at > local.updated_at
-                            || (incoming.updated_at == local.updated_at
-                                && record_hash(incoming) > record_hash(local))
-                    }
+                    Some(local) => rank(incoming) > rank(local),
                 };
 
                 if wins {
@@ -700,6 +698,11 @@ fn verbatim_upsert() -> String {
            file_name=excluded.file_name, var_count=excluded.var_count,
            username=excluded.username"
     )
+}
+
+// The total order the merge picks winners by; see `merge_records`.
+fn rank(r: &Record) -> (i64, u8, [u8; 32]) {
+    (r.updated_at, derived_rank(r), record_hash(r))
 }
 
 // A row [`VaultStore::purge`] has emptied. An ordinary tombstone keeps its

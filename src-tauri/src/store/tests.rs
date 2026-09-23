@@ -1230,6 +1230,33 @@ fn merge_tie_picks_the_same_winner_on_both_sides() {
     assert!(payload == b"aaa" || payload == b"bbb");
 }
 
+// A backfill stamps a derived column without moving `updated_at`, so the
+// stamped row and a peer's pre-column copy tie on time. The stamped side must
+// win — in both directions — or the hash can pick the NULL side every time.
+#[test]
+fn merge_tie_prefers_the_row_whose_derived_columns_are_stamped() {
+    // A payload whose NULL copy beats the stamped one on hash alone.
+    let (unstamped, backfilled) = (0u8..)
+        .map(|n| {
+            let unstamped = stamped("1", &[n], 5000);
+            let backfilled = Record {
+                username: Some("alice".into()),
+                ..unstamped.clone()
+            };
+            (unstamped, backfilled)
+        })
+        .find(|(u, b)| record_hash(u) > record_hash(b))
+        .unwrap();
+
+    let a = seeded(&[backfilled.clone()]);
+    assert_eq!(a.merge_records(&[unstamped.clone()]).unwrap(), 0);
+    assert_eq!(row(&a, "1").username.as_deref(), Some("alice"));
+
+    let b = seeded(&[unstamped]);
+    assert_eq!(b.merge_records(&[backfilled]).unwrap(), 1);
+    assert_eq!(row(&b, "1").username.as_deref(), Some("alice"));
+}
+
 #[test]
 fn merge_is_idempotent() {
     let source = seeded(&[stamped("1", b"x", 1000), stamped("2", b"y", 2000)]);
