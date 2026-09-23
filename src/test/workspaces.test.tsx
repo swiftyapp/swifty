@@ -256,7 +256,7 @@ describe('WorkspacePicker', () => {
 
       await userEvent.keyboard('in')
 
-      expect(screen.getAllByRole('menuitemradio').map(row => row.dataset.testid)).toEqual([
+      expect(screen.getAllByRole('option').map(row => row.dataset.testid)).toEqual([
         'workspace-option-w3',
         'workspace-option-w5'
       ])
@@ -284,11 +284,16 @@ describe('WorkspacePicker', () => {
       const search = screen.getByRole('combobox', { name: 'Find a vault' })
       const lit = () => document.getElementById(search.getAttribute('aria-activedescendant') ?? '')
 
-      expect(search).toHaveAttribute('aria-controls', screen.getByRole('menu').id)
-      expect(lit()).toBe(screen.getByTestId('workspace-option-default'))
+      // A combobox's popup is a listbox, its rows options: the lit one is
+      // selected, the open vault checked.
+      expect(search).toHaveAttribute('aria-controls', screen.getByRole('listbox').id)
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+      expect(lit()).toBe(screen.getByRole('option', { name: /Personal/, selected: true }))
+      expect(lit()).toHaveAttribute('aria-checked', 'true')
 
       await userEvent.keyboard('{ArrowDown}')
-      expect(lit()).toBe(screen.getByTestId('workspace-option-w2'))
+      expect(lit()).toBe(screen.getByRole('option', { name: /Work/, selected: true }))
+      expect(screen.getByTestId('workspace-option-default')).toHaveAttribute('aria-selected', 'false')
 
       await userEvent.keyboard('zzz')
       expect(search).not.toHaveAttribute('aria-activedescendant')
@@ -301,7 +306,7 @@ describe('WorkspacePicker', () => {
       await userEvent.click(screen.getByTestId('workspace-chip'))
       await userEvent.keyboard('zzz')
 
-      expect(screen.queryAllByRole('menuitemradio')).toHaveLength(0)
+      expect(screen.queryAllByRole('option')).toHaveLength(0)
       expect(screen.getByTestId('workspace-search-empty')).toHaveTextContent('zzz')
     })
   })

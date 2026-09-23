@@ -3,9 +3,13 @@ import { cx } from '@/utils/cx'
 
 interface DropdownProps {
   onBlur: () => void
-  // For a control outside the items that points into them (a search field's
-  // `aria-controls`).
-  id?: string
+  /**
+   * The items' id, given when a search field in the header drives them. The
+   * body is then a `listbox` the field controls (a combobox's popup has to
+   * be one) and the items are its options, rather than a `menu` of items the
+   * arrows focus in turn.
+   */
+  listbox?: string
   // Placement against the nearest positioned ancestor (e.g. 'right-0 top-8').
   className?: string
   /**
@@ -20,7 +24,7 @@ interface DropdownProps {
 
 export function Dropdown({
   onBlur,
-  id,
+  listbox,
   className,
   header,
   listClassName,
@@ -29,9 +33,12 @@ export function Dropdown({
   const ref = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLElement | null>(null)
 
-  // Every kind of item: plain, and the radio kind a single-select menu uses.
+  // Every kind of item: plain, the radio kind a single-select menu uses, and
+  // the options of a listbox a search field drives.
   const items = () =>
-    Array.from(ref.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [])
+    Array.from(
+      ref.current?.querySelectorAll<HTMLElement>('[role^="menuitem"], [role="option"]') ?? []
+    )
 
   // Roving focus: unlike a radio group the arrows only *move*, they never
   // activate, so the menu holds no selection of its own.
@@ -81,8 +88,7 @@ export function Dropdown({
     <>
       <div
         ref={ref}
-        id={id}
-        role="menu"
+        role={listbox ? undefined : 'menu'}
         onKeyDown={onKeyDown}
         className={cx(
           'animate-drop absolute z-20 flex min-w-[180px] origin-top flex-col overflow-hidden rounded-xl bg-menu text-text shadow-menu backdrop-blur-[20px]',
@@ -90,7 +96,11 @@ export function Dropdown({
         )}
       >
         {header}
-        <div className={cx('flex flex-col gap-px overflow-y-auto p-1.5', listClassName)}>
+        <div
+          id={listbox}
+          role={listbox && 'listbox'}
+          className={cx('flex flex-col gap-px overflow-y-auto p-1.5', listClassName)}
+        >
           {children}
         </div>
       </div>
@@ -106,6 +116,12 @@ export function Dropdown({
 interface ItemProps {
   // Stable, for a field that names the lit item by `aria-activedescendant`.
   id?: string
+  /**
+   * An option of the listbox a search field drives (see `Dropdown.listbox`):
+   * `aria-selected` says which one the field has lit — `active` — and a
+   * `checked` item says it is the chosen one by `aria-checked`.
+   */
+  option?: boolean
   // A rule across the whole menu above this item, setting it apart.
   separated?: boolean
   // Destructive entry (delete, disconnect, ...): inked in the `bad` token.
@@ -136,6 +152,7 @@ interface ItemProps {
 
 export function DropdownItem({
   id,
+  option,
   separated,
   danger,
   testid,
@@ -165,7 +182,8 @@ export function DropdownItem({
       <button
         type="button"
         id={id}
-        role={radio ? 'menuitemradio' : 'menuitem'}
+        role={option ? 'option' : radio ? 'menuitemradio' : 'menuitem'}
+        aria-selected={option ? !!active : undefined}
         aria-checked={checked}
         data-testid={testid}
         onClick={onClick}

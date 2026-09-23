@@ -8,6 +8,8 @@ interface Props {
   // The row's element id, which the search field's `aria-activedescendant`
   // names while this row is the lit one.
   domId: string
+  // An option of the search field's listbox rather than an item of a menu.
+  option: boolean
   label: string
   // Its size and where it lives, already translated ("284 items · Google Drive").
   about: string
@@ -24,6 +26,7 @@ interface Props {
 export default function Row({
   id,
   domId,
+  option,
   label,
   about,
   position,
@@ -35,6 +38,7 @@ export default function Row({
   return (
     <DropdownItem
       id={domId}
+      option={option}
       testid={`workspace-option-${id}`}
       checked={selected}
       active={lit}

@@ -6,7 +6,7 @@ interface Props {
   value: string
   onChange: (value: string) => void
   onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void
-  // The menu the rows are in, and the lit row's element id (none when nothing
+  // The listbox the rows are in, and the lit row's element id (none when nothing
   // matches). The caret never leaves the field, so this is how a screen
   // reader hears which vault Enter would open as the arrows move.
   controls: string

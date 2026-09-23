@@ -25,11 +25,13 @@ export default function Menu({ list, active, onPick, onClose }: Props) {
   const { t } = useTranslation()
   const configured = useApp(state => state.sync.configured)
   const [query, setQuery] = useState('')
-  // Element ids for the menu and each row, so the search field can point at
+  // Element ids for the list and each row, so the search field can point at
   // the lit one; per row by workspace id, so an id holds while the list filters.
   const base = useId()
-  const menuId = `${base}-menu`
+  const listId = `${base}-list`
   const rowId = (workspace: Workspace) => `${base}-${workspace.id}`
+
+  const searchable = list.length >= SEARCH_FROM
 
   const needle = query.trim().toLowerCase()
   const rows = list
@@ -91,17 +93,17 @@ export default function Menu({ list, active, onPick, onClose }: Props) {
     // 320px, short of a phone's screen edges on the narrowest of them.
     <div className="absolute top-full z-20 mt-2 w-[320px] max-w-[calc(100vw-24px)]">
       <Dropdown
-        id={menuId}
+        listbox={searchable ? listId : undefined}
         onBlur={onClose}
         className="inset-x-0"
         listClassName="max-h-[300px]"
         header={
-          list.length >= SEARCH_FROM && (
+          searchable && (
             <Search
               value={query}
               onChange={find}
               onKeyDown={onSearchKey}
-              controls={menuId}
+              controls={listId}
               active={litId}
             />
           )
@@ -112,6 +114,7 @@ export default function Menu({ list, active, onPick, onClose }: Props) {
             key={row.workspace.id}
             id={row.workspace.id}
             domId={rowId(row.workspace)}
+            option={searchable}
             label={row.label}
             about={about(row.workspace)}
             position={row.index}
