@@ -220,8 +220,28 @@ describe('Type-aware fields', () => {
     render(<Show entry={loginMeta()} />)
 
     await waitFor(() => expect(screen.getByTestId('entry-value-username')).toBeInTheDocument())
-    expect(screen.queryByText('Copy code')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Copy code')).not.toBeInTheDocument()
     expect(calls('generate_otp')).toHaveLength(0)
+  })
+
+  // The dial is the copy control: no separate button, and the editor's live
+  // preview offers none — while typing, it only proves the secret works.
+  it('copies the code when the dial is clicked', async () => {
+    mockCommand('generate_otp', () => ({ code: '123456', time: 25 }))
+    mockCommand('reveal_entry', () => loginEntry({ otp: 'JBSWY3DPEHPK3PXP' }))
+    render(<Show entry={loginMeta()} />)
+
+    await userEvent.click(await screen.findByLabelText('Copy code'))
+    expect(calls('copy_to_clipboard')[0]).toMatchObject({ value: '123456' })
+  })
+
+  it('offers no copy on the editor preview', async () => {
+    mockCommand('generate_otp', () => ({ code: '123456', time: 25 }))
+    mockCommand('reveal_entry', () => loginEntry({ otp: 'JBSWY3DPEHPK3PXP' }))
+    render(<Show entry={loginMeta()} editing />)
+
+    expect(await screen.findByText('123 456')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Copy code')).not.toBeInTheDocument()
   })
 
   it('previews the live code for a secret that is already saved', async () => {
