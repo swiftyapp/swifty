@@ -12,6 +12,7 @@ import {
   enterMain,
   refreshApp,
   forgetBiometricGate,
+  setSwitching,
   setupDriveRestoring,
   setupDriveRestoreFailed,
   type AppState
@@ -39,26 +40,28 @@ export const selectActiveWorkspace = (state: AppState): string =>
 // probe brings the new active workspace on screen. Only a workspace that has
 // never been opened with its password on this device answers with nothing:
 // that switch is a lock, announced as `vault:locked` like any other, and the
-// one handler re-probes and lands on that workspace's lock screen with the
-// picker still offering the way back.
+// one handler lands on that workspace's lock screen with the picker still
+// offering the way back.
 //
-// The gate is dropped first: whether biometrics open a workspace is a fact
-// about that workspace, and the lock screen would otherwise wear the previous
-// one's answer until the re-probe lands (see `forgetBiometricGate`). A switch
-// that fails re-probes to put it back.
+// Nothing on the lock screen changes until the probe after the switch answers:
+// the chip's name and the biometric gate are both read off it, so they change
+// in the one render that lands it. Meanwhile the switch is flagged, and the
+// lock screen takes no attempt — the gate it still draws is the previous
+// workspace's, and an unlock now would reach the next one. However it ends
+// (opened, locked, refused), the switch probes once itself, so the flag never
+// outlives it; a probe that fails leaves the safe default, no gate offered.
 export const switchWorkspace = async (id: string) => {
-  forgetBiometricGate()
-  let result
+  setSwitching(true)
   try {
-    result = await workspaceSelect(id)
-  } catch (error) {
-    void refreshApp()
-    throw error
+    const result = await workspaceSelect(id)
+    if (result) {
+      clearSession()
+      await enterMain(result)
+    }
+  } finally {
+    if (!(await refreshApp())) forgetBiometricGate()
+    setSwitching(false)
   }
-  if (!result) return
-  clearSession()
-  await enterMain(result)
-  await refreshApp()
 }
 
 // Remove a workspace's vault from this device, and with `everywhere` from the

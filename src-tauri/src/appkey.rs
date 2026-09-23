@@ -507,6 +507,7 @@ mod tests {
                     id: id.to_string(),
                     name: None,
                     vault_id: None,
+                    item_count: None,
                 })
                 .collect(),
         };

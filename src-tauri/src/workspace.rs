@@ -48,6 +48,17 @@ pub struct Workspace {
     /// secret: the same id is the pack's file name in the user's own Drive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vault_id: Option<String>,
+    /// How many live entries the vault held when it was last open here — the
+    /// lock screen's picker says it beside each workspace. `None` for a vault
+    /// not opened on this device since the count was first kept.
+    ///
+    /// Recorded outside the vault knowingly: it is the one thing about a
+    /// vault's contents this file says, readable without the password by
+    /// anyone with the disk. It never leaves the device — a Drive pack keeps
+    /// even the count sealed (see `sync::pack`). As of the last open or lock
+    /// here, so entries another device added show up after this one next syncs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_count: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -66,6 +77,7 @@ impl Default for Registry {
                 id: PRIMARY_ID.to_string(),
                 name: None,
                 vault_id: None,
+                item_count: None,
             }],
         }
     }
@@ -437,6 +449,46 @@ fn named(name: &str) -> impl FnOnce(&mut Workspace) -> bool + '_ {
     }
 }
 
+/// Remember how many live entries workspace `id`'s vault holds, for the lock
+/// screen to show while it is locked (see [`Workspace::item_count`]). Best
+/// effort — a count that cannot be saved is only a stale number on the lock
+/// screen — and a no-op when it has not changed.
+///
+/// By id rather than "the active one": a lock records the workspace it
+/// sealed, which a switch landing a moment later must not redirect.
+///
+/// Takes `workspace_lock`, so never call it holding the session lock: every
+/// reader of the two takes the registry's first.
+pub fn record_item_count(app: &AppHandle, id: &str, count: u32) {
+    let state = app.state::<AppState>();
+    let recorded = storage::root_dir(app).and_then(|root| {
+        let _paths = state.workspace_lock.lock().unwrap();
+        update_active_locked(&root, id, counted(count))
+    });
+    if let Err(e) = recorded {
+        log::warn!("could not record workspace {id}'s item count: {e}");
+    }
+}
+
+/// [`record_item_count`] for a caller that already holds `workspace_lock` and
+/// the registry it is about to save (`workspace_select`, leaving one
+/// workspace for another).
+pub(crate) fn count_into(registry: &mut Registry, id: &str, count: u32) {
+    if let Some(workspace) = registry.workspaces.iter_mut().find(|w| w.id == id) {
+        counted(count)(workspace);
+    }
+}
+
+fn counted(count: u32) -> impl FnOnce(&mut Workspace) -> bool {
+    move |workspace| {
+        if workspace.item_count == Some(count) {
+            return false;
+        }
+        workspace.item_count = Some(count);
+        true
+    }
+}
+
 /// The active workspace's registry label, if it has one.
 pub fn active_name(app: &AppHandle) -> Option<String> {
     let root = storage::root_dir(app).ok()?;
@@ -541,11 +593,13 @@ mod tests {
                     id: PRIMARY_ID.into(),
                     name: None,
                     vault_id: None,
+                    item_count: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
+                    item_count: None,
                 },
             ],
         };
@@ -569,6 +623,40 @@ mod tests {
         loaded.save(&root).unwrap();
         let json = fs::read_to_string(root.join(REGISTRY_FILE)).unwrap();
         assert!(!json.contains("vaultId"), "{json}");
+        assert!(!json.contains("itemCount"), "{json}");
+        assert_eq!(loaded.workspaces[0].item_count, None);
+    }
+
+    // A count is recorded against the workspace named, whichever is active,
+    // and survives a save.
+    #[test]
+    fn an_item_count_is_kept_per_workspace() {
+        let root = tmp_root();
+        let mut registry = Registry {
+            active: "a1b2".into(),
+            workspaces: vec![
+                Workspace {
+                    id: PRIMARY_ID.into(),
+                    name: None,
+                    vault_id: None,
+                    item_count: None,
+                },
+                Workspace {
+                    id: "a1b2".into(),
+                    name: Some("Work".into()),
+                    vault_id: None,
+                    item_count: Some(3),
+                },
+            ],
+        };
+        count_into(&mut registry, PRIMARY_ID, 284);
+        registry.save(&root).unwrap();
+
+        let loaded = Registry::load(&root);
+        assert_eq!(loaded.workspaces[0].item_count, Some(284));
+        assert_eq!(loaded.workspaces[1].item_count, Some(3));
+        let json = fs::read_to_string(root.join(REGISTRY_FILE)).unwrap();
+        assert!(json.contains(r#""itemCount":284"#), "{json}");
     }
 
     // The question a restore asks: is this pack already a workspace here — any
@@ -582,11 +670,13 @@ mod tests {
                     id: PRIMARY_ID.into(),
                     name: None,
                     vault_id: Some("cafe".into()),
+                    item_count: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: None,
+                    item_count: None,
                 },
             ],
         };
@@ -610,6 +700,7 @@ mod tests {
                 id: PRIMARY_ID.into(),
                 name: None,
                 vault_id: None,
+                item_count: None,
             }],
         }
         .save(&root)
@@ -637,16 +728,19 @@ mod tests {
                     id: PRIMARY_ID.into(),
                     name: None,
                     vault_id: Some("beef".into()),
+                    item_count: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
+                    item_count: None,
                 },
                 Workspace {
                     id: "c3d4".into(),
                     name: Some("Side".into()),
                     vault_id: None,
+                    item_count: None,
                 },
             ],
         }
@@ -685,6 +779,7 @@ mod tests {
                 id: PRIMARY_ID.into(),
                 name: Some("Work".into()),
                 vault_id: Some("cafe".into()),
+                item_count: None,
             }
         );
         // The one that was not promoted is untouched, and still second.
@@ -785,11 +880,13 @@ mod tests {
                     id: PRIMARY_ID.into(),
                     name: None,
                     vault_id: None,
+                    item_count: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
+                    item_count: None,
                 },
             ],
         };

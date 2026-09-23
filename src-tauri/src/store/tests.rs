@@ -145,6 +145,26 @@ fn delete_tombstones_and_hides_from_list() {
     assert!(exported[0].deleted_at.is_some());
 }
 
+// The count the lock screen shows is the list's length, never the table's:
+// archived rows and purged shells are tombstones, not items.
+#[test]
+fn count_live_counts_what_the_list_shows() {
+    let store = seeded(&[
+        rec("1", b"a"),
+        rec("2", b"b"),
+        tombstone("3", 1_000),
+        Record {
+            payload: Vec::new(),
+            ..tombstone("4", 2_000)
+        },
+    ]);
+    assert_eq!(store.count_live().unwrap(), 2);
+    assert_eq!(
+        store.count_live().unwrap() as usize,
+        store.list().unwrap().len()
+    );
+}
+
 #[test]
 fn list_deleted_lists_tombstones_newest_first() {
     let store = seeded(&[

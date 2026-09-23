@@ -42,6 +42,7 @@ export default function SortMenu({ className }: { className?: string }) {
               <DropdownItem
                 key={option.mode}
                 testid={`sort-option-${option.mode}`}
+                checked={sort === option.mode}
                 onClick={() => pick(option.mode)}
               >
                 <span className="grid w-3.5 flex-none place-items-center text-accent">

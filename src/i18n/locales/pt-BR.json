@@ -582,5 +582,10 @@
   "This file is too large": "Este arquivo é grande demais",
   "This file is not text": "Este arquivo não é um arquivo de texto",
   "The vault changed while this was running. Try again.": "O cofre mudou durante a operação. Tente novamente.",
-  "Backups restore a fresh install and are not imported into an existing vault.": "Backups restauram uma instalação nova e não são importados para um cofre existente."
+  "Backups restore a fresh install and are not imported into an existing vault.": "Backups restauram uma instalação nova e não são importados para um cofre existente.",
+  "Find a vault": "Encontrar um cofre",
+  "No vault matches “{{query}}”": "Nenhum cofre corresponde a “{{query}}”",
+  "{{count}} items_one": "{{count}} item",
+  "{{count}} items_many": "{{count}} de itens",
+  "{{count}} items_other": "{{count}} itens"
 }

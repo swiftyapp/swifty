@@ -30,31 +30,29 @@ export default function Menu({
 
   return (
     <div className={cx('absolute z-20 w-[220px]', className ?? 'left-full top-0 ml-3')}>
-      <Dropdown onBlur={onClose} className="w-full">
+      <Dropdown onBlur={onClose} className="w-full" listClassName="max-h-[320px]">
         {tags.length === 0 ? (
-          <div className="px-3.5 py-2.5" data-testid="tags-empty">
+          <div className="px-2 py-1.5" data-testid="tags-empty">
             <div className="text-base text-text2">{t('No tags yet')}</div>
             <div className={`mt-1 ${META}`}>
               {t('Add tags to an entry and they show up here.')}
             </div>
           </div>
         ) : (
-          <div className="max-h-[320px] overflow-y-auto">
-            {tags.map(({ tag, count }) => (
-              <DropdownItem key={tag} testid={`tag-option-${tag}`} onClick={() => pick(tag)}>
-                <span className="grid w-3.5 flex-none place-items-center text-accent">
-                  {tag === active && <CheckGlyph />}
-                </span>
-                <span className="min-w-0 flex-1 truncate">{tag}</span>
-                <span
-                  data-testid={`tag-option-${tag}-count`}
-                  className={`flex-none ${META_TYPE} opacity-60`}
-                >
-                  {count}
-                </span>
-              </DropdownItem>
-            ))}
-          </div>
+          tags.map(({ tag, count }) => (
+            <DropdownItem key={tag} testid={`tag-option-${tag}`} onClick={() => pick(tag)}>
+              <span className="grid w-3.5 flex-none place-items-center text-accent">
+                {tag === active && <CheckGlyph />}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{tag}</span>
+              <span
+                data-testid={`tag-option-${tag}-count`}
+                className={`flex-none ${META_TYPE} opacity-60`}
+              >
+                {count}
+              </span>
+            </DropdownItem>
+          ))
         )}
       </Dropdown>
     </div>

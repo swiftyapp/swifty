@@ -590,5 +590,11 @@
   "This file is too large": "Этот файл слишком большой",
   "This file is not text": "Этот файл не текстовый",
   "The vault changed while this was running. Try again.": "Хранилище изменилось во время операции. Попробуйте ещё раз.",
-  "Backups restore a fresh install and are not imported into an existing vault.": "Резервная копия восстанавливает чистую установку и не импортируется в существующее хранилище."
+  "Backups restore a fresh install and are not imported into an existing vault.": "Резервная копия восстанавливает чистую установку и не импортируется в существующее хранилище.",
+  "Find a vault": "Найти хранилище",
+  "No vault matches “{{query}}”": "Нет хранилищ по запросу «{{query}}»",
+  "{{count}} items_one": "{{count}} запись",
+  "{{count}} items_few": "{{count}} записи",
+  "{{count}} items_many": "{{count}} записей",
+  "{{count}} items_other": "{{count}} записи"
 }

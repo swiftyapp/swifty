@@ -590,5 +590,11 @@
   "This file is too large": "Ten plik jest zbyt duży",
   "This file is not text": "Ten plik nie jest plikiem tekstowym",
   "The vault changed while this was running. Try again.": "Sejf zmienił się w trakcie operacji. Spróbuj ponownie.",
-  "Backups restore a fresh install and are not imported into an existing vault.": "Kopie zapasowe przywracają nową instalację i nie są importowane do istniejącego sejfu."
+  "Backups restore a fresh install and are not imported into an existing vault.": "Kopie zapasowe przywracają nową instalację i nie są importowane do istniejącego sejfu.",
+  "Find a vault": "Znajdź sejf",
+  "No vault matches “{{query}}”": "Żaden sejf nie pasuje do „{{query}}”",
+  "{{count}} items_one": "{{count}} wpis",
+  "{{count}} items_few": "{{count}} wpisy",
+  "{{count}} items_many": "{{count}} wpisów",
+  "{{count}} items_other": "{{count}} wpisu"
 }

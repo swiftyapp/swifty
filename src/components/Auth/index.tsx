@@ -32,6 +32,7 @@ export function Auth({ biometric, biometry = 'touch' }: Props) {
           bar. */}
       <div className="mx-auto mt-8 max-w-[380px]">
         <Masterpass
+          key={field.vault}
           biometric={biometric}
           biometry={biometry}
           testid="unlock-password-input"

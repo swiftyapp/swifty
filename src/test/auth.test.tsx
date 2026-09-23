@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Auth from '@/components/Auth'
 import { useApp, flowSetup } from '@/store'
+import type { Workspace } from '@/api/types'
 import { calls, mockCommand, mockCommandOnce } from './ipc'
+import { seedApp } from './utils'
+
+const PRIMARY: Workspace = { id: 'default', name: null }
+const WORK: Workspace = { id: 'w2', name: 'Work' }
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -207,5 +212,34 @@ describe('Auth', () => {
 
     expect(calls('unlock_biometric')).toHaveLength(1)
     await waitFor(() => expect(useApp.getState().flow).toBe('main'))
+  })
+
+  // Mid-switch the backend already points at the next vault while the screen
+  // still shows the last one, so nothing typed or touched is sent anywhere.
+  it('takes no attempt while a workspace switch is in flight', async () => {
+    useApp.setState({ switching: true })
+    try {
+      render(<Auth biometric />)
+
+      await userEvent.click(screen.getByLabelText('Touch ID'))
+      await userEvent.type(screen.getByPlaceholderText('Master Password'), 'secret{Enter}')
+
+      expect(calls('unlock_biometric')).toHaveLength(0)
+      expect(calls('unlock')).toHaveLength(0)
+    } finally {
+      useApp.setState({ switching: false })
+    }
+  })
+
+  // A passphrase typed for one vault must not be the one submitted to the next.
+  it('starts the next vault on an empty field', async () => {
+    seedApp({ workspaces: [PRIMARY, WORK], activeWorkspace: 'default' })
+    render(<Auth biometric={false} />)
+    const field = screen.getByPlaceholderText('Master Password')
+    await userEvent.type(field, 'for-personal')
+
+    act(() => seedApp({ workspaces: [PRIMARY, WORK], activeWorkspace: 'w2' }))
+
+    expect(screen.getByPlaceholderText('Master Password')).toHaveValue('')
   })
 })

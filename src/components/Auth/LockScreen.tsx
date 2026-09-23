@@ -48,6 +48,7 @@ export default function LockScreen({ biometric, biometry = 'touch' }: Props) {
           {/* The card keeps its own biometric segment, so revealing the
               passphrase never takes the faster way out away. */}
           <Masterpass
+            key={field.vault}
             biometric={biometric}
             biometry={biometry}
             testid="unlock-password-input"

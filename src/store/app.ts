@@ -61,6 +61,14 @@ export interface AppState {
    */
   status: AppStatus | null
   /**
+   * A workspace switch is in flight: the backend may already be pointed at the
+   * next workspace while `status` still describes the one being left. The lock
+   * screen keeps drawing what it has — the chip and the gate change together,
+   * in the render the probe lands — but takes no attempt meanwhile, since one
+   * would reach a vault other than the one on screen (see `switchWorkspace`).
+   */
+  switching: boolean
+  /**
    * The backend's sync status, verbatim. It owns every flow — it opens the
    * browser, hears back from it, runs the sync — so it is the one that can say;
    * every change arrives whole as `sync:status` and is stored as-is, and the
@@ -110,6 +118,7 @@ export const initialApp: AppState = {
   // biometric is drawn before the probe answers.
   flow: 'auth',
   status: null,
+  switching: false,
   sync: {
     configured: false,
     pending: false,
@@ -190,14 +199,16 @@ export const showLockScreen = () => {
 }
 
 /**
- * Forget whether biometrics open the vault, ahead of a move to another
- * workspace. One enrollment serves the device, but whether it opens a given
- * workspace is that workspace's own answer (its key has to be sealed under the
- * enrolled one), and the lock screen draws the last known gate until the
- * re-probe lands — so without this, the vault being switched *to* briefly wore
- * the gate of the one being left. `false` is the safe default: a gate that is
- * not offered, rather than one that is offered and refused. The probe that
- * follows every lock restores the truth.
+ * Forget whether biometrics open the vault, for when the probe that would say
+ * could not be had after a workspace switch. One enrollment serves the device,
+ * but whether it opens a given workspace is that workspace's own answer (its
+ * key has to be sealed under the enrolled one), so the gate last known belongs
+ * to the workspace that was left. `false` is the safe default: a gate that is
+ * not offered, rather than one that is offered and refused.
+ *
+ * Only a fallback. Clearing it up front, ahead of every switch, took the Touch
+ * ID segment off the passphrase card for the round trip and put it back when
+ * the probe landed — the card visibly blinked on each switch.
  */
 export const forgetBiometricGate = () =>
   useApp.setState(state =>
@@ -205,6 +216,8 @@ export const forgetBiometricGate = () =>
       ? { status: { ...state.status, biometric: { ...state.status.biometric, available: false } } }
       : {}
   )
+
+export const setSwitching = (switching: boolean) => useApp.setState({ switching })
 
 // Everything the unlocked session put in the stores. A lock has to drop all of
 // it — it outlives the session otherwise, and the next unlock (of this or any

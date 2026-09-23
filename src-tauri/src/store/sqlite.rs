@@ -340,6 +340,16 @@ impl SqliteStore {
         Ok(state_digest(&self.export_for_sync()?))
     }
 
+    /// How many live entries the vault holds: what the list shows, so the
+    /// same filter as `list`, and every tombstone (archived or purged) left out.
+    pub fn count_live(&self) -> Result<u32> {
+        Ok(self.lock().query_row(
+            "SELECT count(*) FROM entries WHERE deleted_at IS NULL",
+            [],
+            |r| r.get(0),
+        )?)
+    }
+
     /// Delete every `meta` row whose key starts with `prefix`, returning how
     /// many were removed.
     ///
