@@ -2,7 +2,7 @@ import { call } from './client'
 import type { SyncStatus } from './sync'
 import type { GeneratorOptions } from './tools'
 import type { BiometricMode, BiometryType, Workspace } from './types'
-import type { ThemePreference } from '@/theme'
+import type { Accent, ThemePreference } from '@/theme'
 
 export type DateFormat = 'MM/DD/YYYY' | 'DD.MM.YYYY' | 'YYYY-MM-DD'
 
@@ -20,6 +20,8 @@ export type SortMode = 'recent' | 'alpha'
 export interface Settings {
   /** Light by default, dark opt-in, or follow the OS. */
   theme: ThemePreference
+  /** The accent colour; ink by default (see `theme/index.ts`). */
+  accent: Accent
   /** The entry list's order. Recency first: the list is a working surface. */
   sort: SortMode
   /** Off by default: the HIBP breach check makes an outbound request. */

@@ -71,6 +71,9 @@ pub struct Settings {
     pub date_format: String,
     pub sort: String,
     pub theme: String,
+    /// The accent colour, by name (`theme/index.ts` on the frontend holds the
+    /// list and narrows an unknown one back to the default).
+    pub accent: String,
     /// An explicit language choice. `None` means "follow the OS", which is what
     /// a fresh install does — see `locale::resolve_preferred`.
     pub locale: Option<String>,
@@ -86,6 +89,7 @@ impl Default for Settings {
             date_format: "MM/DD/YYYY".into(),
             sort: "recent".into(),
             theme: "light".into(),
+            accent: "ink".into(),
             locale: None,
             breach_check: false,
             generator: GeneratorDefaults::default(),
@@ -213,6 +217,7 @@ mod tests {
         assert_eq!(settings.date_format, "MM/DD/YYYY");
         assert_eq!(settings.sort, "recent");
         assert_eq!(settings.theme, "light");
+        assert_eq!(settings.accent, "ink");
         assert_eq!(settings.locale, None);
         assert!(!settings.breach_check);
         assert_eq!(settings.generator, GeneratorDefaults::default());

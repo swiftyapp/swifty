@@ -33,15 +33,21 @@ const sizes: Record<Size, string> = {
 
 const blockStyle = 'w-full px-5 py-3 uppercase tracking-label'
 
-// The solid-fill treatment: light ink, a 1px top highlight, and a hover that
-// brightens the fill itself since there is no border or ground to swap.
-const filled = 'text-accent-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] hover:brightness-[1.09]'
+// The solid-fill treatment: a 1px top highlight on a fill with no border or
+// ground to swap on hover. The primary is the accent, with the ground's colour
+// as its text (`accent-fg`: white on the light theme, ink on the dark, where
+// every accent is lifted light). Hover is a second solid per accent and theme
+// (`accent-hover`), never a translucent blend or a brightness filter: either
+// pulls the fill towards the ground, and the text on it under AA. Danger stays
+// red on both themes with white on it, and darkens on hover for the same
+// reason.
+const filled = 'shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]'
 
 const variants: Record<Variant, string> = {
-  primary: `bg-accent ${filled}`,
+  primary: `bg-accent text-accent-fg hover:bg-accent-hover ${filled}`,
   ghost: 'border border-line bg-tile text-text hover:bg-hover',
   pale: 'border border-line2 bg-field text-text2 hover:border-accent-line hover:text-text',
-  danger: `bg-bad ${filled}`
+  danger: `bg-bad text-white hover:bg-bad-hover ${filled}`
 }
 
 // Shared token-styled button. Serves both the full-width auth CTAs (`block`) and

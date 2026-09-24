@@ -8,6 +8,7 @@ import KindTile from './KindTile'
 import ScanAction from './ScanAction'
 import EnvAction from './EnvAction'
 import ReceiveAction from './ReceiveAction'
+import GenerateAction from './GenerateAction'
 
 const TITLE_ID = 'add-secret-title'
 
@@ -98,6 +99,7 @@ export default function AddSecret() {
           <ScanAction />
           <EnvAction />
           <ReceiveAction />
+          <GenerateAction />
         </div>
       </div>
     </Frame>

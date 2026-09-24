@@ -62,9 +62,10 @@ interface Props {
 //
 // Deliberately unlike every other field in the app: a white card set gently
 // into the window ground (see --lockfield-shadow) with big centered dots,
-// whose border + halo carry the state — accent on focus, red (plus a shake) on
-// a bad passphrase, green while a successful unlock lands — while focus also
-// cuts a touch deeper. Its only chrome is Touch ID (primary, when offered) and
+// whose border + halo carry the state — its own blue on focus (`lockfield`
+// tokens, not the user's accent: this control's states are its character),
+// red (plus a shake) on a bad passphrase, green while a successful unlock
+// lands — while focus also cuts a touch deeper. Its only chrome is Touch ID (primary, when offered) and
 // reveal (secondary, only once there is something to reveal) on the right
 // edge. It fills its container: the caller decides how wide a card reads
 // right on its screen.
@@ -175,8 +176,8 @@ export default function Masterpass({
             : success
               ? 'border-good/50 ring-4 ring-good/15'
               : pending
-                ? 'border-accent-line'
-                : 'border-text/12 focus-within:border-accent-line focus-within:ring-4 focus-within:ring-accent-soft',
+                ? 'border-lockfield-line'
+                : 'border-text/12 focus-within:border-lockfield-line focus-within:ring-4 focus-within:ring-lockfield-soft',
           disabled && 'opacity-60'
         )}
       >

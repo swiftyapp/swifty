@@ -8,6 +8,7 @@ import { checkForUpdate } from '@/api/autoUpdate'
 import { resetFavicons } from '@/hooks/useFavicon'
 import { setEntries, resetVault, runAudit } from './vault'
 import { openSettings, resetUi } from './ui'
+import { hydratePrefs, hydrateFromProbe, prefsMark } from './prefs'
 
 /**
  * State that lives as long as the app does, across locks: which flow is on
@@ -139,13 +140,25 @@ export const useApp = create<AppState>()(() => initialApp)
 // --- launch probe -----------------------------------------------------------------
 
 /**
- * Take the boot probe's answer wholesale (see `boot.ts`). `sync` is lifted out
- * of it into its own slot rather than read off `status`: the probe is only one
- * of the two things that report sync, and the events that report the rest write
+ * Take a probe's answer wholesale (see `boot.ts`). `sync` is lifted out of it
+ * into its own slot rather than read off `status`: the probe is only one of
+ * the two things that report sync, and the events that report the rest write
  * here too — so its snapshot goes through the same ordering they do.
+ *
+ * The settings it carries go to the prefs store every time, not only at boot:
+ * a probe that answers late — the shell's own re-ask after the boot probe
+ * failed — is then the first word on the stored theme and accent, and the
+ * prefs store's subscriber paints the document from whatever changed.
+ *
+ * With a `mark` (see `prefsMark`, taken when the probe went out) the settings
+ * are taken only if no preference write has overtaken the probe since; the
+ * boot path passes none, since nothing can have been written before it.
  */
-export const setApp = (status: AppStatus) =>
+export const setApp = (status: AppStatus, mark?: number) => {
   useApp.setState(state => ({ status, sync: newer(state.sync, status.sync) }))
+  if (mark === undefined) hydratePrefs(status.settings)
+  else hydrateFromProbe(status.settings, mark)
+}
 
 /**
  * Of two sync snapshots, the one the backend produced later. The probe and the
@@ -170,13 +183,17 @@ export const useScanSupported = () => useApp(state => state.status?.scanSupporte
  * enrollment. Resolves with what it stored — or null, keeping the last known
  * answer, if the call failed — and never rejects, so no caller has to guard it.
  */
-export const refreshApp = (): Promise<AppStatus | null> =>
-  appStatus()
+export const refreshApp = (): Promise<AppStatus | null> => {
+  // Stamped before the request leaves, so a write issued while it is out — or
+  // still unanswered — outranks the settings it brings back.
+  const mark = prefsMark()
+  return appStatus()
     .then(status => {
-      setApp(status)
+      setApp(status, mark)
       return status
     })
     .catch(() => null)
+}
 
 // --- flow -----------------------------------------------------------------------
 

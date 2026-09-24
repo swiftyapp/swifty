@@ -41,15 +41,33 @@ describe('Generator', () => {
     expect(screen.queryByTestId('generator-dialog')).not.toBeInTheDocument()
   })
 
-  // The rail tile is the pointer half of ⌘G: same open, no apply callback, so
-  // confirming copies rather than filling a field.
-  it('opens from the rail tile with nothing to apply the value to', async () => {
+  // The Add picker's row is the pointer half of ⌘G: same open, no apply
+  // callback, so confirming copies rather than filling a field. The picker
+  // gives way to the dialog rather than stacking under it.
+  it('opens from the Add picker with nothing to apply the value to', async () => {
     withEntries([loginMeta({ id: 'l1', title: 'Google' })])
     render(<Main />)
 
+    await userEvent.click(screen.getByTestId('add-entry-button'))
     await userEvent.click(screen.getByTestId('generator-button'))
 
     expect(await screen.findByTestId('generator-dialog')).toBeInTheDocument()
+    expect(screen.queryByTestId('add-secret-modal')).not.toBeInTheDocument()
+    expect(useUi.getState().generator.apply).toBeNull()
+  })
+
+  // And the palette's command, for the keyboard-first route that does not
+  // know the chord yet — it shows it beside the label.
+  it('opens from the command palette', async () => {
+    withEntries([loginMeta({ id: 'l1', title: 'Google' })])
+    render(<Main />)
+
+    await userEvent.keyboard('{Meta>}k{/Meta}')
+    const palette = within(screen.getByTestId('command-palette'))
+    await userEvent.click(palette.getByText('Generate a password'))
+
+    expect(await screen.findByTestId('generator-dialog')).toBeInTheDocument()
+    expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument()
     expect(useUi.getState().generator.apply).toBeNull()
   })
 

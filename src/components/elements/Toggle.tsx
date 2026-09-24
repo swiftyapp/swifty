@@ -10,8 +10,10 @@ interface Props {
 }
 
 // THE on/off control for settings rows: a 40x22 pill whose track carries the
-// accent when on. A native `button role="switch"` handles Space/Enter and the
-// global `:focus-visible` ring for free.
+// accent when on. The knob is white on the grey off-track and the accent's own
+// foreground on the on-track — the accent is ink, white on the dark theme, so a
+// white knob there would vanish into it. A native `button role="switch"`
+// handles Space/Enter and the global `:focus-visible` ring for free.
 export default function Toggle({
   checked,
   onChange,
@@ -38,8 +40,8 @@ export default function Toggle({
     >
       <span
         className={cx(
-          'absolute top-[2px] left-[2px] h-[18px] w-[18px] rounded-full bg-white transition-transform',
-          checked && 'translate-x-[18px]'
+          'absolute top-[2px] left-[2px] h-[18px] w-[18px] rounded-full transition-[transform,background-color]',
+          checked ? 'translate-x-[18px] bg-accent-fg' : 'bg-white'
         )}
       />
     </button>
