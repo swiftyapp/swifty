@@ -13,6 +13,12 @@ export const ROW_HAIRLINE = 'inset-shadow-hairline last:inset-shadow-none'
 export const FACE_ASIDE =
   'grid grid-cols-1 items-start gap-3 @min-[720px]:grid-cols-[460px_minmax(0,1fr)]'
 
+// The wide shell's detail pane inset, and its exact negative: a surface that
+// wants the whole pane (an empty state with a watermark run off the corner)
+// takes PANE_BLEED to undo PANE_PAD, so the two must always move together.
+export const PANE_PAD = 'pt-[26px] px-[34px] pb-[60px]'
+export const PANE_BLEED = 'md:-mt-[26px] md:-mx-[34px] md:-mb-[60px]'
+
 // A trailing control that stays out of the way until the row is asked about —
 // hovered, or holding the keyboard. Pairs with a `group` on the row itself.
 // Opacity only: the control keeps its place in the layout and in the tab order.

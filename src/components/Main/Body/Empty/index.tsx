@@ -1,5 +1,7 @@
 import type { ReactElement } from 'react'
 import { useUi } from '@/store'
+import { cx } from '@/utils/cx'
+import { PANE_BLEED } from '@/components/elements/tokens'
 import { useVariant, type Variant } from './variant'
 import {
   KindEmpty,
@@ -10,6 +12,7 @@ import {
   FavoritesEmpty,
   ArchiveEmpty
 } from './variants'
+import Watermark from './Watermark'
 
 // The list column's share: only the filter states, and only ever as one line.
 // On `vault` and `health` it renders nothing at all — the detail pane is
@@ -38,11 +41,20 @@ const DETAIL: Record<Variant, () => ReactElement> = {
 }
 
 // The detail pane's share: every variant lands somewhere, centered in the pane.
+// On the wide shell the surface takes the whole pane back from its inset and
+// clips, so the watermark can run off the corner; the content keeps its own
+// gutter so it never meets an edge in a narrow split.
 export function DetailEmpty({ variant }: { variant: Variant }) {
   const Content = DETAIL[variant]
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center">
+    <div
+      className={cx(
+        'relative flex min-h-full flex-col items-center justify-center overflow-hidden px-8 py-10 md:min-h-0 md:flex-1',
+        PANE_BLEED
+      )}
+    >
+      <Watermark />
       <Content />
     </div>
   )
