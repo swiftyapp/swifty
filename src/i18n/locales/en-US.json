@@ -197,7 +197,7 @@
   "search": "search",
   "add": "add",
   "commands": "commands",
-  "edit": "edit",
+  "open": "open",
   "generator": "generator",
   "lock": "lock",
   "in the entry header": "in the entry header",

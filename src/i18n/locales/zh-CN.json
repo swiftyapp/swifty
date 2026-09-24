@@ -191,7 +191,7 @@
   "search": "搜索",
   "add": "新建",
   "commands": "命令",
-  "edit": "编辑",
+  "open": "打开",
   "generator": "生成器",
   "lock": "锁定",
   "in the entry header": "在条目标题栏中",

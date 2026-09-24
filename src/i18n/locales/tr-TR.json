@@ -191,7 +191,7 @@
   "search": "ara",
   "add": "ekle",
   "commands": "komutlar",
-  "edit": "düzenle",
+  "open": "aç",
   "generator": "üretici",
   "lock": "kilitle",
   "in the entry header": "kayıt başlığında",

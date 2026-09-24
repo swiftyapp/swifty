@@ -191,7 +191,7 @@
   "search": "suchen",
   "add": "neu",
   "commands": "befehle",
-  "edit": "bearbeiten",
+  "open": "öffnen",
   "generator": "Generator",
   "lock": "sperren",
   "in the entry header": "in der Kopfzeile des Eintrags",

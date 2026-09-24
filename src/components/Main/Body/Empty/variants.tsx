@@ -49,7 +49,10 @@ export function VaultEmpty() {
 
 // The vault has entries and none is open. No body and no buttons — this state
 // is one arrow key away from real content — so the space goes to the thing
-// worth learning here: every shortcut the app answers to, as a cheat sheet.
+// worth learning here: every shortcut that answers from where the keyboard is
+// now, the list, as a cheat sheet. The list's own keys are `useListKeys`: ⏎
+// opens the row and ⌘⏎ copies its secret without opening it. ⌘E is left out —
+// it needs an open entry, and this state is the one where there is none.
 export function SelectEmpty() {
   const { t } = useTranslation()
   return (
@@ -59,10 +62,10 @@ export function SelectEmpty() {
       title={t('Select an item')}
       hints={[
         { keys: '↑↓', label: t('browse') },
-        { keys: '⏎', label: t('copy') },
+        { keys: '⏎', label: t('open') },
+        { keys: chord('⏎'), label: t('copy') },
         { keys: chord('F'), label: t('search') },
         { keys: chord('N'), label: t('add') },
-        { keys: chord('E'), label: t('edit') },
         { keys: chord('G'), label: t('generator') },
         { keys: chord('K'), label: t('commands') },
         { keys: chord('L'), label: t('lock') }

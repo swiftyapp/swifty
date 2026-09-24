@@ -43,14 +43,17 @@ const DETAIL: Record<Variant, () => ReactElement> = {
 // The detail pane's share: every variant lands somewhere, centered in the pane.
 // On the wide shell the surface takes the whole pane back from its inset and
 // clips, so the watermark can run off the corner; the content keeps its own
-// gutter so it never meets an edge in a narrow split.
+// gutter so it never meets an edge in a narrow split. It grows to fill the
+// pane but never shrinks under its content (`min-h-auto`, the flex item's
+// content-based minimum): in a short window the surface gets taller than the
+// pane and the pane scrolls, rather than the clip taking the sheet with it.
 export function DetailEmpty({ variant }: { variant: Variant }) {
   const Content = DETAIL[variant]
 
   return (
     <div
       className={cx(
-        'relative flex min-h-full flex-col items-center justify-center overflow-hidden px-8 py-10 md:min-h-0 md:flex-1',
+        'relative flex min-h-full flex-col items-center justify-center px-8 py-10 md:min-h-auto md:flex-1 md:overflow-hidden',
         PANE_BLEED
       )}
     >

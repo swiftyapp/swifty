@@ -191,7 +191,7 @@
   "search": "sök",
   "add": "lägg till",
   "commands": "kommandon",
-  "edit": "redigera",
+  "open": "öppna",
   "generator": "generator",
   "lock": "lås",
   "in the entry header": "i postens sidhuvud",
