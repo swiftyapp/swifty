@@ -47,13 +47,17 @@ const DETAIL: Record<Variant, () => ReactElement> = {
 // pane but never shrinks under its content (`min-h-auto`, the flex item's
 // content-based minimum): in a short window the surface gets taller than the
 // pane and the pane scrolls, rather than the clip taking the sheet with it.
+// `overflow-clip`, not `hidden`: hidden makes the surface a scroll container,
+// and a flex item that scrolls has an automatic minimum of zero — the
+// `min-h-auto` above would be void and the sheet cut off at both ends. Clip
+// only trims the watermark at the edge and leaves the sizing alone.
 export function DetailEmpty({ variant }: { variant: Variant }) {
   const Content = DETAIL[variant]
 
   return (
     <div
       className={cx(
-        'relative flex min-h-full flex-col items-center justify-center px-8 py-10 md:min-h-auto md:flex-1 md:overflow-hidden',
+        'relative flex min-h-full flex-col items-center justify-center px-8 py-10 md:min-h-auto md:flex-1 md:overflow-clip',
         PANE_BLEED
       )}
     >
