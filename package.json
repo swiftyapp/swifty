@@ -3,7 +3,7 @@
   "version": "1.0.0-alpha.6",
   "description": "Modern, Lightweight, Fast and Free Password Manager",
   "type": "module",
-  "repository": "https://github.com/swiftyapp/swifty.git",
+  "repository": "https://github.com/fwdai/rowel.git",
   "author": {
     "name": "Alex Chaplinsky",
     "email": "alchaplinsky@gmail.com"
