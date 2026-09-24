@@ -12,24 +12,35 @@ interface Action {
   loading?: boolean
 }
 
+interface Hint {
+  // What to press: a chord ('⌘K'), a key ('⏎'), or the glyph of a control.
+  keys: ReactNode
+  label: string
+}
+
 interface Props {
-  // A glyph or SVG; the caller picks the size (16 compact, 24–28 in the tile).
+  // The brand mark, the mascot, or a glyph; the caller picks the size.
   mark: ReactNode
   title: string
   body?: string
   primary?: Action
   secondary?: Action
-  hints?: { keys: string; label: string }[]
-  // Tint override for the mark tile, e.g. a per-type wash.
+  hints?: Hint[]
+  // Sets the mark in a 64px tinted tile (a per-type wash, an error red). Left
+  // out, the mark stands on the pane by itself — the brand mark is its own
+  // shape and needs no plate under it.
   markClassName?: string
-  // Ink override for the title, e.g. a quieter tier for a non-hero state.
-  titleClassName?: string
   // Single-line variant for a list column: no tile, no title tier.
   compact?: boolean
   // Hook for the surface as a whole — the copy is localised and quoted, so
   // e2e needs something stabler to wait on.
   testid?: string
 }
+
+// Up to three hints read as one line under the copy; more than that is a
+// cheat sheet, and gets ruled off and set in two columns so eight shortcuts
+// scan as a table rather than a run-on.
+const SHEET_FROM = 4
 
 // THE nothing-here surface: one mark, one title, one line, one action. Every
 // empty list, filtered result and unconfigured panel uses it so "empty" reads
@@ -42,7 +53,6 @@ export default function EmptyState({
   secondary,
   hints,
   markClassName,
-  titleClassName,
   compact,
   testid
 }: Props) {
@@ -72,31 +82,23 @@ export default function EmptyState({
       </div>
     )
 
+  const sheet = !!hints && hints.length >= SHEET_FROM
+
   return (
     <div
       data-testid={testid}
-      className="flex max-w-xs flex-col items-center gap-5 text-center animate-pop"
+      className="flex w-full max-w-xs flex-col items-center gap-6 text-center animate-pop"
     >
-      <div
-        className={cx(
-          // Neutral by default: the mark is an emblem, not a call to action,
-          // and the primary button under it already carries the accent.
-          'grid h-16 w-16 place-items-center rounded-lg',
-          markClassName ?? 'bg-tile text-text'
-        )}
-      >
-        {mark}
-      </div>
-
-      <div>
-        <div
-          className={cx(
-            'text-2xl font-semibold tracking-display',
-            titleClassName ?? 'text-text'
-          )}
-        >
-          {title}
+      {markClassName ? (
+        <div className={cx('grid h-16 w-16 place-items-center rounded-lg', markClassName)}>
+          {mark}
         </div>
+      ) : (
+        mark
+      )}
+
+      <div className="w-full">
+        <div className="text-2xl font-semibold tracking-display text-text">{title}</div>
         {body && <div className="mt-2 text-base text-text2">{body}</div>}
 
         {(primary || secondary) && (
@@ -124,9 +126,23 @@ export default function EmptyState({
         )}
 
         {hints && hints.length > 0 && (
-          <div className="mt-4 flex items-center justify-center gap-3">
+          <div
+            className={cx(
+              sheet
+                ? 'mt-7 grid grid-cols-2 gap-x-8 gap-y-2 border-t border-line pt-5 text-left'
+                : 'mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2'
+            )}
+          >
             {hints.map(hint => (
-              <span key={hint.keys} className="flex items-center gap-1.5">
+              <span
+                key={hint.label}
+                className={cx(
+                  'flex items-center gap-2',
+                  // In the sheet the label leads and the key sits flush right,
+                  // the way a menu lists its shortcuts; in a line the key leads.
+                  sheet && 'flex-row-reverse justify-between'
+                )}
+              >
                 <Kbd>{hint.keys}</Kbd>
                 <span className={META}>{hint.label}</span>
               </span>

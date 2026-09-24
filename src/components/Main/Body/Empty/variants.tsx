@@ -9,20 +9,15 @@ import {
 import { kindOf } from '@/kinds'
 import { chord } from '@/lib/platform'
 import { useTranslation } from 'react-i18next'
-import Logo from '@/assets/images/logo.svg?react'
 import EmptyState from '@/components/elements/EmptyState'
-import { ActivityGlyph, ArchiveGlyph, SearchGlyph, StarGlyph } from '../../icons'
-
-// The brand mark at whatever size the surface asks for — the same baked logo
-// the rail shows, so the empty vault and the open one read as one character.
-// `fill-current` overrides the file's baked ink so the mark takes the text
-// colour of whatever tile it sits in.
-const Mark = ({ size }: { size: number }) => (
-  <Logo width={size} height={size} className="fill-current" aria-hidden="true" />
-)
+import Mascot from '@/components/elements/Mascot'
+import { ActivityGlyph, ArchiveGlyph, SearchGlyph, StarGlyph, TrashGlyph } from '../../icons'
+import Mark from './Mark'
 
 // First run — the one hero in the app. Nothing exists yet, so this is the only
-// thing on screen worth looking at and it gets the full treatment.
+// thing on screen worth looking at and it gets the full treatment: the
+// lock-screen character itself, pleased to see you, rather than the faceless
+// mark every other empty state wears.
 export function VaultEmpty() {
   const { t } = useTranslation()
 
@@ -32,7 +27,7 @@ export function VaultEmpty() {
   return (
     <EmptyState
       testid="empty-vault"
-      mark={<Mark size={30} />}
+      mark={<Mascot joy={1} size={96} />}
       title={t('Your vault is empty')}
       body={t('Add your first login, card or note. Everything is encrypted before it touches disk.')}
       primary={{
@@ -45,30 +40,35 @@ export function VaultEmpty() {
       secondary={{ label: t('Import from another app'), onClick: () => openSettings('import') }}
       hints={[
         { keys: chord('N'), label: t('add') },
+        { keys: chord('G'), label: t('generator') },
         { keys: chord('K'), label: t('commands') }
       ]}
     />
   )
 }
 
-// The vault has entries and none is open. Deliberately quiet — no tile, no
-// body, no buttons: the hero treatment belongs to the empty vault alone, and
-// this state is one arrow key away from real content.
+// The vault has entries and none is open. No body and no buttons — this state
+// is one arrow key away from real content — so the space goes to the thing
+// worth learning here: every shortcut that answers from where the keyboard is
+// now, the list, as a cheat sheet. The list's own keys are `useListKeys`: ⏎
+// opens the row and ⌘⏎ copies its secret without opening it. ⌘E is left out —
+// it needs an open entry, and this state is the one where there is none.
 export function SelectEmpty() {
   const { t } = useTranslation()
   return (
     <EmptyState
       testid="empty-select"
-      mark={<Mark size={28} />}
-      markClassName="bg-transparent text-text3"
-      titleClassName="text-text2"
+      mark={<Mark />}
       title={t('Select an item')}
       hints={[
         { keys: '↑↓', label: t('browse') },
-        { keys: '⏎', label: t('copy') },
+        { keys: '⏎', label: t('open') },
+        { keys: chord('⏎'), label: t('copy') },
         { keys: chord('F'), label: t('search') },
         { keys: chord('N'), label: t('add') },
-        { keys: chord('K'), label: t('commands') }
+        { keys: chord('G'), label: t('generator') },
+        { keys: chord('K'), label: t('commands') },
+        { keys: chord('L'), label: t('lock') }
       ]}
     />
   )
@@ -80,7 +80,7 @@ export function HealthEmpty() {
   return (
     <EmptyState
       testid="empty-health"
-      mark={<ActivityGlyph size={28} />}
+      mark={<Mark badge={ActivityGlyph} />}
       title={t('Nothing to audit yet')}
       body={t('Your score appears once a login with a password is saved.')}
       primary={{ label: t(kindOf('login').addLabel), onClick: () => startEntry('login') }}
@@ -89,15 +89,17 @@ export function HealthEmpty() {
 }
 
 // The Favorites view with nothing starred yet — a whole-view state, so it gets
-// the pane's full hero and says how to fill itself.
+// the pane's full hero and says how to fill itself: the star it takes is the
+// one in the entry header, shown as the key to press.
 export function FavoritesEmpty() {
   const { t } = useTranslation()
   return (
     <EmptyState
       testid="empty-favorites"
-      mark={<StarGlyph size={28} />}
+      mark={<Mark badge={StarGlyph} />}
       title={t('No favorites yet')}
       body={t('Star an entry to keep it here.')}
+      hints={[{ keys: <StarGlyph size={11} />, label: t('in the entry header') }]}
     />
   )
 }
@@ -107,9 +109,13 @@ export function ArchiveEmpty() {
   return (
     <EmptyState
       testid="empty-archive"
-      mark={<ArchiveGlyph size={28} />}
+      mark={<Mark badge={ArchiveGlyph} />}
       title={t('Nothing archived yet')}
-      body={t('Archived entries wait here until you restore them or delete them for good.')}
+      // One line, like the Favorites body beside it in the rail: the two are
+      // a tab apart, and a body that wraps on one and not the other makes the
+      // whole surface jump between them.
+      body={t('Archived entries wait here, ready to restore.')}
+      hints={[{ keys: <TrashGlyph size={11} />, label: t('delete moves an entry here') }]}
     />
   )
 }

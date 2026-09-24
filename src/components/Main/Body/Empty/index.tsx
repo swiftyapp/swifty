@@ -1,5 +1,7 @@
 import type { ReactElement } from 'react'
 import { useUi } from '@/store'
+import { cx } from '@/utils/cx'
+import { PANE_BLEED } from '@/components/elements/tokens'
 import { useVariant, type Variant } from './variant'
 import {
   KindEmpty,
@@ -10,6 +12,7 @@ import {
   FavoritesEmpty,
   ArchiveEmpty
 } from './variants'
+import Watermark from './Watermark'
 
 // The list column's share: only the filter states, and only ever as one line.
 // On `vault` and `health` it renders nothing at all — the detail pane is
@@ -38,11 +41,27 @@ const DETAIL: Record<Variant, () => ReactElement> = {
 }
 
 // The detail pane's share: every variant lands somewhere, centered in the pane.
+// On the wide shell the surface takes the whole pane back from its inset and
+// clips, so the watermark can run off the corner; the content keeps its own
+// gutter so it never meets an edge in a narrow split. It grows to fill the
+// pane but never shrinks under its content (`min-h-auto`, the flex item's
+// content-based minimum): in a short window the surface gets taller than the
+// pane and the pane scrolls, rather than the clip taking the sheet with it.
+// `overflow-clip`, not `hidden`: hidden makes the surface a scroll container,
+// and a flex item that scrolls has an automatic minimum of zero — the
+// `min-h-auto` above would be void and the sheet cut off at both ends. Clip
+// only trims the watermark at the edge and leaves the sizing alone.
 export function DetailEmpty({ variant }: { variant: Variant }) {
   const Content = DETAIL[variant]
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center">
+    <div
+      className={cx(
+        'relative flex min-h-full flex-col items-center justify-center px-8 py-10 md:min-h-auto md:flex-1 md:overflow-clip',
+        PANE_BLEED
+      )}
+    >
+      <Watermark />
       <Content />
     </div>
   )
