@@ -23,7 +23,7 @@ security problem.**
 
 Preferred channel — GitHub private security advisories:
 
-1. Go to <https://github.com/swiftyapp/swifty/security/advisories/new>.
+1. Go to <https://github.com/fwdai/rowel/security/advisories/new>.
 2. Describe the issue, the affected version and platform (macOS / Windows /
    Linux), and steps to reproduce. A proof of concept helps.
 3. We triage from there and, if needed, invite you into the advisory thread.

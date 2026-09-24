@@ -73,7 +73,7 @@ reissued under a different name, update it there and in `.env.example`.
 The repo is public, so the updater reads straight from GitHub Releases:
 
 ```json
-"endpoints": ["https://github.com/swiftyapp/swifty/releases/latest/download/latest.json"]
+"endpoints": ["https://github.com/fwdai/rowel/releases/latest/download/latest.json"]
 ```
 
 `/releases/latest` only ever points at a **published, non-draft, non-prerelease**

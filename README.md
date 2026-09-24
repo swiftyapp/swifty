@@ -6,9 +6,9 @@
   
   [![](https://img.shields.io/badge/PayPal-Buy%20me%20a%20Coffee-blue)](https://www.paypal.me/alchaplinsky)
   
-  [![Actions Status](https://github.com/swiftyapp/swifty/workflows/CI/badge.svg)](https://github.com/swiftyapp/swifty/actions)
-  [![Financial Contributors on Open Collective](https://opencollective.com/swifty/all/badge.svg?label=financial+contributors)](https://opencollective.com/swifty) ![GitHub release (latest SemVer including pre-releases)](https://img.shields.io/github/v/release/swiftyapp/swifty?include_prereleases&label=Release)
-  ![GitHub All Releases](https://img.shields.io/github/downloads/swiftyapp/swifty/total?label=Downloads)
+  [![Actions Status](https://github.com/fwdai/rowel/workflows/CI/badge.svg)](https://github.com/fwdai/rowel/actions)
+  [![Financial Contributors on Open Collective](https://opencollective.com/rowelapp/all/badge.svg?label=financial+contributors)](https://opencollective.com/rowelapp) ![GitHub release (latest SemVer including pre-releases)](https://img.shields.io/github/v/release/fwdai/rowel?include_prereleases&label=Release)
+  ![GitHub All Releases](https://img.shields.io/github/downloads/fwdai/rowel/total?label=Downloads)
   [![Encryption](https://img.shields.io/badge/Encryption-AES%20256%20GCM-green.svg)](https://tools.ietf.org/html/rfc5288)
   
 </div>
@@ -39,7 +39,7 @@
 
 ## Install
 
-Check the [Latest Releases](https://github.com/swiftyapp/swifty/releases) page for the
+Check the [Latest Releases](https://github.com/fwdai/rowel/releases) page for the
 most recent packaged app for MacOS, Windows or Linux.
 
 ## Verifying a release
@@ -52,11 +52,15 @@ Every release is built in GitHub Actions and ships with supply-chain evidence:
   workflow, from this source, with the [GitHub CLI](https://cli.github.com):
 
   ```bash
-  gh attestation verify ./Rowel_1.0.0_amd64.AppImage --repo swiftyapp/swifty
+  gh attestation verify ./Rowel_1.0.0_amd64.AppImage --repo fwdai/rowel
   ```
 
   (works for the `.dmg`, `.msi`, `-setup.exe`, `.deb`, `.rpm` and `.AppImage`
   assets — point it at whichever you downloaded).
+
+  Releases up to and including `v1.0.0-alpha.6` were built before the project
+  moved from `swiftyapp/swifty` to `fwdai/rowel`, so their provenance names the
+  old repository. Verify those with `--repo swiftyapp/swifty` instead.
 
 - **CycloneDX SBOM** — every release attaches `rowel-rust.cdx.json` (the full
   Rust dependency graph) and, when available, `rowel-js.cdx.json` (the
@@ -88,7 +92,7 @@ Rowel is built with [Tauri 2](https://v2.tauri.app) (Rust backend + TypeScript/R
 ### Commands
 
 ```bash
-git clone git@github.com:swiftyapp/swifty.git
+git clone git@github.com:fwdai/rowel.git
 cd rowel
 bun install
 
@@ -209,30 +213,30 @@ for what Rowel does and does not defend against.
 ### Code Contributors
 
 This project exists thanks to all the people who contribute. [[Contribute](CONTRIBUTING.md)].
-<a href="https://github.com/swiftyapp/swifty/graphs/contributors"><img src="https://opencollective.com/swifty/contributors.svg?width=890&button=false" /></a>
+<a href="https://github.com/fwdai/rowel/graphs/contributors"><img src="https://opencollective.com/rowelapp/contributors.svg?width=890&button=false" /></a>
 
 ### Financial Contributors
 
-Become a financial contributor and help us sustain our community. [[Contribute](https://opencollective.com/swifty/contribute)]
+Become a financial contributor and help us sustain our community. [[Contribute](https://opencollective.com/rowelapp/contribute)]
 
 #### Individuals
 
-<a href="https://opencollective.com/swifty"><img src="https://opencollective.com/swifty/individuals.svg?width=890"></a>
+<a href="https://opencollective.com/rowelapp"><img src="https://opencollective.com/rowelapp/individuals.svg?width=890"></a>
 
 #### Organizations
 
-Support this project with your organization. Your logo will show up here with a link to your website. [[Contribute](https://opencollective.com/swifty/contribute)]
+Support this project with your organization. Your logo will show up here with a link to your website. [[Contribute](https://opencollective.com/rowelapp/contribute)]
 
-<a href="https://opencollective.com/swifty/organization/0/website"><img src="https://opencollective.com/swifty/organization/0/avatar.svg"></a>
-<a href="https://opencollective.com/swifty/organization/1/website"><img src="https://opencollective.com/swifty/organization/1/avatar.svg"></a>
-<a href="https://opencollective.com/swifty/organization/2/website"><img src="https://opencollective.com/swifty/organization/2/avatar.svg"></a>
-<a href="https://opencollective.com/swifty/organization/3/website"><img src="https://opencollective.com/swifty/organization/3/avatar.svg"></a>
-<a href="https://opencollective.com/swifty/organization/4/website"><img src="https://opencollective.com/swifty/organization/4/avatar.svg"></a>
-<a href="https://opencollective.com/swifty/organization/5/website"><img src="https://opencollective.com/swifty/organization/5/avatar.svg"></a>
-<a href="https://opencollective.com/swifty/organization/6/website"><img src="https://opencollective.com/swifty/organization/6/avatar.svg"></a>
-<a href="https://opencollective.com/swifty/organization/7/website"><img src="https://opencollective.com/swifty/organization/7/avatar.svg"></a>
-<a href="https://opencollective.com/swifty/organization/8/website"><img src="https://opencollective.com/swifty/organization/8/avatar.svg"></a>
-<a href="https://opencollective.com/swifty/organization/9/website"><img src="https://opencollective.com/swifty/organization/9/avatar.svg"></a>
+<a href="https://opencollective.com/rowelapp/organization/0/website"><img src="https://opencollective.com/rowelapp/organization/0/avatar.svg"></a>
+<a href="https://opencollective.com/rowelapp/organization/1/website"><img src="https://opencollective.com/rowelapp/organization/1/avatar.svg"></a>
+<a href="https://opencollective.com/rowelapp/organization/2/website"><img src="https://opencollective.com/rowelapp/organization/2/avatar.svg"></a>
+<a href="https://opencollective.com/rowelapp/organization/3/website"><img src="https://opencollective.com/rowelapp/organization/3/avatar.svg"></a>
+<a href="https://opencollective.com/rowelapp/organization/4/website"><img src="https://opencollective.com/rowelapp/organization/4/avatar.svg"></a>
+<a href="https://opencollective.com/rowelapp/organization/5/website"><img src="https://opencollective.com/rowelapp/organization/5/avatar.svg"></a>
+<a href="https://opencollective.com/rowelapp/organization/6/website"><img src="https://opencollective.com/rowelapp/organization/6/avatar.svg"></a>
+<a href="https://opencollective.com/rowelapp/organization/7/website"><img src="https://opencollective.com/rowelapp/organization/7/avatar.svg"></a>
+<a href="https://opencollective.com/rowelapp/organization/8/website"><img src="https://opencollective.com/rowelapp/organization/8/avatar.svg"></a>
+<a href="https://opencollective.com/rowelapp/organization/9/website"><img src="https://opencollective.com/rowelapp/organization/9/avatar.svg"></a>
 
 ## License
 
