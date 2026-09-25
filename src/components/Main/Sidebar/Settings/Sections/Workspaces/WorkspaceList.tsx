@@ -1,18 +1,25 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useApp, selectWorkspaces, selectActiveWorkspace, switchWorkspace } from '@/store'
+import {
+  useApp,
+  useVault,
+  selectWorkspaces,
+  selectActiveWorkspace,
+  switchWorkspace
+} from '@/store'
 import { messageOf } from '@/api/errors'
 import { syncDeletedRemotely, syncErrorText } from '@/api/sync'
-import { workspaceLabel } from '@/lib/workspace'
-import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
+import WorkspaceRow from './WorkspaceRow'
 import DeleteWorkspace from './DeleteWorkspace'
+import { workspaceAbout } from './about'
 
 export default function WorkspaceList() {
   const { t } = useTranslation()
   const list = useApp(selectWorkspaces)
   const active = useApp(selectActiveWorkspace)
   const sync = useApp(state => state.sync)
+  const liveCount = useVault(state => state.items.length)
   // The one way a switch is refused: a sync flow is mid-flight in this
   // workspace, and moving the paths under it would land its files elsewhere.
   const [error, setError] = useState<string | null>(null)
@@ -41,46 +48,27 @@ export default function WorkspaceList() {
       {list.map(workspace => {
         const current = workspace.id === active
         return (
-          <SettingsRow
+          <WorkspaceRow
             key={workspace.id}
-            label={workspaceLabel(workspace, t)}
-            description={current ? t('Current') : undefined}
-            testid={`workspace-row-${workspace.id}`}
-            control={
-              <div className="flex flex-wrap items-center justify-end gap-1.5">
-                {!current && (
-                  <Button
-                    variant="pale"
-                    size="md"
-                    testid={`workspace-switch-${workspace.id}`}
-                    onClick={() =>
-                      switchWorkspace(workspace.id).catch((err: unknown) =>
-                        setError(messageOf(err))
-                      )
-                    }
-                  >
-                    {t('Switch')}
-                  </Button>
-                )}
-                <Button
-                  variant="pale"
-                  size="md"
-                  className="text-bad hover:text-bad"
-                  testid={`workspace-delete-${workspace.id}`}
-                  disabled={last}
-                  onClick={() => setDeleting(workspace.id)}
-                >
-                  {t('Delete')}
-                </Button>
-              </div>
+            workspace={workspace}
+            current={current}
+            last={last}
+            about={workspaceAbout(
+              workspace,
+              { current, syncs: syncs(workspace.id, workspace.vaultId), liveCount },
+              t
+            )}
+            onSwitch={() =>
+              switchWorkspace(workspace.id).catch((err: unknown) => setError(messageOf(err)))
             }
+            onDelete={() => setDeleting(workspace.id)}
           />
         )
       })}
       {strandedHere && (
         <div
           data-testid="workspace-deleted-remotely"
-          className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-base text-text2"
+          className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-base text-text2 inset-shadow-hairline"
         >
           <span className="text-bad">{syncErrorText(sync)}</span>
           <Button
@@ -96,12 +84,18 @@ export default function WorkspaceList() {
         </div>
       )}
       {last && (
-        <div data-testid="workspace-delete-last" className="px-4 py-3 text-base text-text2">
+        <div
+          data-testid="workspace-delete-last"
+          className="px-4 py-3 text-base text-text2 inset-shadow-hairline"
+        >
           {t('Your only workspace cannot be deleted. Add another one first.')}
         </div>
       )}
       {error && (
-        <div data-testid="workspace-switch-error" className="px-4 py-3 text-base text-bad">
+        <div
+          data-testid="workspace-switch-error"
+          className="px-4 py-3 text-base text-bad inset-shadow-hairline"
+        >
           {error}
         </div>
       )}

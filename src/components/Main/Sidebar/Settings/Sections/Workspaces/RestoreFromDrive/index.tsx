@@ -11,6 +11,7 @@ import {
 import SettingsRow from '@/components/elements/SettingsRow'
 import Button from '@/components/elements/Button'
 import DriveRestoreForm from '@/components/elements/DriveRestoreForm'
+import { CloudGlyph } from '@/components/Main/icons'
 
 // Adding a workspace that already exists somewhere else.
 //
@@ -42,6 +43,7 @@ export default function RestoreFromDrive() {
   return (
     <SettingsRow
       label={t('Restore from Google Drive')}
+      icon={<CloudGlyph size={16} />}
       description={t(
         'Sign in and pick one of the vaults this Google account already holds. It arrives as a workspace of its own, unlocked with its own master password and syncing to the same pack.'
       )}

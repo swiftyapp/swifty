@@ -4,6 +4,7 @@ import { useApp, restoreWorkspaceFromAccount } from '@/store'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import DriveRestoreForm from '@/components/elements/DriveRestoreForm'
+import { CloudGlyph } from '@/components/Main/icons'
 
 /**
  * The vaults the open workspace's Google account holds that are not on this
@@ -40,6 +41,7 @@ export default function RemoteVaults() {
     <SettingsGroup label={t('In your Google account')}>
       <SettingsRow
         label={t('Not on this device yet')}
+        icon={<CloudGlyph size={16} />}
         description={t(
           'Restore one to add it as a workspace here, unlocked with its own master password and already syncing. No new sign-in needed.'
         )}
