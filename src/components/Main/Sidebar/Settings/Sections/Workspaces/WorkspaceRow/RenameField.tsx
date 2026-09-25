@@ -82,7 +82,7 @@ export default function RenameField({ workspace, onDone }: Props) {
         <Kbd>⏎</Kbd> {t('save')} · <Kbd>esc</Kbd> {t('cancel')}
       </div>
       {error && (
-        <p data-testid="workspace-rename-error" className="mt-2 text-base text-bad">
+        <p data-testid="workspace-rename-error" className="mt-2 text-sm text-bad">
           {error}
         </p>
       )}

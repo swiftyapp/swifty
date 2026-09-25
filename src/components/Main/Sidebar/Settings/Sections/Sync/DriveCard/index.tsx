@@ -71,7 +71,7 @@ export default function DriveCard({ probing, offered, restoring }: Props) {
 
       {offered && (
         <div className="flex flex-col gap-3 px-[18px] pb-[18px]">
-          <p data-testid="settings-drive-found" className="text-base text-text2">
+          <p data-testid="settings-drive-found" className="text-sm text-text2">
             {t(
               'Restore it here to sync the same data on this device. The vault open now stays as a workspace of its own.'
             )}

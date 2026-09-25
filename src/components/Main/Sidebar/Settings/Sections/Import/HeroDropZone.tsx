@@ -50,7 +50,7 @@ export default function HeroDropZone({ onDrop }: Props) {
       <div className="mt-3 text-md font-semibold tracking-display text-text">
         {t('Drop an export file')}
       </div>
-      <p className="mt-1 max-w-[360px] text-base text-text2">
+      <p className="mt-1 max-w-[360px] text-sm text-text2">
         {t('We detect the format automatically. Parsed on this device, never uploaded.')}
       </p>
       <Button

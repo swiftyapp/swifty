@@ -126,7 +126,7 @@ export default function MasterPasswordRow() {
           <>
             {input('new_password_repeat')}
             {mismatch && (
-              <span className="text-base text-bad">{t("Passwords don't match yet.")}</span>
+              <span className="text-sm text-bad">{t("Passwords don't match yet.")}</span>
             )}
           </>
         )}
@@ -141,12 +141,12 @@ export default function MasterPasswordRow() {
             {t('Update')}
           </Button>
           {error && (
-            <span data-testid="change-password-error" className="text-base text-bad">
+            <span data-testid="change-password-error" className="text-sm text-bad">
               {error}
             </span>
           )}
           {success && (
-            <span data-testid="change-password-success" className="text-base text-good">
+            <span data-testid="change-password-success" className="text-sm text-good">
               {success}
             </span>
           )}

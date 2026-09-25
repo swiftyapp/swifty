@@ -51,7 +51,7 @@ export default function SettingsRow({
         )}
         <div className="min-w-0 flex-1">
           <div className="text-base font-medium text-text">{label}</div>
-          {description && <div className="mt-0.5 text-base text-text2">{description}</div>}
+          {description && <div className="mt-0.5 text-sm text-text2">{description}</div>}
         </div>
         {control && <div className="flex-none">{control}</div>}
       </div>

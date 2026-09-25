@@ -26,7 +26,7 @@ export default function Result({ flow }: { flow: ReturnType<typeof useImport> })
       {picked.kind === 'rowel' ? (
         // The OS opened one of our own backups with the app, but a vault is
         // already open: it is a whole sealed database, not rows to merge.
-        <span className="text-base text-text2" data-testid="import-rowel-notice">
+        <span className="text-sm text-text2" data-testid="import-rowel-notice">
           {t('Backups restore a fresh install and are not imported into an existing vault.')}
         </span>
       ) : picked.kind === 'swftx' ? (
@@ -53,7 +53,7 @@ export default function Result({ flow }: { flow: ReturnType<typeof useImport> })
       ) : (
         preview && (
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-base text-text2">
+            <span className="text-sm text-text2">
               {t('Ready to import')}:{' '}
               <strong className="text-text">{preview.total}</strong>
               {preview.skipped > 0 && (
@@ -78,18 +78,18 @@ export default function Result({ flow }: { flow: ReturnType<typeof useImport> })
       {running && <Progress done={progress.done} total={progress.total} />}
 
       {error && (
-        <span data-testid="import-error" className="text-base text-bad">
+        <span data-testid="import-error" className="text-sm text-bad">
           {error}
         </span>
       )}
       {result && (
-        <span className="text-base text-good">
+        <span className="text-sm text-good">
           {t('Imported')} {result.imported}
           {result.skipped > 0 && ` · ${t('{{count}} skipped', { count: result.skipped })}`}
         </span>
       )}
       {count !== null && (
-        <span className="text-base text-good">
+        <span className="text-sm text-good">
           {t('Imported')} {count}
         </span>
       )}

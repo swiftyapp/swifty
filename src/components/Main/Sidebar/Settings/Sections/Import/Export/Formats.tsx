@@ -81,7 +81,7 @@ export default function Formats({ value, onChange, label }: Props) {
               </span>
               <span className={META}>{format.extension}</span>
             </div>
-            <div className="mt-1.5 text-base text-text2">{t(format.hint)}</div>
+            <div className="mt-1.5 text-sm text-text2">{t(format.hint)}</div>
           </button>
         )
       })}

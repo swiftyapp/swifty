@@ -38,7 +38,7 @@ function Strip({ onDrop }: Omit<Props, 'variant'>) {
     <>
       <DownloadGlyph size={16} />
       <div className="min-w-0 text-left">
-        <div className="text-base text-text2">
+        <div className="text-sm text-text2">
           {isMobile ? t('Or choose an export file') : t('Or drop an export file here')}
         </div>
         <div className={META_TYPE}>

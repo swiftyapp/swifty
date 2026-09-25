@@ -18,7 +18,7 @@ export default function RowHead({ icon, label, description }: Props) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-base font-medium text-text">{label}</div>
-        <div className="mt-0.5 text-base text-text2">{description}</div>
+        <div className="mt-0.5 text-sm text-text2">{description}</div>
       </div>
     </>
   )

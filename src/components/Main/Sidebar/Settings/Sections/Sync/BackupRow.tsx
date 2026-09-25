@@ -79,8 +79,8 @@ export default function BackupRow() {
           >
             {t('Save')}
           </Button>
-          {error && <span className="text-base text-bad">{error}</span>}
-          {saved && <span className="text-base text-good">{t('Saved')}</span>}
+          {error && <span className="text-sm text-bad">{error}</span>}
+          {saved && <span className="text-sm text-good">{t('Saved')}</span>}
         </div>
       )}
     </div>

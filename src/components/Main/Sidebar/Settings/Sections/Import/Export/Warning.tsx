@@ -18,7 +18,7 @@ export default function Warning({ acknowledged, onAcknowledge }: Props) {
         <div className="text-base font-semibold text-text">
           {t("This file won't be encrypted")}
         </div>
-        <p className="mt-1 text-base text-text2">
+        <p className="mt-1 text-sm text-text2">
           {t(
             "Anyone who opens it can read every password, note and card. Delete it once it's imported elsewhere."
           )}

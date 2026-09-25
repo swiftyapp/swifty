@@ -3,15 +3,13 @@ import { LENGTH_RANGE } from '@/services/generator'
 import { useGenerator } from '@/components/Main/Generator/useGenerator'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
-import Toggle from '@/components/elements/Toggle'
+import CharsetChips from '@/components/Main/Generator/Charset'
 import { META } from '@/components/elements/tokens'
 import Sample from './Sample'
 
 // The seed values for every new password, shared with the ⌘G generator dialog
 // through the same hook: it starts from the stored defaults, writes each change
-// back to them, and draws a fresh sample on every change. `uppercase` stays out
-// of the UI — the dialog always draws from both cases — but is preserved in the
-// stored props.
+// back to them, and draws a fresh sample on every change.
 export default function GeneratorGroup() {
   const { t } = useTranslation()
   const { settings, value, update, regenerate, bits, level } = useGenerator()
@@ -41,27 +39,9 @@ export default function GeneratorGroup() {
         }
       />
       <SettingsRow
-        label={t('Include symbols')}
+        label={t('Characters')}
         control={
-          <Toggle
-            name="symbols"
-            checked={settings.symbols}
-            onChange={symbols => update({ symbols })}
-            aria-label={t('Include symbols')}
-            testid="settings-generator-symbols"
-          />
-        }
-      />
-      <SettingsRow
-        label={t('Include numbers')}
-        control={
-          <Toggle
-            name="numbers"
-            checked={settings.numbers}
-            onChange={numbers => update({ numbers })}
-            aria-label={t('Include numbers')}
-            testid="settings-generator-numbers"
-          />
+          <CharsetChips settings={settings} onChange={update} testidPrefix="settings-generator" />
         }
       />
     </SettingsGroup>

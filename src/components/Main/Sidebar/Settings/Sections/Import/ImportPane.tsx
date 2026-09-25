@@ -29,7 +29,7 @@ export default function ImportPane({ flow }: { flow: ReturnType<typeof useImport
         onBackup={flow.chooseBackup}
       />
       <Result flow={flow} />
-      <p className="text-base text-text2">
+      <p className="text-sm text-text2">
         {t('Imports are merged. Existing items are never overwritten.')}
       </p>
     </div>

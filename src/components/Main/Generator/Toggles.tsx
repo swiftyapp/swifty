@@ -2,22 +2,19 @@ import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
 import type { TKey } from '@/i18n'
 import type { GeneratorSettings } from '@/services/generator'
+import CharsetChips from './Charset'
 
-type Flag = 'symbols' | 'numbers' | 'excludeSimilar' | 'capitalize'
+type Flag = 'numbers' | 'excludeSimilar' | 'capitalize'
 
 interface Toggle {
   flag: Flag
   label: TKey
 }
 
-// Only the switches that mean something in the active mode are offered: symbols
-// and look-alikes have no bearing on a word list, and casing has none on a
-// random charset.
-const RANDOM: Toggle[] = [
-  { flag: 'symbols', label: 'Symbols' },
-  { flag: 'numbers', label: 'Numbers' },
-  { flag: 'excludeSimilar', label: 'No look-alikes' }
-]
+// Only the switches that mean something in the active mode are offered: a word
+// list has no character classes or look-alikes, and a random charset has no
+// casing beyond its classes.
+const RANDOM: Toggle[] = [{ flag: 'excludeSimilar', label: 'No look-alikes' }]
 
 const MEMORABLE: Toggle[] = [
   { flag: 'capitalize', label: 'Capitalize' },
@@ -31,10 +28,21 @@ interface Props {
 
 export default function Toggles({ settings, onChange }: Props) {
   const { t } = useTranslation()
-  const toggles = settings.mode === 'memorable' ? MEMORABLE : RANDOM
+  const memorable = settings.mode === 'memorable'
+  const toggles = memorable ? MEMORABLE : RANDOM
 
   return (
     <div className="mt-3.5 flex gap-1.5">
+      {/* The classes first, as glyphs: the row is too tight for their names. */}
+      {!memorable && (
+        <CharsetChips
+          settings={settings}
+          onChange={onChange}
+          compact
+          size="lg"
+          testidPrefix="generator-charset"
+        />
+      )}
       {toggles.map(({ flag, label }) => {
         const active = settings[flag]
         return (

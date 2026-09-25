@@ -35,7 +35,7 @@ export default function BreachExplainer({ id }: { id: string }) {
         <Legend swatch="bg-accent">{t('sent · first 5 of SHA-1')}</Legend>
         <Legend swatch="bg-line2">{t('never leaves this device')}</Legend>
       </div>
-      <p className="mt-2.5 text-base text-text2">
+      <p className="mt-2.5 text-sm text-text2">
         {t(
           'Only the first 5 characters of each password’s SHA-1 hash are sent (k-anonymity). Your password and its full hash never leave this device.'
         )}

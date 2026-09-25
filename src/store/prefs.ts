@@ -41,6 +41,7 @@ export const DEFAULT_PREFS: Settings = {
     numbers: true,
     symbols: true,
     uppercase: true,
+    lowercase: true,
     exclude: '',
     excludeSimilarCharacters: false
   }

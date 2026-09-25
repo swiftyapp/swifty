@@ -27,7 +27,7 @@ function Cell({ label, value, children }: CellProps) {
     <div className="flex flex-col items-start px-4 py-3.5 not-first:border-l not-first:border-line">
       <div className="flex flex-wrap items-baseline gap-x-1.5">
         <span className={cx('text-2xl font-medium tabular-nums', tone)}>{value ?? '—'}</span>
-        <span className="text-base text-text2">{label}</span>
+        <span className="text-sm text-text2">{label}</span>
       </div>
       {children}
     </div>

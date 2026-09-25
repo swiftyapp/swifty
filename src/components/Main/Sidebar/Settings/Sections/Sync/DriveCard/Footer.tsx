@@ -7,7 +7,7 @@ export default function Footer() {
   const { t } = useTranslation()
   return (
     <div className="flex items-center gap-3 border-t border-line bg-field px-[18px] py-2.5">
-      <p className="min-w-0 flex-1 text-base text-text2">
+      <p className="min-w-0 flex-1 text-sm text-text2">
         {t('Disconnecting keeps everything on this device and stops syncing.')}
       </p>
       <Button

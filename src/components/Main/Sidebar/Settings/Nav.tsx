@@ -27,7 +27,7 @@ export default function Nav({ section, onSelect, disabled = false }: Props) {
   const issues = useAuditIssues()
 
   return (
-    <nav className="flex w-[240px] flex-none flex-col border-r border-line bg-list p-4">
+    <nav className="flex w-[240px] flex-none flex-col border-r border-line bg-rail p-4">
       <div className="px-2 text-xl font-semibold tracking-display text-text">{t('Settings')}</div>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {GROUPS.map((group, index) => (

@@ -549,8 +549,27 @@ describe('Settings › security', () => {
     await go('security')
 
     await userEvent.click(screen.getByTestId('settings-generator-symbols'))
-
     expect(usePrefs.getState().generator.symbols).toBe(false)
+
+    await userEvent.click(screen.getByTestId('settings-generator-uppercase'))
+    expect(usePrefs.getState().generator.uppercase).toBe(false)
+    expect(screen.getByTestId('settings-generator-uppercase')).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
+  })
+
+  it('keeps the last character class on', async () => {
+    await open()
+    await go('security')
+
+    for (const flag of ['uppercase', 'numbers', 'symbols'])
+      await userEvent.click(screen.getByTestId(`settings-generator-${flag}`))
+
+    const lowercase = screen.getByTestId('settings-generator-lowercase')
+    expect(lowercase).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(lowercase)
+    expect(usePrefs.getState().generator.lowercase).toBe(true)
   })
 
   it('draws a sample from the defaults and redraws it on every change', async () => {

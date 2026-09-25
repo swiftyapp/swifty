@@ -72,7 +72,7 @@ function Shares() {
 
   if (error)
     return (
-      <div data-testid="settings-shares-error" className="text-base text-bad">
+      <div data-testid="settings-shares-error" className="text-sm text-bad">
         {error}
       </div>
     )
@@ -99,7 +99,7 @@ function Shares() {
           >
             <span className="min-w-0 flex-1">
               <span className="block truncate text-base text-text">{titleOf(share)}</span>
-              <span className="block text-base text-text2">
+              <span className="block text-sm text-text2">
                 {share.kind && `${t(kindOf(share.kind).label)} · `}
                 {left ? t('Expires {{when}}', { when: left }) : t('Expired')}
               </span>

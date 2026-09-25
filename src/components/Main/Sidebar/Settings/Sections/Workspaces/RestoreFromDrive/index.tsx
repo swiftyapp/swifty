@@ -69,17 +69,17 @@ export default function RestoreFromDrive() {
       }
     >
       {drive.status === 'pending' && (
-        <p data-testid="workspace-restore-waiting" className="text-base text-text2">
+        <p data-testid="workspace-restore-waiting" className="text-sm text-text2">
           {t('Waiting for Google…')}
         </p>
       )}
       {drive.status === 'empty' && (
-        <p data-testid="workspace-restore-empty" className="text-base text-text2">
+        <p data-testid="workspace-restore-empty" className="text-sm text-text2">
           {t('This Google account has nothing to restore')}
         </p>
       )}
       {drive.status === 'error' && (
-        <p data-testid="workspace-restore-error" className="text-base text-bad">
+        <p data-testid="workspace-restore-error" className="text-sm text-bad">
           {drive.error || t('Something went wrong')}
         </p>
       )}

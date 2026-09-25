@@ -9,7 +9,7 @@ import BackupRow from './BackupRow'
 import SharesRow from './SharesRow'
 
 const ErrorNote = ({ message }: { message: string }) => (
-  <div data-testid="settings-sync-error" className="px-[18px] pt-2.5 text-base text-bad">
+  <div data-testid="settings-sync-error" className="px-[18px] pt-2.5 text-sm text-bad">
     {message}
   </div>
 )

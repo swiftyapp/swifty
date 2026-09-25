@@ -67,7 +67,7 @@ export default function BiometricRow() {
       }
     >
       {error && (
-        <span data-testid="settings-biometric-error" className="text-base text-bad">
+        <span data-testid="settings-biometric-error" className="text-sm text-bad">
           {error}
         </span>
       )}

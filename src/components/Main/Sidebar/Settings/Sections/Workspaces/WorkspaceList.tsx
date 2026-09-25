@@ -68,7 +68,7 @@ export default function WorkspaceList() {
       {strandedHere && (
         <div
           data-testid="workspace-deleted-remotely"
-          className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-base text-text2 inset-shadow-hairline"
+          className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm text-text2 inset-shadow-hairline"
         >
           <span className="text-bad">{syncErrorText(sync)}</span>
           <Button
@@ -86,7 +86,7 @@ export default function WorkspaceList() {
       {last && (
         <div
           data-testid="workspace-delete-last"
-          className="px-4 py-3 text-base text-text2 inset-shadow-hairline"
+          className="px-4 py-3 text-sm text-text2 inset-shadow-hairline"
         >
           {t('Your only workspace cannot be deleted. Add another one first.')}
         </div>
@@ -94,7 +94,7 @@ export default function WorkspaceList() {
       {error && (
         <div
           data-testid="workspace-switch-error"
-          className="px-4 py-3 text-base text-bad inset-shadow-hairline"
+          className="px-4 py-3 text-sm text-bad inset-shadow-hairline"
         >
           {error}
         </div>

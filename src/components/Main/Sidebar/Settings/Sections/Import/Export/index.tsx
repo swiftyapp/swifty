@@ -41,7 +41,7 @@ export default function ExportPane() {
       <Warning acknowledged={acknowledged} onAcknowledge={setAcknowledged} />
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <p className="min-w-0 flex-1 text-base text-text2">
+        <p className="min-w-0 flex-1 text-sm text-text2">
           {t('Moving to another device?')}{' '}
           <button
             type="button"
