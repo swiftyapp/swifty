@@ -29,6 +29,8 @@ pub const FILE_OPENED: &str = "file:opened";
 pub const BROWSER_ASSOCIATE: &str = "browser:associate";
 #[cfg(desktop)]
 pub const BROWSER_PASSKEY: &str = "browser:passkey";
+#[cfg(desktop)]
+pub const BROWSER_CLIENTS: &str = "browser:clients";
 
 #[derive(Serialize, Clone)]
 struct Entries {
@@ -143,6 +145,7 @@ pub fn browser_associate(app: &AppHandle, key: &str) {
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct PasskeyAsk<'a> {
+    id: &'a str,
     kind: &'static str,
     rp_id: &'a str,
     origin: &'a str,
@@ -155,9 +158,15 @@ struct PasskeyAsk<'a> {
 /// The page at `origin` asks, through the extension, to create a passkey
 /// (`register`) or to sign in with one (`get`). The site it is for is
 /// `rpId`; the account, on a registration, is the one the site names. The
-/// answer comes back through `commands::browser::browser_passkey_respond`.
+/// answer comes back through `commands::browser::browser_passkey_respond`,
+/// naming `id`, so a dialog left up past this ask cannot answer the next.
 #[cfg(desktop)]
-pub fn browser_passkey(app: &AppHandle, origin: &str, ceremony: crate::passkey::Ceremony<'_>) {
+pub fn browser_passkey(
+    app: &AppHandle,
+    id: &str,
+    origin: &str,
+    ceremony: crate::passkey::Ceremony<'_>,
+) {
     use crate::passkey::Ceremony;
     let ask = match ceremony {
         Ceremony::Register {
@@ -165,6 +174,7 @@ pub fn browser_passkey(app: &AppHandle, origin: &str, ceremony: crate::passkey::
             user_name,
             user_display_name,
         } => PasskeyAsk {
+            id,
             kind: "register",
             rp_id,
             origin,
@@ -172,6 +182,7 @@ pub fn browser_passkey(app: &AppHandle, origin: &str, ceremony: crate::passkey::
             user_display_name,
         },
         Ceremony::SignIn { rp_id } => PasskeyAsk {
+            id,
             kind: "get",
             rp_id,
             origin,
@@ -180,4 +191,12 @@ pub fn browser_passkey(app: &AppHandle, origin: &str, ceremony: crate::passkey::
         },
     };
     let _ = app.emit(BROWSER_PASSKEY, ask);
+}
+
+/// An extension was let into the open vault by the consent dialog. No
+/// payload: Settings › Browser extension re-reads `browser_status`, which is
+/// the one answer its list is drawn from.
+#[cfg(desktop)]
+pub fn browser_clients(app: &AppHandle) {
+    let _ = app.emit(BROWSER_CLIENTS, ());
 }

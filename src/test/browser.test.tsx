@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EVENTS } from '@/api/events'
-import type { BrowserStatus } from '@/api/browser'
+import { ASSOCIATE_TIMEOUT_MS, type BrowserStatus } from '@/api/browser'
 import Settings from '@/components/Main/Sidebar/Settings'
 import BrowserAssociate from '@/components/Main/BrowserAssociate'
 import { openSettings, useUi } from '@/store'
@@ -66,6 +66,44 @@ describe('Settings › Browser extension', () => {
     expect(calls('browser_forget_client')).toEqual([{ key: KEY }])
     expect(screen.queryByTestId('settings-browser-client')).not.toBeInTheDocument()
   })
+
+  it('takes one change at a time', async () => {
+    let settle: (status: BrowserStatus) => void = () => {}
+    mockCommand('browser_status', () =>
+      status({
+        clients: [
+          { name: 'Work Chrome', key: KEY },
+          { name: 'Home Firefox', key: 'ZZZZyyyyXXXXwwww0000=' }
+        ]
+      })
+    )
+    mockCommand('browser_forget_client', () => new Promise(resolve => (settle = resolve)))
+    await openSection()
+    const [first, second] = screen.getAllByTestId('settings-browser-forget')
+
+    await userEvent.click(first)
+
+    // The first forget is in flight: nothing else can be asked for.
+    expect(second).toBeDisabled()
+    expect(screen.getByTestId('settings-browser-toggle')).toBeDisabled()
+    await userEvent.click(second)
+    expect(calls('browser_forget_client')).toEqual([{ key: KEY }])
+
+    await act(async () => settle(status({ clients: [{ name: 'Home Firefox', key: 'Z' }] })))
+    expect(screen.getByTestId('settings-browser-forget')).toBeEnabled()
+  })
+
+  it('re-reads its list when the consent dialog lets an extension in', async () => {
+    mockCommand('browser_status', () => status())
+    subscribeToEvents()
+    await openSection()
+    expect(screen.getByTestId('settings-browser-clients-empty')).toBeInTheDocument()
+
+    mockCommand('browser_status', () => status({ clients: [{ name: 'Work Chrome', key: KEY }] }))
+    act(() => emitEvent(EVENTS.browserClients, undefined))
+
+    expect(await screen.findByTestId('settings-browser-client')).toHaveTextContent('Work Chrome')
+  })
 })
 
 describe('the browser consent dialog', () => {
@@ -86,7 +124,7 @@ describe('the browser consent dialog', () => {
     await userEvent.type(name, 'Work laptop')
     await userEvent.click(screen.getByTestId('browser-associate-allow'))
 
-    expect(calls('browser_respond')).toEqual([{ name: 'Work laptop' }])
+    expect(calls('browser_respond')).toEqual([{ key: KEY, name: 'Work laptop' }])
     expect(screen.queryByTestId('browser-associate-modal')).not.toBeInTheDocument()
     expect(useUi.getState().browserAsk).toBeNull()
   })
@@ -95,14 +133,30 @@ describe('the browser consent dialog', () => {
     await ask()
     await userEvent.click(screen.getByTestId('browser-associate-deny'))
 
-    expect(calls('browser_respond')).toEqual([{ name: null }])
+    expect(calls('browser_respond')).toEqual([{ key: KEY, name: null }])
     expect(screen.queryByTestId('browser-associate-modal')).not.toBeInTheDocument()
   })
 
-  it('replaces an ask still on screen with a newer one', async () => {
+  it('replaces an ask still on screen with a newer one, and answers for that one', async () => {
     await ask()
     act(() => emitEvent(EVENTS.browserAssociate, { key: 'ZZZZyyyyXXXXwwww0000=' }))
 
     expect(screen.getByTestId('browser-associate-fingerprint')).toHaveTextContent('ZZZZyyyy…000=')
+    await userEvent.click(screen.getByTestId('browser-associate-allow'))
+    expect(calls('browser_respond')).toEqual([{ key: 'ZZZZyyyyXXXXwwww0000=', name: 'Browser' }])
+  })
+
+  it('leaves on its own once Rust has given up on the ask', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      await ask()
+      act(() => {
+        vi.advanceTimersByTime(ASSOCIATE_TIMEOUT_MS)
+      })
+      expect(screen.queryByTestId('browser-associate-modal')).not.toBeInTheDocument()
+      expect(calls('browser_respond')).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

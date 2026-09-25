@@ -106,6 +106,13 @@ export interface UiState {
    * the older, and Rust giving up on it after a minute.
    */
   passkeyAsk: PasskeyAsk | null
+  /**
+   * How many times the open vault's list of let-in extensions has changed
+   * behind the frontend's back — a consent dialog answered while Settings ›
+   * Browser extension is open. That section re-reads its status when this
+   * moves; nothing renders the number itself.
+   */
+  browserClientsSeq: number
 }
 
 const GENERATOR_CLOSED: Generator = { open: false, apply: null, ssh: null }
@@ -139,7 +146,8 @@ export const initialUi: UiState = {
   copied: false,
   notice: null,
   browserAsk: null,
-  passkeyAsk: null
+  passkeyAsk: null,
+  browserClientsSeq: 0
 }
 
 export const useUi = create<UiState>()(() => initialUi)
@@ -293,6 +301,8 @@ export const askBrowser = (key: string) => useUi.setState({ browserAsk: key })
 export const closeBrowserAsk = () => useUi.setState({ browserAsk: null })
 export const askPasskey = (ask: PasskeyAsk) => useUi.setState({ passkeyAsk: ask })
 export const closePasskeyAsk = () => useUi.setState({ passkeyAsk: null })
+export const browserClientsChanged = () =>
+  useUi.setState(state => ({ browserClientsSeq: state.browserClientsSeq + 1 }))
 
 // --- scanning ---------------------------------------------------------------------
 

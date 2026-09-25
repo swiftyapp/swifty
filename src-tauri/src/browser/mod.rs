@@ -103,30 +103,34 @@ pub fn socket_name(root: &Path) -> io::Result<Name<'static>> {
 // One `associate` and one passkey ceremony at a time wait on the user, each in
 // its own slot. The connection thread parks on the receiving end; the
 // frontend's answer arrives through `respond` / `respond_passkey`, from the
-// command its dialog invokes.
+// command its dialog invokes. An ask is held under a tag — the extension's
+// key, or a ceremony's id — and an answer names the tag it is for: a dialog
+// left up past the ask it was drawn for (Rust gives up after a minute, the
+// webview does the same on its own clock) cannot answer the next ask with a
+// yes the user gave while looking at another.
 
-struct Pending<T>(Mutex<Option<SyncSender<T>>>);
+struct Pending<T>(Mutex<Option<(String, SyncSender<T>)>>);
 
 impl<T> Pending<T> {
     const fn new() -> Self {
         Self(Mutex::new(None))
     }
 
-    fn slot(&self) -> std::sync::MutexGuard<'_, Option<SyncSender<T>>> {
+    fn slot(&self) -> std::sync::MutexGuard<'_, Option<(String, SyncSender<T>)>> {
         self.0.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// Put the question (`emit`) to the user and block for the answer, up to
-    /// [`CONSENT_TIMEOUT`]. A second question while one is up is refused
-    /// rather than queued: `None`, as no answer is.
-    fn ask(&self, app: &AppHandle, emit: impl FnOnce()) -> Option<T> {
+    /// Put the question (`emit`) to the user under `tag` and block for the
+    /// answer, up to [`CONSENT_TIMEOUT`]. A second question while one is up is
+    /// refused rather than queued: `None`, as no answer is.
+    fn ask(&self, app: &AppHandle, tag: &str, emit: impl FnOnce()) -> Option<T> {
         let (sender, receiver) = sync_channel(1);
         {
             let mut slot = self.slot();
             if slot.is_some() {
                 return None;
             }
-            *slot = Some(sender);
+            *slot = Some((tag.to_string(), sender));
         }
         emit();
         window::raise(app);
@@ -135,10 +139,15 @@ impl<T> Pending<T> {
         answer
     }
 
-    /// The answer to the question that is up. Returns whether one was.
-    fn answer(&self, value: T) -> bool {
-        let sender = self.slot().take();
-        sender.is_some_and(|sender| sender.send(value).is_ok())
+    /// The answer to the question up under `tag`. Returns whether that one was
+    /// waiting for it; an answer for another tag, or for no ask, does nothing.
+    fn answer(&self, tag: &str, value: T) -> bool {
+        let mut slot = self.slot();
+        if slot.as_ref().is_none_or(|(asked, _)| asked != tag) {
+            return false;
+        }
+        let (_, sender) = slot.take().expect("checked above");
+        sender.send(value).is_ok()
     }
 }
 
@@ -149,27 +158,32 @@ static PASSKEY: Pending<bool> = Pending::new();
 /// they gave it, or `None`. Blocks the calling thread (see [`Pending::ask`]).
 pub fn ask(app: &AppHandle, key: &str) -> Option<String> {
     ASSOCIATE
-        .ask(app, || events::browser_associate(app, key))
+        .ask(app, key, || events::browser_associate(app, key))
         .flatten()
 }
 
-/// The user's answer to the associate ask that is up: the name they gave the
-/// extension, or `None` for a refusal. Returns whether an ask was waiting.
-pub fn respond(name: Option<String>) -> bool {
-    ASSOCIATE.answer(name)
+/// The user's answer to the ask up for `key`: the name they gave the
+/// extension, or `None` for a refusal. Returns whether that ask was waiting.
+pub fn respond(key: &str, name: Option<String>) -> bool {
+    ASSOCIATE.answer(key, name)
 }
 
 /// Ask the user whether the page at `origin` may have `ceremony`. Blocks the
-/// calling thread (see [`Pending::ask`]); no answer is a no.
+/// calling thread (see [`Pending::ask`]); no answer is a no. The ask is
+/// tagged with an id of its own, which the dialog's answer names.
 pub fn ask_passkey(app: &AppHandle, origin: &str, ceremony: Ceremony<'_>) -> bool {
+    let id = crate::crypto::random_hex_id();
     PASSKEY
-        .ask(app, || events::browser_passkey(app, origin, ceremony))
+        .ask(app, &id, || {
+            events::browser_passkey(app, &id, origin, ceremony)
+        })
         .unwrap_or(false)
 }
 
-/// The user's answer to the passkey ask that is up. Returns whether one was.
-pub fn respond_passkey(allow: bool) -> bool {
-    PASSKEY.answer(allow)
+/// The user's answer to the passkey ask up under `id`. Returns whether that
+/// one was waiting for it.
+pub fn respond_passkey(id: &str, allow: bool) -> bool {
+    PASSKEY.answer(id, allow)
 }
 
 /// The prompt a ceremony from the extension asks through: the app's dialog,
@@ -315,6 +329,8 @@ impl Host for AppHost {
                 log::warn!("browser host: could not remember the extension: {e}");
                 Code::AssociationFailed
             })?;
+            // Settings › Browser extension, if it is open, lists it now.
+            events::browser_clients(&self.0);
         }
         Ok(name)
     }

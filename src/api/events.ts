@@ -73,6 +73,12 @@ export interface EventPayloads {
    * request open until `browser_passkey_respond`, or a minute. Desktop only.
    */
   'browser:passkey': PasskeyAsk
+  /**
+   * An extension was let into the open vault by the consent dialog. Settings ›
+   * Browser extension re-reads its status on it; no payload, since that status
+   * is the one answer its list is drawn from. Desktop only.
+   */
+  'browser:clients': void
 }
 
 export type EventName = keyof EventPayloads
@@ -99,7 +105,8 @@ export const EVENTS: { [K in EventName as Camel<K>]: K } = {
   workspacesRenamed: 'workspaces:renamed',
   fileOpened: 'file:opened',
   browserAssociate: 'browser:associate',
-  browserPasskey: 'browser:passkey'
+  browserPasskey: 'browser:passkey',
+  browserClients: 'browser:clients'
 }
 
 // Typed wrapper over Tauri's `listen`.

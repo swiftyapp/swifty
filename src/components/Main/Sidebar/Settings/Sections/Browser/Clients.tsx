@@ -7,11 +7,14 @@ import SettingsRow from '@/components/elements/SettingsRow'
 
 // The extensions let into the open vault. Forgetting one ends its access at
 // its next request, connected or not; it has to ask, and be let in, again.
+// `busy` is a change already in flight: the buttons wait for it.
 export default function Clients({
   clients,
+  busy,
   onForget
 }: {
   clients: BrowserClient[]
+  busy: boolean
   onForget: (key: string) => void
 }) {
   const { t } = useTranslation()
@@ -37,6 +40,7 @@ export default function Clients({
                 variant="pale"
                 size="md"
                 className="text-bad hover:text-bad"
+                disabled={busy}
                 onClick={() => onForget(client.key)}
                 testid="settings-browser-forget"
               >
