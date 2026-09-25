@@ -73,7 +73,7 @@ export default function Nav({ section, onSelect, disabled = false }: Props) {
                       {badge !== null && (
                         <span
                           data-testid="settings-nav-audit-badge"
-                          className={`flex-none rounded-full px-2 ${META_TYPE} bg-warn/10 text-warn`}
+                          className={`flex-none rounded-full px-2 ${META_TYPE} bg-accent-soft text-accent`}
                         >
                           {badge}
                         </span>
