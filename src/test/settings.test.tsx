@@ -1836,14 +1836,16 @@ describe('Settings sub-pages', () => {
 
   const onSection = () => {
     expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeInTheDocument()
-    expect(screen.queryByTestId('settings-subpage-crumb')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('settings-subpage-back')).not.toBeInTheDocument()
     expect(screen.getByTestId('workspace-new-row')).toBeInTheDocument()
   }
 
-  it('heads the sub-page under its section and comes back from it', async () => {
+  it('heads the sub-page in the section’s place and comes back from it', async () => {
     await openSubpage()
 
-    expect(screen.getByTestId('settings-subpage-crumb')).toHaveTextContent('Workspaces')
+    // The title takes the section's line: one heading, nothing stacked above
+    // it, so the header keeps its height on the way in and out.
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
     expect(screen.getByRole('heading', { name: 'New workspace' })).toBeInTheDocument()
     expect(
       screen.getByText('Its own encrypted database, unlocked alongside your others.')
@@ -1869,7 +1871,7 @@ describe('Settings sub-pages', () => {
 
     await go('security')
     expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument()
-    expect(screen.queryByTestId('settings-subpage-crumb')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('settings-subpage-back')).not.toBeInTheDocument()
 
     // Coming back lands on the section, not on the sub-page left behind.
     await go('workspaces')

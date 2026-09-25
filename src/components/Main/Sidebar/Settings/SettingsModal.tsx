@@ -3,14 +3,13 @@ import { useTranslation } from 'react-i18next'
 import { useUi, closeSettings, setSettingsSection, type Section as Key } from '@/store'
 import Modal from '@/components/elements/Modal'
 import Kbd from '@/components/elements/Kbd'
-import { LABEL } from '@/components/elements/tokens'
 import { cx } from '@/utils/cx'
 import Nav from './Nav'
 import Section from './Section'
 import { descriptionOf, titleOf } from './sections'
 import { SubpageProvider } from './sectionNav'
 import SubpageBody from './SubpageBody'
-import { subpageCrumbOf, subpageDescriptionOf, subpageTitleOf, type Subpage } from './subpages'
+import { subpageDescriptionOf, subpageTitleOf, type Subpage } from './subpages'
 import { BackGlyph, CloseGlyph } from '../../icons'
 
 const TITLE_ID = 'settings-title'
@@ -73,12 +72,10 @@ export default function SettingsModal() {
                 <BackGlyph size={16} />
               </button>
             )}
+            {/* No crumb above the title: the back button already says there is
+                somewhere to go back to, and a line added over the title would
+                move the header on every step in and out. */}
             <div className="min-w-0 flex-1">
-              {subpage && (
-                <div data-testid="settings-subpage-crumb" className={cx(LABEL, 'mb-0.5 truncate')}>
-                  {subpageCrumbOf(subpage)}
-                </div>
-              )}
               <h1
                 id={TITLE_ID}
                 className="truncate text-xl font-semibold tracking-display text-text"

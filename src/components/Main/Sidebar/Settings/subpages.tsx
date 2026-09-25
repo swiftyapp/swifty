@@ -11,7 +11,7 @@ export type Subpage = { key: 'new-workspace' } | { key: 'edit-workspace'; id: st
 type Key = Subpage['key']
 
 interface Definition<K extends Key> {
-  /** The section it sits under: the eyebrow on the wide shell, Back on the phone. */
+  /** The section it sits under: what the phone's Back is labelled with. */
   crumb: Section
   title: TKey
   description: TKey
@@ -41,5 +41,5 @@ export const subpageTitleOf = (subpage: Subpage): string => t(SUBPAGES[subpage.k
 export const subpageDescriptionOf = (subpage: Subpage): string =>
   t(SUBPAGES[subpage.key].description)
 
-/** The parent section's title, as the crumb and the phone's Back label. */
+/** The parent section's title, as the phone's Back label. */
 export const subpageCrumbOf = (subpage: Subpage): string => titleOf(SUBPAGES[subpage.key].crumb)
