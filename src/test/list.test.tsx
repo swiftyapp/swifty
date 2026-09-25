@@ -135,6 +135,25 @@ describe('Entry list', () => {
     expect(titles()).toEqual(['Airbnb', 'Basecamp', 'Monzo', 'Zebra'])
   })
 
+  it('sorts by date created, which a later edit does not move', async () => {
+    withEntries([
+      loginMeta({ id: 'old', title: 'Basecamp', createdAt: at(2024, 0, 1, 9), updatedAt: at(2024, 2, 14, 11) }),
+      loginMeta({ id: 'mid', title: 'Monzo', createdAt: at(2024, 1, 1, 9), updatedAt: at(2024, 1, 1, 9) }),
+      loginMeta({ id: 'new', title: 'Zebra', createdAt: at(2024, 2, 1, 9), updatedAt: at(2024, 2, 1, 9) })
+    ])
+    render(<ListColumn actions={<SortMenu />} />)
+
+    // Under Recently edited the oldest row leads: it was edited this morning.
+    await userEvent.click(screen.getByTestId('sort-menu'))
+    await userEvent.click(screen.getByText('Recently edited'))
+    expect(titles()).toEqual(['Basecamp', 'Zebra', 'Monzo'])
+
+    // Under Date created that edit counts for nothing: newest-made first.
+    await userEvent.click(screen.getByTestId('sort-menu'))
+    await userEvent.click(screen.getByText('Date created'))
+    expect(titles()).toEqual(['Zebra', 'Monzo', 'Basecamp'])
+  })
+
   // Read off the `hasPasskey` column, so a row is marked without the list
   // decrypting anything — and unmarked rows stay unmarked.
   it('marks only the logins that hold a passkey', () => {

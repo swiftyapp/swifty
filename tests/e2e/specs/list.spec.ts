@@ -20,7 +20,7 @@ const ZEPHYR = "Zephyr Mail";
 const ACME = "Acme Bank";
 const MERCURY = "Mercury Cloud";
 
-type SortMode = "recent" | "alpha";
+type SortMode = "alpha" | "recent" | "created";
 
 async function pickSort(mode: SortMode): Promise<void> {
   await waitFor("sort-menu");

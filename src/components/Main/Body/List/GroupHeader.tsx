@@ -47,9 +47,15 @@ export default function GroupHeader({ type, count, id, door }: Props) {
 
   // A caption that opens a place is a button; one that only names a section is
   // text. Same shell either way, so the two read as one thing.
+  //
+  // Out of the tab order: the list is one tab stop (the selected row, see
+  // List/Item), and a caption per kind in front of it would make the keyboard
+  // walk the captions to reach the rows. The keyboard has the same places
+  // in the title's scope menu, a tab stop the column already carries.
   return door ? (
     <button
       type="button"
+      tabIndex={-1}
       data-testid={`group-${type}`}
       title={t(kind.pluralLabel)}
       onClick={() => showKind(type)}

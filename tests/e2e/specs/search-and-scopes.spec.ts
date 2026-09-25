@@ -115,8 +115,9 @@ describe("search and kind filters", () => {
   it("lists every kind together under All Items", async () => {
     await selectKind("all");
 
-    // Newest write first, so the reverse of the seed order across all kinds.
-    await expectTitles([CARD, NOTE, ...LOGINS_BY_RECENCY]);
+    // Sectioned by kind in registry order — logins, then cards, then notes —
+    // and newest write first inside each section.
+    await expectTitles([...LOGINS_BY_RECENCY, CARD, NOTE]);
     await expect($('[data-testid="list-title"]')).toHaveText("All Items");
     await openScope();
     await expect($('[data-testid="scope-option-all"]')).toHaveAttribute(
