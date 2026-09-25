@@ -4,7 +4,8 @@
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::mpsc::{channel, Sender};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use interprocess::local_socket::{prelude::*, Listener, ListenerOptions, RecvHalf};
 use tauri::AppHandle;
@@ -179,26 +180,42 @@ pub const UNLOCKED: &[u8] = br#"{"action":"database-unlocked"}"#;
 /// The vault just locked: every connected extension flips its icon, and asks
 /// again before it fills anything.
 pub fn notify_locked() {
-    std::thread::spawn(|| signal(LOCKED));
+    queue(LOCKED);
 }
 
 /// The vault just opened, or another workspace did: every connected extension
 /// re-checks the hash, which says which one it is talking to now.
 pub fn notify_unlocked() {
-    std::thread::spawn(|| signal(UNLOCKED));
+    queue(UNLOCKED);
+}
+
+// The signals go out from one thread, in the order they were raised: a
+// workspace switch raises a lock and an unlock back to back, and an extension
+// that heard them the other way round would show the vault just opened as
+// sealed. One thread rather than one per signal, and a channel the caller
+// never waits on, so a peer that has stopped reading — its buffer full, the
+// write to it blocking — stalls neither the lock that raised the signal nor
+// the accept loop registering the next connection. It does stall replies on
+// that one connection, which is dead already, and any signal behind it.
+fn queue(message: &'static [u8]) {
+    static SIGNALS: OnceLock<Sender<&'static [u8]>> = OnceLock::new();
+    let sender = SIGNALS.get_or_init(|| {
+        let (sender, receiver) = channel::<&'static [u8]>();
+        std::thread::spawn(move || {
+            for message in receiver {
+                signal(message);
+            }
+        });
+        sender
+    });
+    let _ = sender.send(message);
 }
 
 /// Send `message` to every connection, in the clear and unsolicited, as
 /// KeePassXC sends its signals: no nonce to seal under, and nothing in them
 /// the extension would not learn from its next ask. A connection the write
-/// fails on has gone, and goes from the list with it.
-///
-/// Writes happen over a snapshot of the list, never under its lock, and the
-/// two notifiers above run this on a thread of its own: a peer that has
-/// stopped reading blocks the write to it once its buffer is full, and that
-/// must stall neither the lock that raised the signal nor the accept loop
-/// registering the next connection. It does stall replies on that one
-/// connection, which is dead already.
+/// fails on has gone, and goes from the list with it. Writes happen over a
+/// snapshot of the list, never under its lock.
 pub fn signal(message: &[u8]) {
     let writers: Vec<Writer> = clients().clone();
     let gone: Vec<Writer> = writers
