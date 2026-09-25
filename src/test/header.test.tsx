@@ -64,7 +64,7 @@ describe('Header', () => {
     expect(chip()).toHaveAttribute('data-tone', 'loading')
   })
 
-  it('opens Settings › Sync & devices from the sync chip', async () => {
+  it('opens Settings › Sync & backup from the sync chip', async () => {
     synced()
     render(<Header />)
 

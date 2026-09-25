@@ -336,6 +336,9 @@
   --color-rail: var(--c-rail);
   --color-list: var(--c-list);
   --color-detail: var(--c-detail);
+  /* An overlay's ground (the settings modal): a shade under the detail pane on
+   * the light theme, so the white cards on it read as cards. */
+  --color-pane: var(--c-pane);
   --color-field: var(--c-field);
   --color-tile: var(--c-tile);
   --color-line: var(--c-line);
@@ -385,6 +388,7 @@
   --color-menu: var(--menu);
   --color-menu-line: var(--menu-line);
   --background-image-card: var(--card);
+  --shadow-card: var(--card-shadow);
   --shadow-float: var(--shadow);
   --shadow-menu: var(--menu-shadow);
   --shadow-lockfield: var(--lockfield-shadow);
@@ -432,6 +436,7 @@
  *
  *   Type      2xs 10px footer chrome (a tier below content)
  *             xs 11px micro (labels/meta/counts/kbd)
+ *             sm 12px the note under a thing (a row's description, a footnote)
  *             base 13px everything readable — hierarchy via weight + ink
  *             md 15px the passphrase field and its mask
  *             lg 16 / xl 20 / 2xl 24 display tiers (2xl is also the phone
@@ -441,8 +446,9 @@
  *   Radius    xs 4 chips & inlays · sm 8 controls · lg 12 tiles & cards
  *             xl 14 overlays · 2xl 28 sheets (a bottom sheet's top corners)
  *   Width     dialog-sm 470 (generator) · dialog 640 (pickers: add, palette)
- *             dialog-lg 720 (the Modal default) · sheet 860 (settings, the
- *             entry detail column) — on top of Tailwind's rem container scale
+ *             dialog-lg 720 (the Modal default) · sheet 860 (the entry detail
+ *             column) · settings 1040 (the settings modal) — on top of
+ *             Tailwind's rem container scale
  *   Motion    one duration (160ms) — plus a 300ms slow tier for sweeps that
  *             should be seen moving (the lock field, a progress bar) —
  *             one easing (ease-swift) — plus ease-spring, which overshoots,
@@ -456,6 +462,8 @@
   --text-2xs--line-height: 1.3;
   --text-xs: 11px;
   --text-xs--line-height: 1.35;
+  --text-sm: 12px;
+  --text-sm--line-height: 1.45;
   --text-base: 13px;
   --text-base--line-height: 1.45;
   --text-md: 15px;
@@ -485,6 +493,7 @@
   --container-dialog: 640px;
   --container-dialog-lg: 720px;
   --container-sheet: 860px;
+  --container-settings: 1040px;
 
   --ease-swift: cubic-bezier(0.2, 0.8, 0.2, 1);
   /* Overshoots and settles: the tab bar's lens sliding to the tapped tab. */
@@ -620,6 +629,7 @@
   --c-rail: #e4e5e8;
   --c-list: #f3f4f6;
   --c-detail: #ffffff;
+  --c-pane: #f7f8fa;
   --c-field: #fafafb;
   --c-tile: rgba(20, 22, 26, 0.065);
   --c-line: rgba(20, 22, 26, 0.075);
@@ -700,6 +710,13 @@
 
   /* Gradients, shadows and scrims; exposed as utilities via @theme above. */
   --card: linear-gradient(180deg, #ffffff, #fbfbfc);
+  /* A card's lift off the pane (see `CARD` in elements/tokens): a whisper of
+   * drop shadow under a white inset top edge on the light theme, and only the
+   * top glow on the dark one, where a shadow on a dark ground says nothing. */
+  --card-shadow:
+    0 1px 2px rgba(22, 28, 48, 0.05),
+    0 2px 8px -2px rgba(22, 28, 48, 0.05),
+    inset 0 1px 0 #ffffff;
   --chrome: rgba(246, 247, 248, 0.92);
   /* `chrome`'s floating cousin: the surface of something the content scrolls
    * under (the compact tab bar), so it is thinner and wants a backdrop blur. */
@@ -777,6 +794,7 @@
   --c-rail: #131415;
   --c-list: #171819;
   --c-detail: #1b1c1e;
+  --c-pane: #1b1c1e;
   --c-field: rgba(255, 255, 255, 0.03);
   --c-tile: rgba(255, 255, 255, 0.06);
   --c-line: rgba(255, 255, 255, 0.05);
@@ -838,6 +856,7 @@
     rgba(255, 255, 255, 0.045),
     rgba(255, 255, 255, 0.012)
   );
+  --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
   --chrome: rgba(15, 16, 17, 0.82);
   --glass: rgba(40, 42, 46, 0.72);
   --topglow: rgba(255, 255, 255, 0.06);

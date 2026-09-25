@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import i18n, { changeLocale } from '@/i18n'
@@ -8,6 +8,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import type { SyncStatus } from '@/api/sync'
 import type { SetupDriveFile } from '@/api/setup'
 import {
+  auditDone,
   closeSettings,
   fileOpened,
   flowMain,
@@ -27,7 +28,7 @@ import DateField from '@/components/elements/fields/DateField'
 import { FieldsProvider } from '@/components/elements/fields/context'
 import Footer from '@/components/Main/Body/Aside/Show/Footer'
 import { appStatusDefault, calls, mockCommand, mockCommandOnce } from './ipc'
-import { seedApp } from './utils'
+import { loginMeta, seedApp, withEntries } from './utils'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -52,12 +53,66 @@ const open = async () => {
 const go = (section: string) =>
   userEvent.click(screen.getByTestId(`settings-nav-${section}`))
 
+// A workspace row's ⋯, which is where Rename and Delete live.
+const openMenu = (id: string) => userEvent.click(screen.getByTestId(`workspace-menu-${id}`))
+
 describe('Settings shell', () => {
   it('opens on the sync section', async () => {
     await open()
     expect(screen.getByTestId('settings-modal')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Sync & devices' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sync & backup' })).toBeInTheDocument()
+    expect(
+      screen.getByText('Keep devices in step through Google Drive, and keep an offline copy.')
+    ).toBeInTheDocument()
     expect(screen.getByTestId('settings-nav-sync')).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('groups the nav under App, Vault and Data', async () => {
+    await open()
+    const nav = screen.getByRole('navigation')
+    const order = [...nav.querySelectorAll('[data-testid^="settings-nav-"]')].map(node =>
+      node.getAttribute('data-testid')
+    )
+    expect(order).toEqual([
+      'settings-nav-language',
+      'settings-nav-security',
+      'settings-nav-audit',
+      'settings-nav-workspaces',
+      'settings-nav-sync',
+      'settings-nav-import'
+    ])
+    for (const group of ['App', 'Vault', 'Data'])
+      expect(within(nav).getByText(group)).toBeInTheDocument()
+  })
+
+  it('badges the audit row with the open issue count', async () => {
+    // One weak-and-reused entry counts twice, as the audit section's tallies do.
+    usePrefs.setState({ breachCheck: true })
+    auditDone({
+      a: { score: 1, isWeak: true, isRepeating: true, breached: false },
+      b: { score: 4, isWeak: false, isRepeating: false, breached: true },
+      c: { score: 4, isWeak: false, isRepeating: false, breached: false }
+    })
+    await open()
+    expect(screen.getByTestId('settings-nav-audit-badge')).toHaveTextContent('3')
+  })
+
+  // The section shows no breach count while monitoring is off, and the badge
+  // must agree with it — even over an audit that ran while it was on.
+  it('leaves breaches out of the badge while monitoring is off', async () => {
+    usePrefs.setState({ breachCheck: false })
+    auditDone({
+      a: { score: 1, isWeak: true, isRepeating: false, breached: false },
+      b: { score: 4, isWeak: false, isRepeating: false, breached: true }
+    })
+    await open()
+    expect(screen.getByTestId('settings-nav-audit-badge')).toHaveTextContent('1')
+  })
+
+  it('shows no audit badge when nothing is open', async () => {
+    auditDone({ a: { score: 4, isWeak: false, isRepeating: false, breached: false } })
+    await open()
+    expect(screen.queryByTestId('settings-nav-audit-badge')).not.toBeInTheDocument()
   })
 
   it('switches sections from the nav and remembers the last one', async () => {
@@ -69,7 +124,7 @@ describe('Settings shell', () => {
 
     await go('language')
     expect(
-      screen.getByRole('heading', { name: 'Language & region' })
+      screen.getByRole('heading', { name: 'General' })
     ).toBeInTheDocument()
     expect(screen.getByTestId('settings-nav-language')).toHaveAttribute(
       'aria-current',
@@ -85,7 +140,10 @@ describe('Settings shell', () => {
 
   it('closes from the header X', async () => {
     await open()
-    await userEvent.click(screen.getByTestId('modal-close'))
+    const close = screen.getByTestId('modal-close')
+    expect(close).toHaveAccessibleName('Close')
+    expect(close).toHaveTextContent('esc')
+    await userEvent.click(close)
     expect(useUi.getState().settings).toBe(false)
   })
 })
@@ -295,28 +353,55 @@ describe('Settings › sync', () => {
 
   it('offers the encrypted backup behind its own control', async () => {
     await open()
+    expect(screen.getByTestId('settings-backup-row')).toHaveTextContent('.rowel')
     expect(document.querySelector('input[name="export_password"]')).toBeNull()
     await userEvent.click(screen.getByText('Save…'))
     expect(document.querySelector('input[name="export_password"]')).toBeInTheDocument()
   })
 
-  // One warning covers the whole picker, CXF included — it is as plaintext as
-  // the other two.
-  it('exports to CXF from the portable export picker', async () => {
-    mockCommand('export_entries', () => '/tmp/rowel-export.json')
+  // The portable export lives with Import now; this section keeps only the
+  // encrypted backup.
+  it('leaves the unencrypted export out of this section', async () => {
     await open()
-    expect(
-      screen.getByText('Bitwarden JSON, FIDO CXF or generic CSV, unencrypted')
-    ).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-export-run')).not.toBeInTheDocument()
+  })
 
-    await userEvent.selectOptions(
-      document.querySelector('select[name="export_format"]')!,
-      'cxf'
-    )
-    await userEvent.click(screen.getByTestId('settings-export-run'))
+  // The pill beside the title says where the connection stands, one tone per
+  // state, with a sync running outranking the last one's failure.
+  it('says where Drive stands in the status pill', async () => {
+    await open()
+    const pill = () => screen.getByTestId('settings-drive-status')
 
-    expect(calls('export_entries')).toContainEqual({ path: null, format: 'cxf' })
-    expect(await screen.findByText(/rowel-export\.json/)).toBeInTheDocument()
+    expect(pill()).toHaveTextContent('Not connected')
+    expect(pill()).toHaveAttribute('data-tone', 'idle')
+
+    act(() => report({ configured: true }))
+    expect(pill()).toHaveTextContent('Up to date')
+    expect(pill()).toHaveAttribute('data-tone', 'good')
+
+    act(() => report({ configured: true, inProgress: true }))
+    expect(pill()).toHaveTextContent('Syncing')
+    expect(pill()).toHaveAttribute('data-tone', 'busy')
+
+    act(() => report({ configured: true, error: 'Drive API 503' }))
+    expect(pill()).toHaveTextContent('Last attempt failed')
+    expect(pill()).toHaveAttribute('data-tone', 'bad')
+    expect(screen.getByTestId('settings-sync-error')).toHaveTextContent('Drive API 503')
+  })
+
+  it('shows what a connected account holds, and the way out', async () => {
+    await open()
+    expect(screen.queryByTestId('settings-sync-now')).not.toBeInTheDocument()
+    expect(screen.queryByText('End-to-end')).not.toBeInTheDocument()
+
+    act(() => report({ configured: true }))
+    expect(screen.queryByTestId('settings-drive-connect')).not.toBeInTheDocument()
+    expect(screen.getByText('End-to-end')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-sync-now'))
+    expect(calls('sync_now')).toHaveLength(1)
+    await userEvent.click(screen.getByTestId('settings-drive-disconnect'))
+    expect(calls('sync_disconnect')).toHaveLength(1)
   })
 })
 
@@ -477,8 +562,66 @@ describe('Settings › security', () => {
     await go('security')
 
     await userEvent.click(screen.getByTestId('settings-generator-symbols'))
-
     expect(usePrefs.getState().generator.symbols).toBe(false)
+
+    await userEvent.click(screen.getByTestId('settings-generator-uppercase'))
+    expect(usePrefs.getState().generator.uppercase).toBe(false)
+    expect(screen.getByTestId('settings-generator-uppercase')).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
+  })
+
+  it('keeps the last character class on', async () => {
+    await open()
+    await go('security')
+
+    for (const flag of ['uppercase', 'numbers', 'symbols'])
+      await userEvent.click(screen.getByTestId(`settings-generator-${flag}`))
+
+    const lowercase = screen.getByTestId('settings-generator-lowercase')
+    expect(lowercase).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(lowercase)
+    expect(usePrefs.getState().generator.lowercase).toBe(true)
+  })
+
+  it('draws a sample from the defaults and redraws it on every change', async () => {
+    let draws = 0
+    mockCommand('generate_password', () => `Sample${++draws}!`)
+    await open()
+    await go('security')
+
+    const sample = screen.getByTestId('settings-generator-sample')
+    await waitFor(() => expect(sample).toHaveTextContent('Sample1!'))
+
+    await userEvent.click(screen.getByTestId('settings-generator-regenerate'))
+    await waitFor(() => expect(sample).toHaveTextContent('Sample2!'))
+
+    await userEvent.click(screen.getByTestId('settings-generator-numbers'))
+    await waitFor(() => expect(sample).toHaveTextContent('Sample3!'))
+    expect(usePrefs.getState().generator.numbers).toBe(false)
+    expect(calls('generate_password').slice(-1)[0]).toMatchObject({
+      options: expect.objectContaining({ numbers: false })
+    })
+  })
+
+  it('labels the change form and flags a repeat that does not match', async () => {
+    await open()
+    await go('security')
+    await userEvent.click(screen.getByText('Change…'))
+
+    await userEvent.type(screen.getByLabelText('New Password'), 'newpass')
+    await userEvent.type(screen.getByLabelText('Repeat New Password'), 'newpa')
+    expect(screen.getByText("Passwords don't match yet.")).toBeInTheDocument()
+    expect(screen.getByTestId('change-password-submit')).toBeDisabled()
+
+    await userEvent.type(screen.getByLabelText('Repeat New Password'), 'ss')
+    expect(screen.queryByText("Passwords don't match yet.")).not.toBeInTheDocument()
+
+    const field = screen.getByLabelText('New Password')
+    expect(field).toHaveAttribute('type', 'password')
+    await userEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(field).toHaveAttribute('type', 'text')
   })
 })
 
@@ -497,8 +640,8 @@ describe('Settings › vault audit', () => {
   it('leaves the always-on monitors without a fake control', async () => {
     await open()
     await go('audit')
-    expect(screen.getByText('Weak passwords')).toBeInTheDocument()
-    expect(screen.getByText('Reused passwords')).toBeInTheDocument()
+    expect(screen.getByText('Weak & reused passwords')).toBeInTheDocument()
+    expect(screen.getByText('Always on')).toBeInTheDocument()
     // Breach monitoring is the only switch on this section.
     expect(screen.getAllByRole('switch')).toHaveLength(1)
   })
@@ -510,6 +653,85 @@ describe('Settings › vault audit', () => {
 
     expect(useUi.getState().view).toBe('health')
     expect(useUi.getState().settings).toBe(false)
+  })
+
+  it('reviews reused passwords from the stat strip too', async () => {
+    await open()
+    await go('audit')
+    await userEvent.click(screen.getByTestId('settings-open-health-reused'))
+
+    expect(useUi.getState().view).toBe('health')
+    expect(useUi.getState().settings).toBe(false)
+  })
+
+  it('says nothing has been scanned before the first audit', async () => {
+    await open()
+    await go('audit')
+    expect(screen.getByTestId('settings-audit-verdict')).toHaveTextContent('Not scanned yet')
+    expect(screen.getByTestId('settings-audit-score')).toHaveTextContent('—')
+  })
+
+  it('puts the score in a word and counts what needs review', async () => {
+    withEntries([loginMeta({ id: 'l1' }), loginMeta({ id: 'l2' })], {
+      l1: { score: 0, isWeak: true, isRepeating: false, breached: false },
+      l2: { score: 2, isWeak: false, isRepeating: true, breached: true }
+    })
+    await open()
+    await go('audit')
+
+    expect(screen.getByTestId('settings-audit-verdict')).toHaveTextContent('Weak')
+    expect(screen.getByText('2 items')).toBeInTheDocument()
+    const strip = screen.getByTestId('settings-audit-counts')
+    expect(strip).toHaveTextContent('1weak')
+    expect(strip).toHaveTextContent('1reused')
+    // Breaches are not counted while monitoring is off; the strip offers it.
+    expect(strip).toHaveTextContent('—breached')
+    expect(screen.getByTestId('settings-breach-enable')).toHaveTextContent('Turn on monitoring')
+  })
+
+  it('calls a healthy vault strong', async () => {
+    withEntries([loginMeta()], {
+      l1: { score: 4, isWeak: false, isRepeating: false, breached: false }
+    })
+    await open()
+    await go('audit')
+    expect(screen.getByTestId('settings-audit-verdict')).toHaveTextContent('Strong')
+  })
+
+  it('turns breach monitoring on from the stat strip', async () => {
+    await open()
+    await go('audit')
+    await userEvent.click(screen.getByTestId('settings-breach-enable'))
+
+    expect(usePrefs.getState().breachCheck).toBe(true)
+    expect(calls('get_audit')).toContainEqual({ checkBreaches: true })
+    expect(screen.getByTestId('settings-breach-toggle')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByTestId('settings-breach-enable')).not.toBeInTheDocument()
+  })
+
+  it('re-runs the audit from Run now', async () => {
+    await open()
+    await go('audit')
+    await userEvent.click(screen.getByTestId('settings-audit-run'))
+    expect(calls('get_audit')).toContainEqual({ checkBreaches: false })
+  })
+
+  it('unfolds how breach monitoring works and folds it away again', async () => {
+    await open()
+    await go('audit')
+    const explain = screen.getByTestId('settings-breach-explain')
+    expect(explain).toHaveTextContent('How it works')
+    expect(screen.queryByTestId('settings-breach-explainer')).not.toBeInTheDocument()
+
+    await userEvent.click(explain)
+    expect(explain).toHaveAttribute('aria-expanded', 'true')
+    expect(explain).toHaveTextContent('Hide details')
+    const explainer = screen.getByTestId('settings-breach-explainer')
+    expect(explainer).toHaveTextContent('5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8')
+    expect(explainer).toHaveTextContent(/k-anonymity/)
+
+    await userEvent.click(explain)
+    expect(screen.queryByTestId('settings-breach-explainer')).not.toBeInTheDocument()
   })
 })
 
@@ -591,16 +813,125 @@ describe('Settings › import', () => {
       expect(screen.getByTestId(`import-tile-${key}`)).toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
+
+  // The picker is on the drop target itself, on every platform; a file chosen
+  // there has no tile behind it, so the backend sniffs its format.
+  it('chooses an export file from the drop target', async () => {
+    vi.mocked(openDialog).mockResolvedValue('/tmp/export.csv')
+    await open()
+    await go('import')
+
+    await userEvent.click(screen.getByTestId('import-choose-file'))
+
+    await waitFor(() =>
+      expect(calls('import_entries')).toContainEqual({
+        path: '/tmp/export.csv',
+        format: 'auto',
+        dryRun: true
+      })
+    )
+  })
+
+  it('switches between the import and export panes', async () => {
+    await open()
+    await go('import')
+    expect(screen.getByTestId('settings-io-import')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('import-dropzone')).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-export-run')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-io-export'))
+    expect(screen.getByTestId('settings-io-export')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByTestId('import-dropzone')).not.toBeInTheDocument()
+    expect(screen.getByTestId('settings-export-run')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-io-import'))
+    expect(screen.getByTestId('import-tile-bitwarden')).toBeInTheDocument()
+  })
+})
+
+describe('Settings › export', () => {
+  const exportPane = async () => {
+    await open()
+    await go('import')
+    await userEvent.click(screen.getByTestId('settings-io-export'))
+  }
+
+  // One warning covers every format, CXF included — it is as plaintext as the
+  // other two — and nothing is written until it has been acknowledged.
+  it('exports to CXF once the risk is acknowledged', async () => {
+    mockCommand('export_entries', () => '/tmp/rowel-export.json')
+    await exportPane()
+
+    expect(screen.getByTestId('settings-export-format-bitwarden')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    await userEvent.click(screen.getByTestId('settings-export-format-cxf'))
+    expect(screen.getByTestId('settings-export-format-cxf')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+
+    expect(screen.getByTestId('settings-export-run')).toBeDisabled()
+    await userEvent.click(screen.getByTestId('settings-export-ack'))
+    expect(screen.getByTestId('settings-export-ack')).toHaveAttribute('aria-checked', 'true')
+    await userEvent.click(screen.getByTestId('settings-export-run'))
+
+    expect(calls('export_entries')).toContainEqual({ path: null, format: 'cxf' })
+    expect(await screen.findByText(/rowel-export\.json/)).toBeInTheDocument()
+  })
+
+  it('stays disabled again once the acknowledgement is taken back', async () => {
+    await exportPane()
+    await userEvent.click(screen.getByTestId('settings-export-ack'))
+    expect(screen.getByTestId('settings-export-run')).toBeEnabled()
+    await userEvent.click(screen.getByTestId('settings-export-ack'))
+    expect(screen.getByTestId('settings-export-run')).toBeDisabled()
+    expect(calls('export_entries')).toEqual([])
+  })
+
+  it('moves the format choice with the arrow keys', async () => {
+    await exportPane()
+    screen.getByTestId('settings-export-format-bitwarden').focus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByTestId('settings-export-format-cxf')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    expect(screen.getByTestId('settings-export-format-cxf')).toHaveFocus()
+  })
+
+  it('counts what it will export on the button', async () => {
+    await exportPane()
+    expect(screen.getByTestId('settings-export-run')).toHaveTextContent('Export 0 items')
+  })
+
+  it('points a device move at the encrypted backup instead', async () => {
+    await exportPane()
+    await userEvent.click(screen.getByTestId('settings-export-backup-link'))
+    expect(useUi.getState().settingsSection).toBe('sync')
+  })
 })
 
 describe('Settings › language & region', () => {
-  it('picks a language from the radio list', async () => {
+  it('picks a language from the menu', async () => {
     await open()
     await go('language')
+
+    const trigger = screen.getByTestId('settings-locale-trigger')
+    expect(trigger).toHaveTextContent('English')
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('settings-locale-en-US')).toHaveAttribute('aria-checked', 'true')
+
     await userEvent.click(screen.getByTestId('settings-locale-de-DE'))
     // Switching is async now: the de-DE catalogue is a dynamic import, fetched
     // on demand rather than bundled with the app.
     await waitFor(() => expect(i18n.resolvedLanguage).toBe('de-DE'))
+    // Picking closes the menu, and the trigger names the language in its own tongue.
+    expect(screen.queryByTestId('settings-locale-de-DE')).not.toBeInTheDocument()
+    expect(screen.getByTestId('settings-locale-trigger')).toHaveTextContent('Deutsch')
   })
 
   // The micro labels are uppercased by CSS, and `text-transform` follows the
@@ -609,17 +940,45 @@ describe('Settings › language & region', () => {
   it('tells the document what language it is in', async () => {
     await open()
     await go('language')
+    await userEvent.click(screen.getByTestId('settings-locale-trigger'))
     await userEvent.click(screen.getByTestId('settings-locale-tr-TR'))
     await waitFor(() => expect(document.documentElement.lang).toBe('tr-TR'))
   })
 
-  it('sets the theme from the segmented control', async () => {
+  it('sets the theme from the preview cards', async () => {
     await open()
     await go('language')
+
+    const cards = screen.getAllByRole('radio', { name: /^(System|Light|Dark)/ })
+    expect(cards.map(card => card.dataset.testid)).toEqual([
+      'settings-theme-system',
+      'settings-theme-light',
+      'settings-theme-dark'
+    ])
+
     await userEvent.click(screen.getByTestId('settings-theme-dark'))
 
     expect(usePrefs.getState().theme).toBe('dark')
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    expect(screen.getByTestId('settings-theme-dark')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('settings-theme-light')).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByTestId('settings-theme-system')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('moves the theme with the arrow keys', async () => {
+    await open()
+    await go('language')
+    await userEvent.click(screen.getByTestId('settings-theme-light'))
+
+    await userEvent.keyboard('{ArrowRight}')
+    expect(usePrefs.getState().theme).toBe('dark')
+    expect(screen.getByTestId('settings-theme-dark')).toHaveFocus()
+  })
+
+  it('says which way System resolves right now', async () => {
+    await open()
+    await go('language')
+    expect(screen.getByTestId('settings-theme-system')).toHaveTextContent(/now (dark|light)/)
   })
 
   it('picks an accent from the swatches and paints the root with it', async () => {
@@ -814,6 +1173,106 @@ describe('Settings › workspaces › vaults in the account', () => {
   })
 })
 
+describe('Settings › workspaces › list', () => {
+  const two = () =>
+    seedApp({
+      workspaces: [
+        { id: 'default', name: null },
+        { id: 'w2', name: 'Work', vaultId: 'cafe', synced: true, itemCount: 12 }
+      ],
+      activeWorkspace: 'default'
+    })
+
+  it('marks the open workspace and offers a switch to the others', async () => {
+    two()
+    await open()
+    await go('workspaces')
+
+    expect(screen.getByText('On this device · 2')).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-row-default')).toHaveTextContent('Open now')
+    expect(screen.queryByTestId('workspace-switch-default')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-row-w2')).not.toHaveTextContent('Open now')
+    expect(screen.getByTestId('workspace-row-w2')).toHaveTextContent('12 items · Google Drive')
+
+    await userEvent.click(screen.getByTestId('workspace-switch-w2'))
+    expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
+  })
+
+  it('keeps Rename and Delete behind the row’s menu', async () => {
+    two()
+    await open()
+    await go('workspaces')
+
+    expect(screen.queryByTestId('workspace-rename-w2')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('workspace-delete-w2')).not.toBeInTheDocument()
+
+    await openMenu('w2')
+    expect(screen.getByTestId('workspace-menu-w2')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('workspace-rename-w2')).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-w2')).toBeEnabled()
+  })
+
+  it('renames a workspace inline from its menu', async () => {
+    two()
+    await open()
+    await go('workspaces')
+    await openMenu('w2')
+    await userEvent.click(screen.getByTestId('workspace-rename-w2'))
+
+    // The menu folds away and the field opens in the row, on the current name.
+    expect(screen.queryByTestId('workspace-rename-w2')).not.toBeInTheDocument()
+    const input = screen.getByTestId('workspace-rename-input')
+    expect(input).toHaveValue('Work')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'Clients{Enter}')
+
+    expect(calls('workspace_rename')).toEqual([{ id: 'w2', name: 'Clients' }])
+    await waitFor(() =>
+      expect(screen.queryByTestId('workspace-rename-input')).not.toBeInTheDocument()
+    )
+  })
+
+  it('lets the rename go with Escape, leaving Settings open', async () => {
+    two()
+    await open()
+    await go('workspaces')
+    await openMenu('default')
+    await userEvent.click(screen.getByTestId('workspace-rename-default'))
+    await userEvent.type(screen.getByTestId('workspace-rename-input'), '{Escape}')
+
+    expect(screen.queryByTestId('workspace-rename-input')).not.toBeInTheDocument()
+    expect(useUi.getState().settings).toBe(true)
+    expect(calls('workspace_rename')).toHaveLength(0)
+  })
+
+  it('unfolds the new workspace form from the last row and creates one', async () => {
+    await open()
+    await go('workspaces')
+
+    const row = screen.getByTestId('workspace-new-row')
+    expect(row).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('workspace-new-name')).not.toBeInTheDocument()
+
+    await userEvent.click(row)
+    expect(row).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.type(screen.getByTestId('workspace-new-name'), 'Family')
+    await userEvent.type(screen.getByTestId('workspace-new-password'), 'master-pass')
+    await act(async () => {
+      await userEvent.click(screen.getByTestId('workspace-create'))
+    })
+
+    expect(calls('workspace_create')).toEqual([{ name: 'Family', password: 'master-pass' }])
+  })
+
+  it('folds the new workspace form away again', async () => {
+    await open()
+    await go('workspaces')
+    await userEvent.click(screen.getByTestId('workspace-new-row'))
+    await userEvent.click(screen.getByTestId('workspace-new-row'))
+    expect(screen.queryByTestId('workspace-new-name')).not.toBeInTheDocument()
+  })
+})
+
 // Local only: the vault leaves this device and whatever it has on Drive stays,
 // so the confirmation asks for two proofs — the workspace's own master password
 // and its label typed out — before anything is removed.
@@ -831,6 +1290,7 @@ describe('Settings › workspaces › delete', () => {
     two()
     await open()
     await go('workspaces')
+    await openMenu(id)
     await userEvent.click(screen.getByTestId(`workspace-delete-${id}`))
     return screen.getByTestId('workspace-delete-dialog')
   }
@@ -929,8 +1389,11 @@ describe('Settings › workspaces › delete', () => {
     await open()
     await go('workspaces')
 
-    expect(screen.getByTestId('workspace-delete-default')).toBeDisabled()
     expect(screen.getByTestId('workspace-delete-last')).toBeInTheDocument()
+    await openMenu('default')
+    expect(screen.getByTestId('workspace-delete-default')).toBeDisabled()
+    await userEvent.click(screen.getByTestId('workspace-delete-default'))
+    expect(screen.queryByTestId('workspace-delete-dialog')).not.toBeInTheDocument()
   })
 
   // A workspace with a vault id has a pack in the account, so it is offered the
@@ -940,12 +1403,13 @@ describe('Settings › workspaces › delete', () => {
     seedApp({
       workspaces: [
         { id: 'default', name: null },
-        { id: 'w2', name: 'Work', vaultId: 'cafe' }
+        { id: 'w2', name: 'Work', vaultId: 'cafe', synced: true }
       ],
       activeWorkspace: 'default'
     })
     await open()
     await go('workspaces')
+    await openMenu('w2')
     await userEvent.click(screen.getByTestId('workspace-delete-w2'))
 
     await userEvent.click(screen.getByTestId('workspace-delete-scope-everywhere'))
@@ -960,6 +1424,29 @@ describe('Settings › workspaces › delete', () => {
     expect(calls('workspace_delete')).toEqual([
       { id: 'w2', password: 'work-pass', everywhere: true }
     ])
+  })
+
+  // A vault id alone is a pack on Drive, not a connection: a workspace that was
+  // disconnected and then locked keeps its id and must read as local — in the
+  // list, and in the delete it is offered.
+  it('reads a disconnected workspace as local despite its vault id', async () => {
+    seedApp({
+      workspaces: [
+        { id: 'default', name: null },
+        { id: 'w2', name: 'Work', vaultId: 'cafe', synced: false, itemCount: 3 }
+      ],
+      activeWorkspace: 'default'
+    })
+    await open()
+    await go('workspaces')
+
+    expect(screen.getByTestId('workspace-row-w2')).toHaveTextContent('3 items · This device')
+
+    await openMenu('w2')
+    await userEvent.click(screen.getByTestId('workspace-delete-w2'))
+    expect(
+      screen.queryByTestId('workspace-delete-scope-everywhere')
+    ).not.toBeInTheDocument()
   })
 
   // No vault id and no connection: there is nothing in an account to delete, so

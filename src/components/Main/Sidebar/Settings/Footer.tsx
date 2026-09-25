@@ -6,9 +6,9 @@ import VaultFooter from '@/components/elements/VaultFooter'
 // App Store, so there the version is only a label.
 export default function Footer() {
   return (
-    // The inset lines the glyph up with the nav items' icons above it.
+    // The inset lines the glyph up with the nav items' icon tiles above it.
     <VaultFooter
-      className="mt-4 ml-1"
+      className="mt-4 px-2"
       onCheckUpdates={isMobile ? undefined : () => runUpdateCheck()}
     />
   )

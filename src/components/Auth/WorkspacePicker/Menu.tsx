@@ -52,11 +52,12 @@ export default function Menu({ list, active, onPick, onClose }: Props) {
 
   // How big each vault is and where it lives, read off what is knowable while
   // it is locked: the count its last open here left, and the open one's live
-  // connection or any other's the vault id a sync recorded. A vault never
-  // opened on this device has no count yet, and says only where it is.
+  // connection or any other's the token file the backend found beside it
+  // (`synced`). A vault never opened on this device has no count yet, and
+  // says only where it is.
   const about = (workspace: Workspace) => {
     const home =
-      (workspace.id === active ? configured : workspace.vaultId !== undefined)
+      (workspace.id === active ? configured : workspace.synced === true)
         ? t('Google Drive')
         : t('This device')
     return workspace.itemCount === undefined

@@ -12,8 +12,9 @@ import Row from './Row'
 import ArchiveRow from './ArchiveRow'
 
 /**
- * The Settings root: the desktop's 220px nav rail as a list of rows that push
- * their pane, the way an iOS settings screen reads.
+ * The Settings root: the desktop's nav rail as a list of rows that push their
+ * pane, the way an iOS settings screen reads. One flat list, in the rail's
+ * order, without its group headings.
  *
  * It also holds what the vanished top bar used to. The sync chip rides in the
  * title row because it is a status pill; locking is a row of its own, in the

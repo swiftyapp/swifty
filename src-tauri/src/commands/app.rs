@@ -34,7 +34,7 @@ pub struct AppStatus {
     /// Every vault on this install — exactly one until the user makes a second,
     /// which is what lets the frontend leave the whole feature out of the UI
     /// until there is something to switch between.
-    workspaces: Vec<workspace::Workspace>,
+    workspaces: Vec<workspace::WorkspaceStatus>,
     /// Which of them the fields above describe.
     active_workspace: String,
 }
@@ -124,7 +124,7 @@ pub fn snapshot(app: &AppHandle) -> Result<AppStatus> {
             kind: gate.kind,
             mode: marker.map(|m| GateMode::from_marker(&m).as_marker().to_string()),
         },
-        workspaces: registry.workspaces,
+        workspaces: registry.statuses(&root),
         active_workspace,
     })
 }

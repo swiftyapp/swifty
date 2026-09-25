@@ -24,7 +24,7 @@ const BADGE: Partial<Record<SyncTone, string>> = {
 // It is always mounted, including on a vault that has never synced -- "your
 // changes are on this disk and nowhere else" is a standing property of the
 // vault worth a permanent slot, not noise. Clicking goes where the state is
-// owned: Settings > Sync & devices, which holds Connect and Sync now.
+// owned: Settings › Sync & backup, which holds Connect and Sync now.
 //
 // How to get there is the shell's to say. The default opens the wide modal on
 // that section; a shell whose settings are a screen of its own (the phone's)

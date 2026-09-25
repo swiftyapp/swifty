@@ -22,6 +22,10 @@ export interface GeneratorSettings {
   length: number
   // Words, `memorable` mode.
   words: number
+  // The four character classes of `random` mode. At least one stays on; the
+  // chips that set them refuse to turn off the last (see Generator/Charset).
+  uppercase: boolean
+  lowercase: boolean
   symbols: boolean
   numbers: boolean
   excludeSimilar: boolean
@@ -72,6 +76,10 @@ export const defaultSettings = (): GeneratorSettings => {
     mode: 'random',
     length: clamp(stored.length, LENGTH_RANGE),
     words: 5,
+    uppercase: stored.uppercase,
+    // A file written before the flag existed: the generator always drew from
+    // lowercase, so that is what it meant.
+    lowercase: stored.lowercase ?? true,
     symbols: stored.symbols,
     numbers: stored.numbers,
     excludeSimilar: stored.excludeSimilarCharacters ?? false,
@@ -79,14 +87,15 @@ export const defaultSettings = (): GeneratorSettings => {
   }
 }
 
-// The dialog always keeps both letter cases and asks for `strict`, so toggling
-// Symbols or Numbers on guarantees the class shows up in the result.
-// Write the shared knobs back so the dialog and Settings › Security agree.
-// Everything else in the stored props (uppercase, exclude) is left untouched.
+// The dialog asks for `strict`, so every class that is on shows up in the
+// result. Write the shared knobs back so the dialog and Settings › Security
+// agree. Everything else in the stored props (exclude) is left untouched.
 export const persistDefaults = (settings: GeneratorSettings) =>
   setPref('generator', {
     ...usePrefs.getState().generator,
     length: settings.length,
+    uppercase: settings.uppercase,
+    lowercase: settings.lowercase,
     symbols: settings.symbols,
     numbers: settings.numbers,
     excludeSimilarCharacters: settings.excludeSimilar
@@ -96,8 +105,8 @@ export const toOptions = (settings: GeneratorSettings): GeneratorOptions => ({
   length: settings.length,
   numbers: settings.numbers,
   symbols: settings.symbols,
-  uppercase: true,
-  lowercase: true,
+  uppercase: settings.uppercase,
+  lowercase: settings.lowercase,
   excludeSimilarCharacters: settings.excludeSimilar,
   strict: true
 })
@@ -108,8 +117,8 @@ export const charset = (settings: GeneratorSettings): string => {
       ? [...pool].filter(char => !SIMILAR.includes(char)).join('')
       : pool
   return (
-    keep(LOWER) +
-    keep(UPPER) +
+    (settings.lowercase ? keep(LOWER) : '') +
+    (settings.uppercase ? keep(UPPER) : '') +
     (settings.numbers ? keep(DIGITS) : '') +
     (settings.symbols ? keep(SYMBOLS) : '')
   )

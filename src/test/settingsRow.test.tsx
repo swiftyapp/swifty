@@ -24,6 +24,18 @@ describe('SettingsGroup / SettingsRow', () => {
     expect(screen.getByRole('switch', { name: 'Biometric unlock' })).toBeChecked()
   })
 
+  it('draws an icon tile before the label, lit when the row is active', () => {
+    const { rerender } = render(
+      <SettingsRow label="Touch ID" icon={<svg data-testid="mark" />} testid="row" />
+    )
+
+    const tile = screen.getByTestId('mark').parentElement
+    expect(tile).toHaveClass('bg-tile')
+
+    rerender(<SettingsRow label="Touch ID" icon={<svg data-testid="mark" />} iconActive testid="row" />)
+    expect(screen.getByTestId('mark').parentElement).toHaveClass('bg-accent-soft')
+  })
+
   it('renders expandable children beneath the row and keeps the control live', async () => {
     const onChange = vi.fn()
     render(

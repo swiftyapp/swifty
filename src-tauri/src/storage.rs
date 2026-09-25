@@ -614,11 +614,16 @@ pub fn set_biometric_marker(app: &AppHandle, marker: Option<&str>) -> Result<()>
 }
 
 pub fn sync_configured(app: &AppHandle) -> bool {
+    workspace_dir(app).is_ok_and(|dir| sync_configured_in(&dir))
+}
+
+/// Whether the workspace at `dir` holds a Drive connection: its token file is
+/// there and non-empty. The one fact about a *locked* workspace's sync that is
+/// readable from outside it — the registry's vault id says a pack exists on
+/// Drive, which outlives a disconnect, not that anything still syncs to it.
+pub fn sync_configured_in(dir: &Path) -> bool {
     // A single metadata call answers both "exists" and "non-empty".
-    gdrive_path(app)
-        .ok()
-        .and_then(|p| fs::metadata(p).ok())
-        .is_some_and(|m| m.len() > 0)
+    fs::metadata(dir.join(GDRIVE_FILE)).is_ok_and(|m| m.len() > 0)
 }
 
 #[cfg(test)]
