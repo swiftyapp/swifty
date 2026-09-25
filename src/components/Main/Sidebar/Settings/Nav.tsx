@@ -48,17 +48,23 @@ export default function Nav({ section, onSelect, disabled = false }: Props) {
                       disabled={disabled && !active}
                       onClick={() => onSelect(key)}
                       className={cx(
-                        'flex h-10 w-full items-center gap-2.5 rounded-sm px-2 text-left text-base transition-colors',
+                        'group flex h-10 w-full items-center gap-2.5 rounded-sm px-2 text-left text-base transition-colors',
                         active
                           ? 'bg-lens font-medium text-text shadow-lens'
                           : 'text-text2 hover:bg-hover hover:text-text focus-visible:bg-hover',
                         disabled && !active ? 'cursor-default opacity-50' : 'cursor-pointer'
                       )}
                     >
+                      {/* The glyph a tier under the label: a 16px stroke lays
+                          down more ink than 13px text, so the same token reads
+                          darker on it. text3 is the glyph tier for exactly
+                          that, and hover lifts both to the full ink together. */}
                       <span
                         className={cx(
-                          'grid h-7 w-7 flex-none place-items-center rounded-sm',
-                          active ? 'bg-accent text-accent-fg' : 'bg-tile text-text2'
+                          'grid h-7 w-7 flex-none place-items-center rounded-sm transition-colors',
+                          active
+                            ? 'bg-accent text-accent-fg'
+                            : 'bg-tile text-text3 group-hover:text-text'
                         )}
                       >
                         <Glyph size={16} />
