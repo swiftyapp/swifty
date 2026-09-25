@@ -5,6 +5,7 @@ import { describeError } from '@/api/errors'
 import type { TKey } from '@/i18n'
 import { cx } from '@/utils/cx'
 import Button from '@/components/elements/Button'
+import Field from '@/components/elements/Field'
 import IconButton from '@/components/elements/IconButton'
 import PasswordStrength from '@/components/elements/PasswordStrength'
 import { inputClass } from '@/components/elements/formStyles'
@@ -13,27 +14,6 @@ import { EyeGlyph, EyeOffGlyph, KeyGlyph } from '@/components/Main/icons'
 import ExpandableRow from '../ExpandableRow'
 
 type Name = 'current_password' | 'new_password' | 'new_password_repeat'
-
-// One labelled field of the form: the label above, the input (and whatever
-// hangs off it) below.
-function Field({
-  id,
-  label,
-  children
-}: {
-  id: string
-  label: string
-  children: ReactNode
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-base font-medium text-text2">
-        {label}
-      </label>
-      {children}
-    </div>
-  )
-}
 
 export default function MasterPasswordRow() {
   const { t } = useTranslation()

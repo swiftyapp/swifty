@@ -121,6 +121,9 @@ const DEFAULTS: Record<string, Handler> = {
   // spec that wants that path mocks the command with a session.)
   workspace_select: () => emitEventSoon(EVENTS.vaultLocked, undefined),
   workspace_rename: () => undefined,
+  // Registry only in Rust, and the fake keeps no registry: the list a spec
+  // sees is the `app_status` it mocks, so a recolour there is the spec's to set.
+  workspace_set_color: () => undefined,
 
   // First run. The probe's result never comes back through these promises —
   // it arrives as `setup:drive:*`, which a spec drives through the store.

@@ -59,6 +59,15 @@ pub struct Workspace {
     /// here, so entries another device added show up after this one next syncs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub item_count: Option<u32>,
+    /// The colour the user picked for the workspace's tile: a palette key the
+    /// frontend defines (`indigo`, `rose`, …), never a hex value, so each theme
+    /// owns what the key looks like. `None` until one is chosen, and the UI
+    /// derives a hue from the id instead.
+    ///
+    /// Device-local, like the count: kept in this file only, never in the vault,
+    /// so it does not travel in the pack or reach the user's other devices.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
 }
 
 /// A registry entry as the frontend is handed it: the record, plus what is
@@ -95,6 +104,7 @@ impl Default for Registry {
                 name: None,
                 vault_id: None,
                 item_count: None,
+                color: None,
             }],
         }
     }
@@ -171,6 +181,18 @@ impl Registry {
         self.workspaces
             .iter()
             .find(|w| w.id != except && w.vault_id.as_deref() == Some(vault_id))
+    }
+
+    /// Give the workspace `id` a tile colour, or take it away with `None`.
+    /// `NotFound` when the registry names no such workspace.
+    pub fn recolor(&mut self, id: &str, color: Option<String>) -> Result<()> {
+        let workspace = self
+            .workspaces
+            .iter_mut()
+            .find(|w| w.id == id)
+            .ok_or(Error::NotFound)?;
+        workspace.color = color;
+        Ok(())
     }
 
     /// The registry as it will read once `id` is gone from this device.
@@ -646,12 +668,14 @@ mod tests {
                     name: None,
                     vault_id: None,
                     item_count: None,
+                    color: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
                     item_count: None,
+                    color: None,
                 },
             ],
         };
@@ -677,6 +701,45 @@ mod tests {
         assert!(!json.contains("vaultId"), "{json}");
         assert!(!json.contains("itemCount"), "{json}");
         assert_eq!(loaded.workspaces[0].item_count, None);
+    }
+
+    // A chosen colour survives a save, and an entry written before colours
+    // existed reads as having none — and is not written back with a `null`.
+    #[test]
+    fn a_colour_round_trips_and_is_optional_on_disk() {
+        let root = tmp_root();
+        fs::write(
+            root.join(REGISTRY_FILE),
+            r#"{"active":"default","workspaces":[{"id":"default","name":null},{"id":"a1b2","name":"Work"}]}"#,
+        )
+        .unwrap();
+        let mut registry = Registry::load(&root);
+        assert_eq!(registry.workspaces[0].color, None);
+        assert_eq!(registry.workspaces[1].color, None);
+
+        registry.recolor("a1b2", Some("rose".into())).unwrap();
+        registry.save(&root).unwrap();
+        let loaded = Registry::load(&root);
+        assert_eq!(loaded.workspaces[0].color, None);
+        assert_eq!(loaded.workspaces[1].color.as_deref(), Some("rose"));
+
+        let json = fs::read_to_string(root.join(REGISTRY_FILE)).unwrap();
+        assert_eq!(json.matches("color").count(), 1, "{json}");
+    }
+
+    #[test]
+    fn recolor_sets_and_clears_and_refuses_an_unknown_id() {
+        let mut registry = Registry::default();
+        registry.recolor(PRIMARY_ID, Some("teal".into())).unwrap();
+        assert_eq!(registry.workspaces[0].color.as_deref(), Some("teal"));
+
+        registry.recolor(PRIMARY_ID, None).unwrap();
+        assert_eq!(registry.workspaces[0].color, None);
+
+        assert!(matches!(
+            registry.recolor("missing", Some("teal".into())),
+            Err(Error::NotFound)
+        ));
     }
 
     // A registry this cannot parse is refused, not replaced: saving the
@@ -724,12 +787,14 @@ mod tests {
                     name: None,
                     vault_id: None,
                     item_count: None,
+                    color: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: None,
                     item_count: Some(3),
+                    color: None,
                 },
             ],
         };
@@ -755,12 +820,14 @@ mod tests {
                     name: None,
                     vault_id: Some("cafe".into()),
                     item_count: None,
+                    color: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: None,
                     item_count: None,
+                    color: None,
                 },
             ],
         };
@@ -785,6 +852,7 @@ mod tests {
                 name: None,
                 vault_id: None,
                 item_count: None,
+                color: None,
             }],
         }
         .save(&root)
@@ -813,18 +881,21 @@ mod tests {
                     name: None,
                     vault_id: Some("beef".into()),
                     item_count: None,
+                    color: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
                     item_count: None,
+                    color: None,
                 },
                 Workspace {
                     id: "c3d4".into(),
                     name: Some("Side".into()),
                     vault_id: None,
                     item_count: None,
+                    color: None,
                 },
             ],
         }
@@ -864,6 +935,7 @@ mod tests {
                 name: Some("Work".into()),
                 vault_id: Some("cafe".into()),
                 item_count: None,
+                color: None,
             }
         );
         // The one that was not promoted is untouched, and still second.
@@ -965,12 +1037,14 @@ mod tests {
                     name: None,
                     vault_id: None,
                     item_count: None,
+                    color: None,
                 },
                 Workspace {
                     id: "a1b2".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
                     item_count: None,
+                    color: None,
                 },
             ],
         };
@@ -1218,12 +1292,14 @@ mod tests {
                     name: None,
                     vault_id: Some("beef".into()),
                     item_count: None,
+                    color: None,
                 },
                 Workspace {
                     id: "w2".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
                     item_count: None,
+                    color: None,
                 },
             ],
         };

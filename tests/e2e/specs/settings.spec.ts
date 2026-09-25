@@ -33,9 +33,9 @@ describe("settings", () => {
     await setSettings({ theme: "light" });
   });
 
-  it("opens on Sync & backup and marks the active nav item", async () => {
-    await expect(title()).toHaveText("Sync & backup");
-    await expect($('[data-testid="settings-nav-sync"]')).toHaveAttribute(
+  it("opens on General and marks the active nav item", async () => {
+    await expect(title()).toHaveText("General");
+    await expect($('[data-testid="settings-nav-language"]')).toHaveAttribute(
       "aria-current",
       "page",
     );

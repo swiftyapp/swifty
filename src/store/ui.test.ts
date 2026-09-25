@@ -9,7 +9,10 @@ import {
   setFilterType,
   editEntry,
   setView,
-  showTag
+  showTag,
+  openSettings,
+  closeSettings,
+  resetUi
 } from './index'
 import { filterEntries } from '@/services/entries'
 import type { EntryMeta } from '@/api/types'
@@ -76,6 +79,31 @@ describe('setFilterTag', () => {
 
     expect(useUi.getState()).toMatchObject({ filterType: 'login', filterTag: 'work' })
     expect(visible()).toEqual(['work', 'both'])
+  })
+})
+
+describe('openSettings', () => {
+  beforeEach(resetUi)
+
+  it('opens on General unless told where to go', () => {
+    openSettings()
+    expect(useUi.getState()).toMatchObject({ settings: true, settingsSection: 'language' })
+  })
+
+  it('opens on the section a deep link names — the sync chip, an opened backup', () => {
+    openSettings('sync')
+    expect(useUi.getState().settingsSection).toBe('sync')
+  })
+
+  it('reopens where it was left within a session, and on General after a reset', () => {
+    openSettings('sync')
+    closeSettings()
+    openSettings()
+    expect(useUi.getState().settingsSection).toBe('sync')
+
+    resetUi()
+    openSettings()
+    expect(useUi.getState().settingsSection).toBe('language')
   })
 })
 

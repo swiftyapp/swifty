@@ -127,7 +127,7 @@ export const describeError = (error: unknown): string => {
     case 'alreadySetUp':
       return t('This device is already set up')
     case 'primaryWorkspaceOnly':
-      return t('Available in the primary workspace only')
+      return t('Unlock the primary workspace first')
     case 'workspaceNameRequired':
       return t('A workspace needs a name')
     case 'workspacePasswordRequired':

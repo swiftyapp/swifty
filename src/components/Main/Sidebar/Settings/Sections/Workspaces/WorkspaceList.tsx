@@ -11,9 +11,9 @@ import { messageOf } from '@/api/errors'
 import type { Workspace } from '@/api/types'
 import { syncDeletedRemotely, syncErrorText } from '@/api/sync'
 import Button from '@/components/elements/Button'
+import { useSubpage } from '../../sectionNav'
 import WorkspaceRow from './WorkspaceRow'
-import DeleteWorkspace from './DeleteWorkspace'
-import { workspaceAbout } from './about'
+import { workspaceAbout, workspaceSyncs } from './about'
 
 export default function WorkspaceList() {
   const { t } = useTranslation()
@@ -24,25 +24,22 @@ export default function WorkspaceList() {
   // The one way a switch is refused: a sync flow is mid-flight in this
   // workspace, and moving the paths under it would land its files elsewhere.
   const [error, setError] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState<string | null>(null)
+  const { open } = useSubpage()
+  // The confirmation is a page under this section, like Edit.
+  const askDelete = (id: string) => open({ key: 'delete-workspace', id })
 
   // A device always has a vault to open, so the last workspace stays. Every
   // other one may go, the open one included: deleting it ends its session and
   // the app comes back on a survivor's lock screen.
   const last = list.length < 2
-  const chosen = list.find(workspace => workspace.id === deleting)
 
   // The account's copy of *this* vault is gone — deleted from another device —
   // so its runs stop here until this workspace goes too. The delete offered for
   // it is the local one: there is nothing left on Drive to remove.
   const strandedHere = syncDeletedRemotely(sync)
 
-  // Whether a workspace syncs, and so has a copy on Drive to delete along with
-  // it. The open one is answered by its live connection; a locked one by the
-  // connection the backend found in its own directory when the list was built
-  // (`synced`) — not by its vault id, which a disconnect leaves behind.
-  const syncs = (workspace: Workspace) =>
-    workspace.id === active ? sync.configured && !strandedHere : workspace.synced === true
+  // Whether it has a copy on Drive to delete along with it.
+  const syncs = (workspace: Workspace) => workspaceSyncs(workspace, { active, sync })
 
   return (
     <>
@@ -62,7 +59,7 @@ export default function WorkspaceList() {
             onSwitch={() =>
               switchWorkspace(workspace.id).catch((err: unknown) => setError(messageOf(err)))
             }
-            onDelete={() => setDeleting(workspace.id)}
+            onDelete={() => askDelete(workspace.id)}
           />
         )
       })}
@@ -78,7 +75,7 @@ export default function WorkspaceList() {
             className="text-bad hover:text-bad"
             testid="workspace-delete-stranded"
             disabled={last}
-            onClick={() => setDeleting(active)}
+            onClick={() => askDelete(active)}
           >
             {t('Delete it here too')}
           </Button>
@@ -99,13 +96,6 @@ export default function WorkspaceList() {
         >
           {error}
         </div>
-      )}
-      {chosen && (
-        <DeleteWorkspace
-          workspace={chosen}
-          syncs={syncs(chosen)}
-          onClose={() => setDeleting(null)}
-        />
       )}
     </>
   )

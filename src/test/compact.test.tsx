@@ -457,6 +457,23 @@ describe('compact shell', () => {
     expect(screen.getByTestId('settings-nav-workspaces')).toBeInTheDocument()
   })
 
+  it('pushes a sub-page over its section, named after it, and comes back', async () => {
+    seed()
+    render(<Main />)
+
+    act(() => openSettings())
+    await userEvent.click(screen.getByTestId('settings-nav-workspaces'))
+    await userEvent.click(screen.getByTestId('workspace-new-row'))
+
+    expect(screen.getByRole('heading', { name: 'New workspace' })).toBeInTheDocument()
+    expect(screen.getByTestId('settings-subpage-back')).toHaveTextContent('Workspaces')
+    expect(screen.queryByTestId('settings-back')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-subpage-back'))
+    expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeInTheDocument()
+    expect(screen.getByTestId('settings-back')).toBeInTheDocument()
+  })
+
   // The chip's default is the wide modal's section state, which a pushed pane
   // does not read — on this shell it navigates the way the rows do.
   it('opens the Sync pane from the sync chip on the settings root', async () => {

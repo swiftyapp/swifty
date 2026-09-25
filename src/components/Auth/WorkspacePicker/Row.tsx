@@ -10,6 +10,8 @@ interface Props {
   // An option of the search field's listbox rather than an item of a menu.
   option: boolean
   label: string
+  // The tile colour it was given, if any (a palette key).
+  color?: string
   // Its size and where it lives, already translated ("284 items · Google Drive").
   about: string
   // Its place in the full list, which is what its chord is numbered by.
@@ -27,6 +29,7 @@ export default function Row({
   domId,
   option,
   label,
+  color,
   about,
   position,
   selected,
@@ -46,7 +49,7 @@ export default function Row({
       onClick={onPick}
       className="py-[7px]"
     >
-      <Monogram name={label} seed={id} size={32} fontSize={14} />
+      <Monogram name={label} seed={id} color={color} size={32} fontSize={14} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-tight">
         <span className="truncate text-[13.5px] font-medium text-text">{label}</span>
         <span className="truncate text-[12px] text-text2">{about}</span>

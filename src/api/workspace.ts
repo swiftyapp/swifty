@@ -19,9 +19,15 @@ import type { UnlockResult } from './types'
  * `invalidPassword`. It comes back already active and unlocked, so the result
  * is an unlock's, not a setup's: the caller has a session to enter main with
  * and a previous workspace's data to drop first.
+ *
+ * `color` is the tile's palette key (see `lib/workspaceColor`); left out, the
+ * workspace has none and its tile takes the hue its id hashes to.
  */
-export const workspaceCreate = (name: string, password: string): Promise<UnlockResult> =>
-  call('workspace_create', { name, password })
+export const workspaceCreate = (
+  name: string,
+  password: string,
+  color?: string | null
+): Promise<UnlockResult> => call('workspace_create', { name, password, color: color ?? null })
 
 /**
  * Close whatever is open and make `id` the active workspace. Persisted, so a
@@ -38,6 +44,14 @@ export const workspaceSelect = (id: string): Promise<UnlockResult | null> =>
 /** Rename a workspace. Metadata only: the vault behind it is untouched. */
 export const workspaceRename = (id: string, name: string): Promise<void> =>
   call('workspace_rename', { id, name })
+
+/**
+ * Give a workspace's tile a palette key, or `null` to go back to the hue its id
+ * hashes to. Kept on this device only: nothing is written to the vault and
+ * nothing syncs, so a locked workspace is recoloured just as the open one is.
+ */
+export const workspaceSetColor = (id: string, color: string | null): Promise<void> =>
+  call('workspace_set_color', { id, color })
 
 /**
  * Remove a workspace's vault from this device. `password` is that workspace's

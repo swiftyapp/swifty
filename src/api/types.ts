@@ -212,6 +212,12 @@ export interface Workspace {
    * Absent for a vault not opened here since the count was first kept.
    */
   itemCount?: number
+  /**
+   * The tile colour the user picked: a palette key (see `lib/workspaceColor`),
+   * never a hex value. Kept on this device only. Absent when none was chosen,
+   * and the tile derives a hue from the id instead.
+   */
+  color?: string
 }
 
 // Which biometry this device gates with, straight from the OS (Apple reads

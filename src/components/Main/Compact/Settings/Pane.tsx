@@ -3,12 +3,21 @@ import type { Section as Key } from '@/store'
 import { cx } from '@/utils/cx'
 import Section from '../../Sidebar/Settings/Section'
 import { titleOf } from '../../Sidebar/Settings/sections'
+import { useSubpage } from '../../Sidebar/Settings/sectionNav'
+import SubpageBody from '../../Sidebar/Settings/SubpageBody'
+import {
+  subpageCrumbOf,
+  subpageDescriptionOf,
+  subpageTitleOf,
+  type Subpage
+} from '../../Sidebar/Settings/subpages'
 import BackButton from '../BackButton'
 import NavBar from '../NavBar'
 import { TAB_BAR_CLEARANCE } from '../chrome'
 
 /**
- * One settings section, pushed from the root.
+ * One settings section, pushed from the root — or a sub-page of it, pushed
+ * from the section.
  *
  * One level deep rather than modal: the tab bar stays up, so the scroller
  * reserves its clearance, and the way back is the shared `NavBar` carrying the
@@ -25,6 +34,9 @@ export default function Pane({
   onBack: () => void
 }) {
   const { t } = useTranslation()
+  const { subpage } = useSubpage()
+
+  if (subpage) return <SubpagePane subpage={subpage} locked={locked} />
 
   return (
     <div className="flex min-h-0 flex-1 flex-col animate-sheet bg-screen">
@@ -46,6 +58,36 @@ export default function Pane({
           {titleOf(section)}
         </h1>
         <Section section={section} />
+      </div>
+    </div>
+  )
+}
+
+// The heading stays put above the body: the frame scrolls itself and keeps the
+// tab bar's clearance, so the column has no scroller of its own.
+function SubpagePane({ subpage, locked }: { subpage: Subpage; locked: boolean }) {
+  const { close } = useSubpage()
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col animate-sheet bg-screen">
+      <NavBar
+        leading={
+          <BackButton
+            testid="settings-subpage-back"
+            label={subpageCrumbOf(subpage)}
+            disabled={locked}
+            onClick={close}
+          />
+        }
+      />
+      <div className="flex-none px-4 pt-1 pb-4">
+        <h1 className="truncate text-2xl font-semibold tracking-display text-text">
+          {subpageTitleOf(subpage)}
+        </h1>
+        <p className="mt-1 text-sm text-text2">{subpageDescriptionOf(subpage)}</p>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <SubpageBody subpage={subpage} />
       </div>
     </div>
   )

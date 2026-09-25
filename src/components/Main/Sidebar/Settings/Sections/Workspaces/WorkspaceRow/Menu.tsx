@@ -9,12 +9,12 @@ interface Props {
   id: string
   // The device's only workspace: it stays, so Delete is shown but inert.
   last: boolean
-  onRename: () => void
+  onEdit: () => void
   onDelete: () => void
 }
 
 // A workspace's less frequent actions, behind the row's ⋯.
-export default function Menu({ id, last, onRename, onDelete }: Props) {
+export default function Menu({ id, last, onEdit, onDelete }: Props) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
@@ -35,9 +35,9 @@ export default function Menu({ id, last, onRename, onDelete }: Props) {
       </IconButton>
       {open && (
         <Dropdown onBlur={() => setOpen(false)} className="right-0 top-9 w-[220px]">
-          <DropdownItem testid={`workspace-rename-${id}`} onClick={pick(onRename)}>
+          <DropdownItem testid={`workspace-edit-${id}`} onClick={pick(onEdit)}>
             <PencilGlyph />
-            {t('Rename')}
+            {t('Edit…')}
           </DropdownItem>
           {/* A disabled fieldset is what makes the item a disabled button
               without the menu item having to know about it. */}

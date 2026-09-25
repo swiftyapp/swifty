@@ -90,6 +90,22 @@ describe('WorkspacePicker', () => {
     expect(screen.getByTestId('workspace-option-w3')).not.toHaveTextContent('item')
   })
 
+  // A colour the user picked is the tile's, on the chip and in the menu alike;
+  // one never picked keeps the hue its id hashes to.
+  it('draws a chosen colour as a solid tile', async () => {
+    seed([{ ...PRIMARY, color: 'rose' }, WORK])
+    render(<WorkspacePicker />)
+
+    expect(screen.getByTestId('workspace-chip').querySelector('.bg-ws-rose')).not.toBeNull()
+
+    await userEvent.click(screen.getByTestId('workspace-chip'))
+
+    expect(screen.getByTestId('workspace-option-default').querySelector('.bg-ws-rose')).not.toBeNull()
+    const plain = screen.getByTestId('workspace-option-w2')
+    expect(plain.querySelector('.monogram')).not.toBeNull()
+    expect(plain.querySelector('[class*="bg-ws-"]')).toBeNull()
+  })
+
   it('closes the menu on Escape and hands focus back to the chip', async () => {
     seed([PRIMARY, WORK])
     render(<WorkspacePicker />)

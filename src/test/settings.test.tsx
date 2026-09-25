@@ -13,6 +13,7 @@ import {
   fileOpened,
   flowMain,
   initialApp,
+  lockSettings,
   openSettings,
   setRemoteVaults,
   setSettingsSection,
@@ -53,18 +54,25 @@ const open = async () => {
 const go = (section: string) =>
   userEvent.click(screen.getByTestId(`settings-nav-${section}`))
 
-// A workspace row's ⋯, which is where Rename and Delete live.
+// Settings opens on General; the sync tests want the Sync & backup pane.
+const openSync = async () => {
+  const opened = await open()
+  await go('sync')
+  return opened
+}
+
+// A workspace row's ⋯, which is where Edit and Delete live.
 const openMenu = (id: string) => userEvent.click(screen.getByTestId(`workspace-menu-${id}`))
 
 describe('Settings shell', () => {
-  it('opens on the sync section', async () => {
+  it('opens on General, the first section in the nav', async () => {
     await open()
     expect(screen.getByTestId('settings-modal')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Sync & backup' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'General' })).toBeInTheDocument()
     expect(
-      screen.getByText('Keep devices in step through Google Drive, and keep an offline copy.')
+      screen.getByText('Appearance, language and how dates are shown.')
     ).toBeInTheDocument()
-    expect(screen.getByTestId('settings-nav-sync')).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByTestId('settings-nav-language')).toHaveAttribute('aria-current', 'page')
   })
 
   it('groups the nav under App, Vault and Data', async () => {
@@ -150,7 +158,7 @@ describe('Settings shell', () => {
 
 describe('Settings › sync', () => {
   it('connects Google Drive', async () => {
-    await open()
+    await openSync()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
     expect(calls('sync_connect')).toHaveLength(1)
   })
@@ -166,7 +174,7 @@ describe('Settings › sync', () => {
       ],
       activeWorkspace: 'w2'
     })
-    await open()
+    await openSync()
 
     expect(screen.queryByTestId('settings-sync-primary-only')).not.toBeInTheDocument()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
@@ -177,7 +185,7 @@ describe('Settings › sync', () => {
   // Safari has the screen, so the row waits on the backend's events — the
   // click itself claims nothing.
   it('waits for Google after a connect that resolved early', async () => {
-    await open()
+    await openSync()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
     expect(useApp.getState().sync.pending).toBe(false)
 
@@ -189,7 +197,7 @@ describe('Settings › sync', () => {
   })
 
   it('reports a consent that failed, and stays disconnected', async () => {
-    await open()
+    await openSync()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
     report({ pending: true })
     report({ error: 'access_denied' })
@@ -205,7 +213,7 @@ describe('Settings › sync', () => {
       report({ error: 'no OAuth client configured' })
       return Promise.reject({ kind: 'other', message: 'no OAuth client configured' })
     })
-    await open()
+    await openSync()
     await userEvent.click(screen.getByTestId('settings-drive-connect'))
 
     await waitFor(() => expect(useApp.getState().sync.pending).toBe(false))
@@ -229,7 +237,7 @@ describe('Settings › sync', () => {
       )
 
     it('waits on the probe, then takes an empty account as this vault', async () => {
-      await open()
+      await openSync()
       await userEvent.click(screen.getByTestId('settings-drive-connect'))
       await act(async () => setupDrivePending())
       expect(await screen.findByText('Waiting for Google…')).toBeInTheDocument()
@@ -247,7 +255,7 @@ describe('Settings › sync', () => {
     // A second device of a vault the account already holds: the backend adopts
     // and the picker is never shown.
     it('joins an account that already holds this vault, with no picker', async () => {
-      await open()
+      await openSync()
       await userEvent.click(screen.getByTestId('settings-drive-connect'))
       await act(async () => setupDriveProbed([VAULT, OTHER_VAULT]))
 
@@ -266,7 +274,7 @@ describe('Settings › sync', () => {
         'sync_adopt_pending',
         () => new Promise<void>(resolve => (decide = resolve))
       )
-      await open()
+      await openSync()
       await userEvent.click(screen.getByTestId('settings-drive-connect'))
       await act(async () => setupDriveProbed([VAULT]))
 
@@ -283,7 +291,7 @@ describe('Settings › sync', () => {
     // Workspaces uses, and the vault that was open stays as its own workspace.
     it("offers the account's vaults to restore when it holds only other ones", async () => {
       refuse()
-      await open()
+      await openSync()
       await userEvent.click(screen.getByTestId('settings-drive-connect'))
       await act(async () => setupDriveProbed([VAULT, OTHER_VAULT]))
 
@@ -310,7 +318,7 @@ describe('Settings › sync', () => {
 
     it('cancels out of the offer by forgetting the account', async () => {
       refuse()
-      await open()
+      await openSync()
       await userEvent.click(screen.getByTestId('settings-drive-connect'))
       await act(async () => setupDriveProbed([VAULT]))
 
@@ -327,7 +335,7 @@ describe('Settings › sync', () => {
       mockCommandOnce('sync_adopt_pending', () =>
         Promise.reject({ kind: 'other', message: 'Google Drive did not answer' })
       )
-      await open()
+      await openSync()
       await userEvent.click(screen.getByTestId('settings-drive-connect'))
       await act(async () => setupDriveProbed([]))
 
@@ -339,7 +347,7 @@ describe('Settings › sync', () => {
     })
 
     it('reports a probe that failed, and offers to try again', async () => {
-      await open()
+      await openSync()
       await userEvent.click(screen.getByTestId('settings-drive-connect'))
       await act(async () => setupDriveFailed('Google Drive did not answer'))
 
@@ -352,7 +360,7 @@ describe('Settings › sync', () => {
   })
 
   it('offers the encrypted backup behind its own control', async () => {
-    await open()
+    await openSync()
     expect(screen.getByTestId('settings-backup-row')).toHaveTextContent('.rowel')
     expect(document.querySelector('input[name="export_password"]')).toBeNull()
     await userEvent.click(screen.getByText('Save…'))
@@ -362,14 +370,14 @@ describe('Settings › sync', () => {
   // The portable export lives with Import now; this section keeps only the
   // encrypted backup.
   it('leaves the unencrypted export out of this section', async () => {
-    await open()
+    await openSync()
     expect(screen.queryByTestId('settings-export-run')).not.toBeInTheDocument()
   })
 
   // The pill beside the title says where the connection stands, one tone per
   // state, with a sync running outranking the last one's failure.
   it('says where Drive stands in the status pill', async () => {
-    await open()
+    await openSync()
     const pill = () => screen.getByTestId('settings-drive-status')
 
     expect(pill()).toHaveTextContent('Not connected')
@@ -390,7 +398,7 @@ describe('Settings › sync', () => {
   })
 
   it('shows what a connected account holds, and the way out', async () => {
-    await open()
+    await openSync()
     expect(screen.queryByTestId('settings-sync-now')).not.toBeInTheDocument()
     expect(screen.queryByText('End-to-end')).not.toBeInTheDocument()
 
@@ -1190,6 +1198,9 @@ describe('Settings › workspaces › list', () => {
 
     expect(screen.getByText('On this device · 2')).toBeInTheDocument()
     expect(screen.getByTestId('workspace-row-default')).toHaveTextContent('Open now')
+    // Which one is primary is said outright: a rename would otherwise hide it.
+    expect(screen.getByTestId('workspace-primary-default')).toBeInTheDocument()
+    expect(screen.queryByTestId('workspace-primary-w2')).not.toBeInTheDocument()
     expect(screen.queryByTestId('workspace-switch-default')).not.toBeInTheDocument()
     expect(screen.getByTestId('workspace-row-w2')).not.toHaveTextContent('Open now')
     expect(screen.getByTestId('workspace-row-w2')).toHaveTextContent('12 items · Google Drive')
@@ -1198,78 +1209,257 @@ describe('Settings › workspaces › list', () => {
     expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
   })
 
-  it('keeps Rename and Delete behind the row’s menu', async () => {
+  it('keeps Edit and Delete behind the row’s menu', async () => {
     two()
     await open()
     await go('workspaces')
 
-    expect(screen.queryByTestId('workspace-rename-w2')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('workspace-edit-w2')).not.toBeInTheDocument()
     expect(screen.queryByTestId('workspace-delete-w2')).not.toBeInTheDocument()
 
     await openMenu('w2')
     expect(screen.getByTestId('workspace-menu-w2')).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByTestId('workspace-rename-w2')).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-edit-w2')).toHaveTextContent('Edit…')
     expect(screen.getByTestId('workspace-delete-w2')).toBeEnabled()
   })
+})
 
-  it('renames a workspace inline from its menu', async () => {
-    two()
+describe('Settings › workspaces › edit', () => {
+  const edit = async (id: string) => {
+    const status = {
+      workspaces: [
+        { id: 'default', name: null },
+        { id: 'w2', name: 'Work', vaultId: 'cafe', synced: true, itemCount: 12 }
+      ],
+      activeWorkspace: 'default'
+    }
+    seedApp(status)
+    // The probe a save re-reads the list through answers with the same two
+    // workspaces, as it would; the bare default would make the one being
+    // edited vanish and the page step out.
+    mockCommand('app_status', () => ({ ...appStatusDefault(), ...status }))
     await open()
     await go('workspaces')
-    await openMenu('w2')
-    await userEvent.click(screen.getByTestId('workspace-rename-w2'))
+    await openMenu(id)
+    await userEvent.click(screen.getByTestId(`workspace-edit-${id}`))
+  }
 
-    // The menu folds away and the field opens in the row, on the current name.
-    expect(screen.queryByTestId('workspace-rename-w2')).not.toBeInTheDocument()
-    const input = screen.getByTestId('workspace-rename-input')
-    expect(input).toHaveValue('Work')
+  const hint = () => screen.getByTestId('settings-subpage-hint')
+  const tile = () => screen.getByTestId('workspace-edit-preview').querySelector('[aria-hidden]')
+
+  it('opens on the workspace as it is, with nothing to save yet', async () => {
+    await edit('w2')
+
+    expect(screen.getByRole('heading', { name: 'Edit workspace' })).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-edit-name')).toHaveValue('Work')
+    expect(screen.getByTestId('workspace-edit-preview')).toHaveTextContent(
+      '12 items · Google Drive'
+    )
+    // No colour picked yet: the tile is still its hashed hue.
+    expect(tile()).toHaveClass('monogram')
+    expect(screen.getByTestId('workspace-edit-save')).toBeDisabled()
+    expect(hint()).toHaveTextContent('No changes yet')
+  })
+
+  it('renames a workspace and steps back to the list', async () => {
+    await edit('w2')
+    const input = screen.getByTestId('workspace-edit-name')
     await userEvent.clear(input)
-    await userEvent.type(input, 'Clients{Enter}')
+    await userEvent.type(input, 'Clients')
+    expect(hint()).toHaveTextContent('Ready')
+    await userEvent.click(screen.getByTestId('workspace-edit-save'))
 
     expect(calls('workspace_rename')).toEqual([{ id: 'w2', name: 'Clients' }])
+    expect(calls('workspace_set_color')).toHaveLength(0)
     await waitFor(() =>
-      expect(screen.queryByTestId('workspace-rename-input')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('workspace-edit-name')).not.toBeInTheDocument()
+    )
+    expect(screen.getByTestId('workspace-new-row')).toBeInTheDocument()
+  })
+
+  it('recolours a workspace without renaming it', async () => {
+    await edit('w2')
+    await userEvent.click(screen.getByTestId('workspace-edit-color-rose'))
+
+    expect(screen.getByTestId('workspace-edit-color-rose')).toHaveAttribute('aria-checked', 'true')
+    expect(tile()).toHaveClass('bg-ws-rose')
+    await userEvent.click(screen.getByTestId('workspace-edit-save'))
+
+    expect(calls('workspace_set_color')).toEqual([{ id: 'w2', color: 'rose' }])
+    expect(calls('workspace_rename')).toHaveLength(0)
+    await waitFor(() =>
+      expect(screen.queryByTestId('workspace-edit-name')).not.toBeInTheDocument()
     )
   })
 
-  it('lets the rename go with Escape, leaving Settings open', async () => {
-    two()
-    await open()
-    await go('workspaces')
-    await openMenu('default')
-    await userEvent.click(screen.getByTestId('workspace-rename-default'))
-    await userEvent.type(screen.getByTestId('workspace-rename-input'), '{Escape}')
+  it('refuses another workspace’s name, whatever its case', async () => {
+    await edit('w2')
+    const input = screen.getByTestId('workspace-edit-name')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'personal')
 
-    expect(screen.queryByTestId('workspace-rename-input')).not.toBeInTheDocument()
-    expect(useUi.getState().settings).toBe(true)
+    expect(screen.getByTestId('workspace-edit-duplicate')).toHaveTextContent(
+      'You already have a workspace with this name.'
+    )
+    expect(screen.getByTestId('workspace-edit-save')).toBeDisabled()
+    await userEvent.keyboard('{Enter}')
     expect(calls('workspace_rename')).toHaveLength(0)
   })
 
-  it('unfolds the new workspace form from the last row and creates one', async () => {
-    await open()
-    await go('workspaces')
+  it('shows what went wrong and stays open', async () => {
+    mockCommandOnce('workspace_rename', () =>
+      Promise.reject({ kind: 'other', message: 'registry is read-only' })
+    )
+    await edit('w2')
+    await userEvent.type(screen.getByTestId('workspace-edit-name'), ' Ltd')
+    await userEvent.click(screen.getByTestId('workspace-edit-save'))
 
-    const row = screen.getByTestId('workspace-new-row')
-    expect(row).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByTestId('workspace-new-name')).not.toBeInTheDocument()
-
-    await userEvent.click(row)
-    expect(row).toHaveAttribute('aria-expanded', 'true')
-    await userEvent.type(screen.getByTestId('workspace-new-name'), 'Family')
-    await userEvent.type(screen.getByTestId('workspace-new-password'), 'master-pass')
-    await act(async () => {
-      await userEvent.click(screen.getByTestId('workspace-create'))
-    })
-
-    expect(calls('workspace_create')).toEqual([{ name: 'Family', password: 'master-pass' }])
+    expect(await screen.findByTestId('workspace-edit-error')).toHaveTextContent(
+      'registry is read-only'
+    )
+    expect(screen.getByTestId('workspace-edit-name')).toBeEnabled()
   })
 
-  it('folds the new workspace form away again', async () => {
+  // A rename that landed before the colour failed is not undone by the
+  // failure: the list is re-read so it shows, and a retry sends only the part
+  // still unsaved rather than renaming twice.
+  it('keeps a rename that landed when the colour after it fails', async () => {
+    mockCommandOnce('workspace_set_color', () =>
+      Promise.reject({ kind: 'other', message: 'registry is read-only' })
+    )
+    await edit('w2')
+    // What the re-read finds once the rename has landed.
+    mockCommand('app_status', () => ({
+      ...appStatusDefault(),
+      workspaces: [
+        { id: 'default', name: null },
+        { id: 'w2', name: 'Work Ltd', vaultId: 'cafe', synced: true, itemCount: 12 }
+      ]
+    }))
+    await userEvent.type(screen.getByTestId('workspace-edit-name'), ' Ltd')
+    await userEvent.click(screen.getByTestId('workspace-edit-color-rose'))
+    await userEvent.click(screen.getByTestId('workspace-edit-save'))
+
+    expect(await screen.findByTestId('workspace-edit-error')).toHaveTextContent(
+      'registry is read-only'
+    )
+    expect(calls('workspace_rename')).toEqual([{ id: 'w2', name: 'Work Ltd' }])
+    expect(screen.getByTestId('workspace-edit-name')).toHaveValue('Work Ltd')
+
+    await userEvent.click(screen.getByTestId('workspace-edit-save'))
+    await waitFor(() => expect(calls('workspace_set_color')).toHaveLength(2))
+    expect(calls('workspace_rename')).toHaveLength(1)
+  })
+
+  it('lets the edit go with Escape, leaving Settings open', async () => {
+    await edit('default')
+    await userEvent.type(screen.getByTestId('workspace-edit-name'), ' vault')
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.queryByTestId('workspace-edit-name')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-new-row')).toBeInTheDocument()
+    expect(useUi.getState().settings).toBe(true)
+    expect(calls('workspace_rename')).toHaveLength(0)
+    expect(calls('workspace_set_color')).toHaveLength(0)
+  })
+})
+
+describe('Settings › workspaces › new', () => {
+  const openNew = async () => {
     await open()
     await go('workspaces')
     await userEvent.click(screen.getByTestId('workspace-new-row'))
-    await userEvent.click(screen.getByTestId('workspace-new-row'))
+  }
+
+  const create = () => screen.getByTestId('workspace-create')
+  const hint = () => screen.getByTestId('settings-subpage-hint')
+  const tile = () => screen.getByTestId('workspace-new-preview').querySelector('[aria-hidden]')
+
+  it('opens the sub-page from the list’s last row and creates one', async () => {
+    await openNew()
+
+    expect(screen.getByRole('heading', { name: 'New workspace' })).toBeInTheDocument()
+    await userEvent.type(screen.getByTestId('workspace-new-name'), 'Family')
+    await userEvent.type(screen.getByTestId('workspace-new-password'), 'master-pass')
+    expect(create()).toBeEnabled()
+    expect(hint()).toHaveTextContent('Ready')
+    await act(async () => {
+      await userEvent.click(create())
+    })
+
+    expect(calls('workspace_create')).toEqual([
+      { name: 'Family', password: 'master-pass', color: 'indigo' }
+    ])
+  })
+
+  it('keeps Create disabled until both the name and the password are in', async () => {
+    await openNew()
+    const name = screen.getByTestId('workspace-new-name')
+
+    expect(create()).toBeDisabled()
+    expect(hint()).toHaveTextContent('Name and master password required')
+    await userEvent.type(name, 'Family')
+    expect(create()).toBeDisabled()
+    await userEvent.clear(name)
+    await userEvent.type(screen.getByTestId('workspace-new-password'), 'master-pass')
+    expect(create()).toBeDisabled()
+    await userEvent.type(name, 'Family')
+    expect(create()).toBeEnabled()
+  })
+
+  it('refuses a name another workspace already has', async () => {
+    seedApp({ workspaces: [{ id: 'default', name: 'Work' }], activeWorkspace: 'default' })
+    await openNew()
+    await userEvent.type(screen.getByTestId('workspace-new-name'), ' work ')
+    await userEvent.type(screen.getByTestId('workspace-new-password'), 'master-pass')
+
+    expect(screen.getByTestId('workspace-new-duplicate')).toHaveTextContent(
+      'You already have a workspace with this name.'
+    )
+    expect(create()).toBeDisabled()
+    await userEvent.keyboard('{Enter}')
+    expect(calls('workspace_create')).toHaveLength(0)
+  })
+
+  it('starts on the first colour no workspace has, and redraws the tile as one is picked', async () => {
+    seedApp({
+      workspaces: [
+        { id: 'default', name: null, color: 'indigo' },
+        { id: 'w2', name: 'Work', color: 'violet' }
+      ],
+      activeWorkspace: 'default'
+    })
+    await openNew()
+
+    expect(screen.getByTestId('workspace-new-color-green')).toHaveAttribute('aria-checked', 'true')
+    expect(tile()).toHaveClass('bg-ws-green')
+    await userEvent.click(screen.getByTestId('workspace-new-color-teal'))
+    expect(tile()).toHaveClass('bg-ws-teal')
+    expect(tile()).not.toHaveClass('bg-ws-green')
+  })
+
+  it('says a wrong master password in the words the unlock uses', async () => {
+    mockCommandOnce('workspace_create', () =>
+      Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })
+    )
+    await openNew()
+    await userEvent.type(screen.getByTestId('workspace-new-name'), 'Family')
+    await userEvent.type(screen.getByTestId('workspace-new-password'), 'wrong{Enter}')
+
+    // Named: the password wanted is the primary's, which need not be the open
+    // workspace's.
+    expect(await screen.findByTestId('workspace-new-error')).toHaveTextContent(
+      'That is not the master password of Personal.'
+    )
+    expect(calls('workspace_create')).toHaveLength(1)
+  })
+
+  it('goes back to the list', async () => {
+    await openNew()
+    await userEvent.click(screen.getByTestId('settings-subpage-back'))
+
     expect(screen.queryByTestId('workspace-new-name')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-new-row')).toBeInTheDocument()
   })
 })
 
@@ -1292,14 +1482,18 @@ describe('Settings › workspaces › delete', () => {
     await go('workspaces')
     await openMenu(id)
     await userEvent.click(screen.getByTestId(`workspace-delete-${id}`))
-    return screen.getByTestId('workspace-delete-dialog')
+    return screen.getByTestId('workspace-delete-page')
   }
 
   it('opens the confirmation on the workspace that was chosen', async () => {
     await openDelete('w2')
 
-    expect(screen.getByTestId('workspace-delete-dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Delete Work?' })).toBeInTheDocument()
+    // A page under Workspaces, like Edit, not a dialog over the list: the
+    // header names the step and the preview says which workspace.
+    expect(screen.getByTestId('workspace-delete-page')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Delete workspace' })).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-preview')).toHaveTextContent('Work')
+    expect(screen.queryByTestId('workspace-new-row')).not.toBeInTheDocument()
     expect(
       screen.getByText(/A copy on Google Drive is left where it is/)
     ).toBeInTheDocument()
@@ -1337,7 +1531,7 @@ describe('Settings › workspaces › delete', () => {
     // The probe is what carries the list, so a delete ends by re-reading it.
     expect(calls('app_status').length).toBeGreaterThan(0)
     await waitFor(() =>
-      expect(screen.queryByTestId('workspace-delete-dialog')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('workspace-delete-page')).not.toBeInTheDocument()
     )
   })
 
@@ -1345,7 +1539,54 @@ describe('Settings › workspaces › delete', () => {
   // the lock, which is what lands on the survivor's lock screen.
   it('offers the delete on the current workspace as well', async () => {
     await openDelete('default')
-    expect(screen.getByRole('heading', { name: 'Delete Personal?' })).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-preview')).toHaveTextContent('Personal')
+  })
+
+  it('steps back to the list on Escape without deleting', async () => {
+    await openDelete('w2')
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.queryByTestId('workspace-delete-page')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-row-w2')).toBeInTheDocument()
+    expect(calls('workspace_delete')).toHaveLength(0)
+    expect(useUi.getState().settings).toBe(true)
+  })
+
+  it('holds every way out while a deletion is in progress', async () => {
+    let finish!: () => void
+    mockCommandOnce(
+      'workspace_delete',
+      () => new Promise<void>(resolve => (finish = resolve))
+    )
+    await openDelete('w2')
+    await userEvent.type(screen.getByTestId('workspace-delete-password'), 'work-pass')
+    await userEvent.type(screen.getByTestId('workspace-delete-confirm'), 'Work')
+    await userEvent.click(screen.getByTestId('workspace-delete-submit'))
+
+    const cancel = screen.getByTestId('settings-subpage-cancel')
+    const back = screen.getByTestId('settings-subpage-back')
+    const modalClose = screen.getByTestId('modal-close')
+    const security = screen.getByTestId('settings-nav-security')
+    expect(cancel).toBeDisabled()
+    expect(back).toBeDisabled()
+    expect(modalClose).toBeDisabled()
+    expect(security).toBeDisabled()
+
+    // The lock is acquired before React redraws the disabled controls too: each
+    // route still refuses if its handler was captured by the preceding render.
+    for (const control of [cancel, back, modalClose, security]) {
+      control.removeAttribute('disabled')
+      await userEvent.click(control)
+    }
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByTestId('workspace-delete-page')).toBeInTheDocument()
+    expect(useUi.getState().settings).toBe(true)
+
+    await act(async () => finish())
+    await waitFor(() =>
+      expect(screen.queryByTestId('workspace-delete-page')).not.toBeInTheDocument()
+    )
+    expect(useUi.getState().settingsLocked).toBe(false)
   })
 
   it('blames the password only when the backend does', async () => {
@@ -1361,7 +1602,7 @@ describe('Settings › workspaces › delete', () => {
     expect(await screen.findByTestId('workspace-delete-error')).toHaveTextContent(
       'That is not this workspace’s master password'
     )
-    expect(screen.getByTestId('workspace-delete-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-page')).toBeInTheDocument()
   })
 
   // The delete proves a password on demand and takes no session, so it runs
@@ -1380,7 +1621,7 @@ describe('Settings › workspaces › delete', () => {
     expect(await screen.findByTestId('workspace-delete-error')).toHaveTextContent(
       'Too many failed attempts. Try again in 8s'
     )
-    expect(screen.getByTestId('workspace-delete-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-page')).toBeInTheDocument()
   })
 
   // A device always has a vault to open, and the control says so rather than
@@ -1393,7 +1634,7 @@ describe('Settings › workspaces › delete', () => {
     await openMenu('default')
     expect(screen.getByTestId('workspace-delete-default')).toBeDisabled()
     await userEvent.click(screen.getByTestId('workspace-delete-default'))
-    expect(screen.queryByTestId('workspace-delete-dialog')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('workspace-delete-page')).not.toBeInTheDocument()
   })
 
   // A workspace with a vault id has a pack in the account, so it is offered the
@@ -1481,7 +1722,7 @@ describe('Settings › workspaces › delete', () => {
     )
     await userEvent.click(screen.getByTestId('workspace-delete-stranded'))
 
-    expect(screen.getByRole('heading', { name: 'Delete Personal?' })).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-preview')).toHaveTextContent('Personal')
     expect(
       screen.queryByTestId('workspace-delete-scope-everywhere')
     ).not.toBeInTheDocument()
@@ -1684,5 +1925,76 @@ describe('Settings › workspaces › restore from Drive', () => {
       'access_denied'
     )
     expect(calls('workspace_restore_from_drive')).toHaveLength(0)
+  })
+})
+
+describe('Settings sub-pages', () => {
+  const openSubpage = async () => {
+    await open()
+    await go('workspaces')
+    await userEvent.click(screen.getByTestId('workspace-new-row'))
+  }
+
+  const onSection = () => {
+    expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-subpage-back')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-new-row')).toBeInTheDocument()
+  }
+
+  it('heads the sub-page in the section’s place and comes back from it', async () => {
+    await openSubpage()
+
+    // The title takes the section's line: one heading, nothing stacked above
+    // it, so the header keeps its height on the way in and out.
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    expect(screen.getByRole('heading', { name: 'New workspace' })).toBeInTheDocument()
+    expect(
+      screen.getByText('Its own encrypted database, unlocked alongside your others.')
+    ).toBeInTheDocument()
+    // It replaces the section's body rather than stacking on it.
+    expect(screen.queryByTestId('workspace-new-row')).not.toBeInTheDocument()
+    expect(screen.getByTestId('settings-subpage-back')).toHaveAccessibleName('Back')
+
+    await userEvent.click(screen.getByTestId('settings-subpage-back'))
+    onSection()
+  })
+
+  it('steps back out on Escape, leaving Settings open', async () => {
+    await openSubpage()
+
+    await userEvent.keyboard('{Escape}')
+    onSection()
+    expect(useUi.getState().settings).toBe(true)
+  })
+
+  it('drops the sub-page when another section is picked', async () => {
+    await openSubpage()
+
+    await go('security')
+    expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-subpage-back')).not.toBeInTheDocument()
+
+    // Coming back lands on the section, not on the sub-page left behind.
+    await go('workspaces')
+    onSection()
+  })
+
+  it('goes back from the footer’s Cancel', async () => {
+    await openSubpage()
+
+    await userEvent.click(screen.getByTestId('settings-subpage-cancel'))
+    onSection()
+  })
+
+  it('holds the sub-page while Settings is locked', async () => {
+    await openSubpage()
+
+    act(() => lockSettings(true))
+    expect(screen.getByTestId('settings-subpage-back')).toBeDisabled()
+    await userEvent.keyboard('{Escape}')
+    await userEvent.click(screen.getByTestId('settings-subpage-cancel'))
+    await userEvent.click(screen.getByTestId('settings-nav-workspaces'))
+    expect(screen.getByRole('heading', { name: 'New workspace' })).toBeInTheDocument()
+    expect(useUi.getState().settings).toBe(true)
   })
 })

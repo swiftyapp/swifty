@@ -74,15 +74,23 @@ export const switchWorkspace = async (id: string) => {
 // account it syncs to as well. The probe is what carries the list, so re-reading
 // it is the whole update here — and when the deleted one was the open one the
 // backend has already announced the lock, which routes to the survivor's lock
-// screen by the one path every lock takes. Rejections are the caller's to show:
-// the dialog has the password field to put them under.
+// screen by the one path every lock takes. Settings stays pinned while the
+// deletion runs; rejections are the caller's to show under the password field.
 export const deleteWorkspace = async (
   id: string,
   password: string,
   everywhere: boolean
 ) => {
-  await workspaceDelete(id, password, everywhere)
-  await refreshApp()
+  // A delete may finish after an Argon2id proof and a Drive request. Hold every
+  // way out of Settings until it has landed, or backing out only hides work that
+  // is still going to remove the workspace.
+  lockSettings(true)
+  try {
+    await workspaceDelete(id, password, everywhere)
+    await refreshApp()
+  } finally {
+    lockSettings(false)
+  }
 }
 
 // Create a workspace and open it. It arrives active and unlocked, so this is an
@@ -91,8 +99,12 @@ export const deleteWorkspace = async (
 // The re-probe is what brings the new list on screen: which workspaces exist
 // and which is active is the probe's answer, and this is the one move that
 // changes it without passing through a lock.
-export const createWorkspace = async (name: string, password: string) => {
-  const result = await workspaceCreate(name, password)
+export const createWorkspace = async (
+  name: string,
+  password: string,
+  color?: string | null
+) => {
+  const result = await workspaceCreate(name, password, color)
   clearSession()
   await enterMain(result)
   await refreshApp()
