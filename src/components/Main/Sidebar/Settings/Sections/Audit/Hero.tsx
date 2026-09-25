@@ -39,7 +39,7 @@ export default function Hero() {
   }
 
   return (
-    <div className={cx(CARD, 'relative mt-4 mb-7')}>
+    <div className={cx(CARD, 'relative mb-7')}>
       <div aria-hidden className={cx('pointer-events-none absolute inset-0', WASH)} />
       <div className="relative flex items-center gap-5 p-5">
         <div className="flex-none text-text">

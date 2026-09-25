@@ -30,7 +30,7 @@ export default function Import() {
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <Segmented
         name={t('Import or export')}
         testidPrefix="settings-io"

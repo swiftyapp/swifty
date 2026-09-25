@@ -67,7 +67,7 @@ export default function Sync() {
 
   return (
     <>
-      <section className="mt-4 mb-7">
+      <section className="mb-7">
         <DriveCard probing={probing} offered={offered} restoring={restoring} />
         {syncFailure && <ErrorNote message={syncFailure} />}
         {drive.status === 'error' && (

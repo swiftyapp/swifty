@@ -27,7 +27,7 @@ export default function SettingsModal() {
     >
       <Nav section={section} onSelect={setSettingsSection} disabled={locked} />
       <div className="flex min-w-0 flex-1 flex-col bg-pane">
-        <div className="flex flex-none items-start gap-3 px-7 pt-5 pb-3.5 inset-shadow-hairline">
+        <div className="flex flex-none items-start gap-3 px-7 pt-4 pb-3.5 inset-shadow-hairline">
           <div className="min-w-0 flex-1">
             <h1
               id={TITLE_ID}
@@ -54,7 +54,7 @@ export default function SettingsModal() {
             <CloseGlyph />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-7 pt-1.5 pb-7">
+        <div className="flex-1 overflow-y-auto px-7 pt-3 pb-7">
           <div key={section} className="animate-pop">
             <Section section={section} />
           </div>
