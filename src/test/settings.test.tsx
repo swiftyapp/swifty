@@ -1010,11 +1010,40 @@ describe('Settings › language & region', () => {
     expect(usePrefs.getState().theme).toBe('system')
   })
 
-  it('names both region radiogroups after their rows', async () => {
+  it('hands focus back to the date format field after a pick', async () => {
     await open()
     await go('language')
 
-    expect(screen.getByRole('radiogroup', { name: 'Date format' })).toBeInTheDocument()
+    const trigger = screen.getByTestId('settings-date-format-trigger')
+    await userEvent.click(trigger)
+    await userEvent.click(screen.getByTestId('settings-date-format-YYYY-MM-DD'))
+    expect(trigger).toHaveFocus()
+  })
+
+  it('closes a menu on Tab and moves on from its field, either way', async () => {
+    await open()
+    await go('language')
+    const language = screen.getByTestId('settings-locale-trigger')
+    const format = screen.getByTestId('settings-date-format-trigger')
+
+    await userEvent.click(language)
+    await userEvent.tab()
+    expect(screen.queryByTestId('dropdown-scrim')).not.toBeInTheDocument()
+    expect(format).toHaveFocus()
+
+    await userEvent.click(format)
+    await userEvent.tab({ shift: true })
+    expect(screen.queryByTestId('dropdown-scrim')).not.toBeInTheDocument()
+    expect(language).toHaveFocus()
+  })
+
+  it('names the theme radiogroup and the date format menu after their rows', async () => {
+    await open()
+    await go('language')
+
+    expect(screen.getByTestId('settings-date-format-trigger')).toHaveAccessibleName(
+      /^Date format: /
+    )
     expect(screen.getByRole('radiogroup', { name: 'Theme' })).toBeInTheDocument()
   })
 
@@ -1025,9 +1054,15 @@ describe('Settings › language & region', () => {
 
     expect(dates(usePrefs.getState().dateFormat).dateTime(iso)).toMatch(/^01\/02\/2024/)
 
+    const trigger = screen.getByTestId('settings-date-format-trigger')
+    expect(trigger).toHaveTextContent('MM/DD/YYYY')
+
+    await userEvent.click(trigger)
     await userEvent.click(screen.getByTestId('settings-date-format-DD.MM.YYYY'))
     expect(dates(usePrefs.getState().dateFormat).dateTime(iso)).toMatch(/^02\.01\.2024/)
+    expect(trigger).toHaveTextContent('DD.MM.YYYY')
 
+    await userEvent.click(trigger)
     await userEvent.click(screen.getByTestId('settings-date-format-YYYY-MM-DD'))
     expect(dates(usePrefs.getState().dateFormat).dateTime(iso)).toMatch(/^2024-01-02/)
   })
@@ -1063,10 +1098,12 @@ describe('Settings › date format', () => {
     expect(screen.getByText('06/01/2035')).toBeInTheDocument()
     expect(screen.getByText('01/15/2024')).toBeInTheDocument()
 
+    await userEvent.click(screen.getByTestId('settings-date-format-trigger'))
     await userEvent.click(screen.getByTestId('settings-date-format-DD.MM.YYYY'))
     expect(await screen.findByText('01.06.2035')).toBeInTheDocument()
     expect(screen.getByText('15.01.2024')).toBeInTheDocument()
 
+    await userEvent.click(screen.getByTestId('settings-date-format-trigger'))
     await userEvent.click(screen.getByTestId('settings-date-format-YYYY-MM-DD'))
     expect(await screen.findByText('2035-06-01')).toBeInTheDocument()
     expect(screen.getByText('2024-01-15')).toBeInTheDocument()

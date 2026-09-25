@@ -155,8 +155,10 @@ describe("settings", () => {
     await $('[data-testid="settings-theme-light"]').click();
     await expect($("html")).toHaveAttribute("data-theme", "light");
 
+    await $('[data-testid="settings-date-format-trigger"]').click();
     await $('[data-testid="settings-date-format-YYYY-MM-DD"]').click();
     expect((await readSettings()).dateFormat).toBe("YYYY-MM-DD");
+    await $('[data-testid="settings-date-format-trigger"]').click();
     await $('[data-testid="settings-date-format-MM/DD/YYYY"]').click();
     expect((await readSettings()).dateFormat).toBe("MM/DD/YYYY");
   });

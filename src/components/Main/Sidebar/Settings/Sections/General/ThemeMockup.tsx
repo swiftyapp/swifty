@@ -75,7 +75,7 @@ function Scene({ palette, style }: { palette: Palette; style?: CSSProperties }) 
 // so the seam runs straight through the pane.
 export default function ThemeMockup({ theme }: { theme: ThemePreference }) {
   return (
-    <div aria-hidden className="relative h-[92px] overflow-hidden rounded-sm border border-line">
+    <div aria-hidden className="relative h-16 overflow-hidden rounded-sm border border-line md:h-[92px]">
       <Scene palette={theme === 'dark' ? DARK : LIGHT} />
       {theme === 'system' && <Scene palette={DARK} style={{ clipPath: 'inset(0 0 0 50%)' }} />}
     </div>

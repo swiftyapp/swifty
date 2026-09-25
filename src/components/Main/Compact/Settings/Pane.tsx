@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import type { Section as Key } from '@/store'
 import { cx } from '@/utils/cx'
 import Section from '../../Sidebar/Settings/Section'
-import { titleOf } from '../../Sidebar/Settings/sections'
+import { descriptionOf, titleOf } from '../../Sidebar/Settings/sections'
 import { useSubpage } from '../../Sidebar/Settings/sectionNav'
 import SubpageBody from '../../Sidebar/Settings/SubpageBody'
 import {
@@ -54,9 +54,10 @@ export default function Pane({
       <div className={cx('min-h-0 flex-1 overflow-y-auto px-4 pt-1', TAB_BAR_CLEARANCE)}>
         {/* The pane names itself the way a root does — there is no room for a
             centred nav title beside a back control that already carries one. */}
-        <h1 className="mb-5 truncate text-2xl font-semibold tracking-display text-text">
+        <h1 className="truncate text-2xl font-semibold tracking-display text-text">
           {titleOf(section)}
         </h1>
+        <p className="mt-1 mb-5 text-sm text-text2">{descriptionOf(section)}</p>
         <Section section={section} />
       </div>
     </div>

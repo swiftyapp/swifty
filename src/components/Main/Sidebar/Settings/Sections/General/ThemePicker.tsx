@@ -45,7 +45,7 @@ export default function ThemePicker() {
       role="radiogroup"
       aria-label={t('Theme')}
       onKeyDown={onKeyDown}
-      className="grid grid-cols-1 gap-3 md:grid-cols-3"
+      className="grid grid-cols-3 gap-2 md:gap-3"
     >
       {THEMES.map(({ value, label }, index) => {
         const active = value === theme
@@ -75,9 +75,9 @@ export default function ThemePicker() {
               >
                 {active && <span className="h-2 w-2 rounded-full bg-accent" />}
               </span>
-              <span className="text-base font-medium text-text">{t(label)}</span>
+              <span className="min-w-0 truncate text-base font-medium text-text">{t(label)}</span>
               {value === 'system' && (
-                <span className={cx(META, 'ml-auto')}>
+                <span className={cx(META, 'ml-auto max-md:hidden')}>
                   {systemDark ? t('now dark') : t('now light')}
                 </span>
               )}
