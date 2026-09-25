@@ -1,26 +1,27 @@
 import { useTranslation } from 'react-i18next'
 import { useUi, setView } from '@/store'
-import Chip from './Chip'
+import { CloseGlyph } from '../../icons'
+import { META_TYPE } from '@/components/elements/tokens'
 
-// The tag the Tags view is showing, and the way out of it: the Tags view is
-// nothing without a tag, so clearing it goes back to All Items.
 export default function ActiveTag() {
   const { t } = useTranslation()
-  // Only the Tags view shows a tag, so only it has one to name (see
-  // `useVisibleEntries` for the same scoping of the filter itself).
   const tag = useUi(state => (state.view === 'tags' ? state.filterTag : null))
   if (!tag) return null
 
   return (
     <div className="mt-2 flex">
-      <Chip
-        testid="active-tag"
-        label={`#${tag}`}
+      <button
+        type="button"
+        data-testid="active-tag"
         title={t('Clear tag filter')}
-        selected
-        dismiss
         onClick={() => setView('items')}
-      />
+        className={`flex h-6 flex-none items-center gap-1.5 rounded-sm border border-accent-line bg-accent-soft px-[9px] ${META_TYPE} whitespace-nowrap text-accent max-md:h-8 max-md:rounded-full max-md:border-text max-md:bg-text max-md:px-3 max-md:text-base max-md:font-medium max-md:text-screen`}
+      >
+        <span>#{tag}</span>
+        <span className="opacity-60">
+          <CloseGlyph size={12} />
+        </span>
+      </button>
     </div>
   )
 }

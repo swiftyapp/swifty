@@ -1,18 +1,24 @@
 import { useState } from 'react'
-import { usePrefs, setPref, type SortMode } from '@/store'
+import { usePrefs, setPref, SORT_MODES, type SortMode } from '@/store'
 import { useTranslation } from 'react-i18next'
 import type { TKey } from '@/i18n'
+import { chord } from '@/lib/platform'
 import IconButton from '@/components/elements/IconButton'
-import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
-import { SortGlyph, CheckGlyph } from '@/components/Main/icons'
+import {
+  Dropdown,
+  DropdownCheck,
+  DropdownItem,
+  DropdownLabel,
+  DropdownMeta
+} from '@/components/elements/Dropdown'
+import { SortGlyph } from '@/components/Main/icons'
 
-const OPTIONS: { mode: SortMode; label: TKey }[] = [
-  { mode: 'recent', label: 'Recent' },
-  { mode: 'alpha', label: 'Alphabetical' }
-]
+const LABELS: Record<SortMode, TKey> = {
+  alpha: 'Name (A–Z)',
+  recent: 'Recently edited',
+  created: 'Date created'
+}
 
-// The list header's sort affordance. The menu is right-anchored under the
-// button so it never runs off the list column's edge.
 export default function SortMenu({ className }: { className?: string }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -27,28 +33,28 @@ export default function SortMenu({ className }: { className?: string }) {
     <div className="relative flex-none">
       <IconButton
         title={t('Sort')}
-        active={open}
+        size={32}
         expanded={open}
         testid="sort-menu"
         onClick={() => setOpen(value => !value)}
         className={className}
       >
-        <SortGlyph />
+        <SortGlyph size={16} stroke={1.8} />
       </IconButton>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-[180px]">
-          <Dropdown onBlur={() => setOpen(false)}>
-            {OPTIONS.map(option => (
+        <div className="absolute right-0 top-full mt-1 w-[232px]">
+          <Dropdown onBlur={() => setOpen(false)} className="w-full">
+            <DropdownLabel>{t('Sort by')}</DropdownLabel>
+            {SORT_MODES.map((mode, index) => (
               <DropdownItem
-                key={option.mode}
-                testid={`sort-option-${option.mode}`}
-                checked={sort === option.mode}
-                onClick={() => pick(option.mode)}
+                key={mode}
+                testid={`sort-option-${mode}`}
+                checked={sort === mode}
+                onClick={() => pick(mode)}
               >
-                <span className="grid w-3.5 flex-none place-items-center text-accent">
-                  {sort === option.mode && <CheckGlyph />}
-                </span>
-                {t(option.label)}
+                <DropdownCheck on={sort === mode} />
+                <span className="min-w-0 flex-1 truncate">{t(LABELS[mode])}</span>
+                <DropdownMeta hint>{chord(String(index + 1))}</DropdownMeta>
               </DropdownItem>
             ))}
           </Dropdown>

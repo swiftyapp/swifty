@@ -16,8 +16,9 @@ export const useListKeys = () => {
   const index = entries.findIndex(entry => entry.id === currentId)
 
   return (event: KeyboardEvent<HTMLElement>) => {
-    // The column holds controls of its own — the sort button and its menu, the
-    // kind chips, the clear button — and their keys bubble through here too. A
+    // The column holds controls of its own — the title's scope menu, the sort
+    // button and its menu, the group captions, the clear button — and their
+    // keys bubble through here too. A
     // key is the list's only if it started in the search field or on a row, so
     // ⏎ on a button activates that button and nothing else.
     const from = event.target instanceof Element ? event.target : null

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { cx } from '@/utils/cx'
+import { CheckGlyph } from '@/components/Main/icons'
 
 interface DropdownProps {
   onBlur: () => void
@@ -91,7 +92,7 @@ export function Dropdown({
         role={listbox ? undefined : 'menu'}
         onKeyDown={onKeyDown}
         className={cx(
-          'animate-drop absolute z-20 flex min-w-[180px] origin-top flex-col overflow-hidden rounded-xl bg-menu text-text shadow-menu backdrop-blur-[20px]',
+          'animate-drop absolute z-20 flex min-w-[180px] origin-top flex-col overflow-hidden rounded-[12px] border border-menu-line bg-menu text-text shadow-menu backdrop-blur-[24px] backdrop-saturate-[1.6]',
           className
         )}
       >
@@ -99,7 +100,7 @@ export function Dropdown({
         <div
           id={listbox}
           role={listbox && 'listbox'}
-          className={cx('flex flex-col gap-px overflow-y-auto p-1.5', listClassName)}
+          className={cx('flex flex-col overflow-y-auto p-[5px]', listClassName)}
         >
           {children}
         </div>
@@ -122,20 +123,17 @@ interface ItemProps {
    * `checked` item says it is the chosen one by `aria-checked`.
    */
   option?: boolean
-  // A rule across the whole menu above this item, setting it apart.
+  // A rule across the menu above this item, setting it apart.
   separated?: boolean
   // Destructive entry (delete, disconnect, ...): inked in the `bad` token.
   danger?: boolean
   testid?: string
   onClick?: () => void
-  // Spacing overrides for a row that is not a plain label (a tile with two
-  // lines of text is taller than the 34px default).
   className?: string
   /**
    * Set on every item of a menu that picks one of several (a sort order, a
    * vault): the item becomes a `menuitemradio` and says whether it is the one,
    * so the selection a check glyph shows is also told to assistive technology.
-   * Its highlight is the selection tint rather than the neutral hover.
    * Left undefined, the item is a plain action.
    */
   checked?: boolean
@@ -165,20 +163,16 @@ export function DropdownItem({
   children
 }: ItemProps) {
   const radio = checked !== undefined
-  // Keyboard focus borrows the hover treatment instead of the global outline,
-  // which would ring a rounded row inset in a rounded panel. The row's corner
-  // (`rounded-sm`, 8px) is the panel's 14px less its 6px padding, so the
-  // highlight sits concentric in it.
   const highlight =
     active !== undefined
-      ? active && (radio ? 'bg-sel' : 'bg-hover')
-      : radio
-        ? 'hover:bg-sel focus-visible:bg-sel'
+      ? active && (checked ? 'bg-sel' : 'bg-hover')
+      : checked
+        ? 'bg-sel'
         : 'hover:bg-hover focus-visible:bg-hover'
 
   return (
     <>
-      {separated && <div role="separator" className="-mx-1.5 my-[5px] h-px flex-none bg-line" />}
+      {separated && <DropdownSeparator />}
       <button
         type="button"
         id={id}
@@ -190,8 +184,8 @@ export function DropdownItem({
         onMouseEnter={onMouseEnter}
         onFocus={onFocus}
         className={cx(
-          'flex min-h-[34px] w-full flex-none cursor-pointer items-center gap-2.75 rounded-sm px-2 py-1.5 text-left text-base focus-visible:outline-none',
-          danger ? 'text-bad' : 'text-text2',
+          'flex min-h-8 w-full flex-none cursor-pointer items-center gap-2.5 rounded-[7px] px-[9px] text-left text-base focus-visible:outline-none',
+          danger ? 'text-bad' : 'text-text',
           highlight,
           className
         )}
@@ -199,5 +193,52 @@ export function DropdownItem({
         {children}
       </button>
     </>
+  )
+}
+
+export function DropdownSeparator() {
+  return <div role="separator" className="mx-[9px] my-[5px] h-px flex-none bg-line" />
+}
+
+export function DropdownLabel({ children }: { children: ReactNode }) {
+  return (
+    <div role="presentation" className="px-[9px] pb-1 pt-[5px] text-xs font-medium text-text3">
+      {children}
+    </div>
+  )
+}
+
+export function DropdownGlyph({ children }: { children: ReactNode }) {
+  return <span className="flex-none opacity-85">{children}</span>
+}
+
+export function DropdownCheck({ on }: { on: boolean }) {
+  return (
+    <span className={cx('grid w-3.5 flex-none place-items-center', !on && 'opacity-0')}>
+      <CheckGlyph stroke={2} />
+    </span>
+  )
+}
+
+export function DropdownMeta({
+  children,
+  testid,
+  hint
+}: {
+  children: ReactNode
+  testid?: string
+  hint?: boolean
+}) {
+  return (
+    <span
+      data-testid={testid}
+      aria-hidden={hint || undefined}
+      className={cx(
+        'flex-none font-mono tabular-nums',
+        hint ? 'text-xs opacity-45 any-pointer-coarse:hidden' : 'text-[11.5px] opacity-50'
+      )}
+    >
+      {children}
+    </span>
   )
 }

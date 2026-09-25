@@ -9,7 +9,10 @@ export type DateFormat = 'MM/DD/YYYY' | 'DD.MM.YYYY' | 'YYYY-MM-DD'
 // The order the segmented control offers them in.
 export const DATE_FORMATS: DateFormat[] = ['MM/DD/YYYY', 'DD.MM.YYYY', 'YYYY-MM-DD']
 
-export type SortMode = 'recent' | 'alpha'
+export type SortMode = 'recent' | 'created' | 'alpha'
+
+// In menu order, which is also what ⌘1, ⌘2, … number.
+export const SORT_MODES: SortMode[] = ['alpha', 'recent', 'created']
 
 /**
  * Every preference, owned and persisted by Rust (`settings.json` in the app

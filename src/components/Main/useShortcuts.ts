@@ -8,7 +8,9 @@ import {
   editEntry,
   focusSearch,
   isModalOpen,
-  lockVault
+  lockVault,
+  setPref,
+  SORT_MODES
 } from '@/store'
 import { keyCode } from '@/utils/keys'
 
@@ -31,7 +33,8 @@ const BINDINGS: Record<string, () => void> = {
   // Edit whatever the list has selected — nothing to edit without a selection.
   KeyE: () => {
     if (selectCurrent(useVault.getState())) editEntry()
-  }
+  },
+  ...Object.fromEntries(SORT_MODES.map((mode, i) => [`Digit${i + 1}`, () => setPref('sort', mode)]))
 }
 
 export const useShortcuts = () => {

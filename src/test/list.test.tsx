@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import ListColumn from '@/components/Main/Body/ListColumn'
 import SortMenu from '@/components/Main/Body/List/SortMenu'
 import { type Audit } from '@/api/tools'
-import { useVault, setFilterType, clearSession } from '@/store'
+import { useVault, useUi, setView, setFilterType, clearSession } from '@/store'
 import { resetFavicons } from '@/hooks/useFavicon'
 import { withEntries, loginEntry, loginMeta } from './utils'
 import { calls, mockCommand, clearCalls } from './ipc'
@@ -130,9 +130,28 @@ describe('Entry list', () => {
     render(<ListColumn actions={<SortMenu />} />)
 
     await userEvent.click(screen.getByTestId('sort-menu'))
-    await userEvent.click(screen.getByText('Alphabetical'))
+    await userEvent.click(screen.getByText('Name (A–Z)'))
 
     expect(titles()).toEqual(['Airbnb', 'Basecamp', 'Monzo', 'Zebra'])
+  })
+
+  it('sorts by date created, which a later edit does not move', async () => {
+    withEntries([
+      loginMeta({ id: 'old', title: 'Basecamp', createdAt: at(2024, 0, 1, 9), updatedAt: at(2024, 2, 14, 11) }),
+      loginMeta({ id: 'mid', title: 'Monzo', createdAt: at(2024, 1, 1, 9), updatedAt: at(2024, 1, 1, 9) }),
+      loginMeta({ id: 'new', title: 'Zebra', createdAt: at(2024, 2, 1, 9), updatedAt: at(2024, 2, 1, 9) })
+    ])
+    render(<ListColumn actions={<SortMenu />} />)
+
+    // Under Recently edited the oldest row leads: it was edited this morning.
+    await userEvent.click(screen.getByTestId('sort-menu'))
+    await userEvent.click(screen.getByText('Recently edited'))
+    expect(titles()).toEqual(['Basecamp', 'Zebra', 'Monzo'])
+
+    // Under Date created that edit counts for nothing: newest-made first.
+    await userEvent.click(screen.getByTestId('sort-menu'))
+    await userEvent.click(screen.getByText('Date created'))
+    expect(titles()).toEqual(['Zebra', 'Monzo', 'Basecamp'])
   })
 
   // Read off the `hasPasskey` column, so a row is marked without the list
@@ -345,5 +364,70 @@ describe('List keyboard navigation', () => {
     await userEvent.keyboard('{ArrowDown}{ArrowUp}')
 
     expect(useVault.getState().currentId).toBeNull()
+  })
+})
+
+// A mixed list is sectioned by kind, in registry order, keeping the sort
+// order inside each section. Not a preference: it is what a mixed list is.
+describe('Grouped by kind', () => {
+  afterEach(() => setView('items'))
+
+  const mixed = [
+    loginMeta({ id: 'g', title: 'Google', updatedAt: at(2024, 2, 14, 9) }),
+    loginMeta({ id: 'v', type: 'card', title: 'Visa', urlHost: '', favorite: true, updatedAt: at(2024, 2, 14, 10) }),
+    loginMeta({ id: 'a', title: 'Airbnb', favorite: true, updatedAt: at(2024, 2, 13, 18) }),
+    loginMeta({ id: 'j', type: 'note', title: 'Journal', urlHost: '', updatedAt: at(2024, 2, 14, 11) })
+  ]
+
+  it('sections the list by kind in registry order, sorted within each', () => {
+    withEntries(mixed)
+    render(<ListColumn />)
+
+    // Logins, then cards, then notes — and inside Logins the starred row is
+    // still pinned over the newer one, exactly as in the flat recent list.
+    expect(titles()).toEqual(['Airbnb', 'Google', 'Visa', 'Journal'])
+    expect(screen.getByTestId('group-login')).toHaveTextContent('Logins2')
+    expect(screen.getByTestId('group-card')).toHaveTextContent('Credit cards1')
+    expect(screen.getByTestId('group-note')).toHaveTextContent('Secure notes1')
+  })
+
+  it('opens the kind from its caption in All Items', async () => {
+    withEntries(mixed)
+    render(<ListColumn />)
+
+    await userEvent.click(screen.getByTestId('group-card'))
+
+    expect(useUi.getState()).toMatchObject({ view: 'items', filterType: 'card' })
+    expect(titles()).toEqual(['Visa'])
+    // One kind is one section, so the captions go.
+    expect(screen.queryByTestId('group-card')).not.toBeInTheDocument()
+  })
+
+  it('captions the other views without opening from them', () => {
+    withEntries(mixed)
+    setView('favorites')
+    render(<ListColumn />)
+
+    // Two starred kinds, so two sections — and their captions are text.
+    expect(titles()).toEqual(['Airbnb', 'Visa'])
+    const caption = screen.getByTestId('group-login')
+    expect(caption).toHaveTextContent('Logins1')
+    expect(caption.tagName).toBe('DIV')
+  })
+
+  it('drops the sections while a query is ranking the rows', async () => {
+    withEntries(mixed)
+    render(<ListColumn />)
+
+    await userEvent.type(screen.getByPlaceholderText('Search'), 'a')
+    expect(screen.queryByTestId('group-login')).not.toBeInTheDocument()
+  })
+
+  it('draws no caption over a list of one kind', () => {
+    withEntries(entries)
+    render(<ListColumn />)
+
+    expect(screen.queryByTestId('group-login')).not.toBeInTheDocument()
+    expect(titles()).toEqual(['Zebra', 'Airbnb', 'Monzo', 'Basecamp'])
   })
 })

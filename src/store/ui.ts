@@ -39,11 +39,9 @@ export interface Generator {
 
 export interface UiState {
   view: View
-  // `filterType: null` is "All Items". The type filter is a filter and nothing
-  // else: it does not double as navigation or as the kind of a new entry.
+  // `null` is "All Items"; a kind is only ever open in the items view.
   filterType: EntryType | null
-  // What the Tags view shows. Only that view holds one — `showTag` sets it with
-  // the view and `setView` clears it — and it composes with the kind filter.
+  // Only the Tags view holds one.
   filterTag: string | null
   query: string
   palette: boolean
@@ -147,9 +145,9 @@ export const flashCopied = () => {
 
 // --- views and filters -----------------------------------------------------------
 
-export const setView = (view: View) => {
-  // A tag belongs to the Tags view alone, so moving between views drops it.
-  useUi.setState({ view, filterTag: null })
+// A tag belongs to the Tags view and a kind to All Items; leaving drops both.
+const enterView = (view: View, patch: Partial<UiState> = {}) => {
+  useUi.setState({ view, filterTag: null, filterType: null, ...patch })
   setNoEntry()
   // Tombstones are not part of the unlock payload, so the Archive reads them
   // when it is opened. Refetching on every visit is also what keeps it honest
@@ -157,12 +155,9 @@ export const setView = (view: View) => {
   if (view === 'archive') void loadArchive()
 }
 
-// The one way into the Tags view: the view and its tag change together, so
-// there is never a frame of the Tags view showing the whole vault.
-export const showTag = (tag: string) => {
-  useUi.setState({ view: 'tags', filterTag: tag })
-  setNoEntry()
-}
+export const setView = (view: View) => enterView(view)
+
+export const showTag = (tag: string) => enterView('tags', { filterTag: tag })
 
 export const setFilterQuery = (query: string) => useUi.setState({ query })
 

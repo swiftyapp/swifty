@@ -94,4 +94,21 @@ describe('views', () => {
     expect(useUi.getState()).toMatchObject({ view: 'favorites', filterTag: null })
     expect(current()).toBeNull()
   })
+
+  it('drops the kind on the way to another view', () => {
+    setFilterType('login')
+    setView('favorites')
+
+    expect(useUi.getState()).toMatchObject({ view: 'favorites', filterType: null })
+  })
+
+  it('drops the kind on the way into a tag, so the tag shows every kind', () => {
+    setEntries([...items, { ...meta('card', ['work']), type: 'card' }])
+    setFilterType('login')
+
+    showTag('work')
+
+    expect(useUi.getState()).toMatchObject({ view: 'tags', filterTag: 'work', filterType: null })
+    expect(visible()).toEqual(['work', 'both', 'card'])
+  })
 })

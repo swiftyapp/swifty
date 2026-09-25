@@ -1,21 +1,41 @@
+import type { EntryMeta } from '@/api/types'
+import { useUi } from '@/store'
 import Item from './Item'
+import Section from './Section'
 import ListEmpty from '../Empty'
-import { useVisibleEntries } from './useVisibleEntries'
+import { useVisibleEntries, useGrouped } from './useVisibleEntries'
 
-// A flat list in either order — retrieval here is by name or search, so date
-// buckets earn nothing (the audit list keeps its severity groups, which do).
+const sections = (entries: EntryMeta[]): EntryMeta[][] => {
+  const runs: EntryMeta[][] = []
+  for (const entry of entries) {
+    const run = runs[runs.length - 1]
+    if (run && run[0].type === entry.type) run.push(entry)
+    else runs.push([entry])
+  }
+  return runs
+}
+
 export default function Manager() {
   const entries = useVisibleEntries()
+  const grouped = useGrouped()
+  const door = useUi(state => state.view === 'items')
 
-  // What "nothing here" means (first run, a filter, a query) is decided in one
-  // place for both panes — see Body/Empty.
   if (entries.length === 0) return <ListEmpty />
+
+  const runs = grouped ? sections(entries) : []
+  const captioned = runs.length > 1
 
   return (
     <div className="pb-6">
-      {entries.map(entry => (
-        <Item entry={entry} key={entry.id} />
-      ))}
+      {captioned
+        ? runs.map(run => (
+            <Section key={run[0].type} type={run[0].type} count={run.length} door={door}>
+              {run.map(entry => (
+                <Item entry={entry} key={entry.id} />
+              ))}
+            </Section>
+          ))
+        : entries.map(entry => <Item entry={entry} key={entry.id} />)}
     </div>
   )
 }

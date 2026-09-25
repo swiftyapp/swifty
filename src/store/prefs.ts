@@ -1,5 +1,12 @@
 import { create } from 'zustand'
-import { DATE_FORMATS, setSettings, type DateFormat, type Settings } from '@/api/app'
+import {
+  DATE_FORMATS,
+  SORT_MODES,
+  setSettings,
+  type DateFormat,
+  type Settings,
+  type SortMode
+} from '@/api/app'
 import i18n from '@/i18n'
 import {
   applyAccent,
@@ -23,7 +30,7 @@ import {
  */
 
 export type { DateFormat, SortMode, Settings as Prefs } from '@/api/app'
-export { DATE_FORMATS } from '@/api/app'
+export { DATE_FORMATS, SORT_MODES } from '@/api/app'
 
 // The same defaults as Rust, so a test store — and the split second before
 // hydration lands — reads like a fresh install rather than like `undefined`.
@@ -64,7 +71,7 @@ const sanitize = (raw: Partial<Settings>): Settings => {
   return {
     theme: isTheme(raw.theme) ? raw.theme : DEFAULT_PREFS.theme,
     accent: isAccent(raw.accent) ? raw.accent : DEFAULT_PREFS.accent,
-    sort: raw.sort === 'alpha' ? 'alpha' : 'recent',
+    sort: SORT_MODES.includes(raw.sort as SortMode) ? (raw.sort as SortMode) : 'recent',
     breachCheck: raw.breachCheck === true,
     autolockSecs: isPositive(raw.autolockSecs) ? raw.autolockSecs : DEFAULT_PREFS.autolockSecs,
     clipboardTimeoutMs:

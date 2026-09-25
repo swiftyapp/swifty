@@ -14,7 +14,8 @@ const entries = [
 ]
 
 const titles = () => screen.getAllByTestId('entry-item-title').map(el => el.textContent)
-const options = () => screen.getAllByRole('menuitem').map(item => item.textContent)
+// The tags are a pick-one menu, so each row is a `menuitemradio`.
+const options = () => screen.getAllByRole('menuitemradio').map(item => item.textContent)
 
 // The rail and the column it drives: Tags is a view, so it is read across the
 // tile that lights, the title, and what the column lists.
@@ -58,7 +59,7 @@ describe('the tags menu', () => {
 
     expect(screen.getByTestId('tags-empty')).toBeInTheDocument()
     expect(screen.getByText('Add tags to an entry and they show up here.')).toBeInTheDocument()
-    expect(screen.queryAllByRole('menuitem')).toHaveLength(0)
+    expect(screen.queryAllByRole('menuitemradio')).toHaveLength(0)
   })
 
   it('closes on Escape and on a click outside', async () => {
@@ -151,14 +152,11 @@ describe('the tags view', () => {
     expect(screen.queryByTestId('active-tag')).not.toBeInTheDocument()
   })
 
-  it('composes with the kind filter', async () => {
+  it('names the tag in the title', async () => {
     seed()
     await open()
     await pick('money')
-    expect(screen.getByTestId('filter-all-count')).toHaveTextContent('4')
-    await userEvent.click(screen.getByTestId('filter-card'))
 
-    // Both narrow the same list: only the card tagged "money" is left.
-    expect(titles()).toEqual(['Visa'])
+    expect(screen.getByTestId('list-title')).toHaveTextContent('#money')
   })
 })

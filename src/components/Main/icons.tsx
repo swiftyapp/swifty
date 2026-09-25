@@ -14,7 +14,6 @@ import {
   Archive,
   ArchiveRestore,
   ArrowDownUp,
-  ArrowDownWideNarrow,
   AtSign,
   Braces,
   Calendar,
@@ -85,6 +84,17 @@ const faceIdNode: IconNode = [
 ]
 const FaceId = createLucideIcon('face-id', faceIdNode)
 
+// The sort glyph of the Rowel menus prototype: three rules stepping in from
+// the left, flush on the right — a list settling into order. Lucide's own
+// list-filter centres its rules and its sort arrows carry an arrow, so this
+// one is drawn on the same grid instead.
+const sortLinesNode: IconNode = [
+  ['path', { d: 'M4 7h16' }],
+  ['path', { d: 'M7 12h13' }],
+  ['path', { d: 'M10 17h10' }]
+]
+const SortLines = createLucideIcon('sort-lines', sortLinesNode)
+
 interface IconProps {
   size?: number
   className?: string
@@ -132,7 +142,7 @@ export const FingerprintGlyph = glyph(Fingerprint, 14)
 // The other biometry: Face ID. Which of the two is shown comes from the device
 // (`biometry_type`) through `lib/biometry` — never a per-call-site guess.
 export const FaceIdGlyph = glyph(FaceId, 14)
-export const SortGlyph = glyph(ArrowDownWideNarrow, 14)
+export const SortGlyph = glyph(SortLines, 14)
 export const ExternalGlyph = glyph(ExternalLink, 14)
 export const AtGlyph = glyph(AtSign, 14)
 export const UserGlyph = glyph(User, 14)

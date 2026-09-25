@@ -128,34 +128,54 @@ describe('Main', () => {
     expect(column.className).not.toContain('pointer-events-none')
   })
 
-  it('narrows the list to one kind through the filter chips', async () => {
+  // The title is the scope menu's trigger in All Items; a row of it is a place.
+  const openScope = () => userEvent.click(screen.getByTestId('list-title'))
+  const pickScope = (id: string) => userEvent.click(screen.getByTestId(`scope-option-${id}`))
+
+  it("narrows the list to one kind through the title's scope menu", async () => {
     seed()
     render(<Main />)
 
-    await userEvent.click(screen.getByTestId('filter-note'))
+    await openScope()
+    await pickScope('note')
     expect(screen.getByText('Journal')).toBeInTheDocument()
     expect(screen.queryByText('Google')).not.toBeInTheDocument()
     expect(screen.queryByText('Visa')).not.toBeInTheDocument()
-    // The title follows the filter, and the chip reports itself pressed.
+    // The title follows the kind, and the menu has closed behind the pick.
     expect(screen.getByTestId('list-title')).toHaveTextContent('Secure notes')
-    expect(screen.getByTestId('filter-note')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
 
-    // "All" puts everything back.
-    await userEvent.click(screen.getByTestId('filter-all'))
+    // Reopened, the menu marks the open kind; All Items puts everything back.
+    await openScope()
+    expect(screen.getByTestId('scope-option-note')).toHaveAttribute('aria-checked', 'true')
+    await pickScope('all')
+    expect(screen.getByTestId('list-title')).toHaveTextContent('All Items')
     expect(screen.getAllByTestId('entry-item')).toHaveLength(3)
   })
 
-  it('counts each kind on its chip', () => {
+  it('lists every kind in the scope menu with its count, the empty ones dimmed', async () => {
+    seed()
+    render(<Main />)
+    await openScope()
+
+    const count = (id: string) => screen.getByTestId(`scope-option-${id}-count`).textContent
+    expect(count('all')).toBe('3')
+    expect(count('login')).toBe('1')
+    expect(count('card')).toBe('1')
+    expect(count('note')).toBe('1')
+    // A kind with nothing in it is still a place, just a quiet one.
+    expect(count('ssh')).toBe('0')
+    expect(screen.getByTestId('scope-option-ssh').className).toContain('opacity-45')
+    expect(screen.getByTestId('scope-option-login').className).not.toContain('opacity-45')
+  })
+
+  it('titles the other views as plain text, with no scope menu', () => {
     seed()
     render(<Main />)
 
-    const count = (testid: string) =>
-      screen.getByTestId(`${testid}-count`).textContent
-
-    expect(count('filter-all')).toBe('3')
-    expect(count('filter-login')).toBe('1')
-    expect(count('filter-card')).toBe('1')
-    expect(count('filter-note')).toBe('1')
+    act(() => setView('favorites'))
+    expect(screen.getByTestId('list-title')).toHaveTextContent('Favorites')
+    expect(screen.getByTestId('list-title')).not.toHaveAttribute('aria-haspopup')
   })
 
   // The health tile is parked (Settings › Audit deep-links into it now), so the
@@ -166,8 +186,6 @@ describe('Main', () => {
 
     act(() => setView('health'))
     expect(screen.getByTestId('list-title')).toHaveTextContent('Vault Health')
-    // Neither chip row applies to the audit.
-    expect(screen.queryByTestId('kinds-list')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('view-items'))
     expect(screen.getByTestId('list-title')).toHaveTextContent('All Items')
@@ -183,11 +201,13 @@ describe('Main', () => {
     expect(useVault.getState().currentId).toBe('l1')
 
     // Narrowing to the kind you are already reading must not close it.
-    await userEvent.click(screen.getByTestId('filter-login'))
+    await openScope()
+    await pickScope('login')
     expect(useVault.getState().currentId).toBe('l1')
 
     // Narrowing to a kind that would hide it does clear the selection.
-    await userEvent.click(screen.getByTestId('filter-card'))
+    await openScope()
+    await pickScope('card')
     expect(useVault.getState().currentId).toBeNull()
   })
 
