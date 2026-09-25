@@ -163,11 +163,12 @@ export function DropdownItem({
   children
 }: ItemProps) {
   const radio = checked !== undefined
-  const highlight = checked
-    ? 'bg-sel'
-    : active !== undefined
-      ? active && 'bg-hover'
-      : 'hover:bg-hover focus-visible:bg-hover'
+  const highlight =
+    active !== undefined
+      ? active && (checked ? 'bg-sel' : 'bg-hover')
+      : checked
+        ? 'bg-sel'
+        : 'hover:bg-hover focus-visible:bg-hover'
 
   return (
     <>
