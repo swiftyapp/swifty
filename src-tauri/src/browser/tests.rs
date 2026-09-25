@@ -1,6 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::io::Cursor;
 use std::net::{TcpListener, TcpStream};
+use std::sync::{Arc, Mutex};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use crypto_box::{aead::Aead, Nonce, PublicKey, SalsaBox, SecretKey};
@@ -25,7 +26,13 @@ struct Mock {
     totp: Option<String>,
     locks: Cell<u32>,
     raises: Cell<u32>,
+    /// Every `save_login`: id, url, host, username, password.
+    saves: RefCell<Vec<Save>>,
+    /// Whether a save fails as a write, not as an unknown id.
+    read_only: bool,
 }
+
+type Save = (Option<String>, String, String, String, String);
 
 impl Mock {
     fn unlocked() -> Self {
@@ -39,6 +46,8 @@ impl Mock {
             totp: Some("654321".into()),
             locks: Cell::new(0),
             raises: Cell::new(0),
+            saves: RefCell::new(Vec::new()),
+            read_only: false,
         }
     }
 
@@ -94,6 +103,29 @@ impl Host for Mock {
     }
     fn generate_password(&self) -> Option<String> {
         Some("generated".into())
+    }
+    fn save_login(
+        &self,
+        id: Option<&str>,
+        url: &str,
+        host: &str,
+        username: &str,
+        password: &str,
+    ) -> Result<(), Code> {
+        if id.is_some_and(|id| id != "gh") {
+            return Err(Code::NoValidUuidProvided);
+        }
+        if self.read_only {
+            return Err(Code::ActionCancelledOrDenied);
+        }
+        self.saves.borrow_mut().push((
+            id.map(String::from),
+            url.into(),
+            host.into(),
+            username.into(),
+            password.into(),
+        ));
+        Ok(())
     }
     fn lock(&self) {
         self.locks.set(self.locks.get() + 1);
@@ -535,6 +567,93 @@ fn get_totp_answers_with_the_current_code() {
 }
 
 #[test]
+fn set_login_without_a_uuid_saves_a_new_login_for_the_site() {
+    let (extension, mut connection) = associated();
+    let response = extension.send(
+        &mut connection,
+        "set-login",
+        json!({
+            "url": "https://Example.com/signup",
+            "submitUrl": "https://example.com/session",
+            "login": "me",
+            "password": "s3cret",
+            "group": "",
+            "groupUuid": "",
+            "downloadFavicon": "true",
+        }),
+    );
+    assert_eq!(response["error"], "success");
+    assert_eq!(response["hash"], "abc123");
+    assert!(response["count"].is_null() && response["entries"].is_null());
+    assert_eq!(
+        connection.host().saves.borrow().as_slice(),
+        &[(
+            None,
+            "https://Example.com/signup".into(),
+            "example.com".into(),
+            "me".into(),
+            "s3cret".into()
+        )]
+    );
+}
+
+#[test]
+fn set_login_with_a_uuid_updates_that_login() {
+    let (extension, mut connection) = associated();
+    let response = extension.send(
+        &mut connection,
+        "set-login",
+        json!({ "url": "https://github.com/login", "uuid": "gh", "login": "octocat", "password": "new" }),
+    );
+    assert_eq!(response["error"], "success");
+    let saves = connection.host().saves.borrow();
+    assert_eq!(saves.len(), 1);
+    assert_eq!(saves[0].0.as_deref(), Some("gh"));
+    assert_eq!(saves[0].4, "new");
+}
+
+#[test]
+fn set_login_for_an_unknown_uuid_is_refused() {
+    let (extension, mut connection) = associated();
+    let response = extension.send(
+        &mut connection,
+        "set-login",
+        json!({ "url": "https://github.com", "uuid": "nope", "login": "a", "password": "b" }),
+    );
+    assert_eq!(error_code(&response), Code::NoValidUuidProvided as u8);
+    assert!(connection.host().saves.borrow().is_empty());
+}
+
+#[test]
+fn set_login_needs_an_association() {
+    let (extension, mut connection) = ready();
+    let response = extension.send(
+        &mut connection,
+        "set-login",
+        json!({ "url": "https://github.com", "login": "a", "password": "b" }),
+    );
+    assert_eq!(error_code(&response), Code::AssociationFailed as u8);
+    assert!(connection.host().saves.borrow().is_empty());
+}
+
+#[test]
+fn a_set_login_that_fails_to_write_says_so_inside_the_reply() {
+    let mut extension = Extension::new();
+    let mut connection = Connection::new(Mock {
+        read_only: true,
+        ..Mock::unlocked().known("Chrome", "id-key")
+    });
+    extension.exchange(&mut connection);
+    let response = extension.send(
+        &mut connection,
+        "set-login",
+        json!({ "url": "https://github.com", "login": "a", "password": "b", "keys": [{ "id": "Chrome", "key": "id-key" }] }),
+    );
+    assert_eq!(response["error"], "error");
+    assert_eq!(response["hash"], "abc123");
+}
+
+#[test]
 fn generate_password_needs_no_association() {
     let (extension, mut connection) = ready();
     let response = extension.send(
@@ -741,6 +860,38 @@ fn serve_answers_frames_on_a_stream_until_it_closes() {
 
     drop(stream);
     served.join().unwrap();
+}
+
+#[test]
+fn a_lock_signal_reaches_every_connection_and_drops_the_gone_ones() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let mut extension = TcpStream::connect(address).unwrap();
+    let (open, _) = listener.accept().unwrap();
+    let _gone_peer = TcpStream::connect(address).unwrap();
+    let (gone, _) = listener.accept().unwrap();
+    gone.shutdown(std::net::Shutdown::Write).unwrap();
+
+    let open = Arc::new(Mutex::new(open));
+    let gone = Arc::new(Mutex::new(gone));
+    server::register(open.clone());
+    server::register(gone.clone());
+    server::notify_locked();
+
+    let signal: Value =
+        serde_json::from_slice(&frame::read(&mut extension).unwrap().unwrap()).unwrap();
+    assert_eq!(signal, json!({ "action": "database-locked" }));
+    assert_eq!(
+        Arc::strong_count(&gone),
+        1,
+        "a failed write drops the writer"
+    );
+    assert_eq!(Arc::strong_count(&open), 2, "a live one stays registered");
+
+    server::notify_unlocked();
+    let signal: Value =
+        serde_json::from_slice(&frame::read(&mut extension).unwrap().unwrap()).unwrap();
+    assert_eq!(signal, json!({ "action": "database-unlocked" }));
 }
 
 #[test]

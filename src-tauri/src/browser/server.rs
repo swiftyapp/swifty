@@ -1,11 +1,12 @@
-//! The listener the extension's proxy connects to, and the loop that serves
-//! one connection.
+//! The listener the extension's proxy connects to, the loop that serves one
+//! connection, and the lock signals every connection is sent.
 
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard};
 
-use interprocess::local_socket::{prelude::*, Listener, ListenerOptions};
+use interprocess::local_socket::{prelude::*, Listener, ListenerOptions, RecvHalf};
 use tauri::AppHandle;
 
 use super::actions::{Connection, Host};
@@ -16,6 +17,14 @@ use crate::{settings, storage};
 // it off in Settings only makes the accept loop refuse what arrives, and the
 // manifests are gone, so no browser launches a proxy to arrive anyway.
 static STARTED: AtomicBool = AtomicBool::new(false);
+
+/// A connection's writing end, shared by the thread serving it and the lock
+/// signals, so a signal never lands inside a reply.
+pub type Writer = Arc<Mutex<dyn Write + Send>>;
+
+// Every connection being served, for the lock signals to reach. Fed by the
+// accept loop rather than by `serve`, which stays a loop over any stream.
+static CLIENTS: Mutex<Vec<Writer>> = Mutex::new(Vec::new());
 
 /// Start listening, once. A failure to bind is logged and leaves the host off;
 /// the next enable from Settings tries again.
@@ -51,8 +60,20 @@ pub fn start(app: &AppHandle) {
                 if !settings::current(&app).browser.enabled {
                     continue;
                 }
+                let (reader, writer) = stream.split();
+                let writer: Writer = Arc::new(Mutex::new(writer));
+                register(writer.clone());
                 let host = AppHost(app.clone());
-                std::thread::spawn(move || serve(stream, host));
+                std::thread::spawn(move || {
+                    serve(
+                        Connected {
+                            reader,
+                            writer: writer.clone(),
+                        },
+                        host,
+                    );
+                    forget(&writer);
+                });
             }
         });
     if let Err(e) = spawned {
@@ -97,4 +118,66 @@ pub fn serve<H: Host>(mut stream: impl Read + Write, host: H) {
             break;
         }
     }
+}
+
+/// A local socket connection as `serve` sees it: read from its own half,
+/// written through the half the lock signals share. `frame::write` is one
+/// `write_all`, and one `write_all` is one hold of the lock.
+struct Connected {
+    reader: RecvHalf,
+    writer: Writer,
+}
+
+impl Read for Connected {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.reader.read(buf)
+    }
+}
+
+impl Write for Connected {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        hold(&self.writer).write(buf)
+    }
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        hold(&self.writer).write_all(buf)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        hold(&self.writer).flush()
+    }
+}
+
+fn hold(writer: &Writer) -> MutexGuard<'_, dyn Write + Send + 'static> {
+    writer.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+fn clients() -> MutexGuard<'static, Vec<Writer>> {
+    CLIENTS.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Hand a connection's writer to the lock signals, until [`forget`].
+pub fn register(writer: Writer) {
+    clients().push(writer);
+}
+
+fn forget(writer: &Writer) {
+    clients().retain(|c| !Arc::ptr_eq(c, writer));
+}
+
+/// The vault just locked: every connected extension flips its icon, and asks
+/// again before it fills anything.
+pub fn notify_locked() {
+    broadcast(br#"{"action":"database-locked"}"#);
+}
+
+/// The vault just opened, or another workspace did: every connected extension
+/// re-checks the hash, which says which one it is talking to now.
+pub fn notify_unlocked() {
+    broadcast(br#"{"action":"database-unlocked"}"#);
+}
+
+// Unsolicited and in the clear, as KeePassXC sends them: no nonce to seal
+// under, and nothing in them the extension would not learn from its next ask.
+// A connection the write fails on has gone, and goes from the list with it.
+fn broadcast(message: &[u8]) {
+    clients().retain(|writer| frame::write(&mut *hold(writer), message).is_ok());
 }

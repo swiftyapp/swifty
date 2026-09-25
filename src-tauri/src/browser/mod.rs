@@ -9,10 +9,11 @@
 //! through the manifests `manifest` writes when the user turns this on.
 //!
 //! What the extension can reach is what the user could copy: the logins for
-//! the site it is on, a TOTP code, a generated password, and the lock. An
-//! extension gets in once per vault, by the user naming it in a dialog; after
-//! that its identification key, kept inside that vault, is what it proves
-//! itself with — to that vault, and to no other workspace on the device.
+//! the site it is on, a TOTP code, a generated password, and the lock — and
+//! it can save the login the user just typed into a page. An extension gets
+//! in once per vault, by the user naming it in a dialog; after that its
+//! identification key, kept inside that vault, is what it proves itself with
+//! — to that vault, and to no other workspace on the device.
 
 pub mod actions;
 pub mod frame;
@@ -37,10 +38,10 @@ pub use self::actions::Client;
 use self::actions::{Host, Login};
 use self::protocol::Code;
 use crate::error::Result;
-use crate::models::GeneratorOptions;
+use crate::models::{Entry, GeneratorOptions};
 use crate::settings;
 use crate::state::AppState;
-use crate::store::{SqliteStore, VaultStore};
+use crate::store::{migrate, SqliteStore, VaultStore};
 use crate::{commands, events, session, window};
 
 /// The bundle identifier, which is the app-data directory's name on every
@@ -293,6 +294,73 @@ impl Host for AppHost {
             strict: Some(true),
         })
         .ok()
+    }
+
+    // One row sealed and upserted, as `commands::vault::save_entry` writes one.
+    // The stamps are the editor's: `updatedAt` on every save, and the rotation
+    // stamp only when the password actually changed.
+    fn save_login(
+        &self,
+        id: Option<&str>,
+        url: &str,
+        host: &str,
+        username: &str,
+        password: &str,
+    ) -> std::result::Result<(), Code> {
+        let failed = |e: crate::error::Error| {
+            log::warn!("browser host: could not save a login: {e}");
+            Code::ActionCancelledOrDenied
+        };
+        let state = self.0.state::<AppState>();
+        let entries = {
+            let session = state.session.lock().unwrap();
+            let cipher = session.payload_cipher().map_err(failed)?;
+            let store = session.store().map_err(failed)?;
+            let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+            let entry = match id {
+                Some(id) => {
+                    let record = store
+                        .get(id)
+                        .map_err(|e| failed(session::store_err(e)))?
+                        .ok_or(Code::NoValidUuidProvided)?;
+                    let mut entry = cipher.unseal(&record.id, &record.payload).map_err(failed)?;
+                    if entry.kind != "login" {
+                        return Err(Code::NoValidUuidProvided);
+                    }
+                    if entry.password.as_deref().unwrap_or_default() != password {
+                        entry.password_updated_at = Some(now.clone());
+                    }
+                    entry.username = Some(username.to_string());
+                    entry.password = Some(password.to_string());
+                    entry.updated_at = Some(now);
+                    entry
+                }
+                None => Entry {
+                    id: migrate::new_entry_id(),
+                    kind: "login".into(),
+                    title: host.to_string(),
+                    website: Some(url.to_string()),
+                    username: Some(username.to_string()),
+                    password: Some(password.to_string()),
+                    password_updated_at: (!password.is_empty()).then(|| now.clone()),
+                    created_at: Some(now.clone()),
+                    updated_at: Some(now),
+                    ..Default::default()
+                },
+            };
+            let payload = cipher.seal(&entry).map_err(failed)?;
+            let record = migrate::build_record(&entry, payload).map_err(failed)?;
+            store
+                .upsert(&record)
+                .map_err(|e| failed(session::store_err(e)))?;
+            session::list_metas(store).map_err(failed)?
+        };
+        // The list the frontend shows, refreshed the way a sync merge refreshes
+        // it; and the change on its way to the user's other devices, as a save
+        // from the editor schedules it.
+        events::vault_merged(&self.0, entries);
+        commands::sync::request_run_if_ready(&self.0, &state);
+        Ok(())
     }
 
     fn lock(&self) {
