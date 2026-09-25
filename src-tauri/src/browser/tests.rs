@@ -744,6 +744,36 @@ fn serve_answers_frames_on_a_stream_until_it_closes() {
 }
 
 #[test]
+fn bind_listens_at_the_root_and_takes_over_a_socket_left_behind() {
+    use interprocess::local_socket::{prelude::*, Stream};
+    let dir = tempfile::tempdir().unwrap();
+    let listener = server::bind(dir.path()).expect("a listener at a fresh root");
+    let mut client = Stream::connect(socket_name(dir.path()).unwrap()).unwrap();
+    let mut served = listener.accept().unwrap();
+    frame::write(&mut client, b"{}").unwrap();
+    assert_eq!(
+        frame::read(&mut served).unwrap().as_deref(),
+        Some(&b"{}"[..])
+    );
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(dir.path().join(super::SOCKET_FILE))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600, "owner-only socket file");
+    }
+
+    // A crash leaves the file behind with nobody listening: the next launch
+    // binds over it rather than refusing.
+    std::mem::forget(listener);
+    let again = server::bind(dir.path()).expect("a listener over a stale socket file");
+    drop(again);
+}
+
+#[test]
 fn a_browser_launch_is_told_by_what_it_puts_on_the_command_line() {
     fn launched(list: &[&str]) -> bool {
         proxy::launched_by_browser(list.iter().map(|s| s.to_string()))
