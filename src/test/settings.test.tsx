@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '@/components/Main/Sidebar/Settings'
 import i18n, { changeLocale } from '@/i18n'
@@ -8,6 +8,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import type { SyncStatus } from '@/api/sync'
 import type { SetupDriveFile } from '@/api/setup'
 import {
+  auditDone,
   closeSettings,
   fileOpened,
   flowMain,
@@ -56,8 +57,46 @@ describe('Settings shell', () => {
   it('opens on the sync section', async () => {
     await open()
     expect(screen.getByTestId('settings-modal')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Sync & devices' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sync & backup' })).toBeInTheDocument()
+    expect(
+      screen.getByText('Keep devices in step through Google Drive, and keep an offline copy.')
+    ).toBeInTheDocument()
     expect(screen.getByTestId('settings-nav-sync')).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('groups the nav under App, Vault and Data', async () => {
+    await open()
+    const nav = screen.getByRole('navigation')
+    const order = [...nav.querySelectorAll('[data-testid^="settings-nav-"]')].map(node =>
+      node.getAttribute('data-testid')
+    )
+    expect(order).toEqual([
+      'settings-nav-language',
+      'settings-nav-security',
+      'settings-nav-audit',
+      'settings-nav-workspaces',
+      'settings-nav-sync',
+      'settings-nav-import'
+    ])
+    for (const group of ['App', 'Vault', 'Data'])
+      expect(within(nav).getByText(group)).toBeInTheDocument()
+  })
+
+  it('badges the audit row with the open issue count', async () => {
+    // One weak-and-reused entry counts twice, as the audit section's tallies do.
+    auditDone({
+      a: { score: 1, isWeak: true, isRepeating: true, breached: false },
+      b: { score: 4, isWeak: false, isRepeating: false, breached: true },
+      c: { score: 4, isWeak: false, isRepeating: false, breached: false }
+    })
+    await open()
+    expect(screen.getByTestId('settings-nav-audit-badge')).toHaveTextContent('3')
+  })
+
+  it('shows no audit badge when nothing is open', async () => {
+    auditDone({ a: { score: 4, isWeak: false, isRepeating: false, breached: false } })
+    await open()
+    expect(screen.queryByTestId('settings-nav-audit-badge')).not.toBeInTheDocument()
   })
 
   it('switches sections from the nav and remembers the last one', async () => {
@@ -69,7 +108,7 @@ describe('Settings shell', () => {
 
     await go('language')
     expect(
-      screen.getByRole('heading', { name: 'Language & region' })
+      screen.getByRole('heading', { name: 'General' })
     ).toBeInTheDocument()
     expect(screen.getByTestId('settings-nav-language')).toHaveAttribute(
       'aria-current',
@@ -85,7 +124,10 @@ describe('Settings shell', () => {
 
   it('closes from the header X', async () => {
     await open()
-    await userEvent.click(screen.getByTestId('modal-close'))
+    const close = screen.getByTestId('modal-close')
+    expect(close).toHaveAccessibleName('Close')
+    expect(close).toHaveTextContent('esc')
+    await userEvent.click(close)
     expect(useUi.getState().settings).toBe(false)
   })
 })

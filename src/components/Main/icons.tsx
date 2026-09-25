@@ -13,6 +13,7 @@ import {
   Activity,
   Archive,
   ArchiveRestore,
+  ArrowDownUp,
   ArrowDownWideNarrow,
   AtSign,
   Braces,
@@ -46,6 +47,7 @@ import {
   ScanLine,
   Search,
   Settings,
+  Settings2,
   Share2,
   ShieldCheck,
   Star,
@@ -167,6 +169,11 @@ export const ShieldGlyph = glyph(ShieldCheck, 16)
 export const GlobeGlyph = glyph(Globe, 16)
 export const ActivityGlyph = glyph(Activity, 16)
 export const LayersGlyph = glyph(Layers, 16)
+// Settings › General: the app's own preferences, as sliders rather than the gear
+// the rail already uses for Settings as a whole.
+export const GeneralGlyph = glyph(Settings2, 16)
+// Settings › Import & export: secrets travelling in both directions.
+export const TransferGlyph = glyph(ArrowDownUp, 16)
 // The iOS disclosure mark: a row that pushes a screen rather than doing a thing.
 export const ChevronRightGlyph = glyph(ChevronRight, 16)
 

@@ -440,8 +440,9 @@
  *   Radius    xs 4 chips & inlays · sm 8 controls · lg 12 tiles & cards
  *             xl 14 overlays · 2xl 28 sheets (a bottom sheet's top corners)
  *   Width     dialog-sm 470 (generator) · dialog 640 (pickers: add, palette)
- *             dialog-lg 720 (the Modal default) · sheet 860 (settings, the
- *             entry detail column) — on top of Tailwind's rem container scale
+ *             dialog-lg 720 (the Modal default) · sheet 860 (the entry detail
+ *             column) · settings 1040 (the settings modal) — on top of
+ *             Tailwind's rem container scale
  *   Motion    one duration (160ms) — plus a 300ms slow tier for sweeps that
  *             should be seen moving (the lock field, a progress bar) —
  *             one easing (ease-swift) — plus ease-spring, which overshoots,
@@ -484,6 +485,7 @@
   --container-dialog: 640px;
   --container-dialog-lg: 720px;
   --container-sheet: 860px;
+  --container-settings: 1040px;
 
   --ease-swift: cubic-bezier(0.2, 0.8, 0.2, 1);
   /* Overshoots and settles: the tab bar's lens sliding to the tapped tab. */
