@@ -41,3 +41,21 @@ export const browserRespond = (name: string | null): Promise<void> =>
 
 export const browserForgetClient = (key: string): Promise<BrowserStatus> =>
   call('browser_forget_client', { key })
+
+/**
+ * A page asking, through the extension, to create a passkey (`register`) or to
+ * sign in with one (`get`). `rpId` is the site the passkey is for, `origin` the
+ * page that asked; the account names come with a registration, as the site
+ * gave them.
+ */
+export interface PasskeyAsk {
+  kind: 'register' | 'get'
+  rpId: string
+  origin: string
+  userName?: string
+  userDisplayName?: string
+}
+
+/** Answer the `browser:passkey` ask. */
+export const browserPasskeyRespond = (allow: boolean): Promise<void> =>
+  call('browser_passkey_respond', { allow })

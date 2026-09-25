@@ -1,4 +1,5 @@
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import type { PasskeyAsk } from './browser'
 import type { SetupDriveFile } from './setup'
 import type { SyncStatus } from './sync'
 import type { EntryMeta } from './types'
@@ -67,6 +68,11 @@ export interface EventPayloads {
    * goes back through `browser_respond`. Desktop only.
    */
   'browser:associate': { key: string }
+  /**
+   * A page asks, through the extension, for a passkey ceremony. Rust holds the
+   * request open until `browser_passkey_respond`, or a minute. Desktop only.
+   */
+  'browser:passkey': PasskeyAsk
 }
 
 export type EventName = keyof EventPayloads
@@ -92,7 +98,8 @@ export const EVENTS: { [K in EventName as Camel<K>]: K } = {
   workspacesAdded: 'workspaces:added',
   workspacesRenamed: 'workspaces:renamed',
   fileOpened: 'file:opened',
-  browserAssociate: 'browser:associate'
+  browserAssociate: 'browser:associate',
+  browserPasskey: 'browser:passkey'
 }
 
 // Typed wrapper over Tauri's `listen`.

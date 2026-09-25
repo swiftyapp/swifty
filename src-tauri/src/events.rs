@@ -27,6 +27,8 @@ pub const FILE_OPENED: &str = "file:opened";
 // Desktop only, like the extension host that raises it (`crate::browser`).
 #[cfg(desktop)]
 pub const BROWSER_ASSOCIATE: &str = "browser:associate";
+#[cfg(desktop)]
+pub const BROWSER_PASSKEY: &str = "browser:passkey";
 
 #[derive(Serialize, Clone)]
 struct Entries {
@@ -135,4 +137,47 @@ struct Associate<'a> {
 #[cfg(desktop)]
 pub fn browser_associate(app: &AppHandle, key: &str) {
     let _ = app.emit(BROWSER_ASSOCIATE, Associate { key });
+}
+
+#[cfg(desktop)]
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PasskeyAsk<'a> {
+    kind: &'static str,
+    rp_id: &'a str,
+    origin: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    user_name: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    user_display_name: Option<&'a str>,
+}
+
+/// The page at `origin` asks, through the extension, to create a passkey
+/// (`register`) or to sign in with one (`get`). The site it is for is
+/// `rpId`; the account, on a registration, is the one the site names. The
+/// answer comes back through `commands::browser::browser_passkey_respond`.
+#[cfg(desktop)]
+pub fn browser_passkey(app: &AppHandle, origin: &str, ceremony: crate::passkey::Ceremony<'_>) {
+    use crate::passkey::Ceremony;
+    let ask = match ceremony {
+        Ceremony::Register {
+            rp_id,
+            user_name,
+            user_display_name,
+        } => PasskeyAsk {
+            kind: "register",
+            rp_id,
+            origin,
+            user_name,
+            user_display_name,
+        },
+        Ceremony::SignIn { rp_id } => PasskeyAsk {
+            kind: "get",
+            rp_id,
+            origin,
+            user_name: None,
+            user_display_name: None,
+        },
+    };
+    let _ = app.emit(BROWSER_PASSKEY, ask);
 }

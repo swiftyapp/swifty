@@ -10,7 +10,9 @@
 //!
 //! What the extension can reach is what the user could copy: the logins for
 //! the site it is on, a TOTP code, a generated password, and the lock — and
-//! it can save the login the user just typed into a page. An extension gets
+//! it can save the login the user just typed into a page. It can also ask for
+//! a passkey to be created or used (`passkeys`), which the user answers one
+//! ceremony at a time; the private key never leaves the app. An extension gets
 //! in once per vault, by the user naming it in a dialog; after that its
 //! identification key, kept inside that vault, is what it proves itself with
 //! — to that vault, and to no other workspace on the device.
@@ -18,6 +20,7 @@
 pub mod actions;
 pub mod frame;
 pub mod manifest;
+pub mod passkeys;
 pub mod protocol;
 pub mod proxy;
 pub mod server;
@@ -31,15 +34,20 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use interprocess::local_socket::{prelude::*, Name};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 
 pub use self::actions::Client;
 use self::actions::{Host, Login};
+use self::passkeys::{Assertion, Registration};
 use self::protocol::Code;
 use crate::crypto::PayloadCipher;
 use crate::error::Result;
-use crate::models::{Entry, GeneratorOptions};
+use crate::models::{Entry, EntryMetaDto, GeneratorOptions, Passkey};
+use crate::passkey::store::{PasskeyVault, SessionVault, Stored};
+use crate::passkey::{Ceremony, UserConsent};
+use crate::session::Epoch;
 use crate::settings;
 use crate::state::AppState;
 use crate::store::{migrate, SqliteStore, VaultStore};
@@ -51,7 +59,8 @@ use crate::{commands, events, session, window};
 pub const IDENTIFIER: &str = "app.rowel.desktop";
 pub const SOCKET_FILE: &str = "browser.sock";
 
-/// How long an `associate` waits for the user's answer before it is refused.
+/// How long an `associate` or a passkey ceremony waits for the user's answer
+/// before it is refused.
 pub const CONSENT_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// The app's data directory, resolved the way `storage::root_dir` resolves it
@@ -91,36 +100,89 @@ pub fn socket_name(root: &Path) -> io::Result<Name<'static>> {
 
 // --- consent -------------------------------------------------------------------
 //
-// One `associate` at a time waits on the user. The connection thread parks on
-// the receiving end; the frontend's answer arrives through `respond`, from the
-// command the dialog invokes.
+// One `associate` and one passkey ceremony at a time wait on the user, each in
+// its own slot. The connection thread parks on the receiving end; the
+// frontend's answer arrives through `respond` / `respond_passkey`, from the
+// command its dialog invokes.
 
-static PENDING: Mutex<Option<SyncSender<Option<String>>>> = Mutex::new(None);
+struct Pending<T>(Mutex<Option<SyncSender<T>>>);
 
-/// Ask the user whether the extension holding `key` may connect. Blocks the
-/// calling thread for the answer, up to [`CONSENT_TIMEOUT`]; a second ask
-/// while one is up is refused rather than queued.
-pub fn ask(app: &AppHandle, key: &str) -> Option<String> {
-    let (sender, receiver) = sync_channel(1);
-    {
-        let mut pending = PENDING.lock().unwrap_or_else(|e| e.into_inner());
-        if pending.is_some() {
-            return None;
-        }
-        *pending = Some(sender);
+impl<T> Pending<T> {
+    const fn new() -> Self {
+        Self(Mutex::new(None))
     }
-    events::browser_associate(app, key);
-    window::raise(app);
-    let answer = receiver.recv_timeout(CONSENT_TIMEOUT).ok().flatten();
-    PENDING.lock().unwrap_or_else(|e| e.into_inner()).take();
-    answer
+
+    fn slot(&self) -> std::sync::MutexGuard<'_, Option<SyncSender<T>>> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Put the question (`emit`) to the user and block for the answer, up to
+    /// [`CONSENT_TIMEOUT`]. A second question while one is up is refused
+    /// rather than queued: `None`, as no answer is.
+    fn ask(&self, app: &AppHandle, emit: impl FnOnce()) -> Option<T> {
+        let (sender, receiver) = sync_channel(1);
+        {
+            let mut slot = self.slot();
+            if slot.is_some() {
+                return None;
+            }
+            *slot = Some(sender);
+        }
+        emit();
+        window::raise(app);
+        let answer = receiver.recv_timeout(CONSENT_TIMEOUT).ok();
+        self.slot().take();
+        answer
+    }
+
+    /// The answer to the question that is up. Returns whether one was.
+    fn answer(&self, value: T) -> bool {
+        let sender = self.slot().take();
+        sender.is_some_and(|sender| sender.send(value).is_ok())
+    }
 }
 
-/// The user's answer to the ask that is up: the name they gave the extension,
-/// or `None` for a refusal. Returns whether an ask was waiting for it.
+static ASSOCIATE: Pending<Option<String>> = Pending::new();
+static PASSKEY: Pending<bool> = Pending::new();
+
+/// Ask the user whether the extension holding `key` may connect: the name
+/// they gave it, or `None`. Blocks the calling thread (see [`Pending::ask`]).
+pub fn ask(app: &AppHandle, key: &str) -> Option<String> {
+    ASSOCIATE
+        .ask(app, || events::browser_associate(app, key))
+        .flatten()
+}
+
+/// The user's answer to the associate ask that is up: the name they gave the
+/// extension, or `None` for a refusal. Returns whether an ask was waiting.
 pub fn respond(name: Option<String>) -> bool {
-    let sender = PENDING.lock().unwrap_or_else(|e| e.into_inner()).take();
-    sender.is_some_and(|sender| sender.send(name).is_ok())
+    ASSOCIATE.answer(name)
+}
+
+/// Ask the user whether the page at `origin` may have `ceremony`. Blocks the
+/// calling thread (see [`Pending::ask`]); no answer is a no.
+pub fn ask_passkey(app: &AppHandle, origin: &str, ceremony: Ceremony<'_>) -> bool {
+    PASSKEY
+        .ask(app, || events::browser_passkey(app, origin, ceremony))
+        .unwrap_or(false)
+}
+
+/// The user's answer to the passkey ask that is up. Returns whether one was.
+pub fn respond_passkey(allow: bool) -> bool {
+    PASSKEY.answer(allow)
+}
+
+/// The prompt a ceremony from the extension asks through: the app's dialog,
+/// told which page is asking.
+struct AskUser {
+    app: AppHandle,
+    origin: String,
+}
+
+impl UserConsent for AskUser {
+    fn approve(&self, ceremony: Ceremony<'_>) -> bool {
+        ask_passkey(&self.app, &self.origin, ceremony)
+    }
 }
 
 // --- the extensions let in ------------------------------------------------------
@@ -166,6 +228,41 @@ pub fn forget(app: &AppHandle, key: &str) -> Result<()> {
     let mut clients = clients_in(store);
     clients.retain(|c| c.key != key);
     write_clients(store, &clients)
+}
+
+// --- passkeys ------------------------------------------------------------------
+
+/// The open vault's passkeys, reached one operation at a time. The session
+/// lock is taken for each read or write and let go in between, so the user is
+/// asked — in the middle of the ceremony — with it let go, as `associate`
+/// asks; and every operation is pinned to the session the ceremony began in,
+/// so a lock or a workspace switch while the user decides fails the write
+/// rather than landing it in another vault.
+struct OpenVault {
+    app: AppHandle,
+    epoch: Epoch,
+}
+
+impl OpenVault {
+    fn with<T>(&self, op: impl FnOnce(&SessionVault<'_>) -> Result<T>) -> Result<T> {
+        let state = self.app.state::<AppState>();
+        let session = state.session.lock().unwrap();
+        let store = session.store_at(self.epoch)?;
+        let cipher = session.payload_cipher()?;
+        op(&SessionVault::new(store, &cipher))
+    }
+}
+
+impl PasskeyVault for OpenVault {
+    fn find(&self, rp_id: &str) -> Result<Vec<Stored>> {
+        self.with(|vault| vault.find(rp_id))
+    }
+    fn insert(&self, passkey: &Passkey) -> Result<()> {
+        self.with(|vault| vault.insert(passkey))
+    }
+    fn update(&self, entry_id: &str, passkey: &Passkey) -> Result<()> {
+        self.with(|vault| vault.update(entry_id, passkey))
+    }
 }
 
 // --- the app as a host ------------------------------------------------------
@@ -320,18 +417,29 @@ impl Host for AppHost {
                 .ok();
             (session.epoch(), entries)
         };
-        // The list the frontend shows, refreshed the way a sync merge refreshes
-        // it — for the session that wrote it. A lock or a workspace switch that
-        // landed since would otherwise be shown this vault's rows over its own.
-        if let Some(entries) = entries {
-            if commands::same_session(&state, epoch).is_ok() {
-                events::vault_merged(&self.0, entries);
-            }
-        }
-        // And the change on its way to the user's other devices, as a save
-        // from the editor schedules it.
-        commands::sync::request_run_if_ready(&self.0, &state);
+        self.written(epoch, entries);
         Ok(())
+    }
+
+    fn passkey_register(&self, registration: Registration) -> std::result::Result<Value, Code> {
+        let vault = self.open_vault()?;
+        let epoch = vault.epoch;
+        let consent = self.ask_user(&registration.origin);
+        let credential = passkeys::register(vault, consent, registration)?;
+        // The passkey is on a login — a new one, or the one for the site.
+        let entries = {
+            let state = self.0.state::<AppState>();
+            let session = state.session.lock().unwrap();
+            let listed = session.store_at(epoch).and_then(session::list_metas);
+            listed.map_err(|e| log::warn!("browser host: {e}")).ok()
+        };
+        self.written(epoch, entries);
+        Ok(credential)
+    }
+
+    fn passkey_get(&self, assertion: Assertion) -> std::result::Result<Value, Code> {
+        let consent = self.ask_user(&assertion.origin);
+        passkeys::assert(self.open_vault()?, consent, assertion)
     }
 
     fn lock(&self) {
@@ -340,6 +448,41 @@ impl Host for AppHost {
 
     fn unlock_requested(&self) {
         window::raise(&self.0);
+    }
+}
+
+impl AppHost {
+    fn open_vault(&self) -> std::result::Result<OpenVault, Code> {
+        let state = self.0.state::<AppState>();
+        let epoch = commands::unlocked_epoch(&state).map_err(|_| Code::DatabaseNotOpened)?;
+        Ok(OpenVault {
+            app: self.0.clone(),
+            epoch,
+        })
+    }
+
+    fn ask_user(&self, origin: &str) -> AskUser {
+        AskUser {
+            app: self.0.clone(),
+            origin: origin.to_string(),
+        }
+    }
+
+    /// A write from the extension is in, in the session `epoch` names.
+    fn written(&self, epoch: Epoch, entries: Option<Vec<EntryMetaDto>>) {
+        let state = self.0.state::<AppState>();
+        // The list the frontend shows, refreshed the way a sync merge
+        // refreshes it — for the session that wrote it. A lock or a workspace
+        // switch that landed since would otherwise be shown this vault's rows
+        // over its own. A list that did not read back just goes without it.
+        if let Some(entries) = entries {
+            if commands::same_session(&state, epoch).is_ok() {
+                events::vault_merged(&self.0, entries);
+            }
+        }
+        // And the change on its way to the user's other devices, as a save
+        // from the editor schedules it.
+        commands::sync::request_run_if_ready(&self.0, &state);
     }
 }
 

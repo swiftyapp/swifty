@@ -450,7 +450,7 @@ async fn the_user_is_asked_about_the_site_and_account() {
     assert_eq!(
         asked.as_slice(),
         [
-            "Register { rp_id: \"example.com\", user_name: Some(\"alice\") }",
+            "Register { rp_id: \"example.com\", user_name: Some(\"alice\"), user_display_name: Some(\"Alice Example\") }",
             "SignIn { rp_id: \"example.com\" }",
         ]
     );

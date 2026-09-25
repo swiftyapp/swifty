@@ -12,7 +12,7 @@ import {
   fileOpened
 } from './app'
 import { setEntries, loadArchive, runAudit } from './vault'
-import { useUi, showNotice, askBrowser } from './ui'
+import { useUi, showNotice, askBrowser, askPasskey } from './ui'
 import { t } from '@/i18n'
 
 // A merge can add or drop tombstones as readily as live entries, but the Archive
@@ -68,7 +68,9 @@ export const subscribeToEvents = (): (() => void) => {
     // app is collected separately, once this is listening (see `App.tsx`).
     on(EVENTS.fileOpened, payload => fileOpened(payload.path)),
     // An extension asking to be let in; the dialog in `Main` answers it.
-    on(EVENTS.browserAssociate, payload => askBrowser(payload.key))
+    on(EVENTS.browserAssociate, payload => askBrowser(payload.key)),
+    // A page's passkey ceremony, through that extension; `Main` answers it too.
+    on(EVENTS.browserPasskey, askPasskey)
   ]
 
   return () => {

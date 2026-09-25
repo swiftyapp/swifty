@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { EntryType } from '@/api/types'
 import type { SshKeyPair } from '@/api/tools'
+import type { PasskeyAsk } from '@/api/browser'
 import { loadArchive, setNoEntry, useVault, selectCurrent } from './vault'
 
 /**
@@ -99,6 +100,12 @@ export interface UiState {
    * at a time and gives up on it by itself after a minute.
    */
   browserAsk: string | null
+  /**
+   * A page's passkey ceremony, asked through the extension, while its dialog
+   * is up. Held the way `browserAsk` is: one at a time, a newer ask replacing
+   * the older, and Rust giving up on it after a minute.
+   */
+  passkeyAsk: PasskeyAsk | null
 }
 
 const GENERATOR_CLOSED: Generator = { open: false, apply: null, ssh: null }
@@ -131,7 +138,8 @@ export const initialUi: UiState = {
   scanError: null,
   copied: false,
   notice: null,
-  browserAsk: null
+  browserAsk: null,
+  passkeyAsk: null
 }
 
 export const useUi = create<UiState>()(() => initialUi)
@@ -283,6 +291,8 @@ export const dropOrphan = (fileId: string) =>
 
 export const askBrowser = (key: string) => useUi.setState({ browserAsk: key })
 export const closeBrowserAsk = () => useUi.setState({ browserAsk: null })
+export const askPasskey = (ask: PasskeyAsk) => useUi.setState({ passkeyAsk: ask })
+export const closePasskeyAsk = () => useUi.setState({ passkeyAsk: null })
 
 // --- scanning ---------------------------------------------------------------------
 

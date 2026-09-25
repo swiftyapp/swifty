@@ -59,6 +59,14 @@ pub fn browser_respond(name: Option<String>) -> Result<()> {
     Ok(())
 }
 
+/// The user's answer to a passkey ceremony the extension asked for. Nothing
+/// happens when no ask is up.
+#[tauri::command]
+pub fn browser_passkey_respond(allow: bool) -> Result<()> {
+    browser::respond_passkey(allow);
+    Ok(())
+}
+
 /// Take an extension's access to the open vault back. Its next request — on
 /// a connection that is up as much as on a new one — fails the association
 /// check, and it has to ask, and be let in, again.

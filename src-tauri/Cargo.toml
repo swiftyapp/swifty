@@ -107,6 +107,13 @@ dirs = "7"
 # process reaches the app through.
 crypto_box = "0.9"
 interprocess = "2"
+# Passkeys through the extension (`browser::passkeys`), where the host is the
+# WebAuthn client. `public-suffix` is the Mozilla list passkey-rs itself checks
+# an rpId against (MIT OR Apache-2.0, already locked under passkey-client);
+# tokio's current-thread runtime drives the authenticator's async traits on
+# the connection's own thread. Both are in the locked graph already.
+public-suffix = "0.1"
+tokio = { version = "1", features = ["rt"] }
 
 # Frameworks that exist on both macOS and iOS: Foundation, LocalAuthentication,
 # Vision and the Keychain.
@@ -188,7 +195,8 @@ windows-registry = "0.5"
 [dev-dependencies]
 # A real WebAuthn client drives the authenticator through a full ceremony in the
 # passkey tests (origin checks, clientDataJSON, attestation) instead of us
-# hand-rolling CTAP2 requests. Test-only: the app never speaks WebAuthn itself.
+# hand-rolling CTAP2 requests. Test-only: the extension host plays the client
+# itself, for the reasons `browser::passkeys` gives.
 passkey-client = "0.5"
 # The CredentialStore/UserValidationMethod traits are async, so the tests need
 # a runtime; `rt` (current-thread) + `macros` is the whole of it.

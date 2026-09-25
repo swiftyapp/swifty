@@ -207,10 +207,6 @@ impl<V: PasskeyVault> VaultCredentialStore<V> {
     pub fn new(vault: V) -> Self {
         Self { vault }
     }
-
-    pub fn vault(&self) -> &V {
-        &self.vault
-    }
 }
 
 #[async_trait::async_trait]

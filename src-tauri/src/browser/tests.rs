@@ -9,11 +9,17 @@ use serde_json::{json, Map, Value};
 
 use super::actions::{host_matches, site_host, Client, Connection, Host, Login};
 use super::manifest::{self, Family, HOST_NAME};
+use super::passkeys::{self, Assertion, Registration};
 use super::protocol::{increment, str_of, Code, NONCE_LEN, VERSION};
 use super::{frame, proxy, save_login_in, server, socket_name, IDENTIFIER};
 use crate::crypto::{PayloadCipher, VaultKey};
 use crate::models::Entry;
+use crate::passkey::store::MemoryVault;
+use crate::passkey::{Ceremony, UserConsent};
 use crate::store::{migrate, SqliteStore, VaultStore};
+
+// Passkeys through the extension, end to end.
+mod ceremonies;
 
 // --- a vault to talk to ------------------------------------------------------
 
@@ -33,9 +39,27 @@ struct Mock {
     saves: RefCell<Vec<Save>>,
     /// Whether a save fails as a write, not as an unknown id.
     read_only: bool,
+    /// The vault's passkeys, and what the user answers a passkey ask with.
+    passkeys: MemoryVault,
+    passkey_consent: bool,
+    /// Every passkey ask the user was shown.
+    passkey_asks: Arc<Mutex<Vec<String>>>,
 }
 
 type Save = (Option<String>, String, String, String, String);
+
+/// The user's answer to a passkey ask, noting what they were asked.
+struct Answer {
+    allow: bool,
+    asks: Arc<Mutex<Vec<String>>>,
+}
+
+impl UserConsent for Answer {
+    fn approve(&self, ceremony: Ceremony<'_>) -> bool {
+        self.asks.lock().unwrap().push(format!("{ceremony:?}"));
+        self.allow
+    }
+}
 
 impl Mock {
     fn unlocked() -> Self {
@@ -51,6 +75,16 @@ impl Mock {
             raises: Cell::new(0),
             saves: RefCell::new(Vec::new()),
             read_only: false,
+            passkeys: MemoryVault::new(),
+            passkey_consent: true,
+            passkey_asks: Arc::default(),
+        }
+    }
+
+    fn answer(&self) -> Answer {
+        Answer {
+            allow: self.passkey_consent,
+            asks: self.passkey_asks.clone(),
         }
     }
 
@@ -129,6 +163,13 @@ impl Host for Mock {
             password.into(),
         ));
         Ok(())
+    }
+    // The real ceremonies, over an in-memory vault and a scripted user.
+    fn passkey_register(&self, registration: Registration) -> Result<Value, Code> {
+        passkeys::register(&self.passkeys, self.answer(), registration)
+    }
+    fn passkey_get(&self, assertion: Assertion) -> Result<Value, Code> {
+        passkeys::assert(&self.passkeys, self.answer(), assertion)
     }
     fn lock(&self) {
         self.locks.set(self.locks.get() + 1);
