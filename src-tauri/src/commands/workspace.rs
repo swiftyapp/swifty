@@ -295,7 +295,7 @@ pub async fn workspace_create(
     let _step = begin_step(&state)?;
 
     let root = storage::root_dir(&app)?;
-    verify_master_password(&root, &state, password.clone()).await?;
+    verify_master_password(&app, &root, &state, password.clone()).await?;
     let id = crate::crypto::random_hex_id();
 
     // The open session comes out on a lease and the paths move as one step
@@ -385,23 +385,24 @@ pub async fn workspace_create(
 }
 
 /// Prove `password` is the master password — the one the primary's key derives
-/// from, held in the ring as the app key — without opening anything: derive
-/// with the primary's own descriptor and compare. `PrimaryWorkspaceOnly` when
-/// the primary has not been opened this session and there is nothing to
-/// compare against, which the frontend has already said no to.
+/// from — without opening the primary when that can be avoided. Once the
+/// primary has been opened this session its key is in the ring as the app key,
+/// and a derive with the primary's own descriptor is compared against it.
+/// Before that — another workspace is what is open, unlocked with a password
+/// of its own — the primary's own database is asked, exactly as the unlock's
+/// detached try asks it, and the key it proves opens the app at its level from
+/// here on (`appkey::open_all`), so the next proof is the cheap one.
 ///
 /// Under the primary's own failed-attempt backoff, exactly as an unlock of it
 /// and a delete of it run: this proves the primary's password on demand from
 /// an open webview, and without the backoff it would be a way to guess that
 /// password at full Argon2id speed while the lock screen beside it escalates.
 async fn verify_master_password(
+    app: &AppHandle,
     root: &Path,
     state: &AppState,
     password: Zeroizing<String>,
 ) -> Result<()> {
-    let Some(app_key) = state.keyring.lock().unwrap().app_key() else {
-        return Err(Error::PrimaryWorkspaceOnly);
-    };
     let lockout = LockoutState::load_in(root)?;
     let now = auth::now_ms();
     if let Some(refusal) = auth::locked_out(lockout, now) {
@@ -409,8 +410,22 @@ async fn verify_master_password(
     }
 
     let dir = root.to_path_buf();
-    let derived = blocking(move || derive_in(&dir, &password)).await?;
-    if derived.biometric_material().ct_eq(&app_key).into() {
+    let app_key = state.keyring.lock().unwrap().app_key();
+    let proved = match app_key {
+        Some(app_key) => {
+            let derived = blocking(move || derive_in(&dir, &password)).await?;
+            derived.biometric_material().ct_eq(&app_key).into()
+        }
+        None => match blocking(move || verify_password_in(&dir, &password)).await {
+            Ok(key) => {
+                appkey::open_all(app, key.biometric_material());
+                true
+            }
+            Err(Error::InvalidPassword) => false,
+            Err(e) => return Err(e),
+        },
+    };
+    if proved {
         if lockout != LockoutState::default() {
             if let Err(e) = LockoutState::default().save_in(root) {
                 log::warn!("failed to reset lockout sidecar: {e}");

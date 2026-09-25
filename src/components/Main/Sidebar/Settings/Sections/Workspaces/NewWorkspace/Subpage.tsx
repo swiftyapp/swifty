@@ -1,8 +1,8 @@
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createWorkspace, selectWorkspaces, useApp } from '@/store'
-import { describeError } from '@/api/errors'
-import { workspaceLabel } from '@/lib/workspace'
+import { describeError, errorKind } from '@/api/errors'
+import { PRIMARY_WORKSPACE, workspaceLabel } from '@/lib/workspace'
 import { firstUnusedColor, type WorkspaceColor } from '@/lib/workspaceColor'
 import { cx } from '@/utils/cx'
 import Field from '@/components/elements/Field'
@@ -39,6 +39,10 @@ export default function NewWorkspaceSubpage() {
   const label = name.trim()
   const taken = workspaces.map(workspace => workspaceLabel(workspace, t))
   const ready = !!label && !nameTaken(label, taken) && !!password
+  // Whose password seals the new vault: the device's master password is the
+  // primary workspace's, and that workspace is not always the open one.
+  const primary = workspaces.find(workspace => workspace.id === PRIMARY_WORKSPACE)
+  const primaryName = primary ? workspaceLabel(primary, t) : t('Personal')
 
   // The fields are read once here and held while busy, so what is created is
   // exactly what is on screen.
@@ -50,7 +54,13 @@ export default function NewWorkspaceSubpage() {
       await createWorkspace(label, password, color)
     } catch (err: unknown) {
       setBusy(false)
-      setError(describeError(err) || t('Something went wrong'))
+      // Named, because the password wanted is the primary's — which may not
+      // be the open workspace's, nor the one the user thinks of as "master".
+      setError(
+        errorKind(err) === 'invalidPassword'
+          ? t('That is not the master password of {{name}}.', { name: primaryName })
+          : describeError(err) || t('Something went wrong')
+      )
     }
   }
 
@@ -107,7 +117,9 @@ export default function NewWorkspaceSubpage() {
             </p>
           )}
           <p className="text-sm text-text2">
-            {t('The new workspace is sealed with your existing master password.')}
+            {t('Sealed with the master password of {{name}}, the primary workspace on this device.', {
+              name: primaryName
+            })}
           </p>
         </Field>
       </div>

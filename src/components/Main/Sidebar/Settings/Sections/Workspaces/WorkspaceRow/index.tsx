@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { Workspace } from '@/api/types'
-import { workspaceLabel } from '@/lib/workspace'
+import { PRIMARY_WORKSPACE, workspaceLabel } from '@/lib/workspace'
 import { cx } from '@/utils/cx'
 import Button from '@/components/elements/Button'
 import Monogram from '@/components/elements/Monogram'
@@ -31,6 +31,21 @@ function OpenNow() {
   )
 }
 
+// The primary is the workspace whose master password is the device's — the one
+// a new workspace is sealed with and the one Touch ID enrols — and nothing
+// else on the row says which that is once it has been renamed.
+function Primary({ id }: { id: string }) {
+  const { t } = useTranslation()
+  return (
+    <span
+      data-testid={`workspace-primary-${id}`}
+      className={`flex h-5 flex-none items-center rounded-full bg-tile px-2 ${META_TYPE} font-medium text-text2`}
+    >
+      {t('Primary')}
+    </span>
+  )
+}
+
 // One workspace on this device: its tile, its name over what is known of it,
 // Switch when it is not the open one, and the rest behind ⋯.
 export default function WorkspaceRow({
@@ -52,6 +67,7 @@ export default function WorkspaceRow({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <span className="truncate text-base font-medium text-text">{label}</span>
+            {workspace.id === PRIMARY_WORKSPACE && <Primary id={workspace.id} />}
             {current && <OpenNow />}
           </div>
           <div className={cx(META, 'mt-0.5 truncate')}>{about}</div>
