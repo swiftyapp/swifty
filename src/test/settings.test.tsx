@@ -1020,16 +1020,21 @@ describe('Settings › language & region', () => {
     expect(trigger).toHaveFocus()
   })
 
-  it('closes the date format menu on Tab', async () => {
+  it('closes a menu on Tab and moves on from its field, either way', async () => {
     await open()
     await go('language')
+    const language = screen.getByTestId('settings-locale-trigger')
+    const format = screen.getByTestId('settings-date-format-trigger')
 
-    const trigger = screen.getByTestId('settings-date-format-trigger')
-    await userEvent.click(trigger)
+    await userEvent.click(language)
     await userEvent.tab()
-    expect(screen.queryByTestId('settings-date-format-YYYY-MM-DD')).not.toBeInTheDocument()
     expect(screen.queryByTestId('dropdown-scrim')).not.toBeInTheDocument()
-    expect(trigger).toHaveFocus()
+    expect(format).toHaveFocus()
+
+    await userEvent.click(format)
+    await userEvent.tab({ shift: true })
+    expect(screen.queryByTestId('dropdown-scrim')).not.toBeInTheDocument()
+    expect(language).toHaveFocus()
   })
 
   it('names the theme radiogroup and the date format menu after their rows', async () => {

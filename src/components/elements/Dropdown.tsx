@@ -71,8 +71,12 @@ export function Dropdown({
       case 'ArrowUp':
         move(-1)
         break
-      case 'Escape':
       case 'Tab':
+        // Left unprevented, the Tab moves on from the trigger once the menu is gone.
+        trigger.current?.focus()
+        onBlur()
+        return
+      case 'Escape':
         // An open menu owns Escape. Modal and Generator listen on `window`
         // and Sheet on `document` — all ancestors of the React root — so
         // without this the one press would dismiss the overlay underneath too.
@@ -177,6 +181,7 @@ export function DropdownItem({
       <button
         type="button"
         id={id}
+        tabIndex={-1}
         role={option ? 'option' : radio ? 'menuitemradio' : 'menuitem'}
         aria-selected={option ? !!active : undefined}
         aria-checked={checked}
