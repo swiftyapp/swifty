@@ -5,27 +5,27 @@ use serde::Serialize;
 use serde_json::json;
 use tauri::AppHandle;
 
-use crate::browser::{self, manifest};
+use crate::browser::{self, manifest, Client};
 use crate::error::Result;
-use crate::settings::{self, BrowserClient};
+use crate::settings;
 use crate::storage;
 
-/// The host as Settings shows it.
+/// The host as Settings shows it. `clients` are the open vault's — the list
+/// is kept inside each vault — so it is empty while locked.
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserStatus {
     pub enabled: bool,
     pub browsers: Vec<manifest::Status>,
-    pub clients: Vec<BrowserClient>,
+    pub clients: Vec<Client>,
 }
 
 fn status(app: &AppHandle) -> Result<BrowserStatus> {
     let root = storage::root_dir(app)?;
-    let browser = settings::current(app).browser;
     Ok(BrowserStatus {
-        enabled: browser.enabled,
+        enabled: settings::current(app).browser.enabled,
         browsers: manifest::status(&root),
-        clients: browser.clients,
+        clients: browser::clients(app),
     })
 }
 
@@ -36,13 +36,12 @@ pub fn browser_status(app: AppHandle) -> Result<BrowserStatus> {
 
 /// Turn the host on — writing the manifests every browser here finds it by,
 /// and listening — or off, taking the manifests back. The listener stays up
-/// once started (see `browser::server`); off means it refuses what arrives.
+/// once started (see `browser::server`); off means every connection, the
+/// ones up included, is refused at its next request.
 #[tauri::command]
 pub fn browser_set_enabled(enabled: bool, app: AppHandle) -> Result<BrowserStatus> {
     let root = storage::root_dir(&app)?;
-    let mut browser = settings::current(&app).browser;
-    browser.enabled = enabled;
-    settings::set(&app, &json!({ "browser": browser }))?;
+    settings::set(&app, &json!({ "browser": { "enabled": enabled } }))?;
     if enabled {
         manifest::install(&root);
         browser::server::start(&app);
@@ -60,12 +59,11 @@ pub fn browser_respond(name: Option<String>) -> Result<()> {
     Ok(())
 }
 
-/// Take an extension's access back. Its next request fails the association
-/// check, and it has to ask — and be let in — again.
+/// Take an extension's access to the open vault back. Its next request — on
+/// a connection that is up as much as on a new one — fails the association
+/// check, and it has to ask, and be let in, again.
 #[tauri::command]
 pub fn browser_forget_client(key: String, app: AppHandle) -> Result<BrowserStatus> {
-    let mut browser = settings::current(&app).browser;
-    browser.clients.retain(|c| c.key != key);
-    settings::set(&app, &json!({ "browser": browser }))?;
+    browser::forget(&app, &key)?;
     status(&app)
 }

@@ -6,6 +6,7 @@
 //! sessions, stores or Tauri, so the whole exchange runs against a fake in
 //! the tests and against the app (`super::AppHost`) in the binary.
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
 use super::protocol::{self, str_of, Code, Session};
@@ -23,8 +24,11 @@ pub struct Login {
 }
 
 /// An extension the user let in: the name they gave it and its identification
-/// public key (`settings::BrowserClient`, without the serde).
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// public key. Kept inside the vault it was let into (see `super::clients`),
+/// which is what makes the key worth something: the protocol has no step in
+/// which the extension proves it holds the private half, so whoever can
+/// present the public key is the extension as far as the host can tell.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Client {
     pub name: String,
     pub key: String,
@@ -32,9 +36,14 @@ pub struct Client {
 
 /// The vault as the extension host sees it.
 pub trait Host {
+    /// Whether the host is still switched on. Asked before every request, so
+    /// turning it off in Settings ends the connections that are up, not only
+    /// the ones to come.
+    fn enabled(&self) -> bool;
     /// A stable digest of the open vault, or `None` while locked. The
     /// extension keys its associations by it, so each workspace is its own.
     fn database_hash(&self) -> Option<String>;
+    /// The extensions let into the open vault. Empty while locked.
     fn clients(&self) -> Vec<Client>;
     /// Ask the user whether the extension holding `key` may connect: the name
     /// they give it, or `None` for a refusal or no answer.
@@ -53,7 +62,11 @@ pub trait Host {
 pub struct Connection<H> {
     host: H,
     session: Session,
-    associated: bool,
+    /// The identification key this connection proved, if any. Held as the key
+    /// rather than a flag: it is checked against the open vault's list on
+    /// every use, so forgetting the extension in Settings, or switching to a
+    /// workspace it was never let into, ends its access with the next request.
+    associated: Option<String>,
 }
 
 impl<H: Host> Connection<H> {
@@ -61,11 +74,10 @@ impl<H: Host> Connection<H> {
         Self {
             host,
             session: Session::new(),
-            associated: false,
+            associated: None,
         }
     }
 
-    #[cfg(test)]
     pub fn host(&self) -> &H {
         &self.host
     }
@@ -130,7 +142,7 @@ impl<H: Host> Connection<H> {
                     name: name.clone(),
                     key: id_key.to_string(),
                 });
-                self.associated = true;
+                self.associated = Some(id_key.to_string());
                 Ok(params(json!({ "hash": hash, "id": name })))
             }
             "test-associate" => {
@@ -144,7 +156,7 @@ impl<H: Host> Connection<H> {
                 if !known {
                     return Err(Code::AssociationFailed);
                 }
-                self.associated = true;
+                self.associated = Some(key.to_string());
                 Ok(params(json!({ "hash": hash, "id": id })))
             }
             "get-logins" => {
@@ -193,7 +205,10 @@ impl<H: Host> Connection<H> {
                     .ok_or(Code::ActionCancelledOrDenied)?;
                 Ok(params(json!({ "password": password })))
             }
+            // Locking takes no secret, but it is the user's session to end:
+            // an extension that was never let in does not get to end it.
             "lock-database" => {
+                self.require_association(message)?;
                 self.host.lock();
                 Ok(Map::new())
             }
@@ -207,23 +222,33 @@ impl<H: Host> Connection<H> {
     // An association proved on this connection, or one the request carries:
     // the extension sends every identification key it holds with each ask,
     // and one the user let in before is as good as a fresh `test-associate`.
+    // Either way the key has to be in the *open* vault's list now — not when
+    // it was proved — so a forget, or a switch to another workspace, takes
+    // effect on the next request rather than at the next reconnect.
     fn require_association(&mut self, message: &Map<String, Value>) -> Result<(), Code> {
-        if self.associated {
+        let known = self.host.clients();
+        let still_known = |key: &str| known.iter().any(|c| c.key == key);
+        if self.associated.as_deref().is_some_and(still_known) {
             return Ok(());
         }
-        let known = self.host.clients();
         let offered = message
             .get("keys")
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
             .filter_map(Value::as_object)
-            .any(|offer| known.iter().any(|c| c.key == str_of(offer, "key")));
-        if !offered {
-            return Err(Code::AssociationFailed);
+            .map(|offer| str_of(offer, "key"))
+            .find(|key| still_known(key));
+        match offered {
+            Some(key) => {
+                self.associated = Some(key.to_string());
+                Ok(())
+            }
+            None => {
+                self.associated = None;
+                Err(Code::AssociationFailed)
+            }
         }
-        self.associated = true;
-        Ok(())
     }
 }
 
@@ -248,9 +273,19 @@ pub fn site_host(url: &str) -> Option<String> {
 /// on either side not counting. `accounts.example.com` gets the login saved
 /// for `example.com`; `example.com` does not get one saved for
 /// `accounts.example.com`, and `notexample.com` gets neither.
+///
+/// The column is the website field cut after its scheme and before its first
+/// `/` — so a port, a query or a user name typed there stays in it — where
+/// `site` is a browser's host and never carries any of those.
 pub fn host_matches(site: &str, entry: &str) -> bool {
     let site = site.trim_start_matches("www.");
     let entry = entry.trim().to_ascii_lowercase();
+    let entry = entry.split(['?', '#']).next().unwrap_or_default();
+    let entry = entry.rsplit('@').next().unwrap_or_default();
+    let entry = match entry.rsplit_once(':') {
+        Some((host, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => host,
+        _ => entry,
+    };
     let entry = entry.trim_start_matches("www.");
     !entry.is_empty() && (site == entry || site.ends_with(&format!(".{entry}")))
 }

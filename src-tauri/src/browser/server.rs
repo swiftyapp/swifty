@@ -76,7 +76,8 @@ pub fn bind(root: &Path) -> io::Result<Listener> {
     options.create_sync()
 }
 
-/// Answer requests on one connection until the other side goes away.
+/// Answer requests on one connection until the other side goes away — or the
+/// host is switched off, which ends the connection at its next request.
 pub fn serve<H: Host>(mut stream: impl Read + Write, host: H) {
     let mut connection = Connection::new(host);
     loop {
@@ -88,6 +89,9 @@ pub fn serve<H: Host>(mut stream: impl Read + Write, host: H) {
                 break;
             }
         };
+        if !connection.host().enabled() {
+            break;
+        }
         let reply = connection.handle(&request);
         if frame::write(&mut stream, &reply).is_err() {
             break;

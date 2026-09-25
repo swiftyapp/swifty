@@ -60,25 +60,14 @@ impl Default for GeneratorDefaults {
     }
 }
 
-/// A browser extension the user let connect (`browser`): the name they gave it
-/// when it asked, and its identification public key — the one thing the
-/// extension keeps across browser restarts and proves itself with on every
-/// reconnect. A public key, so it belongs here in plaintext with the rest.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserClient {
-    pub name: String,
-    pub key: String,
-}
-
-/// The browser extension host: whether it listens at all, and which extensions
-/// may talk to it. Off until the user turns it on in Settings, which is also
-/// what writes the native messaging manifests a browser finds the app by.
+/// The browser extension host: whether it listens at all. Off until the user
+/// turns it on in Settings, which is also what writes the native messaging
+/// manifests a browser finds the app by. Which extensions may talk to it is
+/// not a preference: that list lives inside each vault (`browser::clients`).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct BrowserSettings {
     pub enabled: bool,
-    pub clients: Vec<BrowserClient>,
 }
 
 /// Every preference the app has, with the defaults a fresh install starts from.
@@ -250,7 +239,6 @@ mod tests {
         assert_eq!(settings.generator, GeneratorDefaults::default());
         assert_eq!(settings.generator.length, 20);
         assert!(!settings.browser.enabled);
-        assert!(settings.browser.clients.is_empty());
     }
 
     #[test]

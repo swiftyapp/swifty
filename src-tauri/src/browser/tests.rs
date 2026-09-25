@@ -14,6 +14,7 @@ use super::{frame, proxy, server, socket_name, IDENTIFIER};
 // --- a vault to talk to ------------------------------------------------------
 
 struct Mock {
+    enabled: Cell<bool>,
     locked: Cell<bool>,
     logins: Vec<Login>,
     clients: RefCell<Vec<Client>>,
@@ -27,6 +28,7 @@ struct Mock {
 impl Mock {
     fn unlocked() -> Self {
         Self {
+            enabled: Cell::new(true),
             locked: Cell::new(false),
             logins: vec![login("gh", "GitHub", "octocat", "hunter2", Some("123456"))],
             clients: RefCell::new(Vec::new()),
@@ -57,6 +59,9 @@ fn login(id: &str, title: &str, username: &str, password: &str, totp: Option<&st
 }
 
 impl Host for Mock {
+    fn enabled(&self) -> bool {
+        self.enabled.get()
+    }
     fn database_hash(&self) -> Option<String> {
         (!self.locked.get()).then(|| "abc123".to_string())
     }
@@ -511,11 +516,92 @@ fn generate_password_needs_no_association() {
 }
 
 #[test]
-fn lock_database_locks() {
-    let (extension, mut connection) = ready();
+fn lock_database_locks_for_an_extension_that_was_let_in() {
+    let (extension, mut connection) = associated();
     let response = extension.send(&mut connection, "lock-database", json!({}));
     assert_eq!(response["success"], "true");
     assert_eq!(connection.host().locks.get(), 1);
+}
+
+#[test]
+fn lock_database_is_refused_to_a_stranger() {
+    let (extension, mut connection) = ready();
+    let response = extension.send(&mut connection, "lock-database", json!({}));
+    assert_eq!(error_code(&response), Code::AssociationFailed as u8);
+    assert_eq!(connection.host().locks.get(), 0);
+}
+
+// --- access that ends -------------------------------------------------------
+
+#[test]
+fn a_forgotten_extension_loses_access_on_its_next_request() {
+    let (extension, mut connection) = associated();
+    let before = extension.send(
+        &mut connection,
+        "get-logins",
+        json!({ "url": "https://github.com" }),
+    );
+    assert_eq!(before["count"], 1);
+
+    // Settings › forget, while the connection is still up.
+    connection.host().clients.borrow_mut().clear();
+
+    let after = extension.send(
+        &mut connection,
+        "get-logins",
+        json!({ "url": "https://github.com", "keys": [{ "id": "Chrome", "key": "id-key" }] }),
+    );
+    assert_eq!(error_code(&after), Code::AssociationFailed as u8);
+    let totp = extension.send(&mut connection, "get-totp", json!({ "uuid": "gh" }));
+    assert_eq!(error_code(&totp), Code::AssociationFailed as u8);
+}
+
+#[test]
+fn an_association_does_not_follow_the_connection_into_another_vault() {
+    // The list is the open vault's: a switch to a workspace the extension was
+    // never let into reads as a vault with no clients at all.
+    let (extension, mut connection) = associated();
+    *connection.host().clients.borrow_mut() = vec![Client {
+        name: "Chrome".into(),
+        key: "a key of the other vault's".into(),
+    }];
+    let response = extension.send(
+        &mut connection,
+        "get-logins",
+        json!({ "url": "https://github.com", "keys": [{ "id": "Chrome", "key": "id-key" }] }),
+    );
+    assert_eq!(error_code(&response), Code::AssociationFailed as u8);
+
+    // Let in there too, and the key it carries opens it again.
+    connection.host().clients.borrow_mut().push(Client {
+        name: "Chrome".into(),
+        key: "id-key".into(),
+    });
+    let response = extension.send(
+        &mut connection,
+        "get-logins",
+        json!({ "url": "https://github.com", "keys": [{ "id": "Chrome", "key": "id-key" }] }),
+    );
+    assert_eq!(response["count"], 1);
+}
+
+#[test]
+fn serve_ends_the_connection_once_the_host_is_switched_off() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let served = std::thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        let host = Mock::unlocked();
+        host.enabled.set(false);
+        server::serve(stream, host);
+    });
+
+    let mut stream = TcpStream::connect(address).unwrap();
+    let request = json!({ "action": "change-public-keys", "publicKey": "x", "nonce": "y" });
+    frame::write(&mut stream, &serde_json::to_vec(&request).unwrap()).unwrap();
+    // No reply: the other end hangs up instead.
+    assert_eq!(frame::read(&mut stream).unwrap(), None);
+    served.join().unwrap();
 }
 
 #[test]
@@ -555,6 +641,19 @@ fn a_login_matches_its_host_and_subdomains_but_not_its_lookalikes() {
     assert!(!host_matches("notgithub.com", "github.com"));
     assert!(!host_matches("github.com", ""));
     assert!(!host_matches("github.com", "  "));
+}
+
+#[test]
+fn a_login_matches_whatever_else_its_website_field_carried() {
+    // The column is the website cut before its first `/`, so all of these
+    // are what a typed URL leaves in it.
+    assert!(host_matches("example.com", "example.com:8443"));
+    assert!(host_matches("example.com", "user@example.com"));
+    assert!(host_matches("example.com", "user:pw@example.com:8443"));
+    assert!(host_matches("example.com", "example.com?next=1"));
+    assert!(host_matches("example.com", "example.com#top"));
+    assert!(!host_matches("example.com", "example.com:notaport"));
+    assert!(host_matches("192.168.1.1", "192.168.1.1:8080"));
 }
 
 // --- framing and the wire ----------------------------------------------------
@@ -667,6 +766,27 @@ fn a_manifest_names_the_host_and_the_extension_for_its_family() {
         json!(["keepassxc-browser@keepassxc.org"])
     );
     assert!(firefox.get("allowed_origins").is_none());
+}
+
+#[test]
+fn a_manifest_in_place_is_told_apart_from_keepassxcs_own() {
+    use manifest::{classify, Found};
+    let exe = std::path::Path::new("/Applications/Rowel.app/Contents/MacOS/rowel");
+    let ours = manifest::manifest(Family::Chromium, exe);
+    assert_eq!(classify(&ours, exe), Found::Current);
+
+    let moved = std::path::Path::new("/opt/rowel/rowel");
+    assert_eq!(classify(&ours, moved), Found::Stale);
+
+    let keepassxc = json!({
+        "name": HOST_NAME,
+        "description": "KeePassXC integration with native messaging support",
+        "path": "/Applications/KeePassXC.app/Contents/MacOS/keepassxc-proxy",
+        "type": "stdio",
+        "allowed_origins": ["chrome-extension://oboonakemofpalcgghocfoadofidjkkk/"]
+    });
+    assert_eq!(classify(&keepassxc.to_string(), exe), Found::Foreign);
+    assert_eq!(classify("not json", exe), Found::Foreign);
 }
 
 #[test]

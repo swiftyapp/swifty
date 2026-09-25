@@ -10,8 +10,9 @@
 //!
 //! What the extension can reach is what the user could copy: the logins for
 //! the site it is on, a TOTP code, a generated password, and the lock. An
-//! extension gets in once, by the user naming it in a dialog; after that its
-//! identification key, kept in `settings.json`, is what it proves itself with.
+//! extension gets in once per vault, by the user naming it in a dialog; after
+//! that its identification key, kept inside that vault, is what it proves
+//! itself with — to that vault, and to no other workspace on the device.
 
 pub mod actions;
 pub mod frame;
@@ -29,15 +30,16 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use interprocess::local_socket::{prelude::*, Name};
-use serde_json::json;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 
-use self::actions::{Client, Host, Login};
+pub use self::actions::Client;
+use self::actions::{Host, Login};
+use crate::error::Result;
 use crate::models::GeneratorOptions;
-use crate::settings::{self, BrowserClient};
+use crate::settings;
 use crate::state::AppState;
-use crate::store::VaultStore;
+use crate::store::{SqliteStore, VaultStore};
 use crate::{commands, events, session, window};
 
 /// The bundle identifier, which is the app-data directory's name on every
@@ -118,12 +120,61 @@ pub fn respond(name: Option<String>) -> bool {
     sender.is_some_and(|sender| sender.send(name).is_ok())
 }
 
+// --- the extensions let in ------------------------------------------------------
+//
+// A `meta` row of the vault they were let into, sealed with the rest of it.
+// In the vault rather than in `settings.json` for two reasons. The key is the
+// whole credential — the protocol never asks the extension to sign with the
+// private half — so on disk it must be as unreadable as what it opens. And an
+// association is to one vault: the extension keys its own copy by the vault
+// hash, and a workspace the user never let it into must not answer to it.
+// Every read and write happens under the session lock, so two approvals
+// cannot each write a list that misses the other's.
+
+const CLIENTS_META: &str = "browser_clients";
+
+fn clients_in(store: &SqliteStore) -> Vec<Client> {
+    store
+        .meta_get(CLIENTS_META)
+        .ok()
+        .flatten()
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_default()
+}
+
+fn write_clients(store: &SqliteStore, clients: &[Client]) -> Result<()> {
+    store
+        .meta_set(CLIENTS_META, &serde_json::to_string(clients)?)
+        .map_err(session::store_err)
+}
+
+/// The extensions let into the open vault; none while it is locked.
+pub fn clients(app: &AppHandle) -> Vec<Client> {
+    let state = app.state::<AppState>();
+    let session = state.session.lock().unwrap();
+    session.store().map(clients_in).unwrap_or_default()
+}
+
+/// Take an extension's access to the open vault back.
+pub fn forget(app: &AppHandle, key: &str) -> Result<()> {
+    let state = app.state::<AppState>();
+    let session = state.session.lock().unwrap();
+    let store = session.store()?;
+    let mut clients = clients_in(store);
+    clients.retain(|c| c.key != key);
+    write_clients(store, &clients)
+}
+
 // --- the app as a host ------------------------------------------------------
 
 /// The open vault, as [`Host`] sees it.
 pub struct AppHost(pub AppHandle);
 
 impl Host for AppHost {
+    fn enabled(&self) -> bool {
+        settings::current(&self.0).browser.enabled
+    }
+
     fn database_hash(&self) -> Option<String> {
         let state = self.0.state::<AppState>();
         let unlocked = state.session.lock().unwrap().is_unlocked();
@@ -137,15 +188,7 @@ impl Host for AppHost {
     }
 
     fn clients(&self) -> Vec<Client> {
-        settings::current(&self.0)
-            .browser
-            .clients
-            .into_iter()
-            .map(|c| Client {
-                name: c.name,
-                key: c.key,
-            })
-            .collect()
+        clients(&self.0)
     }
 
     fn associate(&self, key: &str) -> Option<String> {
@@ -153,15 +196,17 @@ impl Host for AppHost {
     }
 
     fn remember(&self, client: Client) {
-        let mut browser = settings::current(&self.0).browser;
-        if browser.clients.iter().any(|c| c.key == client.key) {
+        let state = self.0.state::<AppState>();
+        let session = state.session.lock().unwrap();
+        let Ok(store) = session.store() else {
+            return;
+        };
+        let mut clients = clients_in(store);
+        if clients.iter().any(|c| c.key == client.key) {
             return;
         }
-        browser.clients.push(BrowserClient {
-            name: client.name,
-            key: client.key,
-        });
-        if let Err(e) = settings::set(&self.0, &json!({ "browser": browser })) {
+        clients.push(client);
+        if let Err(e) = write_clients(store, &clients) {
             log::warn!("browser host: could not remember the extension: {e}");
         }
     }
