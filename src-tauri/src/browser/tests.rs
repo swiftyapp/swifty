@@ -20,6 +20,8 @@ struct Mock {
     clients: RefCell<Vec<Client>>,
     /// What the user answers an `associate` with.
     consent: Option<String>,
+    /// The yes cannot be kept: the write fails, or the vault changed hands.
+    remember_fails: Cell<bool>,
     totp: Option<String>,
     locks: Cell<u32>,
     raises: Cell<u32>,
@@ -33,6 +35,7 @@ impl Mock {
             logins: vec![login("gh", "GitHub", "octocat", "hunter2", Some("123456"))],
             clients: RefCell::new(Vec::new()),
             consent: Some("Chrome".into()),
+            remember_fails: Cell::new(false),
             totp: Some("654321".into()),
             locks: Cell::new(0),
             raises: Cell::new(0),
@@ -68,11 +71,16 @@ impl Host for Mock {
     fn clients(&self) -> Vec<Client> {
         self.clients.borrow().clone()
     }
-    fn associate(&self, _key: &str) -> Option<String> {
-        self.consent.clone()
-    }
-    fn remember(&self, client: Client) {
-        self.clients.borrow_mut().push(client);
+    fn associate(&self, key: &str) -> Result<String, Code> {
+        let name = self.consent.clone().ok_or(Code::ActionCancelledOrDenied)?;
+        if self.remember_fails.get() {
+            return Err(Code::AssociationFailed);
+        }
+        self.clients.borrow_mut().push(Client {
+            name: name.clone(),
+            key: key.into(),
+        });
+        Ok(name)
     }
     fn logins_for(&self, host: &str) -> Vec<Login> {
         if host == "github.com" {
@@ -393,6 +401,28 @@ fn a_refused_associate_is_denied_and_forgotten() {
         json!({ "key": extension.public_key(), "idKey": "id-key" }),
     );
     assert_eq!(error_code(&response), Code::ActionCancelledOrDenied as u8);
+    assert!(connection.host().clients.borrow().is_empty());
+    let logins = extension.send(
+        &mut connection,
+        "get-logins",
+        json!({ "url": "https://github.com" }),
+    );
+    assert_eq!(error_code(&logins), Code::AssociationFailed as u8);
+}
+
+#[test]
+fn a_yes_that_could_not_be_kept_is_refused_not_reported() {
+    // The write failed, or the vault the user was asked for is no longer the
+    // one open: the extension must not hear "in" when its next request
+    // will find it is not.
+    let (extension, mut connection) = ready();
+    connection.host().remember_fails.set(true);
+    let response = extension.send(
+        &mut connection,
+        "associate",
+        json!({ "key": extension.public_key(), "idKey": "id-key" }),
+    );
+    assert_eq!(error_code(&response), Code::AssociationFailed as u8);
     assert!(connection.host().clients.borrow().is_empty());
     let logins = extension.send(
         &mut connection,

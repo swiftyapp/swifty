@@ -45,10 +45,13 @@ pub trait Host {
     fn database_hash(&self) -> Option<String>;
     /// The extensions let into the open vault. Empty while locked.
     fn clients(&self) -> Vec<Client>;
-    /// Ask the user whether the extension holding `key` may connect: the name
-    /// they give it, or `None` for a refusal or no answer.
-    fn associate(&self, key: &str) -> Option<String>;
-    fn remember(&self, client: Client);
+    /// Ask the user whether the extension holding `key` may connect, and let
+    /// it into the open vault if they say so: the name they gave it. A
+    /// refusal or no answer is `ActionCancelledOrDenied`; a yes that could
+    /// not be kept — the write failed, or the vault that asked is no longer
+    /// the one open — is `AssociationFailed`, so the extension is never told
+    /// it is in when the next request will find it is not.
+    fn associate(&self, key: &str) -> Result<String, Code>;
     /// Every login for `host` (a bare hostname, lowercase), secrets unsealed.
     fn logins_for(&self, host: &str) -> Vec<Login>;
     /// The current code for the login `id`, if it has a seed.
@@ -134,14 +137,7 @@ impl<H: Host> Connection<H> {
                 if key.is_empty() || Some(key) != self.session.client_key() || id_key.is_empty() {
                     return Err(Code::AssociationFailed);
                 }
-                let name = self
-                    .host
-                    .associate(id_key)
-                    .ok_or(Code::ActionCancelledOrDenied)?;
-                self.host.remember(Client {
-                    name: name.clone(),
-                    key: id_key.to_string(),
-                });
+                let name = self.host.associate(id_key)?;
                 self.associated = Some(id_key.to_string());
                 Ok(params(json!({ "hash": hash, "id": name })))
             }

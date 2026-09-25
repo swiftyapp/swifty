@@ -35,6 +35,7 @@ use tauri::{AppHandle, Manager};
 
 pub use self::actions::Client;
 use self::actions::{Host, Login};
+use self::protocol::Code;
 use crate::error::Result;
 use crate::models::GeneratorOptions;
 use crate::settings;
@@ -191,24 +192,32 @@ impl Host for AppHost {
         clients(&self.0)
     }
 
-    fn associate(&self, key: &str) -> Option<String> {
-        ask(&self.0, key)
-    }
-
-    fn remember(&self, client: Client) {
+    // The user is asked with the session lock let go — they may take a
+    // minute — so the vault that asked is remembered by its epoch, and the
+    // key is written only if that is still the vault open when they answer.
+    // A workspace switch in between makes the approval nobody's: the vault
+    // it was given for is closed, and the one now open was never asked for.
+    fn associate(&self, key: &str) -> std::result::Result<String, Code> {
         let state = self.0.state::<AppState>();
+        let epoch = commands::unlocked_epoch(&state).map_err(|_| Code::DatabaseNotOpened)?;
+        let name = ask(&self.0, key).ok_or(Code::ActionCancelledOrDenied)?;
         let session = state.session.lock().unwrap();
-        let Ok(store) = session.store() else {
-            return;
-        };
+        let store = session.store_at(epoch).map_err(|_| {
+            log::warn!("browser host: the vault changed hands while the user was asked");
+            Code::AssociationFailed
+        })?;
         let mut clients = clients_in(store);
-        if clients.iter().any(|c| c.key == client.key) {
-            return;
+        if !clients.iter().any(|c| c.key == key) {
+            clients.push(Client {
+                name: name.clone(),
+                key: key.to_string(),
+            });
+            write_clients(store, &clients).map_err(|e| {
+                log::warn!("browser host: could not remember the extension: {e}");
+                Code::AssociationFailed
+            })?;
         }
-        clients.push(client);
-        if let Err(e) = write_clients(store, &clients) {
-            log::warn!("browser host: could not remember the extension: {e}");
-        }
+        Ok(name)
     }
 
     fn logins_for(&self, host: &str) -> Vec<Login> {
