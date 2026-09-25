@@ -34,9 +34,9 @@ export default function Settings() {
   const [section, setSection] = useState<Section | null>(null)
   const locked = useUi(state => state.settingsLocked)
   // A sub-page is one more pane on top of the section's, held the same way.
-  const nav = useSubpageState(locked)
+  const nav = useSubpageState()
   const go = (next: Section) => {
-    if (locked) return
+    if (useUi.getState().settingsLocked) return
     nav.drop()
     setSection(next)
   }
@@ -48,7 +48,7 @@ export default function Settings() {
           section={section}
           locked={locked}
           onBack={() => {
-            if (locked) return
+            if (useUi.getState().settingsLocked) return
             nav.drop()
             setSection(null)
           }}

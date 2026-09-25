@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { createWorkspace, selectWorkspaces, useApp } from '@/store'
+import { createWorkspace, lockSettings, selectWorkspaces, useApp } from '@/store'
 import { describeError, errorKind } from '@/api/errors'
 import { PRIMARY_WORKSPACE, workspaceLabel } from '@/lib/workspace'
 import { firstUnusedColor, type WorkspaceColor } from '@/lib/workspaceColor'
@@ -49,6 +49,7 @@ export default function NewWorkspaceSubpage() {
   const submit = async () => {
     if (!ready || busy) return
     setBusy(true)
+    lockSettings(true)
     setError(null)
     try {
       await createWorkspace(label, password, color)
@@ -61,6 +62,8 @@ export default function NewWorkspaceSubpage() {
           ? t('That is not the master password of {{name}}.', { name: primaryName })
           : describeError(err) || t('Something went wrong')
       )
+    } finally {
+      lockSettings(false)
     }
   }
 

@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Workspace } from '@/api/types'
-import { useApp, useVault, refreshApp, selectActiveWorkspace, selectWorkspaces } from '@/store'
+import {
+  useApp,
+  useVault,
+  refreshApp,
+  lockSettings,
+  selectActiveWorkspace,
+  selectWorkspaces
+} from '@/store'
 import { workspaceRename, workspaceSetColor } from '@/api/workspace'
 import { describeError } from '@/api/errors'
 import { workspaceLabel } from '@/lib/workspace'
@@ -43,18 +50,23 @@ export default function Editor({ workspace }: { workspace: Workspace }) {
   const submit = async () => {
     if (!ready || busy) return
     setBusy(true)
+    lockSettings(true)
     setError(null)
     let failure: unknown = null
     try {
-      if (renamed) await workspaceRename(workspace.id, next)
-      if (recoloured) await workspaceSetColor(workspace.id, color)
-    } catch (err: unknown) {
-      failure = err
+      try {
+        if (renamed) await workspaceRename(workspace.id, next)
+        if (recoloured) await workspaceSetColor(workspace.id, color)
+      } catch (err: unknown) {
+        failure = err
+      }
+      // Re-read either way: a rename that landed before the colour failed is
+      // in the list, and — since the fields are compared against the workspace
+      // as it now is — a retry sends only what is still unsaved.
+      await refreshApp()
+    } finally {
+      lockSettings(false)
     }
-    // Re-read either way: a rename that landed before the colour failed is
-    // in the list, and — since the fields are compared against the workspace
-    // as it now is — a retry sends only what is still unsaved.
-    await refreshApp()
     if (failure === null) return close()
     setBusy(false)
     setError(describeError(failure) || t('Something went wrong'))

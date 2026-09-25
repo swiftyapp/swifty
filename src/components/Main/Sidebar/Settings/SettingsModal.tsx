@@ -20,7 +20,7 @@ export default function SettingsModal() {
   // are shown disabled so that refusal is not read as a button that broke.
   const locked = useUi(state => state.settingsLocked)
   // Local, not in the store, so Settings never reopens halfway into a form.
-  const nav = useSubpageState(locked)
+  const nav = useSubpageState()
   const { subpage, close } = nav
   // Any nav pick lands on that section's own page, the current one included.
   const select = (next: Key) => {

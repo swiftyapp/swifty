@@ -1552,6 +1552,43 @@ describe('Settings › workspaces › delete', () => {
     expect(useUi.getState().settings).toBe(true)
   })
 
+  it('holds every way out while a deletion is in progress', async () => {
+    let finish!: () => void
+    mockCommandOnce(
+      'workspace_delete',
+      () => new Promise<void>(resolve => (finish = resolve))
+    )
+    await openDelete('w2')
+    await userEvent.type(screen.getByTestId('workspace-delete-password'), 'work-pass')
+    await userEvent.type(screen.getByTestId('workspace-delete-confirm'), 'Work')
+    await userEvent.click(screen.getByTestId('workspace-delete-submit'))
+
+    const cancel = screen.getByTestId('settings-subpage-cancel')
+    const back = screen.getByTestId('settings-subpage-back')
+    const modalClose = screen.getByTestId('modal-close')
+    const security = screen.getByTestId('settings-nav-security')
+    expect(cancel).toBeDisabled()
+    expect(back).toBeDisabled()
+    expect(modalClose).toBeDisabled()
+    expect(security).toBeDisabled()
+
+    // The lock is acquired before React redraws the disabled controls too: each
+    // route still refuses if its handler was captured by the preceding render.
+    for (const control of [cancel, back, modalClose, security]) {
+      control.removeAttribute('disabled')
+      await userEvent.click(control)
+    }
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByTestId('workspace-delete-page')).toBeInTheDocument()
+    expect(useUi.getState().settings).toBe(true)
+
+    await act(async () => finish())
+    await waitFor(() =>
+      expect(screen.queryByTestId('workspace-delete-page')).not.toBeInTheDocument()
+    )
+    expect(useUi.getState().settingsLocked).toBe(false)
+  })
+
   it('blames the password only when the backend does', async () => {
     mockCommandOnce('workspace_delete', () =>
       Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })

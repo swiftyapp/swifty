@@ -59,7 +59,13 @@ export default function SubpageFrame({ children, footer, testid }: Props) {
       <div data-testid="settings-subpage-hint" className={cx(META, 'min-w-0 flex-1')}>
         {footer.hint}
       </div>
-      <Button variant="pale" size="md" testid="settings-subpage-cancel" onClick={close}>
+      <Button
+        variant="pale"
+        size="md"
+        testid="settings-subpage-cancel"
+        disabled={footer.loading}
+        onClick={close}
+      >
         {t('Cancel')}
       </Button>
       {/* The button's own borderless chip, not a bordered Kbd: on the accent
