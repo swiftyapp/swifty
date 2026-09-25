@@ -519,6 +519,7 @@ mod tests {
                     name: None,
                     vault_id: None,
                     item_count: None,
+                    color: None,
                 })
                 .collect(),
         };

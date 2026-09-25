@@ -1,0 +1,45 @@
+import type { ComponentType } from 'react'
+import { t } from '@/i18n'
+import type { TKey } from '@/i18n'
+import type { Section } from '@/store'
+import NewWorkspace from './Sections/Workspaces/NewWorkspace/Subpage'
+import EditWorkspace from './Sections/Workspaces/EditWorkspace/Subpage'
+import { titleOf } from './sections'
+
+export type Subpage = { key: 'new-workspace' } | { key: 'edit-workspace'; id: string }
+
+type Key = Subpage['key']
+
+interface Definition<K extends Key> {
+  /** The section it sits under: the eyebrow on the wide shell, Back on the phone. */
+  crumb: Section
+  title: TKey
+  description: TKey
+  /** Gets its own variant, so a body reads its params (the workspace id) typed. */
+  Body: ComponentType<{ subpage: Extract<Subpage, { key: K }> }>
+}
+
+// Each sub-page's heading and body, in one place both shells read, the way
+// `SECTIONS` is for the sections themselves.
+export const SUBPAGES: { [K in Key]: Definition<K> } = {
+  'new-workspace': {
+    crumb: 'workspaces',
+    title: 'New workspace',
+    description: 'Its own encrypted database, unlocked alongside your others.',
+    Body: NewWorkspace
+  },
+  'edit-workspace': {
+    crumb: 'workspaces',
+    title: 'Edit workspace',
+    description: 'Change how this workspace is named and told apart.',
+    Body: EditWorkspace
+  }
+}
+
+export const subpageTitleOf = (subpage: Subpage): string => t(SUBPAGES[subpage.key].title)
+
+export const subpageDescriptionOf = (subpage: Subpage): string =>
+  t(SUBPAGES[subpage.key].description)
+
+/** The parent section's title, as the crumb and the phone's Back label. */
+export const subpageCrumbOf = (subpage: Subpage): string => titleOf(SUBPAGES[subpage.key].crumb)

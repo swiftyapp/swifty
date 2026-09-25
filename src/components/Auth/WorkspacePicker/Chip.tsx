@@ -40,7 +40,7 @@ export default function Chip({ workspace, open, onClick, ref }: Props) {
         open ? 'bg-tile shadow-[inset_0_0_0_0.5px_var(--c-line2)]' : 'bg-hover hover:bg-tile'
       )}
     >
-      <Monogram name={label} seed={workspace.id} size={24} />
+      <Monogram name={label} seed={workspace.id} color={workspace.color} size={24} />
       <span className="max-w-[180px] truncate">{label}</span>
       <span
         className={cx(

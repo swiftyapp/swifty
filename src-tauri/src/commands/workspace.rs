@@ -277,6 +277,7 @@ fn restore(state: &AppState, active: String, previous: Lease) {
 pub async fn workspace_create(
     name: String,
     password: Zeroizing<String>,
+    color: Option<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<UnlockResult> {
@@ -284,6 +285,7 @@ pub async fn workspace_create(
     if name.is_empty() {
         return Err(Error::WorkspaceNameRequired);
     }
+    let color = tile_color(color);
     if password.is_empty() {
         return Err(Error::WorkspacePasswordRequired);
     }
@@ -341,6 +343,7 @@ pub async fn workspace_create(
             // and no pack, so there is nothing to record.
             vault_id: vault_id.clone(),
             item_count: None,
+            color,
         });
         registry.active = id.clone();
         Ok(())
@@ -673,6 +676,7 @@ async fn restore_workspace(
             // first, not left to the sync that follows.
             vault_id: Some(vault_id.clone()),
             item_count: None,
+            color: None,
         });
         registry.active = id.clone();
         Ok(())
@@ -758,6 +762,31 @@ pub fn workspace_rename(
     // vault, and it reaches the account the way every other one does.
     super::sync::request_run_if_ready(&app, &state);
     Ok(())
+}
+
+/// Give a workspace a tile colour, or clear it with `None` (or an empty key).
+///
+/// Registry only, unlike a rename: the colour is this device's to choose (see
+/// [`Workspace::color`]), so there is no vault to write and nothing to sync, and
+/// a locked workspace is recoloured exactly as the open one is.
+#[tauri::command]
+pub fn workspace_set_color(
+    id: String,
+    color: Option<String>,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<()> {
+    let root = storage::root_dir(&app)?;
+    update_registry(&state, &root, |registry| {
+        registry.recolor(&id, tile_color(color))
+    })
+}
+
+/// A palette key as the frontend sent it: trimmed, and `None` when blank.
+fn tile_color(color: Option<String>) -> Option<String> {
+    color
+        .map(|c| c.trim().to_string())
+        .filter(|c| !c.is_empty())
 }
 
 /// Write the name into the open vault's `meta` — stamped, so another device can
@@ -1214,6 +1243,15 @@ mod tests {
         SqliteStore::open(&path, &[9u8; 32]).unwrap()
     }
 
+    // What `workspace_create` and `workspace_set_color` record: the key the
+    // frontend sent, trimmed, and nothing at all for a blank one.
+    #[test]
+    fn a_tile_color_is_trimmed_and_blank_is_none() {
+        assert_eq!(tile_color(Some(" rose ".into())).as_deref(), Some("rose"));
+        assert_eq!(tile_color(Some("   ".into())), None);
+        assert_eq!(tile_color(None), None);
+    }
+
     // A key of the right shape; nothing here derives or opens anything with it.
     fn key() -> VaultKey {
         VaultKey::Argon2 {
@@ -1281,12 +1319,14 @@ mod tests {
                     name: None,
                     vault_id: None,
                     item_count: None,
+                    color: None,
                 },
                 Workspace {
                     id: "b2c3".into(),
                     name: Some("Work".into()),
                     vault_id: Some("cafe".into()),
                     item_count: None,
+                    color: None,
                 },
             ],
         }

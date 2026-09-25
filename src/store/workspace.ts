@@ -91,8 +91,12 @@ export const deleteWorkspace = async (
 // The re-probe is what brings the new list on screen: which workspaces exist
 // and which is active is the probe's answer, and this is the one move that
 // changes it without passing through a lock.
-export const createWorkspace = async (name: string, password: string) => {
-  const result = await workspaceCreate(name, password)
+export const createWorkspace = async (
+  name: string,
+  password: string,
+  color?: string | null
+) => {
+  const result = await workspaceCreate(name, password, color)
   clearSession()
   await enterMain(result)
   await refreshApp()

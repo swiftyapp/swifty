@@ -117,6 +117,7 @@ export default function Menu({ list, active, onPick, onClose }: Props) {
             domId={rowId(row.workspace)}
             option={searchable}
             label={row.label}
+            color={row.workspace.color}
             about={about(row.workspace)}
             position={row.index}
             selected={row.workspace.id === active}

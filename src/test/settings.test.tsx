@@ -13,6 +13,7 @@ import {
   fileOpened,
   flowMain,
   initialApp,
+  lockSettings,
   openSettings,
   setRemoteVaults,
   setSettingsSection,
@@ -53,7 +54,7 @@ const open = async () => {
 const go = (section: string) =>
   userEvent.click(screen.getByTestId(`settings-nav-${section}`))
 
-// A workspace row's ⋯, which is where Rename and Delete live.
+// A workspace row's ⋯, which is where Edit and Delete live.
 const openMenu = (id: string) => userEvent.click(screen.getByTestId(`workspace-menu-${id}`))
 
 describe('Settings shell', () => {
@@ -1198,78 +1199,217 @@ describe('Settings › workspaces › list', () => {
     expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
   })
 
-  it('keeps Rename and Delete behind the row’s menu', async () => {
+  it('keeps Edit and Delete behind the row’s menu', async () => {
     two()
     await open()
     await go('workspaces')
 
-    expect(screen.queryByTestId('workspace-rename-w2')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('workspace-edit-w2')).not.toBeInTheDocument()
     expect(screen.queryByTestId('workspace-delete-w2')).not.toBeInTheDocument()
 
     await openMenu('w2')
     expect(screen.getByTestId('workspace-menu-w2')).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByTestId('workspace-rename-w2')).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-edit-w2')).toHaveTextContent('Edit…')
     expect(screen.getByTestId('workspace-delete-w2')).toBeEnabled()
   })
+})
 
-  it('renames a workspace inline from its menu', async () => {
-    two()
+describe('Settings › workspaces › edit', () => {
+  const edit = async (id: string) => {
+    seedApp({
+      workspaces: [
+        { id: 'default', name: null },
+        { id: 'w2', name: 'Work', vaultId: 'cafe', synced: true, itemCount: 12 }
+      ],
+      activeWorkspace: 'default'
+    })
     await open()
     await go('workspaces')
-    await openMenu('w2')
-    await userEvent.click(screen.getByTestId('workspace-rename-w2'))
+    await openMenu(id)
+    await userEvent.click(screen.getByTestId(`workspace-edit-${id}`))
+  }
 
-    // The menu folds away and the field opens in the row, on the current name.
-    expect(screen.queryByTestId('workspace-rename-w2')).not.toBeInTheDocument()
-    const input = screen.getByTestId('workspace-rename-input')
-    expect(input).toHaveValue('Work')
+  const hint = () => screen.getByTestId('settings-subpage-hint')
+  const tile = () => screen.getByTestId('workspace-edit-preview').querySelector('[aria-hidden]')
+
+  it('opens on the workspace as it is, with nothing to save yet', async () => {
+    await edit('w2')
+
+    expect(screen.getByRole('heading', { name: 'Edit workspace' })).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-edit-name')).toHaveValue('Work')
+    expect(screen.getByTestId('workspace-edit-preview')).toHaveTextContent(
+      '12 items · Google Drive'
+    )
+    // No colour picked yet: the tile is still its hashed hue.
+    expect(tile()).toHaveClass('monogram')
+    expect(screen.getByTestId('workspace-edit-save')).toBeDisabled()
+    expect(hint()).toHaveTextContent('No changes yet')
+  })
+
+  it('renames a workspace and steps back to the list', async () => {
+    await edit('w2')
+    const input = screen.getByTestId('workspace-edit-name')
     await userEvent.clear(input)
-    await userEvent.type(input, 'Clients{Enter}')
+    await userEvent.type(input, 'Clients')
+    expect(hint()).toHaveTextContent('Ready')
+    await userEvent.click(screen.getByTestId('workspace-edit-save'))
 
     expect(calls('workspace_rename')).toEqual([{ id: 'w2', name: 'Clients' }])
+    expect(calls('workspace_set_color')).toHaveLength(0)
     await waitFor(() =>
-      expect(screen.queryByTestId('workspace-rename-input')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('workspace-edit-name')).not.toBeInTheDocument()
+    )
+    expect(screen.getByTestId('workspace-new-row')).toBeInTheDocument()
+  })
+
+  it('recolours a workspace without renaming it', async () => {
+    await edit('w2')
+    await userEvent.click(screen.getByTestId('workspace-edit-color-rose'))
+
+    expect(screen.getByTestId('workspace-edit-color-rose')).toHaveAttribute('aria-checked', 'true')
+    expect(tile()).toHaveClass('bg-ws-rose')
+    await userEvent.click(screen.getByTestId('workspace-edit-save'))
+
+    expect(calls('workspace_set_color')).toEqual([{ id: 'w2', color: 'rose' }])
+    expect(calls('workspace_rename')).toHaveLength(0)
+    await waitFor(() =>
+      expect(screen.queryByTestId('workspace-edit-name')).not.toBeInTheDocument()
     )
   })
 
-  it('lets the rename go with Escape, leaving Settings open', async () => {
-    two()
-    await open()
-    await go('workspaces')
-    await openMenu('default')
-    await userEvent.click(screen.getByTestId('workspace-rename-default'))
-    await userEvent.type(screen.getByTestId('workspace-rename-input'), '{Escape}')
+  it('refuses another workspace’s name, whatever its case', async () => {
+    await edit('w2')
+    const input = screen.getByTestId('workspace-edit-name')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'personal')
 
-    expect(screen.queryByTestId('workspace-rename-input')).not.toBeInTheDocument()
-    expect(useUi.getState().settings).toBe(true)
+    expect(screen.getByTestId('workspace-edit-duplicate')).toHaveTextContent(
+      'You already have a workspace with this name.'
+    )
+    expect(screen.getByTestId('workspace-edit-save')).toBeDisabled()
+    await userEvent.keyboard('{Enter}')
     expect(calls('workspace_rename')).toHaveLength(0)
   })
 
-  it('unfolds the new workspace form from the last row and creates one', async () => {
-    await open()
-    await go('workspaces')
+  it('shows what went wrong and stays open', async () => {
+    mockCommandOnce('workspace_rename', () =>
+      Promise.reject({ kind: 'other', message: 'registry is read-only' })
+    )
+    await edit('w2')
+    await userEvent.type(screen.getByTestId('workspace-edit-name'), ' Ltd')
+    await userEvent.click(screen.getByTestId('workspace-edit-save'))
 
-    const row = screen.getByTestId('workspace-new-row')
-    expect(row).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByTestId('workspace-new-name')).not.toBeInTheDocument()
-
-    await userEvent.click(row)
-    expect(row).toHaveAttribute('aria-expanded', 'true')
-    await userEvent.type(screen.getByTestId('workspace-new-name'), 'Family')
-    await userEvent.type(screen.getByTestId('workspace-new-password'), 'master-pass')
-    await act(async () => {
-      await userEvent.click(screen.getByTestId('workspace-create'))
-    })
-
-    expect(calls('workspace_create')).toEqual([{ name: 'Family', password: 'master-pass' }])
+    expect(await screen.findByTestId('workspace-edit-error')).toHaveTextContent(
+      'registry is read-only'
+    )
+    expect(screen.getByTestId('workspace-edit-name')).toBeEnabled()
   })
 
-  it('folds the new workspace form away again', async () => {
+  it('lets the edit go with Escape, leaving Settings open', async () => {
+    await edit('default')
+    await userEvent.type(screen.getByTestId('workspace-edit-name'), ' vault')
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.queryByTestId('workspace-edit-name')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-new-row')).toBeInTheDocument()
+    expect(useUi.getState().settings).toBe(true)
+    expect(calls('workspace_rename')).toHaveLength(0)
+    expect(calls('workspace_set_color')).toHaveLength(0)
+  })
+})
+
+describe('Settings › workspaces › new', () => {
+  const openNew = async () => {
     await open()
     await go('workspaces')
     await userEvent.click(screen.getByTestId('workspace-new-row'))
-    await userEvent.click(screen.getByTestId('workspace-new-row'))
+  }
+
+  const create = () => screen.getByTestId('workspace-create')
+  const hint = () => screen.getByTestId('settings-subpage-hint')
+  const tile = () => screen.getByTestId('workspace-new-preview').querySelector('[aria-hidden]')
+
+  it('opens the sub-page from the list’s last row and creates one', async () => {
+    await openNew()
+
+    expect(screen.getByRole('heading', { name: 'New workspace' })).toBeInTheDocument()
+    await userEvent.type(screen.getByTestId('workspace-new-name'), 'Family')
+    await userEvent.type(screen.getByTestId('workspace-new-password'), 'master-pass')
+    expect(create()).toBeEnabled()
+    expect(hint()).toHaveTextContent('Ready')
+    await act(async () => {
+      await userEvent.click(create())
+    })
+
+    expect(calls('workspace_create')).toEqual([
+      { name: 'Family', password: 'master-pass', color: 'indigo' }
+    ])
+  })
+
+  it('keeps Create disabled until both the name and the password are in', async () => {
+    await openNew()
+    const name = screen.getByTestId('workspace-new-name')
+
+    expect(create()).toBeDisabled()
+    expect(hint()).toHaveTextContent('Name and master password required')
+    await userEvent.type(name, 'Family')
+    expect(create()).toBeDisabled()
+    await userEvent.clear(name)
+    await userEvent.type(screen.getByTestId('workspace-new-password'), 'master-pass')
+    expect(create()).toBeDisabled()
+    await userEvent.type(name, 'Family')
+    expect(create()).toBeEnabled()
+  })
+
+  it('refuses a name another workspace already has', async () => {
+    seedApp({ workspaces: [{ id: 'default', name: 'Work' }], activeWorkspace: 'default' })
+    await openNew()
+    await userEvent.type(screen.getByTestId('workspace-new-name'), ' work ')
+    await userEvent.type(screen.getByTestId('workspace-new-password'), 'master-pass')
+
+    expect(screen.getByTestId('workspace-new-duplicate')).toHaveTextContent(
+      'You already have a workspace with this name.'
+    )
+    expect(create()).toBeDisabled()
+    await userEvent.keyboard('{Enter}')
+    expect(calls('workspace_create')).toHaveLength(0)
+  })
+
+  it('starts on the first colour no workspace has, and redraws the tile as one is picked', async () => {
+    seedApp({
+      workspaces: [
+        { id: 'default', name: null, color: 'indigo' },
+        { id: 'w2', name: 'Work', color: 'violet' }
+      ],
+      activeWorkspace: 'default'
+    })
+    await openNew()
+
+    expect(screen.getByTestId('workspace-new-color-green')).toHaveAttribute('aria-checked', 'true')
+    expect(tile()).toHaveClass('bg-ws-green')
+    await userEvent.click(screen.getByTestId('workspace-new-color-teal'))
+    expect(tile()).toHaveClass('bg-ws-teal')
+    expect(tile()).not.toHaveClass('bg-ws-green')
+  })
+
+  it('says a wrong master password in the words the unlock uses', async () => {
+    mockCommandOnce('workspace_create', () =>
+      Promise.reject({ kind: 'invalidPassword', message: 'invalid master password' })
+    )
+    await openNew()
+    await userEvent.type(screen.getByTestId('workspace-new-name'), 'Family')
+    await userEvent.type(screen.getByTestId('workspace-new-password'), 'wrong{Enter}')
+
+    expect(await screen.findByTestId('form-error')).toHaveTextContent('Incorrect Master Password')
+    expect(calls('workspace_create')).toHaveLength(1)
+  })
+
+  it('goes back to the list', async () => {
+    await openNew()
+    await userEvent.click(screen.getByTestId('settings-subpage-back'))
+
     expect(screen.queryByTestId('workspace-new-name')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-new-row')).toBeInTheDocument()
   })
 })
 
@@ -1684,5 +1824,74 @@ describe('Settings › workspaces › restore from Drive', () => {
       'access_denied'
     )
     expect(calls('workspace_restore_from_drive')).toHaveLength(0)
+  })
+})
+
+describe('Settings sub-pages', () => {
+  const openSubpage = async () => {
+    await open()
+    await go('workspaces')
+    await userEvent.click(screen.getByTestId('workspace-new-row'))
+  }
+
+  const onSection = () => {
+    expect(screen.getByRole('heading', { name: 'Workspaces' })).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-subpage-crumb')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-new-row')).toBeInTheDocument()
+  }
+
+  it('heads the sub-page under its section and comes back from it', async () => {
+    await openSubpage()
+
+    expect(screen.getByTestId('settings-subpage-crumb')).toHaveTextContent('Workspaces')
+    expect(screen.getByRole('heading', { name: 'New workspace' })).toBeInTheDocument()
+    expect(
+      screen.getByText('Its own encrypted database, unlocked alongside your others.')
+    ).toBeInTheDocument()
+    // It replaces the section's body rather than stacking on it.
+    expect(screen.queryByTestId('workspace-new-row')).not.toBeInTheDocument()
+    expect(screen.getByTestId('settings-subpage-back')).toHaveAccessibleName('Back')
+
+    await userEvent.click(screen.getByTestId('settings-subpage-back'))
+    onSection()
+  })
+
+  it('steps back out on Escape, leaving Settings open', async () => {
+    await openSubpage()
+
+    await userEvent.keyboard('{Escape}')
+    onSection()
+    expect(useUi.getState().settings).toBe(true)
+  })
+
+  it('drops the sub-page when another section is picked', async () => {
+    await openSubpage()
+
+    await go('security')
+    expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-subpage-crumb')).not.toBeInTheDocument()
+
+    // Coming back lands on the section, not on the sub-page left behind.
+    await go('workspaces')
+    onSection()
+  })
+
+  it('goes back from the footer’s Cancel', async () => {
+    await openSubpage()
+
+    await userEvent.click(screen.getByTestId('settings-subpage-cancel'))
+    onSection()
+  })
+
+  it('holds the sub-page while Settings is locked', async () => {
+    await openSubpage()
+
+    act(() => lockSettings(true))
+    expect(screen.getByTestId('settings-subpage-back')).toBeDisabled()
+    await userEvent.keyboard('{Escape}')
+    await userEvent.click(screen.getByTestId('settings-subpage-cancel'))
+    await userEvent.click(screen.getByTestId('settings-nav-workspaces'))
+    expect(screen.getByRole('heading', { name: 'New workspace' })).toBeInTheDocument()
+    expect(useUi.getState().settings).toBe(true)
   })
 })

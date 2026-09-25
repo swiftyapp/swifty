@@ -75,12 +75,22 @@ describe('createWorkspace', () => {
 
     await createWorkspace('Work', 'hunter2hunter2')
 
-    expect(calls('workspace_create')).toEqual([{ name: 'Work', password: 'hunter2hunter2' }])
+    expect(calls('workspace_create')).toEqual([
+      { name: 'Work', password: 'hunter2hunter2', color: null }
+    ])
     expect(useApp.getState().flow).toBe('main')
     expect(useVault.getState().items).toEqual([])
     // The re-probe is what brings the new list on screen: creating is the one
     // move that changes which workspaces exist without passing through a lock.
     await vi.waitFor(() => expect(useApp.getState().status?.activeWorkspace).toBe('w2'))
+  })
+
+  it('sends the tile colour chosen for the new workspace', async () => {
+    await createWorkspace('Work', 'hunter2hunter2', 'rose')
+
+    expect(calls('workspace_create')).toEqual([
+      { name: 'Work', password: 'hunter2hunter2', color: 'rose' }
+    ])
   })
 
   it('reports a rejected create to the caller', async () => {

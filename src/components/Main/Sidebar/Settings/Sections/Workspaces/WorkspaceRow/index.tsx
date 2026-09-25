@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Workspace } from '@/api/types'
 import { workspaceLabel } from '@/lib/workspace'
@@ -6,8 +5,8 @@ import { cx } from '@/utils/cx'
 import Button from '@/components/elements/Button'
 import Monogram from '@/components/elements/Monogram'
 import { META, META_TYPE, ROW_HAIRLINE } from '@/components/elements/tokens'
+import { useSubpage } from '../../../sectionNav'
 import Menu from './Menu'
-import RenameField from './RenameField'
 
 interface Props {
   workspace: Workspace
@@ -33,8 +32,7 @@ function OpenNow() {
 }
 
 // One workspace on this device: its tile, its name over what is known of it,
-// Switch when it is not the open one, and the rest behind ⋯. Rename unfolds
-// in the row itself, under the name.
+// Switch when it is not the open one, and the rest behind ⋯.
 export default function WorkspaceRow({
   workspace,
   current,
@@ -44,13 +42,13 @@ export default function WorkspaceRow({
   onDelete
 }: Props) {
   const { t } = useTranslation()
-  const [renaming, setRenaming] = useState(false)
+  const { open } = useSubpage()
   const label = workspaceLabel(workspace, t)
 
   return (
     <div data-testid={`workspace-row-${workspace.id}`} className={cx('px-4 py-3.5', ROW_HAIRLINE)}>
       <div className="flex items-center gap-3.5">
-        <Monogram name={label} seed={workspace.id} size={36} />
+        <Monogram name={label} seed={workspace.id} color={workspace.color} size={36} />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <span className="truncate text-base font-medium text-text">{label}</span>
@@ -72,16 +70,11 @@ export default function WorkspaceRow({
           <Menu
             id={workspace.id}
             last={last}
-            onRename={() => setRenaming(true)}
+            onEdit={() => open({ key: 'edit-workspace', id: workspace.id })}
             onDelete={onDelete}
           />
         </div>
       </div>
-      {renaming && (
-        <div className="mt-3 pl-[50px]">
-          <RenameField workspace={workspace} onDone={() => setRenaming(false)} />
-        </div>
-      )}
     </div>
   )
 }

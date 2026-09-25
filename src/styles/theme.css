@@ -426,6 +426,17 @@
   --color-kind-env-soft: var(--c-kind-env-soft);
   --color-kind-apikey: var(--c-kind-apikey);
   --color-kind-apikey-soft: var(--c-kind-apikey-soft);
+
+  /*
+   * Workspace tile colours (see lib/workspaceColor), so `bg-ws-rose` compiles.
+   * One per key in `WORKSPACE_COLORS`; the tile draws white ink on them.
+   */
+  --color-ws-indigo: var(--c-ws-indigo);
+  --color-ws-violet: var(--c-ws-violet);
+  --color-ws-green: var(--c-ws-green);
+  --color-ws-amber: var(--c-ws-amber);
+  --color-ws-rose: var(--c-ws-rose);
+  --color-ws-teal: var(--c-ws-teal);
 }
 
 /*
@@ -708,6 +719,14 @@
   --c-kind-apikey: #2b7fc4;
   --c-kind-apikey-soft: rgba(43, 127, 196, 0.12);
 
+  /* Workspace tiles: solids a white initial reads on. */
+  --c-ws-indigo: #5b78e8;
+  --c-ws-violet: #8e6fe0;
+  --c-ws-green: #3fae84;
+  --c-ws-amber: #d69a3c;
+  --c-ws-rose: #d9667a;
+  --c-ws-teal: #3aa6b9;
+
   /* Gradients, shadows and scrims; exposed as utilities via @theme above. */
   --card: linear-gradient(180deg, #ffffff, #fbfbfc);
   /* A card's lift off the pane (see `CARD` in elements/tokens): a whisper of
@@ -850,6 +869,15 @@
   --c-kind-env-soft: rgba(127, 184, 90, 0.18);
   --c-kind-apikey: #5ea3e6;
   --c-kind-apikey-soft: rgba(94, 163, 230, 0.18);
+
+  /* Workspace tiles sit a step lower here, not higher like the kind inks:
+   * the white initial on them has to keep reading against the dark ground. */
+  --c-ws-indigo: #4b69de;
+  --c-ws-violet: #7f5ed6;
+  --c-ws-green: #3e9c78;
+  --c-ws-amber: #ca8f32;
+  --c-ws-rose: #cf576c;
+  --c-ws-teal: #3a95a6;
 
   --card: linear-gradient(
     180deg,
