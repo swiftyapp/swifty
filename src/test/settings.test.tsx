@@ -1400,7 +1400,7 @@ describe('Settings › workspaces › new', () => {
     await userEvent.type(screen.getByTestId('workspace-new-name'), 'Family')
     await userEvent.type(screen.getByTestId('workspace-new-password'), 'wrong{Enter}')
 
-    expect(await screen.findByTestId('form-error')).toHaveTextContent('Incorrect Master Password')
+    expect(await screen.findByTestId('workspace-new-error')).toHaveTextContent('Incorrect Master Password')
     expect(calls('workspace_create')).toHaveLength(1)
   })
 

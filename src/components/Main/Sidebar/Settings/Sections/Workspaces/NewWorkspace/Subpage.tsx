@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createWorkspace, selectWorkspaces, useApp } from '@/store'
 import { describeError } from '@/api/errors'
 import { workspaceLabel } from '@/lib/workspace'
 import { firstUnusedColor, type WorkspaceColor } from '@/lib/workspaceColor'
 import { cx } from '@/utils/cx'
-import Masterpass from '@/components/elements/Masterpass'
+import Field from '@/components/elements/Field'
+import { inputClass } from '@/components/elements/formStyles'
+import { verbatimInput } from '@/components/elements/inputProps'
 import { CARD, LABEL } from '@/components/elements/tokens'
 import SubpageFrame from '../../../SubpageFrame'
 import WorkspaceForm from '../WorkspaceForm'
@@ -22,6 +24,7 @@ import { nameTaken } from '../WorkspaceForm/nameTaken'
 // than closed here.
 export default function NewWorkspaceSubpage() {
   const { t } = useTranslation()
+  const passwordId = useId()
   const workspaces = useApp(selectWorkspaces)
   // A new workspace joins the open one's Drive account.
   const syncs = useApp(state => state.sync.configured)
@@ -79,21 +82,34 @@ export default function NewWorkspaceSubpage() {
         testidPrefix="workspace-new"
       />
       <div className={cx(LABEL, 'mt-6 mb-2')}>{t("Confirm it's you")}</div>
-      <div className={cx(CARD, 'p-4')}>
-        <Masterpass
-          placeholder={t('Master password')}
-          testid="workspace-new-password"
-          autoFocus={false}
-          pending={busy}
-          error={error}
-          onChange={event => {
-            setError(null)
-            setPassword(event.currentTarget.value)
-          }}
-        />
-        <p className="mt-2 text-sm text-text2">
-          {t('The new workspace is sealed with your existing master password.')}
-        </p>
+      {/* A plain field, not the lock screen's card: here it is one input of a
+          form beside the name, and should read as that form's. */}
+      <div className={cx(CARD, 'p-5')}>
+        <Field id={passwordId} label={t('Master password')}>
+          <input
+            id={passwordId}
+            type="password"
+            name="workspace_new_password"
+            {...verbatimInput}
+            className={cx(inputClass, error && 'border-bad')}
+            data-testid="workspace-new-password"
+            aria-invalid={!!error}
+            value={password}
+            disabled={busy}
+            onChange={event => {
+              setError(null)
+              setPassword(event.target.value)
+            }}
+          />
+          {error && (
+            <p data-testid="workspace-new-error" className="text-sm text-bad">
+              {error}
+            </p>
+          )}
+          <p className="text-sm text-text2">
+            {t('The new workspace is sealed with your existing master password.')}
+          </p>
+        </Field>
       </div>
     </SubpageFrame>
   )
