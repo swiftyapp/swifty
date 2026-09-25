@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   browserForgetClient,
@@ -42,16 +42,32 @@ export default function Browser() {
   )
 
   // On the way in, and again whenever the consent dialog lets an extension in
-  // behind this section's back (`browser:clients`).
+  // behind this section's back (`browser:clients`). A refresh that arrives
+  // while a change is in flight waits for it: taken at once it would be the
+  // latest request, could read the status from before the change committed,
+  // and would then have the change's own answer thrown away as stale.
+  const inFlight = useRef(false)
+  const refreshAfter = useRef(false)
   const clientsSeq = useUi(state => state.browserClientsSeq)
-  useEffect(() => void load(browserStatus), [load, clientsSeq])
+  useEffect(() => {
+    if (inFlight.current) refreshAfter.current = true
+    else void load(browserStatus)
+  }, [load, clientsSeq])
 
   // One change at a time: the toggle and every Forget button wait for the
   // answer in flight, so two forgets cannot cross and leave the earlier one's
   // client on screen.
   const change = (request: () => Promise<BrowserStatus>) => {
+    inFlight.current = true
     setBusy(true)
-    void load(request).finally(() => setBusy(false))
+    void load(request).finally(() => {
+      inFlight.current = false
+      setBusy(false)
+      if (refreshAfter.current) {
+        refreshAfter.current = false
+        void load(browserStatus)
+      }
+    })
   }
   const toggle = (enabled: boolean) => change(() => browserSetEnabled(enabled))
   const forget = (key: string) => change(() => browserForgetClient(key))
