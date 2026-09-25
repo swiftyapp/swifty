@@ -44,6 +44,9 @@ mod tray;
 mod window;
 // The optional additional vaults, and which of them the app is addressing.
 mod workspace;
+// The macOS window zoom, re-done so the page follows it.
+#[cfg(target_os = "macos")]
+mod zoom;
 
 use state::AppState;
 use tauri::Manager;

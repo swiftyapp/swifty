@@ -49,6 +49,10 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let window = builder.build()?;
     #[cfg(target_os = "ios")]
     cover_safe_area(&window)?;
+    // The native zoom animation leaves the page frozen until it ends; this
+    // swaps in one the webview can keep up with (see `zoom`).
+    #[cfg(target_os = "macos")]
+    crate::zoom::install(window.ns_window()?);
     let handle = app.clone();
     window.on_window_event(move |event| {
         autolock::handle_event(&handle, event);
