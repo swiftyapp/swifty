@@ -4,16 +4,24 @@ import { pickImportFile } from '@/api/pickers'
 import { useFileDrop } from '@/hooks/useFileDrop'
 import { DownloadGlyph } from '../../../../icons'
 import { META_TYPE } from '@/components/elements/tokens'
+import HeroDropZone from './HeroDropZone'
 
 interface Props {
   onDrop: (path: string) => void
+  // `hero`: the section's lead drop target, with a picker button of its own
+  // on every platform (see HeroDropZone). Left out, the compact strip below.
+  variant?: 'hero'
+}
+
+export default function DropZone({ onDrop, variant }: Props) {
+  return variant === 'hero' ? <HeroDropZone onDrop={onDrop} /> : <Strip onDrop={onDrop} />
 }
 
 // The "I don't see my provider" route into the same import: any export file,
 // with the backend sniffing its format. Nothing drags a file onto a phone, so
 // there the drop target becomes the button it was the alternative to — the
 // picker is `pick_import_file`, the very one the tiles above already use.
-export default function DropZone({ onDrop }: Props) {
+function Strip({ onDrop }: Omit<Props, 'variant'>) {
   const { t } = useTranslation()
   useFileDrop(([path]) => {
     if (path) onDrop(path)
