@@ -104,7 +104,9 @@ export const initialUi: UiState = {
   query: '',
   palette: false,
   settings: false,
-  settingsSection: 'sync',
+  // General, the first item in the nav. A deep link (the sync chip, an opened
+  // backup) says otherwise for its own opening.
+  settingsSection: 'language',
   settingsLocked: false,
   addPicker: false,
   generator: GENERATOR_CLOSED,
