@@ -21,6 +21,10 @@ export default function SettingsModal() {
     <Modal
       onClose={closeSettings}
       className="flex h-[720px] max-h-[calc(100vh-56px)] w-settings max-w-[calc(100vw-56px)]"
+      // Centred, not hung from the top like a picker: at its full height the
+      // card is most of the window, and the top offset would push its foot
+      // past the edge at the default 700px window.
+      align="center"
       labelledBy={TITLE_ID}
       testid="settings-modal"
       hideClose
