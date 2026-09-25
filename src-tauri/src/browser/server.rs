@@ -3,9 +3,9 @@
 
 use std::io::{self, Read, Write};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Sender};
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use interprocess::local_socket::{prelude::*, Listener, ListenerOptions, RecvHalf};
 use tauri::AppHandle;
@@ -23,9 +23,13 @@ static STARTED: AtomicBool = AtomicBool::new(false);
 /// signals, so a signal never lands inside a reply.
 pub type Writer = Arc<Mutex<dyn Write + Send>>;
 
+// A connection's signal queue, by the id `register` handed out.
+type Queue = (u64, Sender<&'static [u8]>);
+
 // Every connection being served, for the lock signals to reach. Fed by the
 // accept loop rather than by `serve`, which stays a loop over any stream.
-static CLIENTS: Mutex<Vec<Writer>> = Mutex::new(Vec::new());
+static CLIENTS: Mutex<Vec<Queue>> = Mutex::new(Vec::new());
+static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 /// Start listening, once. A failure to bind is logged and leaves the host off;
 /// the next enable from Settings tries again.
@@ -63,17 +67,11 @@ pub fn start(app: &AppHandle) {
                 }
                 let (reader, writer) = stream.split();
                 let writer: Writer = Arc::new(Mutex::new(writer));
-                register(writer.clone());
+                let id = register(writer.clone());
                 let host = AppHost(app.clone());
                 std::thread::spawn(move || {
-                    serve(
-                        Connected {
-                            reader,
-                            writer: writer.clone(),
-                        },
-                        host,
-                    );
-                    forget(&writer);
+                    serve(Connected { reader, writer }, host);
+                    forget(id);
                 });
             }
         });
@@ -161,17 +159,38 @@ fn hold(writer: &Writer) -> MutexGuard<'_, dyn Write + Send + 'static> {
     writer.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-fn clients() -> MutexGuard<'static, Vec<Writer>> {
+fn clients() -> MutexGuard<'static, Vec<Queue>> {
     CLIENTS.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// Hand a connection's writer to the lock signals, until [`forget`].
-pub fn register(writer: Writer) {
-    clients().push(writer);
+/// Hand a connection's writer to the lock signals, until [`forget`] is
+/// called with the id this returns.
+///
+/// Each connection gets a queue and a thread of its own to drain it, so the
+/// signals reach it in the order they were raised — a workspace switch
+/// raises a lock and an unlock back to back, and an extension that heard
+/// them the other way round would show the vault just opened as sealed — and
+/// so a peer that has stopped reading, its buffer full and the write to it
+/// blocking, stalls its own thread and nothing else: not the lock that raised
+/// the signal, not the accept loop, and not the signals to the other
+/// browsers. A write that fails ends the thread, and with it the writer.
+pub fn register(writer: Writer) -> u64 {
+    let (sender, receiver) = channel::<&'static [u8]>();
+    std::thread::spawn(move || {
+        for message in receiver {
+            if frame::write(&mut *hold(&writer), message).is_err() {
+                break;
+            }
+        }
+    });
+    let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
+    clients().push((id, sender));
+    id
 }
 
-fn forget(writer: &Writer) {
-    clients().retain(|c| !Arc::ptr_eq(c, writer));
+/// The connection `id` has ended: its queue is dropped, which ends its thread.
+pub fn forget(id: u64) {
+    clients().retain(|(known, _)| *known != id);
 }
 
 pub const LOCKED: &[u8] = br#"{"action":"database-locked"}"#;
@@ -180,49 +199,20 @@ pub const UNLOCKED: &[u8] = br#"{"action":"database-unlocked"}"#;
 /// The vault just locked: every connected extension flips its icon, and asks
 /// again before it fills anything.
 pub fn notify_locked() {
-    queue(LOCKED);
+    signal(LOCKED);
 }
 
 /// The vault just opened, or another workspace did: every connected extension
 /// re-checks the hash, which says which one it is talking to now.
 pub fn notify_unlocked() {
-    queue(UNLOCKED);
+    signal(UNLOCKED);
 }
 
-// The signals go out from one thread, in the order they were raised: a
-// workspace switch raises a lock and an unlock back to back, and an extension
-// that heard them the other way round would show the vault just opened as
-// sealed. One thread rather than one per signal, and a channel the caller
-// never waits on, so a peer that has stopped reading — its buffer full, the
-// write to it blocking — stalls neither the lock that raised the signal nor
-// the accept loop registering the next connection. It does stall replies on
-// that one connection, which is dead already, and any signal behind it.
-fn queue(message: &'static [u8]) {
-    static SIGNALS: OnceLock<Sender<&'static [u8]>> = OnceLock::new();
-    let sender = SIGNALS.get_or_init(|| {
-        let (sender, receiver) = channel::<&'static [u8]>();
-        std::thread::spawn(move || {
-            for message in receiver {
-                signal(message);
-            }
-        });
-        sender
-    });
-    let _ = sender.send(message);
-}
-
-/// Send `message` to every connection, in the clear and unsolicited, as
-/// KeePassXC sends its signals: no nonce to seal under, and nothing in them
-/// the extension would not learn from its next ask. A connection the write
-/// fails on has gone, and goes from the list with it. Writes happen over a
-/// snapshot of the list, never under its lock.
-pub fn signal(message: &[u8]) {
-    let writers: Vec<Writer> = clients().clone();
-    let gone: Vec<Writer> = writers
-        .into_iter()
-        .filter(|writer| frame::write(&mut *hold(writer), message).is_err())
-        .collect();
-    if !gone.is_empty() {
-        clients().retain(|c| !gone.iter().any(|g| Arc::ptr_eq(c, g)));
-    }
+// Queue `message` for every connection, in the clear and unsolicited, as
+// KeePassXC sends its signals: no nonce to seal under, and nothing in them
+// the extension would not learn from its next ask. Never waits: a queue is
+// unbounded, and one whose thread has ended — its write failed, the peer is
+// gone — refuses the send and goes from the list with it.
+fn signal(message: &'static [u8]) {
+    clients().retain(|(_, queue)| queue.send(message).is_ok());
 }

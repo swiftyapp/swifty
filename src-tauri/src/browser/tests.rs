@@ -1098,15 +1098,24 @@ fn a_lock_signal_reaches_every_connection_and_drops_the_gone_ones() {
 
     let open = Arc::new(Mutex::new(open));
     let gone = Arc::new(Mutex::new(gone));
-    server::register(open.clone());
+    let open_id = server::register(open.clone());
     server::register(gone.clone());
-    // What the two notifiers run on a thread of their own, run here inline
-    // so the list can be looked at once it is done.
-    server::signal(server::LOCKED);
+    server::notify_locked();
+    server::notify_unlocked();
 
+    // In order, on the connection that reads.
     let signal: Value =
         serde_json::from_slice(&frame::read(&mut extension).unwrap().unwrap()).unwrap();
     assert_eq!(signal, json!({ "action": "database-locked" }));
+    let signal: Value =
+        serde_json::from_slice(&frame::read(&mut extension).unwrap().unwrap()).unwrap();
+    assert_eq!(signal, json!({ "action": "database-unlocked" }));
+
+    // The gone one's write failed on its own thread, which let the writer go.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while Arc::strong_count(&gone) > 1 && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
     assert_eq!(
         Arc::strong_count(&gone),
         1,
@@ -1114,10 +1123,46 @@ fn a_lock_signal_reaches_every_connection_and_drops_the_gone_ones() {
     );
     assert_eq!(Arc::strong_count(&open), 2, "a live one stays registered");
 
-    server::signal(server::UNLOCKED);
+    // The connection ending lets its writer go too.
+    server::forget(open_id);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while Arc::strong_count(&open) > 1 && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert_eq!(Arc::strong_count(&open), 1, "a forgotten one is let go");
+}
+
+#[test]
+fn a_peer_that_stops_reading_stalls_no_one_else() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    // A peer that never reads: its socket buffer fills, then writes block.
+    let _stalled_peer = TcpStream::connect(address).unwrap();
+    let (stalled, _) = listener.accept().unwrap();
+    let mut extension = TcpStream::connect(address).unwrap();
+    let (open, _) = listener.accept().unwrap();
+
+    let stalled_id = server::register(Arc::new(Mutex::new(stalled)));
+    let open_id = server::register(Arc::new(Mutex::new(open)));
+    // Far more than a socket buffer holds; every one of these would block a
+    // shared thread on the stalled peer.
+    for _ in 0..4096 {
+        server::notify_locked();
+    }
+    server::notify_unlocked();
+
+    // The reading peer still gets every signal, in order.
+    for _ in 0..4096 {
+        let signal: Value =
+            serde_json::from_slice(&frame::read(&mut extension).unwrap().unwrap()).unwrap();
+        assert_eq!(signal, json!({ "action": "database-locked" }));
+    }
     let signal: Value =
         serde_json::from_slice(&frame::read(&mut extension).unwrap().unwrap()).unwrap();
     assert_eq!(signal, json!({ "action": "database-unlocked" }));
+
+    server::forget(stalled_id);
+    server::forget(open_id);
 }
 
 #[test]
