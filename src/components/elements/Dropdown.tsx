@@ -72,6 +72,7 @@ export function Dropdown({
         move(-1)
         break
       case 'Escape':
+      case 'Tab':
         // An open menu owns Escape. Modal and Generator listen on `window`
         // and Sheet on `document` — all ancestors of the React root — so
         // without this the one press would dismiss the overlay underneath too.
