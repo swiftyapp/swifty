@@ -1439,14 +1439,18 @@ describe('Settings › workspaces › delete', () => {
     await go('workspaces')
     await openMenu(id)
     await userEvent.click(screen.getByTestId(`workspace-delete-${id}`))
-    return screen.getByTestId('workspace-delete-dialog')
+    return screen.getByTestId('workspace-delete-page')
   }
 
   it('opens the confirmation on the workspace that was chosen', async () => {
     await openDelete('w2')
 
-    expect(screen.getByTestId('workspace-delete-dialog')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Delete Work?' })).toBeInTheDocument()
+    // A page under Workspaces, like Edit, not a dialog over the list: the
+    // header names the step and the preview says which workspace.
+    expect(screen.getByTestId('workspace-delete-page')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Delete workspace' })).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-preview')).toHaveTextContent('Work')
+    expect(screen.queryByTestId('workspace-new-row')).not.toBeInTheDocument()
     expect(
       screen.getByText(/A copy on Google Drive is left where it is/)
     ).toBeInTheDocument()
@@ -1484,7 +1488,7 @@ describe('Settings › workspaces › delete', () => {
     // The probe is what carries the list, so a delete ends by re-reading it.
     expect(calls('app_status').length).toBeGreaterThan(0)
     await waitFor(() =>
-      expect(screen.queryByTestId('workspace-delete-dialog')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('workspace-delete-page')).not.toBeInTheDocument()
     )
   })
 
@@ -1492,7 +1496,17 @@ describe('Settings › workspaces › delete', () => {
   // the lock, which is what lands on the survivor's lock screen.
   it('offers the delete on the current workspace as well', async () => {
     await openDelete('default')
-    expect(screen.getByRole('heading', { name: 'Delete Personal?' })).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-preview')).toHaveTextContent('Personal')
+  })
+
+  it('steps back to the list on Escape without deleting', async () => {
+    await openDelete('w2')
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.queryByTestId('workspace-delete-page')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-row-w2')).toBeInTheDocument()
+    expect(calls('workspace_delete')).toHaveLength(0)
+    expect(useUi.getState().settings).toBe(true)
   })
 
   it('blames the password only when the backend does', async () => {
@@ -1508,7 +1522,7 @@ describe('Settings › workspaces › delete', () => {
     expect(await screen.findByTestId('workspace-delete-error')).toHaveTextContent(
       'That is not this workspace’s master password'
     )
-    expect(screen.getByTestId('workspace-delete-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-page')).toBeInTheDocument()
   })
 
   // The delete proves a password on demand and takes no session, so it runs
@@ -1527,7 +1541,7 @@ describe('Settings › workspaces › delete', () => {
     expect(await screen.findByTestId('workspace-delete-error')).toHaveTextContent(
       'Too many failed attempts. Try again in 8s'
     )
-    expect(screen.getByTestId('workspace-delete-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-page')).toBeInTheDocument()
   })
 
   // A device always has a vault to open, and the control says so rather than
@@ -1540,7 +1554,7 @@ describe('Settings › workspaces › delete', () => {
     await openMenu('default')
     expect(screen.getByTestId('workspace-delete-default')).toBeDisabled()
     await userEvent.click(screen.getByTestId('workspace-delete-default'))
-    expect(screen.queryByTestId('workspace-delete-dialog')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('workspace-delete-page')).not.toBeInTheDocument()
   })
 
   // A workspace with a vault id has a pack in the account, so it is offered the
@@ -1628,7 +1642,7 @@ describe('Settings › workspaces › delete', () => {
     )
     await userEvent.click(screen.getByTestId('workspace-delete-stranded'))
 
-    expect(screen.getByRole('heading', { name: 'Delete Personal?' })).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-preview')).toHaveTextContent('Personal')
     expect(
       screen.queryByTestId('workspace-delete-scope-everywhere')
     ).not.toBeInTheDocument()

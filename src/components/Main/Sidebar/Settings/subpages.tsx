@@ -4,9 +4,13 @@ import type { TKey } from '@/i18n'
 import type { Section } from '@/store'
 import NewWorkspace from './Sections/Workspaces/NewWorkspace/Subpage'
 import EditWorkspace from './Sections/Workspaces/EditWorkspace/Subpage'
+import DeleteWorkspace from './Sections/Workspaces/DeleteWorkspace/Subpage'
 import { titleOf } from './sections'
 
-export type Subpage = { key: 'new-workspace' } | { key: 'edit-workspace'; id: string }
+export type Subpage =
+  | { key: 'new-workspace' }
+  | { key: 'edit-workspace'; id: string }
+  | { key: 'delete-workspace'; id: string }
 
 type Key = Subpage['key']
 
@@ -33,6 +37,12 @@ export const SUBPAGES: { [K in Key]: Definition<K> } = {
     title: 'Edit workspace',
     description: 'Change how this workspace is named and told apart.',
     Body: EditWorkspace
+  },
+  'delete-workspace': {
+    crumb: 'workspaces',
+    title: 'Delete workspace',
+    description: 'There is no undo, so it takes two proofs first.',
+    Body: DeleteWorkspace
   }
 }
 

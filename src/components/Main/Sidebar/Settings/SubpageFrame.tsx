@@ -11,6 +11,8 @@ export interface SubpageFooter {
   /** A line of context beside the actions (what the CTA will do, a count). */
   hint?: ReactNode
   cta: string
+  /** The CTA destroys something: drawn in the warning fill, not the accent. */
+  danger?: boolean
   disabled?: boolean
   loading?: boolean
   onSubmit: () => void
@@ -65,6 +67,7 @@ export default function SubpageFrame({ children, footer, onCancel, testid }: Pro
       {/* The button's own borderless chip, not a bordered Kbd: on the accent
           fill a dimmed Kbd is the one thing that disappears. */}
       <Button
+        variant={footer.danger ? 'danger' : 'primary'}
         size="md"
         kbd="⏎"
         testid={footer.testid ?? 'settings-subpage-submit'}
