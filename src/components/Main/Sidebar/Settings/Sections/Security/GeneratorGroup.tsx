@@ -20,7 +20,7 @@ export default function GeneratorGroup() {
       <SettingsRow
         label={t('Length')}
         control={
-          <div className="flex w-[280px] items-center gap-3">
+          <div className="flex w-[280px] max-w-full items-center gap-3">
             <input
               type="range"
               name="length"
