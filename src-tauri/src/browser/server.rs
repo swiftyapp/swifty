@@ -64,16 +64,26 @@ pub fn start(app: &AppHandle) {
 /// The listener at `root`'s socket. A socket file a crashed process left
 /// behind is replaced rather than refused; the single-instance guard is what
 /// keeps two live apps from contending for one.
+///
+/// The socket file is made owner-only after the bind rather than through the
+/// listener's `mode` option, which macOS does not support (the crate answers
+/// `Unsupported`, and that is what "could not listen" was). The moment
+/// between the two is covered by the data directory, which is `0700` from
+/// its creation, so nothing else could reach the file in it anyway.
 pub fn bind(root: &Path) -> io::Result<Listener> {
-    let options = ListenerOptions::new()
+    let listener = ListenerOptions::new()
         .name(socket_name(root)?)
-        .try_overwrite(true);
+        .try_overwrite(true)
+        .create_sync()?;
     #[cfg(unix)]
-    let options = {
-        use interprocess::os::unix::local_socket::ListenerOptionsExt;
-        options.mode(0o600)
-    };
-    options.create_sync()
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(
+            root.join(super::SOCKET_FILE),
+            std::fs::Permissions::from_mode(0o600),
+        )?;
+    }
+    Ok(listener)
 }
 
 /// Answer requests on one connection until the other side goes away — or the
