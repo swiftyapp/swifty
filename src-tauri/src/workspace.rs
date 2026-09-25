@@ -61,6 +61,23 @@ pub struct Workspace {
     pub item_count: Option<u32>,
 }
 
+/// A registry entry as the frontend is handed it: the record, plus what is
+/// true of the workspace right now and is not the registry's to keep.
+///
+/// `synced` is read off the workspace's own token file at the moment of
+/// asking (see [`crate::storage::sync_configured_in`]). It is not `vault_id`:
+/// that says a pack for the vault exists on Drive, and a disconnect leaves the
+/// pack there, so a workspace disconnected and then locked would otherwise
+/// keep reading as one that syncs — and be offered a delete "everywhere" it
+/// has no credentials to carry out.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceStatus {
+    #[serde(flatten)]
+    pub workspace: Workspace,
+    pub synced: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Registry {
@@ -84,6 +101,17 @@ impl Default for Registry {
 }
 
 impl Registry {
+    /// Every workspace with its live sync state, for `app_status`.
+    pub fn statuses(&self, root: &Path) -> Vec<WorkspaceStatus> {
+        self.workspaces
+            .iter()
+            .map(|workspace| WorkspaceStatus {
+                synced: crate::storage::sync_configured_in(&dir_of(root, &workspace.id)),
+                workspace: workspace.clone(),
+            })
+            .collect()
+    }
+
     /// Read the registry under `root`, or the single-workspace default.
     ///
     /// Never fails. A missing file is the ordinary case (nobody has made a
@@ -1175,5 +1203,47 @@ mod tests {
         assert!(!from.exists());
         assert!(!staging(&root).exists());
         assert!(!DeleteJournal::path(&root).exists());
+    }
+
+    // `synced` is the token file in the workspace's own directory, not its
+    // vault id: a disconnected workspace keeps the id and reads as local.
+    #[test]
+    fn statuses_read_sync_off_each_workspace_token_file() {
+        let root = tmp_root();
+        let registry = Registry {
+            active: PRIMARY_ID.to_string(),
+            workspaces: vec![
+                Workspace {
+                    id: PRIMARY_ID.to_string(),
+                    name: None,
+                    vault_id: Some("beef".into()),
+                    item_count: None,
+                },
+                Workspace {
+                    id: "w2".into(),
+                    name: Some("Work".into()),
+                    vault_id: Some("cafe".into()),
+                    item_count: None,
+                },
+            ],
+        };
+        let token = dir_of(&root, "w2").join(storage::GDRIVE_FILE);
+        fs::create_dir_all(token.parent().unwrap()).unwrap();
+        fs::write(&token, b"sealed").unwrap();
+
+        let statuses = registry.statuses(&root);
+        assert_eq!(statuses.len(), 2);
+        assert!(!statuses[0].synced, "a vault id alone is not a connection");
+        assert!(statuses[1].synced);
+        assert_eq!(statuses[1].workspace, registry.workspaces[1]);
+
+        // An empty token file is a disconnect that never finished: not synced.
+        fs::write(&token, b"").unwrap();
+        assert!(!registry.statuses(&root)[1].synced);
+
+        let json = serde_json::to_value(&statuses[1]).unwrap();
+        assert_eq!(json["id"], "w2");
+        assert_eq!(json["vaultId"], "cafe");
+        assert_eq!(json["synced"], true);
     }
 }

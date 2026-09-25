@@ -8,6 +8,7 @@ import {
   switchWorkspace
 } from '@/store'
 import { messageOf } from '@/api/errors'
+import type { Workspace } from '@/api/types'
 import { syncDeletedRemotely, syncErrorText } from '@/api/sync'
 import Button from '@/components/elements/Button'
 import WorkspaceRow from './WorkspaceRow'
@@ -36,12 +37,12 @@ export default function WorkspaceList() {
   // it is the local one: there is nothing left on Drive to remove.
   const strandedHere = syncDeletedRemotely(sync)
 
-  // Whether a workspace has a copy on Drive to delete along with it. The open
-  // one is answered by its live connection; a locked one by the vault id the
-  // registry recorded when a run of its settled one, which is the only thing
-  // about it readable from here.
-  const syncs = (id: string, vaultId?: string) =>
-    id === active ? sync.configured && !strandedHere : vaultId !== undefined
+  // Whether a workspace syncs, and so has a copy on Drive to delete along with
+  // it. The open one is answered by its live connection; a locked one by the
+  // connection the backend found in its own directory when the list was built
+  // (`synced`) — not by its vault id, which a disconnect leaves behind.
+  const syncs = (workspace: Workspace) =>
+    workspace.id === active ? sync.configured && !strandedHere : workspace.synced === true
 
   return (
     <>
@@ -55,7 +56,7 @@ export default function WorkspaceList() {
             last={last}
             about={workspaceAbout(
               workspace,
-              { current, syncs: syncs(workspace.id, workspace.vaultId), liveCount },
+              { current, syncs: syncs(workspace), liveCount },
               t
             )}
             onSwitch={() =>
@@ -102,7 +103,7 @@ export default function WorkspaceList() {
       {chosen && (
         <DeleteWorkspace
           workspace={chosen}
-          syncs={syncs(chosen.id, chosen.vaultId)}
+          syncs={syncs(chosen)}
           onClose={() => setDeleting(null)}
         />
       )}

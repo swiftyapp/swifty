@@ -1178,7 +1178,7 @@ describe('Settings › workspaces › list', () => {
     seedApp({
       workspaces: [
         { id: 'default', name: null },
-        { id: 'w2', name: 'Work', vaultId: 'cafe', itemCount: 12 }
+        { id: 'w2', name: 'Work', vaultId: 'cafe', synced: true, itemCount: 12 }
       ],
       activeWorkspace: 'default'
     })
@@ -1403,7 +1403,7 @@ describe('Settings › workspaces › delete', () => {
     seedApp({
       workspaces: [
         { id: 'default', name: null },
-        { id: 'w2', name: 'Work', vaultId: 'cafe' }
+        { id: 'w2', name: 'Work', vaultId: 'cafe', synced: true }
       ],
       activeWorkspace: 'default'
     })
@@ -1424,6 +1424,29 @@ describe('Settings › workspaces › delete', () => {
     expect(calls('workspace_delete')).toEqual([
       { id: 'w2', password: 'work-pass', everywhere: true }
     ])
+  })
+
+  // A vault id alone is a pack on Drive, not a connection: a workspace that was
+  // disconnected and then locked keeps its id and must read as local — in the
+  // list, and in the delete it is offered.
+  it('reads a disconnected workspace as local despite its vault id', async () => {
+    seedApp({
+      workspaces: [
+        { id: 'default', name: null },
+        { id: 'w2', name: 'Work', vaultId: 'cafe', synced: false, itemCount: 3 }
+      ],
+      activeWorkspace: 'default'
+    })
+    await open()
+    await go('workspaces')
+
+    expect(screen.getByTestId('workspace-row-w2')).toHaveTextContent('3 items · This device')
+
+    await openMenu('w2')
+    await userEvent.click(screen.getByTestId('workspace-delete-w2'))
+    expect(
+      screen.queryByTestId('workspace-delete-scope-everywhere')
+    ).not.toBeInTheDocument()
   })
 
   // No vault id and no connection: there is nothing in an account to delete, so

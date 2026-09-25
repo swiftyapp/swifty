@@ -200,6 +200,13 @@ export interface Workspace {
    */
   vaultId?: string
   /**
+   * Whether the workspace is connected to Drive right now, read off its own
+   * token file when the list was built. Distinct from `vaultId`, which
+   * outlives a disconnect: a pack on Drive is not a connection to it. Absent
+   * from a backend built before the flag existed, which reads as not synced.
+   */
+  synced?: boolean
+  /**
    * How many live entries the vault held when it was last open on this
    * device — the one thing about its contents readable while it is locked.
    * Absent for a vault not opened here since the count was first kept.

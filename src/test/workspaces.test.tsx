@@ -64,15 +64,17 @@ describe('WorkspacePicker', () => {
   })
 
   // Where each vault lives is read off what is knowable while it is locked:
-  // the open one's live connection, any other's the vault id a sync recorded.
+  // the open one's live connection, any other's the connection the backend
+  // found beside it. A vault id alone is not that — it outlives a disconnect.
   it('says where each workspace lives', async () => {
-    seed([PRIMARY, { ...WORK, vaultId: 'v-work' }])
+    seed([PRIMARY, { ...WORK, vaultId: 'v-work', synced: true }, { id: 'w3', name: 'Old', vaultId: 'v-old' }])
     render(<WorkspacePicker />)
 
     await userEvent.click(screen.getByTestId('workspace-chip'))
 
     expect(screen.getByTestId('workspace-option-default')).toHaveTextContent('This device')
     expect(screen.getByTestId('workspace-option-w2')).toHaveTextContent('Google Drive')
+    expect(screen.getByTestId('workspace-option-w3')).toHaveTextContent('This device')
   })
 
   // The size its last open here recorded, ahead of where it lives; a vault
