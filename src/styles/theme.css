@@ -341,8 +341,6 @@
   --color-pane: var(--c-pane);
   --color-field: var(--c-field);
   --color-tile: var(--c-tile);
-  /* The glyph on a tile: a slate on the light theme, text2 on the dark. */
-  --color-tile-ink: var(--c-tile-ink);
   --color-line: var(--c-line);
   --color-line2: var(--c-line2);
   --color-hover: var(--c-hover);
@@ -622,35 +620,27 @@
 :root {
   color-scheme: light;
 
-  /*
-   * The light greys lean cool (the Rowel settings prototype's palette): the
-   * grounds carry a touch of blue, and the hairlines, hovers and shadows are
-   * mixed from a navy ink (20,24,34) rather than a neutral one. The tile is a
-   * solid, pale steel (#edf0f7) — the one surface with visible colour — and
-   * the glyph on it takes `tile-ink`, a slate a shade bluer than text2.
-   */
-  --c-app: #e4e6ea;
+  --c-app: #e7e8ea;
   /* The phone shell's one ground (the mobile prototype's `--screen`): every
    * compact screen is painted on it, and cards, fields and sheets sit white on
    * top. The wide shell never uses it — its panes keep app/list/detail. */
   --c-screen: #f4f4f6;
-  --c-rail: #dfe1e6;
-  --c-list: #edeef2;
+  --c-rail: #e4e5e8;
+  --c-list: #f3f4f6;
   --c-detail: #ffffff;
   --c-pane: #f7f8fa;
-  --c-field: #ffffff;
-  --c-tile: #edf0f7;
-  --c-tile-ink: #4a5470;
-  --c-line: rgba(20, 24, 34, 0.085);
-  --c-line2: rgba(20, 24, 34, 0.15);
-  --c-hover: rgba(20, 24, 34, 0.04);
-  --c-sel: rgba(20, 24, 34, 0.07);
+  --c-field: #fafafb;
+  --c-tile: rgba(20, 22, 26, 0.065);
+  --c-line: rgba(20, 22, 26, 0.075);
+  --c-line2: rgba(20, 22, 26, 0.19);
+  --c-hover: rgba(20, 22, 26, 0.045);
+  --c-sel: rgba(20, 22, 26, 0.07);
   --c-text: #15161a;
-  --c-text2: #555961;
-  /* The glyph tier. ~3.7:1 on --c-detail and ~3:1 on --c-app: enough for a
+  --c-text2: #585c64;
+  /* The glyph tier. ~3.6:1 on --c-detail and ~2.9:1 on --c-app: enough for a
      bare icon (WCAG AA 3:1 for graphics), not for text (4.5:1). Labels, stamps
      and placeholders take text2 — see elements/tokens. */
-  --c-text3: #7f838a;
+  --c-text3: #84878e;
   /*
    * The accent is the user's to choose (Settings › Appearance; the blocks
    * under `[data-accent]` at the end of this file). These are the default,
@@ -669,10 +659,10 @@
   --c-accent-hover: #2c2d31;
   --c-lens: #ffffff;
   --lens-shadow:
-    0 1px 2px rgba(22, 28, 48, 0.1),
-    0 0 0 1px rgba(22, 28, 48, 0.05);
+    0 1px 2px rgba(20, 22, 26, 0.1),
+    0 0 0 1px rgba(20, 22, 26, 0.05);
   --c-good: #1e9c6e;
-  --c-warn: #a96a12;
+  --c-warn: #b7761a;
   --c-bad: #c9453a;
   /* The danger button under the pointer: darker, so its white text gains. */
   --c-bad-hover: #b33e34;
@@ -730,22 +720,17 @@
   /* `chrome`'s floating cousin: the surface of something the content scrolls
    * under (the compact tab bar), so it is thinner and wants a backdrop blur. */
   --glass: rgba(255, 255, 255, 0.8);
-  --topglow: rgba(255, 255, 255, 0.9);
-  /* A dialog's lift: a long, soft fall pulled in at the edges, a shorter one
-   * under it, and a hairline ring so the edge holds on a light ground. */
-  --shadow:
-    0 50px 110px -24px rgba(22, 28, 48, 0.38),
-    0 12px 30px -10px rgba(22, 28, 48, 0.16),
-    0 0 0 1px rgba(20, 24, 34, 0.06);
+  --topglow: rgba(255, 255, 255, 0.7);
+  --shadow: 0 24px 60px rgba(24, 26, 30, 0.16), 0 1px 3px rgba(24, 26, 30, 0.1);
   /* A dropdown menu (see elements/Dropdown): a near-opaque sheet over a
    * backdrop blur, edged by a half-pixel hairline in the shadow rather than a
    * border, and lifted less than a dialog — it hangs off a control. */
   --menu: rgba(255, 255, 255, 0.96);
   --menu-shadow:
-    0 0 0 0.5px rgba(20, 24, 34, 0.14), 0 12px 40px rgba(22, 28, 48, 0.16),
-    0 2px 6px rgba(22, 28, 48, 0.06);
-  --scrim: rgba(34, 38, 50, 0.3);
-  --thumb: rgba(20, 24, 34, 0.2);
+    0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 12px 40px rgba(20, 22, 30, 0.16),
+    0 2px 6px rgba(20, 22, 30, 0.06);
+  --scrim: rgba(40, 43, 48, 0.3);
+  --thumb: rgba(20, 22, 26, 0.22);
   /*
    * The lock screen's signature field (see Masterpass): a white surface set
    * gently *into* the ground rather than floating on it. A faint shadow along
@@ -804,20 +789,18 @@
   --c-app: #0f1011;
   --c-screen: #0e0f11;
   --c-rail: #131415;
-  --c-list: #161718;
+  --c-list: #171819;
   --c-detail: #1b1c1e;
   --c-pane: #1b1c1e;
-  --c-field: rgba(255, 255, 255, 0.035);
-  --c-tile: rgba(255, 255, 255, 0.065);
-  /* No slate here: on the dark ground the tile's glyph is simply text2. */
-  --c-tile-ink: #a2a5aa;
-  --c-line: rgba(255, 255, 255, 0.075);
-  --c-line2: rgba(255, 255, 255, 0.13);
+  --c-field: rgba(255, 255, 255, 0.03);
+  --c-tile: rgba(255, 255, 255, 0.06);
+  --c-line: rgba(255, 255, 255, 0.05);
+  --c-line2: rgba(255, 255, 255, 0.12);
   --c-hover: rgba(255, 255, 255, 0.045);
   --c-sel: rgba(255, 255, 255, 0.06);
   --c-text: #ebeced;
-  --c-text2: #a2a5aa;
-  --c-text3: #75787e;
+  --c-text2: #9ea1a6;
+  --c-text3: #71747a;
   --c-accent: #f2f3f4;
   --c-accent-fg: #15161a;
   --c-accent-soft: rgba(255, 255, 255, 0.1);
@@ -868,18 +851,18 @@
   --card: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.045),
-    rgba(255, 255, 255, 0.015)
+    rgba(255, 255, 255, 0.012)
   );
   --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
   --chrome: rgba(15, 16, 17, 0.82);
   --glass: rgba(40, 42, 46, 0.72);
   --topglow: rgba(255, 255, 255, 0.06);
-  --shadow: 0 40px 100px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
   --menu: rgba(27, 28, 30, 0.96);
   --menu-shadow:
     0 0 0 0.5px rgba(255, 255, 255, 0.12), 0 12px 40px rgba(0, 0, 0, 0.5),
     0 2px 6px rgba(0, 0, 0, 0.3);
-  --scrim: rgba(8, 9, 10, 0.6);
+  --scrim: rgba(8, 9, 10, 0.7);
   --thumb: rgba(255, 255, 255, 0.14);
   --lockfield-shadow:
     inset 0 1.5px 3px rgba(0, 0, 0, 0.5),

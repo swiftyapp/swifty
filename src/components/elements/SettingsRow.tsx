@@ -43,7 +43,7 @@ export default function SettingsRow({
           <div
             className={cx(
               'grid h-8 w-8 flex-none place-items-center rounded-sm transition-colors',
-              iconActive ? 'bg-accent-soft text-accent' : 'bg-tile text-tile-ink'
+              iconActive ? 'bg-accent-soft text-accent' : 'bg-tile text-text2'
             )}
           >
             {icon}

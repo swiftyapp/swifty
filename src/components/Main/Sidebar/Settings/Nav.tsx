@@ -58,7 +58,7 @@ export default function Nav({ section, onSelect, disabled = false }: Props) {
                       <span
                         className={cx(
                           'grid h-7 w-7 flex-none place-items-center rounded-sm',
-                          active ? 'bg-accent text-accent-fg' : 'bg-tile text-tile-ink'
+                          active ? 'bg-accent text-accent-fg' : 'bg-tile text-text2'
                         )}
                       >
                         <Glyph size={16} />
