@@ -24,6 +24,9 @@ pub const WORKSPACES_RENAMED: &str = "workspaces:renamed";
 // Desktop only, like the file associations that produce it (`crate::opened`).
 #[cfg(desktop)]
 pub const FILE_OPENED: &str = "file:opened";
+// Desktop only, like the extension host that raises it (`crate::browser`).
+#[cfg(desktop)]
+pub const BROWSER_ASSOCIATE: &str = "browser:associate";
 
 #[derive(Serialize, Clone)]
 struct Entries {
@@ -118,4 +121,18 @@ pub fn workspace_renamed(app: &AppHandle) {
 #[cfg(desktop)]
 pub fn file_opened(app: &AppHandle, path: &str) {
     let _ = app.emit(FILE_OPENED, Opened { path });
+}
+
+#[cfg(desktop)]
+#[derive(Serialize, Clone)]
+struct Associate<'a> {
+    key: &'a str,
+}
+
+/// A browser extension asks to be let in (`browser::consent`). `key` is its
+/// identification public key, for the dialog to show a fingerprint of; the
+/// answer comes back through `commands::browser::browser_respond`.
+#[cfg(desktop)]
+pub fn browser_associate(app: &AppHandle, key: &str) {
+    let _ = app.emit(BROWSER_ASSOCIATE, Associate { key });
 }

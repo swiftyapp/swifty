@@ -4,6 +4,11 @@ mod appkey;
 mod auth;
 mod autolock;
 mod biometrics;
+// The browser extension host: the KeePassXC-Browser protocol over a local
+// socket, and the proxy mode the browser launches this binary in. `pub` so the
+// proxy integration test can reach the socket name and framing.
+#[cfg(desktop)]
+pub mod browser;
 mod cards;
 mod commands;
 pub mod crypto;
@@ -53,6 +58,13 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // A browser launched this binary as its native messaging host: relay its
+    // stdio to the running app and never build a window (see `browser::proxy`).
+    #[cfg(desktop)]
+    if browser::proxy::launched_by_browser(std::env::args().skip(1)) {
+        std::process::exit(browser::proxy::run());
+    }
+
     // Before anything else: on mobile Tauri builds a reqwest client while
     // launching, and with `rustls-no-provider` that aborts the process unless
     // a provider is already installed (see `sync::install_crypto_provider`).
@@ -131,6 +143,13 @@ pub fn run() {
         .setup(|app| {
             // Preferences first: the shell and the auto-lock both open on them.
             settings::boot(app.handle());
+            // The extension host listens from launch when it was left on, so
+            // a browser that starts before the vault is unlocked finds the
+            // app and can ask for the unlock.
+            #[cfg(desktop)]
+            if settings::current(app.handle()).browser.enabled {
+                browser::server::start(app.handle());
+            }
             // The plaintext favicon directory the in-vault cache replaced: the
             // vault's host list in the clear, so it goes on the first launch
             // that can see it, whether or not this one looks an icon up.

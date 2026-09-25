@@ -60,6 +60,27 @@ impl Default for GeneratorDefaults {
     }
 }
 
+/// A browser extension the user let connect (`browser`): the name they gave it
+/// when it asked, and its identification public key — the one thing the
+/// extension keeps across browser restarts and proves itself with on every
+/// reconnect. A public key, so it belongs here in plaintext with the rest.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserClient {
+    pub name: String,
+    pub key: String,
+}
+
+/// The browser extension host: whether it listens at all, and which extensions
+/// may talk to it. Off until the user turns it on in Settings, which is also
+/// what writes the native messaging manifests a browser finds the app by.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct BrowserSettings {
+    pub enabled: bool,
+    pub clients: Vec<BrowserClient>,
+}
+
 /// Every preference the app has, with the defaults a fresh install starts from.
 ///
 /// The enum-ish fields are plain strings: the frontend's union types narrow
@@ -83,6 +104,7 @@ pub struct Settings {
     pub locale: Option<String>,
     pub breach_check: bool,
     pub generator: GeneratorDefaults,
+    pub browser: BrowserSettings,
 }
 
 impl Default for Settings {
@@ -97,6 +119,7 @@ impl Default for Settings {
             locale: None,
             breach_check: false,
             generator: GeneratorDefaults::default(),
+            browser: BrowserSettings::default(),
         }
     }
 }
@@ -226,6 +249,8 @@ mod tests {
         assert!(!settings.breach_check);
         assert_eq!(settings.generator, GeneratorDefaults::default());
         assert_eq!(settings.generator.length, 20);
+        assert!(!settings.browser.enabled);
+        assert!(settings.browser.clients.is_empty());
     }
 
     #[test]
