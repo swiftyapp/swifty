@@ -12,9 +12,10 @@ interface Props<T extends string> {
   className?: string
 }
 
-// THE two-to-four-way switch (generator mode, timeout, theme): a hairline
-// trough with the active segment in the accent wash. Labels arrive already
-// translated.
+// THE two-to-five-way switch (generator mode, timeout, theme): a tile trough
+// with the active segment raised on the lens — the same "you are here" key the
+// rail and the phone tab bar use, so a chosen segment is a place rather than a
+// wash of accent. Labels arrive already translated.
 export default function Segmented<T extends string>({
   options,
   value,
@@ -40,7 +41,7 @@ export default function Segmented<T extends string>({
       role="radiogroup"
       aria-label={name}
       onKeyDown={onKeyDown}
-      className={cx('flex gap-0.5 rounded-sm border border-line2 p-0.5', className)}
+      className={cx('flex gap-0.5 rounded-lg bg-tile p-[3px]', className)}
     >
       {options.map((option, index) => {
         const active = option.value === value
@@ -54,8 +55,10 @@ export default function Segmented<T extends string>({
             data-testid={testidPrefix && `${testidPrefix}-${option.value}`}
             onClick={() => onChange(option.value)}
             className={cx(
-              'cursor-pointer rounded-sm px-2.5 py-[3px] text-base tabular-nums transition-colors',
-              active ? 'bg-accent-soft text-text' : 'text-text3 hover:text-text'
+              'h-[26px] cursor-pointer whitespace-nowrap rounded-sm px-2.5 text-base tabular-nums transition-[color,background-color,box-shadow]',
+              active
+                ? 'bg-lens font-medium text-text shadow-lens'
+                : 'text-text2 hover:text-text'
             )}
           >
             {option.label}

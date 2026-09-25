@@ -1,6 +1,8 @@
 // A step rounder on the phone shell, where a card is the screen's main shape
-// rather than a panel inside a pane.
-export const CARD = 'overflow-hidden rounded-lg border border-line bg-card max-md:rounded-xl'
+// rather than a panel inside a pane. `shadow-card` is its lift off the pane:
+// a faint drop plus a white top edge on light, a top glow alone on dark.
+export const CARD =
+  'overflow-hidden rounded-lg border border-line bg-card shadow-card max-md:rounded-xl'
 
 export const ROW_HAIRLINE = 'inset-shadow-hairline last:inset-shadow-none'
 
