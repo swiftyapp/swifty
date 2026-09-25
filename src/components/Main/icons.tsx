@@ -37,6 +37,7 @@ import {
   KeySquare,
   Layers,
   LayoutGrid,
+  Link,
   Lock,
   Moon,
   MoreHorizontal,
@@ -54,6 +55,7 @@ import {
   Terminal,
   Trash2,
   TriangleAlert,
+  Upload,
   User,
   X,
   createLucideIcon,
@@ -169,6 +171,11 @@ export const ActivityGlyph = glyph(Activity, 16)
 export const LayersGlyph = glyph(Layers, 16)
 // The iOS disclosure mark: a row that pushes a screen rather than doing a thing.
 export const ChevronRightGlyph = glyph(ChevronRight, 16)
+// Links that are out there (Settings › Sharing). The row's own mark, not an
+// action: `ShareGlyph` is what hands an entry over in the first place.
+export const LinkGlyph = glyph(Link, 16)
+// A file going into the app (the import drop target).
+export const UploadGlyph = glyph(Upload, 16)
 
 // Rail tier (20px, for the 40px+ rail hit areas and Settings nav headers)
 export const PlusRailGlyph = glyph(Plus, 20)

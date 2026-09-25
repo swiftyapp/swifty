@@ -295,28 +295,55 @@ describe('Settings › sync', () => {
 
   it('offers the encrypted backup behind its own control', async () => {
     await open()
+    expect(screen.getByTestId('settings-backup-row')).toHaveTextContent('.rowel')
     expect(document.querySelector('input[name="export_password"]')).toBeNull()
     await userEvent.click(screen.getByText('Save…'))
     expect(document.querySelector('input[name="export_password"]')).toBeInTheDocument()
   })
 
-  // One warning covers the whole picker, CXF included — it is as plaintext as
-  // the other two.
-  it('exports to CXF from the portable export picker', async () => {
-    mockCommand('export_entries', () => '/tmp/rowel-export.json')
+  // The portable export lives with Import now; this section keeps only the
+  // encrypted backup.
+  it('leaves the unencrypted export out of this section', async () => {
     await open()
-    expect(
-      screen.getByText('Bitwarden JSON, FIDO CXF or generic CSV, unencrypted')
-    ).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-export-run')).not.toBeInTheDocument()
+  })
 
-    await userEvent.selectOptions(
-      document.querySelector('select[name="export_format"]')!,
-      'cxf'
-    )
-    await userEvent.click(screen.getByTestId('settings-export-run'))
+  // The pill beside the title says where the connection stands, one tone per
+  // state, with a sync running outranking the last one's failure.
+  it('says where Drive stands in the status pill', async () => {
+    await open()
+    const pill = () => screen.getByTestId('settings-drive-status')
 
-    expect(calls('export_entries')).toContainEqual({ path: null, format: 'cxf' })
-    expect(await screen.findByText(/rowel-export\.json/)).toBeInTheDocument()
+    expect(pill()).toHaveTextContent('Not connected')
+    expect(pill()).toHaveAttribute('data-tone', 'idle')
+
+    act(() => report({ configured: true }))
+    expect(pill()).toHaveTextContent('Up to date')
+    expect(pill()).toHaveAttribute('data-tone', 'good')
+
+    act(() => report({ configured: true, inProgress: true }))
+    expect(pill()).toHaveTextContent('Syncing')
+    expect(pill()).toHaveAttribute('data-tone', 'busy')
+
+    act(() => report({ configured: true, error: 'Drive API 503' }))
+    expect(pill()).toHaveTextContent('Last attempt failed')
+    expect(pill()).toHaveAttribute('data-tone', 'bad')
+    expect(screen.getByTestId('settings-sync-error')).toHaveTextContent('Drive API 503')
+  })
+
+  it('shows what a connected account holds, and the way out', async () => {
+    await open()
+    expect(screen.queryByTestId('settings-sync-now')).not.toBeInTheDocument()
+    expect(screen.queryByText('End-to-end')).not.toBeInTheDocument()
+
+    act(() => report({ configured: true }))
+    expect(screen.queryByTestId('settings-drive-connect')).not.toBeInTheDocument()
+    expect(screen.getByText('End-to-end')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-sync-now'))
+    expect(calls('sync_now')).toHaveLength(1)
+    await userEvent.click(screen.getByTestId('settings-drive-disconnect'))
+    expect(calls('sync_disconnect')).toHaveLength(1)
   })
 })
 
@@ -590,6 +617,104 @@ describe('Settings › import', () => {
     ])
       expect(screen.getByTestId(`import-tile-${key}`)).toBeInTheDocument()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  })
+
+  // The picker is on the drop target itself, on every platform; a file chosen
+  // there has no tile behind it, so the backend sniffs its format.
+  it('chooses an export file from the drop target', async () => {
+    vi.mocked(openDialog).mockResolvedValue('/tmp/export.csv')
+    await open()
+    await go('import')
+
+    await userEvent.click(screen.getByTestId('import-choose-file'))
+
+    await waitFor(() =>
+      expect(calls('import_entries')).toContainEqual({
+        path: '/tmp/export.csv',
+        format: 'auto',
+        dryRun: true
+      })
+    )
+  })
+
+  it('switches between the import and export panes', async () => {
+    await open()
+    await go('import')
+    expect(screen.getByTestId('settings-io-import')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('import-dropzone')).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-export-run')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-io-export'))
+    expect(screen.getByTestId('settings-io-export')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByTestId('import-dropzone')).not.toBeInTheDocument()
+    expect(screen.getByTestId('settings-export-run')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('settings-io-import'))
+    expect(screen.getByTestId('import-tile-bitwarden')).toBeInTheDocument()
+  })
+})
+
+describe('Settings › export', () => {
+  const exportPane = async () => {
+    await open()
+    await go('import')
+    await userEvent.click(screen.getByTestId('settings-io-export'))
+  }
+
+  // One warning covers every format, CXF included — it is as plaintext as the
+  // other two — and nothing is written until it has been acknowledged.
+  it('exports to CXF once the risk is acknowledged', async () => {
+    mockCommand('export_entries', () => '/tmp/rowel-export.json')
+    await exportPane()
+
+    expect(screen.getByTestId('settings-export-format-bitwarden')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    await userEvent.click(screen.getByTestId('settings-export-format-cxf'))
+    expect(screen.getByTestId('settings-export-format-cxf')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+
+    expect(screen.getByTestId('settings-export-run')).toBeDisabled()
+    await userEvent.click(screen.getByTestId('settings-export-ack'))
+    expect(screen.getByTestId('settings-export-ack')).toHaveAttribute('aria-checked', 'true')
+    await userEvent.click(screen.getByTestId('settings-export-run'))
+
+    expect(calls('export_entries')).toContainEqual({ path: null, format: 'cxf' })
+    expect(await screen.findByText(/rowel-export\.json/)).toBeInTheDocument()
+  })
+
+  it('stays disabled again once the acknowledgement is taken back', async () => {
+    await exportPane()
+    await userEvent.click(screen.getByTestId('settings-export-ack'))
+    expect(screen.getByTestId('settings-export-run')).toBeEnabled()
+    await userEvent.click(screen.getByTestId('settings-export-ack'))
+    expect(screen.getByTestId('settings-export-run')).toBeDisabled()
+    expect(calls('export_entries')).toEqual([])
+  })
+
+  it('moves the format choice with the arrow keys', async () => {
+    await exportPane()
+    screen.getByTestId('settings-export-format-bitwarden').focus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByTestId('settings-export-format-cxf')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    expect(screen.getByTestId('settings-export-format-cxf')).toHaveFocus()
+  })
+
+  it('counts what it will export on the button', async () => {
+    await exportPane()
+    expect(screen.getByTestId('settings-export-run')).toHaveTextContent('Export 0 items')
+  })
+
+  it('points a device move at the encrypted backup instead', async () => {
+    await exportPane()
+    await userEvent.click(screen.getByTestId('settings-export-backup-link'))
+    expect(useUi.getState().settingsSection).toBe('sync')
   })
 })
 
