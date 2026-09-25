@@ -39,8 +39,11 @@ export interface Generator {
 
 export interface UiState {
   view: View
-  // `filterType: null` is "All Items". The type filter is a filter and nothing
-  // else: it does not double as navigation or as the kind of a new entry.
+  // `filterType: null` is "All Items". On the wide shell a kind is a place
+  // under All Items — the rail's kind tiles enter it through `showKind`, and
+  // `setView` drops it on the way to any other view. The phone's chips set it
+  // directly as a filter over the open view. It never doubles as the kind of a
+  // new entry.
   filterType: EntryType | null
   // What the Tags view shows. Only that view holds one — `showTag` sets it with
   // the view and `setView` clears it — and it composes with the kind filter.
@@ -148,8 +151,10 @@ export const flashCopied = () => {
 // --- views and filters -----------------------------------------------------------
 
 export const setView = (view: View) => {
-  // A tag belongs to the Tags view alone, so moving between views drops it.
-  useUi.setState({ view, filterTag: null })
+  // A tag belongs to the Tags view alone and a kind to the view it was picked
+  // in, so moving between views drops both: Favorites narrowed to a kind no
+  // tile is lit for would be a filter nothing on screen names.
+  useUi.setState({ view, filterTag: null, filterType: null })
   setNoEntry()
   // Tombstones are not part of the unlock payload, so the Archive reads them
   // when it is opened. Refetching on every visit is also what keeps it honest
@@ -183,6 +188,14 @@ const dropHidden = (hidden: (current: { type: EntryType; tags: string[] }) => bo
 export const setFilterType = (type: EntryType | null) => {
   useUi.setState({ filterType: type })
   if (type) dropHidden(current => current.type !== type)
+}
+
+// The rail's way into one kind: All Items, narrowed to it. From another view
+// this is navigation and the selection goes with the view; from All Items it is
+// only the filter changing, so a selection the kind still admits is kept.
+export const showKind = (type: EntryType) => {
+  if (useUi.getState().view !== 'items') setView('items')
+  setFilterType(type)
 }
 
 export const setFilterTag = (tag: string | null) => {

@@ -8,7 +8,8 @@ import {
   editEntry,
   focusSearch,
   isModalOpen,
-  lockVault
+  lockVault,
+  setPref
 } from '@/store'
 import { keyCode } from '@/utils/keys'
 
@@ -31,7 +32,11 @@ const BINDINGS: Record<string, () => void> = {
   // Edit whatever the list has selected — nothing to edit without a selection.
   KeyE: () => {
     if (selectCurrent(useVault.getState())) editEntry()
-  }
+  },
+  // The three orders of the sort menu, numbered as the menu lists them.
+  Digit1: () => setPref('sort', 'alpha'),
+  Digit2: () => setPref('sort', 'recent'),
+  Digit3: () => setPref('sort', 'created')
 }
 
 export const useShortcuts = () => {

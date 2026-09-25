@@ -9,7 +9,12 @@ export type DateFormat = 'MM/DD/YYYY' | 'DD.MM.YYYY' | 'YYYY-MM-DD'
 // The order the segmented control offers them in.
 export const DATE_FORMATS: DateFormat[] = ['MM/DD/YYYY', 'DD.MM.YYYY', 'YYYY-MM-DD']
 
-export type SortMode = 'recent' | 'alpha'
+/**
+ * The list's order: by last edit, by creation, or by name. The two dated
+ * orders are working orders and keep starred rows pinned; the name order is
+ * the index and does not (see `Body/List/order`).
+ */
+export type SortMode = 'recent' | 'created' | 'alpha'
 
 /**
  * Every preference, owned and persisted by Rust (`settings.json` in the app

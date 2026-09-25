@@ -1,14 +1,17 @@
 import type { EntryMeta } from '@/api/types'
+import { KINDS } from '@/kinds'
 import { toTime } from '@/utils/time'
 
-// How the entry list is ordered. "recent" is the working order (newest
-// first); "alpha" is the flat A–Z index.
+// How the entry list is ordered. "recent" is the working order (last edited
+// first), "created" its sibling by when the row was made, and "alpha" the flat
+// A–Z index.
 
 // An entry's own clock: when it last changed, falling back to when it was made.
 export const stampOf = (entry: EntryMeta): string | undefined =>
   entry.updatedAt ?? entry.createdAt
 
 const timeOf = (entry: EntryMeta): number => toTime(stampOf(entry)) ?? 0
+const madeAt = (entry: EntryMeta): number => toTime(entry.createdAt) ?? 0
 
 export const byTitle = (entries: EntryMeta[]): EntryMeta[] =>
   [...entries].sort((a, b) => a.title.localeCompare(b.title))
@@ -19,4 +22,22 @@ export const byTitle = (entries: EntryMeta[]): EntryMeta[] =>
 export const byRecency = (entries: EntryMeta[]): EntryMeta[] =>
   [...entries].sort(
     (a, b) => Number(b.favorite) - Number(a.favorite) || timeOf(b) - timeOf(a)
+  )
+
+// Newest-made first, starred on top for the same reason as recency: it is a
+// working order, not an index.
+export const byCreated = (entries: EntryMeta[]): EntryMeta[] =>
+  [...entries].sort(
+    (a, b) => Number(b.favorite) - Number(a.favorite) || madeAt(b) - madeAt(a)
+  )
+
+const KIND_RANK = new Map(KINDS.map((kind, rank) => [kind.type, rank]))
+
+// The same rows, sectioned by kind in registry order — the order the Add
+// picker and the scope menu use — and left in the order they came inside each
+// section. A stable sort, so "recent within Logins" is exactly the recent list
+// with the other kinds taken out.
+export const byKind = (entries: EntryMeta[]): EntryMeta[] =>
+  [...entries].sort(
+    (a, b) => (KIND_RANK.get(a.type) ?? 0) - (KIND_RANK.get(b.type) ?? 0)
   )

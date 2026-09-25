@@ -93,7 +93,7 @@ describe('the Favorites view', () => {
     expect(titles()).toEqual(['Monzo', 'Airbnb'])
 
     await userEvent.click(screen.getByTestId('sort-menu'))
-    await userEvent.click(screen.getByText('Alphabetical'))
+    await userEvent.click(screen.getByText('Name (A–Z)'))
     expect(titles()).toEqual(['Airbnb', 'Monzo'])
   })
 

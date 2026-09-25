@@ -72,7 +72,9 @@ export default function MoreMenu({
                 onEdit()
               }}
             >
-              <PencilGlyph />
+              <span className="flex-none opacity-85">
+                <PencilGlyph />
+              </span>
               {t('Edit')}
             </DropdownItem>
           )}
@@ -84,7 +86,9 @@ export default function MoreMenu({
                 onShare()
               }}
             >
-              <ShareGlyph />
+              <span className="flex-none opacity-85">
+                <ShareGlyph />
+              </span>
               {t('Share…')}
             </DropdownItem>
           )}
@@ -96,7 +100,9 @@ export default function MoreMenu({
             testid={armed ? 'delete-entry-confirm' : 'delete-entry-button'}
             onClick={armed ? confirm : () => setArmed(true)}
           >
-            <ArchiveGlyph />
+            <span className="flex-none opacity-85">
+              <ArchiveGlyph />
+            </span>
             {armed ? t('Archive entry?') : t('Archive')}
           </DropdownItem>
         </Dropdown>

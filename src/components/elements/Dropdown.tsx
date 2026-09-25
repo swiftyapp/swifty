@@ -1,6 +1,15 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { cx } from '@/utils/cx'
 
+/**
+ * The app's one menu, per the Rowel menus prototype: a 12px-radius sheet with
+ * 5px of padding, 32px rows with 9px side padding and a 7px radius, 13px
+ * primary ink, a 10px gap between a row's parts. The sheet is `--menu` over a
+ * saturated blur, edged by `--menu-line`, and drops in over 140ms. Every menu
+ * in the app (sort, scope, tags, the entry's overflow, the vault picker) is
+ * this one, so a measurement changes here and nowhere else.
+ */
+
 interface DropdownProps {
   onBlur: () => void
   /**
@@ -91,7 +100,7 @@ export function Dropdown({
         role={listbox ? undefined : 'menu'}
         onKeyDown={onKeyDown}
         className={cx(
-          'animate-drop absolute z-20 flex min-w-[180px] origin-top flex-col overflow-hidden rounded-xl bg-menu text-text shadow-menu backdrop-blur-[20px]',
+          'animate-drop absolute z-20 flex min-w-[180px] origin-top flex-col overflow-hidden rounded-[12px] border border-menu-line bg-menu text-text shadow-menu backdrop-blur-[24px] backdrop-saturate-[1.6]',
           className
         )}
       >
@@ -99,7 +108,7 @@ export function Dropdown({
         <div
           id={listbox}
           role={listbox && 'listbox'}
-          className={cx('flex flex-col gap-px overflow-y-auto p-1.5', listClassName)}
+          className={cx('flex flex-col overflow-y-auto p-[5px]', listClassName)}
         >
           {children}
         </div>
@@ -122,21 +131,26 @@ interface ItemProps {
    * `checked` item says it is the chosen one by `aria-checked`.
    */
   option?: boolean
-  // A rule across the whole menu above this item, setting it apart.
+  // A rule across the menu above this item, setting it apart.
   separated?: boolean
   // Destructive entry (delete, disconnect, ...): inked in the `bad` token.
   danger?: boolean
+  /**
+   * Quiet: a place with nothing in it yet. Still a row — it can be picked,
+   * and lands on the empty state — but at under half its ink.
+   */
+  dim?: boolean
   testid?: string
   onClick?: () => void
   // Spacing overrides for a row that is not a plain label (a tile with two
-  // lines of text is taller than the 34px default).
+  // lines of text is taller than the 32px default).
   className?: string
   /**
    * Set on every item of a menu that picks one of several (a sort order, a
    * vault): the item becomes a `menuitemradio` and says whether it is the one,
    * so the selection a check glyph shows is also told to assistive technology.
-   * Its highlight is the selection tint rather than the neutral hover.
-   * Left undefined, the item is a plain action.
+   * The chosen one sits on the selection wash. Left undefined, the item is a
+   * plain action.
    */
   checked?: boolean
   /**
@@ -155,6 +169,7 @@ export function DropdownItem({
   option,
   separated,
   danger,
+  dim,
   testid,
   onClick,
   className,
@@ -165,20 +180,20 @@ export function DropdownItem({
   children
 }: ItemProps) {
   const radio = checked !== undefined
-  // Keyboard focus borrows the hover treatment instead of the global outline,
-  // which would ring a rounded row inset in a rounded panel. The row's corner
-  // (`rounded-sm`, 8px) is the panel's 14px less its 6px padding, so the
-  // highlight sits concentric in it.
+  // The chosen row keeps the selection wash; every other row takes the hover
+  // wash under the pointer or the keyboard. Keyboard focus borrows the hover
+  // treatment instead of the global outline, which would ring a rounded row
+  // inset in a rounded panel.
   const highlight =
     active !== undefined
-      ? active && (radio ? 'bg-sel' : 'bg-hover')
-      : radio
-        ? 'hover:bg-sel focus-visible:bg-sel'
+      ? active && (checked ? 'bg-sel' : 'bg-hover')
+      : checked
+        ? 'bg-sel'
         : 'hover:bg-hover focus-visible:bg-hover'
 
   return (
     <>
-      {separated && <div role="separator" className="-mx-1.5 my-[5px] h-px flex-none bg-line" />}
+      {separated && <DropdownSeparator />}
       <button
         type="button"
         id={id}
@@ -190,8 +205,9 @@ export function DropdownItem({
         onMouseEnter={onMouseEnter}
         onFocus={onFocus}
         className={cx(
-          'flex min-h-[34px] w-full flex-none cursor-pointer items-center gap-2.75 rounded-sm px-2 py-1.5 text-left text-base focus-visible:outline-none',
-          danger ? 'text-bad' : 'text-text2',
+          'flex min-h-8 w-full flex-none cursor-pointer items-center gap-2.5 rounded-[7px] px-[9px] text-left text-base focus-visible:outline-none',
+          danger ? 'text-bad' : 'text-text',
+          dim && 'opacity-45',
           highlight,
           className
         )}
@@ -199,5 +215,46 @@ export function DropdownItem({
         {children}
       </button>
     </>
+  )
+}
+
+/** A rule between two runs of items, inset to the rows' text edge. */
+export function DropdownSeparator() {
+  return <div role="separator" className="mx-[9px] my-[5px] h-px flex-none bg-line" />
+}
+
+/** The caption over a run of items ("Kinds", "Sort by"): 11px, the third ink. */
+export function DropdownLabel({ children }: { children: ReactNode }) {
+  return (
+    <div role="presentation" className="px-[9px] pb-1 pt-[5px] text-xs font-medium text-text3">
+      {children}
+    </div>
+  )
+}
+
+/**
+ * A row's trailing figure — a count, or a chord — in the mono face at half
+ * ink, so it reads after the label. Tabular, so a count holds its width.
+ */
+export function DropdownMeta({
+  children,
+  testid,
+  hint
+}: {
+  children: ReactNode
+  testid?: string
+  /** A keyboard hint rather than a count: a touch smaller and quieter. */
+  hint?: boolean
+}) {
+  return (
+    <span
+      data-testid={testid}
+      className={cx(
+        'flex-none font-mono tabular-nums',
+        hint ? 'text-xs opacity-45' : 'text-[11.5px] opacity-50'
+      )}
+    >
+      {children}
+    </span>
   )
 }

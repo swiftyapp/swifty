@@ -86,7 +86,7 @@ describe("entry list states and ordering", () => {
     await waitFor("create-first-entry-button");
   });
 
-  it("orders entries A to Z under Alphabetical", async () => {
+  it("orders entries A to Z under Name (A–Z)", async () => {
     // Seeded out of alphabetical order on purpose.
     for (const title of [ZEPHYR, ACME, MERCURY]) {
       await createLogin({

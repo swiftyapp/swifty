@@ -1,15 +1,15 @@
 import type { ReactNode } from 'react'
 import { useUi } from '@/store'
 import { cx } from '@/utils/cx'
-import KindChips from './KindChips'
 import ActiveTag from './ActiveTag'
 import List from '../List'
 import Search from './Search'
+import Title from './Title'
 import { useListKeys } from './useListKeys'
 import { useListTitle } from './useListTitle'
 
-// The middle pane: a title with the caller's controls, the search field and the
-// kind filter chips, over the scrollable entry list.
+// The middle pane: a title (the scope menu, in All Items) with the caller's
+// controls and the search field, over the scrollable entry list.
 interface Props {
   /**
    * The title row's controls, hidden with the rest of the filtering chrome on
@@ -18,15 +18,16 @@ interface Props {
    */
   actions?: ReactNode
   /**
-   * Replaces the 20px title block. The compact root sends its large title —
-   * same words (`useListTitle`), a micro eyebrow above them.
+   * Replaces the 20px title block. The compact root sends the same `Title` at
+   * its own 24px.
    */
   heading?: ReactNode
   /**
    * The title row's own classes — alignment and height, not side padding, which
-   * the box around the row, the search and the chips gives all three. Absent,
-   * the desktop's: 16px under the top of the column, the controls sat on the
-   * title's baseline. The compact root sends its 56px nav-height row
+   * the box around the row and the search gives both. Absent, the desktop's:
+   * 16px under the top of the column, the controls centred on the title's
+   * line — the 32px sort tile and the title's pill are then concentric, which
+   * is what reads as aligned. The compact root sends its 56px nav-height row
    * (`ROOT_HEADER`).
    */
   header?: string
@@ -48,7 +49,7 @@ interface Props {
 export default function ListColumn({
   actions,
   heading,
-  header = 'flex items-end gap-2.5 pt-4',
+  header = 'flex items-center gap-2.5 pt-4',
   search,
   scroller,
   footer
@@ -73,26 +74,16 @@ export default function ListColumn({
     >
       <div className="flex-none px-4 pb-2.5">
         <div className={header}>
-          {heading ?? (
-            <div className="min-w-0 flex-1">
-              <div
-                data-testid="list-title"
-                className="text-xl font-semibold tracking-display text-text"
-              >
-                {title}
-              </div>
-            </div>
-          )}
+          {heading ?? <Title />}
           {/* The audit list has its own severity order — nothing to sort, and
-              nothing the chips or the query below would narrow either. */}
+              nothing the query below would narrow either. */}
           {!health && actions}
         </div>
-        {/* The audit is not a filtered view of the vault, so neither the query
-            nor the chips apply to it. */}
+        {/* The audit is not a filtered view of the vault, so the query does
+            not apply to it. */}
         {!health && (
           <>
             <Search className={search} />
-            <KindChips />
             <ActiveTag />
           </>
         )}

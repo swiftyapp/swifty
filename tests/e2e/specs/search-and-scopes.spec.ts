@@ -52,16 +52,25 @@ async function expectSelected(title: string): Promise<void> {
   );
 }
 
-/** Press one kind chip, or the "All" chip. */
-async function selectKind(kind: "all" | "login" | "note" | "card"): Promise<void> {
-  await waitFor(`filter-${kind}`);
-  await $(`[data-testid="filter-${kind}"]`).click();
+/** Open the title's scope menu (the title is its trigger in All Items). */
+async function openScope(): Promise<void> {
+  await waitFor("list-title");
+  await $('[data-testid="list-title"]').click();
+  await waitFor("scope-option-all");
 }
 
-/** The count rendered on one chip. */
-async function chipCount(kind: string): Promise<number> {
-  await waitFor(`filter-${kind}-count`);
-  return Number(await $(`[data-testid="filter-${kind}-count"]`).getText());
+/** Pick one kind, or All Items, from the title's scope menu. */
+async function selectKind(kind: "all" | "login" | "note" | "card"): Promise<void> {
+  await openScope();
+  await $(`[data-testid="scope-option-${kind}"]`).click();
+}
+
+/** The count on one row of the scope menu; opens the menu and closes it again. */
+async function scopeCount(kind: string): Promise<number> {
+  await openScope();
+  const count = Number(await $(`[data-testid="scope-option-${kind}-count"]`).getText());
+  await browser.keys("Escape");
+  return count;
 }
 
 describe("search and kind filters", () => {
@@ -109,30 +118,34 @@ describe("search and kind filters", () => {
     // Newest write first, so the reverse of the seed order across all kinds.
     await expectTitles([CARD, NOTE, ...LOGINS_BY_RECENCY]);
     await expect($('[data-testid="list-title"]')).toHaveText("All Items");
-    await expect($('[data-testid="filter-all"]')).toHaveAttribute(
-      "aria-pressed",
+    await openScope();
+    await expect($('[data-testid="scope-option-all"]')).toHaveAttribute(
+      "aria-checked",
       "true",
     );
+    await browser.keys("Escape");
   });
 
-  it("counts each kind on its chip", async () => {
+  it("counts each kind in the scope menu", async () => {
     await selectKind("all");
 
-    expect(await chipCount("all")).toBe(5);
-    expect(await chipCount("login")).toBe(3);
-    expect(await chipCount("note")).toBe(1);
-    expect(await chipCount("card")).toBe(1);
+    expect(await scopeCount("all")).toBe(5);
+    expect(await scopeCount("login")).toBe(3);
+    expect(await scopeCount("note")).toBe(1);
+    expect(await scopeCount("card")).toBe(1);
   });
 
-  it("shows only the kind the chip selects", async () => {
+  it("shows only the kind the scope menu opens", async () => {
     // The query is global state, so leave it empty for the filter assertions.
     await selectKind("note");
     await expectTitles([NOTE]);
     await expect($('[data-testid="list-title"]')).toHaveText("Secure notes");
-    await expect($('[data-testid="filter-note"]')).toHaveAttribute(
-      "aria-pressed",
+    await openScope();
+    await expect($('[data-testid="scope-option-note"]')).toHaveAttribute(
+      "aria-checked",
       "true",
     );
+    await browser.keys("Escape");
 
     await selectKind("card");
     await expectTitles([CARD]);

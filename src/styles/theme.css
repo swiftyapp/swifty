@@ -46,7 +46,7 @@
 @keyframes drop {
   from {
     opacity: 0;
-    transform: translateY(-6px) scale(0.97);
+    transform: translateY(-4px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -383,6 +383,7 @@
   --color-chrome: var(--chrome);
   --color-glass: var(--glass);
   --color-menu: var(--menu);
+  --color-menu-line: var(--menu-line);
   --background-image-card: var(--card);
   --shadow-float: var(--shadow);
   --shadow-menu: var(--menu-shadow);
@@ -493,7 +494,7 @@
 
   --animate-fade: fade 160ms var(--ease-swift) both;
   --animate-pop: pop 160ms var(--ease-swift) both;
-  --animate-drop: drop 180ms var(--ease-swift) both;
+  --animate-drop: drop 140ms var(--ease-swift) both;
   --animate-sheet: sheet 160ms var(--ease-swift) both;
   --animate-step-forward: step-forward 240ms var(--ease-swift) both;
   --animate-step-back: step-back 240ms var(--ease-swift) both;
@@ -705,13 +706,15 @@
   --glass: rgba(255, 255, 255, 0.8);
   --topglow: rgba(255, 255, 255, 0.7);
   --shadow: 0 24px 60px rgba(24, 26, 30, 0.16), 0 1px 3px rgba(24, 26, 30, 0.1);
-  /* A dropdown menu (see elements/Dropdown): a near-opaque sheet over a
-   * backdrop blur, edged by a half-pixel hairline in the shadow rather than a
-   * border, and lifted less than a dialog — it hangs off a control. */
-  --menu: rgba(255, 255, 255, 0.96);
+  /* A dropdown menu (see elements/Dropdown, the Rowel menus prototype): a
+   * translucent sheet over a saturated backdrop blur, a 1px line at its edge,
+   * a half-pixel hairline and a soft drop in the shadow, and a 1px highlight
+   * along the inside top — lifted less than a dialog, it hangs off a control. */
+  --menu: rgba(252, 252, 253, 0.84);
+  --menu-line: rgba(20, 24, 34, 0.1);
   --menu-shadow:
-    0 0 0 0.5px rgba(0, 0, 0, 0.14), 0 12px 40px rgba(20, 22, 30, 0.16),
-    0 2px 6px rgba(20, 22, 30, 0.06);
+    0 18px 40px -10px rgba(22, 28, 48, 0.28), 0 4px 12px rgba(22, 28, 48, 0.08),
+    0 0 0 0.5px rgba(22, 28, 48, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --scrim: rgba(40, 43, 48, 0.3);
   --thumb: rgba(20, 22, 26, 0.22);
   /*
@@ -839,10 +842,11 @@
   --glass: rgba(40, 42, 46, 0.72);
   --topglow: rgba(255, 255, 255, 0.06);
   --shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
-  --menu: rgba(27, 28, 30, 0.96);
+  --menu: rgba(34, 35, 38, 0.82);
+  --menu-line: rgba(255, 255, 255, 0.11);
   --menu-shadow:
-    0 0 0 0.5px rgba(255, 255, 255, 0.12), 0 12px 40px rgba(0, 0, 0, 0.5),
-    0 2px 6px rgba(0, 0, 0, 0.3);
+    0 18px 40px -8px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.3),
+    0 0 0 0.5px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.07);
   --scrim: rgba(8, 9, 10, 0.7);
   --thumb: rgba(255, 255, 255, 0.14);
   --lockfield-shadow:

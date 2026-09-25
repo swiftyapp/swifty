@@ -78,14 +78,19 @@ async function expectDocType(label: string): Promise<void> {
  *
  * Same reason as in notes.spec.ts: `useRevealed` keys the decrypt on the entry
  * id alone, so after an in-place save the detail pane keeps serving the pre-edit
- * plaintext. Filtering to a kind the selection is not clears it, which unmounts
+ * plaintext. Opening a kind the selection is not clears it, which unmounts
  * the pane; coming back forces the reveal.
  */
+async function openKind(kind: string): Promise<void> {
+  await waitFor("list-title");
+  await $('[data-testid="list-title"]').click();
+  await waitFor(`scope-option-${kind}`);
+  await $(`[data-testid="scope-option-${kind}"]`).click();
+}
+
 async function reopen(title: string): Promise<void> {
-  await waitFor("filter-login");
-  await $('[data-testid="filter-login"]').click();
-  await waitFor("filter-identity");
-  await $('[data-testid="filter-identity"]').click();
+  await openKind("login");
+  await openKind("identity");
   await waitFor("entry-item");
   for (const row of await $$('[data-testid="entry-item"]').getElements()) {
     if ((await row.$('[data-testid="entry-item-title"]').getText()) === title) {
@@ -171,16 +176,20 @@ describe("identity entries", () => {
       password: "Seed-Basalt-Passphrase-2!",
     });
 
-    await waitFor("filter-identity");
-    await $('[data-testid="filter-identity"]').click();
+    await openKind("identity");
 
     // Newest write first, and the licence is the one that has been edited.
     await expectTitles([LICENCE.title, PASSPORT.title]);
-    await expect($('[data-testid="filter-identity"]')).toHaveAttribute(
-      "aria-pressed",
+    await expect($('[data-testid="list-title"]')).toHaveText("Identities");
+    // Reopened, the scope menu marks the open kind and counts it.
+    await $('[data-testid="list-title"]').click();
+    await waitFor("scope-option-identity");
+    await expect($('[data-testid="scope-option-identity"]')).toHaveAttribute(
+      "aria-checked",
       "true",
     );
-    await expect($('[data-testid="filter-identity-count"]')).toHaveText("2");
+    await expect($('[data-testid="scope-option-identity-count"]')).toHaveText("2");
+    await browser.keys("Escape");
   });
 
   // What the template has no row for goes in a custom field, so the pair has to

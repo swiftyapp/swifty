@@ -1,12 +1,11 @@
 import ListColumn from '../../Body/ListColumn'
-import { useListTitle } from '../../Body/ListColumn/useListTitle'
+import Title from '../../Body/ListColumn/Title'
 import SortMenu from '../../Body/List/SortMenu'
 import Audit from '../../Body/Aside/Audit'
 import { DetailEmpty } from '../../Body/Empty'
 import { useVariant, isWholeView } from '../../Body/Empty/variant'
 import Tags from '../../Sidebar/Tags'
 import { ROOT_HEADER, TAB_BAR_CLEARANCE, TOUCH } from '../chrome'
-import Heading from '../Heading'
 
 // The 44px search field's measure. Passed as classes rather than asked for by
 // a flag: the box is the same field, dressed for a finger — its surface,
@@ -16,7 +15,7 @@ const SEARCH = 'mt-4 h-11 gap-2.5 rounded-lg pl-3.5 pr-2.5 [&_input]:text-md'
 /**
  * The list root — the screen the tab bar comes home to.
  *
- * The shared list column, with the phone's chrome around it: a large title
+ * The shared list column, with the phone's chrome around it: a 24px title
  * where the desktop has a 20px one, the rail's sort and tag tiles in the title
  * row (there is no rail; the rail's Add went to the tab bar's centre), and room
  * at the bottom of the scroller for the floating bar the rows slide under.
@@ -26,7 +25,6 @@ export default function Vault() {
   // puts in its detail pane — otherwise an empty vault is a blank screen, and
   // the audit view is its groups with no score.
   const variant = useVariant()
-  const title = useListTitle()
 
   // The same call `Body/Aside` makes for the wide detail pane: no variant means
   // the audit has a score to show, and the audit is the only view that can be
@@ -44,7 +42,10 @@ export default function Vault() {
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-screen pt-[env(safe-area-inset-top)]">
       <ListColumn
-        heading={<Heading title={title} testid="list-title" />}
+        // The column's own title at the root's 24px, so that in All Items it
+        // is the scope menu's trigger here too — the same words `Heading`
+        // would draw, with the same handle (`list-title`).
+        heading={<Title className="text-2xl" />}
         header={ROOT_HEADER}
         actions={
           <>

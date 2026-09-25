@@ -63,7 +63,7 @@ const sanitize = (raw: Partial<Settings>): Settings => {
   return {
     theme: isTheme(raw.theme) ? raw.theme : DEFAULT_PREFS.theme,
     accent: isAccent(raw.accent) ? raw.accent : DEFAULT_PREFS.accent,
-    sort: raw.sort === 'alpha' ? 'alpha' : 'recent',
+    sort: raw.sort === 'alpha' || raw.sort === 'created' ? raw.sort : 'recent',
     breachCheck: raw.breachCheck === true,
     autolockSecs: isPositive(raw.autolockSecs) ? raw.autolockSecs : DEFAULT_PREFS.autolockSecs,
     clipboardTimeoutMs:

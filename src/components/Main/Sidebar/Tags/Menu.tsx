@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import { useUi, showTag } from '@/store'
 import { cx } from '@/utils/cx'
-import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
+import { Dropdown, DropdownItem, DropdownMeta } from '@/components/elements/Dropdown'
 import { CheckGlyph } from '../../icons'
 import { useTagCounts } from './useTagCounts'
-import { META, META_TYPE } from '@/components/elements/tokens'
+import { META } from '@/components/elements/tokens'
 
 // Hangs off the right edge of the 36px rail tile, floating over the list column
 // — the rail itself is too narrow to hold a menu. `className` is where it is
@@ -40,17 +40,17 @@ export default function Menu({
           </div>
         ) : (
           tags.map(({ tag, count }) => (
-            <DropdownItem key={tag} testid={`tag-option-${tag}`} onClick={() => pick(tag)}>
-              <span className="grid w-3.5 flex-none place-items-center text-accent">
-                {tag === active && <CheckGlyph />}
+            <DropdownItem
+              key={tag}
+              testid={`tag-option-${tag}`}
+              checked={tag === active}
+              onClick={() => pick(tag)}
+            >
+              <span className="grid w-3.5 flex-none place-items-center">
+                {tag === active && <CheckGlyph stroke={2} />}
               </span>
               <span className="min-w-0 flex-1 truncate">{tag}</span>
-              <span
-                data-testid={`tag-option-${tag}-count`}
-                className={`flex-none ${META_TYPE} opacity-60`}
-              >
-                {count}
-              </span>
+              <DropdownMeta testid={`tag-option-${tag}-count`}>{count}</DropdownMeta>
             </DropdownItem>
           ))
         )}

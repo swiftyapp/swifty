@@ -1,15 +1,15 @@
 /**
  * A tab root's title: the root's own name at 24px, centred on the 56px header
  * row (`ROOT_HEADER`) with the 44px action tiles beside it. It replaces the
- * 20px column title the wide shell keeps, and is the same block on every root
- * — the list, the generator and settings — so the three cannot drift apart.
+ * 20px column title the wide shell keeps, and is the same block on the
+ * generator and settings roots; the list root draws the column's own `Title`
+ * at this size instead, since in All Items that title is also the scope menu.
  *
  * Deliberately not the 34px large title iOS puts on a tab root: with a search
- * field and a chip row under it the screen has plenty to say already, and the
- * app's name needs no saying — the icon on the home screen did that.
+ * field under it the screen has plenty to say already, and the app's name
+ * needs no saying — the icon on the home screen did that.
  *
- * `testid` is the handle the *list* root is addressed by (`list-title`); the
- * other roots have nothing that needs finding.
+ * `testid` is the handle a root is addressed by, when it has one.
  */
 export default function Heading({ title, testid }: { title: string; testid?: string }) {
   return (
