@@ -104,6 +104,25 @@ describe('Settings › Browser extension', () => {
 
     expect(await screen.findByTestId('settings-browser-client')).toHaveTextContent('Work Chrome')
   })
+
+  it('holds a refresh until the change in flight has landed', async () => {
+    let settle: (status: BrowserStatus) => void = () => {}
+    mockCommand('browser_status', () => status({ clients: [{ name: 'Work Chrome', key: KEY }] }))
+    mockCommand('browser_forget_client', () => new Promise(resolve => (settle = resolve)))
+    subscribeToEvents()
+    await openSection()
+    await userEvent.click(screen.getByTestId('settings-browser-forget'))
+
+    // Let in while the forget is out: not read yet, so the forget's own
+    // answer is not thrown away as stale.
+    mockCommand('browser_status', () => status({ clients: [{ name: 'Home Firefox', key: 'Z' }] }))
+    act(() => emitEvent(EVENTS.browserClients, undefined))
+    expect(calls('browser_status')).toHaveLength(1)
+
+    await act(async () => settle(status({ clients: [] })))
+    expect(calls('browser_status')).toHaveLength(2)
+    expect(await screen.findByTestId('settings-browser-client')).toHaveTextContent('Home Firefox')
+  })
 })
 
 describe('the browser consent dialog', () => {
