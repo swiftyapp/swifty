@@ -16,7 +16,14 @@ import { loadArchive, setNoEntry, useVault, selectCurrent } from './vault'
 export type View = 'items' | 'favorites' | 'health' | 'archive' | 'tags'
 
 // The Settings sections, in nav order.
-export type Section = 'sync' | 'security' | 'audit' | 'import' | 'language' | 'workspaces'
+export type Section =
+  | 'sync'
+  | 'security'
+  | 'audit'
+  | 'import'
+  | 'language'
+  | 'browser'
+  | 'workspaces'
 
 /** Why a scan produced no fields. The copy for each lives in `Scan/Status`. */
 export type ScanError = 'unreadable' | 'unsupported' | 'failed'
@@ -86,6 +93,12 @@ export interface UiState {
    * `NoticeToast` for a few seconds, then gone; `null` between notices.
    */
   notice: string | null
+  /**
+   * The identification key of a browser extension asking to connect, while
+   * its consent dialog is up. A second ask replaces the first: Rust holds one
+   * at a time and gives up on it by itself after a minute.
+   */
+  browserAsk: string | null
 }
 
 const GENERATOR_CLOSED: Generator = { open: false, apply: null, ssh: null }
@@ -117,7 +130,8 @@ export const initialUi: UiState = {
   scanBusy: false,
   scanError: null,
   copied: false,
-  notice: null
+  notice: null,
+  browserAsk: null
 }
 
 export const useUi = create<UiState>()(() => initialUi)
@@ -264,6 +278,11 @@ export const queueOrphan = (fileId: string) =>
   }))
 export const dropOrphan = (fileId: string) =>
   useUi.setState(state => ({ orphans: state.orphans.filter(id => id !== fileId) }))
+
+// --- browser extension -------------------------------------------------------------
+
+export const askBrowser = (key: string) => useUi.setState({ browserAsk: key })
+export const closeBrowserAsk = () => useUi.setState({ browserAsk: null })
 
 // --- scanning ---------------------------------------------------------------------
 
