@@ -16,13 +16,13 @@ interface Palette {
 }
 
 const LIGHT: Palette = {
-  ground: '#f3f4f6',
-  bar: 'rgba(20,22,26,.13)',
+  ground: '#edeef2',
+  bar: 'rgba(20,24,34,.13)',
   barFirst: '#15161a',
   pane: '#ffffff',
-  paneLine: 'rgba(20,22,26,.1)',
-  title: 'rgba(20,22,26,.78)',
-  line: 'rgba(20,22,26,.12)',
+  paneLine: 'rgba(20,24,34,.1)',
+  title: 'rgba(20,24,34,.78)',
+  line: 'rgba(20,24,34,.12)',
   button: '#15161a'
 }
 

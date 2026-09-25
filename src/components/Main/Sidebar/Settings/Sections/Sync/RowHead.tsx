@@ -13,7 +13,7 @@ interface Props {
 export default function RowHead({ icon, label, description }: Props) {
   return (
     <>
-      <div className="grid h-8 w-8 flex-none place-items-center rounded-sm bg-tile text-text2">
+      <div className="grid h-8 w-8 flex-none place-items-center rounded-sm bg-tile text-tile-ink">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
