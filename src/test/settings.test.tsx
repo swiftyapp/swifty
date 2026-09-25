@@ -522,6 +522,45 @@ describe('Settings › security', () => {
 
     expect(usePrefs.getState().generator.symbols).toBe(false)
   })
+
+  it('draws a sample from the defaults and redraws it on every change', async () => {
+    let draws = 0
+    mockCommand('generate_password', () => `Sample${++draws}!`)
+    await open()
+    await go('security')
+
+    const sample = screen.getByTestId('settings-generator-sample')
+    await waitFor(() => expect(sample).toHaveTextContent('Sample1!'))
+
+    await userEvent.click(screen.getByTestId('settings-generator-regenerate'))
+    await waitFor(() => expect(sample).toHaveTextContent('Sample2!'))
+
+    await userEvent.click(screen.getByTestId('settings-generator-numbers'))
+    await waitFor(() => expect(sample).toHaveTextContent('Sample3!'))
+    expect(usePrefs.getState().generator.numbers).toBe(false)
+    expect(calls('generate_password').slice(-1)[0]).toMatchObject({
+      options: expect.objectContaining({ numbers: false })
+    })
+  })
+
+  it('labels the change form and flags a repeat that does not match', async () => {
+    await open()
+    await go('security')
+    await userEvent.click(screen.getByText('Change…'))
+
+    await userEvent.type(screen.getByLabelText('New Password'), 'newpass')
+    await userEvent.type(screen.getByLabelText('Repeat New Password'), 'newpa')
+    expect(screen.getByText("Passwords don't match yet.")).toBeInTheDocument()
+    expect(screen.getByTestId('change-password-submit')).toBeDisabled()
+
+    await userEvent.type(screen.getByLabelText('Repeat New Password'), 'ss')
+    expect(screen.queryByText("Passwords don't match yet.")).not.toBeInTheDocument()
+
+    const field = screen.getByLabelText('New Password')
+    expect(field).toHaveAttribute('type', 'password')
+    await userEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(field).toHaveAttribute('type', 'text')
+  })
 })
 
 describe('Settings › vault audit', () => {
@@ -636,13 +675,24 @@ describe('Settings › import', () => {
 })
 
 describe('Settings › language & region', () => {
-  it('picks a language from the radio list', async () => {
+  it('picks a language from the menu', async () => {
     await open()
     await go('language')
+
+    const trigger = screen.getByTestId('settings-locale-trigger')
+    expect(trigger).toHaveTextContent('English')
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('settings-locale-en-US')).toHaveAttribute('aria-checked', 'true')
+
     await userEvent.click(screen.getByTestId('settings-locale-de-DE'))
     // Switching is async now: the de-DE catalogue is a dynamic import, fetched
     // on demand rather than bundled with the app.
     await waitFor(() => expect(i18n.resolvedLanguage).toBe('de-DE'))
+    // Picking closes the menu, and the trigger names the language in its own tongue.
+    expect(screen.queryByTestId('settings-locale-de-DE')).not.toBeInTheDocument()
+    expect(screen.getByTestId('settings-locale-trigger')).toHaveTextContent('Deutsch')
   })
 
   // The micro labels are uppercased by CSS, and `text-transform` follows the
@@ -651,17 +701,45 @@ describe('Settings › language & region', () => {
   it('tells the document what language it is in', async () => {
     await open()
     await go('language')
+    await userEvent.click(screen.getByTestId('settings-locale-trigger'))
     await userEvent.click(screen.getByTestId('settings-locale-tr-TR'))
     await waitFor(() => expect(document.documentElement.lang).toBe('tr-TR'))
   })
 
-  it('sets the theme from the segmented control', async () => {
+  it('sets the theme from the preview cards', async () => {
     await open()
     await go('language')
+
+    const cards = screen.getAllByRole('radio', { name: /^(System|Light|Dark)/ })
+    expect(cards.map(card => card.dataset.testid)).toEqual([
+      'settings-theme-system',
+      'settings-theme-light',
+      'settings-theme-dark'
+    ])
+
     await userEvent.click(screen.getByTestId('settings-theme-dark'))
 
     expect(usePrefs.getState().theme).toBe('dark')
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    expect(screen.getByTestId('settings-theme-dark')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('settings-theme-light')).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByTestId('settings-theme-system')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('moves the theme with the arrow keys', async () => {
+    await open()
+    await go('language')
+    await userEvent.click(screen.getByTestId('settings-theme-light'))
+
+    await userEvent.keyboard('{ArrowRight}')
+    expect(usePrefs.getState().theme).toBe('dark')
+    expect(screen.getByTestId('settings-theme-dark')).toHaveFocus()
+  })
+
+  it('says which way System resolves right now', async () => {
+    await open()
+    await go('language')
+    expect(screen.getByTestId('settings-theme-system')).toHaveTextContent(/now (dark|light)/)
   })
 
   it('picks an accent from the swatches and paints the root with it', async () => {
