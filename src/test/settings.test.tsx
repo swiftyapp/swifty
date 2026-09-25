@@ -1226,13 +1226,18 @@ describe('Settings › workspaces › list', () => {
 
 describe('Settings › workspaces › edit', () => {
   const edit = async (id: string) => {
-    seedApp({
+    const status = {
       workspaces: [
         { id: 'default', name: null },
         { id: 'w2', name: 'Work', vaultId: 'cafe', synced: true, itemCount: 12 }
       ],
       activeWorkspace: 'default'
-    })
+    }
+    seedApp(status)
+    // The probe a save re-reads the list through answers with the same two
+    // workspaces, as it would; the bare default would make the one being
+    // edited vanish and the page step out.
+    mockCommand('app_status', () => ({ ...appStatusDefault(), ...status }))
     await open()
     await go('workspaces')
     await openMenu(id)
@@ -1313,6 +1318,37 @@ describe('Settings › workspaces › edit', () => {
       'registry is read-only'
     )
     expect(screen.getByTestId('workspace-edit-name')).toBeEnabled()
+  })
+
+  // A rename that landed before the colour failed is not undone by the
+  // failure: the list is re-read so it shows, and a retry sends only the part
+  // still unsaved rather than renaming twice.
+  it('keeps a rename that landed when the colour after it fails', async () => {
+    mockCommandOnce('workspace_set_color', () =>
+      Promise.reject({ kind: 'other', message: 'registry is read-only' })
+    )
+    await edit('w2')
+    // What the re-read finds once the rename has landed.
+    mockCommand('app_status', () => ({
+      ...appStatusDefault(),
+      workspaces: [
+        { id: 'default', name: null },
+        { id: 'w2', name: 'Work Ltd', vaultId: 'cafe', synced: true, itemCount: 12 }
+      ]
+    }))
+    await userEvent.type(screen.getByTestId('workspace-edit-name'), ' Ltd')
+    await userEvent.click(screen.getByTestId('workspace-edit-color-rose'))
+    await userEvent.click(screen.getByTestId('workspace-edit-save'))
+
+    expect(await screen.findByTestId('workspace-edit-error')).toHaveTextContent(
+      'registry is read-only'
+    )
+    expect(calls('workspace_rename')).toEqual([{ id: 'w2', name: 'Work Ltd' }])
+    expect(screen.getByTestId('workspace-edit-name')).toHaveValue('Work Ltd')
+
+    await userEvent.click(screen.getByTestId('workspace-edit-save'))
+    await waitFor(() => expect(calls('workspace_set_color')).toHaveLength(2))
+    expect(calls('workspace_rename')).toHaveLength(1)
   })
 
   it('lets the edit go with Escape, leaving Settings open', async () => {

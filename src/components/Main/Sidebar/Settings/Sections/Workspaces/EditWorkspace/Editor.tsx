@@ -44,15 +44,20 @@ export default function Editor({ workspace }: { workspace: Workspace }) {
     if (!ready || busy) return
     setBusy(true)
     setError(null)
+    let failure: unknown = null
     try {
       if (renamed) await workspaceRename(workspace.id, next)
       if (recoloured) await workspaceSetColor(workspace.id, color)
-      await refreshApp()
-      close()
     } catch (err: unknown) {
-      setBusy(false)
-      setError(describeError(err) || t('Something went wrong'))
+      failure = err
     }
+    // Re-read either way: a rename that landed before the colour failed is
+    // in the list, and — since the fields are compared against the workspace
+    // as it now is — a retry sends only what is still unsaved.
+    await refreshApp()
+    if (failure === null) return close()
+    setBusy(false)
+    setError(describeError(failure) || t('Something went wrong'))
   }
 
   const current = workspace.id === active
