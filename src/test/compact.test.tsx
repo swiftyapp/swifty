@@ -453,7 +453,7 @@ describe('compact shell', () => {
     await userEvent.click(screen.getByTestId('sync-indicator'))
 
     expect(screen.getByTestId('settings-back')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Sync & devices' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sync & backup' })).toBeInTheDocument()
   })
 
   it('locks the vault from the settings root', async () => {
