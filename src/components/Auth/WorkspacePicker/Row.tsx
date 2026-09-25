@@ -1,6 +1,5 @@
-import { DropdownItem, DropdownMeta } from '@/components/elements/Dropdown'
+import { DropdownCheck, DropdownItem, DropdownMeta } from '@/components/elements/Dropdown'
 import Monogram from '@/components/elements/Monogram'
-import { CheckGlyph } from '@/components/Main/icons'
 import { chord } from '@/lib/platform'
 
 interface Props {
@@ -53,16 +52,9 @@ export default function Row({
         <span className="truncate text-[12px] text-text2">{about}</span>
       </span>
       {selected ? (
-        <span className="grid flex-none place-items-center">
-          <CheckGlyph stroke={2} />
-        </span>
+        <DropdownCheck on />
       ) : (
-        position < 9 && (
-          // A finger has no ⌘, so no coarse pointer is shown one.
-          <span aria-hidden className="any-pointer-coarse:hidden">
-            <DropdownMeta hint>{chord(String(position + 1))}</DropdownMeta>
-          </span>
-        )
+        position < 9 && <DropdownMeta hint>{chord(String(position + 1))}</DropdownMeta>
       )}
     </DropdownItem>
   )

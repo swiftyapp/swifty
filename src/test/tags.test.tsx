@@ -152,14 +152,11 @@ describe('the tags view', () => {
     expect(screen.queryByTestId('active-tag')).not.toBeInTheDocument()
   })
 
-  it('names the tag in a plain title, with no scope menu to leave it by', async () => {
+  it('names the tag in the title', async () => {
     seed()
     await open()
     await pick('money')
 
-    // A kind is a place under All Items, so the way to one from here is the
-    // All Items tile — the tag's title offers no menu of its own.
     expect(screen.getByTestId('list-title')).toHaveTextContent('#money')
-    expect(screen.getByTestId('list-title')).not.toHaveAttribute('aria-haspopup')
   })
 })

@@ -370,6 +370,8 @@ describe('List keyboard navigation', () => {
 // A mixed list is sectioned by kind, in registry order, keeping the sort
 // order inside each section. Not a preference: it is what a mixed list is.
 describe('Grouped by kind', () => {
+  afterEach(() => setView('items'))
+
   const mixed = [
     loginMeta({ id: 'g', title: 'Google', updatedAt: at(2024, 2, 14, 9) }),
     loginMeta({ id: 'v', type: 'card', title: 'Visa', urlHost: '', favorite: true, updatedAt: at(2024, 2, 14, 10) }),
@@ -399,7 +401,6 @@ describe('Grouped by kind', () => {
     expect(titles()).toEqual(['Visa'])
     // One kind is one section, so the captions go.
     expect(screen.queryByTestId('group-card')).not.toBeInTheDocument()
-    setFilterType(null)
   })
 
   it('captions the other views without opening from them', () => {
@@ -412,7 +413,6 @@ describe('Grouped by kind', () => {
     const caption = screen.getByTestId('group-login')
     expect(caption).toHaveTextContent('Logins1')
     expect(caption.tagName).toBe('DIV')
-    setView('items')
   })
 
   it('drops the sections while a query is ranking the rows', async () => {

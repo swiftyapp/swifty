@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LANGUAGES } from '@/i18n'
-import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
+import { Dropdown, DropdownCheck, DropdownItem } from '@/components/elements/Dropdown'
 import { META } from '@/components/elements/tokens'
-import { CheckGlyph, ChevronDownGlyph } from '@/components/Main/icons'
+import { ChevronDownGlyph } from '@/components/Main/icons'
 
 // The locale picker: a field-shaped trigger naming the current language in its
 // own tongue, opening a single-select menu of the rest. Switching applies at
@@ -44,9 +44,7 @@ export default function LanguageMenu() {
             >
               <span className="min-w-0 flex-1 truncate text-text">{LANGUAGES[key]}</span>
               <span className={META}>{key}</span>
-              <span className="grid w-3.5 flex-none place-items-center text-accent">
-                {key === current && <CheckGlyph />}
-              </span>
+              <DropdownCheck on={key === current} />
             </DropdownItem>
           ))}
         </Dropdown>

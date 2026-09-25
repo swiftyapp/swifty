@@ -14,6 +14,7 @@ export {
   visibleTitles,
   expectTitles,
   openEntry,
+  openKind,
   startEdit,
   toggleFavorite,
   type LoginFields,

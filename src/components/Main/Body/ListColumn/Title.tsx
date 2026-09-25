@@ -6,39 +6,17 @@ import { ChevronDownGlyph } from '../../icons'
 import { useListTitle } from './useListTitle'
 import ScopeMenu from './ScopeMenu'
 
-interface Props {
-  /**
-   * The title's type: the wide shell's 20px column title by default; the
-   * compact root sends its 24px one.
-   */
-  className?: string
-  /** Where the scope menu hangs, when the default under the title is wrong. */
-  menu?: string
-}
-
-// The list column's title — and, in All Items, the switch between the places
-// under it. The title already renames itself to the open kind ("Credit
-// cards"), so the title is the one control that can pick the kind without
-// adding any chrome: a chevron says it opens, and the menu it opens is the
-// list of places with their counts. In every other view the title is text.
-//
-// The trigger is the prototype's pill around the words — 10px in front of
-// them, 8px after the chevron, washed on hover and held on the selection wash
-// while its menu is open, the chevron turned over — but it takes no room of
-// its own: the 4px it adds above and below the line is given back in negative
-// margin, so the words sit exactly where "Favorites" and "Archive" sit in
-// their views and the header row keeps the same height in every view.
-export default function Title({ className = 'text-xl', menu }: Props) {
+export default function Title({ className = 'text-xl' }: { className?: string }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const title = useListTitle()
   const scoped = useUi(state => state.view === 'items')
 
-  const type = cx('min-w-0 truncate font-semibold tracking-display text-text', className)
+  const words = cx('min-w-0 truncate font-semibold tracking-display text-text', className)
 
   if (!scoped)
     return (
-      <div data-testid="list-title" className={cx('flex-1', type)}>
+      <div data-testid="list-title" className={cx('flex-1', words)}>
         {title}
       </div>
     )
@@ -57,14 +35,14 @@ export default function Title({ className = 'text-xl', menu }: Props) {
           open ? 'bg-sel' : 'hover:bg-hover'
         )}
       >
-        <span className={type}>{title}</span>
+        <span className={words}>{title}</span>
         <span
           className={cx('flex-none text-text2 transition-transform', open && 'rotate-180')}
         >
           <ChevronDownGlyph stroke={2} />
         </span>
       </button>
-      {open && <ScopeMenu onClose={() => setOpen(false)} className={menu} />}
+      {open && <ScopeMenu onClose={() => setOpen(false)} />}
     </div>
   )
 }

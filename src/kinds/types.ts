@@ -19,7 +19,7 @@ export interface Kind {
   type: EntryType
   /** Singular, untranslated — call sites wrap it in `t()`. */
   label: TKey
-  /** Plural, untranslated (list-column title, filter chip). */
+  /** Plural, untranslated (list-column title, scope menu, section caption). */
   pluralLabel: TKey
   /** One line for pickers and empty states. */
   description: TKey

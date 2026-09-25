@@ -1,14 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { cx } from '@/utils/cx'
-
-/**
- * The app's one menu, per the Rowel menus prototype: a 12px-radius sheet with
- * 5px of padding, 32px rows with 9px side padding and a 7px radius, 13px
- * primary ink, a 10px gap between a row's parts. The sheet is `--menu` over a
- * saturated blur, edged by `--menu-line`, and drops in over 140ms. Every menu
- * in the app (sort, scope, tags, the entry's overflow, the vault picker) is
- * this one, so a measurement changes here and nowhere else.
- */
+import { CheckGlyph } from '@/components/Main/icons'
 
 interface DropdownProps {
   onBlur: () => void
@@ -135,22 +127,14 @@ interface ItemProps {
   separated?: boolean
   // Destructive entry (delete, disconnect, ...): inked in the `bad` token.
   danger?: boolean
-  /**
-   * Quiet: a place with nothing in it yet. Still a row — it can be picked,
-   * and lands on the empty state — but at under half its ink.
-   */
-  dim?: boolean
   testid?: string
   onClick?: () => void
-  // Spacing overrides for a row that is not a plain label (a tile with two
-  // lines of text is taller than the 32px default).
   className?: string
   /**
    * Set on every item of a menu that picks one of several (a sort order, a
    * vault): the item becomes a `menuitemradio` and says whether it is the one,
    * so the selection a check glyph shows is also told to assistive technology.
-   * The chosen one sits on the selection wash. Left undefined, the item is a
-   * plain action.
+   * Left undefined, the item is a plain action.
    */
   checked?: boolean
   /**
@@ -169,7 +153,6 @@ export function DropdownItem({
   option,
   separated,
   danger,
-  dim,
   testid,
   onClick,
   className,
@@ -180,16 +163,11 @@ export function DropdownItem({
   children
 }: ItemProps) {
   const radio = checked !== undefined
-  // The chosen row keeps the selection wash; every other row takes the hover
-  // wash under the pointer or the keyboard. Keyboard focus borrows the hover
-  // treatment instead of the global outline, which would ring a rounded row
-  // inset in a rounded panel.
-  const highlight =
-    active !== undefined
-      ? active && (checked ? 'bg-sel' : 'bg-hover')
-      : checked
-        ? 'bg-sel'
-        : 'hover:bg-hover focus-visible:bg-hover'
+  const highlight = checked
+    ? 'bg-sel'
+    : active !== undefined
+      ? active && 'bg-hover'
+      : 'hover:bg-hover focus-visible:bg-hover'
 
   return (
     <>
@@ -207,7 +185,6 @@ export function DropdownItem({
         className={cx(
           'flex min-h-8 w-full flex-none cursor-pointer items-center gap-2.5 rounded-[7px] px-[9px] text-left text-base focus-visible:outline-none',
           danger ? 'text-bad' : 'text-text',
-          dim && 'opacity-45',
           highlight,
           className
         )}
@@ -218,12 +195,10 @@ export function DropdownItem({
   )
 }
 
-/** A rule between two runs of items, inset to the rows' text edge. */
 export function DropdownSeparator() {
   return <div role="separator" className="mx-[9px] my-[5px] h-px flex-none bg-line" />
 }
 
-/** The caption over a run of items ("Kinds", "Sort by"): 11px, the third ink. */
 export function DropdownLabel({ children }: { children: ReactNode }) {
   return (
     <div role="presentation" className="px-[9px] pb-1 pt-[5px] text-xs font-medium text-text3">
@@ -232,10 +207,18 @@ export function DropdownLabel({ children }: { children: ReactNode }) {
   )
 }
 
-/**
- * A row's trailing figure — a count, or a chord — in the mono face at half
- * ink, so it reads after the label. Tabular, so a count holds its width.
- */
+export function DropdownGlyph({ children }: { children: ReactNode }) {
+  return <span className="flex-none opacity-85">{children}</span>
+}
+
+export function DropdownCheck({ on }: { on: boolean }) {
+  return (
+    <span className={cx('grid w-3.5 flex-none place-items-center', !on && 'opacity-0')}>
+      <CheckGlyph stroke={2} />
+    </span>
+  )
+}
+
 export function DropdownMeta({
   children,
   testid,
@@ -243,15 +226,15 @@ export function DropdownMeta({
 }: {
   children: ReactNode
   testid?: string
-  /** A keyboard hint rather than a count: a touch smaller and quieter. */
   hint?: boolean
 }) {
   return (
     <span
       data-testid={testid}
+      aria-hidden={hint || undefined}
       className={cx(
         'flex-none font-mono tabular-nums',
-        hint ? 'text-xs opacity-45' : 'text-[11.5px] opacity-50'
+        hint ? 'text-xs opacity-45 any-pointer-coarse:hidden' : 'text-[11.5px] opacity-50'
       )}
     >
       {children}

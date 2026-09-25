@@ -24,8 +24,6 @@ export const byRecency = (entries: EntryMeta[]): EntryMeta[] =>
     (a, b) => Number(b.favorite) - Number(a.favorite) || timeOf(b) - timeOf(a)
   )
 
-// Newest-made first, starred on top for the same reason as recency: it is a
-// working order, not an index.
 export const byCreated = (entries: EntryMeta[]): EntryMeta[] =>
   [...entries].sort(
     (a, b) => Number(b.favorite) - Number(a.favorite) || madeAt(b) - madeAt(a)
@@ -33,10 +31,7 @@ export const byCreated = (entries: EntryMeta[]): EntryMeta[] =>
 
 const KIND_RANK = new Map(KINDS.map((kind, rank) => [kind.type, rank]))
 
-// The same rows, sectioned by kind in registry order — the order the Add
-// picker and the scope menu use — and left in the order they came inside each
-// section. A stable sort, so "recent within Logins" is exactly the recent list
-// with the other kinds taken out.
+// Stable, so each section keeps the order the rows came in.
 export const byKind = (entries: EntryMeta[]): EntryMeta[] =>
   [...entries].sort(
     (a, b) => (KIND_RANK.get(a.type) ?? 0) - (KIND_RANK.get(b.type) ?? 0)

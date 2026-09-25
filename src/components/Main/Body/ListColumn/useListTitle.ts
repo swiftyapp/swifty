@@ -3,7 +3,7 @@ import { useUi, type View } from '@/store'
 import { kindOf } from '@/kinds'
 import type { TKey } from '@/i18n'
 
-// The column is titled after the view, except in All Items, where a kind chip
+// The column is titled after the view, except in All Items, where an open kind
 // renames it to what it is now showing ("Logins"), and in Tags, where the tag
 // does ("#work"). The other views keep their own name: "Logins" would lose the
 // fact that you are looking at the Archive.

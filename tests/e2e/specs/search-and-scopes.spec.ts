@@ -11,6 +11,7 @@ import {
   unlock,
   visibleTitles,
   waitFor,
+  openKind,
 } from "../helpers";
 
 // What the list column shows: it lands on every kind at once ("All Items"), the
@@ -52,17 +53,11 @@ async function expectSelected(title: string): Promise<void> {
   );
 }
 
-/** Open the title's scope menu (the title is its trigger in All Items). */
+/** Open the scope menu without picking, to read it (`openKind` picks). */
 async function openScope(): Promise<void> {
   await waitFor("list-title");
   await $('[data-testid="list-title"]').click();
   await waitFor("scope-option-all");
-}
-
-/** Pick one kind, or All Items, from the title's scope menu. */
-async function selectKind(kind: "all" | "login" | "note" | "card"): Promise<void> {
-  await openScope();
-  await $(`[data-testid="scope-option-${kind}"]`).click();
 }
 
 /** The count on one row of the scope menu; opens the menu and closes it again. */
@@ -100,7 +95,7 @@ describe("search and kind filters", () => {
   });
 
   it("filters the list by title and restores it on clear", async () => {
-    await selectKind("login");
+    await openKind("login");
     await expectTitles(LOGINS_BY_RECENCY);
 
     await searchInput().setValue("Basalt");
@@ -113,7 +108,7 @@ describe("search and kind filters", () => {
   });
 
   it("lists every kind together under All Items", async () => {
-    await selectKind("all");
+    await openKind("all");
 
     // Sectioned by kind in registry order — logins, then cards, then notes —
     // and newest write first inside each section.
@@ -128,7 +123,7 @@ describe("search and kind filters", () => {
   });
 
   it("counts each kind in the scope menu", async () => {
-    await selectKind("all");
+    await openKind("all");
 
     expect(await scopeCount("all")).toBe(5);
     expect(await scopeCount("login")).toBe(3);
@@ -138,7 +133,7 @@ describe("search and kind filters", () => {
 
   it("shows only the kind the scope menu opens", async () => {
     // The query is global state, so leave it empty for the filter assertions.
-    await selectKind("note");
+    await openKind("note");
     await expectTitles([NOTE]);
     await expect($('[data-testid="list-title"]')).toHaveText("Secure notes");
     await openScope();
@@ -148,23 +143,23 @@ describe("search and kind filters", () => {
     );
     await browser.keys("Escape");
 
-    await selectKind("card");
+    await openKind("card");
     await expectTitles([CARD]);
     await expect($('[data-testid="list-title"]')).toHaveText("Credit cards");
 
-    await selectKind("login");
+    await openKind("login");
     await expectTitles(LOGINS_BY_RECENCY);
     await expect($('[data-testid="list-title"]')).toHaveText("Logins");
   });
 
   it("searches across every kind under All Items", async () => {
-    await selectKind("all");
+    await openKind("all");
     await searchInput().setValue("Recovery");
     await expectTitles([NOTE]);
 
     // The same query under a kind that cannot match it comes back empty — and
     // says so in the list column, naming the query and the kind narrowing it.
-    await selectKind("login");
+    await openKind("login");
     await expectTitles([]);
     await waitFor("empty-search");
     // The widen link is the tell that the kind filter is named in the line.
@@ -176,7 +171,7 @@ describe("search and kind filters", () => {
   });
 
   it("takes ⌘F, and ⏎ selects the first row left standing", async () => {
-    await selectKind("all");
+    await openKind("all");
 
     // Nothing is focused on entry, so a caret in the field can only have come
     // from the chord.
@@ -201,7 +196,7 @@ describe("search and kind filters", () => {
   // The whole keyboard path, driven end to end: ⌘F, type, ↓↓, ⏎, ⌘E — never
   // touching the pointer.
   it("walks the results with ↓ and edits the row it lands on", async () => {
-    await selectKind("all");
+    await openKind("all");
 
     await chord("f");
     await browser.waitUntil(async () => await searchInput().isFocused(), {

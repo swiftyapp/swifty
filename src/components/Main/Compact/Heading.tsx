@@ -8,15 +8,10 @@
  * Deliberately not the 34px large title iOS puts on a tab root: with a search
  * field under it the screen has plenty to say already, and the app's name
  * needs no saying — the icon on the home screen did that.
- *
- * `testid` is the handle a root is addressed by, when it has one.
  */
-export default function Heading({ title, testid }: { title: string; testid?: string }) {
+export default function Heading({ title }: { title: string }) {
   return (
-    <div
-      data-testid={testid}
-      className="min-w-0 flex-1 truncate text-2xl font-semibold tracking-display text-text"
-    >
+    <div className="min-w-0 flex-1 truncate text-2xl font-semibold tracking-display text-text">
       {title}
     </div>
   )

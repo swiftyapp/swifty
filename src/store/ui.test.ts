@@ -9,8 +9,7 @@ import {
   setFilterType,
   editEntry,
   setView,
-  showTag,
-  showKind
+  showTag
 } from './index'
 import { filterEntries } from '@/services/entries'
 import type { EntryMeta } from '@/api/types'
@@ -96,26 +95,8 @@ describe('views', () => {
     expect(current()).toBeNull()
   })
 
-  it('enters All Items narrowed to a kind from another view, leaving the tag behind', () => {
-    showTag('work')
-    setCurrentEntry('both')
-
-    showKind('login')
-
-    expect(useUi.getState()).toMatchObject({ view: 'items', filterType: 'login', filterTag: null })
-    expect(current()).toBeNull()
-  })
-
-  it('keeps a selection the kind still admits when already in All Items', () => {
-    setCurrentEntry('both')
-    showKind('login')
-
-    expect(useUi.getState()).toMatchObject({ view: 'items', filterType: 'login' })
-    expect(current()?.id).toBe('both')
-  })
-
   it('drops the kind on the way to another view', () => {
-    showKind('login')
+    setFilterType('login')
     setView('favorites')
 
     expect(useUi.getState()).toMatchObject({ view: 'favorites', filterType: null })
@@ -123,7 +104,7 @@ describe('views', () => {
 
   it('drops the kind on the way into a tag, so the tag shows every kind', () => {
     setEntries([...items, { ...meta('card', ['work']), type: 'card' }])
-    showKind('login')
+    setFilterType('login')
 
     showTag('work')
 

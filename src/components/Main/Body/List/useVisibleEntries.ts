@@ -9,8 +9,8 @@ import { byTitle, byRecency, byCreated, byKind } from './order'
  *
  * One definition for all the item views, so a view is only ever a different
  * source array — never a second filter path. Everything downstream (the list,
- * the scope counts, the empty states) reads the vault through here. Tags reads
- * the whole vault: a tag gathers items from across it, not from one view.
+ * the empty states) reads the vault through here. Tags reads the whole vault:
+ * a tag gathers items from across it, not from one view.
  */
 export const useRows = (): EntryMeta[] => {
   const view = useUi(state => state.view)
@@ -25,25 +25,14 @@ export const useRows = (): EntryMeta[] => {
   return items
 }
 
-/**
- * Whether the list is sectioned by kind right now: the list is mixed (no kind
- * is open — one section would be no sections) and nothing is being searched
- * (results come ranked, and sectioning would bury the closest match under
- * whichever kind sorts first). Not a preference: a mixed list is always the
- * map of the kinds in it.
- */
+// Search results come ranked, so they are never sectioned.
 export const useGrouped = (): boolean => {
-  const type = useUi(state => state.filterType)
   const query = useUi(state => state.query)
-  return type === null && !query.trim()
+  return !query.trim()
 }
 
-// The rows the list actually shows: the view's rows, narrowed by the open
-// kind, the Tags view's picked tag and the query, in the order the sort control
-// asks for — and, in a mixed list, in kind sections in that order. The
-// sections are applied here rather than by the list so the keyboard walks the
-// rows in the order they are drawn. Memoized because the whole column (the
-// list, the empty states) reads it — one pass per keystroke.
+// The rows the list shows, sectioned by kind here so the keyboard walks them
+// in the order they are drawn. Memoized: the whole column reads it.
 export const useVisibleEntries = () => {
   const type = useUi(state => state.filterType)
   // A tag narrows the Tags view and nothing else — `setView` already drops it

@@ -42,9 +42,6 @@ export default function Vault() {
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-screen pt-[env(safe-area-inset-top)]">
       <ListColumn
-        // The column's own title at the root's 24px, so that in All Items it
-        // is the scope menu's trigger here too — the same words `Heading`
-        // would draw, with the same handle (`list-title`).
         heading={<Title className="text-2xl" />}
         header={ROOT_HEADER}
         actions={

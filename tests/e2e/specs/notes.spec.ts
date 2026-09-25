@@ -1,19 +1,12 @@
-import { createNote, resetEmpty, startEdit, unlock, waitFor } from "../helpers";
+import { createNote, openKind, resetEmpty, startEdit, unlock, waitFor } from "../helpers";
 
 // Known app bug (not fixed here): `useRevealed` keys the decrypt on the entry
 // id alone, so after an in-place save the detail pane keeps serving the
 // pre-edit plaintext. Clearing the selection unmounts the pane, so re-opening
 // the entry forces a fresh reveal — which is what this asserts against.
-// Opening a kind the selection is not clears it (`showKind`), so the login→note
-// round trip through the title's scope menu is what unmounts the pane; All
-// Items would keep the note selected and the stale reveal with it.
-async function openKind(kind: string): Promise<void> {
-  await waitFor("list-title");
-  await $('[data-testid="list-title"]').click();
-  await waitFor(`scope-option-${kind}`);
-  await $(`[data-testid="scope-option-${kind}"]`).click();
-}
-
+// Opening a kind the selection is not clears it (`setFilterType`), so the
+// login→note round trip through the title's scope menu is what unmounts the
+// pane; All Items would keep the note selected and the stale reveal with it.
 async function reopenFirstEntry(): Promise<void> {
   await openKind("login");
   await openKind("note");

@@ -9,7 +9,8 @@ import {
   focusSearch,
   isModalOpen,
   lockVault,
-  setPref
+  setPref,
+  SORT_MODES
 } from '@/store'
 import { keyCode } from '@/utils/keys'
 
@@ -33,10 +34,7 @@ const BINDINGS: Record<string, () => void> = {
   KeyE: () => {
     if (selectCurrent(useVault.getState())) editEntry()
   },
-  // The three orders of the sort menu, numbered as the menu lists them.
-  Digit1: () => setPref('sort', 'alpha'),
-  Digit2: () => setPref('sort', 'recent'),
-  Digit3: () => setPref('sort', 'created')
+  ...Object.fromEntries(SORT_MODES.map((mode, i) => [`Digit${i + 1}`, () => setPref('sort', mode)]))
 }
 
 export const useShortcuts = () => {

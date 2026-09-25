@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import IconButton from '@/components/elements/IconButton'
-import { Dropdown, DropdownItem } from '@/components/elements/Dropdown'
+import { Dropdown, DropdownGlyph, DropdownItem } from '@/components/elements/Dropdown'
 import { ArchiveGlyph, MoreGlyph, PencilGlyph, ShareGlyph } from '../../../icons'
 
 interface Props {
@@ -72,9 +72,9 @@ export default function MoreMenu({
                 onEdit()
               }}
             >
-              <span className="flex-none opacity-85">
+              <DropdownGlyph>
                 <PencilGlyph />
-              </span>
+              </DropdownGlyph>
               {t('Edit')}
             </DropdownItem>
           )}
@@ -86,9 +86,9 @@ export default function MoreMenu({
                 onShare()
               }}
             >
-              <span className="flex-none opacity-85">
+              <DropdownGlyph>
                 <ShareGlyph />
-              </span>
+              </DropdownGlyph>
               {t('Share…')}
             </DropdownItem>
           )}
@@ -100,9 +100,9 @@ export default function MoreMenu({
             testid={armed ? 'delete-entry-confirm' : 'delete-entry-button'}
             onClick={armed ? confirm : () => setArmed(true)}
           >
-            <span className="flex-none opacity-85">
+            <DropdownGlyph>
               <ArchiveGlyph />
-            </span>
+            </DropdownGlyph>
             {armed ? t('Archive entry?') : t('Archive')}
           </DropdownItem>
         </Dropdown>

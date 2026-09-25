@@ -7,6 +7,7 @@ import {
   startEdit,
   unlock,
   waitFor,
+  openKind,
 } from "../helpers";
 
 // ID documents. What makes this kind different from the other three is that the
@@ -81,13 +82,6 @@ async function expectDocType(label: string): Promise<void> {
  * plaintext. Opening a kind the selection is not clears it, which unmounts
  * the pane; coming back forces the reveal.
  */
-async function openKind(kind: string): Promise<void> {
-  await waitFor("list-title");
-  await $('[data-testid="list-title"]').click();
-  await waitFor(`scope-option-${kind}`);
-  await $(`[data-testid="scope-option-${kind}"]`).click();
-}
-
 async function reopen(title: string): Promise<void> {
   await openKind("login");
   await openKind("identity");

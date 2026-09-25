@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useUi, showTag } from '@/store'
 import { cx } from '@/utils/cx'
-import { Dropdown, DropdownItem, DropdownMeta } from '@/components/elements/Dropdown'
-import { CheckGlyph } from '../../icons'
+import { Dropdown, DropdownCheck, DropdownItem, DropdownMeta } from '@/components/elements/Dropdown'
 import { useTagCounts } from './useTagCounts'
 import { META } from '@/components/elements/tokens'
 
@@ -46,9 +45,7 @@ export default function Menu({
               checked={tag === active}
               onClick={() => pick(tag)}
             >
-              <span className="grid w-3.5 flex-none place-items-center">
-                {tag === active && <CheckGlyph stroke={2} />}
-              </span>
+              <DropdownCheck on={tag === active} />
               <span className="min-w-0 flex-1 truncate">{tag}</span>
               <DropdownMeta testid={`tag-option-${tag}-count`}>{count}</DropdownMeta>
             </DropdownItem>

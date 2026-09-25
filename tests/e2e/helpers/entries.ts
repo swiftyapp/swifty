@@ -10,6 +10,14 @@ import { waitFor } from "./app";
 
 type Kind = "login" | "card" | "note" | "identity";
 
+/** Pick a kind, or All Items, from the title's scope menu. */
+export async function openKind(kind: Kind | "all"): Promise<void> {
+  await waitFor("list-title");
+  await $('[data-testid="list-title"]').click();
+  await waitFor(`scope-option-${kind}`);
+  await $(`[data-testid="scope-option-${kind}"]`).click();
+}
+
 /** The `doc_type` values the identity form offers, in its own order. */
 export type DocType =
   | "passport"
