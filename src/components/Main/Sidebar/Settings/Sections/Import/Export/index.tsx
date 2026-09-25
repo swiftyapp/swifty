@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { exportEntries, type ExportFormat } from '@/api/imports'
 import { describeError } from '@/api/errors'
-import { setSettingsSection, useVault } from '@/store'
+import { useVault } from '@/store'
 import { cx } from '@/utils/cx'
 import Button from '@/components/elements/Button'
 import { LABEL } from '@/components/elements/tokens'
+import { useSectionNav } from '../../../sectionNav'
 import Formats from './Formats'
 import Warning from './Warning'
 
@@ -17,6 +18,8 @@ const fileName = (path: string) => path.replace(/^.*[\\/]/, '')
 export default function ExportPane() {
   const { t } = useTranslation()
   const items = useVault(state => state.items)
+  // Whichever shell this is in: the modal's nav, or the phone's pushed pane.
+  const go = useSectionNav()
   const [format, setFormat] = useState<ExportFormat>('bitwarden')
   const [acknowledged, setAcknowledged] = useState(false)
   const [running, setRunning] = useState(false)
@@ -46,7 +49,7 @@ export default function ExportPane() {
           <button
             type="button"
             data-testid="settings-export-backup-link"
-            onClick={() => setSettingsSection('sync')}
+            onClick={() => go('sync')}
             className="cursor-pointer text-accent hover:underline"
           >
             {t('Save an encrypted backup instead')}

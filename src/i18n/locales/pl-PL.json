@@ -573,7 +573,7 @@
   "Separate database": "Osobna baza danych",
   "Each workspace is its own encrypted file.": "Każda przestrzeń robocza to osobny zaszyfrowany plik.",
   "One unlock": "Jedno odblokowanie",
-  "Your master password opens all of them.": "Twoje hasło główne otwiera je wszystkie.",
+  "Your master password opens every workspace that shares it.": "Twoje hasło główne otwiera każdą przestrzeń roboczą, która je współdzieli.",
   "Synced as its own vault": "Synchronizowana jako osobny sejf",
   "Stored in the same Google Drive account.": "Przechowywana na tym samym koncie Google Drive.",
   "In your Google account": "Na Twoim koncie Google",

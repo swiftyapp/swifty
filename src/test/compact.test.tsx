@@ -417,6 +417,20 @@ describe('compact shell', () => {
     expect(screen.getByTestId('settings-nav-security')).toBeInTheDocument()
   })
 
+  // A section body that sends the user elsewhere (the export pane's "save a
+  // backup instead") has to move this shell's pushed pane, not the modal's
+  // remembered section, which nothing on a phone is showing.
+  it('follows the export pane’s backup link to the Sync pane', async () => {
+    seed()
+    render(<Main />)
+
+    act(() => openSettings())
+    await userEvent.click(screen.getByTestId('settings-nav-import'))
+    await userEvent.click(screen.getByTestId('settings-io-export'))
+    await userEvent.click(screen.getByTestId('settings-export-backup-link'))
+    expect(screen.getByRole('heading', { name: 'Sync & backup' })).toBeInTheDocument()
+  })
+
   // The pane's section is local state, so the store's guard on the wide
   // modal's close and nav does not reach it by itself — the Back has to honour
   // the same lock, or a restore from Drive could be walked away from here

@@ -1,6 +1,7 @@
+import { useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { usePrefs, setPref } from '@/store'
-import { resolveTheme, type ThemePreference } from '@/theme'
+import { prefersDark, type ThemePreference } from '@/theme'
 import type { TKey } from '@/i18n'
 import { useRadioNav } from '@/hooks/useRadioNav'
 import { cx } from '@/utils/cx'
@@ -13,11 +14,23 @@ const THEMES: { value: ThemePreference; label: TKey }[] = [
   { value: 'dark', label: 'Dark' }
 ]
 
+// The OS appearance, live: the System card says which way it currently falls,
+// and that has to follow a change made while Settings is open. The preference
+// store re-applies the theme on that change but nothing in it re-renders, so
+// the card subscribes to the media query itself. No matchMedia (jsdom, a
+// locked-down webview) means the hint just reads the initial answer.
+const subscribeToOs = (onChange: () => void) => {
+  const query = window.matchMedia?.('(prefers-color-scheme: dark)')
+  query?.addEventListener('change', onChange)
+  return () => query?.removeEventListener('change', onChange)
+}
+
 // The theme as three preview cards rather than three words: a radiogroup like
 // Segmented (one tab stop, arrows select), each option a picture of the palette.
 export default function ThemePicker() {
   const { t } = useTranslation()
   const theme = usePrefs(state => state.theme)
+  const systemDark = useSyncExternalStore(subscribeToOs, prefersDark, () => false)
   const choose = (next: ThemePreference) => setPref('theme', next)
   const { ref, onKeyDown } = useRadioNav(
     THEMES.map(option => option.value),
@@ -65,7 +78,7 @@ export default function ThemePicker() {
               <span className="text-base font-medium text-text">{t(label)}</span>
               {value === 'system' && (
                 <span className={cx(META, 'ml-auto')}>
-                  {resolveTheme('system') === 'dark' ? t('now dark') : t('now light')}
+                  {systemDark ? t('now dark') : t('now light')}
                 </span>
               )}
             </span>

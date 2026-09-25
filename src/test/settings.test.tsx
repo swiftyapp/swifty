@@ -87,6 +87,7 @@ describe('Settings shell', () => {
 
   it('badges the audit row with the open issue count', async () => {
     // One weak-and-reused entry counts twice, as the audit section's tallies do.
+    usePrefs.setState({ breachCheck: true })
     auditDone({
       a: { score: 1, isWeak: true, isRepeating: true, breached: false },
       b: { score: 4, isWeak: false, isRepeating: false, breached: true },
@@ -94,6 +95,18 @@ describe('Settings shell', () => {
     })
     await open()
     expect(screen.getByTestId('settings-nav-audit-badge')).toHaveTextContent('3')
+  })
+
+  // The section shows no breach count while monitoring is off, and the badge
+  // must agree with it — even over an audit that ran while it was on.
+  it('leaves breaches out of the badge while monitoring is off', async () => {
+    usePrefs.setState({ breachCheck: false })
+    auditDone({
+      a: { score: 1, isWeak: true, isRepeating: false, breached: false },
+      b: { score: 4, isWeak: false, isRepeating: false, breached: true }
+    })
+    await open()
+    expect(screen.getByTestId('settings-nav-audit-badge')).toHaveTextContent('1')
   })
 
   it('shows no audit badge when nothing is open', async () => {

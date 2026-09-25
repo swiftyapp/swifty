@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { cx } from '@/utils/cx'
-import { useVault, type Section } from '@/store'
+import { useVault, usePrefs, type Section } from '@/store'
 import { LABEL, META_TYPE } from '@/components/elements/tokens'
 import { auditCounts } from '@/utils/vaultScore'
 import Footer from './Footer'
@@ -14,12 +14,15 @@ interface Props {
 }
 
 // Open audit findings, as the audit row's badge: zero (or no audit run yet)
-// reads as nothing to show.
+// reads as nothing to show. Breaches count only while monitoring is on — the
+// section itself shows none otherwise, and an audit that ran with the check
+// on can still be the one in the store after it was switched off.
 function useAuditIssues(): number {
   const audit = useVault(state => state.audit)
+  const breachCheck = usePrefs(state => state.breachCheck)
   if (!audit) return 0
   const { weak, reused, breached } = auditCounts(audit)
-  return weak + reused + breached
+  return weak + reused + (breachCheck ? breached : 0)
 }
 
 export default function Nav({ section, onSelect, disabled = false }: Props) {

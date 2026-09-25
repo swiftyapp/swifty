@@ -567,7 +567,7 @@
   "Separate database": "Separate database",
   "Each workspace is its own encrypted file.": "Each workspace is its own encrypted file.",
   "One unlock": "One unlock",
-  "Your master password opens all of them.": "Your master password opens all of them.",
+  "Your master password opens every workspace that shares it.": "Your master password opens every workspace that shares it.",
   "Synced as its own vault": "Synced as its own vault",
   "Stored in the same Google Drive account.": "Stored in the same Google Drive account.",
   "In your Google account": "In your Google account",

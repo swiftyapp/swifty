@@ -549,7 +549,7 @@
   "Separate database": "独立数据库",
   "Each workspace is its own encrypted file.": "每个工作区都是独立的加密文件。",
   "One unlock": "一次解锁",
-  "Your master password opens all of them.": "一个主密码即可打开全部工作区。",
+  "Your master password opens every workspace that shares it.": "主密码可打开所有使用它的工作区。",
   "Synced as its own vault": "作为独立保险库同步",
   "Stored in the same Google Drive account.": "存储在同一个 Google Drive 账户中。",
   "In your Google account": "在你的 Google 账号中",

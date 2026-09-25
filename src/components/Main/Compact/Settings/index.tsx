@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useUi, type Section } from '@/store'
+import { SectionNavProvider } from '../../Sidebar/Settings/sectionNav'
 import Root from './Root'
 import Pane from './Pane'
 
@@ -20,19 +21,28 @@ import Pane from './Pane'
  * pane's Back is the same move here, so it refuses the same way. The tab bar
  * needs nothing of its own — leaving Settings from there goes through
  * `closeSettings`, which is already guarded.
+ *
+ * A section body that sends the user to another section (the export pane's
+ * "save a backup instead") goes through `SectionNavProvider`, so here it moves
+ * this local state rather than the modal's — under the same lock.
  */
 export default function Settings() {
   const [section, setSection] = useState<Section | null>(null)
   const locked = useUi(state => state.settingsLocked)
+  const go = (next: Section) => {
+    if (!locked) setSection(next)
+  }
 
   return section ? (
-    <Pane
-      section={section}
-      locked={locked}
-      onBack={() => {
-        if (!locked) setSection(null)
-      }}
-    />
+    <SectionNavProvider value={go}>
+      <Pane
+        section={section}
+        locked={locked}
+        onBack={() => {
+          if (!locked) setSection(null)
+        }}
+      />
+    </SectionNavProvider>
   ) : (
     <Root onSelect={setSection} />
   )

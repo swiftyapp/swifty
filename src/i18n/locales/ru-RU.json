@@ -573,7 +573,7 @@
   "Separate database": "Отдельная база данных",
   "Each workspace is its own encrypted file.": "Каждое рабочее пространство — отдельный зашифрованный файл.",
   "One unlock": "Одна разблокировка",
-  "Your master password opens all of them.": "Мастер-пароль открывает их все.",
+  "Your master password opens every workspace that shares it.": "Мастер-пароль открывает все рабочие пространства, которые его используют.",
   "Synced as its own vault": "Синхронизируется отдельным хранилищем",
   "Stored in the same Google Drive account.": "Хранится в том же аккаунте Google Drive.",
   "In your Google account": "В вашем аккаунте Google",

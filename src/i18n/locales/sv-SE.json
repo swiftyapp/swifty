@@ -557,7 +557,7 @@
   "Separate database": "Separat databas",
   "Each workspace is its own encrypted file.": "Varje arbetsyta är en egen krypterad fil.",
   "One unlock": "En upplåsning",
-  "Your master password opens all of them.": "Ditt huvudlösenord öppnar alla.",
+  "Your master password opens every workspace that shares it.": "Ditt huvudlösenord öppnar varje arbetsyta som delar det.",
   "Synced as its own vault": "Synkas som ett eget valv",
   "Stored in the same Google Drive account.": "Lagras i samma Google Drive-konto.",
   "In your Google account": "I ditt Google-konto",

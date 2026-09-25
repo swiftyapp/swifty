@@ -567,7 +567,7 @@
   "Separate database": "Eigene Datenbank",
   "Each workspace is its own encrypted file.": "Jeder Arbeitsbereich ist eine eigene verschlüsselte Datei.",
   "One unlock": "Einmal entsperren",
-  "Your master password opens all of them.": "Dein Hauptpasswort öffnet alle.",
+  "Your master password opens every workspace that shares it.": "Dein Hauptpasswort öffnet jeden Arbeitsbereich, der es teilt.",
   "Synced as its own vault": "Als eigener Tresor synchronisiert",
   "Stored in the same Google Drive account.": "Im selben Google-Drive-Konto gespeichert.",
   "In your Google account": "In deinem Google-Konto",

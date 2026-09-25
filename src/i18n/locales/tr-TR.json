@@ -557,7 +557,7 @@
   "Separate database": "Ayrı veritabanı",
   "Each workspace is its own encrypted file.": "Her çalışma alanı kendi şifreli dosyasıdır.",
   "One unlock": "Tek kilit açma",
-  "Your master password opens all of them.": "Ana şifreniz hepsini açar.",
+  "Your master password opens every workspace that shares it.": "Ana şifreniz onu paylaşan her çalışma alanını açar.",
   "Synced as its own vault": "Kendi kasası olarak eşitlenir",
   "Stored in the same Google Drive account.": "Aynı Google Drive hesabında saklanır.",
   "In your Google account": "Google hesabında",
