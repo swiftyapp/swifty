@@ -163,9 +163,12 @@ export const setView = (view: View) => {
 }
 
 // The one way into the Tags view: the view and its tag change together, so
-// there is never a frame of the Tags view showing the whole vault.
+// there is never a frame of the Tags view showing the whole vault. The kind
+// goes the way it does in `setView`: a tag picked from "Credit cards" shows
+// everything carrying the tag, not only the cards — the Tags view has no
+// control that could name a kind still narrowing it.
 export const showTag = (tag: string) => {
-  useUi.setState({ view: 'tags', filterTag: tag })
+  useUi.setState({ view: 'tags', filterTag: tag, filterType: null })
   setNoEntry()
 }
 

@@ -120,4 +120,14 @@ describe('views', () => {
 
     expect(useUi.getState()).toMatchObject({ view: 'favorites', filterType: null })
   })
+
+  it('drops the kind on the way into a tag, so the tag shows every kind', () => {
+    setEntries([...items, { ...meta('card', ['work']), type: 'card' }])
+    showKind('login')
+
+    showTag('work')
+
+    expect(useUi.getState()).toMatchObject({ view: 'tags', filterTag: 'work', filterType: null })
+    expect(visible()).toEqual(['work', 'both', 'card'])
+  })
 })
