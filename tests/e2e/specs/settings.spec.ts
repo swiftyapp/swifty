@@ -33,8 +33,8 @@ describe("settings", () => {
     await setSettings({ theme: "light" });
   });
 
-  it("opens on Sync & devices and marks the active nav item", async () => {
-    await expect(title()).toHaveText("Sync & devices");
+  it("opens on Sync & backup and marks the active nav item", async () => {
+    await expect(title()).toHaveText("Sync & backup");
     await expect($('[data-testid="settings-nav-sync"]')).toHaveAttribute(
       "aria-current",
       "page",
@@ -45,9 +45,10 @@ describe("settings", () => {
     const sections: [string, string][] = [
       ["security", "Security"],
       ["audit", "Vault audit"],
-      ["import", "Import"],
-      ["language", "Language & region"],
-      ["sync", "Sync & devices"],
+      ["workspaces", "Workspaces"],
+      ["import", "Import & export"],
+      ["language", "General"],
+      ["sync", "Sync & backup"],
     ];
 
     for (const [name, heading] of sections) {
