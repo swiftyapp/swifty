@@ -143,8 +143,7 @@ tauri-plugin-deep-link = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # NSWindow, NSAnimationContext and its block-based completion: the zoom the
-# webview can follow; NSEvent for the mouse state that tells a zoom from a
-# drag's un-zoom (see `zoom`).
+# webview can follow (see `zoom`).
 objc2-app-kit = { version = "0.3", features = [
   "NSPasteboard",
   "NSWindow",
