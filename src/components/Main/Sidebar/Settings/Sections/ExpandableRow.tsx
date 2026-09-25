@@ -6,6 +6,8 @@ import SettingsRow from '@/components/elements/SettingsRow'
 interface Props {
   label: string
   description?: string
+  // The row's 16px mark, drawn in SettingsRow's tile.
+  icon?: ReactNode
   action: string
   testid?: string
   children: ReactNode
@@ -16,6 +18,7 @@ interface Props {
 export default function ExpandableRow({
   label,
   description,
+  icon,
   action,
   testid,
   children
@@ -27,6 +30,7 @@ export default function ExpandableRow({
     <SettingsRow
       label={label}
       description={description}
+      icon={icon}
       testid={testid}
       control={
         <Button variant="pale" size="md" onClick={() => setOpen(!open)}>

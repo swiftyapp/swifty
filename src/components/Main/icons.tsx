@@ -16,10 +16,12 @@ import {
   ArrowDownWideNarrow,
   AtSign,
   Braces,
+  Calendar,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   Cloud,
   Copy,
   CreditCard,
@@ -40,6 +42,7 @@ import {
   Lock,
   Moon,
   MoreHorizontal,
+  Palette,
   Pencil,
   Plus,
   RefreshCw,
@@ -169,6 +172,10 @@ export const ActivityGlyph = glyph(Activity, 16)
 export const LayersGlyph = glyph(Layers, 16)
 // The iOS disclosure mark: a row that pushes a screen rather than doing a thing.
 export const ChevronRightGlyph = glyph(ChevronRight, 16)
+// Settings row marks: the accent, the date pattern, the clipboard wipe.
+export const PaletteGlyph = glyph(Palette, 16)
+export const CalendarGlyph = glyph(Calendar, 16)
+export const ClipboardGlyph = glyph(ClipboardList, 16)
 
 // Rail tier (20px, for the 40px+ rail hit areas and Settings nav headers)
 export const PlusRailGlyph = glyph(Plus, 20)
