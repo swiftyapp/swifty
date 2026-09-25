@@ -174,6 +174,13 @@ fn clients() -> MutexGuard<'static, Vec<Queue>> {
 /// blocking, stalls its own thread and nothing else: not the lock that raised
 /// the signal, not the accept loop, and not the signals to the other
 /// browsers. A write that fails ends the thread, and with it the writer.
+///
+/// A thread blocked in such a write cannot see its queue dropped, so it
+/// outlives [`forget`] — for as long as the peer neither reads nor goes
+/// away. That is the proxy process the browser launched, and it is blocked
+/// on the browser's stdio in turn: the moment the browser exits, the proxy
+/// does, the socket closes, and the write fails. One thread and one socket
+/// per hung browser, for the life of that browser, is the whole of it.
 pub fn register(writer: Writer) -> u64 {
     let (sender, receiver) = channel::<&'static [u8]>();
     std::thread::spawn(move || {
