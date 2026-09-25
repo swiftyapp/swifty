@@ -3,8 +3,10 @@ import { cx } from '@/utils/cx'
 import { ROW_HAIRLINE } from './tokens'
 
 interface Props {
-  label: string
-  description?: string
+  label: ReactNode
+  // Text, or text with something inline in it (a chip after the label, a
+  // "How it works" link closing the description).
+  description?: ReactNode
   // Right-aligned control (Toggle, Segmented, Button, Select, ...).
   control?: ReactNode
   /**

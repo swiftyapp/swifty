@@ -25,7 +25,7 @@ export default function BreachExplainer({ id }: { id: string }) {
     <div
       id={id}
       data-testid="settings-breach-explainer"
-      className="mt-2.5 animate-pop rounded-lg border border-line bg-field p-3.5"
+      className="animate-pop rounded-lg border border-line bg-field p-3.5"
     >
       <div className="break-all text-base tabular-nums">
         <span className="rounded-xs bg-accent-soft px-1 text-accent">{HASH.slice(0, SENT)}</span>

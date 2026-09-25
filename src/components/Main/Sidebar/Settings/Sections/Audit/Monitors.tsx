@@ -21,7 +21,21 @@ export default function Monitors() {
     <SettingsGroup label={t('Monitors')}>
       <SettingsRow
         label={t('Breach monitoring')}
-        description={t('Checks passwords against known leaks without revealing them.')}
+        description={
+          <>
+            {t('Checks passwords against known leaks without revealing them.')}{' '}
+            <button
+              type="button"
+              data-testid="settings-breach-explain"
+              aria-expanded={explained}
+              aria-controls={explainerId}
+              onClick={() => setExplained(open => !open)}
+              className="cursor-pointer text-accent hover:underline"
+            >
+              {explained ? t('Hide details') : t('How it works')}
+            </button>
+          </>
+        }
         icon={<ShieldGlyph />}
         iconActive={breachCheck}
         control={
@@ -34,17 +48,6 @@ export default function Monitors() {
           />
         }
       >
-        {/* Pulled up under the description, which it reads as the end of. */}
-        <button
-          type="button"
-          data-testid="settings-breach-explain"
-          aria-expanded={explained}
-          aria-controls={explainerId}
-          onClick={() => setExplained(open => !open)}
-          className="-mt-2.5 block cursor-pointer text-base text-accent hover:underline"
-        >
-          {explained ? t('Hide details') : t('How it works')}
-        </button>
         {explained && <BreachExplainer id={explainerId} />}
       </SettingsRow>
       <SettingsRow
