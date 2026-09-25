@@ -24,18 +24,34 @@
 //! native; the warning below is what says so.
 
 use std::ffi::c_void;
+use std::ptr::NonNull;
 use std::sync::Mutex;
 
+use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyClass, AnyObject, Bool, Imp, Sel};
-use objc2::{ffi, msg_send, sel};
+use objc2::{ffi, msg_send, sel, Message};
 use objc2_app_kit::{NSAnimationContext, NSWindow};
 use objc2_foundation::NSRect;
 
-// Where the window goes back to on un-zoom. AppKit keeps its own note of this,
-// but it takes it while performing the zoom that is being vetoed here, so it
-// is kept independently. One main window per process.
-static RESTORE: Mutex<Option<NSRect>> = Mutex::new(None);
+// One main window per process.
+static STATE: Mutex<State> = Mutex::new(State {
+    restore: None,
+    in_flight: false,
+});
+
+struct State {
+    // Where the window goes back to on un-zoom. AppKit keeps its own note of
+    // this, but it takes it while performing the zoom that is being vetoed
+    // here, so it is kept independently.
+    restore: Option<NSRect>,
+    // Whether the animator is still moving the window. Until it is done
+    // `isZoomed` reports the frame it is passing through, so a request that
+    // lands mid-flight would read the wrong state and, on the way in, save a
+    // half-way frame as the one to restore. Such requests are dropped; the
+    // completion handler clears this.
+    in_flight: bool,
+}
 
 /// Route the zoom of `ns_window` (a `*mut NSWindow`, as `WebviewWindow::ns_window`
 /// hands it out) through the animator. Main thread only.
@@ -70,23 +86,31 @@ extern "C-unwind" fn should_zoom(
     window: &NSWindow,
     proposed: NSRect,
 ) -> Bool {
-    let mut restore = RESTORE.lock().unwrap_or_else(|e| e.into_inner());
+    let mut state = STATE.lock().unwrap_or_else(|e| e.into_inner());
+    if state.in_flight {
+        return Bool::NO;
+    }
     let target = if window.isZoomed() {
         // A window that was already zoomed when it first appeared has nowhere
         // of its own to go back to; AppKit's proposal is the best there is.
-        restore.take().unwrap_or(proposed)
+        state.restore.take().unwrap_or(proposed)
     } else {
-        *restore = Some(window.frame());
+        state.restore = Some(window.frame());
         proposed
     };
-    drop(restore);
+    state.in_flight = true;
+    drop(state);
 
-    unsafe {
-        NSAnimationContext::beginGrouping();
-        NSAnimationContext::currentContext().setDuration(window.animationResizeTime(target));
-        let animator: Retained<NSWindow> = msg_send![window, animator];
+    let duration = window.animationResizeTime(target);
+    let window = window.retain();
+    let changes = RcBlock::new(move |_: NonNull<NSAnimationContext>| unsafe {
+        NSAnimationContext::currentContext().setDuration(duration);
+        let animator: Retained<NSWindow> = msg_send![&*window, animator];
         animator.setFrame_display(target, true);
-        NSAnimationContext::endGrouping();
-    }
+    });
+    let done = RcBlock::new(|| {
+        STATE.lock().unwrap_or_else(|e| e.into_inner()).in_flight = false;
+    });
+    NSAnimationContext::runAnimationGroup_completionHandler(&changes, Some(&done));
     Bool::NO
 }

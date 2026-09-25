@@ -142,11 +142,13 @@ security-framework = { version = "3.6.0", features = ["OSX_10_15"] }
 tauri-plugin-deep-link = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# NSWindow and NSAnimationContext: the zoom the webview can follow (see `zoom`).
+# NSWindow, NSAnimationContext and its block-based completion: the zoom the
+# webview can follow (see `zoom`).
 objc2-app-kit = { version = "0.3", features = [
   "NSPasteboard",
   "NSWindow",
   "NSAnimationContext",
+  "block2",
 ] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
