@@ -10,7 +10,10 @@ use serde_json::{json, Map, Value};
 use super::actions::{host_matches, site_host, Client, Connection, Host, Login};
 use super::manifest::{self, Family, HOST_NAME};
 use super::protocol::{increment, str_of, Code, NONCE_LEN, VERSION};
-use super::{frame, proxy, server, socket_name, IDENTIFIER};
+use super::{frame, proxy, save_login_in, server, socket_name, IDENTIFIER};
+use crate::crypto::{PayloadCipher, VaultKey};
+use crate::models::Entry;
+use crate::store::{migrate, SqliteStore, VaultStore};
 
 // --- a vault to talk to ------------------------------------------------------
 
@@ -653,6 +656,186 @@ fn a_set_login_that_fails_to_write_says_so_inside_the_reply() {
     assert_eq!(response["hash"], "abc123");
 }
 
+// --- the save itself, against a store --------------------------------------------
+
+fn vault() -> (tempfile::TempDir, SqliteStore, PayloadCipher) {
+    let dir = tempfile::tempdir().unwrap();
+    let key = VaultKey::legacy_from_password("pw");
+    let store =
+        SqliteStore::open(&dir.path().join("vault.db"), key.sqlcipher_key().as_slice()).unwrap();
+    (dir, store, key.payload_cipher())
+}
+
+fn stored(store: &SqliteStore, cipher: &PayloadCipher, id: &str) -> Entry {
+    let record = store.get(id).unwrap().unwrap();
+    cipher.unseal(&record.id, &record.payload).unwrap()
+}
+
+fn seed(store: &SqliteStore, cipher: &PayloadCipher, entry: &Entry) {
+    let payload = cipher.seal(entry).unwrap();
+    store
+        .upsert(&migrate::build_record(entry, payload).unwrap())
+        .unwrap();
+}
+
+const THEN: &str = "2026-01-01T00:00:00.000Z";
+const NOW: &str = "2026-09-26T12:00:00.000Z";
+
+#[test]
+fn a_save_without_an_id_creates_a_login_for_the_site() {
+    let (_dir, store, cipher) = vault();
+    save_login_in(
+        &store,
+        &cipher,
+        None,
+        "https://github.com/signup",
+        "github.com",
+        "octocat",
+        "hunter2",
+        NOW,
+    )
+    .unwrap();
+
+    let metas = store.list().unwrap();
+    assert_eq!(metas.len(), 1);
+    assert_eq!(metas[0].kind, "login");
+    assert_eq!(metas[0].url_host, "github.com");
+    let entry = stored(&store, &cipher, &metas[0].id);
+    assert_eq!(entry.title, "github.com");
+    assert_eq!(entry.website.as_deref(), Some("https://github.com/signup"));
+    assert_eq!(entry.username.as_deref(), Some("octocat"));
+    assert_eq!(entry.password.as_deref(), Some("hunter2"));
+    assert_eq!(entry.created_at.as_deref(), Some(NOW));
+    assert_eq!(entry.updated_at.as_deref(), Some(NOW));
+    assert_eq!(entry.password_updated_at.as_deref(), Some(NOW));
+}
+
+#[test]
+fn a_save_over_a_login_changes_only_what_the_page_sent() {
+    let (_dir, store, cipher) = vault();
+    seed(
+        &store,
+        &cipher,
+        &Entry {
+            id: "gh".into(),
+            kind: "login".into(),
+            title: "GitHub (work)".into(),
+            website: Some("https://github.com".into()),
+            username: Some("octocat".into()),
+            password: Some("old".into()),
+            otp: Some("JBSWY3DPEHPK3PXP".into()),
+            tags: Some(vec!["work".into()]),
+            created_at: Some(THEN.into()),
+            updated_at: Some(THEN.into()),
+            password_updated_at: Some(THEN.into()),
+            ..Entry::default()
+        },
+    );
+
+    save_login_in(
+        &store,
+        &cipher,
+        Some("gh"),
+        "https://github.com/settings",
+        "github.com",
+        "octocat",
+        "new",
+        NOW,
+    )
+    .unwrap();
+
+    let entry = stored(&store, &cipher, "gh");
+    assert_eq!(entry.password.as_deref(), Some("new"));
+    assert_eq!(entry.password_updated_at.as_deref(), Some(NOW), "rotated");
+    assert_eq!(entry.updated_at.as_deref(), Some(NOW));
+    // Untouched: the row is the user's, the page only knows two fields of it.
+    assert_eq!(entry.title, "GitHub (work)");
+    assert_eq!(entry.website.as_deref(), Some("https://github.com"));
+    assert_eq!(entry.otp.as_deref(), Some("JBSWY3DPEHPK3PXP"));
+    assert_eq!(entry.tags, Some(vec!["work".to_string()]));
+    assert_eq!(entry.created_at.as_deref(), Some(THEN));
+    assert_eq!(
+        store.list().unwrap().len(),
+        1,
+        "an update, not a second row"
+    );
+}
+
+#[test]
+fn a_save_with_the_same_password_does_not_count_as_a_rotation() {
+    let (_dir, store, cipher) = vault();
+    seed(
+        &store,
+        &cipher,
+        &Entry {
+            id: "gh".into(),
+            kind: "login".into(),
+            title: "GitHub".into(),
+            username: Some("old-name".into()),
+            password: Some("same".into()),
+            password_updated_at: Some(THEN.into()),
+            ..Entry::default()
+        },
+    );
+    save_login_in(
+        &store,
+        &cipher,
+        Some("gh"),
+        "https://github.com",
+        "github.com",
+        "new-name",
+        "same",
+        NOW,
+    )
+    .unwrap();
+    let entry = stored(&store, &cipher, "gh");
+    assert_eq!(entry.username.as_deref(), Some("new-name"));
+    assert_eq!(entry.password_updated_at.as_deref(), Some(THEN));
+    assert_eq!(entry.updated_at.as_deref(), Some(NOW));
+}
+
+#[test]
+fn a_save_over_something_that_is_not_a_login_is_refused() {
+    let (_dir, store, cipher) = vault();
+    seed(
+        &store,
+        &cipher,
+        &Entry {
+            id: "note".into(),
+            kind: "note".into(),
+            title: "Not a login".into(),
+            note: Some("keep".into()),
+            ..Entry::default()
+        },
+    );
+    let missing = save_login_in(
+        &store,
+        &cipher,
+        Some("nope"),
+        "https://x.com",
+        "x.com",
+        "a",
+        "b",
+        NOW,
+    );
+    assert_eq!(missing, Err(Code::NoValidUuidProvided));
+    let wrong_kind = save_login_in(
+        &store,
+        &cipher,
+        Some("note"),
+        "https://x.com",
+        "x.com",
+        "a",
+        "b",
+        NOW,
+    );
+    assert_eq!(wrong_kind, Err(Code::NoValidUuidProvided));
+    assert_eq!(
+        stored(&store, &cipher, "note").note.as_deref(),
+        Some("keep")
+    );
+}
+
 #[test]
 fn generate_password_needs_no_association() {
     let (extension, mut connection) = ready();
@@ -876,7 +1059,9 @@ fn a_lock_signal_reaches_every_connection_and_drops_the_gone_ones() {
     let gone = Arc::new(Mutex::new(gone));
     server::register(open.clone());
     server::register(gone.clone());
-    server::notify_locked();
+    // What the two notifiers run on a thread of their own, run here inline
+    // so the list can be looked at once it is done.
+    server::signal(server::LOCKED);
 
     let signal: Value =
         serde_json::from_slice(&frame::read(&mut extension).unwrap().unwrap()).unwrap();
@@ -888,7 +1073,7 @@ fn a_lock_signal_reaches_every_connection_and_drops_the_gone_ones() {
     );
     assert_eq!(Arc::strong_count(&open), 2, "a live one stays registered");
 
-    server::notify_unlocked();
+    server::signal(server::UNLOCKED);
     let signal: Value =
         serde_json::from_slice(&frame::read(&mut extension).unwrap().unwrap()).unwrap();
     assert_eq!(signal, json!({ "action": "database-unlocked" }));

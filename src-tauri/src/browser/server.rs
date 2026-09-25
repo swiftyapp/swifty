@@ -163,21 +163,39 @@ fn forget(writer: &Writer) {
     clients().retain(|c| !Arc::ptr_eq(c, writer));
 }
 
+pub const LOCKED: &[u8] = br#"{"action":"database-locked"}"#;
+pub const UNLOCKED: &[u8] = br#"{"action":"database-unlocked"}"#;
+
 /// The vault just locked: every connected extension flips its icon, and asks
 /// again before it fills anything.
 pub fn notify_locked() {
-    broadcast(br#"{"action":"database-locked"}"#);
+    std::thread::spawn(|| signal(LOCKED));
 }
 
 /// The vault just opened, or another workspace did: every connected extension
 /// re-checks the hash, which says which one it is talking to now.
 pub fn notify_unlocked() {
-    broadcast(br#"{"action":"database-unlocked"}"#);
+    std::thread::spawn(|| signal(UNLOCKED));
 }
 
-// Unsolicited and in the clear, as KeePassXC sends them: no nonce to seal
-// under, and nothing in them the extension would not learn from its next ask.
-// A connection the write fails on has gone, and goes from the list with it.
-fn broadcast(message: &[u8]) {
-    clients().retain(|writer| frame::write(&mut *hold(writer), message).is_ok());
+/// Send `message` to every connection, in the clear and unsolicited, as
+/// KeePassXC sends its signals: no nonce to seal under, and nothing in them
+/// the extension would not learn from its next ask. A connection the write
+/// fails on has gone, and goes from the list with it.
+///
+/// Writes happen over a snapshot of the list, never under its lock, and the
+/// two notifiers above run this on a thread of its own: a peer that has
+/// stopped reading blocks the write to it once its buffer is full, and that
+/// must stall neither the lock that raised the signal nor the accept loop
+/// registering the next connection. It does stall replies on that one
+/// connection, which is dead already.
+pub fn signal(message: &[u8]) {
+    let writers: Vec<Writer> = clients().clone();
+    let gone: Vec<Writer> = writers
+        .into_iter()
+        .filter(|writer| frame::write(&mut *hold(writer), message).is_err())
+        .collect();
+    if !gone.is_empty() {
+        clients().retain(|c| !gone.iter().any(|g| Arc::ptr_eq(c, g)));
+    }
 }
