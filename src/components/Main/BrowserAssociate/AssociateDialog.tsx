@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { browserRespond } from '@/api/browser'
+import { ASSOCIATE_TIMEOUT_MS, browserRespond } from '@/api/browser'
 import { closeBrowserAsk } from '@/store'
 import { keyFingerprint } from '@/lib/keyFingerprint'
 import Frame from '@/components/elements/Frame'
@@ -16,15 +16,22 @@ const NAME_ID = 'browser-associate-name'
  * which is holding the extension's request open for it; Escape and the
  * backdrop count as a refusal. Nothing is awaited: Rust gives up on the ask
  * after a minute whether or not this answered, so a failed reply has no one
- * left to report to.
+ * left to report to. The dialog leaves on the same clock, and its answer
+ * names the key it was drawn for, so one that somehow outlives its ask
+ * cannot hand a yes to the next extension's.
  */
 export default function AssociateDialog({ publicKey }: { publicKey: string }) {
   const { t } = useTranslation()
   const [name, setName] = useState(() => t('Browser'))
 
+  useEffect(() => {
+    const expiry = setTimeout(closeBrowserAsk, ASSOCIATE_TIMEOUT_MS)
+    return () => clearTimeout(expiry)
+  }, [publicKey])
+
   const answer = (reply: string | null) => {
     closeBrowserAsk()
-    browserRespond(reply).catch(() => {})
+    browserRespond(publicKey, reply).catch(() => {})
   }
   const allow = () => answer(name.trim() || t('Browser'))
   const deny = () => answer(null)

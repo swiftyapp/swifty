@@ -8,6 +8,7 @@ import {
 } from '@/api/browser'
 import { describeError } from '@/api/errors'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
+import { useUi } from '@/store'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Toggle from '@/components/elements/Toggle'
@@ -40,12 +41,20 @@ export default function Browser() {
     [begin]
   )
 
-  useEffect(() => void load(browserStatus), [load])
+  // On the way in, and again whenever the consent dialog lets an extension in
+  // behind this section's back (`browser:clients`).
+  const clientsSeq = useUi(state => state.browserClientsSeq)
+  useEffect(() => void load(browserStatus), [load, clientsSeq])
 
-  const toggle = (enabled: boolean) => {
+  // One change at a time: the toggle and every Forget button wait for the
+  // answer in flight, so two forgets cannot cross and leave the earlier one's
+  // client on screen.
+  const change = (request: () => Promise<BrowserStatus>) => {
     setBusy(true)
-    void load(() => browserSetEnabled(enabled)).finally(() => setBusy(false))
+    void load(request).finally(() => setBusy(false))
   }
+  const toggle = (enabled: boolean) => change(() => browserSetEnabled(enabled))
+  const forget = (key: string) => change(() => browserForgetClient(key))
 
   const enabled = !!status?.enabled
   const label = t('Fill logins in your browser')
@@ -81,10 +90,7 @@ export default function Browser() {
       {status && (
         <>
           <Browsers browsers={status.browsers} enabled={enabled} />
-          <Clients
-            clients={status.clients}
-            onForget={key => void load(() => browserForgetClient(key))}
-          />
+          <Clients clients={status.clients} busy={busy} onForget={forget} />
         </>
       )}
     </>

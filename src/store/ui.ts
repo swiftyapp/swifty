@@ -99,6 +99,13 @@ export interface UiState {
    * at a time and gives up on it by itself after a minute.
    */
   browserAsk: string | null
+  /**
+   * How many times the open vault's list of let-in extensions has changed
+   * behind the frontend's back — a consent dialog answered while Settings ›
+   * Browser extension is open. That section re-reads its status when this
+   * moves; nothing renders the number itself.
+   */
+  browserClientsSeq: number
 }
 
 const GENERATOR_CLOSED: Generator = { open: false, apply: null, ssh: null }
@@ -131,7 +138,8 @@ export const initialUi: UiState = {
   scanError: null,
   copied: false,
   notice: null,
-  browserAsk: null
+  browserAsk: null,
+  browserClientsSeq: 0
 }
 
 export const useUi = create<UiState>()(() => initialUi)
@@ -283,6 +291,8 @@ export const dropOrphan = (fileId: string) =>
 
 export const askBrowser = (key: string) => useUi.setState({ browserAsk: key })
 export const closeBrowserAsk = () => useUi.setState({ browserAsk: null })
+export const browserClientsChanged = () =>
+  useUi.setState(state => ({ browserClientsSeq: state.browserClientsSeq + 1 }))
 
 // --- scanning ---------------------------------------------------------------------
 

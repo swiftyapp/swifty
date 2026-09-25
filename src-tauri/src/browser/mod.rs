@@ -91,9 +91,13 @@ pub fn socket_name(root: &Path) -> io::Result<Name<'static>> {
 //
 // One `associate` at a time waits on the user. The connection thread parks on
 // the receiving end; the frontend's answer arrives through `respond`, from the
-// command the dialog invokes.
+// command the dialog invokes. The ask is held by the extension's key, and an
+// answer names the key it is for: a dialog left up past the ask it was drawn
+// for — Rust gives up after a minute, the webview does the same on its own
+// clock — cannot answer the next extension's ask with a yes the user gave
+// while looking at another fingerprint.
 
-static PENDING: Mutex<Option<SyncSender<Option<String>>>> = Mutex::new(None);
+static PENDING: Mutex<Option<(String, SyncSender<Option<String>>)>> = Mutex::new(None);
 
 /// Ask the user whether the extension holding `key` may connect. Blocks the
 /// calling thread for the answer, up to [`CONSENT_TIMEOUT`]; a second ask
@@ -105,7 +109,7 @@ pub fn ask(app: &AppHandle, key: &str) -> Option<String> {
         if pending.is_some() {
             return None;
         }
-        *pending = Some(sender);
+        *pending = Some((key.to_string(), sender));
     }
     events::browser_associate(app, key);
     window::raise(app);
@@ -114,11 +118,16 @@ pub fn ask(app: &AppHandle, key: &str) -> Option<String> {
     answer
 }
 
-/// The user's answer to the ask that is up: the name they gave the extension,
-/// or `None` for a refusal. Returns whether an ask was waiting for it.
-pub fn respond(name: Option<String>) -> bool {
-    let sender = PENDING.lock().unwrap_or_else(|e| e.into_inner()).take();
-    sender.is_some_and(|sender| sender.send(name).is_ok())
+/// The user's answer to the ask that is up for `key`: the name they gave the
+/// extension, or `None` for a refusal. Returns whether that ask was waiting
+/// for it; an answer for another key, or for no ask at all, does nothing.
+pub fn respond(key: &str, name: Option<String>) -> bool {
+    let mut pending = PENDING.lock().unwrap_or_else(|e| e.into_inner());
+    if pending.as_ref().is_none_or(|(asked, _)| asked != key) {
+        return false;
+    }
+    let (_, sender) = pending.take().expect("checked above");
+    sender.send(name).is_ok()
 }
 
 // --- the extensions let in ------------------------------------------------------
@@ -216,6 +225,8 @@ impl Host for AppHost {
                 log::warn!("browser host: could not remember the extension: {e}");
                 Code::AssociationFailed
             })?;
+            // Settings › Browser extension, if it is open, lists it now.
+            events::browser_clients(&self.0);
         }
         Ok(name)
     }

@@ -35,9 +35,19 @@ export const browserStatus = (): Promise<BrowserStatus> => call('browser_status'
 export const browserSetEnabled = (enabled: boolean): Promise<BrowserStatus> =>
   call('browser_set_enabled', { enabled })
 
-/** Answer the `browser:associate` ask: the name to remember it by, or null to refuse. */
-export const browserRespond = (name: string | null): Promise<void> =>
-  call('browser_respond', { name })
+/**
+ * How long Rust holds an `associate` ask open for the user (its
+ * `CONSENT_TIMEOUT`). The dialog closes itself on the same clock, so one left
+ * up is never answering an ask that has already been given up on.
+ */
+export const ASSOCIATE_TIMEOUT_MS = 60_000
+
+/**
+ * Answer the `browser:associate` ask for `key`: the name to remember it by, or
+ * null to refuse. Rust honours it only for the ask that is up for that key.
+ */
+export const browserRespond = (key: string, name: string | null): Promise<void> =>
+  call('browser_respond', { key, name })
 
 export const browserForgetClient = (key: string): Promise<BrowserStatus> =>
   call('browser_forget_client', { key })
