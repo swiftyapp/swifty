@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EVENTS } from '@/api/events'
-import type { PasskeyAsk } from '@/api/browser'
+import { ASSOCIATE_TIMEOUT_MS, type PasskeyAsk } from '@/api/browser'
 import BrowserPasskey from '@/components/Main/BrowserPasskey'
 import { useUi } from '@/store'
 import { clearSession } from '@/store/app'
@@ -11,6 +11,7 @@ import { calls } from './ipc'
 import { emitEvent } from './events'
 
 const REGISTER: PasskeyAsk = {
+  id: 'ask-1',
   kind: 'register',
   rpId: 'example.com',
   origin: 'https://login.example.com',
@@ -18,7 +19,12 @@ const REGISTER: PasskeyAsk = {
   userDisplayName: 'Alice Example'
 }
 
-const GET: PasskeyAsk = { kind: 'get', rpId: 'github.com', origin: 'https://github.com' }
+const GET: PasskeyAsk = {
+  id: 'ask-2',
+  kind: 'get',
+  rpId: 'github.com',
+  origin: 'https://github.com'
+}
 
 describe('the passkey consent dialog', () => {
   const ask = async (payload: PasskeyAsk = REGISTER) => {
@@ -37,7 +43,7 @@ describe('the passkey consent dialog', () => {
 
     await userEvent.click(screen.getByTestId('browser-passkey-allow'))
 
-    expect(calls('browser_passkey_respond')).toEqual([{ allow: true }])
+    expect(calls('browser_passkey_respond')).toEqual([{ id: 'ask-1', allow: true }])
     expect(screen.queryByTestId('browser-passkey-modal')).not.toBeInTheDocument()
     expect(useUi.getState().passkeyAsk).toBeNull()
   })
@@ -50,7 +56,7 @@ describe('the passkey consent dialog', () => {
 
     await userEvent.click(screen.getByTestId('browser-passkey-deny'))
 
-    expect(calls('browser_passkey_respond')).toEqual([{ allow: false }])
+    expect(calls('browser_passkey_respond')).toEqual([{ id: 'ask-2', allow: false }])
     expect(screen.queryByTestId('browser-passkey-modal')).not.toBeInTheDocument()
   })
 
@@ -67,13 +73,29 @@ describe('the passkey consent dialog', () => {
     )
   })
 
-  it('replaces an ask still on screen with a newer one', async () => {
+  it('replaces an ask still on screen with a newer one, and answers for that one', async () => {
     await ask()
     act(() => emitEvent(EVENTS.browserPasskey, GET))
 
     expect(screen.getByTestId('browser-passkey-title')).toHaveTextContent(
       'github.com wants to sign in with your passkey'
     )
+    await userEvent.click(screen.getByTestId('browser-passkey-allow'))
+    expect(calls('browser_passkey_respond')).toEqual([{ id: 'ask-2', allow: true }])
+  })
+
+  it('leaves on its own once Rust has given up on the ask', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      await ask()
+      act(() => {
+        vi.advanceTimersByTime(ASSOCIATE_TIMEOUT_MS)
+      })
+      expect(screen.queryByTestId('browser-passkey-modal')).not.toBeInTheDocument()
+      expect(calls('browser_passkey_respond')).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('is gone once the vault locks', async () => {

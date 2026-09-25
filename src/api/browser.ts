@@ -36,8 +36,8 @@ export const browserSetEnabled = (enabled: boolean): Promise<BrowserStatus> =>
   call('browser_set_enabled', { enabled })
 
 /**
- * How long Rust holds an `associate` ask open for the user (its
- * `CONSENT_TIMEOUT`). The dialog closes itself on the same clock, so one left
+ * How long Rust holds an `associate` or a passkey ask open for the user (its
+ * `CONSENT_TIMEOUT`). Each dialog closes itself on the same clock, so one left
  * up is never answering an ask that has already been given up on.
  */
 export const ASSOCIATE_TIMEOUT_MS = 60_000
@@ -59,6 +59,8 @@ export const browserForgetClient = (key: string): Promise<BrowserStatus> =>
  * gave them.
  */
 export interface PasskeyAsk {
+  /** Names this ask; the answer carries it, and Rust honours it for this ask alone. */
+  id: string
   kind: 'register' | 'get'
   rpId: string
   origin: string
@@ -66,6 +68,6 @@ export interface PasskeyAsk {
   userDisplayName?: string
 }
 
-/** Answer the `browser:passkey` ask. */
-export const browserPasskeyRespond = (allow: boolean): Promise<void> =>
-  call('browser_passkey_respond', { allow })
+/** Answer the `browser:passkey` ask `id`. Rust honours it only for the ask up under that id. */
+export const browserPasskeyRespond = (id: string, allow: boolean): Promise<void> =>
+  call('browser_passkey_respond', { id, allow })

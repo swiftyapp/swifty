@@ -1,5 +1,6 @@
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { browserPasskeyRespond, type PasskeyAsk } from '@/api/browser'
+import { ASSOCIATE_TIMEOUT_MS, browserPasskeyRespond, type PasskeyAsk } from '@/api/browser'
 import { closePasskeyAsk } from '@/store'
 import Frame from '@/components/elements/Frame'
 import Button from '@/components/elements/Button'
@@ -11,14 +12,21 @@ const TITLE_ID = 'browser-passkey-title'
  * passkey belongs to — and the page that asked is shown under it, so a
  * subdomain asking for its parent's passkey is in plain sight. As with the
  * associate dialog, the answer goes straight back to Rust, Escape and the
- * backdrop count as a refusal, and nothing is awaited.
+ * backdrop count as a refusal, and nothing is awaited; the dialog leaves on
+ * Rust's own clock, and its answer names the ask it was drawn for, so one
+ * that outlives its ask cannot hand a yes to the next ceremony's.
  */
 export default function PasskeyDialog({ ask }: { ask: PasskeyAsk }) {
   const { t } = useTranslation()
 
+  useEffect(() => {
+    const expiry = setTimeout(closePasskeyAsk, ASSOCIATE_TIMEOUT_MS)
+    return () => clearTimeout(expiry)
+  }, [ask.id])
+
   const answer = (allow: boolean) => {
     closePasskeyAsk()
-    browserPasskeyRespond(allow).catch(() => {})
+    browserPasskeyRespond(ask.id, allow).catch(() => {})
   }
   const allow = () => answer(true)
   const deny = () => answer(false)
