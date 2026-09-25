@@ -18,6 +18,17 @@
 //! way it does under a drag resize. The duration is AppKit's own
 //! `animationResizeTime:`, so the zoom looks and paces exactly as before.
 //!
+//! Not every `windowShouldZoom:toFrame:` is a zoom the user asked for, though.
+//! Since macOS 15 dragging a zoomed window by its title bar un-zooms it first
+//! — AppKit puts it back at its pre-zoom size under the pointer and then lets
+//! the drag carry on — and that un-zoom asks the delegate the same question.
+//! Answering it with an animation moves the window on our own schedule in the
+//! middle of the window server's drag, which ends the drag: the window jumps
+//! back to size and stays put, as if the title bar were not draggable at all.
+//! Every zoom a user can ask for (the header's double click, the traffic light,
+//! the Window menu) lands with the mouse button up, so a request that arrives
+//! with the left button held is the drag's, and it is left to AppKit.
+//!
 //! tao owns the window delegate (`TaoWindowDelegate`, tao 0.35.3), which does
 //! not implement the method, so it is added to that class at runtime. Should a
 //! tao upgrade add its own, `class_addMethod` fails and the zoom simply stays
@@ -31,7 +42,7 @@ use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyClass, AnyObject, Bool, Imp, Sel};
 use objc2::{ffi, msg_send, sel, Message};
-use objc2_app_kit::{NSAnimationContext, NSWindow};
+use objc2_app_kit::{NSAnimationContext, NSEvent, NSWindow};
 use objc2_foundation::NSRect;
 
 // One main window per process.
@@ -41,9 +52,9 @@ static STATE: Mutex<State> = Mutex::new(State {
 });
 
 struct State {
-    // Where the window goes back to on un-zoom. AppKit keeps its own note of
-    // this, but it takes it while performing the zoom that is being vetoed
-    // here, so it is kept independently.
+    // Where the window goes back to on un-zoom: the frame the vetoed zoom
+    // started from. AppKit notes the same frame before it asks, and proposes
+    // it back on un-zoom; this is the copy the animation here trusts.
     restore: Option<NSRect>,
     // Whether the animator is still moving the window. Until it is done
     // `isZoomed` reports the frame it is passing through, so a request that
@@ -89,6 +100,15 @@ extern "C-unwind" fn should_zoom(
     let mut state = STATE.lock().unwrap_or_else(|e| e.into_inner());
     if state.in_flight {
         return Bool::NO;
+    }
+    // The left button is down: this is a title-bar drag un-zooming the window,
+    // not a zoom (see the module doc). AppKit's proposal is the frame it noted
+    // before the zoom it asked about — it records that whether or not the
+    // delegate lets the zoom go ahead — so its native, instant un-zoom is the
+    // right one here, and the drag continues from it. Ours is stale after it.
+    if NSEvent::pressedMouseButtons() & 1 != 0 {
+        state.restore = None;
+        return Bool::YES;
     }
     let target = if window.isZoomed() {
         // A window that was already zoomed when it first appeared has nowhere
