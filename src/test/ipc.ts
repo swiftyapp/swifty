@@ -50,6 +50,7 @@ const DEFAULT_SETTINGS: Settings = {
     numbers: true,
     symbols: true,
     uppercase: true,
+    lowercase: true,
     exclude: '',
     excludeSimilarCharacters: false
   }

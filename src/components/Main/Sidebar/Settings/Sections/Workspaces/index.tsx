@@ -1,23 +1,35 @@
 import { useTranslation } from 'react-i18next'
+import { useApp, selectWorkspaces } from '@/store'
+import { cx } from '@/utils/cx'
 import SettingsGroup from '@/components/elements/SettingsGroup'
+import { CARD, LABEL } from '@/components/elements/tokens'
 import WorkspaceList from './WorkspaceList'
-import RenameRow from './RenameRow'
-import RemoteVaults from './RemoteVaults'
 import NewWorkspace from './NewWorkspace'
+import InfoTiles from './InfoTiles'
+import RemoteVaults from './RemoteVaults'
 import RestoreFromDrive from './RestoreFromDrive'
 
 export default function Workspaces() {
   const { t } = useTranslation()
+  const count = useApp(selectWorkspaces).length
 
   return (
     <>
-      <SettingsGroup label={t('Workspaces')}>
-        <WorkspaceList />
-        <RenameRow />
-      </SettingsGroup>
+      {/* A SettingsGroup, spelled out: the info tiles belong to the group,
+          under its card. The card's overflow stays open so a row's menu can
+          hang past the last row. */}
+      <section className="mb-7">
+        <div className={cx(LABEL, 'mb-2')}>
+          {t('On this device')} · {count}
+        </div>
+        <div className={cx(CARD, 'overflow-visible!')}>
+          <WorkspaceList />
+          <NewWorkspace />
+        </div>
+        <InfoTiles />
+      </section>
       <RemoteVaults />
-      <SettingsGroup label={t('New workspace')}>
-        <NewWorkspace />
+      <SettingsGroup label={t('Google Drive')}>
         <RestoreFromDrive />
       </SettingsGroup>
     </>

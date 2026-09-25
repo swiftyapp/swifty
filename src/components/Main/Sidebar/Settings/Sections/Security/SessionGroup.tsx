@@ -4,6 +4,7 @@ import { usePrefs, setPref } from '@/store'
 import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Segmented from '@/components/elements/Segmented'
+import { ClipboardGlyph, LockGlyph } from '@/components/Main/icons'
 
 const LOCK_OPTIONS = [
   { value: '60', label: '1 m' },
@@ -39,9 +40,10 @@ export default function SessionGroup() {
   const clipboardLabel = t('Clear clipboard')
 
   return (
-    <SettingsGroup label={t('Session')}>
+    <SettingsGroup label={t('Auto-lock')}>
       <SettingsRow
         label={lockLabel}
+        icon={<LockGlyph size={16} />}
         description={t('Idle time before the vault seals itself')}
         control={
           <Segmented
@@ -55,6 +57,7 @@ export default function SessionGroup() {
       />
       <SettingsRow
         label={clipboardLabel}
+        icon={<ClipboardGlyph />}
         description={t('Copied secrets are wiped after this delay')}
         control={
           <Segmented

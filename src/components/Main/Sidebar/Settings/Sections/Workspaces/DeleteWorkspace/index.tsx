@@ -99,7 +99,7 @@ export default function DeleteWorkspace({
           </div>
         )}
 
-        <p className="mt-1.5 text-base text-text2">
+        <p className="mt-1.5 text-sm text-text2">
           {everywhere
             ? t(
                 'This removes the workspace from this device and deletes its copy in Google Drive. Your other devices will stop syncing it.'
@@ -110,7 +110,7 @@ export default function DeleteWorkspace({
         </p>
 
         <label className="mt-5 block">
-          <span className="text-base text-text2">
+          <span className="text-sm text-text2">
             {t('Master password of this workspace')}
           </span>
           <input
@@ -125,13 +125,13 @@ export default function DeleteWorkspace({
           />
         </label>
         {error && (
-          <p data-testid="workspace-delete-error" className="mt-1.5 text-base text-bad">
+          <p data-testid="workspace-delete-error" className="mt-1.5 text-sm text-bad">
             {error}
           </p>
         )}
 
         <label className="mt-4 block">
-          <span className="text-base text-text2">
+          <span className="text-sm text-text2">
             {t('Type {{name}} to confirm', { name: label })}
           </span>
           <input

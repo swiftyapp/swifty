@@ -5,9 +5,9 @@ import type { BiometricMode } from '@/api/types'
 import { enableBiometric, disableBiometric } from '@/api/auth'
 import { describeError } from '@/api/errors'
 import { useApp, refreshApp } from '@/store'
-import SettingsGroup from '@/components/elements/SettingsGroup'
 import SettingsRow from '@/components/elements/SettingsRow'
 import Toggle from '@/components/elements/Toggle'
+import BiometryGlyph from '@/components/elements/BiometryGlyph'
 
 // What the gate actually is, once we know it. Before enrollment we can only
 // describe the offer; afterwards the recorded mode says which guarantee holds.
@@ -48,28 +48,29 @@ export default function BiometricRow() {
       .finally(() => refreshApp().finally(() => setBusy(false)))
   }
 
+  // A row of the Unlock card: its tile lights once the key is enrolled.
   return (
-    <SettingsGroup label={t('Biometrics')}>
-      <SettingsRow
-        label={t('Unlock with Touch ID or Windows Hello')}
-        description={description(t, biometric?.available ? biometric.mode : null)}
-        control={
-          <Toggle
-            name="biometric"
-            checked={!!biometric?.available}
-            disabled={busy || !enrollable}
-            onChange={toggle}
-            aria-label={t('Unlock with Touch ID or Windows Hello')}
-            testid="settings-biometric-toggle"
-          />
-        }
-      >
-        {error && (
-          <span data-testid="settings-biometric-error" className="text-base text-bad">
-            {error}
-          </span>
-        )}
-      </SettingsRow>
-    </SettingsGroup>
+    <SettingsRow
+      label={t('Unlock with Touch ID or Windows Hello')}
+      icon={<BiometryGlyph type={biometric?.type ?? 'touch'} size={16} />}
+      iconActive={!!biometric?.available}
+      description={description(t, biometric?.available ? biometric.mode : null)}
+      control={
+        <Toggle
+          name="biometric"
+          checked={!!biometric?.available}
+          disabled={busy || !enrollable}
+          onChange={toggle}
+          aria-label={t('Unlock with Touch ID or Windows Hello')}
+          testid="settings-biometric-toggle"
+        />
+      }
+    >
+      {error && (
+        <span data-testid="settings-biometric-error" className="text-sm text-bad">
+          {error}
+        </span>
+      )}
+    </SettingsRow>
   )
 }

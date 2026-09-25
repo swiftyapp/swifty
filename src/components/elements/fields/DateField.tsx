@@ -8,7 +8,7 @@ import { useField } from './context'
 import Field from './Field'
 
 // A calendar date. Stored as ISO `YYYY-MM-DD` and read in the pattern picked in
-// Settings › Language & region — in the editor too, so a date is typed in the
+// Settings › General — in the editor too, so a date is typed in the
 // same form it is read back in, and the placeholder says which form that is.
 export default function DateField({
   name,

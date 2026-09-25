@@ -30,8 +30,10 @@ pub const MAX_AUTOLOCK_SECS: u64 = 24 * 60 * 60;
 pub const MAX_CLIPBOARD_MS: u64 = 60 * 60 * 1000;
 
 /// The seed values for every new password, shared by Settings › Security and
-/// the ⌘G dialog. `uppercase` and `exclude` have no control of their own yet;
-/// they are carried so a future one inherits what is already stored.
+/// the ⌘G dialog: the four character classes, the length, and the look-alike
+/// filter. `exclude` has no control of its own yet; it is carried so a future
+/// one inherits what is already stored. A file written before `lowercase`
+/// existed reads it as on, which is what the generator always drew from.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct GeneratorDefaults {
@@ -39,6 +41,7 @@ pub struct GeneratorDefaults {
     pub numbers: bool,
     pub symbols: bool,
     pub uppercase: bool,
+    pub lowercase: bool,
     pub exclude: String,
     pub exclude_similar_characters: bool,
 }
@@ -50,6 +53,7 @@ impl Default for GeneratorDefaults {
             numbers: true,
             symbols: true,
             uppercase: true,
+            lowercase: true,
             exclude: String::new(),
             exclude_similar_characters: false,
         }

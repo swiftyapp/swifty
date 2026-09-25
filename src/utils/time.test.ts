@@ -35,7 +35,7 @@ describe('relativeTime', () => {
   })
 
   // Past a week the label becomes a real date, in the pattern chosen in
-  // Settings › Language & region (MM/DD/YYYY by default).
+  // Settings › General (MM/DD/YYYY by default).
   it('falls back to a formatted date past a week', () => {
     expect(relativeTime(new Date(2024, 2, 4, 9).toISOString(), now)).toBe('03/04/2024')
   })

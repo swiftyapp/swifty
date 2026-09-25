@@ -8,8 +8,11 @@ import { kindOf } from '@/kinds'
 import { useNow } from '@/hooks/useNow'
 import { useLatestRequest } from '@/hooks/useLatestRequest'
 import { relativeUntil } from '@/utils/time'
+import { cx } from '@/utils/cx'
 import Button from '@/components/elements/Button'
-import ExpandableRow from '../ExpandableRow'
+import { ROW_HAIRLINE } from '@/components/elements/tokens'
+import { ChevronRightGlyph, LinkGlyph } from '../../../../icons'
+import RowHead from './RowHead'
 
 // How often the countdowns are re-read. A minute is the finest unit they show.
 const TICK_MS = 60_000
@@ -69,7 +72,7 @@ function Shares() {
 
   if (error)
     return (
-      <div data-testid="settings-shares-error" className="text-base text-bad">
+      <div data-testid="settings-shares-error" className="text-sm text-bad">
         {error}
       </div>
     )
@@ -96,7 +99,7 @@ function Shares() {
           >
             <span className="min-w-0 flex-1">
               <span className="block truncate text-base text-text">{titleOf(share)}</span>
-              <span className="block text-base text-text2">
+              <span className="block text-sm text-text2">
                 {share.kind && `${t(kindOf(share.kind).label)} · `}
                 {left ? t('Expires {{when}}', { when: left }) : t('Expired')}
               </span>
@@ -119,18 +122,36 @@ function Shares() {
 
 // Every link still out there, and the way to take one back before its 24 hours
 // are up. Only shown with Drive connected: without it there is nowhere a share
-// could have been put, so there is nothing this row could ever list.
+// could have been put, so there is nothing this row could ever list. The whole
+// row is the disclosure — it has nothing else to press.
 export default function SharesRow() {
   const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
 
   return (
-    <ExpandableRow
-      label={t('Shared links')}
-      description={t('Links you have sent out, until they expire or you revoke them')}
-      action={t('Show')}
-      testid="settings-shares-row"
-    >
-      <Shares />
-    </ExpandableRow>
+    <div className={ROW_HAIRLINE}>
+      <button
+        type="button"
+        data-testid="settings-shares-row"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full cursor-pointer items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-hover"
+      >
+        <RowHead
+          icon={<LinkGlyph />}
+          label={t('Shared links')}
+          description={t("Links you've sent stay live until they expire or you revoke them")}
+        />
+        <ChevronRightGlyph
+          className={cx('flex-none text-text2 transition-transform', open && 'rotate-90')}
+        />
+      </button>
+      {/* Lines up under the label, past the tile, as SettingsRow's does. */}
+      {open && (
+        <div className="px-4 pb-3.5 pl-[62px]">
+          <Shares />
+        </div>
+      )}
+    </div>
   )
 }

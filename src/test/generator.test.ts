@@ -27,8 +27,13 @@ describe('wordlist', () => {
 })
 
 describe('charset', () => {
-  it('always keeps both letter cases', () => {
+  it('keeps both letter cases by default', () => {
     expect(charset(settings({ symbols: false, numbers: false }))).toHaveLength(52)
+  })
+
+  it('drops a letter case that is switched off', () => {
+    expect(charset(settings({ symbols: false, numbers: false, uppercase: false }))).toHaveLength(26)
+    expect(charset(settings({ symbols: false, numbers: true, lowercase: false }))).toHaveLength(36)
   })
 
   it('adds digits and symbols only when they are toggled on', () => {

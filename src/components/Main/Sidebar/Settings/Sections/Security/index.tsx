@@ -10,10 +10,10 @@ export default function Security() {
 
   return (
     <>
-      <SettingsGroup label={t('Master password')}>
+      <SettingsGroup label={t('Unlock')}>
         <MasterPasswordRow />
+        <BiometricRow />
       </SettingsGroup>
-      <BiometricRow />
       <SessionGroup />
       <GeneratorGroup />
     </>

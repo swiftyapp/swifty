@@ -13,13 +13,16 @@ import {
   Activity,
   Archive,
   ArchiveRestore,
+  ArrowDownUp,
   ArrowDownWideNarrow,
   AtSign,
   Braces,
+  Calendar,
   Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   Cloud,
   Copy,
   CreditCard,
@@ -37,15 +40,18 @@ import {
   KeySquare,
   Layers,
   LayoutGrid,
+  Link,
   Lock,
   Moon,
   MoreHorizontal,
+  Palette,
   Pencil,
   Plus,
   RefreshCw,
   ScanLine,
   Search,
   Settings,
+  Settings2,
   Share2,
   ShieldCheck,
   Star,
@@ -54,6 +60,7 @@ import {
   Terminal,
   Trash2,
   TriangleAlert,
+  Upload,
   User,
   X,
   createLucideIcon,
@@ -167,8 +174,22 @@ export const ShieldGlyph = glyph(ShieldCheck, 16)
 export const GlobeGlyph = glyph(Globe, 16)
 export const ActivityGlyph = glyph(Activity, 16)
 export const LayersGlyph = glyph(Layers, 16)
+// Settings › General: the app's own preferences, as sliders rather than the gear
+// the rail already uses for Settings as a whole.
+export const GeneralGlyph = glyph(Settings2, 16)
+// Settings › Import & export: secrets travelling in both directions.
+export const TransferGlyph = glyph(ArrowDownUp, 16)
 // The iOS disclosure mark: a row that pushes a screen rather than doing a thing.
 export const ChevronRightGlyph = glyph(ChevronRight, 16)
+// Settings row marks: the accent, the date pattern, the clipboard wipe.
+export const PaletteGlyph = glyph(Palette, 16)
+export const CalendarGlyph = glyph(Calendar, 16)
+export const ClipboardGlyph = glyph(ClipboardList, 16)
+// Links that are out there (Settings › Sharing). The row's own mark, not an
+// action: `ShareGlyph` is what hands an entry over in the first place.
+export const LinkGlyph = glyph(Link, 16)
+// A file going into the app (the import drop target).
+export const UploadGlyph = glyph(Upload, 16)
 
 // Rail tier (20px, for the 40px+ rail hit areas and Settings nav headers)
 export const PlusRailGlyph = glyph(Plus, 20)
