@@ -1045,8 +1045,14 @@ fn serve_answers_frames_on_a_stream_until_it_closes() {
     served.join().unwrap();
 }
 
+// The signal registry is one per process, so the tests that register with it
+// run one at a time: with both up at once, one's broadcasts would land on the
+// other's connection, ahead of the frames it is counting.
+static SIGNAL_TESTS: Mutex<()> = Mutex::new(());
+
 #[test]
 fn a_lock_signal_reaches_every_connection_and_drops_the_gone_ones() {
+    let _one_at_a_time = SIGNAL_TESTS.lock().unwrap_or_else(|e| e.into_inner());
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
     let mut extension = TcpStream::connect(address).unwrap();
@@ -1093,6 +1099,7 @@ fn a_lock_signal_reaches_every_connection_and_drops_the_gone_ones() {
 
 #[test]
 fn a_peer_that_stops_reading_stalls_no_one_else() {
+    let _one_at_a_time = SIGNAL_TESTS.lock().unwrap_or_else(|e| e.into_inner());
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
     // A peer that never reads: its socket buffer fills, then writes block.
