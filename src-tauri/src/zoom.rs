@@ -18,6 +18,9 @@
 //! way it does under a drag resize. The duration is AppKit's own
 //! `animationResizeTime:`, so the zoom looks and paces exactly as before.
 //!
+//! A title-bar drag on a zoomed window un-zooms it through the same hook
+//! (macOS 15+); animating that one ends the drag, so it is left to AppKit.
+//!
 //! tao owns the window delegate (`TaoWindowDelegate`, tao 0.35.3), which does
 //! not implement the method, so it is added to that class at runtime. Should a
 //! tao upgrade add its own, `class_addMethod` fails and the zoom simply stays
@@ -31,7 +34,7 @@ use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyClass, AnyObject, Bool, Imp, Sel};
 use objc2::{ffi, msg_send, sel, Message};
-use objc2_app_kit::{NSAnimationContext, NSWindow};
+use objc2_app_kit::{NSAnimationContext, NSEvent, NSWindow};
 use objc2_foundation::NSRect;
 
 // One main window per process.
@@ -41,9 +44,7 @@ static STATE: Mutex<State> = Mutex::new(State {
 });
 
 struct State {
-    // Where the window goes back to on un-zoom. AppKit keeps its own note of
-    // this, but it takes it while performing the zoom that is being vetoed
-    // here, so it is kept independently.
+    // Where the window goes back to on un-zoom.
     restore: Option<NSRect>,
     // Whether the animator is still moving the window. Until it is done
     // `isZoomed` reports the frame it is passing through, so a request that
@@ -89,6 +90,11 @@ extern "C-unwind" fn should_zoom(
     let mut state = STATE.lock().unwrap_or_else(|e| e.into_inner());
     if state.in_flight {
         return Bool::NO;
+    }
+    // Left button held: a drag's un-zoom. AppKit's proposal is the pre-zoom frame.
+    if NSEvent::pressedMouseButtons() & 1 != 0 {
+        state.restore = None;
+        return Bool::YES;
     }
     let target = if window.isZoomed() {
         // A window that was already zoomed when it first appeared has nowhere
