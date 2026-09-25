@@ -4,7 +4,7 @@ import { ChevronDownGlyph } from '@/components/Main/icons'
 import { Dropdown, DropdownCheck, DropdownItem } from './Dropdown'
 import { META } from './tokens'
 
-export interface MenuSelectOption<T extends string = string> {
+interface Option<T extends string> {
   value: T
   label: string
   // Grey, on the right of the label: a locale code, a pattern.
@@ -14,7 +14,7 @@ export interface MenuSelectOption<T extends string = string> {
 interface Props<T extends string> {
   // The accessible name; the trigger reads as "<label>: <current option>".
   label: string
-  options: MenuSelectOption<T>[]
+  options: Option<T>[]
   value: T
   onChange: (value: T) => void
   // `<prefix>-trigger` on the trigger, `<prefix>-<value>` on each item.
