@@ -22,8 +22,6 @@ export interface SubpageFooter {
 interface Props {
   children: ReactNode
   footer: SubpageFooter
-  /** Defaults to going back to the section. */
-  onCancel?: () => void
   testid?: string
 }
 
@@ -38,7 +36,7 @@ interface Props {
  * Enter submits from anywhere inside, except where Enter means something else:
  * a textarea's new line, or a focused button pressing itself.
  */
-export default function SubpageFrame({ children, footer, onCancel, testid }: Props) {
+export default function SubpageFrame({ children, footer, testid }: Props) {
   const { t } = useTranslation()
   const { close } = useSubpage()
   const compact = useLayout() === 'compact'
@@ -61,7 +59,7 @@ export default function SubpageFrame({ children, footer, onCancel, testid }: Pro
       <div data-testid="settings-subpage-hint" className={cx(META, 'min-w-0 flex-1')}>
         {footer.hint}
       </div>
-      <Button variant="pale" size="md" testid="settings-subpage-cancel" onClick={onCancel ?? close}>
+      <Button variant="pale" size="md" testid="settings-subpage-cancel" onClick={close}>
         {t('Cancel')}
       </Button>
       {/* The button's own borderless chip, not a bordered Kbd: on the accent

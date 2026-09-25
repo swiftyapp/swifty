@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useState } from 'react'
 import { setSettingsSection, type Section } from '@/store'
 import type { Subpage } from './subpages'
 
@@ -39,3 +39,23 @@ const SubpageContext = createContext<SubpageNav>({
 export const SubpageProvider = SubpageContext.Provider
 
 export const useSubpage = () => useContext(SubpageContext)
+
+/**
+ * The sub-page a shell holds, under the section lock: while Settings may not
+ * be left (`settingsLocked`) a sub-page is neither opened nor left either.
+ * `drop` is the shell's own unguarded clear, for a move whose lock it has
+ * already checked — a nav pick, backing out to the phone's root.
+ */
+export function useSubpageState(locked: boolean): SubpageNav & { drop: () => void } {
+  const [subpage, setSubpage] = useState<Subpage | null>(null)
+  return {
+    subpage,
+    open: next => {
+      if (!locked) setSubpage(next)
+    },
+    close: () => {
+      if (!locked) setSubpage(null)
+    },
+    drop: () => setSubpage(null)
+  }
+}

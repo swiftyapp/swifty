@@ -4,7 +4,6 @@ import type { Workspace } from '@/api/types'
 import { deleteWorkspace, selectActiveWorkspace, useApp, useVault } from '@/store'
 import { unsealError } from '@/components/Start/shared/errors'
 import { workspaceLabel } from '@/lib/workspace'
-import { isWorkspaceColor } from '@/lib/workspaceColor'
 import { cx } from '@/utils/cx'
 import Field from '@/components/elements/Field'
 import Segmented from '@/components/elements/Segmented'
@@ -14,7 +13,7 @@ import { CARD, LABEL } from '@/components/elements/tokens'
 import SubpageFrame from '../../../SubpageFrame'
 import { useSubpage } from '../../../sectionNav'
 import Preview from '../WorkspaceForm/Preview'
-import { workspaceAbout } from '../about'
+import { workspaceAbout, workspaceSyncs } from '../about'
 
 type Scope = 'device' | 'everywhere'
 
@@ -31,18 +30,14 @@ type Scope = 'device' | 'everywhere'
  * Google account with it (`syncs`); one that does not is only ever a local
  * delete, and is not offered a scope to pick from at all.
  */
-export default function Confirm({
-  workspace,
-  syncs
-}: {
-  workspace: Workspace
-  /** Offer "Delete everywhere" — this workspace has a vault on Drive. */
-  syncs: boolean
-}) {
+export default function Confirm({ workspace }: { workspace: Workspace }) {
   const { t } = useTranslation()
   const { close } = useSubpage()
   const active = useApp(selectActiveWorkspace)
+  const sync = useApp(state => state.sync)
   const liveCount = useVault(state => state.items.length)
+  // Offer "Delete everywhere" only to a workspace with a vault on Drive.
+  const syncs = workspaceSyncs(workspace, { active, sync })
   const passwordId = useId()
   const confirmId = useId()
   const label = workspaceLabel(workspace, t)
@@ -87,7 +82,7 @@ export default function Confirm({
         {/* The workspace itself, as the list draws it: what is about to go. */}
         <Preview
           name={label}
-          color={isWorkspaceColor(workspace.color) ? workspace.color : null}
+          color={workspace.color}
           seed={workspace.id}
           meta={meta}
           testid="workspace-delete-preview"

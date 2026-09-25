@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useUi, closeSettings, setSettingsSection, type Section as Key } from '@/store'
 import Modal from '@/components/elements/Modal'
@@ -7,9 +6,9 @@ import { cx } from '@/utils/cx'
 import Nav from './Nav'
 import Section from './Section'
 import { descriptionOf, titleOf } from './sections'
-import { SubpageProvider } from './sectionNav'
+import { SubpageProvider, useSubpageState } from './sectionNav'
 import SubpageBody from './SubpageBody'
-import { subpageDescriptionOf, subpageTitleOf, type Subpage } from './subpages'
+import { subpageDescriptionOf, subpageTitleOf } from './subpages'
 import { BackGlyph, CloseGlyph } from '../../icons'
 
 const TITLE_ID = 'settings-title'
@@ -21,24 +20,17 @@ export default function SettingsModal() {
   // are shown disabled so that refusal is not read as a button that broke.
   const locked = useUi(state => state.settingsLocked)
   // Local, not in the store, so Settings never reopens halfway into a form.
-  const [subpage, setSubpage] = useState<Subpage | null>(null)
-
-  // Under the same lock as the section: a sub-page is a step of it.
-  const open = (next: Subpage) => {
-    if (!locked) setSubpage(next)
-  }
-  const close = () => {
-    if (!locked) setSubpage(null)
-  }
+  const nav = useSubpageState(locked)
+  const { subpage, close } = nav
   // Any nav pick lands on that section's own page, the current one included.
   const select = (next: Key) => {
     if (locked) return
-    setSubpage(null)
+    nav.drop()
     setSettingsSection(next)
   }
 
   return (
-    <SubpageProvider value={{ subpage, open, close }}>
+    <SubpageProvider value={nav}>
       <Modal
         // Escape and the scrim step back out of a sub-page before they close.
         onClose={subpage ? close : closeSettings}

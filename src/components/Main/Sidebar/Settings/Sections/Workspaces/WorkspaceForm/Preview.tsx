@@ -1,12 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import type { WorkspaceColor } from '@/lib/workspaceColor'
 import { cx } from '@/utils/cx'
 import Monogram from '@/components/elements/Monogram'
 import { CARD, META } from '@/components/elements/tokens'
 
 interface Props {
   name: string
-  color: WorkspaceColor | null
+  /** As the workspace carries it; Monogram falls back to the seed's hue. */
+  color?: string | null
   /** The hue with no colour chosen: the workspace's id, or a stand-in for one to come. */
   seed: string
   meta: string

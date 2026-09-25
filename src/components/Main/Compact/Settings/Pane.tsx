@@ -25,17 +25,16 @@ import { TAB_BAR_CLEARANCE } from '../chrome'
  */
 export default function Pane({
   section,
-  subpage,
   locked,
   onBack
 }: {
   section: Key
-  subpage: Subpage | null
   /** The section may not be left (see `settingsLocked`); Back is shown inert. */
   locked: boolean
   onBack: () => void
 }) {
   const { t } = useTranslation()
+  const { subpage } = useSubpage()
 
   if (subpage) return <SubpagePane subpage={subpage} locked={locked} />
 

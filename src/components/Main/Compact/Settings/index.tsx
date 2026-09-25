@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useUi, type Section } from '@/store'
-import { SectionNavProvider, SubpageProvider } from '../../Sidebar/Settings/sectionNav'
-import type { Subpage } from '../../Sidebar/Settings/subpages'
+import {
+  SectionNavProvider,
+  SubpageProvider,
+  useSubpageState
+} from '../../Sidebar/Settings/sectionNav'
 import Root from './Root'
 import Pane from './Pane'
 
@@ -29,31 +32,24 @@ import Pane from './Pane'
  */
 export default function Settings() {
   const [section, setSection] = useState<Section | null>(null)
-  // A sub-page is one more pane on top of the section's, held the same way.
-  const [subpage, setSubpage] = useState<Subpage | null>(null)
   const locked = useUi(state => state.settingsLocked)
+  // A sub-page is one more pane on top of the section's, held the same way.
+  const nav = useSubpageState(locked)
   const go = (next: Section) => {
     if (locked) return
-    setSubpage(null)
+    nav.drop()
     setSection(next)
-  }
-  const open = (next: Subpage) => {
-    if (!locked) setSubpage(next)
-  }
-  const close = () => {
-    if (!locked) setSubpage(null)
   }
 
   return section ? (
     <SectionNavProvider value={go}>
-      <SubpageProvider value={{ subpage, open, close }}>
+      <SubpageProvider value={nav}>
         <Pane
           section={section}
-          subpage={subpage}
           locked={locked}
           onBack={() => {
             if (locked) return
-            setSubpage(null)
+            nav.drop()
             setSection(null)
           }}
         />
