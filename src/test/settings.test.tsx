@@ -27,7 +27,7 @@ import DateField from '@/components/elements/fields/DateField'
 import { FieldsProvider } from '@/components/elements/fields/context'
 import Footer from '@/components/Main/Body/Aside/Show/Footer'
 import { appStatusDefault, calls, mockCommand, mockCommandOnce } from './ipc'
-import { seedApp } from './utils'
+import { loginMeta, seedApp, withEntries } from './utils'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -51,6 +51,9 @@ const open = async () => {
 
 const go = (section: string) =>
   userEvent.click(screen.getByTestId(`settings-nav-${section}`))
+
+// A workspace row's ⋯, which is where Rename and Delete live.
+const openMenu = (id: string) => userEvent.click(screen.getByTestId(`workspace-menu-${id}`))
 
 describe('Settings shell', () => {
   it('opens on the sync section', async () => {
@@ -497,8 +500,8 @@ describe('Settings › vault audit', () => {
   it('leaves the always-on monitors without a fake control', async () => {
     await open()
     await go('audit')
-    expect(screen.getByText('Weak passwords')).toBeInTheDocument()
-    expect(screen.getByText('Reused passwords')).toBeInTheDocument()
+    expect(screen.getByText('Weak & reused passwords')).toBeInTheDocument()
+    expect(screen.getByText('Always on')).toBeInTheDocument()
     // Breach monitoring is the only switch on this section.
     expect(screen.getAllByRole('switch')).toHaveLength(1)
   })
@@ -510,6 +513,85 @@ describe('Settings › vault audit', () => {
 
     expect(useUi.getState().view).toBe('health')
     expect(useUi.getState().settings).toBe(false)
+  })
+
+  it('reviews reused passwords from the stat strip too', async () => {
+    await open()
+    await go('audit')
+    await userEvent.click(screen.getByTestId('settings-open-health-reused'))
+
+    expect(useUi.getState().view).toBe('health')
+    expect(useUi.getState().settings).toBe(false)
+  })
+
+  it('says nothing has been scanned before the first audit', async () => {
+    await open()
+    await go('audit')
+    expect(screen.getByTestId('settings-audit-verdict')).toHaveTextContent('Not scanned yet')
+    expect(screen.getByTestId('settings-audit-score')).toHaveTextContent('—')
+  })
+
+  it('puts the score in a word and counts what needs review', async () => {
+    withEntries([loginMeta({ id: 'l1' }), loginMeta({ id: 'l2' })], {
+      l1: { score: 0, isWeak: true, isRepeating: false, breached: false },
+      l2: { score: 2, isWeak: false, isRepeating: true, breached: true }
+    })
+    await open()
+    await go('audit')
+
+    expect(screen.getByTestId('settings-audit-verdict')).toHaveTextContent('Weak')
+    expect(screen.getByText('2 items')).toBeInTheDocument()
+    const strip = screen.getByTestId('settings-audit-counts')
+    expect(strip).toHaveTextContent('1weak')
+    expect(strip).toHaveTextContent('1reused')
+    // Breaches are not counted while monitoring is off; the strip offers it.
+    expect(strip).toHaveTextContent('—breached')
+    expect(screen.getByTestId('settings-breach-enable')).toHaveTextContent('Turn on monitoring')
+  })
+
+  it('calls a healthy vault strong', async () => {
+    withEntries([loginMeta()], {
+      l1: { score: 4, isWeak: false, isRepeating: false, breached: false }
+    })
+    await open()
+    await go('audit')
+    expect(screen.getByTestId('settings-audit-verdict')).toHaveTextContent('Strong')
+  })
+
+  it('turns breach monitoring on from the stat strip', async () => {
+    await open()
+    await go('audit')
+    await userEvent.click(screen.getByTestId('settings-breach-enable'))
+
+    expect(usePrefs.getState().breachCheck).toBe(true)
+    expect(calls('get_audit')).toContainEqual({ checkBreaches: true })
+    expect(screen.getByTestId('settings-breach-toggle')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByTestId('settings-breach-enable')).not.toBeInTheDocument()
+  })
+
+  it('re-runs the audit from Run now', async () => {
+    await open()
+    await go('audit')
+    await userEvent.click(screen.getByTestId('settings-audit-run'))
+    expect(calls('get_audit')).toContainEqual({ checkBreaches: false })
+  })
+
+  it('unfolds how breach monitoring works and folds it away again', async () => {
+    await open()
+    await go('audit')
+    const explain = screen.getByTestId('settings-breach-explain')
+    expect(explain).toHaveTextContent('How it works')
+    expect(screen.queryByTestId('settings-breach-explainer')).not.toBeInTheDocument()
+
+    await userEvent.click(explain)
+    expect(explain).toHaveAttribute('aria-expanded', 'true')
+    expect(explain).toHaveTextContent('Hide details')
+    const explainer = screen.getByTestId('settings-breach-explainer')
+    expect(explainer).toHaveTextContent('5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8')
+    expect(explainer).toHaveTextContent(/k-anonymity/)
+
+    await userEvent.click(explain)
+    expect(screen.queryByTestId('settings-breach-explainer')).not.toBeInTheDocument()
   })
 })
 
@@ -814,6 +896,106 @@ describe('Settings › workspaces › vaults in the account', () => {
   })
 })
 
+describe('Settings › workspaces › list', () => {
+  const two = () =>
+    seedApp({
+      workspaces: [
+        { id: 'default', name: null },
+        { id: 'w2', name: 'Work', vaultId: 'cafe', itemCount: 12 }
+      ],
+      activeWorkspace: 'default'
+    })
+
+  it('marks the open workspace and offers a switch to the others', async () => {
+    two()
+    await open()
+    await go('workspaces')
+
+    expect(screen.getByText('On this device · 2')).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-row-default')).toHaveTextContent('Open now')
+    expect(screen.queryByTestId('workspace-switch-default')).not.toBeInTheDocument()
+    expect(screen.getByTestId('workspace-row-w2')).not.toHaveTextContent('Open now')
+    expect(screen.getByTestId('workspace-row-w2')).toHaveTextContent('12 items · Google Drive')
+
+    await userEvent.click(screen.getByTestId('workspace-switch-w2'))
+    expect(calls('workspace_select')).toEqual([{ id: 'w2' }])
+  })
+
+  it('keeps Rename and Delete behind the row’s menu', async () => {
+    two()
+    await open()
+    await go('workspaces')
+
+    expect(screen.queryByTestId('workspace-rename-w2')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('workspace-delete-w2')).not.toBeInTheDocument()
+
+    await openMenu('w2')
+    expect(screen.getByTestId('workspace-menu-w2')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('workspace-rename-w2')).toBeInTheDocument()
+    expect(screen.getByTestId('workspace-delete-w2')).toBeEnabled()
+  })
+
+  it('renames a workspace inline from its menu', async () => {
+    two()
+    await open()
+    await go('workspaces')
+    await openMenu('w2')
+    await userEvent.click(screen.getByTestId('workspace-rename-w2'))
+
+    // The menu folds away and the field opens in the row, on the current name.
+    expect(screen.queryByTestId('workspace-rename-w2')).not.toBeInTheDocument()
+    const input = screen.getByTestId('workspace-rename-input')
+    expect(input).toHaveValue('Work')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'Clients{Enter}')
+
+    expect(calls('workspace_rename')).toEqual([{ id: 'w2', name: 'Clients' }])
+    await waitFor(() =>
+      expect(screen.queryByTestId('workspace-rename-input')).not.toBeInTheDocument()
+    )
+  })
+
+  it('lets the rename go with Escape, leaving Settings open', async () => {
+    two()
+    await open()
+    await go('workspaces')
+    await openMenu('default')
+    await userEvent.click(screen.getByTestId('workspace-rename-default'))
+    await userEvent.type(screen.getByTestId('workspace-rename-input'), '{Escape}')
+
+    expect(screen.queryByTestId('workspace-rename-input')).not.toBeInTheDocument()
+    expect(useUi.getState().settings).toBe(true)
+    expect(calls('workspace_rename')).toHaveLength(0)
+  })
+
+  it('unfolds the new workspace form from the last row and creates one', async () => {
+    await open()
+    await go('workspaces')
+
+    const row = screen.getByTestId('workspace-new-row')
+    expect(row).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('workspace-new-name')).not.toBeInTheDocument()
+
+    await userEvent.click(row)
+    expect(row).toHaveAttribute('aria-expanded', 'true')
+    await userEvent.type(screen.getByTestId('workspace-new-name'), 'Family')
+    await userEvent.type(screen.getByTestId('workspace-new-password'), 'master-pass')
+    await act(async () => {
+      await userEvent.click(screen.getByTestId('workspace-create'))
+    })
+
+    expect(calls('workspace_create')).toEqual([{ name: 'Family', password: 'master-pass' }])
+  })
+
+  it('folds the new workspace form away again', async () => {
+    await open()
+    await go('workspaces')
+    await userEvent.click(screen.getByTestId('workspace-new-row'))
+    await userEvent.click(screen.getByTestId('workspace-new-row'))
+    expect(screen.queryByTestId('workspace-new-name')).not.toBeInTheDocument()
+  })
+})
+
 // Local only: the vault leaves this device and whatever it has on Drive stays,
 // so the confirmation asks for two proofs — the workspace's own master password
 // and its label typed out — before anything is removed.
@@ -831,6 +1013,7 @@ describe('Settings › workspaces › delete', () => {
     two()
     await open()
     await go('workspaces')
+    await openMenu(id)
     await userEvent.click(screen.getByTestId(`workspace-delete-${id}`))
     return screen.getByTestId('workspace-delete-dialog')
   }
@@ -929,8 +1112,11 @@ describe('Settings › workspaces › delete', () => {
     await open()
     await go('workspaces')
 
-    expect(screen.getByTestId('workspace-delete-default')).toBeDisabled()
     expect(screen.getByTestId('workspace-delete-last')).toBeInTheDocument()
+    await openMenu('default')
+    expect(screen.getByTestId('workspace-delete-default')).toBeDisabled()
+    await userEvent.click(screen.getByTestId('workspace-delete-default'))
+    expect(screen.queryByTestId('workspace-delete-dialog')).not.toBeInTheDocument()
   })
 
   // A workspace with a vault id has a pack in the account, so it is offered the
@@ -946,6 +1132,7 @@ describe('Settings › workspaces › delete', () => {
     })
     await open()
     await go('workspaces')
+    await openMenu('w2')
     await userEvent.click(screen.getByTestId('workspace-delete-w2'))
 
     await userEvent.click(screen.getByTestId('workspace-delete-scope-everywhere'))
