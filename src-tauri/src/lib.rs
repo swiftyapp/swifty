@@ -143,13 +143,6 @@ pub fn run() {
         .setup(|app| {
             // Preferences first: the shell and the auto-lock both open on them.
             settings::boot(app.handle());
-            // The extension host listens from launch when it was left on, so
-            // a browser that starts before the vault is unlocked finds the
-            // app and can ask for the unlock.
-            #[cfg(desktop)]
-            if settings::current(app.handle()).browser.enabled {
-                browser::server::start(app.handle());
-            }
             // The plaintext favicon directory the in-vault cache replaced: the
             // vault's host list in the clear, so it goes on the first launch
             // that can see it, whether or not this one looks an icon up.
@@ -159,6 +152,18 @@ pub fn run() {
             // either — the registry below is the first thing that does.
             let root = storage::root_dir(app.handle())?;
             workspace::recover_interrupted_delete(&root);
+            // The extension host, when it was left on: the browsers' manifests
+            // are put right — an update moved the executable, a browser
+            // arrived since, a manifest went missing — and the listener is up
+            // from launch, so a browser that starts before the vault is
+            // unlocked finds the app and can ask for the unlock. Writing the
+            // manifests again is idempotent, and one another host owns is
+            // left alone (`manifest::install`).
+            #[cfg(desktop)]
+            if settings::current(app.handle()).browser.enabled {
+                browser::manifest::install(&root);
+                browser::server::start(app.handle());
+            }
             // Which workspace was open last. Read before the window exists, so
             // the lock screen the user lands on is that workspace's.
             let registry = workspace::Registry::load(&root);

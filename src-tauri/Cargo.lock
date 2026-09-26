@@ -4473,6 +4473,7 @@ dependencies = [
  "passkey-authenticator",
  "passkey-client",
  "passkey-types",
+ "public-suffix",
  "rand",
  "reqwest",
  "ring",
