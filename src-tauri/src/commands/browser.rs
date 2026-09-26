@@ -51,13 +51,13 @@ pub fn browser_set_enabled(enabled: bool, app: AppHandle) -> Result<BrowserStatu
     status(&app)
 }
 
-/// The user's answer to the extension holding `key` asking to connect: the
-/// name they gave it, or `null` to refuse. Nothing happens when no ask is up
-/// for that key — a dialog answering late, after its ask timed out and another
-/// extension's took its place, approves nothing.
+/// The user's answer to the extension asking to connect under `id`: the name
+/// they gave it, or `null` to refuse. Nothing happens when no ask is up under
+/// that id — a dialog answering late, after its ask timed out and another
+/// took its place, approves nothing, not even the same extension's retry.
 #[tauri::command]
-pub fn browser_respond(key: String, name: Option<String>) -> Result<()> {
-    browser::respond(&key, name);
+pub fn browser_respond(id: String, name: Option<String>) -> Result<()> {
+    browser::respond(&id, name);
     Ok(())
 }
 
