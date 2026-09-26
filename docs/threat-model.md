@@ -516,10 +516,15 @@ exposed process than the webview, and it is not ours.
   is asked for**, in a dialog that names the rpId the passkey is for and,
   under it, the page that asked — so a subdomain asking for its parent's
   passkey is in plain sight — one ceremony at a time and refused after a
-  minute unanswered; a registration whose `excludeCredentials` names a
-  passkey the vault holds is refused before the user is asked, and a sign-in
-  the allow list leaves nothing for is answered "no credentials" before they
-  are asked, as KeePassXC does. A new passkey is put on the one login for
+  minute unanswered. A sign-in names the account it would be as, and when
+  the vault holds several passkeys for the site that the request admits (a
+  site asking for a discoverable credential names none), the dialog offers
+  the choice: the request is narrowed to the one picked before the
+  authenticator sees it, so a yes never signs as an account the user was
+  not shown. A registration whose `excludeCredentials` names a passkey the
+  vault holds is refused before the user is asked, and a sign-in the allow
+  list leaves nothing for is answered "no credentials" before they are
+  asked, as KeePassXC does. A new passkey is put on the one login for
   that site, or on a new login when there is none or several (the same rule
   `passkey::store` had). The write is pinned to the session the ceremony
   began in: a lock or a workspace switch while the user decides fails it

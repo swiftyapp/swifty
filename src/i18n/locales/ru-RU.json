@@ -714,5 +714,7 @@
   "{{site}} wants to create a passkey for {{account}}": "{{site}} хочет создать ключ доступа для {{account}}",
   "{{site}} wants to create a passkey": "{{site}} хочет создать ключ доступа",
   "{{site}} wants to sign in with your passkey": "{{site}} хочет выполнить вход с вашим ключом доступа",
+  "{{site}} wants to sign in with your passkey for {{account}}": "{{site}} хочет выполнить вход с вашим ключом доступа для {{account}}",
+  "Account": "Аккаунт",
   "Asked by {{origin}} through the browser extension.": "Запрос от {{origin}} через расширение браузера."
 }

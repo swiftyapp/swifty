@@ -694,5 +694,7 @@
   "{{site}} wants to create a passkey for {{account}}": "{{site}} vill skapa en nyckel för {{account}}",
   "{{site}} wants to create a passkey": "{{site}} vill skapa en nyckel",
   "{{site}} wants to sign in with your passkey": "{{site}} vill logga in med din nyckel",
+  "{{site}} wants to sign in with your passkey for {{account}}": "{{site}} vill logga in med din nyckel för {{account}}",
+  "Account": "Konto",
   "Asked by {{origin}} through the browser extension.": "Begärt av {{origin}} via webbläsartillägget."
 }

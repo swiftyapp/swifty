@@ -207,6 +207,39 @@ impl<V: PasskeyVault> VaultCredentialStore<V> {
     pub fn new(vault: V) -> Self {
         Self { vault }
     }
+
+    /// The vault's passkeys for `rp_id` that could sign, newest first — those
+    /// `ids` names, or every one when there is no list (ours are always
+    /// discoverable). What the authenticator signs with, and what the user is
+    /// offered to sign in as, come from here alike.
+    pub fn matching(
+        &self,
+        ids: Option<&[PublicKeyCredentialDescriptor]>,
+        rp_id: &str,
+    ) -> std::result::Result<Vec<Stored>, StatusCode> {
+        Ok(self
+            .vault
+            .find(rp_id)
+            .map_err(vault_err)?
+            .into_iter()
+            .filter(|s| match ids {
+                Some(ids) => ids
+                    .iter()
+                    .any(|d| same_credential(&s.passkey.credential_id, &d.id)),
+                None => true,
+            })
+            // A credential we cannot read (a foreign key type, a mangled id) is
+            // dropped rather than failing the ceremony, so one bad import does
+            // not lock the user out of the good credentials beside it.
+            .filter(|s| match key::to_passkey_types(&s.passkey) {
+                Ok(_) => true,
+                Err(e) => {
+                    log::warn!("skipping unusable passkey on entry {}: {e}", s.entry_id);
+                    false
+                }
+            })
+            .collect())
+    }
 }
 
 #[async_trait::async_trait]
@@ -224,29 +257,9 @@ impl<V: PasskeyVault> passkey_authenticator::CredentialStore for VaultCredential
         _user_handle: Option<&[u8]>,
     ) -> std::result::Result<Vec<Self::PasskeyItem>, StatusCode> {
         let found: Vec<_> = self
-            .vault
-            .find(rp_id)
-            .map_err(vault_err)?
+            .matching(ids, rp_id)?
             .iter()
-            // An allow or exclude list names credential ids; with no list, every
-            // credential for the relying party is offered (ours are always
-            // discoverable).
-            .filter(|s| match ids {
-                Some(ids) => ids
-                    .iter()
-                    .any(|d| same_credential(&s.passkey.credential_id, &d.id)),
-                None => true,
-            })
-            // A credential we cannot read (a foreign key type, a mangled id) is
-            // dropped rather than failing the ceremony, so one bad import does
-            // not lock the user out of the good credentials beside it.
-            .filter_map(|s| match key::to_passkey_types(&s.passkey) {
-                Ok(passkey) => Some(passkey),
-                Err(e) => {
-                    log::warn!("skipping unusable passkey on entry {}: {e}", s.entry_id);
-                    None
-                }
-            })
+            .filter_map(|s| key::to_passkey_types(&s.passkey).ok())
             .collect();
 
         if found.is_empty() {
@@ -302,10 +315,10 @@ impl<V: PasskeyVault> passkey_authenticator::CredentialStore for VaultCredential
 }
 
 // Credential ids are compared as bytes, never as strings: ours are stored
-// exactly as their source wrote them, and one exporter's padded base64url is
-// another's unpadded.
+// exactly as their source wrote them, one exporter's padded base64url is
+// another's unpadded, and Bitwarden's is a GUID (`key::decode_credential_id`).
 fn same_credential(stored: &str, id: &[u8]) -> bool {
-    passkey_types::encoding::try_from_base64url(stored).is_some_and(|bytes| bytes == id)
+    key::decode_credential_id(stored).is_ok_and(|bytes| bytes == id)
 }
 
 // A vault failure is ours, not the relying party's: report the CTAP catch-all

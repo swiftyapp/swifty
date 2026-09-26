@@ -23,7 +23,17 @@ const GET: PasskeyAsk = {
   id: 'ask-2',
   kind: 'get',
   rpId: 'github.com',
-  origin: 'https://github.com'
+  origin: 'https://github.com',
+  accounts: [{ userName: 'octocat', userDisplayName: 'The Octocat' }]
+}
+
+const GET_SEVERAL: PasskeyAsk = {
+  ...GET,
+  id: 'ask-3',
+  accounts: [
+    { userName: 'work', userDisplayName: 'Octocat at work' },
+    { userName: '', userDisplayName: 'Octocat at home' }
+  ]
 }
 
 describe('the passkey consent dialog', () => {
@@ -48,16 +58,33 @@ describe('the passkey consent dialog', () => {
     expect(useUi.getState().passkeyAsk).toBeNull()
   })
 
-  it('asks to sign in, and sends a no on Deny', async () => {
+  it('asks to sign in as the one account, and sends a no on Deny', async () => {
     await ask(GET)
     expect(screen.getByTestId('browser-passkey-title')).toHaveTextContent(
-      'github.com wants to sign in with your passkey'
+      'github.com wants to sign in with your passkey for octocat'
     )
+    expect(screen.queryByTestId('browser-passkey-account-0')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('browser-passkey-deny'))
 
     expect(calls('browser_passkey_respond')).toEqual([{ id: 'ask-2', allow: false }])
     expect(screen.queryByTestId('browser-passkey-modal')).not.toBeInTheDocument()
+  })
+
+  it('offers the accounts of a sign-in, the newest picked, and sends the pick', async () => {
+    await ask(GET_SEVERAL)
+    expect(screen.getByTestId('browser-passkey-title')).toHaveTextContent(
+      /^github\.com wants to sign in with your passkey$/
+    )
+    expect(screen.getByTestId('browser-passkey-account-0')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('browser-passkey-account-0')).toHaveTextContent('work')
+    // An account the site gave no name falls back to its display name.
+    expect(screen.getByTestId('browser-passkey-account-1')).toHaveTextContent('Octocat at home')
+
+    await userEvent.click(screen.getByTestId('browser-passkey-account-1'))
+    await userEvent.click(screen.getByTestId('browser-passkey-allow'))
+
+    expect(calls('browser_passkey_respond')).toEqual([{ id: 'ask-3', allow: true, account: 1 }])
   })
 
   it('falls back to the display name, then to no account at all', async () => {

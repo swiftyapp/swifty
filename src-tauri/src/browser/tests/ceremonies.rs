@@ -238,14 +238,84 @@ fn a_passkey_registered_through_the_extension_signs_in_through_it() {
         assert_eq!(bytes(&response["userHandle"]), USER_ID);
     }
 
+    let sign_in = format!(
+        "SignIn {{ rp_id: \"example.com\", accounts: [Account {{ credential_id: {id:?}, user_name: \"alice\", user_display_name: \"Alice Example\" }}] }}"
+    );
     assert_eq!(
         asks(&connection),
         [
-            "Register { rp_id: \"example.com\", user_name: Some(\"alice\"), user_display_name: Some(\"Alice Example\") }",
-            "SignIn { rp_id: \"example.com\" }",
-            "SignIn { rp_id: \"example.com\" }",
+            "Register { rp_id: \"example.com\", user_name: Some(\"alice\"), user_display_name: Some(\"Alice Example\") }".to_string(),
+            sign_in.clone(),
+            sign_in,
         ],
-        "every ceremony is asked for"
+        "every ceremony is asked for, a sign-in with the account it would be as"
+    );
+}
+
+/// A passkey for `RP_ID` as an import would leave it, for `user_name`, made
+/// on `created_at`.
+fn passkey(user_name: &str, created_at: &str) -> crate::models::Passkey {
+    crate::models::Passkey {
+        credential_id: base64url(format!("cred-{user_name}").as_bytes()),
+        rp_id: RP_ID.into(),
+        rp_name: None,
+        user_handle: base64url(user_name.as_bytes()),
+        user_name: user_name.into(),
+        user_display_name: String::new(),
+        private_key: fresh_key(),
+        counter: 0,
+        created_at: Some(created_at.into()),
+    }
+}
+
+// A site that names no credential expects the user to pick the account. The
+// library would take the newest; the user is asked with every one at stake,
+// newest first, and signs in as the one they picked.
+#[test]
+fn a_sign_in_with_several_accounts_is_the_one_the_user_picks() {
+    let (extension, mut connection) = connected(Mock {
+        passkey_choice: 1,
+        ..Mock::unlocked()
+    });
+    let vault = &connection.host().passkeys;
+    for (name, made) in [
+        ("alice", "2024-01-01T00:00:00Z"),
+        ("bob", "2025-01-01T00:00:00Z"),
+    ] {
+        crate::passkey::store::PasskeyVault::insert(vault, &passkey(name, made)).unwrap();
+    }
+
+    let signed = get(&extension, &mut connection, request(&challenge(), &[]));
+    assert_eq!(
+        bytes(&signed["id"]),
+        b"cred-alice",
+        "the second account offered — the older one — is the one picked"
+    );
+    assert_eq!(bytes(&signed["response"]["userHandle"]), b"alice");
+    let asked = asks(&connection);
+    assert_eq!(asked.len(), 1);
+    assert!(
+        asked[0].contains("user_name: \"bob\"") && asked[0].contains("user_name: \"alice\""),
+        "both accounts were offered: {}",
+        asked[0]
+    );
+    assert!(
+        asked[0].find("bob") < asked[0].find("alice"),
+        "newest first: {}",
+        asked[0]
+    );
+
+    // An allow list naming one account leaves nothing to pick: the user is
+    // asked about that one, and a pick past the end of the list is a no.
+    let bob = base64url(b"cred-bob");
+    let refused = get(&extension, &mut connection, request(&challenge(), &[&bob]));
+    assert_eq!(failed(&refused), Code::PasskeyRequestCanceled as u8);
+    let asked = asks(&connection);
+    assert_eq!(asked.len(), 2);
+    assert!(
+        asked[1].contains("bob") && !asked[1].contains("alice"),
+        "only the account the site allows is offered: {}",
+        asked[1]
     );
 }
 

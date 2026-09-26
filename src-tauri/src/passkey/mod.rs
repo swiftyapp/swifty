@@ -17,10 +17,12 @@
 //! can construct an authenticator without saying how the user is asked, so a
 //! transport has to bring its confirm prompt with it rather than inherit a
 //! silent yes. A refusal ends the ceremony as `OperationDenied`; presence and
-//! verification are both reported only after an approval. The one ceremony
-//! refused before the user is asked is a registration whose excludeCredentials
-//! names a credential we already hold — `passkey-authenticator` leaves that
-//! answer to the verification method.
+//! verification are both reported only after an approval. A sign-in is asked
+//! about with every account it could be as — the site may name none, and the
+//! vault may hold several for it — and the user's answer picks one. The one
+//! ceremony refused before the user is asked is a registration whose
+//! excludeCredentials names a credential we already hold —
+//! `passkey-authenticator` leaves that answer to the verification method.
 //!
 //! ## Signature counters
 //! Passkeys here sync between devices, so a per-device counter would look like
@@ -39,10 +41,13 @@ pub mod store;
 #[cfg(test)]
 mod tests;
 
+use std::sync::{Arc, Mutex};
+
 use passkey_authenticator::{UiHint, UserCheck, UserValidationMethod};
 use passkey_types::ctap2::{get_assertion, make_credential, Aaguid, Ctap2Error, StatusCode};
+use passkey_types::webauthn::{PublicKeyCredentialDescriptor, PublicKeyCredentialType};
 
-use store::{PasskeyVault, VaultCredentialStore};
+use store::{PasskeyVault, Stored, VaultCredentialStore};
 
 /// Rowel's AAGUID — `8f2b41d7-6c93-4e1a-a50d-37e8b16429c5`, a UUIDv4 generated
 /// once for this crate. One fixed identifier for "the Rowel desktop
@@ -57,6 +62,25 @@ pub const AAGUID: Aaguid = Aaguid([
 pub type Ctap2Authenticator<V> =
     passkey_authenticator::Authenticator<VaultCredentialStore<V>, UnlockedSession>;
 
+/// An account a sign-in could be as: one passkey the vault holds for the site,
+/// named the way the site named it at registration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Account {
+    pub credential_id: String,
+    pub user_name: String,
+    pub user_display_name: String,
+}
+
+impl From<&Stored> for Account {
+    fn from(stored: &Stored) -> Self {
+        Self {
+            credential_id: stored.passkey.credential_id.clone(),
+            user_name: stored.passkey.user_name.clone(),
+            user_display_name: stored.passkey.user_display_name.clone(),
+        }
+    }
+}
+
 /// What the user is being asked to approve, in the terms a prompt would show.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ceremony<'a> {
@@ -67,33 +91,48 @@ pub enum Ceremony<'a> {
         user_name: Option<&'a str>,
         user_display_name: Option<&'a str>,
     },
-    /// Sign in to `rp_id` with a passkey the vault already holds.
-    SignIn { rp_id: &'a str },
+    /// Sign in to `rp_id` as one of `accounts` — every passkey the vault holds
+    /// for it that the site's allow list admits, newest first, never empty.
+    SignIn {
+        rp_id: &'a str,
+        accounts: &'a [Account],
+    },
 }
 
 /// The user's say over a ceremony. `approve` runs before a key is created or a
-/// signature made; `false` ends the ceremony as denied. Supplied by whatever
-/// feeds requests in — the browser-extension host and its confirm sheet — and
-/// blocking is fine: the authenticator runs off the UI thread.
+/// signature made; `None` ends the ceremony as denied. For a sign-in the answer
+/// is which of the accounts: `Some(i)` signs in as `accounts[i]`. A
+/// registration has nothing to choose, so any `Some` is a yes. Supplied by
+/// whatever feeds requests in — the browser-extension host and its confirm
+/// sheet — and blocking is fine: the authenticator runs off the UI thread.
 pub trait UserConsent: Send + Sync {
-    fn approve(&self, ceremony: Ceremony<'_>) -> bool;
+    fn approve(&self, ceremony: Ceremony<'_>) -> Option<usize>;
 }
 
 /// Registers and asserts passkeys against a [`PasskeyVault`].
 pub struct Authenticator<V: PasskeyVault> {
     inner: Ctap2Authenticator<V>,
+    consent: Arc<dyn UserConsent>,
+    /// The credential the user picked for the sign-in under way; see
+    /// [`Self::get_assertion`].
+    chosen: Arc<Mutex<Option<Vec<u8>>>>,
 }
 
 impl<V: PasskeyVault> Authenticator<V> {
     pub fn new(vault: V, consent: impl UserConsent + 'static) -> Self {
+        let consent: Arc<dyn UserConsent> = Arc::new(consent);
+        let chosen = Arc::new(Mutex::new(None));
         Self {
             inner: passkey_authenticator::Authenticator::new(
                 AAGUID,
                 VaultCredentialStore::new(vault),
                 UnlockedSession {
-                    consent: Box::new(consent),
+                    consent: consent.clone(),
+                    chosen: chosen.clone(),
                 },
             ),
+            consent,
+            chosen,
         }
     }
 
@@ -113,16 +152,51 @@ impl<V: PasskeyVault> Authenticator<V> {
     }
 
     /// Sign-in: assert an existing credential for the request's rpId.
+    ///
+    /// The library would sign with the newest passkey for the site and ask
+    /// about that one alone; a site that names no credential expects the
+    /// authenticator to let the user pick the account. So the user is asked
+    /// here, with every account the request admits at stake, and the request
+    /// is narrowed to their pick before the library sees it.
     pub async fn get_assertion(
         &mut self,
-        request: get_assertion::Request,
+        mut request: get_assertion::Request,
     ) -> std::result::Result<get_assertion::Response, StatusCode> {
-        self.inner.get_assertion(request).await
+        let allow = request
+            .allow_list
+            .as_deref()
+            .filter(|list| !list.is_empty());
+        let found = self.inner.store().matching(allow, &request.rp_id)?;
+        if found.is_empty() {
+            return Err(Ctap2Error::NoCredentials.into());
+        }
+        let accounts: Vec<Account> = found.iter().map(Account::from).collect();
+        let picked = self
+            .consent
+            .approve(Ceremony::SignIn {
+                rp_id: &request.rp_id,
+                accounts: &accounts,
+            })
+            .and_then(|i| found.get(i))
+            .ok_or(Ctap2Error::OperationDenied)?;
+        let id = key::decode_credential_id(&picked.passkey.credential_id)
+            .map_err(|_| Ctap2Error::NoCredentials)?;
+        request.allow_list = Some(vec![PublicKeyCredentialDescriptor {
+            ty: PublicKeyCredentialType::PublicKey,
+            id: id.clone().into(),
+            transports: None,
+        }]);
+        *self.chosen.lock().unwrap() = Some(id);
+        let signed = self.inner.get_assertion(request).await;
+        *self.chosen.lock().unwrap() = None;
+        signed
     }
 
     /// Hand the bare CTAP2 authenticator to a WebAuthn client (`passkey-client`),
-    /// which is how the tests drive a whole ceremony. The extension host plays
-    /// the client itself and sends raw CTAP2 requests (see `browser::passkeys`).
+    /// which is how the tests drive a whole registration. Only a registration:
+    /// the sign-in's consent lives in [`Self::get_assertion`], so the bare
+    /// authenticator refuses to sign. The extension host plays the client
+    /// itself and sends raw CTAP2 requests (see `browser::passkeys`).
     #[cfg(test)]
     pub fn into_ctap2(self) -> Ctap2Authenticator<V> {
         self.inner
@@ -132,7 +206,8 @@ impl<V: PasskeyVault> Authenticator<V> {
 /// User verification: the vault is unlocked (or this could not have been
 /// built), and the user approves each ceremony. See the module docs.
 pub struct UnlockedSession {
-    consent: Box<dyn UserConsent>,
+    consent: Arc<dyn UserConsent>,
+    chosen: Arc<Mutex<Option<Vec<u8>>>>,
 }
 
 #[async_trait::async_trait]
@@ -155,14 +230,20 @@ impl UserValidationMethod for UnlockedSession {
             // Nothing to approve: the library fails the ceremony on its own
             // once this returns.
             UiHint::InformNoCredentialsFound => true,
-            UiHint::RequestNewCredential(user, rp) => self.consent.approve(Ceremony::Register {
-                rp_id: &rp.id,
-                user_name: user.name.as_deref(),
-                user_display_name: user.display_name.as_deref(),
-            }),
-            UiHint::RequestExistingCredential(passkey) => self.consent.approve(Ceremony::SignIn {
-                rp_id: &passkey.rp_id,
-            }),
+            UiHint::RequestNewCredential(user, rp) => self
+                .consent
+                .approve(Ceremony::Register {
+                    rp_id: &rp.id,
+                    user_name: user.name.as_deref(),
+                    user_display_name: user.display_name.as_deref(),
+                })
+                .is_some(),
+            // Asked already, in `Authenticator::get_assertion`, with every
+            // account at stake — and the request narrowed to the one picked, so
+            // this is it. Anything else is a sign-in nobody was asked about.
+            UiHint::RequestExistingCredential(passkey) => {
+                self.chosen.lock().unwrap().as_deref() == Some(&passkey.credential_id[..])
+            }
         };
         if !approved {
             return Err(Ctap2Error::OperationDenied);

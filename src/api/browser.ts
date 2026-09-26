@@ -52,11 +52,18 @@ export const browserRespond = (key: string, name: string | null): Promise<void> 
 export const browserForgetClient = (key: string): Promise<BrowserStatus> =>
   call('browser_forget_client', { key })
 
+/** An account a sign-in could be as: one passkey the vault holds for the site. */
+export interface PasskeyAccount {
+  userName: string
+  userDisplayName: string
+}
+
 /**
  * A page asking, through the extension, to create a passkey (`register`) or to
  * sign in with one (`get`). `rpId` is the site the passkey is for, `origin` the
  * page that asked; the account names come with a registration, as the site
- * gave them.
+ * gave them, and a sign-in lists the `accounts` the vault could sign in as,
+ * newest first — the answer picks one by its place in the list.
  */
 export interface PasskeyAsk {
   /** Names this ask; the answer carries it, and Rust honours it for this ask alone. */
@@ -66,8 +73,16 @@ export interface PasskeyAsk {
   origin: string
   userName?: string
   userDisplayName?: string
+  accounts?: PasskeyAccount[]
 }
 
-/** Answer the `browser:passkey` ask `id`. Rust honours it only for the ask up under that id. */
-export const browserPasskeyRespond = (id: string, allow: boolean): Promise<void> =>
-  call('browser_passkey_respond', { id, allow })
+/**
+ * Answer the `browser:passkey` ask `id`, with which of its accounts a sign-in
+ * is as (the first when unsaid). Rust honours it only for the ask up under
+ * that id.
+ */
+export const browserPasskeyRespond = (
+  id: string,
+  allow: boolean,
+  account?: number
+): Promise<void> => call('browser_passkey_respond', { id, allow, account })

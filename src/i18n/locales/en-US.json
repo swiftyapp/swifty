@@ -700,5 +700,7 @@
   "{{site}} wants to create a passkey for {{account}}": "{{site}} wants to create a passkey for {{account}}",
   "{{site}} wants to create a passkey": "{{site}} wants to create a passkey",
   "{{site}} wants to sign in with your passkey": "{{site}} wants to sign in with your passkey",
+  "{{site}} wants to sign in with your passkey for {{account}}": "{{site}} wants to sign in with your passkey for {{account}}",
+  "Account": "Account",
   "Asked by {{origin}} through the browser extension.": "Asked by {{origin}} through the browser extension."
 }

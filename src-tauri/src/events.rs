@@ -153,11 +153,24 @@ struct PasskeyAsk<'a> {
     user_name: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     user_display_name: Option<&'a str>,
+    /// A sign-in's accounts, as the vault names them; the answer picks one by
+    /// its place here. Not sent for a registration.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    accounts: Vec<PasskeyAccount<'a>>,
+}
+
+#[cfg(desktop)]
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct PasskeyAccount<'a> {
+    user_name: &'a str,
+    user_display_name: &'a str,
 }
 
 /// The page at `origin` asks, through the extension, to create a passkey
 /// (`register`) or to sign in with one (`get`). The site it is for is
-/// `rpId`; the account, on a registration, is the one the site names. The
+/// `rpId`; the account, on a registration, is the one the site names, and on
+/// a sign-in the `accounts` are the ones the vault could sign in as. The
 /// answer comes back through `commands::browser::browser_passkey_respond`,
 /// naming `id`, so a dialog left up past this ask cannot answer the next.
 #[cfg(desktop)]
@@ -180,14 +193,22 @@ pub fn browser_passkey(
             origin,
             user_name,
             user_display_name,
+            accounts: Vec::new(),
         },
-        Ceremony::SignIn { rp_id } => PasskeyAsk {
+        Ceremony::SignIn { rp_id, accounts } => PasskeyAsk {
             id,
             kind: "get",
             rp_id,
             origin,
             user_name: None,
             user_display_name: None,
+            accounts: accounts
+                .iter()
+                .map(|account| PasskeyAccount {
+                    user_name: &account.user_name,
+                    user_display_name: &account.user_display_name,
+                })
+                .collect(),
         },
     };
     let _ = app.emit(BROWSER_PASSKEY, ask);
