@@ -454,9 +454,11 @@ pub(crate) fn save_login_in(
             // Written back to the field it was served from: `logins_for` fills
             // the extension's username from `username`, or from `email` when
             // that is blank, so a login kept by its email must not grow a
-            // second name beside it.
+            // second name beside it — unless what the page sent is not an
+            // email at all, which the email field would only reject; that
+            // goes to `username`, and the email stays what it was.
             let blank = |field: &Option<String>| field.as_deref().unwrap_or_default().is_empty();
-            if blank(&entry.username) && !blank(&entry.email) {
+            if blank(&entry.username) && !blank(&entry.email) && username.contains('@') {
                 entry.email = Some(username.to_string());
             } else {
                 entry.username = Some(username.to_string());
