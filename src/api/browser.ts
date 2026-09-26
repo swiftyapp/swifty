@@ -82,6 +82,13 @@ export interface PasskeyAsk {
 }
 
 /**
+ * The one decision the extension host has put to the user: an extension
+ * asking to connect (`key` is its identification public key), or a page's
+ * passkey ceremony. Rust holds one at a time, in one slot, whichever kind.
+ */
+export type BrowserConsent = { kind: 'associate'; key: string } | { kind: 'passkey'; ask: PasskeyAsk }
+
+/**
  * Answer the `browser:passkey` ask `id`, with which of its accounts a sign-in
  * is as (the first when unsaid). Rust honours it only for the ask up under
  * that id.

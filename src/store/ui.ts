@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { EntryType } from '@/api/types'
 import type { SshKeyPair } from '@/api/tools'
-import type { PasskeyAsk } from '@/api/browser'
+import type { BrowserConsent, PasskeyAsk } from '@/api/browser'
 import { loadArchive, setNoEntry, useVault, selectCurrent } from './vault'
 
 /**
@@ -95,17 +95,14 @@ export interface UiState {
    */
   notice: string | null
   /**
-   * The identification key of a browser extension asking to connect, while
-   * its consent dialog is up. A second ask replaces the first: Rust holds one
-   * at a time and gives up on it by itself after a minute.
+   * The one security decision the browser extension has put to the user —
+   * an extension asking to connect, or a page's passkey ceremony — while its
+   * dialog is up. One field for both kinds: Rust holds one ask at a time in
+   * one slot and gives up on it by itself after a minute, and a newer ask of
+   * either kind replaces whatever dialog was left up, so two decisions are
+   * never on screen together.
    */
-  browserAsk: string | null
-  /**
-   * A page's passkey ceremony, asked through the extension, while its dialog
-   * is up. Held the way `browserAsk` is: one at a time, a newer ask replacing
-   * the older, and Rust giving up on it after a minute.
-   */
-  passkeyAsk: PasskeyAsk | null
+  consentAsk: BrowserConsent | null
   /**
    * How many times the open vault's list of let-in extensions has changed
    * behind the frontend's back — a consent dialog answered while Settings ›
@@ -145,8 +142,7 @@ export const initialUi: UiState = {
   scanError: null,
   copied: false,
   notice: null,
-  browserAsk: null,
-  passkeyAsk: null,
+  consentAsk: null,
   browserClientsSeq: 0
 }
 
@@ -297,10 +293,11 @@ export const dropOrphan = (fileId: string) =>
 
 // --- browser extension -------------------------------------------------------------
 
-export const askBrowser = (key: string) => useUi.setState({ browserAsk: key })
-export const closeBrowserAsk = () => useUi.setState({ browserAsk: null })
-export const askPasskey = (ask: PasskeyAsk) => useUi.setState({ passkeyAsk: ask })
-export const closePasskeyAsk = () => useUi.setState({ passkeyAsk: null })
+export const askBrowser = (key: string) =>
+  useUi.setState({ consentAsk: { kind: 'associate', key } })
+export const askPasskey = (ask: PasskeyAsk) =>
+  useUi.setState({ consentAsk: { kind: 'passkey', ask } })
+export const closeConsentAsk = () => useUi.setState({ consentAsk: null })
 export const browserClientsChanged = () =>
   useUi.setState(state => ({ browserClientsSeq: state.browserClientsSeq + 1 }))
 

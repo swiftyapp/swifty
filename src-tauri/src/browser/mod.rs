@@ -101,14 +101,16 @@ pub fn socket_name(root: &Path) -> io::Result<Name<'static>> {
 
 // --- consent -------------------------------------------------------------------
 //
-// One `associate` and one passkey ceremony at a time wait on the user, each in
-// its own slot. The connection thread parks on the receiving end; the
-// frontend's answer arrives through `respond` / `respond_passkey`, from the
-// command its dialog invokes. An ask is held under a tag — the extension's
-// key, or a ceremony's id — and an answer names the tag it is for: a dialog
-// left up past the ask it was drawn for (Rust gives up after a minute, the
-// webview does the same on its own clock) cannot answer the next ask with a
-// yes the user gave while looking at another.
+// One security decision at a time: an `associate` or a passkey ceremony
+// waits on the user in the one slot, and a second ask of either kind while
+// one is up is refused, not queued, so two connections cannot put two dialogs
+// on screen. The connection thread parks on the receiving end; the frontend's
+// answer arrives through `respond` / `respond_passkey`, from the command its
+// dialog invokes. An ask is held under a tag — the extension's key, or a
+// ceremony's id — and an answer names the tag it is for and the kind it
+// answers: a dialog left up past the ask it was drawn for (Rust gives up
+// after a minute, the webview does the same on its own clock) cannot answer
+// the next ask with a yes the user gave while looking at another.
 
 /// An ask waiting on the user: its tag, its number — by which the asker tells
 /// its own slot from a later ask's — and the way back to it.
@@ -186,24 +188,35 @@ impl<T> Pending<T> {
     }
 }
 
-static ASSOCIATE: Pending<Option<String>> = Pending::new();
-static PASSKEY: Pending<Option<usize>> = Pending::new();
+/// What the user answered, in the terms of the ask it is for. An answer of
+/// the other kind — a passkey dialog somehow answering an `associate` — is no
+/// answer at all.
+enum Answer {
+    /// The name given to an extension, or `None` for a refusal.
+    Name(Option<String>),
+    /// The account picked for a passkey ceremony, or `None` for a refusal.
+    Account(Option<usize>),
+}
+
+static CONSENT: Pending<Answer> = Pending::new();
 
 /// Ask the user whether the extension holding `key` may connect: the name
 /// they gave it, or `None`. Blocks the calling thread (see [`Pending::ask`]).
 pub fn ask(app: &AppHandle, key: &str) -> Option<String> {
-    ASSOCIATE
-        .ask(key, || {
-            events::browser_associate(app, key);
-            window::raise(app);
-        })
-        .flatten()
+    let answer = CONSENT.ask(key, || {
+        events::browser_associate(app, key);
+        window::raise(app);
+    });
+    match answer {
+        Some(Answer::Name(name)) => name,
+        _ => None,
+    }
 }
 
 /// The user's answer to the ask up for `key`: the name they gave the
 /// extension, or `None` for a refusal. Returns whether that ask was waiting.
 pub fn respond(key: &str, name: Option<String>) -> bool {
-    ASSOCIATE.answer(key, name)
+    CONSENT.answer(key, Answer::Name(name))
 }
 
 /// Ask the user whether the page at `origin` may have `ceremony`: the account
@@ -212,18 +225,20 @@ pub fn respond(key: &str, name: Option<String>) -> bool {
 /// The ask is tagged with an id of its own, which the dialog's answer names.
 pub fn ask_passkey(app: &AppHandle, origin: &str, ceremony: Ceremony<'_>) -> Option<usize> {
     let id = crate::crypto::random_hex_id();
-    PASSKEY
-        .ask(&id, || {
-            events::browser_passkey(app, &id, origin, ceremony);
-            window::raise(app);
-        })
-        .flatten()
+    let answer = CONSENT.ask(&id, || {
+        events::browser_passkey(app, &id, origin, ceremony);
+        window::raise(app);
+    });
+    match answer {
+        Some(Answer::Account(account)) => account,
+        _ => None,
+    }
 }
 
 /// The user's answer to the passkey ask up under `id`: which account, or
 /// `None` for a refusal. Returns whether that ask was waiting for it.
 pub fn respond_passkey(id: &str, account: Option<usize>) -> bool {
-    PASSKEY.answer(id, account)
+    CONSENT.answer(id, Answer::Account(account))
 }
 
 /// The prompt a ceremony from the extension asks through: the app's dialog,

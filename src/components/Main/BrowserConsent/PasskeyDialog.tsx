@@ -6,7 +6,7 @@ import {
   type PasskeyAccount,
   type PasskeyAsk
 } from '@/api/browser'
-import { closePasskeyAsk } from '@/store'
+import { closeConsentAsk } from '@/store'
 import Frame from '@/components/elements/Frame'
 import Button from '@/components/elements/Button'
 import RadioList from '@/components/elements/RadioList'
@@ -29,11 +29,11 @@ export default function PasskeyDialog({ ask }: { ask: PasskeyAsk }) {
   const { t } = useTranslation()
   const { relativeLong } = useDates()
   // Which of a sign-in's accounts; the newest, first in the list, until the
-  // user says otherwise. Mounted afresh for each ask (see `BrowserPasskey`).
+  // user says otherwise. Mounted afresh for each ask (see `BrowserConsent`).
   const [account, setAccount] = useState(0)
 
   useEffect(() => {
-    const expiry = setTimeout(closePasskeyAsk, ASSOCIATE_TIMEOUT_MS)
+    const expiry = setTimeout(closeConsentAsk, ASSOCIATE_TIMEOUT_MS)
     return () => clearTimeout(expiry)
   }, [ask.id])
 
@@ -41,7 +41,7 @@ export default function PasskeyDialog({ ask }: { ask: PasskeyAsk }) {
   const choice = accounts.length > 1
 
   const answer = (allow: boolean) => {
-    closePasskeyAsk()
+    closeConsentAsk()
     browserPasskeyRespond(ask.id, allow, choice ? account : undefined).catch(() => {})
   }
   const allow = () => answer(true)

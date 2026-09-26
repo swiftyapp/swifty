@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ASSOCIATE_TIMEOUT_MS, browserRespond } from '@/api/browser'
-import { closeBrowserAsk } from '@/store'
+import { closeConsentAsk } from '@/store'
 import { keyFingerprint } from '@/lib/keyFingerprint'
 import Frame from '@/components/elements/Frame'
 import Button from '@/components/elements/Button'
@@ -25,12 +25,12 @@ export default function AssociateDialog({ publicKey }: { publicKey: string }) {
   const [name, setName] = useState(() => t('Browser'))
 
   useEffect(() => {
-    const expiry = setTimeout(closeBrowserAsk, ASSOCIATE_TIMEOUT_MS)
+    const expiry = setTimeout(closeConsentAsk, ASSOCIATE_TIMEOUT_MS)
     return () => clearTimeout(expiry)
   }, [publicKey])
 
   const answer = (reply: string | null) => {
-    closeBrowserAsk()
+    closeConsentAsk()
     browserRespond(publicKey, reply).catch(() => {})
   }
   const allow = () => answer(name.trim() || t('Browser'))

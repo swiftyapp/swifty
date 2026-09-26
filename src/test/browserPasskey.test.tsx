@@ -3,7 +3,7 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EVENTS } from '@/api/events'
 import { ASSOCIATE_TIMEOUT_MS, type PasskeyAsk } from '@/api/browser'
-import BrowserPasskey from '@/components/Main/BrowserPasskey'
+import BrowserConsent from '@/components/Main/BrowserConsent'
 import { useUi } from '@/store'
 import { clearSession } from '@/store/app'
 import { subscribeToEvents } from '@/store/events'
@@ -39,7 +39,7 @@ const GET_SEVERAL: PasskeyAsk = {
 describe('the passkey consent dialog', () => {
   const ask = async (payload: PasskeyAsk = REGISTER) => {
     subscribeToEvents()
-    render(<BrowserPasskey />)
+    render(<BrowserConsent />)
     act(() => emitEvent(EVENTS.browserPasskey, payload))
     return screen.findByTestId('browser-passkey-modal')
   }
@@ -55,7 +55,7 @@ describe('the passkey consent dialog', () => {
 
     expect(calls('browser_passkey_respond')).toEqual([{ id: 'ask-1', allow: true }])
     expect(screen.queryByTestId('browser-passkey-modal')).not.toBeInTheDocument()
-    expect(useUi.getState().passkeyAsk).toBeNull()
+    expect(useUi.getState().consentAsk).toBeNull()
   })
 
   it('asks to sign in as the one account, and sends a no on Deny', async () => {
@@ -129,6 +129,17 @@ describe('the passkey consent dialog', () => {
     )
     await userEvent.click(screen.getByTestId('browser-passkey-allow'))
     expect(calls('browser_passkey_respond')).toEqual([{ id: 'ask-2', allow: true }])
+  })
+
+  it('shows one security decision at a time, whichever kind', async () => {
+    await ask(GET)
+    // An extension asking to connect takes the place of the passkey dialog
+    // left up, rather than opening beside it.
+    act(() => emitEvent(EVENTS.browserAssociate, { key: 'a'.repeat(43) + '=' }))
+
+    expect(screen.queryByTestId('browser-passkey-modal')).not.toBeInTheDocument()
+    expect(screen.getByTestId('browser-associate-modal')).toBeInTheDocument()
+    expect(useUi.getState().consentAsk?.kind).toBe('associate')
   })
 
   it('leaves on its own once Rust has given up on the ask', async () => {

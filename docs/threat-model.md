@@ -515,8 +515,11 @@ exposed process than the webview, and it is not ours.
   is the attestation or assertion, inside the sealed reply. **Every ceremony
   is asked for**, in a dialog that names the rpId the passkey is for and,
   under it, the page that asked — so a subdomain asking for its parent's
-  passkey is in plain sight — one ceremony at a time and refused after a
-  minute unanswered. A sign-in names the account it would be as, and when
+  passkey is in plain sight — and refused after a minute unanswered. It is
+  the same dialog slot an `associate` waits in: one security decision is on
+  screen at a time, whichever kind, and a second ask of either kind while
+  one is up is refused rather than queued. A sign-in names the account it
+  would be as, and when
   the vault holds several passkeys for the site that the request admits (a
   site asking for a discoverable credential names none), the dialog offers
   the choice: the request is narrowed to the one picked before the

@@ -85,7 +85,6 @@ use passkey_types::webauthn::{
     PublicKeyCredentialDescriptor, PublicKeyCredentialParameters, PublicKeyCredentialType,
     PublicKeyCredentialUserEntity,
 };
-use public_suffix::DEFAULT_PROVIDER;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use url::{Host, Url};
@@ -367,7 +366,7 @@ pub fn rp_id(origin: &Url, claimed: Option<&Value>) -> Result<String, Code> {
     if rp_id == host {
         return Ok(rp_id);
     }
-    if !host.ends_with(&format!(".{rp_id}")) || DEFAULT_PROVIDER.is_effective_tld(&rp_id) {
+    if !host.ends_with(&format!(".{rp_id}")) || super::actions::is_public_suffix(&rp_id) {
         return Err(Code::PasskeyRpIdMismatch);
     }
     Ok(rp_id)

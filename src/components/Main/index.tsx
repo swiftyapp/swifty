@@ -13,8 +13,7 @@ import AddSecret from './AddSecret'
 import Share from './Share'
 import Scan from './Scan'
 import EnvDrop from './EnvDrop'
-import BrowserAssociate from './BrowserAssociate'
-import BrowserPasskey from './BrowserPasskey'
+import BrowserConsent from './BrowserConsent'
 import { useShortcuts } from './useShortcuts'
 
 // Two shells, one set of overlays. `Wide` is the three-pane desktop/iPad layout
@@ -44,8 +43,7 @@ export function Main() {
         <Share />
         <Scan />
         <EnvDrop />
-        <BrowserAssociate />
-        <BrowserPasskey />
+        <BrowserConsent />
       </FrameProvider>
       <CopyToast />
       <NoticeToast />
