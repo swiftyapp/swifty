@@ -93,10 +93,10 @@ pub fn socket_name(root: &Path) -> io::Result<Name<'static>> {
 // One `associate` at a time waits on the user, in a slot. The connection
 // thread parks on the receiving end; the frontend's answer arrives through
 // `respond`, from the command its dialog invokes. An ask is held under a tag
-// — the extension's key — and an answer names the tag it is for: a dialog
-// left up past the ask it was drawn for (Rust gives up after a minute, the
-// webview does the same on its own clock) cannot answer the next ask with a
-// yes the user gave while looking at another.
+// — an id of its own — and an answer names the tag it is for: a dialog left
+// up past the ask it was drawn for (Rust gives up after a minute, the webview
+// does the same on its own clock) cannot answer the next ask with a yes the
+// user gave while looking at another, not even the same extension's retry.
 
 /// An ask waiting on the user: its tag, its number — by which the asker tells
 /// its own slot from a later ask's — and the way back to it.
@@ -178,19 +178,23 @@ static ASSOCIATE: Pending<Option<String>> = Pending::new();
 
 /// Ask the user whether the extension holding `key` may connect: the name
 /// they gave it, or `None`. Blocks the calling thread (see [`Pending::ask`]).
+/// The ask is tagged with an id of its own rather than with the key: the
+/// same extension asks again after a timeout, under the same key, and a
+/// dialog left up from the first ask must not be the yes to the second.
 pub fn ask(app: &AppHandle, key: &str) -> Option<String> {
+    let id = crate::crypto::random_hex_id();
     ASSOCIATE
-        .ask(key, || {
-            events::browser_associate(app, key);
+        .ask(&id, || {
+            events::browser_associate(app, &id, key);
             window::raise(app);
         })
         .flatten()
 }
 
-/// The user's answer to the ask up for `key`: the name they gave the
+/// The user's answer to the ask up under `id`: the name they gave the
 /// extension, or `None` for a refusal. Returns whether that ask was waiting.
-pub fn respond(key: &str, name: Option<String>) -> bool {
-    ASSOCIATE.answer(key, name)
+pub fn respond(id: &str, name: Option<String>) -> bool {
+    ASSOCIATE.answer(id, name)
 }
 
 // --- the extensions let in ------------------------------------------------------
