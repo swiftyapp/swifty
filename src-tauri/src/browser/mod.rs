@@ -292,6 +292,8 @@ impl Host for AppHost {
                 log::warn!("browser host: could not remember the extension: {e}");
                 Code::AssociationFailed
             })?;
+            // Settings › Browser extension, if it is open, lists it now.
+            events::browser_clients(&self.0);
         }
         Ok(name)
     }

@@ -66,7 +66,13 @@ export interface EventPayloads {
    * key, base64, for the consent dialog to show a fingerprint of; the answer
    * goes back through `browser_respond`. Desktop only.
    */
-  'browser:associate': { key: string }
+  'browser:associate': { id: string; key: string }
+  /**
+   * An extension was let into the open vault by the consent dialog. Settings ›
+   * Browser extension re-reads its status on it; no payload, since that status
+   * is the one answer its list is drawn from. Desktop only.
+   */
+  'browser:clients': void
 }
 
 export type EventName = keyof EventPayloads
@@ -92,7 +98,8 @@ export const EVENTS: { [K in EventName as Camel<K>]: K } = {
   workspacesAdded: 'workspaces:added',
   workspacesRenamed: 'workspaces:renamed',
   fileOpened: 'file:opened',
-  browserAssociate: 'browser:associate'
+  browserAssociate: 'browser:associate',
+  browserClients: 'browser:clients'
 }
 
 // Typed wrapper over Tauri's `listen`.
