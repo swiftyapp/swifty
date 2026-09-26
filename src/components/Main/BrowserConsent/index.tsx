@@ -15,7 +15,7 @@ export default function BrowserConsent() {
 
   if (!ask) return null
   return ask.kind === 'associate' ? (
-    <AssociateDialog key={ask.key} publicKey={ask.key} />
+    <AssociateDialog key={ask.ask.id} ask={ask.ask} />
   ) : (
     <PasskeyDialog key={ask.ask.id} ask={ask.ask} />
   )

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { EntryType } from '@/api/types'
 import type { SshKeyPair } from '@/api/tools'
-import type { BrowserConsent, PasskeyAsk } from '@/api/browser'
+import type { AssociateAsk, BrowserConsent, PasskeyAsk } from '@/api/browser'
 import { loadArchive, setNoEntry, useVault, selectCurrent } from './vault'
 
 /**
@@ -293,8 +293,8 @@ export const dropOrphan = (fileId: string) =>
 
 // --- browser extension -------------------------------------------------------------
 
-export const askBrowser = (key: string) =>
-  useUi.setState({ consentAsk: { kind: 'associate', key } })
+export const askBrowser = (ask: AssociateAsk) =>
+  useUi.setState({ consentAsk: { kind: 'associate', ask } })
 export const askPasskey = (ask: PasskeyAsk) =>
   useUi.setState({ consentAsk: { kind: 'passkey', ask } })
 export const closeConsentAsk = () => useUi.setState({ consentAsk: null })

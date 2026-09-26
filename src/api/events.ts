@@ -67,7 +67,7 @@ export interface EventPayloads {
    * key, base64, for the consent dialog to show a fingerprint of; the answer
    * goes back through `browser_respond`. Desktop only.
    */
-  'browser:associate': { key: string }
+  'browser:associate': { id: string; key: string }
   /**
    * A page asks, through the extension, for a passkey ceremony. Rust holds the
    * request open until `browser_passkey_respond`, or a minute. Desktop only.

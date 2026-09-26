@@ -135,7 +135,7 @@ describe('the passkey consent dialog', () => {
     await ask(GET)
     // An extension asking to connect takes the place of the passkey dialog
     // left up, rather than opening beside it.
-    act(() => emitEvent(EVENTS.browserAssociate, { key: 'a'.repeat(43) + '=' }))
+    act(() => emitEvent(EVENTS.browserAssociate, { id: 'ask-9', key: 'a'.repeat(43) + '=' }))
 
     expect(screen.queryByTestId('browser-passkey-modal')).not.toBeInTheDocument()
     expect(screen.getByTestId('browser-associate-modal')).toBeInTheDocument()

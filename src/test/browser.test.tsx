@@ -126,10 +126,10 @@ describe('Settings › Browser extension', () => {
 })
 
 describe('the browser consent dialog', () => {
-  const ask = async (key = KEY) => {
+  const ask = async (key = KEY, id = 'ask-1') => {
     subscribeToEvents()
     render(<BrowserConsent />)
-    act(() => emitEvent(EVENTS.browserAssociate, { key }))
+    act(() => emitEvent(EVENTS.browserAssociate, { id, key }))
     return screen.findByTestId('browser-associate-modal')
   }
 
@@ -143,7 +143,7 @@ describe('the browser consent dialog', () => {
     await userEvent.type(name, 'Work laptop')
     await userEvent.click(screen.getByTestId('browser-associate-allow'))
 
-    expect(calls('browser_respond')).toEqual([{ key: KEY, name: 'Work laptop' }])
+    expect(calls('browser_respond')).toEqual([{ id: 'ask-1', name: 'Work laptop' }])
     expect(screen.queryByTestId('browser-associate-modal')).not.toBeInTheDocument()
     expect(useUi.getState().consentAsk).toBeNull()
   })
@@ -152,17 +152,23 @@ describe('the browser consent dialog', () => {
     await ask()
     await userEvent.click(screen.getByTestId('browser-associate-deny'))
 
-    expect(calls('browser_respond')).toEqual([{ key: KEY, name: null }])
+    expect(calls('browser_respond')).toEqual([{ id: 'ask-1', name: null }])
     expect(screen.queryByTestId('browser-associate-modal')).not.toBeInTheDocument()
   })
 
   it('replaces an ask still on screen with a newer one, and answers for that one', async () => {
     await ask()
-    act(() => emitEvent(EVENTS.browserAssociate, { key: 'ZZZZyyyyXXXXwwww0000=' }))
+    act(() => emitEvent(EVENTS.browserAssociate, { id: 'ask-2', key: 'ZZZZyyyyXXXXwwww0000=' }))
 
     expect(screen.getByTestId('browser-associate-fingerprint')).toHaveTextContent('ZZZZyyyy…000=')
     await userEvent.click(screen.getByTestId('browser-associate-allow'))
-    expect(calls('browser_respond')).toEqual([{ key: 'ZZZZyyyyXXXXwwww0000=', name: 'Browser' }])
+    expect(calls('browser_respond')).toEqual([{ id: 'ask-2', name: 'Browser' }])
+
+    // The same extension asking again — a retry after a timeout — is a new
+    // ask with an id of its own, and the answer names that one.
+    act(() => emitEvent(EVENTS.browserAssociate, { id: 'ask-3', key: 'ZZZZyyyyXXXXwwww0000=' }))
+    await userEvent.click(screen.getByTestId('browser-associate-allow'))
+    expect(calls('browser_respond').slice(-1)).toEqual([{ id: 'ask-3', name: 'Browser' }])
   })
 
   it('leaves on its own once Rust has given up on the ask', async () => {
