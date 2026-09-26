@@ -379,7 +379,16 @@ pub(crate) fn save_login_in(
             if entry.password.as_deref().unwrap_or_default() != password {
                 entry.password_updated_at = Some(now.to_string());
             }
-            entry.username = Some(username.to_string());
+            // Written back to the field it was served from: `logins_for` fills
+            // the extension's username from `username`, or from `email` when
+            // that is blank, so a login kept by its email must not grow a
+            // second name beside it.
+            let blank = |field: &Option<String>| field.as_deref().unwrap_or_default().is_empty();
+            if blank(&entry.username) && !blank(&entry.email) {
+                entry.email = Some(username.to_string());
+            } else {
+                entry.username = Some(username.to_string());
+            }
             entry.password = Some(password.to_string());
             entry.updated_at = Some(now.to_string());
             entry
