@@ -797,6 +797,75 @@ fn a_save_without_an_id_creates_a_login_for_the_site() {
     assert_eq!(entry.password_updated_at.as_deref(), Some(NOW));
 }
 
+// A login kept by its email is served to the extension under that email
+// (`logins_for`), so what comes back goes to the same field: the row must not
+// grow a username beside the email it already had.
+#[test]
+fn a_save_over_an_email_login_writes_back_to_its_email() {
+    let (_dir, store, cipher) = vault();
+    seed(
+        &store,
+        &cipher,
+        &Entry {
+            id: "gh".into(),
+            kind: "login".into(),
+            title: "GitHub".into(),
+            website: Some("https://github.com".into()),
+            email: Some("octocat@example.com".into()),
+            password: Some("old".into()),
+            ..Entry::default()
+        },
+    );
+
+    save_login_in(
+        &store,
+        &cipher,
+        Some("gh"),
+        "https://github.com/login",
+        "github.com",
+        "octo@example.com",
+        "new",
+        NOW,
+    )
+    .unwrap();
+
+    let entry = stored(&store, &cipher, "gh");
+    assert_eq!(entry.email.as_deref(), Some("octo@example.com"));
+    assert_eq!(entry.username, None, "no second name beside the email");
+    assert_eq!(entry.password.as_deref(), Some("new"));
+
+    // With a username of its own, that is the field — the email stays what
+    // it was, whatever the page called the user.
+    seed(
+        &store,
+        &cipher,
+        &Entry {
+            id: "both".into(),
+            kind: "login".into(),
+            title: "GitHub".into(),
+            website: Some("https://github.com".into()),
+            username: Some("octocat".into()),
+            email: Some("octocat@example.com".into()),
+            password: Some("old".into()),
+            ..Entry::default()
+        },
+    );
+    save_login_in(
+        &store,
+        &cipher,
+        Some("both"),
+        "https://github.com/login",
+        "github.com",
+        "octocat2",
+        "new",
+        NOW,
+    )
+    .unwrap();
+    let entry = stored(&store, &cipher, "both");
+    assert_eq!(entry.username.as_deref(), Some("octocat2"));
+    assert_eq!(entry.email.as_deref(), Some("octocat@example.com"));
+}
+
 #[test]
 fn a_save_over_a_login_changes_only_what_the_page_sent() {
     let (_dir, store, cipher) = vault();
