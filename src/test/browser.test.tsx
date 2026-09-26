@@ -168,7 +168,7 @@ describe('the browser consent dialog', () => {
     // ask with an id of its own, and the answer names that one.
     act(() => emitEvent(EVENTS.browserAssociate, { id: 'ask-3', key: 'ZZZZyyyyXXXXwwww0000=' }))
     await userEvent.click(screen.getByTestId('browser-associate-allow'))
-    expect(calls('browser_respond').at(-1)).toEqual({ id: 'ask-3', name: 'Browser' })
+    expect(calls('browser_respond').slice(-1)).toEqual([{ id: 'ask-3', name: 'Browser' }])
   })
 
   it('leaves on its own once Rust has given up on the ask', async () => {
