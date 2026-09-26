@@ -9,7 +9,7 @@ use serde_json::{json, Map, Value};
 use super::actions::{host_matches, site_host, Client, Connection, Host, Login};
 use super::manifest::{self, Family, HOST_NAME};
 use super::protocol::{increment, str_of, Code, NONCE_LEN, VERSION};
-use super::{frame, proxy, server, socket_name, IDENTIFIER};
+use super::{frame, proxy, server, socket_name, Pending, IDENTIFIER};
 
 // --- a vault to talk to ------------------------------------------------------
 
@@ -49,6 +49,46 @@ impl Mock {
         });
         self
     }
+}
+
+// --- the consent slot ----------------------------------------------------------
+
+#[test]
+fn an_ask_that_was_answered_leaves_the_next_ask_its_slot() {
+    let pending: Pending<bool> = Pending::new();
+    let (first, answer) = pending.begin("a").unwrap();
+    assert!(pending.begin("b").is_none(), "one ask at a time");
+    assert!(
+        !pending.answer("b", true),
+        "an answer for another tag does nothing"
+    );
+    assert!(pending.answer("a", true));
+    assert_eq!(answer.recv().ok(), Some(true));
+
+    // The answer freed the slot, and the next ask took it before the first
+    // ask's thread got round to tidying up. That tidy-up must be a no-op.
+    let (_, next) = pending.begin("b").expect("the answer freed the slot");
+    pending.end(first);
+    assert!(
+        pending.answer("b", false),
+        "the second ask is still waiting"
+    );
+    assert_eq!(next.recv().ok(), Some(false));
+
+    // An ask nobody answered does clear its own slot.
+    let (third, _) = pending.begin("c").unwrap();
+    pending.end(third);
+    assert!(pending.begin("d").is_some());
+}
+
+// --- what the host claims to be --------------------------------------------------
+
+// The extension turns features on by the version alone (see `VERSION`): this
+// host answers every action through the 2.7.0 row of that table and none of
+// the passkey actions, so it claims the release just before those.
+#[test]
+fn the_version_claimed_turns_on_nothing_this_host_lacks() {
+    assert_eq!(VERSION, "2.7.6");
 }
 
 fn login(id: &str, title: &str, username: &str, password: &str, totp: Option<&str>) -> Login {
@@ -671,6 +711,15 @@ fn a_login_matches_its_host_and_subdomains_but_not_its_lookalikes() {
     assert!(!host_matches("notgithub.com", "github.com"));
     assert!(!host_matches("github.com", ""));
     assert!(!host_matches("github.com", "  "));
+    // A public suffix is not a parent: a login stored under one — a malformed
+    // website, an import — is served to no site beneath it.
+    assert!(!host_matches("github.com", "com"));
+    assert!(!host_matches("bank.co.uk", "co.uk"));
+    assert!(
+        host_matches("co.uk", "co.uk"),
+        "the suffix itself, as a site, still is"
+    );
+    assert!(host_matches("online.bank.co.uk", "bank.co.uk"));
 }
 
 #[test]

@@ -268,20 +268,37 @@ pub fn site_host(url: &str) -> Option<String> {
 /// page at `site`: the same host, or a subdomain of it, with a leading `www.`
 /// on either side not counting. `accounts.example.com` gets the login saved
 /// for `example.com`; `example.com` does not get one saved for
-/// `accounts.example.com`, and `notexample.com` gets neither.
+/// `accounts.example.com`, and `notexample.com` gets neither. A login stored
+/// under a public suffix — `com`, `co.uk`, whether typed or imported — is
+/// served to no site beneath it: that is not a parent, it is everyone.
 ///
 /// The column is the website field cut after its scheme and before its first
 /// `/` — so a port, a query or a user name typed there stays in it — where
-/// `site` is a browser's host and never carries any of those.
+/// `site` is a browser's host and never carries any of those. Read back as a
+/// URL, the column comes out as a bare host the way `site` does, by the one
+/// parser, rather than by stripping each of those by hand.
 pub fn host_matches(site: &str, entry: &str) -> bool {
-    let site = site.trim_start_matches("www.");
-    let entry = entry.trim().to_ascii_lowercase();
-    let entry = entry.split(['?', '#']).next().unwrap_or_default();
-    let entry = entry.rsplit('@').next().unwrap_or_default();
-    let entry = match entry.rsplit_once(':') {
-        Some((host, port)) if !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()) => host,
-        _ => entry,
+    let Some(entry) = entry_host(entry) else {
+        return false;
     };
+    let site = site.trim_start_matches("www.");
     let entry = entry.trim_start_matches("www.");
-    !entry.is_empty() && (site == entry || site.ends_with(&format!(".{entry}")))
+    site == entry || (site.ends_with(&format!(".{entry}")) && !is_public_suffix(entry))
+}
+
+/// The host in a `url_host` column, or `None` when what was typed there does
+/// not read as one.
+fn entry_host(entry: &str) -> Option<String> {
+    let entry = entry.trim();
+    if entry.is_empty() || entry.contains("://") {
+        return None;
+    }
+    site_host(&format!("https://{entry}"))
+}
+
+/// Whether `host` is a public suffix — `com`, `co.uk` — under which anyone's
+/// site could live. What keeps a parent-domain match honest, here and for the
+/// rpId a passkey may claim.
+pub fn is_public_suffix(host: &str) -> bool {
+    public_suffix::DEFAULT_PROVIDER.is_effective_tld(host)
 }
