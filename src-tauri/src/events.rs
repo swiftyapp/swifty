@@ -126,13 +126,16 @@ pub fn file_opened(app: &AppHandle, path: &str) {
 #[cfg(desktop)]
 #[derive(Serialize, Clone)]
 struct Associate<'a> {
+    id: &'a str,
     key: &'a str,
 }
 
 /// A browser extension asks to be let in (`browser::consent`). `key` is its
 /// identification public key, for the dialog to show a fingerprint of; the
-/// answer comes back through `commands::browser::browser_respond`.
+/// answer comes back through `commands::browser::browser_respond`, naming
+/// `id` — this ask's alone, so a dialog left up past it cannot answer the
+/// next ask the same extension makes.
 #[cfg(desktop)]
-pub fn browser_associate(app: &AppHandle, key: &str) {
-    let _ = app.emit(BROWSER_ASSOCIATE, Associate { key });
+pub fn browser_associate(app: &AppHandle, id: &str, key: &str) {
+    let _ = app.emit(BROWSER_ASSOCIATE, Associate { id, key });
 }
