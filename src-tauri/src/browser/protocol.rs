@@ -13,10 +13,23 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use crypto_box::{aead::Aead, Nonce, PublicKey, SalsaBox, SecretKey};
 use serde_json::{json, Map, Value};
 
-/// The KeePassXC release this host answers as. The extension gates features
-/// on it — passkeys from 2.7.7, which this host speaks — and shows it in its
-/// status panel.
-pub const VERSION: &str = "2.7.10";
+/// The KeePassXC release this host answers as. There is no capability
+/// negotiation in the protocol: the extension turns features on by this
+/// string alone (`keepass.updateFeaturesList` in `background/keepass.js`), so
+/// it must claim no more than the actions this host answers. The gates, and
+/// what each needs from the host:
+///
+/// | claims   | the extension turns on             | needs                                   |
+/// |----------|------------------------------------|-----------------------------------------|
+/// | ≥ 2.6.0  | association at all                 | the core actions in `actions`           |
+/// | ≥ 2.6.1  | TOTP from the host (`get-totp`)    | `get-totp`                              |
+/// | ≥ 2.7.0  | `generate-password`, favicons      | `generate-password`; favicons are ours  |
+/// | ≥ 2.7.7  | passkeys                           | `passkeys-get`, `passkeys-register`     |
+/// | ≥ 2.7.10 | a default passkey *group* setting  | groups, which the vault does not have   |
+///
+/// The highest row this host has every action for, and no higher: raise it in
+/// the change that adds the next row's actions, and hold it there with a test.
+pub const VERSION: &str = "2.7.7";
 
 pub const NONCE_LEN: usize = 24;
 

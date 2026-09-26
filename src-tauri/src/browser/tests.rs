@@ -132,6 +132,17 @@ fn an_ask_that_was_answered_leaves_the_next_ask_its_slot() {
     assert!(pending.begin("d").is_some());
 }
 
+// --- what the host claims to be --------------------------------------------------
+
+// The extension turns features on by the version alone (see `VERSION`): this
+// host answers the passkey actions, so it claims the release that turns them
+// on — and not the one after, whose default passkey *group* the vault has no
+// groups to honour.
+#[test]
+fn the_version_claimed_turns_on_nothing_this_host_lacks() {
+    assert_eq!(VERSION, "2.7.7");
+}
+
 fn login(id: &str, title: &str, username: &str, password: &str, totp: Option<&str>) -> Login {
     Login {
         id: id.into(),
@@ -1049,6 +1060,15 @@ fn a_login_matches_its_host_and_subdomains_but_not_its_lookalikes() {
     assert!(!host_matches("notgithub.com", "github.com"));
     assert!(!host_matches("github.com", ""));
     assert!(!host_matches("github.com", "  "));
+    // A public suffix is not a parent: a login stored under one — a malformed
+    // website, an import — is served to no site beneath it.
+    assert!(!host_matches("github.com", "com"));
+    assert!(!host_matches("bank.co.uk", "co.uk"));
+    assert!(
+        host_matches("co.uk", "co.uk"),
+        "the suffix itself, as a site, still is"
+    );
+    assert!(host_matches("online.bank.co.uk", "bank.co.uk"));
 }
 
 #[test]
