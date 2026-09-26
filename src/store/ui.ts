@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { EntryType } from '@/api/types'
 import type { SshKeyPair } from '@/api/tools'
+import type { AssociateAsk, BrowserConsent, PasskeyAsk } from '@/api/browser'
 import { loadArchive, setNoEntry, useVault, selectCurrent } from './vault'
 
 /**
@@ -16,7 +17,14 @@ import { loadArchive, setNoEntry, useVault, selectCurrent } from './vault'
 export type View = 'items' | 'favorites' | 'health' | 'archive' | 'tags'
 
 // The Settings sections, in nav order.
-export type Section = 'sync' | 'security' | 'audit' | 'import' | 'language' | 'workspaces'
+export type Section =
+  | 'sync'
+  | 'security'
+  | 'audit'
+  | 'import'
+  | 'language'
+  | 'browser'
+  | 'workspaces'
 
 /** Why a scan produced no fields. The copy for each lives in `Scan/Status`. */
 export type ScanError = 'unreadable' | 'unsupported' | 'failed'
@@ -86,6 +94,22 @@ export interface UiState {
    * `NoticeToast` for a few seconds, then gone; `null` between notices.
    */
   notice: string | null
+  /**
+   * The one security decision the browser extension has put to the user —
+   * an extension asking to connect, or a page's passkey ceremony — while its
+   * dialog is up. One field for both kinds: Rust holds one ask at a time in
+   * one slot and gives up on it by itself after a minute, and a newer ask of
+   * either kind replaces whatever dialog was left up, so two decisions are
+   * never on screen together.
+   */
+  consentAsk: BrowserConsent | null
+  /**
+   * How many times the open vault's list of let-in extensions has changed
+   * behind the frontend's back — a consent dialog answered while Settings ›
+   * Browser extension is open. That section re-reads its status when this
+   * moves; nothing renders the number itself.
+   */
+  browserClientsSeq: number
 }
 
 const GENERATOR_CLOSED: Generator = { open: false, apply: null, ssh: null }
@@ -117,7 +141,9 @@ export const initialUi: UiState = {
   scanBusy: false,
   scanError: null,
   copied: false,
-  notice: null
+  notice: null,
+  consentAsk: null,
+  browserClientsSeq: 0
 }
 
 export const useUi = create<UiState>()(() => initialUi)
@@ -264,6 +290,16 @@ export const queueOrphan = (fileId: string) =>
   }))
 export const dropOrphan = (fileId: string) =>
   useUi.setState(state => ({ orphans: state.orphans.filter(id => id !== fileId) }))
+
+// --- browser extension -------------------------------------------------------------
+
+export const askBrowser = (ask: AssociateAsk) =>
+  useUi.setState({ consentAsk: { kind: 'associate', ask } })
+export const askPasskey = (ask: PasskeyAsk) =>
+  useUi.setState({ consentAsk: { kind: 'passkey', ask } })
+export const closeConsentAsk = () => useUi.setState({ consentAsk: null })
+export const browserClientsChanged = () =>
+  useUi.setState(state => ({ browserClientsSeq: state.browserClientsSeq + 1 }))
 
 // --- scanning ---------------------------------------------------------------------
 
