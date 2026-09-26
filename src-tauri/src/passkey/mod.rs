@@ -63,12 +63,14 @@ pub type Ctap2Authenticator<V> =
     passkey_authenticator::Authenticator<VaultCredentialStore<V>, UnlockedSession>;
 
 /// An account a sign-in could be as: one passkey the vault holds for the site,
-/// named the way the site named it at registration.
+/// named the way the site named it at registration, and when it was made —
+/// which is what tells two passkeys apart when a site named them the same.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Account {
     pub credential_id: String,
     pub user_name: String,
     pub user_display_name: String,
+    pub created_at: Option<String>,
 }
 
 impl From<&Stored> for Account {
@@ -77,6 +79,7 @@ impl From<&Stored> for Account {
             credential_id: stored.passkey.credential_id.clone(),
             user_name: stored.passkey.user_name.clone(),
             user_display_name: stored.passkey.user_display_name.clone(),
+            created_at: stored.passkey.created_at.clone(),
         }
     }
 }
@@ -113,19 +116,23 @@ pub trait UserConsent: Send + Sync {
 pub struct Authenticator<V: PasskeyVault> {
     inner: Ctap2Authenticator<V>,
     consent: Arc<dyn UserConsent>,
-    /// The credential the user picked for the sign-in under way; see
-    /// [`Self::get_assertion`].
-    chosen: Arc<Mutex<Option<Vec<u8>>>>,
+    /// The record the user picked for the sign-in under way — the store hands
+    /// the library that one and nothing else; see [`Self::get_assertion`].
+    chosen: Chosen,
 }
+
+/// Shared by the authenticator, its store and its verification method, so the
+/// pick made in `get_assertion` is what the other two go by.
+pub(crate) type Chosen = Arc<Mutex<Option<Stored>>>;
 
 impl<V: PasskeyVault> Authenticator<V> {
     pub fn new(vault: V, consent: impl UserConsent + 'static) -> Self {
         let consent: Arc<dyn UserConsent> = Arc::new(consent);
-        let chosen = Arc::new(Mutex::new(None));
+        let chosen: Chosen = Arc::default();
         Self {
             inner: passkey_authenticator::Authenticator::new(
                 AAGUID,
-                VaultCredentialStore::new(vault),
+                VaultCredentialStore::new(vault, chosen.clone()),
                 UnlockedSession {
                     consent: consent.clone(),
                     chosen: chosen.clone(),
@@ -157,7 +164,10 @@ impl<V: PasskeyVault> Authenticator<V> {
     /// about that one alone; a site that names no credential expects the
     /// authenticator to let the user pick the account. So the user is asked
     /// here, with every account the request admits at stake, and the request
-    /// is narrowed to their pick before the library sees it.
+    /// is narrowed to their pick before the library sees it — to the record
+    /// itself, through the store, not just its id: an import can leave two
+    /// records with one credential id, and a yes to one is not a yes to the
+    /// other.
     pub async fn get_assertion(
         &mut self,
         mut request: get_assertion::Request,
@@ -183,10 +193,10 @@ impl<V: PasskeyVault> Authenticator<V> {
             .map_err(|_| Ctap2Error::NoCredentials)?;
         request.allow_list = Some(vec![PublicKeyCredentialDescriptor {
             ty: PublicKeyCredentialType::PublicKey,
-            id: id.clone().into(),
+            id: id.into(),
             transports: None,
         }]);
-        *self.chosen.lock().unwrap() = Some(id);
+        *self.chosen.lock().unwrap() = Some(picked.clone());
         let signed = self.inner.get_assertion(request).await;
         *self.chosen.lock().unwrap() = None;
         signed
@@ -207,7 +217,7 @@ impl<V: PasskeyVault> Authenticator<V> {
 /// built), and the user approves each ceremony. See the module docs.
 pub struct UnlockedSession {
     consent: Arc<dyn UserConsent>,
-    chosen: Arc<Mutex<Option<Vec<u8>>>>,
+    chosen: Chosen,
 }
 
 #[async_trait::async_trait]
@@ -239,10 +249,12 @@ impl UserValidationMethod for UnlockedSession {
                 })
                 .is_some(),
             // Asked already, in `Authenticator::get_assertion`, with every
-            // account at stake — and the request narrowed to the one picked, so
-            // this is it. Anything else is a sign-in nobody was asked about.
+            // account at stake — and the store narrowed to the record picked,
+            // so this is it. Anything else is a sign-in nobody was asked about.
             UiHint::RequestExistingCredential(passkey) => {
-                self.chosen.lock().unwrap().as_deref() == Some(&passkey.credential_id[..])
+                self.chosen.lock().unwrap().as_ref().is_some_and(|chosen| {
+                    store::same_credential(&chosen.passkey.credential_id, &passkey.credential_id)
+                })
             }
         };
         if !approved {

@@ -10,6 +10,7 @@ import { closePasskeyAsk } from '@/store'
 import Frame from '@/components/elements/Frame'
 import Button from '@/components/elements/Button'
 import RadioList from '@/components/elements/RadioList'
+import { useDates } from '@/hooks/useDates'
 
 const TITLE_ID = 'browser-passkey-title'
 
@@ -26,6 +27,7 @@ const TITLE_ID = 'browser-passkey-title'
  */
 export default function PasskeyDialog({ ask }: { ask: PasskeyAsk }) {
   const { t } = useTranslation()
+  const { relativeLong } = useDates()
   // Which of a sign-in's accounts; the newest, first in the list, until the
   // user says otherwise. Mounted afresh for each ask (see `BrowserPasskey`).
   const [account, setAccount] = useState(0)
@@ -87,8 +89,13 @@ export default function PasskeyDialog({ ask }: { ask: PasskeyAsk }) {
             <RadioList
               options={accounts.map((a, i) => ({
                 value: String(i),
-                label: nameOf(a),
-                meta: a.userDisplayName !== nameOf(a) ? a.userDisplayName : undefined
+                label:
+                  a.userDisplayName && a.userDisplayName !== nameOf(a)
+                    ? `${nameOf(a)} (${a.userDisplayName})`
+                    : nameOf(a),
+                // When the passkey was added: a site can name two of them
+                // alike, and this is what tells them apart.
+                meta: a.createdAt ? relativeLong(a.createdAt) : undefined
               }))}
               value={String(account)}
               onChange={value => setAccount(Number(value))}

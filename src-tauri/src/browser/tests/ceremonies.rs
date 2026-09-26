@@ -238,8 +238,9 @@ fn a_passkey_registered_through_the_extension_signs_in_through_it() {
         assert_eq!(bytes(&response["userHandle"]), USER_ID);
     }
 
+    let made = passkey.created_at.clone();
     let sign_in = format!(
-        "SignIn {{ rp_id: \"example.com\", accounts: [Account {{ credential_id: {id:?}, user_name: \"alice\", user_display_name: \"Alice Example\" }}] }}"
+        "SignIn {{ rp_id: \"example.com\", accounts: [Account {{ credential_id: {id:?}, user_name: \"alice\", user_display_name: \"Alice Example\", created_at: {made:?} }}] }}"
     );
     assert_eq!(
         asks(&connection),

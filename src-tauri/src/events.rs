@@ -165,6 +165,9 @@ struct PasskeyAsk<'a> {
 struct PasskeyAccount<'a> {
     user_name: &'a str,
     user_display_name: &'a str,
+    /// RFC3339, when known: what tells two passkeys named alike apart.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    created_at: Option<&'a str>,
 }
 
 /// The page at `origin` asks, through the extension, to create a passkey
@@ -207,6 +210,7 @@ pub fn browser_passkey(
                 .map(|account| PasskeyAccount {
                     user_name: &account.user_name,
                     user_display_name: &account.user_display_name,
+                    created_at: account.created_at.as_deref(),
                 })
                 .collect(),
         },

@@ -52,10 +52,15 @@ export const browserRespond = (key: string, name: string | null): Promise<void> 
 export const browserForgetClient = (key: string): Promise<BrowserStatus> =>
   call('browser_forget_client', { key })
 
-/** An account a sign-in could be as: one passkey the vault holds for the site. */
+/**
+ * An account a sign-in could be as: one passkey the vault holds for the site,
+ * and when it was added (RFC3339, when known), which is what tells two
+ * passkeys a site named alike apart.
+ */
 export interface PasskeyAccount {
   userName: string
   userDisplayName: string
+  createdAt?: string
 }
 
 /**

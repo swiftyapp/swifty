@@ -492,12 +492,13 @@ async fn the_user_is_asked_about_the_site_and_account() {
         .expect("sign-in");
 
     let id = encoding::base64url(&created);
+    let made = vault.all()[0].passkey.created_at.clone();
     let asked = asked.lock().unwrap();
     assert_eq!(
         asked.as_slice(),
         [
             "Register { rp_id: \"example.com\", user_name: Some(\"alice\"), user_display_name: Some(\"Alice Example\") }".to_string(),
-            format!("SignIn {{ rp_id: \"example.com\", accounts: [Account {{ credential_id: {id:?}, user_name: \"alice\", user_display_name: \"Alice Example\" }}] }}"),
+            format!("SignIn {{ rp_id: \"example.com\", accounts: [Account {{ credential_id: {id:?}, user_name: \"alice\", user_display_name: \"Alice Example\", created_at: {made:?} }}] }}"),
         ]
     );
 }
@@ -549,6 +550,42 @@ async fn a_sign_in_is_as_the_account_the_user_picks() {
             .is_err(),
         "an account that was not offered cannot be picked"
     );
+}
+
+// An import can leave two records under one credential id. A yes to one of
+// them is not a yes to the other: the record picked is the one that signs,
+// not whichever the vault lists first under that id.
+#[tokio::test]
+async fn a_pick_is_the_record_itself_not_every_record_under_its_id() {
+    let vault = MemoryVault::new();
+    let shared = encoding::base64url(b"twice");
+    let alice = Passkey {
+        credential_id: shared.clone(),
+        user_handle: encoding::base64url(b"alice"),
+        user_name: "alice".into(),
+        ..imported_passkey(RP_ID)
+    };
+    let bob = Passkey {
+        credential_id: shared,
+        user_handle: encoding::base64url(b"bob"),
+        user_name: "bob".into(),
+        private_key: generated_key().1,
+        ..imported_passkey(RP_ID)
+    };
+    vault.seed("entry-1", alice);
+    vault.seed("entry-2", bob);
+
+    for (pick, handle) in [(0, b"alice" as &[u8]), (1, b"bob")] {
+        let signed = Authenticator::new(&vault, Pick(pick))
+            .get_assertion(assertion_request(&random_vec(32), None))
+            .await
+            .expect("sign-in");
+        assert_eq!(
+            signed.user.map(|user| user.id.to_vec()),
+            Some(handle.to_vec()),
+            "the record picked is the one that signs"
+        );
+    }
 }
 
 // --- SessionVault over a real store -----------------------------------------

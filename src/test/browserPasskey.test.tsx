@@ -87,6 +87,26 @@ describe('the passkey consent dialog', () => {
     expect(calls('browser_passkey_respond')).toEqual([{ id: 'ask-3', allow: true, account: 1 }])
   })
 
+  it('tells two passkeys named alike apart by when they were added', async () => {
+    const twin = { userName: 'octocat', userDisplayName: 'The Octocat' }
+    const now = Date.now()
+    await ask({
+      ...GET,
+      id: 'ask-4',
+      accounts: [
+        { ...twin, createdAt: new Date(now - 2 * 60_000).toISOString() },
+        { ...twin, createdAt: new Date(now - 3 * 24 * 60 * 60_000).toISOString() }
+      ]
+    })
+    const [first, second] = ['0', '1'].map(i =>
+      screen.getByTestId(`browser-passkey-account-${i}`)
+    )
+    expect(first).toHaveTextContent('octocat (The Octocat)')
+    expect(second).toHaveTextContent('octocat (The Octocat)')
+    expect(first).toHaveTextContent('2 minutes ago')
+    expect(second).toHaveTextContent('3 days ago')
+  })
+
   it('falls back to the display name, then to no account at all', async () => {
     await ask({ ...REGISTER, userName: '' })
     expect(screen.getByTestId('browser-passkey-title')).toHaveTextContent(
