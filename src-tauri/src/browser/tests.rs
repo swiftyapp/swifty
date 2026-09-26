@@ -834,6 +834,23 @@ fn a_save_over_an_email_login_writes_back_to_its_email() {
     assert_eq!(entry.username, None, "no second name beside the email");
     assert_eq!(entry.password.as_deref(), Some("new"));
 
+    // A name that is not an email cannot go in the email field: it becomes
+    // the username, and the email is left as it was.
+    save_login_in(
+        &store,
+        &cipher,
+        Some("gh"),
+        "https://github.com/login",
+        "github.com",
+        "octocat",
+        "new",
+        NOW,
+    )
+    .unwrap();
+    let entry = stored(&store, &cipher, "gh");
+    assert_eq!(entry.username.as_deref(), Some("octocat"));
+    assert_eq!(entry.email.as_deref(), Some("octo@example.com"));
+
     // With a username of its own, that is the field — the email stays what
     // it was, whatever the page called the user.
     seed(

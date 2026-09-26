@@ -106,11 +106,12 @@ pub fn socket_name(root: &Path) -> io::Result<Name<'static>> {
 // one is up is refused, not queued, so two connections cannot put two dialogs
 // on screen. The connection thread parks on the receiving end; the frontend's
 // answer arrives through `respond` / `respond_passkey`, from the command its
-// dialog invokes. An ask is held under a tag — the extension's key, or a
-// ceremony's id — and an answer names the tag it is for and the kind it
-// answers: a dialog left up past the ask it was drawn for (Rust gives up
-// after a minute, the webview does the same on its own clock) cannot answer
-// the next ask with a yes the user gave while looking at another.
+// dialog invokes. An ask is held under a tag — an id of its own, whichever
+// kind — and an answer names the tag it is for and the kind it answers: a
+// dialog left up past the ask it was drawn for (Rust gives up after a
+// minute, the webview does the same on its own clock) cannot answer the next
+// ask with a yes the user gave while looking at another, not even the same
+// extension's retry.
 
 /// An ask waiting on the user: its tag, its number — by which the asker tells
 /// its own slot from a later ask's — and the way back to it.
@@ -202,9 +203,13 @@ static CONSENT: Pending<Answer> = Pending::new();
 
 /// Ask the user whether the extension holding `key` may connect: the name
 /// they gave it, or `None`. Blocks the calling thread (see [`Pending::ask`]).
+/// The ask is tagged with an id of its own rather than with the key: the
+/// same extension asks again after a timeout, under the same key, and a
+/// dialog left up from the first ask must not be the yes to the second.
 pub fn ask(app: &AppHandle, key: &str) -> Option<String> {
-    let answer = CONSENT.ask(key, || {
-        events::browser_associate(app, key);
+    let id = crate::crypto::random_hex_id();
+    let answer = CONSENT.ask(&id, || {
+        events::browser_associate(app, &id, key);
         window::raise(app);
     });
     match answer {
@@ -213,10 +218,10 @@ pub fn ask(app: &AppHandle, key: &str) -> Option<String> {
     }
 }
 
-/// The user's answer to the ask up for `key`: the name they gave the
+/// The user's answer to the ask up under `id`: the name they gave the
 /// extension, or `None` for a refusal. Returns whether that ask was waiting.
-pub fn respond(key: &str, name: Option<String>) -> bool {
-    CONSENT.answer(key, Answer::Name(name))
+pub fn respond(id: &str, name: Option<String>) -> bool {
+    CONSENT.answer(id, Answer::Name(name))
 }
 
 /// Ask the user whether the page at `origin` may have `ceremony`: the account
@@ -596,9 +601,11 @@ pub(crate) fn save_login_in(
             // Written back to the field it was served from: `logins_for` fills
             // the extension's username from `username`, or from `email` when
             // that is blank, so a login kept by its email must not grow a
-            // second name beside it.
+            // second name beside it — unless what the page sent is not an
+            // email at all, which the email field would only reject; that
+            // goes to `username`, and the email stays what it was.
             let blank = |field: &Option<String>| field.as_deref().unwrap_or_default().is_empty();
-            if blank(&entry.username) && !blank(&entry.email) {
+            if blank(&entry.username) && !blank(&entry.email) && username.contains('@') {
                 entry.email = Some(username.to_string());
             } else {
                 entry.username = Some(username.to_string());
