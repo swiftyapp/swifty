@@ -121,9 +121,24 @@ pub struct Authenticator<V: PasskeyVault> {
     chosen: Chosen,
 }
 
-/// Shared by the authenticator, its store and its verification method, so the
-/// pick made in `get_assertion` is what the other two go by.
-pub(crate) type Chosen = Arc<Mutex<Option<Stored>>>;
+/// The record the user picked, by identity — the entry it is on and its
+/// credential id — rather than by value: the vault may move on under a sign-in
+/// (a sync lands while the user decides) without the pick meaning another
+/// record. Shared by the authenticator, its store and its verification
+/// method, so the pick made in `get_assertion` is what the other two go by.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Picked {
+    pub entry_id: String,
+    pub credential_id: String,
+}
+
+impl Picked {
+    pub fn is(&self, stored: &Stored) -> bool {
+        self.entry_id == stored.entry_id && self.credential_id == stored.passkey.credential_id
+    }
+}
+
+pub(crate) type Chosen = Arc<Mutex<Option<Picked>>>;
 
 impl<V: PasskeyVault> Authenticator<V> {
     pub fn new(vault: V, consent: impl UserConsent + 'static) -> Self {
@@ -196,7 +211,10 @@ impl<V: PasskeyVault> Authenticator<V> {
             id: id.into(),
             transports: None,
         }]);
-        *self.chosen.lock().unwrap() = Some(picked.clone());
+        *self.chosen.lock().unwrap() = Some(Picked {
+            entry_id: picked.entry_id.clone(),
+            credential_id: picked.passkey.credential_id.clone(),
+        });
         let signed = self.inner.get_assertion(request).await;
         *self.chosen.lock().unwrap() = None;
         signed
@@ -253,7 +271,7 @@ impl UserValidationMethod for UnlockedSession {
             // so this is it. Anything else is a sign-in nobody was asked about.
             UiHint::RequestExistingCredential(passkey) => {
                 self.chosen.lock().unwrap().as_ref().is_some_and(|chosen| {
-                    store::same_credential(&chosen.passkey.credential_id, &passkey.credential_id)
+                    store::same_credential(&chosen.credential_id, &passkey.credential_id)
                 })
             }
         };

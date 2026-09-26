@@ -588,6 +588,93 @@ async fn a_pick_is_the_record_itself_not_every_record_under_its_id() {
     }
 }
 
+// And the counter that moves after that sign-in is the picked record's, not
+// the first the vault lists under the id.
+#[tokio::test]
+async fn a_counter_update_lands_on_the_record_picked() {
+    let vault = MemoryVault::new();
+    let shared = encoding::base64url(b"twice");
+    vault.seed(
+        "entry-1",
+        Passkey {
+            credential_id: shared.clone(),
+            counter: 5,
+            ..imported_passkey(RP_ID)
+        },
+    );
+    vault.seed(
+        "entry-2",
+        Passkey {
+            credential_id: shared,
+            user_handle: encoding::base64url(b"bob"),
+            user_name: "bob".into(),
+            private_key: generated_key().1,
+            counter: 9,
+            ..imported_passkey(RP_ID)
+        },
+    );
+
+    Authenticator::new(&vault, Pick(1))
+        .get_assertion(assertion_request(&random_vec(32), None))
+        .await
+        .expect("sign-in");
+
+    let all = vault.all();
+    let counter = |id: &str| {
+        all.iter()
+            .find(|s| s.entry_id == id)
+            .unwrap()
+            .passkey
+            .counter
+    };
+    assert_eq!(counter("entry-2"), 10, "the picked record counted");
+    assert_eq!(
+        counter("entry-1"),
+        5,
+        "the other record under that id did not"
+    );
+}
+
+// Approves, and moves the vault on under the ask — as a sync landing while
+// the user decides would.
+struct Bump(std::sync::Arc<MemoryVault>);
+
+impl UserConsent for Bump {
+    fn approve(&self, _: Ceremony<'_>) -> Option<usize> {
+        let stored = self.0.all().into_iter().next().unwrap();
+        let bumped = Passkey {
+            counter: stored.passkey.counter + 1,
+            ..stored.passkey
+        };
+        self.0.update(&stored.entry_id, &bumped).unwrap();
+        Some(0)
+    }
+}
+
+// The pick is the record — the entry it is on and its id — not what the
+// record held when the user was asked.
+#[tokio::test]
+async fn a_record_that_changed_while_the_user_decided_still_signs() {
+    let vault = std::sync::Arc::new(MemoryVault::new());
+    vault.seed(
+        "entry-1",
+        Passkey {
+            counter: 3,
+            ..imported_passkey(RP_ID)
+        },
+    );
+
+    Authenticator::new(&*vault, Bump(vault.clone()))
+        .get_assertion(assertion_request(&random_vec(32), None))
+        .await
+        .expect("the approved sign-in must not come back as no credentials");
+    assert_eq!(
+        vault.all()[0].passkey.counter,
+        5,
+        "bumped under the ask, then by the sign-in"
+    );
+}
+
 // --- SessionVault over a real store -----------------------------------------
 
 fn tmp_db() -> PathBuf {

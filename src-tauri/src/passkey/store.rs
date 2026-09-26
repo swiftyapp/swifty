@@ -265,7 +265,7 @@ impl<V: PasskeyVault> passkey_authenticator::CredentialStore for VaultCredential
             .iter()
             // The record the user picked, when there is one: not another that
             // happens to carry the same credential id.
-            .filter(|s| chosen.as_ref().is_none_or(|chosen| chosen == *s))
+            .filter(|s| chosen.as_ref().is_none_or(|chosen| chosen.is(s)))
             .filter_map(|s| key::to_passkey_types(&s.passkey).ok())
             .collect();
 
@@ -293,11 +293,16 @@ impl<V: PasskeyVault> passkey_authenticator::CredentialStore for VaultCredential
         &mut self,
         cred: &passkey_types::Passkey,
     ) -> std::result::Result<(), StatusCode> {
+        // The record that signed — the one picked, when a pick is up, since
+        // an import can leave two records under one id — and not merely the
+        // first the vault lists under the id.
+        let chosen = self.chosen.lock().unwrap().clone();
         let stored = self
             .vault
             .find(&cred.rp_id)
             .map_err(vault_err)?
             .into_iter()
+            .filter(|s| chosen.as_ref().is_none_or(|chosen| chosen.is(s)))
             .find(|s| same_credential(&s.passkey.credential_id, &cred.credential_id))
             .ok_or_else(|| StatusCode::from(Ctap2Error::InvalidCredential))?;
 
