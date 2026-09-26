@@ -1,6 +1,8 @@
 #!/bin/sh
 # Regenerates the Swift bindings the iOS AutoFill extension compiles against,
-# into src-tauri/gen/apple/Sources/autofill/generated/, which is committed.
+# into src-tauri/gen/apple/Sources/autofill/generated/, which is committed:
+# the Swift, the C header it calls the library through, and the module map
+# the extension imports that header by (OTHER_SWIFT_FLAGS in project.yml).
 #
 # Re-run it, and commit what it writes, whenever this crate's exported API
 # changes — anything `#[uniffi::export]`ed or derived as a `uniffi::Record`,
@@ -22,8 +24,3 @@ cargo build -p rowel-autofill
 cargo run -q -p rowel-autofill --features bindgen --bin uniffi-bindgen -- \
   generate --library "$target_dir/debug/librowel_autofill.a" \
   --language swift --out-dir "$out"
-
-# The extension reads the C declarations through its bridging header
-# (SWIFT_OBJC_BRIDGING_HEADER in project.yml), so it has no use for a module
-# map — and a stray one would be copied into the bundle as a resource.
-rm -f "$out"/*.modulemap
