@@ -25,7 +25,8 @@ mod tests;
 
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -89,45 +90,107 @@ pub fn socket_name(root: &Path) -> io::Result<Name<'static>> {
 
 // --- consent -------------------------------------------------------------------
 //
-// One `associate` at a time waits on the user. The connection thread parks on
-// the receiving end; the frontend's answer arrives through `respond`, from the
-// command the dialog invokes. The ask is held by the extension's key, and an
-// answer names the key it is for: a dialog left up past the ask it was drawn
-// for — Rust gives up after a minute, the webview does the same on its own
-// clock — cannot answer the next extension's ask with a yes the user gave
-// while looking at another fingerprint.
+// One `associate` at a time waits on the user, in a slot. The connection
+// thread parks on the receiving end; the frontend's answer arrives through
+// `respond`, from the command its dialog invokes. An ask is held under a tag
+// — the extension's key — and an answer names the tag it is for: a dialog
+// left up past the ask it was drawn for (Rust gives up after a minute, the
+// webview does the same on its own clock) cannot answer the next ask with a
+// yes the user gave while looking at another.
 
-static PENDING: Mutex<Option<(String, SyncSender<Option<String>>)>> = Mutex::new(None);
-
-/// Ask the user whether the extension holding `key` may connect. Blocks the
-/// calling thread for the answer, up to [`CONSENT_TIMEOUT`]; a second ask
-/// while one is up is refused rather than queued.
-pub fn ask(app: &AppHandle, key: &str) -> Option<String> {
-    let (sender, receiver) = sync_channel(1);
-    {
-        let mut pending = PENDING.lock().unwrap_or_else(|e| e.into_inner());
-        if pending.is_some() {
-            return None;
-        }
-        *pending = Some((key.to_string(), sender));
-    }
-    events::browser_associate(app, key);
-    window::raise(app);
-    let answer = receiver.recv_timeout(CONSENT_TIMEOUT).ok().flatten();
-    PENDING.lock().unwrap_or_else(|e| e.into_inner()).take();
-    answer
+/// An ask waiting on the user: its tag, its number — by which the asker tells
+/// its own slot from a later ask's — and the way back to it.
+struct Ask<T> {
+    serial: u64,
+    tag: String,
+    sender: SyncSender<T>,
 }
 
-/// The user's answer to the ask that is up for `key`: the name they gave the
-/// extension, or `None` for a refusal. Returns whether that ask was waiting
-/// for it; an answer for another key, or for no ask at all, does nothing.
-pub fn respond(key: &str, name: Option<String>) -> bool {
-    let mut pending = PENDING.lock().unwrap_or_else(|e| e.into_inner());
-    if pending.as_ref().is_none_or(|(asked, _)| asked != key) {
-        return false;
+struct Pending<T> {
+    slot: Mutex<Option<Ask<T>>>,
+    serial: AtomicU64,
+}
+
+impl<T> Pending<T> {
+    const fn new() -> Self {
+        Self {
+            slot: Mutex::new(None),
+            serial: AtomicU64::new(0),
+        }
     }
-    let (_, sender) = pending.take().expect("checked above");
-    sender.send(name).is_ok()
+
+    fn slot(&self) -> std::sync::MutexGuard<'_, Option<Ask<T>>> {
+        self.slot.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Put the question (`emit`) to the user under `tag` and block for the
+    /// answer, up to [`CONSENT_TIMEOUT`]. A second question while one is up is
+    /// refused rather than queued: `None`, as no answer is.
+    fn ask(&self, tag: &str, emit: impl FnOnce()) -> Option<T> {
+        let (serial, receiver) = self.begin(tag)?;
+        emit();
+        let answer = receiver.recv_timeout(CONSENT_TIMEOUT).ok();
+        self.end(serial);
+        answer
+    }
+
+    /// Take the slot for an ask under `tag`: its number, and the end its answer
+    /// arrives on. `None` while another ask is up.
+    fn begin(&self, tag: &str) -> Option<(u64, Receiver<T>)> {
+        let mut slot = self.slot();
+        if slot.is_some() {
+            return None;
+        }
+        let (sender, receiver) = sync_channel(1);
+        let serial = self.serial.fetch_add(1, Ordering::Relaxed);
+        *slot = Some(Ask {
+            serial,
+            tag: tag.to_string(),
+            sender,
+        });
+        Some((serial, receiver))
+    }
+
+    /// Give the slot back after ask `serial` — if it is still that ask's. An
+    /// answer empties the slot itself, and the next ask may have taken it in
+    /// the meantime; that one is waiting on its own answer and is not ours to
+    /// clear.
+    fn end(&self, serial: u64) {
+        let mut slot = self.slot();
+        if slot.as_ref().is_some_and(|ask| ask.serial == serial) {
+            slot.take();
+        }
+    }
+
+    /// The answer to the question up under `tag`. Returns whether that one was
+    /// waiting for it; an answer for another tag, or for no ask, does nothing.
+    fn answer(&self, tag: &str, value: T) -> bool {
+        let mut slot = self.slot();
+        if slot.as_ref().is_none_or(|ask| ask.tag != tag) {
+            return false;
+        }
+        let ask = slot.take().expect("checked above");
+        ask.sender.send(value).is_ok()
+    }
+}
+
+static ASSOCIATE: Pending<Option<String>> = Pending::new();
+
+/// Ask the user whether the extension holding `key` may connect: the name
+/// they gave it, or `None`. Blocks the calling thread (see [`Pending::ask`]).
+pub fn ask(app: &AppHandle, key: &str) -> Option<String> {
+    ASSOCIATE
+        .ask(key, || {
+            events::browser_associate(app, key);
+            window::raise(app);
+        })
+        .flatten()
+}
+
+/// The user's answer to the ask up for `key`: the name they gave the
+/// extension, or `None` for a refusal. Returns whether that ask was waiting.
+pub fn respond(key: &str, name: Option<String>) -> bool {
+    ASSOCIATE.answer(key, name)
 }
 
 // --- the extensions let in ------------------------------------------------------
