@@ -42,12 +42,19 @@ export const browserSetEnabled = (enabled: boolean): Promise<BrowserStatus> =>
  */
 export const ASSOCIATE_TIMEOUT_MS = 60_000
 
+/** An extension asking to connect: this ask's own `id`, and its identification public key. */
+export interface AssociateAsk {
+  id: string
+  key: string
+}
+
 /**
- * Answer the `browser:associate` ask for `key`: the name to remember it by, or
- * null to refuse. Rust honours it only for the ask that is up for that key.
+ * Answer the `browser:associate` ask `id`: the name to remember the extension
+ * by, or null to refuse. Rust honours it only for the ask up under that id —
+ * not for the same extension's next ask, which has an id of its own.
  */
-export const browserRespond = (key: string, name: string | null): Promise<void> =>
-  call('browser_respond', { key, name })
+export const browserRespond = (id: string, name: string | null): Promise<void> =>
+  call('browser_respond', { id, name })
 
 export const browserForgetClient = (key: string): Promise<BrowserStatus> =>
   call('browser_forget_client', { key })

@@ -9,5 +9,5 @@ import AssociateDialog from './AssociateDialog'
 export default function BrowserAssociate() {
   const ask = useUi(state => state.browserAsk)
 
-  return ask ? <AssociateDialog key={ask} publicKey={ask} /> : null
+  return ask ? <AssociateDialog key={ask.id} ask={ask} /> : null
 }

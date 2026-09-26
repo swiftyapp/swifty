@@ -68,7 +68,7 @@ export const subscribeToEvents = (): (() => void) => {
     // app is collected separately, once this is listening (see `App.tsx`).
     on(EVENTS.fileOpened, payload => fileOpened(payload.path)),
     // An extension asking to be let in; the dialog in `Main` answers it.
-    on(EVENTS.browserAssociate, payload => askBrowser(payload.key)),
+    on(EVENTS.browserAssociate, askBrowser),
     // One let in: Settings › Browser extension re-reads its list.
     on(EVENTS.browserClients, () => browserClientsChanged())
   ]

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { EntryType } from '@/api/types'
 import type { SshKeyPair } from '@/api/tools'
+import type { AssociateAsk } from '@/api/browser'
 import { loadArchive, setNoEntry, useVault, selectCurrent } from './vault'
 
 /**
@@ -94,11 +95,11 @@ export interface UiState {
    */
   notice: string | null
   /**
-   * The identification key of a browser extension asking to connect, while
-   * its consent dialog is up. A second ask replaces the first: Rust holds one
-   * at a time and gives up on it by itself after a minute.
+   * A browser extension asking to connect, while its consent dialog is up. A
+   * second ask replaces the first: Rust holds one at a time and gives up on
+   * it by itself after a minute.
    */
-  browserAsk: string | null
+  browserAsk: AssociateAsk | null
   /**
    * How many times the open vault's list of let-in extensions has changed
    * behind the frontend's back — a consent dialog answered while Settings ›
@@ -289,7 +290,7 @@ export const dropOrphan = (fileId: string) =>
 
 // --- browser extension -------------------------------------------------------------
 
-export const askBrowser = (key: string) => useUi.setState({ browserAsk: key })
+export const askBrowser = (ask: AssociateAsk) => useUi.setState({ browserAsk: ask })
 export const closeBrowserAsk = () => useUi.setState({ browserAsk: null })
 export const browserClientsChanged = () =>
   useUi.setState(state => ({ browserClientsSeq: state.browserClientsSeq + 1 }))
